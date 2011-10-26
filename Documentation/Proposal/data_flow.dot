@@ -1,0 +1,121 @@
+digraph navigation {
+    NP  [label="Navigation Stereo Pair"];
+    RT  [label="Calibration and\nRectification"];
+    DC  [label="Dense Stereo\nCorrespondence"];
+    FD  [label="Feature Detection"];
+    IN  [label="Inertial Measurements"];
+    WO  [label="Odometery"];
+    VO  [label="Visual Odometery and\nPose Estimation"];
+    FM  [label="Feature Group Mapping"];
+    OD  [label="Obstacle Detection"];
+    OOG [label="Obstacle\nOccupancy Grid"];
+
+    NP->RT;
+    RT->DC;
+    RT->FD;
+    DC->VO;
+    FD->VO;
+    IN->VO;
+    WO->VO;
+    FD->FM;
+    VO->FM;
+    FM->VO;
+    VO->OOG;
+    DC->OD;
+    OD->OOG;
+}
+
+digraph search {
+    VO  [label="Visual Odometery and\nPose Estimation", style="dotted"];
+    DC  [label="Dense Stereo\nCorrespondence", style="dotted"];
+    SC  [label="Search Camera"];
+    SP  [label="Pose and Calibration"];
+    GP  [label="Ground Plane\nEstimation"];
+    R0  [label="Starting Platform\nRecognizer"];
+    R1  [label="Cached Sample\nRecognizer"];
+    R2  [label="Tennis Ball\nRecognizer"];
+    R3  [label="Yellow Rock\nRecognizer"];
+    R4  [label="Hockey Puck\nRecognizer"];
+    R5  [label="Small Colored Sphere\nRecognizer"];
+    R6  [label="Rectilinear Mark\nRecognizer"];
+    GOG [label="Goal\nOccupancy Grid"];
+
+    SC->SP;
+    VO->SP;
+    VO->GP;
+    DC->GP;
+    GP->R0;
+    GP->R1;
+    GP->R2;
+    GP->R3;
+    GP->R4;
+    GP->R5;
+    GP->R6;
+    SP->R0->GOG;
+    SP->R1->GOG;
+    SP->R2->GOG;
+    SP->R3->GOG;
+    SP->R4->GOG;
+    SP->R5->GOG;
+    SP->R6->GOG;
+
+    R0->R4 [style=invisible];
+    { rank="same" R0 R1 R2 R3}
+    { rank="same" R4 R5 R6}
+}
+
+digraph navigation_planning {
+    GOG [label="Goal\nOccupancy Grid", style="dotted"];
+    OOG [label="Obstacle\nOccupancy Grid", style="dotted"];
+    VO  [label="Visual Odometery and\nPose Estimation", style="dotted"];
+    GS  [label="Goal Selector"];
+    RP  [label="Route Planner"];
+
+    GOG->GS;
+    VO->GS;
+    GS->RP;
+    OOG->RP;
+}
+
+digraph manipulation {
+    VO  [label="Visual Odometery and\nPose Estimation", style="dotted"];
+    MSP [label="Manipulator Stereo Pair"];
+    RT  [label="Calibration and\nRectification"];
+    TT  [label="Target Tracking"];
+    GS  [label="Goal Selector", style="dotted"];
+    MP  [label="Manipulation Planner"];
+
+    VO->RT;
+    MSP->RT;
+    RT->TT;
+    GS->TT [label="Goal Position"];
+    TT->MP;
+}
+
+digraph execution {
+    ME  [label="Mission Executive"];
+    SH  [label="System Health\nMonitor"];
+    GS  [label="Goal Selector", style="dotted"];
+    RP  [label="Route Planner", style="dotted"];
+    MP  [label="Manipulation Planner", style="dotted"];
+    RX  [label="Route Executor"];
+    SC  [label="Servo Interface"];
+    MX  [label="Manipulation Executor"];
+    UI  [label="User Input\n(Pause Request)"];
+
+    UI->ME;
+    SH->ME;
+    GS->ME [label="Selected Goal"];
+    ME->GS [label="Goal Prioritization"];
+    ME->RP [label="Plan Request"];
+    ME->MP [label="Plan Request"];
+    RP->RX;
+    MP->MX;
+    ME->RX [label="Execution Request"];
+    ME->SC [label="Input Select"];
+    ME->MX [label="Execution Request"];
+    RX->SC;
+    MX->SC;
+
+    { rank="same" GS ME }
+}
