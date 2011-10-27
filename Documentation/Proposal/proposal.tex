@@ -87,9 +87,7 @@ Laptop Computers.\\
 
 Assuming a mission duration of 2 hours, Table~\ref{power budget} summarizes the systems estimated power needs.
 
-\begin{table}
-    \caption{2 hour Power Budget}
-    \label{power budget}
+\begin{table}[htbp]
     \begin{tabular}{|l|c|c||p{4cm}|}
         \hline
         System & Demand (Watts) & Duty Cycle & Energy Requirement (Watt Hours)\\
@@ -103,6 +101,8 @@ Assuming a mission duration of 2 hours, Table~\ref{power budget} summarizes the 
         \multicolumn{3}{|r||}{Total Energy} & 754\\
         \hline
     \end{tabular}
+    \caption{2 hour Power Budget}
+    \label{power budget}
 \end{table}
 
 \section{Perception}\label{Perception}
@@ -115,7 +115,7 @@ We are also exploring the possiblity of a odometery caster to provide estimates 
 \section{Software}\label{Software}
 
 \subsection{Navigation}\label{Navigation}
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=4in]{data_flow.dot.pdf}
 \caption{Navigation data flow}
@@ -126,7 +126,7 @@ Figure~\ref{fig_df_nav} gives an overview of the navigation system dataflow. The
 In addition, a local 2.5D occupancy grid is made based on obstacle detections for maneuver planning. This occupancy grid incorporates a local piece of the global data provided by satellite imagery as a prior on obstacle occupancy of a cell.
 
 \subsection{Search}\label{Search}
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=6in]{data_flow.dot.2.pdf}
 \caption{Goal Search data flow}
@@ -139,7 +139,7 @@ All recognizers intersect the detection vector with an estimate of the ground pl
 The Goal Recognizers are allowed to be noisy and produce false positives since all their measurements are accumulated in an occupancy grid. This grid encodes exclusions around detected goal and resolves conflicts between detectors. It also includes any pre-loaded information about goal position. This map is mantained globally and effectively makes a record of already-searched areas.
 
 \subsection{Route Planning}
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=4in]{data_flow.dot.3.pdf}
 \caption{Route Planning data flow}
@@ -150,7 +150,7 @@ Figure~\ref{fig_df_rp} Shows the layout of the Route Planning system. The Goal S
 How does the Goal Selector decide where to go next? Does it consider the value of the object? Certainly includes likelihood of detection and distance from robot.
 
 \subsection{Manipulation}\label{Manipulation}
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=4.5in]{data_flow.dot.4.pdf}
 \caption{Manipulation data flow}
@@ -158,8 +158,10 @@ How does the Goal Selector decide where to go next? Does it consider the value o
 \end{figure}
 See Figure~\ref{fig_df_man}.
 
+
+
 \subsection{Mission Execution}\label{MissionExecution}
-\begin{figure}
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=6.5in]{data_flow.dot.5.pdf}
 \caption{Mission Execution data flow}
