@@ -1,0 +1,78 @@
+Subsystem breakout:
+
+Frame
+
+Wheel x3 
+    steering $400
+        servo
+        controller
+        gearbox
+        feedback
+    drive $400
+        servo
+        controller
+        gearbox
+        feedback
+    Frame
+    wheel $50
+    shock $100
+
+Sensing
+    Navigation Pair
+        4.5mm Lenses $50
+        Pt Grey FireFly MV $275
+    Search Camera
+        Canon Rebel $500
+    Manipulation Pair
+        10mm $50
+        Pt Grey FireFly MV $275
+    Inclinometer $50
+    Sparkfun IMU $50
+
+Compute
+    2X W520
+
+Sample Collector
+    20 deployments
+    Linear Actuator $400
+        pneumatic cylinder
+        #position feedback - stringpot
+        limit switches
+        pressure feedback
+        solenoid control
+    4 Jaw chuck $800
+        2 cylinders
+        2 solenoids 
+        2 limit switches
+        2 pressure feedback
+        2 position feedback
+
+    $400 misc
+    Pressure storage 
+    Compressor
+
+Sample storage $400
+    Carousel
+
+    geneva, limit switch?
+
+    servo, home switch
+
+Power
+    Lithium Pack X2 $1500
+
+    laptop converters
+
+    12V converter $500
+
+    Lithium and no converters?
+
+    Charge system - external to machine
+
+Misc
+    2x arduino $100
+    Wiring $500
+    Bearings
+    Aluminium
+    Fasteners
+
