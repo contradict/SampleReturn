@@ -90,4 +90,6 @@ def print_details(
     ax.set_ylabel('Ground Distance\nfrom Camera')
 
     print "At %3.1fm, 1 horizontal pixel is %7.4fm on the ground"%(D, (1.0*pw)*D/f)
- 
+
+# Current best guess
+print_details(f=0.006, h=.145, rotate=True)
