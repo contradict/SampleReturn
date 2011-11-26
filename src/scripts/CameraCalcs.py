@@ -28,6 +28,7 @@ def print_details(
                   pw=6e-6,
                   D=20.0,
                   N=2.0,
+                  rotate=False
                   ):
     
     """ Print calcualtions for camera position
@@ -39,7 +40,12 @@ def print_details(
     pw      Pixel size in meters. not checked against above
     D       Longest interesting diatance
     N       distance to near edge
+    rotate  If true, camera is rotated to have wide axis vertical
     """
+
+    if rotate:
+        Nx, Ny = Ny, Nx
+        Sw, Sh = Sh, Sw
 
     print "Lens focal length %4.1fmm"%(f*1000.)
     Hfov = 2*arctan(Sw/f/2)
