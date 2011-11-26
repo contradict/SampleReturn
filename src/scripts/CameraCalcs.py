@@ -1,3 +1,5 @@
+import scipy
+import scipy.optimize
 
 def Dsquare(yi, h, f, psi):
     A = (1 + (yi/f)**2)
