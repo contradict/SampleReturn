@@ -54,10 +54,13 @@ def print_details(
     print "%3.2fm camera elevation with %5.2f degree down-pitch"%(h, degrees(psi))
     print "Near edge at %3.2fm"%(h/tan(psi+Vfov/2))
     top = (psi-Vfov/2)
+    far_edge = (h/tan(psi-Vfov/2))
     if top<=0:
         print "Top edge is horizontal or higher: %4.1f degrees"%degrees(top)
     else:
-        print "Top edge at %3.2fm"%(h/tan(psi-Vfov/2))
+        print "Top edge at %3.2fm"%far_edge
+        if far_edge<D:
+            D = far_edge
     Y_D = round(scipy.optimize.fsolve(lambda x:Dsquare(x*pw, h, f, psi) - D**2,
                                       0, # initial guess
                                       fprime=lambda x:dDdyi(x*pw, h, f, psi))[0])
@@ -65,12 +68,9 @@ def print_details(
         dir = 'below'
     else:
         dir = 'above'
-    if abs(Y_D)>Ny/2:
-        print "ERROR: %3.1fm is beyond top edge of sensor (Y_D=%d)"%(D, Y_D)
-    else:
-        print "%3.1fm at %d pixels %s center"%(D, abs(Y_D), dir)
-        print "At %3.1fm, 1 vertical pixel is %7.4fm on the ground"%(D,
-            (-1.0*pw)*dDdyi(Y_D*pw, h, f, psi))
+    print "%3.1fm at %d pixels %s center"%(D, abs(Y_D), dir)
+    print "At %3.1fm, 1 vertical pixel is %7.4fm on the ground"%(D,
+        (-1.0*pw)*dDdyi(Y_D*pw, h, f, psi))
     top_row = max(Y_D, -Ny/2)
     yi_r = linspace(top_row, Ny/2, Ny/2-top_row + 1)
     fig = pylab.figure(1)
