@@ -1,0 +1,3 @@
+[submodule "src/ros/externals/camera_umd"]
+	path = src/ros/externals/camera_umd
+	url = git://ram.umd.edu/ros/camera_umd.git
