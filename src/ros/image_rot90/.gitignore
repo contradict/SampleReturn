@@ -1,0 +1,7 @@
+build
+bin
+lib
+cfg/*.cfgc
+cfg/cpp
+docs
+src/image_rot90
