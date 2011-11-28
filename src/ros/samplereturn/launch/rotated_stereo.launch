@@ -1,0 +1,98 @@
+<launch>
+    <node
+        pkg="nodelet" 
+        type="nodelet"
+        name="camera_process"
+        args="manager"
+        output="screen"
+        />
+
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="uvc_camera_stereo"
+        args="load uvc_camera/StereoNodelet /camera_process"
+        output="screen"
+        ns="stereo">
+
+        <param name="width" type="int" value="320" />
+        <param name="height" type="int" value="240" />
+        <param name="fps" type="int" value="15" />
+        <param name="frame" type="string" value="wide_stereo" />
+        <param name="left/device" type="string" value="/dev/video0" />
+        <param name="right/device" type="string" value="/dev/video1" />
+        <param name="left/camera_info_url"
+            type="string"
+            value="file://$(find samplereturn)/calibration/cheap-left.yaml" />
+        <param name="right/camera_info_url"
+            type="string"
+            value="file://$(find samplereturn)/calibration/cheap-right.yaml" />
+    </node>
+
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="image_rot90"
+        args="load image_rot90/ImageRot90 /camera_process"
+        ns="/stereo/left">
+
+        <remap from="rot90/image_raw_in" to="image_raw"/>
+
+    </node>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="image_rot90"
+        args="load image_rot90/ImageRot90 /camera_process"
+        ns="/stereo/right">
+
+        <remap from="rot90/image_raw_in" to="image_raw"/>
+    </node>
+
+    <node
+        pkg="image_view"
+        type="stereo_view"
+        name="stereo_display"
+        >
+
+        <remap from="stereo" to="/stereo"/>
+        <remap from="image" to="image_raw"/>
+    </node>
+
+    <!--
+    <node
+        pkg="camera_calibration"
+        type="cameracalibrator.py"
+        name="calibrator"
+        args="--size 8x6 --square 0.108"
+        >
+        <remap from="right" to="/stereo/right/rot90/image_raw_rot"/>
+        <remap from="left" to="/stereo/left/rot90/image_raw_rot"/>
+        <remap from="right_camera" to="/stereo/right"/>
+        <remap from="left_camera" to="/stereo/left"/>
+    </node>
+    -->
+
+    <node
+        pkg="image_view"
+        type="image_view"
+        name="left_rot_display"
+        ns="/stereo/left/rot90">
+
+        <param name="rot" type="string" value="-pi/2"/>
+
+        <remap from="image" to="image_raw_rot"/>
+    </node>
+
+    <node
+        pkg="image_view"
+        type="image_view"
+        name="right_rot_display"
+        ns="/stereo/right/rot90">
+
+        <param name="rot" type="string" value="-pi/2"/>
+
+        <remap from="image" to="image_raw_rot"/>
+    </node>
+
+</launch>

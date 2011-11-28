@@ -1,0 +1,14 @@
+<package>
+  <description brief="samplereturn">
+
+     samplereturn
+
+  </description>
+  <author></author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/samplereturn</url>
+
+</package>
+
+
