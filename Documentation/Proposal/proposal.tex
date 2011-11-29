@@ -13,7 +13,7 @@
 \usepackage{graphicx}
 \usepackage{grffile}
 \usepackage{hyperref}
-
+\graphicspath{{./assets/}}
 \begin{document}
 \maketitle
 
@@ -29,42 +29,28 @@ The remainder of this article is organized as follows.
 Section~\ref{Chassis} describes the locomotion and maneuvering system. Section~\ref{Manipulator} describes our approach to sample acquisition and storage. Section~\ref{Electronics} describes the power management, servo, and compute systems employed. Section~\ref{Perception} discusses our sensing systems. Section~\ref{Software} gitves a high-level overview of our software architecture.
 
 \section{Chassis}\label{Chassis}
-Jascha will discuss why an ATV chassis is exactly what we need already.
 
-We are particularly fond of the TrailMaster MINI XRS (Figure~\ref{fig_gokart}) available here \url{http://gokartsusa.com/TrailMaster-Mini-XRS-Gokart-Buggy.aspx}.
+We evaluated several commercial Go-Kart platforms as potential chassis, for example the TrailMaster MINI XRS (Figure~\ref{fig_gokart}) available here \url{http://gokartsusa.com/TrailMaster-Mini-XRS-Gokart-Buggy.aspx}. After considering several options, it became clear that this style of frame has too much mass devoted to functions we do not need.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=4in]{TrailMasterMINIXRS.jpg}
-\caption{The proposed vehicle chassis.}
+\includegraphics[width=4in]{../assets/TrailMasterMINIXRS.jpg}
+\caption{A possible commercial chassis.}
 \label{fig_gokart}
+\end{figure}
+
+We decided to create our own special-purpose chassis for this project to take maximum advantage of the mass available. Jascha will discuss the awesome chassis he is building, shown in Figure~\ref{fig_bot_chassis}.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=4.5in]{../assets/Frame.jpg}
+\caption{The proposed vehicle chassis.}
+\label{fig_bot_chassis}
 \end{figure}
 
 The challenge rules specify an 80kg mass limit, our system allocates this as shown in Table~\ref{tab massb}.
 
-\begin{table}[htbp]
-    \begin{center}
-    \begin{tabular}{lr}
-        \hline
-        Component & Mass (kg)\\
-        \hline
-        Rolling Chassis and Suspension & 25\\
-        Drive Motor & 10\\
-        Steering Motor & 10\\
-        Batteries & 20\\
-        Computers & 6\\
-        Cameras & 5\\
-        Manipulator & 4\\
-        \hline
-        \hline
-        \multicolumn{1}{r}{Total} & 80\\
-        \hline
-    \end{tabular}
-    \end{center}
-    \caption{Mass Budget}
-    \label{tab massb}
-\end{table}
-
+\input{massbudget}
 \section{Manipulator}\label{Manipulator}
 
 Glue puck.\\
@@ -87,23 +73,7 @@ Laptop Computers.\\
 
 Assuming a mission duration of 2 hours, Table~\ref{power budget} summarizes the systems estimated power needs.
 
-\begin{table}[htbp]
-    \begin{tabular}{|l|c|c||p{4cm}|}
-        \hline
-        System & Demand (Watts) & Duty Cycle & Energy Requirement (Watt Hours)\\
-        \hline
-        Chassis Drive & 100 & 90\% & 180\\
-        Steering & 25 & 90\% & 45\\
-        Manipulator & 100 & 10\% & 20\\
-        Compute & 200 & 100\% & 400\\
-        Perception & 50 & 100\% & 100\\
-        \hline
-        \multicolumn{3}{|r||}{Total Energy} & 754\\
-        \hline
-    \end{tabular}
-    \caption{2 hour Power Budget}
-    \label{power budget}
-\end{table}
+\input{powerbudget}
 
 \section{Perception}\label{Perception}
 The environmental perception system consists of two stereo pairs and one high-resolution search camera. One stereo pair is aligned with the steering direction and provides the primary obstacle avoidance and navigation sensing. The other stereo pair is associated with the manipulator and provides close-in tracking and guidance for item collection. The search camera is positioned above th robot looking forward with a wide filed of view and is used by all the long-range object detectors while searching for items to be collected.

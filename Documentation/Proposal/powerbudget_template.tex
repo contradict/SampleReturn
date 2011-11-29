@@ -1,0 +1,15 @@
+
+\begin{table}[htbp]
+    \begin{tabular}{|l|c|c||p{4cm}|}
+        \hline
+        Component & Demand (Watts) & Duty Cycle & Energy Requirement (Watt Hours)\\
+        \hline
+%(rows)s
+        \hline
+        \multicolumn{3}{|r||}{Total Energy} & %(total)4.0f\\
+        \hline
+    \end{tabular}
+    \caption{%(duration)4.1f hour Power Budget}
+    \label{power budget}
+\end{table}
+

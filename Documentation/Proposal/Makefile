@@ -1,5 +1,5 @@
 
-proposal.pdf: proposal.tex proposal.bbl data_flow.dot.pdf
+proposal.pdf: proposal.tex proposal.bbl data_flow.dot.pdf tables
 	pdflatex proposal.tex
 
 proposal.bbl: proposal.aux main.bib
@@ -11,7 +11,11 @@ proposal.aux: data_flow.dot.pdf
 data_flow.dot.pdf: data_flow.dot
 	dot -Tpdf -O $<
 
+tables: powerbudget_template.tex massbudget_template.tex mktables
+	scripts/GetTableData.py credentials
+	touch tables
+
 clean:
-	rm *.pdf *.aux *.log *.bbl *.blg
+	rm build/* *.pdf
 
 .PHONY: clean
