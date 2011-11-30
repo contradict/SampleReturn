@@ -1,12 +1,15 @@
+<!-- vim: ft=xml : -->
 <launch>
+    <!-- Nodelet Host process -->
     <node
         pkg="nodelet" 
         type="nodelet"
         name="camera_process"
         args="manager"
         output="screen"
-        />
-
+        >
+    </node> 
+    <!-- USB Camera Driver -->
     <node
         pkg="nodelet"
         type="nodelet"
@@ -15,20 +18,22 @@
         output="screen"
         ns="stereo">
 
-        <param name="width" type="int" value="320" />
-        <param name="height" type="int" value="240" />
-        <param name="fps" type="int" value="15" />
+        <param name="width" type="int" value="640" />
+        <param name="height" type="int" value="480" />
+        <param name="fps" type="int" value="10" />
         <param name="frame" type="string" value="wide_stereo" />
         <param name="left/device" type="string" value="/dev/video0" />
         <param name="right/device" type="string" value="/dev/video1" />
-        <param name="left/camera_info_url"
+        <param name="left/camera_calibration_url"
             type="string"
             value="file://$(find samplereturn)/calibration/cheap-left.yaml" />
-        <param name="right/camera_info_url"
+        <param name="right/camera_calibration_url"
             type="string"
             value="file://$(find samplereturn)/calibration/cheap-right.yaml" />
+
     </node>
 
+    <!-- Rotate images 90 degrees -->
     <node
         pkg="nodelet"
         type="nodelet"
@@ -37,7 +42,7 @@
         ns="/stereo/left">
 
         <remap from="rot90/image_raw_in" to="image_raw"/>
-
+        <param name="rot" type="string" value="-pi/2"/>
     </node>
     <node
         pkg="nodelet"
@@ -47,24 +52,120 @@
         ns="/stereo/right">
 
         <remap from="rot90/image_raw_in" to="image_raw"/>
+        <param name="rot" type="string" value="-pi/2"/>
     </node>
 
+    <!-- Display rotated images -->
+    <!--
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="left_rot_display"
+        args="load image_view/image /camera_process"
+        ns="/stereo/left">
+
+        <remap  from="image" to="rot90/image_raw_rot"/>
+    </node>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="right_rot_display"
+        args="load image_view/image /camera_process"
+        ns="/stereo/right">
+
+        <remap from="image" to="rot90/image_raw_rot"/>
+    </node>
+    -->
+
+    <!-- Convert images to mono -->
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="left_image_mono"
+        args="load image_proc/debayer /camera_process"
+        ns="/stereo/left">
+
+        <remap from="image_raw" to="rot90/image_raw_rot"/>
+    </node>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="right_image_mono"
+        args="load image_proc/debayer /camera_process"
+        ns="/stereo/right">
+
+        <remap from="image_raw" to="rot90/image_raw_rot"/>
+    </node>
+
+
+    <!-- Rectify images -->
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="rect_left"
+        args="load image_proc/rectify /camera_process"
+        ns="/stereo/left"
+        >
+    </node>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="rect_right"
+        args="load image_proc/rectify /camera_process"
+        ns="/stereo/right"
+        >
+    </node>
+
+    <!-- Display rectified images -->
+    <!--
     <node
         pkg="image_view"
-        type="stereo_view"
-        name="stereo_display"
-        >
+        type="image_view"
+        name="left_rect_display"
+        ns="/stereo/left">
 
-        <remap from="stereo" to="/stereo"/>
-        <remap from="image" to="image_raw"/>
+        <remap from="image" to="image_rect"/>
+    </node>
+    <node
+        pkg="image_view"
+        type="image_view"
+        name="right_rect_display"
+        ns="/stereo/right">
+
+        <remap from="image" to="image_rect"/>
+    </node>
+    -->
+
+
+    <!-- Compute Stereo -->
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="stereo_image_proc"
+        args="load stereo_image_proc/disparity /camera_process"
+        ns="/stereo"
+        > 
     </node>
 
+    <!-- Display Disparity -->
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="vis_disparity"
+        args="load image_view/disparity /camera_process"
+        ns="/stereo"
+        >
+
+        <remap from="image" to="disparity"/>
+    </node>
+
+    <!-- Calibration tool -->
     <!--
     <node
         pkg="camera_calibration"
         type="cameracalibrator.py"
         name="calibrator"
-        args="--size 8x6 --square 0.108"
+        args="- -size 9x6 - -square 0.108"
         >
         <remap from="right" to="/stereo/right/rot90/image_raw_rot"/>
         <remap from="left" to="/stereo/left/rot90/image_raw_rot"/>
@@ -72,27 +173,5 @@
         <remap from="left_camera" to="/stereo/left"/>
     </node>
     -->
-
-    <node
-        pkg="image_view"
-        type="image_view"
-        name="left_rot_display"
-        ns="/stereo/left/rot90">
-
-        <param name="rot" type="string" value="-pi/2"/>
-
-        <remap from="image" to="image_raw_rot"/>
-    </node>
-
-    <node
-        pkg="image_view"
-        type="image_view"
-        name="right_rot_display"
-        ns="/stereo/right/rot90">
-
-        <param name="rot" type="string" value="-pi/2"/>
-
-        <remap from="image" to="image_raw_rot"/>
-    </node>
 
 </launch>
