@@ -10,6 +10,7 @@
         >
     </node> 
     <!-- USB Camera Driver -->
+    <!--
     <node
         pkg="nodelet"
         type="nodelet"
@@ -32,6 +33,24 @@
             value="file://$(find samplereturn)/calibration/cheap-right.yaml" />
 
     </node>
+    -->
+    <node
+         pkg="nodelet"
+         type="nodelet"
+         name="camera1394_left"
+         args="load camera1394/driver /camera_process">
+        <param name="guid" type="string" value="00b09d0100a8563d"/>
+        <remap from="camera" to="left"/>
+    </node>
+    <node
+         pkg="nodelet"
+         type="nodelet"
+         name="camera1394_right"
+         args="load camera1394/driver /camera_process">
+        <param name="guid" type="string" value="00b09d0100a8566e"/>
+        <remap from="camera" to="right"/>
+    </node>
+
 
     <!-- Rotate images 90 degrees -->
     <node
@@ -163,6 +182,7 @@
 
     <!-- Calibration tool -->
     <!--
+    -->
     <node
         pkg="camera_calibration"
         type="cameracalibrator.py"
@@ -174,6 +194,5 @@
         <remap from="right_camera" to="/stereo/right"/>
         <remap from="left_camera" to="/stereo/left"/>
     </node>
-    -->
 
 </launch>
