@@ -1,0 +1,146 @@
+<mesh>
+	<submeshes>
+		<submesh material="default" usesharedvertices="false" use32bitindexes="false" operationtype="triangle_list">
+			<faces count="8">
+				<face v1="0" v2="1" v3="2"/>
+				<face v1="3" v2="4" v3="5"/>
+				<face v1="6" v2="7" v3="8"/>
+				<face v1="9" v2="10" v3="11"/>
+				<face v1="12" v2="13" v3="14"/>
+				<face v1="15" v2="16" v3="17"/>
+				<face v1="18" v2="19" v3="20"/>
+				<face v1="21" v2="22" v3="23"/>
+            </faces>
+			<geometry vertexcount="23">
+                <vertexbuffer positions="true" normals="true">
+                    <!--top-->
+                    <!--0-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.10"/>
+                        <normal x="0.0" y="0.0" z="1.000000"/>
+                    </vertex>
+                    <!--1-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.10"/>
+                        <normal x="0.0" y="0.0" z="1.000000"/>
+                    </vertex>
+                    <!--2-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.10"/>
+                        <normal x="0.0" y="0.0" z="1.000000"/>
+                    </vertex>
+                    <!--bottom-->
+                    <!--3-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.0"/>
+                        <normal x="0.0" y="0.0" z="-1.000000"/>
+                    </vertex>
+                    <!--4-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.0"/>
+                        <normal x="0.0" y="0.0" z="-1.000000"/>
+                    </vertex>
+                    <!--5-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.0"/>
+                        <normal x="0.0" y="0.0" z="-1.000000"/>
+                    </vertex>
+                    <!--front edge-->
+                    <!--6-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.10"/>
+                        <normal x="0.0" y="-1.0" z="0.0"/>
+                    </vertex>
+                    <!--7-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.0"/>
+                        <normal x="0.0" y="-1.0" z="0.0"/>
+                    </vertex>
+                    <!--8-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.0"/>
+                        <normal x="0.0" y="-1.0" z="0.0"/>
+                    </vertex>
+                    <!--9-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.10"/>
+                        <normal x="0.0" y="-1.0" z="0.0"/>
+                    </vertex>
+                    <!--10-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.10"/>
+                        <normal x="0.0" y="-1.0" z="0.0"/>
+                    </vertex>
+                    <!--11-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.0"/>
+                        <normal x="0.0" y="-1.0" z="0.0"/>
+                    </vertex>
+                    <!--right edge-->
+                    <!--12-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.10"/>
+                        <normal x="0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--13-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.0"/>
+                        <normal x="0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--14-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.0"/>
+                        <normal x="0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--15-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.10"/>
+                        <normal x="0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--16-->
+                    <vertex>
+                        <position x="1.5" y="0.0" z="0.10"/>
+                        <normal x="0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--17-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.0"/>
+                        <normal x="0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--left edge-->
+                    <!--18-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.10"/>
+                        <normal x="-0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--19-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.10"/>
+                        <normal x="-0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--20-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.0"/>
+                        <normal x="-0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--21-->
+                    <vertex>
+                        <position x="0.75" y="1.5" z="0.0"/>
+                        <normal x="-0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--22-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.0"/>
+                        <normal x="-0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                    <!--23-->
+                    <vertex>
+                        <position x="0.0" y="0.0" z="0.10"/>
+                        <normal x="-0.894" y="0.447" z="0.0"/>
+                    </vertex>
+                  </vertexbuffer>
+            </geometry>
+        </submesh>
+    </submeshes>
+</mesh>
+

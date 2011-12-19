@@ -1,0 +1,213 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<robot
+    xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+    name="awesome_robot">
+    <enableGravity>false</enableGravity>
+    <material name="plate">
+        <color rgba="0.0 0.8 0.0 1.0"/>
+    </material>
+    <material name="suspension">
+        <color rgba="0.0 0.8 0.8 1.0"/>
+    </material>
+    <material name="wheel">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+    </material>
+    <material name="sensor">
+        <color rgba="0.2 0.6 0.1 1.0"/>
+    </material>
+    <material name="lens">
+        <color rgba="0.5 0.3 0.1 1.0"/>
+    </material>
+    <material name="carousel">
+        <color rgba="0.1 0.8 0.2 1.0"/>
+    </material>
+    <!-- the big triangle -->
+    <link name="base_link">
+        <inertial>
+            <origin xyz="0.75 0.5 0.05" /> 
+            <mass value="1.0" />
+            <inertia  ixx="0.140" ixy="0.0"  ixz="0.0"  iyy="0.105"  iyz="0.0" izz="0.246" />
+        </inertial>
+        <visual>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" />
+            </geometry>
+            <material name="plate"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" />
+            </geometry>
+        </collision>
+    </link>
+    <xacro:macro name="wheel_module" params="name position">
+        <joint name="${name}_suspension_joint" type="revolute">
+            <axis xyz="0 0 1"/>
+            <limit upper="1.57" lower="-1.57" effort="100" velocity="3.14"/>
+            <parent link="base_link"/>
+            <child link="${name}_suspension"/>
+            <origin xyz="${position}"/>
+        </joint>
+        <link name="${name}_suspension">
+            <visual>
+                <origin xyz="0 0 ${-suspension_height/2}"/>
+                <geometry>
+                    <cylinder length="${suspension_height}" radius="0.075"/>
+                </geometry>
+                <material name="suspension"/>
+            </visual>
+        </link>
+        <joint name="${name}_yoke_joint" type="fixed">
+            <parent link="${name}_suspension"/>
+            <child link="${name}_yoke"/>
+            <!-- z puts yoke at bottom of suspension since last number is
+            yoke_height/2 -->
+            <origin xyz="0 0 ${-suspension_height-wheel_diameter*1.25/4}"/>
+        </joint>
+        <link name="${name}_yoke">
+            <visual>
+                <geometry>
+                    <!-- 2.25 and 1.25 are aribtrary factors to make things look nice -->
+                    <!-- be sure to check _yoke_joint and _axle if you change z -->
+                    <box size="${wheel_width*2.25} ${yoke_thickness} ${wheel_diameter*1.25/2}"/>
+                </geometry>
+                <material name="suspension"/>
+            </visual>
+        </link>
+        <joint name="${name}_axle" type="continuous">
+            <axis xyz="0 0 1"/>
+            <limit effort="10" velocity="31.4"/>
+            <parent link="${name}_yoke"/>
+            <child link="${name}_wheel"/>
+            <!-- 1.25 must match factor in yoke, 0.125 is (1.25-1)/2 -->
+            <origin xyz="0 0 ${-wheel_diameter*1.25/4+wheel_diameter*0.125/2}" rpy="0 1.57 0 "/>
+        </joint>
+        <link name="${name}_wheel">
+            <visual>
+                <geometry>
+                    <cylinder length="${wheel_width}" radius="${wheel_diameter/2}"/>
+                </geometry>
+                <material name="wheel"/>
+            </visual>
+        </link>
+    </xacro:macro>
+    <xacro:macro name="stereo_pair" params="name baseline">
+        <link name="${name}_baseline_bar">
+            <visual>
+                <geometry>
+                    <!-- numbers measured from first prototype article -->
+                    <box size="${baseline-0.054} 0.0254 0.0381"/>
+                </geometry>
+                <material name="sensor"/>
+            </visual>
+        </link>
+        <!-- BEGIN LEFT CAMERA -->
+        <joint name="${name_left_camera_joint" type="fixed">
+            <parent link="${name}_baseline_bar"/>
+            <child link="${name}_left_camera"/>
+            <origin xyz="${baseline/2} 0 0"/>
+        </joint>
+        <link name="${name}_left_camera">
+            <visual>
+                <geometry>
+                    <!-- numbers measured from first prototype article -->
+                    <box size="0.054 0.0635 0.0381"/>
+                </geometry>
+                <material name="sensor"/>
+            </visual>
+        </link>
+        <joint name="${name}_left_camera_lens_joint" type="fixed">
+            <parent link="${name}_left_camera"/>
+            <child link="${name}_left_camera_lens"/>
+            <!-- numbers measured from first prototype article -->
+            <!-- z should be 1/2 of bar thickness to put lens on face of bar-->
+            <origin xyz="0 0 0.04125"/>
+        </joint>
+        <link name="${name}_left_camera_lens">
+            <visual>
+                <geometry>
+                    <!-- numbers measured from first prototype article -->
+                    <cylinder length="0.0444" radius="0.015875"/>
+                </geometry>
+                <material name="lens"/>
+            </visual>
+        </link>
+        <!-- END LEFT CAMERA -->
+        <!-- BEGIN RIGHT CAMERA -->
+        <joint name="${name}_right_camera_joint" type="fixed">
+            <parent link="${name}_baseline_bar"/>
+            <child link="${name}_right_camera"/>
+            <origin xyz="${-baseline/2} 0 0"/>
+        </joint>
+        <link name="${name}_right_camera">
+            <visual>
+                <geometry>
+                    <box size="0.054 0.0635 0.0381"/>
+                </geometry>
+                <material name="sensor"/>
+            </visual>
+        </link>
+        <joint name="${name}_right_camera_lens_joint" type="fixed">
+            <parent link="${name}_right_camera"/>
+            <child link="${name}_right_camera_lens"/>
+            <origin xyz="0 0 0.04125"/>
+        </joint>
+        <link name="${name}_right_camera_lens">
+            <visual>
+                <geometry>
+                    <cylinder length="0.0444" radius="0.015875"/>
+                </geometry>
+                <material name="lens"/>
+            </visual>
+        </link>
+        <!-- END RIGHT CAMERA -->
+    </xacro:macro>
+
+    <!-- define suspension properties -->
+    <xacro:property name="wheel_diameter" value="0.33"/>
+    <xacro:property name="wheel_width" value="0.09"/>
+    <xacro:property name="yoke_thickness" value="0.1"/>
+    <xacro:property name="suspension_height" value="0.15"/>
+    <!-- instantiate 3 modules -->
+    <xacro:wheel_module name="rear" position="0.75 1.30 0"/>
+    <xacro:wheel_module name="right_front" position="0.170 0.105 0"/>
+    <xacro:wheel_module name="left_front" position="1.330 0.105 0"/>
+
+    <!-- instantiate navigation pair -->
+    <xacro:stereo_pair name="navigation" baseline="0.30" />
+    <!-- attach navigation pair -->
+    <joint name="navigation_stereo_pair_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="navigation_baseline_bar"/>
+        <!-- macro defines camera with lenses facing along +z -->
+        <!-- rpy is pi/2 + 16.5 degree down tilt -->
+        <!-- height of bottom of deck (origin) is -->
+        <!-- suspension_height + yoke_height - yoke_offset + wheel_radius -->
+        <!--
+        suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
+        -->
+        <!-- so camera should be at 1.4 - deck -->
+        <origin xyz="0.75 0.5 0.900" rpy="1.8588 0 0"/>
+    </joint>
+
+    <!-- carousel -->
+    <link name="carousel">
+        <visual>
+            <geometry>
+                <cylinder length="0.250" radius="0.6"/>
+            </geometry>
+            <material name="carousel"/>
+        </visual>
+    </link>
+    <joint name="carousel_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="carousel"/>
+        <axis xyz="0 0 1"/>
+        <origin xyz="0.75 0.5 -0.125"/>
+    </joint>
+
+</robot>
+
