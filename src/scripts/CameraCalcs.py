@@ -97,5 +97,14 @@ def print_details(
 
     print "At %3.1fm, 1 horizontal pixel is %7.4fm on the ground"%(D, (1.0*pw)*D/f)
 
+def disparity_calcs(f=0.0045, B=0.3):
+    # z = f B / d
+    pw=6e-6
+    print "Lens focal length %4.1fmm"%(f*1000.)
+    print "Baseline %5.3fm"%B
+    print "Disparity    Range"
+    for d in [1,2,4,8,16,32,64,128]:
+        print " %3dpx        %5.2fm"%(d,f*B/d/pw)
+
 # Current best guess
 print_details(f=0.006, h=.145, rotate=True)
