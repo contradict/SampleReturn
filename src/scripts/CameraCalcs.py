@@ -6,13 +6,12 @@ def Dsquare(yi, h, f, psi):
     B = (yi/f)*cos(psi) + sin(psi)
     return h**2*(A/B**2 - 1)
 
-def dDdyi(yi, h, f, psi):
+def dDsqdyi(yi, h, f, psi):
     A = (1 + (yi/f)**2)
     B = (yi/f)*cos(psi) + sin(psi)
     dAdyi = 2*yi/f**2
     dBdyi = cos(psi)/f
-    D = sqrt(Dsquare(yi, h, f, psi))
-    return (h**2/2/D)*(dAdyi/B**2 - 2*A/B**3*dBdyi)
+    return h**2*(dAdyi/B**2 - 2*A/B**3*dBdyi)
 
 # def dDdyi(yi, h, f, psi, D):
 #     A = 2*(h/f)**2*yi
@@ -68,8 +67,8 @@ def print_details(
         if far_edge<D:
             D = far_edge
     Y_D = round(scipy.optimize.fsolve(lambda x:Dsquare(x*pw, h, f, psi) - D**2,
-                                      0, # initial guess
-                                      fprime=lambda x:dDdyi(x*pw, h, f, psi))[0])
+                                      -10, # initial guess
+                                     fprime=lambda x:dDsqdyi(x*pw, h, f, psi)*pw)[0])
     if Y_D > 0:
         dir = 'below'
     else:
