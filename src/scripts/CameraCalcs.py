@@ -107,4 +107,6 @@ def disparity_calcs(f=0.0045, B=0.3):
         print " %3dpx        %5.2fm"%(d,f*B/d/pw)
 
 # Current best guess
-print_details(f=0.006, h=.145, rotate=True)
+disparity_calcs(B=0.3)
+print_details(f=0.0045, h=1.45, rotate=True)
+
