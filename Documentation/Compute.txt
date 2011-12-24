@@ -1,0 +1,47 @@
+System A: 2x Lenovo W520
+    $5000
+    12lbs
+    340W peak
+    Digikey 454-1341-ND 700W 48V to 20V $268 91% 7.75oz
+    Core i7 2920XM 45W 2.5GHz 8M 10Gflop/core (2*4*10=80GFLOP total)
+    NVIDIA Quadro 2000M 55W 422Gflop/card (2*422=844GFLOP total)
+
+System B: 2x Micro-ATX 
+    $2298
+    18 lbs
+    700W peak
+    FSP200-61DL 200W 48V to ATX 2lb
+    Core i7 2600K 95W 3.5GHz 8M 14GFLOP/core (2*4*14=112GFLOP total
+    NVIDIA GTX 560 150W 1075GFLOPS/card (2*1075=2150GFLOPS)
+
+    EVGA 01G-P3-1561-AR GeForce GTX 560 Ti FPB (Fermi) 1GB 256-bit GDDR5 PCI
+      Express 2.0 x16 HDCP Ready SLI Support Video Card $249, 1.6lbs
+    EVGA P67 SLI Micro 120-SB-E672-KR $150, 3.4lbs
+    Intel Core i7-2600K Sandy Bridge 3.4GHz (3.8GHz Turbo Boost) LGA 1155 95W
+      Quad-Core Desktop Processor Intel HD Graphics 3000 BX80623I72600K $320
+      13.4oz
+    G.SKILL Ripjaws Z Series 16GB (4 x 4GB) 240-Pin DDR3 SDRAM DDR3 2133 (PC3
+      17000) Desktop Memory Model F3-17000CL9Q-16GBZH $160, 7oz
+    OCZ Vertex 3 Series – MAX IOPS Edition VTX3MI-25SAT3-120G 2.5" 120GB SATA
+      III MLC Internal Solid State Drive (SSD) $230, 3.2oz
+    Digikey 555-1207-ND 400W 48V-12V $80 x1 for graphics cards 2.34oz
+
+Sources:
+http://www.nvidia.com/content/HelpMeChoose
+http://www.geforce.com/Hardware/GPUs/geforce-gtx-550ti/specifications
+http://en.wikipedia.org/wiki/Comparison_of_Nvidia_graphics_processing_units
+http://en.wikipedia.org/wiki/GeForce_500_Series
+http://www.amazon.com/EVGA-01G-P3-1180-AR-GeForce-PCI-Express-Graphics/dp/B00275G0SW
+http://www.amazon.com/OCZ-Vertex-2-5-Inch-Solid-VTX3-25SAT3-120G/dp/B004Q81CKY/ref=sr_1_1?s=electronics&ie=UTF8&qid=1324750816&sr=1-1
+http://www.amazon.com/G-skill-Ripjaws-240-pin-Desktop-F3-12800cl9q-16gbxl/dp/B004JPKGY2/ref=sr_1_1?ie=UTF8&qid=1324750997&sr=8-1
+http://www.sparklepower.com/proPCPS_DC.html
+http://www.newegg.com/Product/Product.aspx?Item=N82E16813188081
+http://www.newegg.com/Product/Product.aspx?Item=N82E16819115070
+http://www.newegg.com/Product/Product.aspx?Item=N82E16820231503
+http://www.newegg.com/Product/Product.aspx?Item=N82E16820227714
+http://www.newegg.com/Product/Product.aspx?Item=N82E16814130604
+http://en.wikipedia.org/wiki/Comparison_of_Nvidia_graphics_processing_units
+http://www.tomshardware.com/charts/desktop-cpu-charts-2010/Raw-Performance-SiSoftware-Sandra-2010-Pro-GFLOPS,2409.html
+http://www.primatelabs.ca/geekbench/pc-benchmarks/
+http://ubuntuforums.org/archive/index.php/t-1004406.html
+
