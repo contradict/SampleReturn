@@ -1,0 +1,175 @@
+digraph Robot {
+    graph [overlap="voronoi" splines="true"];
+    // Computers
+    NavigationComputer [label="W520\nNavigation" shape=box];
+    ControlComputer [label="W520\nControl" shape=box];
+
+    EthernetSwitch [label="Switch" shape=box];
+
+    // Computer Interface Devices
+    CANInterface [label="Kvasser" shape=diamond];
+    Phidget888 [label="Phidget 8/8/8" shape=diamond];
+    DynamixelInterface [label="USB to\nDynamixel" shape=diamond];
+    ControlFireWireCard [label="Firewire\nExpresscard" shape=diamond];
+    NavigationFireWireCard [label="Firewire\nExpresscard" shape=diamond];
+ 
+    // Wheel Actuators
+    RightFrontWheel [label="Right Front\nWheel" shape=invtriangle];
+    RightFrontSteering [label="Right Front\nSteering" shape=invtriangle];
+    LeftFrontWheel [label="Left Front\nWheel" shape=invtriangle];
+    LeftFrontSteering [label="Left Front\nSteering" shape=invtriangle];
+    RearWheel [label="Rear\nWheel" shape=invtriangle];
+    RearSteering [label="Rear\nSteering" shape=invtriangle];
+
+    // Gripper Actuators
+    GripperDriver [label="Phidget SSR" shape=parallelogram];
+    GripperSolenoid [label="Gripper\nSolenoid" shape=invtriangle];
+    LiftDriver [label="Phidget SSR" shape=parallelogram];
+    LiftSolenoid [label="Lift\nSolenoid" shape=invtriangle];
+    RotationDynamixel [label="Gripper\nRotation" shape=invtriangle];
+    CompressorDriver [label="Phidget SSR" shape=parallelogram];
+    Compressor [label="Compressor" shape=invtriangle];
+
+    // Carousel Actuator
+    Carousel [label="Carousel" shape=invtriangle];
+
+    // Wheel Sensors
+    RightFrontEncoder [label="Right Wheel\nEncoder" shape=triangle];
+    RightFrontSteeringEncoder [label="Right Steering\nEncoder" shape=triangle];
+    RightFrontHome [label="Right Home\nSensor" shape=triangle];
+    LeftFrontEncoder [label="Left Wheel\nEncoder" shape=triangle];
+    LeftFrontSteeringEncoder [label="Left Steering\nEncoder" shape=triangle];
+    LeftFrontHome [label="Left Home\nSensor" shape=triangle];
+    RearEncoder [label="Rear Wheel\nEncoder" shape=triangle];
+    RearSteeringEncoder [label="Rear Steering\nEncoder" shape=triangle];
+    RearSteeringHome [label="Rear Home\nSensor" shape=triangle];
+
+    // Gripper Sensors
+    GripperCylinderPressure [label="Gripper\nPressure" shape=triangle];
+    LiftCylinderPressure [label="Lift\nPressure" shape=triangle];
+    AccumulatorPressure [label="Accumulator\nPressure" shape=triangle];
+    GripperCamera [label="Gripper\nStereo" shape=triangle];
+
+    // Carousel Sensors
+    CarouselHome [label="Carousel\nHome" shape=triangle];
+    CarouselEncoder [label="Carousel\nEncoder" shape=triangle];
+
+    // Navigation Sensors
+    StereoCamera [label="Navigation\nStereo" shape=triangle];
+    SearchCamera [label="Search\nCamera" shape=triangle];
+    IMU [label="Phidget\nOrientation" shape=triangle];
+
+    // Power Components
+    Battery [label="Battery" shape=doublecircle];
+    ComputerPower [label="48V - 20V\n700W" shape=circle];
+    AccessoryPower [label="48V - 12V\n400W" shape=circle];
+
+    // Wheel wiring
+    ControlComputer -> CANInterface [label="USB"];
+    RightFrontEncoder -> RightFrontWheel [label="QU"];
+    RightFrontWheel -> RightFrontSteering [label="CAN"];
+    RightFrontSteeringEncoder -> RightFrontSteering [label="QU"];
+    RightFrontHome -> RightFrontSteering [label="DI"];
+    RightFrontSteering -> LeftFrontWheel [label="CAN"];
+    LeftFrontEncoder -> LeftFrontWheel [label="QU"];
+    LeftFrontWheel -> LeftFrontSteering [label="CAN"];
+    LeftFrontSteeringEncoder -> LeftFrontSteering [label="QU"];
+    LeftFrontHome -> LeftFrontSteering [label="DI"];
+    LeftFrontSteering -> RearWheel [label="CAN"];
+    RearEncoder -> RearWheel [label="QU"];
+    RearWheel -> RearSteering [label="CAN"];
+    RearSteeringEncoder -> RearSteering [label="QU"];
+    RearSteeringHome -> RearSteering [label="DI"];
+    /*
+    subgraph LeftWheelPod {
+        LeftFrontWheel;
+        LeftFrontSteering;
+        LeftFrontEncoder;
+        LeftFrontSteeringEncoder;
+        LeftFrontHome;
+        rank="same";
+    };
+    subgraph RightWheelPod {
+        RightFrontWheel;
+        RightFrontSteering;
+        RightFrontEncoder;
+        RightFrontSteeringEncoder;
+        RightFrontHome;
+        rank="same";
+    };
+    subgraph RearWheelPod {
+        RearWheel;
+        RearSteering;
+        RearEncoder;
+        RearSteeringEncoder;
+        RearSteeringHome;
+        rank="same";
+    };
+    */
+
+    // Carousel Wiring
+    CANInterface -> Carousel [label="CAN"];
+    Carousel -> RightFrontWheel [label="CAN"];
+    CarouselHome -> Carousel [label="DI"];
+    CarouselEncoder -> Carousel [label="QU"];
+
+    // Gripper Wiring
+    ControlComputer -> Phidget888 [label="USB"];
+    ControlComputer -> DynamixelInterface [label="USB"];
+    Phidget888 -> GripperDriver [label="DO[01]"];
+    GripperDriver -> GripperSolenoid [label="12V"];
+    Phidget888 -> LiftDriver [label="DO[23]"];
+    LiftDriver -> LiftSolenoid [label="12V"];
+    Phidget888 -> CompressorDriver [label="DO[4]"];
+    CompressorDriver -> Compressor [label="12V"];
+    GripperCylinderPressure -> Phidget888 [label="AI[0]"];
+    LiftCylinderPressure -> Phidget888 [label="AI[1]"];
+    AccumulatorPressure -> Phidget888 [label="AI[2]"];
+    DynamixelInterface -> RotationDynamixel [label="RS485"];
+    GripperCamera -> ControlFireWireCard [label="IEEE1394"];
+    ControlFireWireCard -> ControlComputer [label="ExpressCard"];
+
+    // Navigation Wiring
+    StereoCamera -> NavigationFireWireCard [label="IEEE1394"];
+    NavigationFireWireCard -> NavigationComputer [label="ExpressCard"];
+    SearchCamera -> NavigationComputer [label="USB"];
+    IMU -> NavigationComputer [label="USB"];
+
+    // Network
+    NavigationComputer -> EthernetSwitch [label="Ethernet"];
+    ControlComputer -> EthernetSwitch [label="Ethernet"];
+    /*
+    subgraph Network {
+        NavigationComputer;
+        ControlComputer;
+        EthernetSwitch;
+        rank="same";
+    }
+    */
+
+    // Power
+    Battery -> LeftFrontWheel [label="48V"];
+    Battery -> LeftFrontSteering [label="48V"];
+    Battery -> RightFrontWheel [label="48V"];
+    Battery -> RightFrontSteering [label="48V"];
+    Battery -> RearWheel [label="48V"];
+    Battery -> RearSteering [label="48V"];
+    Battery -> Carousel [label="48V"];
+    Battery -> ComputerPower [label="48V"];
+    Battery -> AccessoryPower [label="48V"];
+    ComputerPower -> NavigationComputer [label="20V"];
+    ComputerPower -> ControlComputer [label="20V"];
+    AccessoryPower -> NavigationFireWireCard [label="12V"]
+    AccessoryPower -> ControlFireWireCard [label="12V"]
+    AccessoryPower -> CompressorDriver [label="12V"]
+    AccessoryPower -> GripperDriver [label="12V"]
+    AccessoryPower -> LiftDriver [label="12V"]
+    /*
+    subgraph PowerConversion {
+        Battery;
+        ComputerPower;
+        AccessoryPower;
+        rank="same";
+    }
+    */
+}
