@@ -18,7 +18,8 @@
 \maketitle
 
 \begin{abstract}
-Our robot will be awesome and stuff.
+Our robot uses a primarily visual perception and navigation system, with multiple sets of cameras performing the tasks of navigation and mapping, obstacle avoidance, object detection, and manipulation control. A custom chassis has been designed to minimize weight and ease planning by allowing very general motion over varied terrain. A simple three-axis manipulator takes advantage of this flexibility to allow object retrieval and storage in a sectioned carousel.
+
 \end{abstract}
 
 \section{Introduction}
@@ -26,64 +27,90 @@ This proposal documents our thought process leading up to the prototype design o
 
 \paragraph{Outline}
 The remainder of this article is organized as follows.
-Section~\ref{Chassis} describes the locomotion and maneuvering system. Section~\ref{Manipulator} describes our approach to sample acquisition and storage. Section~\ref{Electronics} describes the power management, servo, and compute systems employed. Section~\ref{Perception} discusses our sensing systems. Section~\ref{Software} gitves a high-level overview of our software architecture.
+Section~\ref{Chassis} describes the locomotion and maneuvering system. Section~\ref{Manipulator} describes our approach to sample acquisition and storage. Section~\ref{Electronics} describes the power management, servo, and compute systems employed. Section~\ref{Perception} discusses our sensing systems. Section~\ref{Software} gives a high-level overview of our software architecture. Section~\ref{Hazardous} discusses hazardous materials compliance. Section~\ref{Comms} describes the external communications of the robot.
+
+
+%\begin{figure}[htbp]
+%\centering
+%\includegraphics[width=4in]{../assets/TrailMasterMINIXRS.jpg}
+%\caption{Labeled Three-Quarters View}
+%\label{fig_gokart}
+%\end{figure}
+%
+%\begin{figure}[htbp]
+%\centering
+%\includegraphics[width=4in]{../assets/TrailMasterMINIXRS.jpg}
+%\caption{Wheel Pod}
+%\label{fig_gokart}
+%\end{figure}
+%
+%\begin{figure}[htbp]
+%\centering
+%\includegraphics[width=4in]{../assets/TrailMasterMINIXRS.jpg}
+%\caption{Manipulator Assembly}
+%\label{fig_gokart}
+%\end{figure}
 
 \section{Chassis}\label{Chassis}
 
-We evaluated several commercial Go-Kart platforms as potential chassis, for example the TrailMaster MINI XRS (Figure~\ref{fig_gokart}) available here \url{http://gokartsusa.com/TrailMaster-Mini-XRS-Gokart-Buggy.aspx}. After considering several options, it became clear that this style of frame has too much mass devoted to functions we do not need.
+We evaluated several commercial Go-Kart platforms as potential chassis, for example the TrailMaster MINI XRS\footnote{ \url{http://gokartsusa.com/TrailMaster-Mini-XRS-Gokart-Buggy.aspx}}. After considering several options, it became clear that this style of frame has too much mass devoted to functions we do not need. It was decided that we would fabricate a custom chassis to both reduce weight and simplify trajectory/manipulator planning.
+
+The chassis is triangular in plan, with three independently steerable wheel pods, one on each corner (the side between two wheels defining the front of the robot, with a trailing third). Each wheel pod consists of wheel and tire driven through a gearbox and chain reduction/transmission by a brushless electric motor. Using three independently steerable wheels allows for in-place rotations of the robot, as well as translation in any direction relative to the manipulator, permitting a simple three-axis manipulator design (up/down, open/close, rotate). Both the drive axis and steering axis for each wheel pod have optical encoders for measuring angle/velocity and aiding the odometry system.
+
+The body itself is a triangular box, providing three distinct mounting layers: under the bottom plate, between the plates, and on the top plate. A sectioned carousel slung under the lower plate is used for sample storage. Indexed by a single motor, its low to the ground position reduces the amount of travel needed in the vertical manipulator axis. Behind the carousel are the lithium ion battery packs, mounted low to keep the center of mass as far down as possible. Between the two triangular decks are the six wheel motor controllers, driving the two motors on each of the three wheel pods. The search and navigation computers are also mounted on this level.
+
+The top plate supports navigation, manipulator, and search cameras, as well as the supports for the manipulator vertical axis. The manipulator cameras peer through a cutout in the lower deck to observe the gripper jaws and the object to be retrieved, as well as the appropriate carousel slot when it's rotated into position. Space is reserved for the specified required payload.
+
+The navigation and search cameras are mounted at the top of a pyramidal frame above the top deck. This provides maximum height above the ground given the volume envelope, expanding the search region
+
+%\begin{figure}[htbp]
+%\centering
+%\includegraphics[width=4in]{../assets/TrailMasterMINIXRS.jpg}
+%\caption{A possible commercial chassis.}
+%\label{fig_gokart}
+%\end{figure}
+
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=4in]{../assets/TrailMasterMINIXRS.jpg}
-\caption{A possible commercial chassis.}
-\label{fig_gokart}
-\end{figure}
-
-We decided to create our own special-purpose chassis for this project to take maximum advantage of the mass available. Jascha will discuss the awesome chassis he is building, shown in Figure~\ref{fig_bot_chassis}.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=4.5in]{../assets/Frame.jpg}
+\includegraphics[width=4.5in]{../assets/overalliso.jpg}
 \caption{The proposed vehicle chassis.}
 \label{fig_bot_chassis}
 \end{figure}
 
-The challenge rules specify an 80kg mass limit, our system allocates this as shown in Table~\ref{tab massb}.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=4in]{../assets/wheelmodule.jpg}
+\caption{The wheel module.}
+\label{fig_bot_wheel}
+\end{figure}
 
-\input{massbudget}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=4.5in]{../assets/manipulator.jpg}
+\caption{The manipulator.}
+\label{fig_bot_manipulator}
+\end{figure}
+
+The challenge rules specify an 80kg mass limit. Preliminary mass analysis shows that the current design comes in under this weight limit.
+
+%\input{massbudget}
 \section{Manipulator}\label{Manipulator}
 
-Glue puck.\\
+Early in the design process, a variety of manipulators were considered for the task of sample retrieval. Adhesion based glue pucks, mechanically driven tentacles, and multi-axis grabbers were assessed and rejected in favor of a single axis grabber with parallel jaws; selected as the most simple and mechanically robust design that could still manipulate the specified samples. Driven through a linkage with a Dynamixel servo, the two jaws support a variety of surface types that can be rapidly iterated during testing to find the best general performer. The jaws themselves can be rotated through ninety degrees independently of the robot, so that the short dimension of any item can be gripped. The manipulator assembly rides vertically on a linear bearing driven by a rack and pinion to allow it to be lowered below the level of the wheels and above the sample carousel.
 
-Sharp Tentacles.\\
 
 \section{Electronics}\label{Electronics}
 
-Battery System.\\
-
-E-Stop design. Power On sequencing.\\
-
-Drive motor, controller.\\
-
-Steering servo, controller.\\
-
-Manipulator servos, controllers.\\
-
-Laptop Computers.\\
-
-Assuming a mission duration of 2 hours, Table~\ref{power budget} summarizes the systems estimated power needs.
-
-\input{powerbudget}
+The electronics system breaks down into four main components: energy storage, power distribution, actuators, and control. Energy is stored in two lithium iron phosphate battery packs packaged by PingBattery\footnote{\url{http://www.pingbattery.com}}. It feeds through the main power switch to directly drive the wheel motors at 48V and into DC/DC converters to drive the cameras and warning beacon at 12V and the laptops and manipulator servos at 20V. The E-stop is a latching push button switch sitting between the battery stack and all motor controllers and servos; activating it completely disconnects power from these actuators. The drive and steering motors are brushless DC motors with planetary gearboxes, each controlled by a Copely Accelnet \footnote{\url{http://www.copleycontrols.com/}} motor controller. The manipulator open/close, rotating, and lift axes are driven with Dynamixel RX-64 \footnote{\url{http://www.robotis.com/xe/dynamixel_en}} servomotors. All of this is driven by a pair of Lenovo W520 laptops: one handling navigation and mapping and one handling search and manipulation.
 
 \section{Perception}\label{Perception}
-The environmental perception system consists of two stereo pairs and one high-resolution search camera. One stereo pair is aligned with the steering direction and provides the primary obstacle avoidance and navigation sensing. The other stereo pair is associated with the manipulator and provides close-in tracking and guidance for item collection. The search camera is positioned above th robot looking forward with a wide filed of view and is used by all the long-range object detectors while searching for items to be collected.
+The environmental perception system consists of two stereo pairs and one high-resolution search camera. One stereo pair is aligned with the steering direction and provides the primary obstacle avoidance and navigation sensing. The other stereo pair is associated with the manipulator and provides close-in tracking and guidance for item collection. The search camera is positioned above the robot looking forward with a wide field of view and is used by all the long-range object detectors while searching for items to be collected. The use of a rotatable polarizing filter on one or more of the cameras, or the addition of multiple additional cameras with distinct static polarizers is being considered for detection of strongly polarizing surfaces, i.e. water, smooth metal.
 
-The navigational perception system consists of 4 wheel encoders for odometery, MEMS gyroscopes and precision inclinometers for attitude estimation. The attitude estimate is used to help stabilize the navigation estimate and to help align the search camera with the navigation map.
-
-We are also exploring the possiblity of a odometery caster to provide estimates of distance traveled, it is not yet clear if this will provide sufficiently higher quality data than the wheel encoders to be worthwhile.
+The navigational perception system consists of 6 wheel encoders (one for the steering and drive axis of each wheel pod) for odometery, MEMS gyroscopes and precision inclinometers for attitude estimation. The attitude estimate is used to help stabilize the navigation estimate and to help align the search camera with the navigation map. We explored the possiblity of an odometery caster to provide estimates of distance traveled, but it was determined that the encoders on the wheels are of sufficient quality to render one unnecessary.
 
 \section{Software}\label{Software}
-Our software uses the ROS framework \url{http://www.ros.org/} to provide structure and inter-module communication. In addition, ROS has a large library of general-purpose modules which allows us to take advantage of significant expertise outside our immediate team.
+Our software uses the ROS framework \footnote{\url{http://www.ros.org/}} to provide structure and inter-module communication. In addition, ROS has a large library of general-purpose modules which allows us to take advantage of significant expertise outside our immediate team.
 
 \subsection{Navigation}\label{Navigation}
 \begin{figure}[htbp]
@@ -103,11 +130,11 @@ In addition, a local 2.5D occupancy grid is made based on obstacle detections fo
 \caption{Goal Search data flow}
 \label{fig_df_gs}
 \end{figure}
-As show in Figure~\ref{fig_df_gs}, the each goal item has its own recognizer. Several of these share large pieces of functionality, but all can operate in parallel and have slightly different tunings. For example, the Tennis Ball and Colored Sphere recognizers are identical code with different search parameters.
+As show in Figure~\ref{fig_df_gs}, each goal item has its own recognizer. Several of these share large pieces of functionality, but all can operate in parallel and have slightly different tunings. For example, the Tennis Ball and Colored Sphere recognizers may be identical code with different search parameters.
 
 All recognizers intersect the detection vector with an estimate of the ground plane. This estimate is constructed from the current vehicle pose and a subset of the points detected by the navigation stereo pair.
 
-The Goal Recognizers are allowed to be noisy and produce false positives since all their measurements are accumulated in an occupancy grid. This grid encodes exclusions around detected goal and resolves conflicts between detectors. It also includes any pre-loaded information about goal position. This map is mantained globally and effectively makes a record of already-searched areas.
+The Goal Recognizers are allowed to be noisy and produce false positives since all their measurements are accumulated in an occupancy grid. This grid encodes exclusions around detected goals and resolves conflicts between detectors. It also includes any pre-loaded information about goal and obstacle position. This map is mantained globally and effectively produces a record of already-searched areas.
 
 \subsection{Route Planning}
 \begin{figure}[htbp]
@@ -116,9 +143,9 @@ The Goal Recognizers are allowed to be noisy and produce false positives since a
 \caption{Route Planning data flow}
 \label{fig_df_rp}
 \end{figure}
-Figure~\ref{fig_df_rp} Shows the layout of the Route Planning system. The Goal Selector uses information in the Goal Occupancy Grid to decide the next goal position in the map. It then passes this information to the Route Planner which produces a path consistent with the Obstacle Occupancy Grid and the vehicle's kinematics to arrive at the goal.
+Figure~\ref{fig_df_rp} shows the layout of the Route Planning system. The Goal Selector uses information in the Goal Occupancy Grid to decide the next goal position in the map. It then passes this information to the Route Planner which produces a path consistent with the Obstacle Occupancy Grid and the vehicle's kinematics to arrive at the goal.
 
-How does the Goal Selector decide where to go next? Does it consider the value of the object? Certainly includes likelihood of detection and distance from robot.
+%How does the Goal Selector decide where to go next? Does it consider the value of the object? Certainly includes likelihood of detection and distance from robot.
 
 \subsection{Manipulation}\label{Manipulation}
 \begin{figure}[htbp]
@@ -127,8 +154,8 @@ How does the Goal Selector decide where to go next? Does it consider the value o
 \caption{Manipulation data flow}
 \label{fig_df_man}
 \end{figure}
-See Figure~\ref{fig_df_man}.
 
+The manipulator is controlled by visual servo, using the manipulator camera pair to identify both the location of the object to be retrieved and the gripper jaws. When the search camera identifies a potential goal item, the manipulator camera pair will start feeding into a detector for that object. This will generate keypoints that the visual servo system can use to direct the gripper toward the item.
 
 
 \subsection{Mission Execution}\label{MissionExecution}
@@ -139,7 +166,15 @@ See Figure~\ref{fig_df_man}.
 \label{fig_df_exec}
 \end{figure}
 
-High level executive coordinates actions of Planners and Executors.
+This is a high level state machine that manages the behavior of the robot. It handles switching between Search, Acquisition and Retrieval, Homing, and Paused states.
+
+
+\section{Hazardous Materials Compliance}\label{Hazardous}
+As currently designed, the robot contains no hazardous materials. It does contain lithium iron phosphate batteries manufactured by PingBattery \footnote{\url{http://www.pingbattery.com}}. These should not pose any material hazard, but are included here for thoroughness.
+
+\section{Communications Protocal and Pause Switch}\label{Comms}
+The pause switch for the robot transmits an on-off keyed serial command to the robot in the 433 Mhz band at 0.5W. With line of sight, it has a range of 3 miles. This registers in the robot as a software Pause command. This is the only external communication channel with the robot.
+
 
 \bibliographystyle{abbrv}
 \bibliography{main}
