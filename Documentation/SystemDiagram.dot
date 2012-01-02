@@ -3,6 +3,7 @@ digraph Robot {
     // Computers
     NavigationComputer [label="W520\nNavigation" shape=box];
     ControlComputer [label="W520\nControl" shape=box];
+    DebugComputer [label="W500\nConsole" shape=box];
 
     EthernetSwitch [label="Switch" shape=box];
 
@@ -22,13 +23,9 @@ digraph Robot {
     RearSteering [label="Rear\nSteering" shape=invtriangle];
 
     // Gripper Actuators
-    GripperDriver [label="Phidget SSR" shape=parallelogram];
-    GripperSolenoid [label="Gripper\nSolenoid" shape=invtriangle];
-    LiftDriver [label="Phidget SSR" shape=parallelogram];
-    LiftSolenoid [label="Lift\nSolenoid" shape=invtriangle];
+    GripperDynamixel [label="Gripper\nDynamixel" shape=invtriangle];
+    LiftDynamixel [label="Lift\nDynamixel" shape=invtriangle];
     RotationDynamixel [label="Gripper\nRotation" shape=invtriangle];
-    CompressorDriver [label="Phidget SSR" shape=parallelogram];
-    Compressor [label="Compressor" shape=invtriangle];
 
     // Carousel Actuator
     Carousel [label="Carousel" shape=invtriangle];
@@ -36,22 +33,15 @@ digraph Robot {
     // Wheel Sensors
     RightFrontEncoder [label="Right Wheel\nEncoder" shape=triangle];
     RightFrontSteeringEncoder [label="Right Steering\nEncoder" shape=triangle];
-    RightFrontHome [label="Right Home\nSensor" shape=triangle];
     LeftFrontEncoder [label="Left Wheel\nEncoder" shape=triangle];
     LeftFrontSteeringEncoder [label="Left Steering\nEncoder" shape=triangle];
-    LeftFrontHome [label="Left Home\nSensor" shape=triangle];
     RearEncoder [label="Rear Wheel\nEncoder" shape=triangle];
     RearSteeringEncoder [label="Rear Steering\nEncoder" shape=triangle];
-    RearSteeringHome [label="Rear Home\nSensor" shape=triangle];
 
     // Gripper Sensors
-    GripperCylinderPressure [label="Gripper\nPressure" shape=triangle];
-    LiftCylinderPressure [label="Lift\nPressure" shape=triangle];
-    AccumulatorPressure [label="Accumulator\nPressure" shape=triangle];
     GripperCamera [label="Gripper\nStereo" shape=triangle];
 
     // Carousel Sensors
-    CarouselHome [label="Carousel\nHome" shape=triangle];
     CarouselEncoder [label="Carousel\nEncoder" shape=triangle];
 
     // Navigation Sensors
@@ -60,26 +50,32 @@ digraph Robot {
     IMU [label="Phidget\nOrientation" shape=triangle];
 
     // Power Components
-    Battery [label="Battery" shape=doublecircle];
+    Battery0 [label="Battery" shape=doublecircle];
+    Battery1 [label="Battery" shape=doublecircle];
     ComputerPower [label="48V - 20V\n700W" shape=circle];
     AccessoryPower [label="48V - 12V\n400W" shape=circle];
+    PowerSwitch [label="Power\nSwitch" shape=Mcircle];
+    EStopSwitch [label="E-Stop\nSwitch" shape=Mcircle];
+    WarningBeaconDriver [label="Beacon Driver\nPhidget Dual SSR"];
+
+    // User Interface
+    PauseSwitch [label="Pause\nSwitch" shape=Msquare];
+    PauseReceiver [label="Pause\nReceiver" shape=house];
+    WarningBeacon [label="Warning\nBeacon" shape=circle];
 
     // Wheel wiring
     ControlComputer -> CANInterface [label="USB"];
     RightFrontEncoder -> RightFrontWheel [label="QU"];
     RightFrontWheel -> RightFrontSteering [label="CAN"];
     RightFrontSteeringEncoder -> RightFrontSteering [label="QU"];
-    RightFrontHome -> RightFrontSteering [label="DI"];
     RightFrontSteering -> LeftFrontWheel [label="CAN"];
     LeftFrontEncoder -> LeftFrontWheel [label="QU"];
     LeftFrontWheel -> LeftFrontSteering [label="CAN"];
     LeftFrontSteeringEncoder -> LeftFrontSteering [label="QU"];
-    LeftFrontHome -> LeftFrontSteering [label="DI"];
     LeftFrontSteering -> RearWheel [label="CAN"];
     RearEncoder -> RearWheel [label="QU"];
     RearWheel -> RearSteering [label="CAN"];
     RearSteeringEncoder -> RearSteering [label="QU"];
-    RearSteeringHome -> RearSteering [label="DI"];
     /*
     subgraph LeftWheelPod {
         LeftFrontWheel;
@@ -110,22 +106,14 @@ digraph Robot {
     // Carousel Wiring
     CANInterface -> Carousel [label="CAN"];
     Carousel -> RightFrontWheel [label="CAN"];
-    CarouselHome -> Carousel [label="DI"];
     CarouselEncoder -> Carousel [label="QU"];
 
     // Gripper Wiring
     ControlComputer -> Phidget888 [label="USB"];
     ControlComputer -> DynamixelInterface [label="USB"];
-    Phidget888 -> GripperDriver [label="DO[01]"];
-    GripperDriver -> GripperSolenoid [label="12V"];
-    Phidget888 -> LiftDriver [label="DO[23]"];
-    LiftDriver -> LiftSolenoid [label="12V"];
-    Phidget888 -> CompressorDriver [label="DO[4]"];
-    CompressorDriver -> Compressor [label="12V"];
-    GripperCylinderPressure -> Phidget888 [label="AI[0]"];
-    LiftCylinderPressure -> Phidget888 [label="AI[1]"];
-    AccumulatorPressure -> Phidget888 [label="AI[2]"];
-    DynamixelInterface -> RotationDynamixel [label="RS485"];
+    DynamixelInterface -> LiftDynamixel [label="RS485"];
+    LiftDynamixel -> RotationDynamixel [label="RS485"];
+    RotationDynamixel -> GripperDynamixel [label="RS485"];
     GripperCamera -> ControlFireWireCard [label="IEEE1394"];
     ControlFireWireCard -> ControlComputer [label="ExpressCard"];
 
@@ -138,6 +126,7 @@ digraph Robot {
     // Network
     NavigationComputer -> EthernetSwitch [label="Ethernet"];
     ControlComputer -> EthernetSwitch [label="Ethernet"];
+    DebugComputer -> EthernetSwitch [label="Ethernet"];
     /*
     subgraph Network {
         NavigationComputer;
@@ -148,22 +137,27 @@ digraph Robot {
     */
 
     // Power
-    Battery -> LeftFrontWheel [label="48V"];
-    Battery -> LeftFrontSteering [label="48V"];
-    Battery -> RightFrontWheel [label="48V"];
-    Battery -> RightFrontSteering [label="48V"];
-    Battery -> RearWheel [label="48V"];
-    Battery -> RearSteering [label="48V"];
-    Battery -> Carousel [label="48V"];
-    Battery -> ComputerPower [label="48V"];
-    Battery -> AccessoryPower [label="48V"];
+    Battery0 -> PowerSwitch [label="48V"];
+    Battery1 -> PowerSwitch [label="48V"];
+    PowerSwitch -> EStopSwitch [label="48V"];
+    EStopSwitch -> LeftFrontWheel [label="48V"];
+    EStopSwitch -> LeftFrontSteering [label="48V"];
+    EStopSwitch -> RightFrontWheel [label="48V"];
+    EStopSwitch -> RightFrontSteering [label="48V"];
+    EStopSwitch -> RearWheel [label="48V"];
+    EStopSwitch -> RearSteering [label="48V"];
+    EStopSwitch -> Carousel [label="48V"];
+    PowerSwitch -> ComputerPower [label="48V"];
+    PowerSwitch -> AccessoryPower [label="48V"];
     ComputerPower -> NavigationComputer [label="20V"];
     ComputerPower -> ControlComputer [label="20V"];
+    ComputerPower -> DebugComputer [label="20V"];
+    ComputerPower -> EStopSwitch [label="20V"];
+    EStopSwitch -> DynamixelInterface [label="20V"];
     AccessoryPower -> NavigationFireWireCard [label="12V"]
     AccessoryPower -> ControlFireWireCard [label="12V"]
-    AccessoryPower -> CompressorDriver [label="12V"]
-    AccessoryPower -> GripperDriver [label="12V"]
-    AccessoryPower -> LiftDriver [label="12V"]
+    AccessoryPower -> PauseReceiver [label="12V"]
+    AccessoryPower -> WarningBeaconDriver [label="12V"]
     /*
     subgraph PowerConversion {
         Battery;
@@ -172,4 +166,10 @@ digraph Robot {
         rank="same";
     }
     */
+
+    PauseReceiver -> Phidget888 [label="DI[0]"];
+    PauseSwitch -> Phidget888 [label="DI[1]"];
+    Phidget888 -> WarningBeaconDriver [label="DO[0]"];
+    Phidget888 -> WarningBeaconDriver [label="DO[1]"];
+    WarningBeaconDriver -> WarningBeacon [label="12V"];
 }
