@@ -83,7 +83,12 @@ class RPDO : public PDO {
 
         uint16_t mappingIndex(void);
 
-        void send(std::vector<uint8_t> &data);
+        void send(std::vector<uint8_t> &data, PDOCallbackObject
+                callback=PDOCallbackObject());
+        void send(uint8_t value, PDOCallbackObject callback=PDOCallbackObject());
+        void send(uint16_t value, PDOCallbackObject callback=PDOCallbackObject());
+        void send(uint32_t value, PDOCallbackObject callback=PDOCallbackObject());
+        void send(int32_t value, PDOCallbackObject callback=PDOCallbackObject());
 
 };
 
