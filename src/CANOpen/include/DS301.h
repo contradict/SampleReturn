@@ -24,8 +24,9 @@ class DS301 : public TransferCallbackReceiver {
                      std::tr1::shared_ptr<SDOCallbackObject> callback);
         void writeObjectDictionary(uint16_t index, uint8_t subindex, std::vector<uint8_t> &bytes,
                      std::tr1::shared_ptr<SDOCallbackObject>
-                     callback=std::move(std::tr1::shared_ptr<SDOCallbackObject>(new
-                             SDOCallbackObject())));
+                     callback=std::tr1::shared_ptr<SDOCallbackObject>(new
+                             SDOCallbackObject())
+                     );
 
         void sendNMT(enum NodeControlCommand cmd,
                      DS301NotifyCallback cb=NULL);
