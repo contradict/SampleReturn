@@ -290,7 +290,7 @@ void DS301::setSyncInterval(uint32_t interval_us)
     data.push_back((interval_us&0x0000FF00)>> 8);
     data.push_back((interval_us&0x00FF0000)>>16);
     data.push_back((interval_us&0xFF000000)>>24);
-    DS301::writeObjectDictionary(0x1006, 0x0, data);
+    writeObjectDictionary(0x1006, 0x0, data);
 }
 
 void DS301::enableSync(bool enable)
