@@ -3,6 +3,7 @@
 #include <string.h>
 #include <vector>
 #include <map>
+#include <tr1/memory>
 
 #include <Message.h>
 #include <Transfer.h>

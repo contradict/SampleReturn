@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <vector>
 #include <stdint.h>
+#include <tr1/memory>
 
 #include <Message.h>
 #include <Transfer.h>
