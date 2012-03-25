@@ -204,7 +204,79 @@ std::tr1::shared_ptr<RPDO> DS301::createRPDO(std::string name,
     return ppdo;
 }
 
-void DS301::setTPDOType(std::tr1::shared_ptr<TPDO> ppdo, uint8_t type)
+void DS301::mapPDO(std::tr1::shared_ptr<PDO> ppdo,
+                   std::vector<struct PDOMap> mapped,
+                   uint8_t type
+                  )
+{
+    ppdo->mapped = false;
+    bus->add(ppdo);
+    ppdo->objectCount = mapped.size();
+    for(int i=0; i<mapped.size(); i++){
+        ppdo->mappedObjects[i] = mapped[i];
+    }
+    ppdo->communication_parameters.identifier = ppdo->COBID();
+    ppdo->communication_parameters.extended = false;
+    ppdo->communication_parameters.rtr = false;
+    ppdo->communication_parameters.invalid = false;
+    ppdo->communication_parameters.type = type;
+
+    std::vector<uint8_t> data;
+    // Disable PDO
+    data.push_back(0);
+    writeObjectDictionary(ppdo->mappingIndex(), 0, data);
+    // write map
+    for(int i=0;i<ppdo->objectCount;i++) {
+        data.clear();
+        ppdo->writeMappingData(i, data);
+        writeObjectDictionary(ppdo->mappingIndex(), i+1, data);
+    }
+    // write comm params
+    data.clear();
+    ppdo->writeCommunicationData(data);
+    writeObjectDictionary(ppdo->communicationIndex(), 1, data);
+    data.clear();
+    ppdo->writeCommunicationTypeData(data);
+    writeObjectDictionary(ppdo->communicationIndex(), 2, data);
+    // enable PDO
+    data.clear();
+    data.push_back(ppdo->objectCount);
+    writeObjectDictionary(ppdo->mappingIndex(), 0, data,
+            std::tr1::shared_ptr<SDOCallbackObject> (new 
+            SDOCallbackObject(static_cast<std::tr1::shared_ptr<TransferCallbackReceiver> >(ppdo),
+                static_cast<SDOCallbackObject::CallbackFunction>(&PDO::mappingComplete))));
+
+}
+
+std::tr1::shared_ptr<RPDO> DS301::mapRPDO(std::string name,
+                                          int pdo_number,
+                                          std::vector<struct PDOMap> mapped,
+                                          uint8_t type
+                                         ) 
+{
+    std::tr1::shared_ptr<RPDO> ppdo(new RPDO(name,
+                                            node_id,
+                                            pdo_number));
+    mapPDO(ppdo, mapped, type);
+    return ppdo;
+}
+
+std::tr1::shared_ptr<TPDO> DS301::mapTPDO(std::string name,
+                                   int pdo_number,
+                                   std::vector<struct PDOMap> mapped,
+                                   uint8_t type,
+                                   PDOCallbackObject callback
+                                  )
+{
+    std::tr1::shared_ptr<TPDO> ppdo(new TPDO(name,
+                                             node_id,
+                                             pdo_number,
+                                             callback));
+    mapPDO(ppdo, mapped, type);
+    return ppdo;
+}
+
+void DS301::setPDOType(std::tr1::shared_ptr<PDO> ppdo, uint8_t type)
 {
     std::vector<uint8_t> data;
     data.push_back(type);

@@ -36,11 +36,28 @@ class DS301 : public TransferCallbackReceiver {
         std::tr1::shared_ptr<RPDO> createRPDO(std::string name,
                                               int pdo_number
                                              );
-        void setTPDOType(std::tr1::shared_ptr<TPDO> ppdo, uint8_t type);
+        std::tr1::shared_ptr<RPDO> mapRPDO(std::string name,
+                                           int pdo_number,
+                                           std::vector<struct PDOMap> mapped,
+                                           uint8_t type
+                                          );
+
+        std::tr1::shared_ptr<TPDO> mapTPDO(std::string name,
+                                           int pdo_number,
+                                           std::vector<struct PDOMap> mapped,
+                                           uint8_t type,
+                                           PDOCallbackObject callback=PDOCallbackObject()
+                                          );
+
+        void setPDOType(std::tr1::shared_ptr<PDO> ppdo, uint8_t type);
 
         void enableSync(bool enable);
         void setSyncInterval(uint32_t interval_us);
     private:
+        void mapPDO(std::tr1::shared_ptr<PDO> ppdo,
+                    std::vector<struct PDOMap> mapped,
+                    uint8_t type
+                   );
         void nmt_callback(NMT &nmt);
         void sdo_callback(SDO &sdo);
 

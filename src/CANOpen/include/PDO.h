@@ -10,6 +10,12 @@ namespace CANOpen {
 class PDO;
 typedef CallbackObject<PDO> PDOCallbackObject;
 
+struct PDOMap {
+    uint16_t index;
+    uint8_t subindex;
+    uint8_t bits;
+};
+
 class PDO : public Transfer {
     public:
         PDO(std::string name,
@@ -28,19 +34,17 @@ class PDO : public Transfer {
         void readCommunicationData(const std::vector<uint8_t> &d);
         void writeCommunicationTypeData(std::vector<uint8_t> &d);
         void readCommunicationTypeData(const std::vector<uint8_t> &d);
+        void mappingComplete(SDO &sdo);
 
         int pdo_number;
+        bool mapped;
         uint8_t objectCount;
-        struct {
-            uint8_t bits;
-            uint8_t subindex;
-            uint16_t index;
-        } objects[4];
+        struct PDOMap mappedObjects[4];
         struct {
             unsigned identifier:28;
             unsigned extended:1;
             unsigned rtr:1;
-            unsigned valid:1;
+            unsigned invalid:1;
             uint8_t type;
         } communication_parameters;
 

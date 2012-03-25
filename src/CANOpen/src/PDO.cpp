@@ -7,6 +7,7 @@
 #include <Message.h>
 #include <Transfer.h>
 #include <Callbacks.h>
+#include <SDO.h>
 #include <PDO.h>
 
 namespace CANOpen {
@@ -19,32 +20,33 @@ void PDO::readMappingCount(const std::vector<uint8_t> &d)
 {
     objectCount = d[0];
     std::cerr << "objectCount " << (int)objectCount << std::endl;
+    mapped = objectCount>0;
 }
 
 void PDO::writeMappingData(int i, std::vector<uint8_t> &d)
 {
     uint8_t *pd;
-    uint16_t index_le = htole16(objects[i].index);
+    d.push_back(mappedObjects[i].bits);
+    d.push_back(mappedObjects[i].subindex);
+    uint16_t index_le = htole16(mappedObjects[i].index);
     pd = (uint8_t *)&index_le;
     std::copy(pd, pd+sizeof(uint16_t), std::back_inserter(d));
-    d.push_back(objects[i].subindex);
-    d.push_back(objects[i].bits);
 }
 
 void PDO::readMappingData(int i, const std::vector<uint8_t> &d)
 {
     std::vector<uint8_t>::const_iterator b=d.begin();
-    objects[i].bits = *b;
+    mappedObjects[i].bits = *b;
     b++;
-    objects[i].subindex = *b;
+    mappedObjects[i].subindex = *b;
     b++;
-    objects[i].index = *b;
+    mappedObjects[i].index = *b;
     b++;
-    objects[i].index |= (*b)<<8;
+    mappedObjects[i].index |= (*b)<<8;
     std::cerr << "mapping data " << i << " 0x" <<
-        std::hex << objects[i].index << " 0x" <<
-        (int)objects[i].subindex << " " << std::dec <<
-        (int)objects[i].bits << std::endl;
+        std::hex << mappedObjects[i].index << " 0x" <<
+        (int)mappedObjects[i].subindex << " " << std::dec <<
+        (int)mappedObjects[i].bits << std::endl;
 }
 
 void PDO::writeCommunicationData(std::vector<uint8_t> &d)
@@ -53,7 +55,7 @@ void PDO::writeCommunicationData(std::vector<uint8_t> &d)
     comm_params = communication_parameters.identifier |
                   communication_parameters.extended<<29 |
                   communication_parameters.rtr<<30 |
-                  communication_parameters.valid<<31;
+                  communication_parameters.invalid<<31;
     comm_params = htole32(comm_params);
     uint8_t *pc = (uint8_t *)&comm_params;
     std::copy(pc, pc+sizeof(uint32_t), std::back_inserter(d));
@@ -74,7 +76,7 @@ void PDO::readCommunicationData(const std::vector<uint8_t> &d)
     communication_parameters.identifier = comm_params & 0x1FFFFFFF;
     communication_parameters.extended = comm_params & 0x20000000;
     communication_parameters.rtr = comm_params & 0x40000000;
-    communication_parameters.valid = comm_params & 0x80000000;
+    communication_parameters.invalid = comm_params & 0x80000000;
 
     std::cerr << "com params: 0x" << std::hex << (int)comm_params <<
         std::dec << std::endl;
@@ -92,10 +94,14 @@ void PDO::readCommunicationTypeData(const std::vector<uint8_t> &d)
         std::dec << std::endl;
 }
 
+void PDO::mappingComplete(SDO &sdo)
+{
+    mapped=true;
+}
 
 uint16_t RPDO::COBID(void)
 {
-    return 0x200+((pdo_number<<8)|node_id);
+    return 0x200+(((pdo_number-1)<<8)|node_id);
 }
 
 bool TPDO::handleMessage(const Message m)
