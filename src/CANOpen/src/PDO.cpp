@@ -145,7 +145,7 @@ uint16_t TPDO::mappingIndex(void)
     return 0x1A00+pdo_number-1;
 }
 
-void RPDO::send(std::vector<uint8_t> &data)
+void RPDO::send(std::vector<uint8_t> &data, PDOCallbackObject callback)
 {
     Message m;
 
@@ -157,6 +157,8 @@ void RPDO::send(std::vector<uint8_t> &data)
     std::copy(data.begin(), data.begin()+tocopy, &m.data[0]);
 
     to_send.push_back( m );
+
+    this->callback = callback;
 }
 
 }

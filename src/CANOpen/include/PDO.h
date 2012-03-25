@@ -20,8 +20,10 @@ class PDO : public Transfer {
     public:
         PDO(std::string name,
             unsigned long node_id,
-            int pdo_number
-            ) : Transfer(name, node_id), pdo_number(pdo_number) {};
+            int pdo_number,
+            PDOCallbackObject callback=PDOCallbackObject()
+            ) : Transfer(name, node_id), pdo_number(pdo_number), mapped(false),
+        callback(callback){};
 
         virtual uint16_t mappingIndex(void)=0;
         void writeMappingCount(std::vector<uint8_t> &d);
@@ -50,17 +52,32 @@ class PDO : public Transfer {
 
         std::vector<uint8_t> data;
 
+    protected:
+        PDOCallbackObject callback;
 };
 
 class RPDO : public PDO {
     public:
         RPDO(std::string name,
              unsigned long node_id,
-             int pdo_number
-            ) : PDO(name, node_id, pdo_number){};
+             int pdo_number,
+             PDOCallbackObject callback=PDOCallbackObject()
+            ) : PDO(name, node_id, pdo_number, callback){};
 
         uint16_t COBID(void);
         bool handleMessage(const Message m){return false;};
+        bool nextMessage(Message &m)
+        {
+            if(to_send.empty()){
+                return false;
+            } else {
+                m = to_send.front();
+                to_send.erase(to_send.begin());
+                callback(*this);
+                return true;
+            }
+        };
+
 
         uint16_t communicationIndex(void);
 
@@ -75,8 +92,7 @@ class TPDO : public PDO {
         TPDO(std::string name,
              unsigned long node_id,
              int pdo_number,
-             PDOCallbackObject callback) : PDO(name, node_id, pdo_number),
-                callback(callback){};
+             PDOCallbackObject callback) : PDO(name, node_id, pdo_number, callback) {};
 
         uint16_t COBID(void);
         bool handleMessage(const Message m);
@@ -85,8 +101,6 @@ class TPDO : public PDO {
 
         uint16_t mappingIndex(void);
 
-    private:
-        PDOCallbackObject callback;
 };
 
 }
