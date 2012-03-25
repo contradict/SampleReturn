@@ -22,7 +22,8 @@ class SYNC : public Transfer {
 
         bool handleMessage(const Message m)
         {
-            callback(*this);
+            if(m.id == COBID())
+                callback(*this);
             return false;
         };
 
