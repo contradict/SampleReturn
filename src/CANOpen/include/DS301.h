@@ -62,7 +62,7 @@ class DS301 : public TransferCallbackReceiver {
         void nmt_callback(NMT &nmt);
         void sdo_callback(SDO &sdo);
 
-        void insertSDOTransaction(std::shared_ptr<struct SDOTransaction> &t);
+        void insertSDOTransaction(std::tr1::shared_ptr<struct SDOTransaction> &t);
         void startNextTransaction(void);
         void checkSDOTransactionQueue(SDO &sdo);
         void checkSDOTransactionQueueError(SDO &sdo);
@@ -79,7 +79,8 @@ class DS301 : public TransferCallbackReceiver {
         DS301NotifyCallback nmt_notify;
         std::tr1::shared_ptr<SDO> psdo;
 
-        std::vector<std::shared_ptr<struct SDOTransaction> > sdoTransactionQueue;
+        std::vector<std::tr1::shared_ptr<struct SDOTransaction> > sdoTransactionQueue;
+
 };
 }
 #endif // __DS301_H__

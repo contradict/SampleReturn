@@ -39,7 +39,7 @@ DS301::DS301(unsigned long node_id, std::tr1::shared_ptr<Bus> b, bool extended) 
 void DS301::readObjectDictionary(uint16_t index, uint8_t subindex,
         std::tr1::shared_ptr<SDOCallbackObject> callback)
 {
-    std::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
+    std::tr1::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
     pt->write=false;
     pt->index=index;
     pt->subindex=subindex;
@@ -50,7 +50,7 @@ void DS301::readObjectDictionary(uint16_t index, uint8_t subindex,
 void DS301::writeObjectDictionary(uint16_t index, uint8_t subindex,
         std::vector<uint8_t> &bytes, std::tr1::shared_ptr<SDOCallbackObject> callback)
 {
-    std::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
+    std::tr1::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
     pt->write=true;
     pt->index=index;
     pt->subindex=subindex;
@@ -59,17 +59,17 @@ void DS301::writeObjectDictionary(uint16_t index, uint8_t subindex,
     insertSDOTransaction(pt);
 }
 
-void DS301::insertSDOTransaction(std::shared_ptr<struct SDOTransaction> &t)
+void DS301::insertSDOTransaction(std::tr1::shared_ptr<struct SDOTransaction> &t)
 {
     sdoTransactionQueue.push_back(t);
-    if( !inCheck && sdoTransactionQueue.size() == 1) {
+    if( sdoTransactionQueue.size() == 1) {
         startNextTransaction();
     }
 }
 
 void DS301::startNextTransaction(void)
 {
-    std::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
+    std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
     SDOCallbackObject
         intermediate_callback(static_cast<TransferCallbackReceiver *>(this),
                 static_cast<SDOCallbackObject::CallbackFunction>(&DS301::checkSDOTransactionQueue),
@@ -83,7 +83,7 @@ void DS301::startNextTransaction(void)
 
 void DS301::checkSDOTransactionQueue(SDO &sdo)
 {
-   std::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
+   std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
    sdoTransactionQueue.erase(sdoTransactionQueue.begin());
    inCheck = true;
    ptr->callback->operator()(sdo);
@@ -95,7 +95,7 @@ void DS301::checkSDOTransactionQueue(SDO &sdo)
 
 void DS301::checkSDOTransactionQueueError(SDO &sdo)
 {
-   std::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
+   std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
    sdoTransactionQueue.erase(sdoTransactionQueue.begin());
    inCheck = true;
    ptr->callback->error(sdo);
