@@ -46,15 +46,70 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
     DS301(node_id,
           bus,
           false),
-    allReady(false)
-{
-    sync = std::tr1::shared_ptr<SYNC>(new SYNC(node_id,
+    sync(std::tr1::shared_ptr<SYNC>(new SYNC(node_id,
          SYNCCallbackObject(static_cast<TransferCallbackReceiver *>(this),
-                            static_cast<SYNCCallbackObject::CallbackFunction>(&CopleyServo::syncCallback))));
+                            static_cast<SYNCCallbackObject::CallbackFunction>(&CopleyServo::syncCallback))))),
+    syncProducer(false),
+    allReady(false),
+    gotPV(false),
+    mapsCreated(false)
+{
     bus->add(sync);
+}
 
+CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_ptr<Bus> bus) :
+    DS301(node_id,
+          bus,
+          false),
+    sync(std::tr1::shared_ptr<SYNC>(new SYNC(node_id,
+         SYNCCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                            static_cast<SYNCCallbackObject::CallbackFunction>(&CopleyServo::syncCallback))))),
+    syncProducer(true),
+    syncInterval(sync_interval),
+    allReady(false),
+    gotPV(false),
+    mapsCreated(false)
+{
+    bus->add(sync);
+}
+
+
+void CopleyServo::initialize(void)
+{
+    sendNMT(ResetNode, DS301CallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                static_cast<DS301CallbackObject::CallbackFunction>(&CopleyServo::_initialize))
+                 );
+
+}
+
+void CopleyServo::_initialize(DS301 &node)
+{
+    std::cout << "Initialize" << std::endl;
+    allReady = false;
+    gotPV = false;
+
+    _mapPDOs();
+
+    std::cout << "Read control word" << std::endl;
+    // Read initial control word
+    readObjectDictionary(0x6040, 0, std::tr1::shared_ptr<SDOCallbackObject>(
+                new SDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                    static_cast<SDOCallbackObject::CallbackFunction>(&CopleyServo::_initialControlWord))));
+
+    if(syncProducer) {
+        setSyncInterval(syncInterval);
+        enableSync(true);
+    }
+}
+
+void CopleyServo::_mapPDOs(void)
+{
     std::vector<struct PDOMap> maps;
     struct PDOMap map;
+
+    std::cout << "Map PDOs" << std::endl;
+    mapsCreated = false;
+
     // Status Word
     map.index = 0x6041;
     map.subindex = 0;
@@ -129,10 +184,7 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
     velocity_pdo = mapRPDO("Target Velocity", 3, maps, 0);
     bus->add(velocity_pdo);
 
-    // Read initial control word
-    readObjectDictionary(0x6040, 0, std::tr1::shared_ptr<SDOCallbackObject>(
-                new SDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
-                    static_cast<SDOCallbackObject::CallbackFunction>(&CopleyServo::_initialControlWord))));
+    mapsCreated = true;
 }
 
 
@@ -145,54 +197,94 @@ void CopleyServo::_initialControlWord(SDO &sdo)
 
 void CopleyServo::statusModePDOCallback(PDO &pdo)
 {
-    status_word = pdo.data[0] | (pdo.data[1]<<8);
-    mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
-    std::cout << "Status: " <<
-        ((status_word&0x0001)?"Ready to Switch On, ":"") <<
-        ((status_word&0x0002)?"Switched On, ":"") <<
-        ((status_word&0x0004)?"Operation Enabled, ":"") <<
-        ((status_word&0x0008)?"Fault, ":"") <<
-        ((status_word&0x0010)?"Voltage Enabled, ":"") <<
-        ((status_word&0x0020)?"":"Quick Stop, ") <<
-        ((status_word&0x0040)?"Switch On Disabled, ":"") <<
-        ((status_word&0x0080)?"Warning, ":"") <<
-        ((status_word&0x0100)?"Trajectory Abort, ":"") <<
-        ((status_word&0x0200)?"Remote, ":"") <<
-        ((status_word&0x0400)?"Target Reached, ":"") <<
-        ((status_word&0x0800)?"Internal Limit, ":"");
-    switch(mode_of_operation) {
+    uint16_t new_status_word = pdo.data[0] | (pdo.data[1]<<8);
+    enum OperationMode new_mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
+
+    uint16_t rising_status = new_status_word & (~status_word);
+
+    switch(new_mode_of_operation) {
         case ProfilePosition:
-            std::cout << ((status_word&0x1000)?"Setpoint Ack, ":"") <<
-                         ((status_word&0x2000)?"Following Error, ":"");
+            if(rising_status&STATUS_TARGET_REACHED) {
+                position_callback(*this);
+            }
             break;
         case ProfileVelocity:
-            std::cout << ((status_word&0x1000)?"Speed==0, ":"") <<
-                         ((status_word&0x2000)?"Maximum Slippage Error, ":"");
             break;
         case ProfileTorque:
-            std::cout << ((status_word&0x1000)?"Reserved (PT12), ":"") <<
-                         ((status_word&0x2000)?"Reserved (PT13), ":"");
             break;
         case Homing:
-            std::cout << ((status_word&0x1000)?"Homing Attained, ":"") <<
-                         ((status_word&0x2000)?"Homing Error, ":"");
+            if(rising_status&STATUS_HOMING_ATTAINED) {
+                home_callback(*this);
+            }
             break;
         case InterpolatedPosition:
-            std::cout << ((status_word&0x1000)?"Interpolated Position Active, ":"") <<
-                         ((status_word&0x2000)?"Reserved (IP13), ":"");
             break;
-        case 8:
+        case CyclicSynchonousPosition:
+            break;
+        case CyclicSynchronousVelocity:
+            break;
+        case CyclicSynchronousTorque:
+            break;
+        default:
+            break;
+ 
+    }
+
+    status_word = new_status_word;
+    mode_of_operation = new_mode_of_operation;
+    //_printStatusAndMode();
+}
+
+void CopleyServo::_printStatusAndMode(void)
+{
+    std::cout << "Status: " <<
+        ((status_word&STATUS_READY)?"Ready to Switch On, ":"") <<
+        ((status_word&STATUS_SWITCHED_ON)?"Switched On, ":"") <<
+        ((status_word&STATUS_OPERATION_ENABLED)?"Operation Enabled, ":"") <<
+        ((status_word&STATUS_FAULT)?"Fault, ":"") <<
+        ((status_word&STATUS_VOLTAGE_ENABLED)?"Voltage Enabled, ":"") <<
+        ((status_word&STATUS_QUICK_STOP)?"":"Quick Stop, ") <<
+        ((status_word&STATUS_SWITCH_ON_DISABLED)?"Switch On Disabled, ":"") <<
+        ((status_word&STATUS_WARNING)?"Warning, ":"") <<
+        ((status_word&STATUS_TRAJECTORY_ABORT)?"Trajectory Abort, ":"") <<
+        ((status_word&STATUS_REMOTE)?"Remote, ":"") <<
+        ((status_word&STATUS_TARGET_REACHED)?"Target Reached, ":"") <<
+        ((status_word&STATUS_INTERNAL_LIMIT)?"Internal Limit, ":"");
+     switch(mode_of_operation) {
+        case ProfilePosition:
+            std::cout << ((status_word&STATUS_SETPOINT_ACK)?"Setpoint Ack, ":"") <<
+                         ((status_word&STATUS_FOLLOWING_ERROR)?"Following Error, ":"");
+            break;
+        case ProfileVelocity:
+            std::cout << ((status_word&STATUS_SPEED_ZERO)?"Speed==0, ":"") <<
+                         ((status_word&STATUS_MAXIMUM_SLIPPAGE)?"Maximum Slippage Error, ":"");
+            break;
+        case ProfileTorque:
+            std::cout << ((status_word&STATUS_RESERVED_PT12)?"Reserved (PT12), ":"") <<
+                         ((status_word&STATUS_RESERVED_PT13)?"Reserved (PT13), ":"");
+            break;
+        case Homing:
+            std::cout << ((status_word&STATUS_HOMING_ATTAINED)?"Homing Attained, ":"") <<
+                         ((status_word&STATUS_HOMING_ERROR)?"Homing Error, ":"");
+            break;
+        case InterpolatedPosition:
+            std::cout << ((status_word&STATUS_INTERPOLATED_POSITION)?"Interpolated Position Active, ":"") <<
+                         ((status_word&STATUS_RESERVED_IP13)?"Reserved (IP13), ":"");
+            break;
+        case CyclicSynchonousPosition:
             // Cyclic Synchronous Position
-        case 9:
+            break;
+        case CyclicSynchronousVelocity:
             // Cyclic Synchronous Velocity
-        case 10:
+            break;
+        case CyclicSynchronousTorque:
             // Cyclic Synchronous Torque
             break;
         default:
             break;
     }
-    std::cout << ((status_word&0x4000)?"Performing Move, ":"") <<
-                 ((status_word&0x8000)?"Reserved (15)":"") <<
+    std::cout << ((status_word&STATUS_PERFORMING_MOVE)?"Performing Move, ":"") <<
+                 ((status_word&STATUS_RESERVED_15)?"Reserved (15)":"") <<
                  std::endl;
 
     std::cout << "Mode of Operation: " << operationModeName(mode_of_operation) << std::endl;
@@ -210,24 +302,30 @@ void CopleyServo::positionVelocityPDOCallback(PDO &pdo)
                          ((uint32_t)pdo.data[6]<<16) |
                          ((uint32_t)pdo.data[7]<<24));
 
-    std::cout << "Position: " << position << " Velocity: " << velocity << std::endl;
+    gotPV = true;
+    //std::cout << "Position: " << position << " Velocity: " << velocity << std::endl;
 }
 
 void CopleyServo::syncCallback(SYNC &sync)
 {
+    if(!mapsCreated) {
+        return;
+    }
     if(!allReady) {
         std::cout <<
             "status_mode: " << status_mode_pdo->mapped <<
             " position_velocity: " << position_velocity_pdo->mapped <<
             " control_mode: " << control_mode_pdo->mapped <<
             " position: " << position_pdo->mapped <<
-            " velocity: " << velocity_pdo->mapped << std::endl;
+            " velocity: " << velocity_pdo->mapped <<
+            " PV: " << gotPV << std::endl;
     }
     if( status_mode_pdo->mapped &&
             position_velocity_pdo->mapped &&
             control_mode_pdo->mapped &&
             position_pdo->mapped &&
             velocity_pdo->mapped &&
+            gotPV &&
             !allReady) {
         allReady=true;
     }
