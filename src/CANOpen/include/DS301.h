@@ -70,7 +70,6 @@ class DS301 : public TransferCallbackReceiver {
         void readPDO(std::tr1::shared_ptr<PDO> ppdo);
 
         const unsigned long node_id;
-        std::tr1::shared_ptr<Bus> bus;
         bool EXTENDED;
 
         bool inCheck;
@@ -81,6 +80,8 @@ class DS301 : public TransferCallbackReceiver {
 
         std::vector<std::tr1::shared_ptr<struct SDOTransaction> > sdoTransactionQueue;
 
+    protected:
+        std::tr1::shared_ptr<Bus> bus;
 };
 }
 #endif // __DS301_H__
