@@ -30,7 +30,6 @@ DS301::DS301(unsigned long node_id, std::tr1::shared_ptr<Bus> b, bool extended) 
                     static_cast<TransferCallbackReceiver *>(this),
                     static_cast<SDOCallbackObject::CallbackFunction>(&DS301::sdo_callback))))
 {
-    inCheck = false;
     bus->add(pnmt);
     bus->add(psdo);
 }
@@ -84,24 +83,20 @@ void DS301::checkSDOTransactionQueue(SDO &sdo)
 {
    std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
    sdoTransactionQueue.erase(sdoTransactionQueue.begin());
-   inCheck = true;
    ptr->callback->operator()(sdo);
-   if(!sdoTransactionQueue.empty()) {
+   if(!psdo->inProgress() && !sdoTransactionQueue.empty()) {
        startNextTransaction();
    }
-   inCheck = false;
 }
 
 void DS301::checkSDOTransactionQueueError(SDO &sdo)
 {
    std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
    sdoTransactionQueue.erase(sdoTransactionQueue.begin());
-   inCheck = true;
    ptr->callback->error(sdo);
-   if(!sdoTransactionQueue.empty()) {
+   if(!psdo->inProgress() && !sdoTransactionQueue.empty()) {
        startNextTransaction();
    }
-   inCheck = false;
 }
 
 
