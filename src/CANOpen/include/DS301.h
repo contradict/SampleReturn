@@ -3,7 +3,7 @@
 namespace CANOpen {
 
 class DS301;
-typedef void (*DS301NotifyCallback)(DS301 &node);
+typedef CallbackObject<DS301> DS301CallbackObject;
 
 struct SDOTransaction {
     bool write;
@@ -29,7 +29,7 @@ class DS301 : public TransferCallbackReceiver {
                      );
 
         void sendNMT(enum NodeControlCommand cmd,
-                     DS301NotifyCallback cb=NULL);
+                     DS301CallbackObject cb=DS301CallbackObject());
 
         std::tr1::shared_ptr<TPDO> createTPDO(std::string name,
                                               int pdo_number,
@@ -76,7 +76,7 @@ class DS301 : public TransferCallbackReceiver {
         bool inCheck;
 
         std::tr1::shared_ptr<NMT> pnmt;
-        DS301NotifyCallback nmt_notify;
+        DS301CallbackObject nmt_notify;
         std::tr1::shared_ptr<SDO> psdo;
 
         std::vector<std::tr1::shared_ptr<struct SDOTransaction> > sdoTransactionQueue;

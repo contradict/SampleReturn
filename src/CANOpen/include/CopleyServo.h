@@ -60,10 +60,11 @@ class CopleyServo : public DS301 {
 
         void enable(void);
 
-        void home(void);
+        void home(DS301CallbackObject callback=DS301CallbackObject());
 
         void setVelocity(int32_t v);
-        void setPosition(int32_t p);
+        void setPosition(int32_t p, DS301CallbackObject
+                callback=DS301CallbackObject() );
 
         enum OperationMode operationMode(uint8_t m);
         static enum OperationMode operationMode(std::string m);

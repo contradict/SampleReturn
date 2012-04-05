@@ -25,7 +25,6 @@ DS301::DS301(unsigned long node_id, std::tr1::shared_ptr<Bus> b, bool extended) 
                  NMTCallbackObject(
                      static_cast<TransferCallbackReceiver *>(this),
                      static_cast<NMTCallbackObject::CallbackFunction>(&DS301::nmt_callback)))),
-    nmt_notify(NULL),
     psdo(new SDO("Default SDO", node_id,
                 SDOCallbackObject(
                     static_cast<TransferCallbackReceiver *>(this),
@@ -109,17 +108,14 @@ void DS301::checkSDOTransactionQueueError(SDO &sdo)
 void DS301::nmt_callback(NMT &nmt)
 {
     std::cerr << "NMT state transition: " << pnmt->nodeStateName(pnmt->node_state) << std::endl;
-    if(nmt_notify != NULL) {
-        nmt_notify(*this);
-        nmt_notify=NULL;
-    }
+    nmt_notify(*this);
 }
 
 void DS301::sdo_callback(SDO &sdo)
 {
 }
 
-void DS301::sendNMT(enum NodeControlCommand cmd, DS301NotifyCallback cb)
+void DS301::sendNMT(enum NodeControlCommand cmd, DS301CallbackObject cb)
 {
     nmt_notify = cb;
     pnmt->nodeControl(cmd);

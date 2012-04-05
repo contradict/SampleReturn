@@ -73,11 +73,6 @@ class Stopper : public TransferCallbackReceiver {
 
 Stopper stopit;
 
-void stopnmt(DS301 &node)
-{
-    stopit.stop(node);
-}
-
 int main(int argc, char * argv[])
 {
     po::options_description interface("Interface Options");
@@ -236,7 +231,9 @@ int main(int argc, char * argv[])
             node.readObjectDictionary(Index, Subindex, pstopc);
             break; 
         case SendNMT:
-            node.sendNMT(cmd, stopnmt);
+            node.sendNMT(cmd,
+                    DS301CallbackObject(static_cast<TransferCallbackReceiver *>(&stopit),
+                                        static_cast<DS301CallbackObject::CallbackFunction>(&Stopper::stop)));
             break;
         case CreateTPDO:
             ptpdo = node.createTPDO("Test PDO", pdo_number,

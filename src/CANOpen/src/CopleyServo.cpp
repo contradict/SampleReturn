@@ -312,9 +312,10 @@ void CopleyServo::enable(void)
            );
 }
 
-void CopleyServo::home(void)
+void CopleyServo::home(DS301CallbackObject callback)
 {
-    modeControl(0, CONTROL_NEW_SETPOINT, Homing);
+    home_callback = callback;
+    modeControl(0, CONTROL_NEW_SETPOINT, Homing); 
     control( CONTROL_NEW_SETPOINT| CONTROL_CHANGE_SET_IMMEDIATE, 0);
 }
 
@@ -324,8 +325,9 @@ void CopleyServo::setVelocity(int32_t v)
     velocity_pdo->send(v);
 }
 
-void CopleyServo::setPosition(int32_t p)
+void CopleyServo::setPosition(int32_t p, DS301CallbackObject callback)
 {
+    position_callback = callback;
     modeControl(0, CONTROL_NEW_SETPOINT | CONTROL_CHANGE_SET_IMMEDIATE, ProfilePosition);
     position_pdo->send(p,
             PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
