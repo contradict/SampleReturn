@@ -10,9 +10,9 @@ class Bus {
         Bus(std::tr1::shared_ptr<Interface> interface, bool log=false);
         int runonce(bool &canRead, bool &canWrite);
         int add(std::tr1::shared_ptr<Transfer> xfer);
+        bool canSend(void);
 
     private:
-        transfer_iterator canSend(void);
 
         std::tr1::shared_ptr<Interface> interface;
         bool log;
