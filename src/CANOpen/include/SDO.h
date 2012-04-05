@@ -27,6 +27,7 @@ class SDO : public Transfer {
         uint32_t abortCode(void);
         bool isError(void);
         bool handleMessage(const Message m);
+        bool inProgress(void){return _handleMessage != &SDO::_processMessageUnitializedError;};
 
         // CANOpen Object address
         uint16_t index;
