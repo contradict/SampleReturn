@@ -195,6 +195,25 @@
     <remap from="image" to="/vslam/vo_tracks/image" />
   </node>
 
+
+  <!-- Publishes the voxel grid to rviz for display -->
+  <node pkg="costmap_2d" type="costmap_2d_markers" name="voxel_visualizer">
+    <remap from="voxel_grid" to="/costmap_node/costmap/voxel_grid"/>
+  </node>
+
+  <node pkg="costmap_2d" type="costmap_2d_cloud" name="voxel_visualizer_cloud">
+    <remap from="voxel_grid" to="/costmap_node/costmap/voxel_grid"/>
+  </node>
+
+  <!-- Run the costmap node -->
+  <node name="costmap_node" pkg="costmap_2d" type="costmap_2d_node" >
+    <rosparam file="$(find samplereturn)/launch/example_params.yaml" command="load" ns="costmap" />
+  </node>
+
+  <!-- Run the tf broadcaster and fake odometry -->
+  <!--<node name="tf_broadcaster" pkg="robot_setup_tf" type="tf_broadcaster" />
+  <node name=-->
+
   <!-- Costmap 2D -->
 
     <!-- Calibration tool -->
