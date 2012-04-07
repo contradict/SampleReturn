@@ -1,11 +1,7 @@
 import numpy as np
 from numpy import arctan2, sin, cos, pi, sign, sqrt, abs
+from numpy.linalg import norm
 import pylab
-
-def nrm(v):
-    """Vector norm
-    """
-    return sqrt((v**2).sum(axis=0))
 
 def wheel_angles(phi, kappa, l, w):
     """ Generate wheel angles from robot shape and plane point
@@ -31,7 +27,7 @@ def wheel_angles(phi, kappa, l, w):
     w2 = pi/2 - arctan2( sin(phi) + kappa*w/2, kappa*l - cos(phi))
     return w0, w1, w2
 
-def drive(body_pt, body_vel, body_omega, d, l, w):
+def drive(body_pt, body_vel, body_omega, d=0.305, l=1.125, w=1.30):
     """ Move the given body point
 
     body_pt     Point in body coordinates to move
@@ -44,39 +40,56 @@ def drive(body_pt, body_vel, body_omega, d, l, w):
 
     Returns wheel angles (radians) and rotational speeds (radians/sec)
     """
-    body_speed = nrm(body_vel)
+    body_speed = norm(body_vel)
     if abs(body_omega)>0:
         if body_speed>0:
-            center_dir = np.r_[-body_vel[1], body_vel[0]]/body_speed
-            kappa = body_omega/body_speed
+            center_dir = sign(body_omega)*np.r_[-body_vel[1], body_vel[0]]/body_speed
+            kappa = abs(body_omega)/body_speed
             center_pos = body_pt + center_dir/kappa
         else:
-            kappa = 1./nrm(body_pt)
+            kappa = 1./norm(body_pt)
             center_pos = body_pt
-        phi = arctan2(center_pos[1], center_pos[0]) + pi/2
-        v0 = nrm(center_pos)*body_omega/pi/d
-        v1 = nrm(center_pos-[l,  w/2])*body_omega/pi/d
-        v2 = nrm(center_pos-[l, -w/2])*body_omega/pi/d
+        phi = arctan2(center_pos[1], center_pos[0])
+        v0 = norm(center_pos)*body_omega/pi/d
+        v1 = norm(center_pos-[l,  w/2])*body_omega/pi/d
+        v2 = norm(center_pos-[l, -w/2])*body_omega/pi/d
     else:
         kappa = 0
         phi = arctan2(body_vel[1], body_vel[0])+pi/2
         v0 = v1 = v2 = body_speed/pi/d
     w0, w1, w2 = wheel_angles(phi, kappa, l, w)
-    return [(w0, v0), (w1, v1), (w2, v2)]
+    return [(w0, v0), (w1, v1), (w2, v2)], kappa
 
-def plot_wheels(phi, kappa, d, l, w):
-    w0, w1, w2 = wheel_angles(phi, kappa, l, w)
+def plot_wheels(vel, omega, d=0.305, l=1.125, w=1.30):
+    body_pt = np.r_[l, 0]
+    [(w0, v0), (w1, v1), (w2, v2)], kappa = drive(body_pt, vel, omega, d, l, w)
+    print degrees(w0), degrees(w1), degrees(w2)
     fig = pylab.figure(1)
     fig.clf()
     ax = fig.add_subplot(111)
-    ax.plot( [-cos(w0)*d/2, cos(w0)*d/2],
-             [-sin(w0)*d/2, sin(w0)*d/2],
+    ax.plot( [0, cos(w0)*d/2*np.sign(v0)],
+             [0, sin(w0)*d/2*np.sign(v0)],
+             'b-x',
              label='w0')
-    ax.plot( [l-cos(w1)*d/2, l+cos(w1)*d/2],
-             [w/2-sin(w1)*d/2, w/2+sin(w1)*d/2],
+    ax.plot( [-cos(w0)*d/2*np.sign(v0), 0],
+             [-sin(w0)*d/2*np.sign(v0), 0],
+             'b-',
+             label='w0')
+    ax.plot( [l, l+cos(w1)*d/2*np.sign(v1)],
+             [w/2, w/2+sin(w1)*d/2*np.sign(v1)],
+             'b-x',
              label='w1')
-    ax.plot( [l-cos(w2)*d/2, l+cos(w2)*d/2],
-             [-w/2-sin(w2)*d/2, -w/2+sin(w2)*d/2],
+    ax.plot( [l-cos(w1)*d/2*np.sign(v1), l],
+             [w/2-sin(w1)*d/2*np.sign(v1), w/2],
+             'b-',
+             label='w1')
+    ax.plot( [l, l+cos(w2)*d/2*np.sign(v2)],
+             [-w/2, -w/2+sin(w2)*d/2*np.sign(v2)],
+             'b-x',
+             label='w2')
+    ax.plot( [l-cos(w2)*d/2*np.sign(v2), l],
+             [-w/2-sin(w2)*d/2*np.sign(v2), -w/2],
+             'b-',
              label='w2')
     if abs(kappa)>0:
         r = 5*sign(kappa)

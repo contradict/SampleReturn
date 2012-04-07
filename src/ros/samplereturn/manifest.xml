@@ -7,7 +7,12 @@
   <author></author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/samplereturn</url>
+  <url>https://github.com/contradict/SampleReturn</url>
+
+  <depend package="nodelet"/>
+  <depend package="image_proc"/>
+  <depend package="stereo_image_proc"/>
+  <depend package="camera_calibration"/>
 
 </package>
 

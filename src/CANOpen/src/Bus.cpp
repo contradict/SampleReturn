@@ -20,21 +20,24 @@ Bus::Bus(std::tr1::shared_ptr<Interface> interface, bool log):
 
 int Bus::runonce(bool &canRead, bool &canWrite)
 {
-    if(active_transfers.empty())
-            return 0;
+    Message m;
     if (canRead){
-        Message m;
         int err = interface->readMessage(m);
         if(err<0)
             return err;
         if(log) std::cout << "recv: " << m << std::endl;
+    }
+    if(active_transfers.empty()) {
+            canWrite = false;
+            canRead = true;
+            return 0;
+    } else if(canRead) {
         for(transfer_iterator it=active_transfers.begin(); it!=active_transfers.end(); it++)
             if((*it)->handleMessage(m))
                 break;
     }
     if( canWrite ) {
-        transfer_iterator start=current_transfer;
-        do {
+        for(int i=0;i<active_transfers.size();i++) {
             current_transfer++;
             if(current_transfer == active_transfers.end()) {
                 current_transfer=active_transfers.begin();
@@ -46,25 +49,23 @@ int Bus::runonce(bool &canRead, bool &canWrite)
                 interface->sendMessage(m);
                 break;
             }
-        } while(current_transfer != start);
+        }
     }
 
-    if(canSend() == active_transfers.end()) {
-        canWrite = false;
-    } else {
-        canWrite = true;
-    }
+    canWrite = canSend();
     canRead = true;
     return 0;
 }
 
-transfer_iterator Bus::canSend(void)
+bool Bus::canSend(void)
 {
     transfer_iterator it;
-    for( it=active_transfers.begin(); it!=active_transfers.end(); it++)
-        if((*it)->canSend())
-            break;
-    return it;
+    for( it=active_transfers.begin(); it!=active_transfers.end(); it++) {
+        if((*it)->canSend()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 int Bus::add(std::tr1::shared_ptr<Transfer> xfer)

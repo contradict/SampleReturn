@@ -52,6 +52,9 @@ enum OperationMode {
 class CopleyServo : public DS301 {
     public:
         CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus);
+        CopleyServo(long int node_id, int sync_interval, std::tr1::shared_ptr<Bus> bus);
+
+        void initialize(void);
 
         void control(uint16_t set, uint16_t clear);
         void mode(enum OperationMode mode);
@@ -60,10 +63,11 @@ class CopleyServo : public DS301 {
 
         void enable(void);
 
-        void home(void);
+        void home(DS301CallbackObject callback=DS301CallbackObject());
 
         void setVelocity(int32_t v);
-        void setPosition(int32_t p);
+        void setPosition(int32_t p, DS301CallbackObject
+                callback=DS301CallbackObject() );
 
         enum OperationMode operationMode(uint8_t m);
         static enum OperationMode operationMode(std::string m);
@@ -71,10 +75,19 @@ class CopleyServo : public DS301 {
 
         bool ready(void);
 
+        uint16_t status_word;
+        uint16_t control_word;
+        enum OperationMode mode_of_operation;
+        int32_t position;
+        int32_t velocity;
+
     private:
         void syncCallback(SYNC &sync);
+        void _initialize(DS301 &node);
+        void _mapPDOs(void);
         void statusModePDOCallback(PDO &pdo);
         void positionVelocityPDOCallback(PDO &pdo);
+        void _printStatusAndMode(void);
 
         void _initialModeOfOperation(SDO &sdo);
         void _initialControlWord(SDO &sdo);
@@ -91,13 +104,14 @@ class CopleyServo : public DS301 {
         std::tr1::shared_ptr<RPDO> position_pdo;
         std::tr1::shared_ptr<RPDO> velocity_pdo;
 
-        uint16_t status_word;
-        uint16_t control_word;
-        enum OperationMode mode_of_operation;
-        int32_t position;
-        int32_t velocity;
+        DS301CallbackObject home_callback;
+        DS301CallbackObject position_callback;
 
+        bool syncProducer;
+        int32_t syncInterval;
         bool allReady;
+        bool gotPV;
+        bool mapsCreated;
 };
 
 }

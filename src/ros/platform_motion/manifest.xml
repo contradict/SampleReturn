@@ -1,0 +1,23 @@
+<package>
+  <description brief="platform_motion">
+
+     platform_motion
+
+  </description>
+  <author></author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>https://github.com/contradict/SampleReturn</url>
+  <depend package="roscpp"/>
+  <depend package="joy"/>
+  <depend package="eigen"/>
+  <depend package="actionlib_msgs"/>
+  <depend package="actionlib"/>
+
+  <export>
+      <cpp clfags="-I${prefix}/../../CANOpen/include" lflags="-L${prefix}/../../CANOpen/build/src -lcanopen"/>
+  </export>
+
+</package>
+
+

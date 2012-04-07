@@ -25,13 +25,11 @@ DS301::DS301(unsigned long node_id, std::tr1::shared_ptr<Bus> b, bool extended) 
                  NMTCallbackObject(
                      static_cast<TransferCallbackReceiver *>(this),
                      static_cast<NMTCallbackObject::CallbackFunction>(&DS301::nmt_callback)))),
-    nmt_notify(NULL),
     psdo(new SDO("Default SDO", node_id,
                 SDOCallbackObject(
                     static_cast<TransferCallbackReceiver *>(this),
                     static_cast<SDOCallbackObject::CallbackFunction>(&DS301::sdo_callback))))
 {
-    inCheck = false;
     bus->add(pnmt);
     bus->add(psdo);
 }
@@ -39,7 +37,7 @@ DS301::DS301(unsigned long node_id, std::tr1::shared_ptr<Bus> b, bool extended) 
 void DS301::readObjectDictionary(uint16_t index, uint8_t subindex,
         std::tr1::shared_ptr<SDOCallbackObject> callback)
 {
-    std::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
+    std::tr1::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
     pt->write=false;
     pt->index=index;
     pt->subindex=subindex;
@@ -50,7 +48,7 @@ void DS301::readObjectDictionary(uint16_t index, uint8_t subindex,
 void DS301::writeObjectDictionary(uint16_t index, uint8_t subindex,
         std::vector<uint8_t> &bytes, std::tr1::shared_ptr<SDOCallbackObject> callback)
 {
-    std::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
+    std::tr1::shared_ptr<struct SDOTransaction> pt(new struct SDOTransaction);
     pt->write=true;
     pt->index=index;
     pt->subindex=subindex;
@@ -59,17 +57,17 @@ void DS301::writeObjectDictionary(uint16_t index, uint8_t subindex,
     insertSDOTransaction(pt);
 }
 
-void DS301::insertSDOTransaction(std::shared_ptr<struct SDOTransaction> &t)
+void DS301::insertSDOTransaction(std::tr1::shared_ptr<struct SDOTransaction> &t)
 {
     sdoTransactionQueue.push_back(t);
-    if( !inCheck && sdoTransactionQueue.size() == 1) {
+    if( sdoTransactionQueue.size() == 1) {
         startNextTransaction();
     }
 }
 
 void DS301::startNextTransaction(void)
 {
-    std::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
+    std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
     SDOCallbackObject
         intermediate_callback(static_cast<TransferCallbackReceiver *>(this),
                 static_cast<SDOCallbackObject::CallbackFunction>(&DS301::checkSDOTransactionQueue),
@@ -83,43 +81,36 @@ void DS301::startNextTransaction(void)
 
 void DS301::checkSDOTransactionQueue(SDO &sdo)
 {
-   std::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
+   std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
    sdoTransactionQueue.erase(sdoTransactionQueue.begin());
-   inCheck = true;
    ptr->callback->operator()(sdo);
-   if(!sdoTransactionQueue.empty()) {
+   if(!psdo->inProgress() && !sdoTransactionQueue.empty()) {
        startNextTransaction();
    }
-   inCheck = false;
 }
 
 void DS301::checkSDOTransactionQueueError(SDO &sdo)
 {
-   std::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
+   std::tr1::shared_ptr<struct SDOTransaction> ptr(sdoTransactionQueue.front());
    sdoTransactionQueue.erase(sdoTransactionQueue.begin());
-   inCheck = true;
    ptr->callback->error(sdo);
-   if(!sdoTransactionQueue.empty()) {
+   if(!psdo->inProgress() && !sdoTransactionQueue.empty()) {
        startNextTransaction();
    }
-   inCheck = false;
 }
 
 
 void DS301::nmt_callback(NMT &nmt)
 {
     std::cerr << "NMT state transition: " << pnmt->nodeStateName(pnmt->node_state) << std::endl;
-    if(nmt_notify != NULL) {
-        nmt_notify(*this);
-        nmt_notify=NULL;
-    }
+    nmt_notify(*this);
 }
 
 void DS301::sdo_callback(SDO &sdo)
 {
 }
 
-void DS301::sendNMT(enum NodeControlCommand cmd, DS301NotifyCallback cb)
+void DS301::sendNMT(enum NodeControlCommand cmd, DS301CallbackObject cb)
 {
     nmt_notify = cb;
     pnmt->nodeControl(cmd);
