@@ -13,6 +13,7 @@
   <depend package="eigen"/>
   <depend package="actionlib_msgs"/>
   <depend package="actionlib"/>
+  <depend package="nav_msgs"/>
 
   <export>
       <cpp clfags="-I${prefix}/../../CANOpen/include" lflags="-L${prefix}/../../CANOpen/build/src -lcanopen"/>

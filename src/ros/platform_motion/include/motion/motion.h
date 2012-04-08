@@ -13,11 +13,17 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void doHome(void);
         void homeComplete(CANOpen::DS301 &node);
+        void pvCallback(CANOpen::DS301 &node);
+        void syncCallback(CANOpen::SYNC &sync);
 
+        bool intersectLines(Eigen::Vector2d d0, Eigen::Vector2d p0,
+                            Eigen::Vector2d d1, Eigen::Vector2d p1,
+                            Eigen::Vector2d &pi);
 
         ros::NodeHandle nh_;
 
         ros::Subscriber twist_sub;
+        ros::Publisher odometry_pub;
 
         actionlib::SimpleActionServer<HomeWheelPodsAction> home_action_server;
         HomeWheelPodsFeedback feedback;
@@ -51,10 +57,17 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool CAN_thread_run;
         int notify_read_fd, notify_write_fd;
 
+        bool enabled;
+
+        Eigen::Vector2d starboard_pos, port_pos, stern_pos;
+        Eigen::Vector2d body_pt;
         double v_stern, v_starboard, v_port;
         double angle_stern, angle_starboard, angle_port;
-
-        bool enabled;
+        double last_starboard_wheel, last_port_wheel, last_stern_wheel;
+        int pv_counter;
+        Eigen::Vector2d odom_position;
+        double odom_orientation;
+        int odom_frame_id;
 };
 
 }

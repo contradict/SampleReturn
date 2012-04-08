@@ -7,6 +7,12 @@
 
 namespace platform_motion {
 
+void WheelPod::pvCallbacks(CANOpen::DS301CallbackObject wheelcb, CANOpen::DS301CallbackObject steeringcb)
+{
+    wheel.pvCallback(wheelcb);
+    steering.pvCallback(steeringcb);
+}
+
 void WheelPod::drive(double angle, double omega)
 {
     _setMode(PodDrive);
@@ -21,7 +27,7 @@ void WheelPod::drive(double angle, double omega)
         omega *= -1.0;
     }
     int position = round(steering_encoder_counts*desired_steering_position/2./M_PI);
-    velocity = round(wheel_encoder_counts*10.0*omega/2./M_PI);
+    velocity = round(wheel_encoder_counts*10.0*omega);
     /*
     if(abs(position - steering.position)>large_steering_move) {
         wheel.setVelocity(0);
@@ -84,4 +90,18 @@ void WheelPod::initialize(void)
     wheel.initialize();
 }
 
+void WheelPod::getPosition(double &steering_pos, double &steering_vel, double &wheel_pos, double &wheel_vel)
+{
+    steering_pos =
+        ((double)steering.position)/((double)steering_encoder_counts)*2*M_PI +
+        steering_offset;
+    steering_vel =
+        ((double)steering.velocity)/((double)steering_encoder_counts)*2*M_PI/10.;
+
+    wheel_pos =
+        ((double)wheel.position)/((double)wheel_encoder_counts);
+    wheel_vel =
+        ((double)wheel.velocity)/((double)wheel_encoder_counts)/10.;
+
+}
 }

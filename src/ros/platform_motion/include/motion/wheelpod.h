@@ -30,6 +30,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
             currentMode(PodUninitialized)
             {};
 
+        void pvCallbacks(CANOpen::DS301CallbackObject wheelcb, CANOpen::DS301CallbackObject steeringcb);
+
         void initialize(void);
 
         void drive(double angle, double omega);
@@ -38,6 +40,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         bool ready(void);
         void enable(void);
 
+        void getPosition(double &steering_pos, double &steering_vel,
+                double &wheel_pos, double &wheel_vel);
     private:
         void _setMode(enum PodMode m);
         void _positionAcchieved(CANOpen::DS301 &node);
