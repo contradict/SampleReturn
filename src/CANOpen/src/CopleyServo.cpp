@@ -307,8 +307,20 @@ void CopleyServo::positionVelocityPDOCallback(PDO &pdo)
                          ((uint32_t)pdo.data[7]<<24));
 
     gotPV = true;
+    pv_callback(*this);
     //std::cout << "Position: " << position << " Velocity: " << velocity << std::endl;
 }
+
+/*
+   bool CopleyServo::getPV(uint32_t &P, uint32_t &V, bool clear)
+{
+    bool gotPV_ = gotPV;
+    P = position;
+    V = velocity;
+    if(clear) gotPV=false;
+    return gotPV_;
+}
+*/
 
 void CopleyServo::syncCallback(SYNC &sync)
 {
@@ -439,6 +451,11 @@ void CopleyServo::setPosition(int32_t p, DS301CallbackObject callback)
 void CopleyServo::_positionGo(PDO &pdo)
 {
     modeControl(CONTROL_NEW_SETPOINT | CONTROL_CHANGE_SET_IMMEDIATE, 0, ProfilePosition);
+}
+
+void CopleyServo::pvCallback(DS301CallbackObject cb)
+{
+    pv_callback = cb;
 }
 
 }
