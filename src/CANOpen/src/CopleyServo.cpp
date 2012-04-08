@@ -76,9 +76,10 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
 
 void CopleyServo::initialize(void)
 {
-    sendNMT(ResetNode, DS301CallbackObject(static_cast<TransferCallbackReceiver *>(this),
+    sendNMT(ResetNode,
+            DS301CallbackObject(static_cast<TransferCallbackReceiver *>(this),
                 static_cast<DS301CallbackObject::CallbackFunction>(&CopleyServo::_initialize))
-                 );
+           );
 
 }
 
@@ -192,7 +193,10 @@ void CopleyServo::_initialControlWord(SDO &sdo)
 {
     control_word =  sdo.data[0] | (sdo.data[1]<<8);
     std::cout << "Control: " << std::hex << control_word << std::dec << std::endl;
-    sendNMT(StartRemoteNode);
+    sendNMT(StartRemoteNode,
+            DS301CallbackObject(static_cast<TransferCallbackReceiver *>(this),
+            static_cast<DS301CallbackObject::CallbackFunction>(&CopleyServo::_initialize))
+           );
 }
 
 void CopleyServo::statusModePDOCallback(PDO &pdo)
