@@ -13,21 +13,21 @@
 2,0,Programmed Current Command,0
 19,0,Analog Input Scale,2000
 1a,0,Analog Input Offset,0
-21,0,User Peak Current Limit,732
-22,0,User Continuous Current Limit,105
-23,0,User Peak Current Time Limit,1000
+21,0,User Peak Current Limit,1500
+22,0,User Continuous Current Limit,500
+23,0,User Peak Current Time Limit,10000
 24,0,Desired State,30
 26,0,Analog Input Deadband,0
-27,0,Velocity Vp,3100
-28,0,Velocity Vi,650
+27,0,Velocity Vp,4000
+28,0,Velocity Vi,200
 2f,0,Programmed Velocity Command,0
-31,0,Velocity Gains Scalor,-1
-36,0,Velocity Loop Acceleration Limit,200
-37,0,Velocity Loop Deceleration Limit,200
-39,0,Velocity Fast Stop Ramp,200
-3a,0,Velocity Loop Velocity Limit,106000
+31,0,Velocity Gains Scalor,0
+36,0,Velocity Loop Acceleration Limit,728
+37,0,Velocity Loop Deceleration Limit,728
+39,0,Velocity Fast Stop Ramp,728
+3a,0,Velocity Loop Velocity Limit,231560
 3f,0,Velocity Tracking Time,100
-3e,0,Velocity Tracking Window,399999
+3e,0,Velocity Tracking Window,873811
 41,0,Motor Manufacturer,Midwest Motion Products
 42,0,Motor Model Number,MMP D22-490G-48V GP007
 43,0,Motor Units,1
@@ -38,7 +38,7 @@
 4a,0,Motor Inductance,600
 4b,0,Motor Peak Torque,197723
 4c,0,Motor Continuous Torque,28246
-4d,0,Motor Velocity Limit,120000
+4d,0,Motor Velocity Limit,262144
 4e,0,Motor Wiring,0
 53,0,Brake/Stop Delay Time,0
 54,0,Motor Brake Delay Time,0
@@ -53,11 +53,11 @@
 7c,0,Input 5 Config,0
 7d,0,Input 6 Config,0
 80,0,Amp Model Number,ACP-090-36
-8a,0,Voltage Sense,2256
-92,0,Amp Name,Starboard Wheel
+8a,0,Voltage Sense,2255
+92,0,Amp Name,Stern Wheel
 98,0,Function Generator Config,8193
 99,0,Function Generator Frequency,2
-9a,0,Function Generator Amplitude,300
+9a,0,Function Generator Amplitude,20000
 9b,0,Function Generator Duty Cycle,1000
 a5,0,Input Configuration Register,15
 a7,0,Fault Mask,671
@@ -72,7 +72,7 @@ ae,0,Current Loop Offset,0
 4f,0,Motor Hall Offset,0
 50,0,Motor Hall Type,0
 52,0,Motor Hall Wiring,0
-5f,0,Velocity Loop Output Filter,8448:200:0:775:1550:775:-12774:32763:5813
+5f,0,Velocity Loop Output Filter,8448:100:0:183:366:183:-14287:32767:6986
 60,0,Motor Encoder Type,1
 61,0,Motor Encoder Units,0
 62,0,Motor Encoder Counts,4000
@@ -90,7 +90,7 @@ bb,0,Position Following Warning Limit,5000
 bc,0,Position Tracking Window,2500
 bd,0,Position Tracking Window Time,10
 c8,0,Trajectory Profile Mode,256
-ca,0,Trajectory Position Command,-10000
+ca,0,Trajectory Position Command,5000
 cb,0,Trajectory Max Velocity,500000
 cc,0,Trajectory Max Accel,100000
 cd,0,Trajectory Max Decel,100000
@@ -101,7 +101,7 @@ f2,0,Input 3 Debounce Time,0
 f3,0,Input 4 Debounce Time,0
 f4,0,Input 5 Debounce Time,0
 f5,0,Input 6 Debounce Time,0
-114,0,Velocity Vi Drain,0
+114,0,Velocity Vi Drain,10
 10c,0,Network Heart Beat Time,0
 10d,0,CANopen Node Guarding Time,0
 10e,0,CANopen Node Guarding Life Time Factor,0
