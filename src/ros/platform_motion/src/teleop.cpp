@@ -32,6 +32,8 @@ Teleop::Teleop():
   linear_y(0),
   angular_z(2),
   button_homing(1),
+  l_scale_(2),
+  a_scale_(M_PI),
   homing(false),
   ac("home_wheelpods")
 {
