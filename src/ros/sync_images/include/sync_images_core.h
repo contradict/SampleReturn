@@ -42,13 +42,8 @@
 // ROS includes.
 #include <ros/ros.h>
 
-#include <cv_bridge/CvBridge.h>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/highgui/highgui.hpp>
-
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
@@ -56,11 +51,8 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-#include <stereo_image_proc/processor.h>
-#include <image_geometry/stereo_camera_model.h>
 
 using namespace sensor_msgs;
-using namespace stereo_msgs;
 using namespace message_filters::sync_policies;
 
 class SyncImages
