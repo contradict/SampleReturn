@@ -3,7 +3,7 @@
 <launch>
 
     <!-- platform node -->
- <node pkg="platform_motion" type="motion_node" name="motion" output="screen"/>
+ <node pkg="platform_motion" type="motion_node" name="motion"/>
 
 
  <!-- joy node -->

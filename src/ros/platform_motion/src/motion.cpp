@@ -12,6 +12,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
+#include <tf/transform_broadcaster.h>
 
 #include <canlib.h>
 #include <CANOpen.h>
@@ -19,8 +20,8 @@
 
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeWheelPodsAction.h>
-
 #include <motion/wheelpod.h>
+
 #include <motion/motion.h>
 
 #include <motion/lmmin.h>
@@ -31,27 +32,36 @@ namespace platform_motion {
 
 struct lmmin_data {
     Eigen::Vector2d body_pt;
-    Eigen::Vector2d port_pos, port_move;
-    Eigen::Vector2d stern_pos, stern_move;
-    Eigen::Vector2d starboard_pos, starboard_move;
+    Eigen::Vector2d port_pos, port_delta;
+    double port_vel;
+    Eigen::Vector2d stern_pos, stern_delta;
+    double stern_vel;
+    Eigen::Vector2d starboard_pos, starboard_delta;
+    double starboard_vel;
 };
 
 void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double *fvec, int *info)
 {
     const struct lmmin_data *data = reinterpret_cast<const struct lmmin_data *>(vdata);
 
+    double x,y,theta;
+
+    x=xytheta[0];
+    y=xytheta[1];
+    theta=xytheta[2];
+
     Eigen::Matrix2d R;
-    R(0,0) = cos(xytheta[2]);
-    R(0,1) = -sin(xytheta[2]);
-    R(1,0) = sin(xytheta[2]);
-    R(1,1) = cos(xytheta[2]);
+    R << cos(theta), -sin(theta),
+         sin(theta),  cos(theta);
 
-    Eigen::Vector2d T(xytheta[0], xytheta[1]);
-    T += data->body_pt;
+    Eigen::Vector2d T(x, y);
 
-    Eigen::Vector2d port_error = R*(data->port_pos - data->body_pt) + T - data->port_move;
-    Eigen::Vector2d stern_error = R*(data->stern_pos - data->body_pt) + T - data->stern_move;
-    Eigen::Vector2d starboard_error = R*(data->starboard_pos - data->body_pt) + T - data->starboard_move;
+    Eigen::Vector2d port_error = R*(data->port_pos - data->body_pt) + data->body_pt +
+        T - (data->port_pos + data->port_delta);
+    Eigen::Vector2d stern_error = R*(data->stern_pos - data->body_pt) + data->body_pt +
+        T - (data->stern_pos + data->stern_delta);
+    Eigen::Vector2d starboard_error = R*(data->starboard_pos - data->body_pt) + data->body_pt +
+        T - (data->starboard_pos + data->starboard_delta);
 
     fvec[0] = port_error(0);
     fvec[1] = port_error(1);
@@ -59,13 +69,17 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
     fvec[3] = stern_error(1);
     fvec[4] = starboard_error(0);
     fvec[5] = starboard_error(1);
+
     *info = 1;
 }
+
 
 Motion::Motion() :
     home_action_server(nh_, "home_wheelpods", false),
     enabled(false),
     last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
+    odom_count(1), odom_counter(1),
+    port_vel_sum(0), starboard_vel_sum(0), stern_vel_sum(0),
     pv_counter(0),
     odom_position(Eigen::Vector2d::Zero()),
     odom_orientation(0),
@@ -252,19 +266,19 @@ void Motion::runBus(void)
                             stern->drive(angle_stern, -v_stern);
                             break;
                         case '\x01':
-                            std::cout << "Home" << std::endl;
+                            ROS_INFO( "Home" );
                             port->home(cb);
                             starboard->home(cb);
                             stern->home(cb);
                             break;
                         case '\x02':
-                            std::cout << "enable" << std::endl;
+                            ROS_INFO( "enable" );
                             port->enable();
                             starboard->enable();
                             stern->enable();
                             break;
                         case '\x03':
-                            std::cout << "initialize" << std::endl;
+                            ROS_INFO( "initialize" );
                             port->initialize();
                             starboard->initialize();
                             stern->initialize();
@@ -274,7 +288,9 @@ void Motion::runBus(void)
                             break;
                     }
                 } else {
-                    perror("Error during notify read");
+                    std::string errstring("Error during notify read: ");
+                    errstring += strerror(errno);
+                    ROS_ERROR( "%s", errstring.c_str() );
                 }
                 if(pbus->canSend()) {
                     pfd[0].events |= POLLOUT;
@@ -370,6 +386,8 @@ void Motion::enable(void)
 void Motion::pvCallback(CANOpen::DS301 &node)
 {
     if(pv_counter>0 && --pv_counter==0) {
+        ros::Time current_time = ros::Time::now();
+
         double port_steering, starboard_steering, stern_steering;
         double port_steering_velocity, starboard_steering_velocity,
                stern_steering_velocity;
@@ -383,6 +401,23 @@ void Motion::pvCallback(CANOpen::DS301 &node)
                 starboard_wheel, starboard_wheel_velocity);
         stern->getPosition(stern_steering, stern_steering_velocity,
                 stern_wheel, stern_wheel_velocity);
+
+        port_vel_sum += port_wheel_velocity;
+        starboard_vel_sum += starboard_wheel_velocity;
+        stern_vel_sum += stern_wheel_velocity;
+
+        if(--odom_counter>0) {
+            return;
+        } else {
+            odom_counter = odom_count;
+            port_wheel_velocity = port_vel_sum/odom_count*M_PI*wheel_diameter;
+            port_vel_sum = 0;
+            starboard_wheel_velocity =
+                starboard_vel_sum/odom_count*M_PI*wheel_diameter;
+            starboard_vel_sum = 0;
+            stern_wheel_velocity = stern_vel_sum/odom_count*M_PI*wheel_diameter;
+            stern_vel_sum = 0;
+        }
 
         starboard_wheel *= -1;
         starboard_wheel_velocity *= -1;
@@ -404,15 +439,20 @@ void Motion::pvCallback(CANOpen::DS301 &node)
 
         double max_abs_vel = std::max(fabs(port_wheel_velocity), fabs(starboard_wheel_velocity));
         max_abs_vel = std::max(max_abs_vel, fabs(stern_wheel_velocity));
-        /*
-        std::cerr << "vel: (" << port_wheel_velocity << ", "
-            << starboard_wheel_velocity << ", " << stern_wheel_velocity << ") "
-            << max_abs_vel << std::endl;
-            */
+        ROS_DEBUG( "vel: (%6.3f, %6.3f, %6.3f) max: %6.3f",
+                port_wheel_velocity, starboard_wheel_velocity, stern_wheel_velocity,
+                max_abs_vel);
         nav_msgs::Odometry odo;
         odo.header.frame_id = "odom";
-        odo.header.stamp = ros::Time::now();
-        if(max_abs_vel<1e-2) {
+        odo.child_frame_id = "base_link";
+        odo.header.stamp = current_time;
+        if(max_abs_vel<5e-2) {
+            odo.twist.twist.linear.x = 0;
+            odo.twist.twist.linear.y = 0;
+            odo.twist.twist.linear.z = 0;
+            odo.twist.twist.angular.x = 0;
+            odo.twist.twist.angular.y = 0;
+            odo.twist.twist.angular.z = 0;
             // xx
             odo.pose.covariance[0] = 1e-10;
             // yy
@@ -425,15 +465,30 @@ void Motion::pvCallback(CANOpen::DS301 &node)
             odo.pose.covariance[11] = odo.pose.covariance[31] = 1e-10;
             // yaw*yaw
             odo.pose.covariance[35] = 1e-10;
+            // vxvx
+            odo.twist.covariance[0] = 1e-10;
+            // vyvy
+            odo.twist.covariance[7] = 1e-10;
+            // vxvy
+            odo.twist.covariance[1] = odo.pose.covariance[6] = 1e-10;
+            // vxomegaz
+            odo.twist.covariance[5] = odo.pose.covariance[30] = 1e-10;
+            // vyomegaz
+            odo.twist.covariance[11] = odo.pose.covariance[31] = 1e-10;
+            // omegaz*omegaz
+            odo.twist.covariance[35] = 1e-10;
         } else {
             struct lmmin_data data;
             data.body_pt = body_pt;
             data.port_pos = port_pos;
-            data.port_move = port_pos + port_delta*port_wheel_direction;
+            data.port_delta = port_delta*port_wheel_direction;
+            data.port_vel = port_wheel_velocity;
             data.stern_pos = stern_pos;
-            data.stern_move = stern_pos + stern_delta*stern_wheel_direction;
+            data.stern_delta = stern_delta*stern_wheel_direction;
+            data.stern_vel = stern_wheel_velocity;
             data.starboard_pos = starboard_pos;
-            data.starboard_move = starboard_pos + starboard_delta*starboard_wheel_direction;
+            data.starboard_delta = starboard_delta*starboard_wheel_direction;
+            data.starboard_vel = starboard_wheel_velocity;
 
             double xytheta[3] = {0.0, 0.0, 0.0};
             lm_status_struct status;
@@ -441,17 +496,13 @@ void Motion::pvCallback(CANOpen::DS301 &node)
             control.printflags = 0;
             lmmin( 3, xytheta, 6, &data, lmmin_evaluate, &control, &status, NULL);
 
+            ROS_DEBUG( "delta: (%6.4f, %6.4f, %6.4f)", port_delta, starboard_delta, stern_delta);
+
             if(status.info>4) {
                 // minimization failed
-                std::cerr << "Minimization failed: " << lm_infmsg[status.info] << std::endl;
+                ROS_ERROR( "%s", (std::string("Minimization failed: ") +
+                                    lm_infmsg[status.info]).c_str() );
             } else {
-                if(++odom_frame_id == 20) {
-                    odom_frame_id = 0;
-                    //std::cerr << "Minimization success: (" << xytheta[0] << ", "
-                    //    << xytheta[1] << ", " << xytheta[2] << ")" << std::endl;
-                    //std::cerr << "delta: (" << port_delta << ", "
-                    //    << starboard_delta << ", " << stern_delta << ")" << std::endl;
-                }
                 Eigen::Matrix2d R;
                 R << cos(odom_orientation), -sin(odom_orientation),
                   sin(odom_orientation),  cos(odom_orientation);
@@ -459,6 +510,15 @@ void Motion::pvCallback(CANOpen::DS301 &node)
                 odom_orientation += xytheta[2];
                 if(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
                 if(odom_orientation < 0) odom_orientation += 2*M_PI;
+
+                /*
+                odo.twist.twist.linear.x = xythetavxvyomega[3];
+                odo.twist.twist.linear.y = xythetavxvyomega[4];
+                odo.twist.twist.linear.z = 0;
+                odo.twist.twist.angular.x = 0;
+                odo.twist.twist.angular.y = 0;
+                odo.twist.twist.angular.z = xythetavxvyomega[5];
+                */
             }
             // xx
             odo.pose.covariance[0] = 0.05;
@@ -473,15 +533,42 @@ void Motion::pvCallback(CANOpen::DS301 &node)
             // yaw*yaw
             odo.pose.covariance[35] =
                 pow((2.*M_PI/((double)steering_encoder_counts)), 2);
+            // vxvx
+            odo.twist.covariance[0] = 10.0;
+            // vyvy
+            odo.twist.covariance[7] = 10.0;
+            // vxvy
+            odo.twist.covariance[1] = odo.pose.covariance[6] = 10.0;
+            // vxomegaz
+            odo.twist.covariance[5] = odo.pose.covariance[30] = 10.0;
+            // vyomegaz
+            odo.twist.covariance[11] = odo.pose.covariance[31] = 10.0;
+            // omegaz*omegaz
+            odo.twist.covariance[35] = 10.0;
         }
+        odo.pose.covariance[14] = DBL_MAX;
+        odo.pose.covariance[21] = DBL_MAX;
+        odo.pose.covariance[28] = DBL_MAX;
+        odo.twist.covariance[14] = DBL_MAX;
+        odo.twist.covariance[21] = DBL_MAX;
+        odo.twist.covariance[28] = DBL_MAX;
         odo.pose.pose.position.x = odom_position(0);
         odo.pose.pose.position.y = odom_position(1);
         odo.pose.pose.position.z = 0;
-        odo.pose.pose.orientation.x = 0;
-        odo.pose.pose.orientation.y = 0;
-        odo.pose.pose.orientation.z = sin(odom_orientation/2.);
-        odo.pose.pose.orientation.w = cos(odom_orientation/2.);
+        geometry_msgs::Quaternion odom_quat =
+            tf::createQuaternionMsgFromYaw(odom_orientation);
+        odo.pose.pose.orientation = odom_quat;
         odometry_pub.publish(odo);
+
+        geometry_msgs::TransformStamped odom_trans;
+        odom_trans.header.stamp = current_time;
+        odom_trans.header.frame_id = "odom";
+        odom_trans.child_frame_id = "base_link";
+        odom_trans.transform.translation.x = odom_position(0);
+        odom_trans.transform.translation.y = odom_position(1);
+        odom_trans.transform.translation.z = 0;
+        odom_trans.transform.rotation = odom_quat;
+        odom_broadcaster.sendTransform(odom_trans);
     }
 }
 
