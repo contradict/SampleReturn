@@ -11,12 +11,12 @@
   <node pkg="rosbag"
         type="record"
         name="record"
-        output="screen"
-        args="odometry stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info"/>
+        output="log"
+        args="odometry tf stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info"/>
 
   <!-- joy node -->
   <node respawn="true" pkg="joy"
-        type="joy" name="joy" >
+        type="joy" name="joy" output="screen">
     <param name="dev" type="string" value="/dev/input/js0" />
     <param name="deadzone" value="0.05" />
   </node>
@@ -36,7 +36,7 @@
         type="nodelet"
         name="camera_process"
         args="manager"
-        output="screen"
+        output="log"
         >
     </node>
     <node
