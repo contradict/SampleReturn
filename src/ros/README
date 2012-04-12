@@ -1,6 +1,10 @@
 Assumes ros-electric-desktop-full is installed as described here:
 http://www.ros.org/wiki/electric/Installation/Ubuntu
 
+Need these debs:
+libtbb-dev
+libsuitesparse-dev
+
 Add the path to this directory to ROS_PACKAGE_PATH.
 
 also need
