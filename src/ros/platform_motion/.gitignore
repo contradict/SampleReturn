@@ -3,5 +3,4 @@ bin
 lib
 msg
 msg_gen
-Makefile
 src/platform_motion
