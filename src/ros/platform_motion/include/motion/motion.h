@@ -7,12 +7,14 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void start(void);
         void runBus(void);
         bool ready(void);
-        void enable(void);
+        void enable(bool state = true);
 
     private:
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void doHome(void);
         void homeComplete(CANOpen::DS301 &node);
+        void doEnable(void);
+        void enableStateChange(CANOpen::DS301 &node);
         void pvCallback(CANOpen::DS301 &node);
         void syncCallback(CANOpen::SYNC &sync);
 
@@ -27,9 +29,13 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         tf::TransformBroadcaster odom_broadcaster;
 
         actionlib::SimpleActionServer<HomeWheelPodsAction> home_action_server;
-        HomeWheelPodsFeedback feedback;
-        HomeWheelPodsResult result;
+        HomeWheelPodsFeedback home_feedback;
+        HomeWheelPodsResult home_result;
         int home_count;
+        actionlib::SimpleActionServer<EnableWheelPodsAction> enable_action_server;
+        EnableWheelPodsFeedback enable_feedback;
+        EnableWheelPodsResult enable_result;
+        int enable_count;
 
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;

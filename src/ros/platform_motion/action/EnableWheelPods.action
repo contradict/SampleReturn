@@ -1,0 +1,10 @@
+#goal definition
+bool enable_state
+---
+#result definition
+bool port_enabled
+bool starboard_enabled
+bool stern_enabled
+---
+#feedback definition
+int8 enable_count

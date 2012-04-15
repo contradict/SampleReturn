@@ -20,6 +20,7 @@
 
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeWheelPodsAction.h>
+#include <platform_motion/EnableWheelPodsAction.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -76,6 +77,7 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
 
 Motion::Motion() :
     home_action_server(nh_, "home_wheelpods", false),
+    enable_action_server(nh_, "enable_wheelpods", false),
     enabled(false),
     last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
     odom_count(1), odom_counter(1),
@@ -192,6 +194,8 @@ Motion::Motion() :
 
     home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
 
+    enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
+
 }
 
 Motion::~Motion()
@@ -200,25 +204,6 @@ Motion::~Motion()
     CAN_thread.join();
     close(notify_read_fd);
     close(notify_write_fd);
-}
-
-void Motion::start(void)
-{
-    int pipe_fds[2];
-    if(pipe(pipe_fds)<0) {
-        perror("Error creating pipe fds");
-    }
-    notify_read_fd = pipe_fds[0];
-    notify_write_fd = pipe_fds[1];
-    ROS_INFO("Start CAN bus thread");
-    CAN_thread = boost::thread(boost::bind(&Motion::runBus, this));
-    ROS_INFO("Start home server");
-    home_action_server.start();
-    ROS_INFO("Send initialize notification");
-    char c='\x03';
-    if(write(notify_write_fd, &c, 1) != 1) {
-        perror("Error during start notify write");
-    }
 }
 
 /*
@@ -230,6 +215,13 @@ void Motion::shutdown(void)
     carousel->enable(false);
 }
 */
+enum motion_command {
+    motion_drive=0,
+    motion_home=1,
+    motion_enable=2,
+    motion_initialize=3,
+    motion_disable=4
+};
 
 void Motion::runBus(void)
 {
@@ -257,27 +249,36 @@ void Motion::runBus(void)
                 char c;
                 if(read(notify_read_fd, &c, 1) == 1){
                     CANOpen::DS301CallbackObject
-                        cb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                        hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                                 static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeComplete));
+                    CANOpen::DS301CallbackObject
+                        ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                                static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::enableStateChange));
                     switch(c) {
-                        case '\x00':
+                        case motion_drive:
                             port->drive(angle_port, v_port);
                             starboard->drive(angle_starboard, -v_starboard);
                             stern->drive(angle_stern, -v_stern);
                             break;
-                        case '\x01':
+                        case motion_home:
                             ROS_INFO( "Home" );
-                            port->home(cb);
-                            starboard->home(cb);
-                            stern->home(cb);
+                            port->home(hcb);
+                            starboard->home(hcb);
+                            stern->home(hcb);
                             break;
-                        case '\x02':
+                        case motion_enable:
                             ROS_INFO( "enable" );
-                            port->enable();
-                            starboard->enable();
-                            stern->enable();
+                            port->enable(true, ecb);
+                            starboard->enable(true, ecb);
+                            stern->enable(true, ecb);
                             break;
-                        case '\x03':
+                        case motion_disable:
+                            ROS_INFO( "disable" );
+                            port->enable(false, ecb);
+                            starboard->enable(false, ecb);
+                            stern->enable(false, ecb);
+                            break;
+                         case motion_initialize:
                             ROS_INFO( "initialize" );
                             port->initialize();
                             starboard->initialize();
@@ -285,6 +286,7 @@ void Motion::runBus(void)
                             carousel->initialize();
                             break;
                         default:
+                            ROS_ERROR("Unrecognized motion command: %d", c);
                             break;
                     }
                 } else {
@@ -297,15 +299,30 @@ void Motion::runBus(void)
                 }
             }
         }
-        bool rdy = ready();
-        if(rdy && ! enabled) {
-            enable();
-        } else if( !rdy && enabled ) {
-            enabled = false;
-        }
     }
 }
  
+void Motion::start(void)
+{
+    int pipe_fds[2];
+    if(pipe(pipe_fds)<0) {
+        perror("Error creating pipe fds");
+    }
+    notify_read_fd = pipe_fds[0];
+    notify_write_fd = pipe_fds[1];
+    ROS_INFO("Start CAN bus thread");
+    CAN_thread = boost::thread(boost::bind(&Motion::runBus, this));
+    ROS_INFO("Start home server");
+    home_action_server.start();
+    ROS_INFO("Start enable server");
+    enable_action_server.start();
+    ROS_INFO("Send initialize notification");
+    char c=motion_initialize;
+    if(write(notify_write_fd, &c, 1) != 1) {
+        perror("Error during start notify write");
+    }
+}
+
 void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
     Eigen::Vector2d body_vel( twist->linear.x, twist->linear.y );
@@ -342,30 +359,60 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
     angle_starboard = M_PI_2 - atan2( sin(phi) + kappa*width/2,
                                  kappa*length - cos(phi)
                                );
-    char c='\x00';
+    char c=motion_drive;
     if(write(notify_write_fd, &c, 1) != 1) {
         perror("Error during move notify write");
     }
-
 }
 
 void Motion::doHome(void)
 {
     home_count = 0;
-    char c='\x01';
+    char c=motion_home;
     if(write(notify_write_fd, &c, 1) != 1) {
+        ROS_ERROR("Could not home: %s", strerror(errno));
         perror("Error during home notify write");
+    } else {
+        ROS_INFO("Enable goal accepted");
+        home_action_server.acceptNewGoal();
     }
-    home_action_server.acceptNewGoal();
 }
 
 void Motion::homeComplete(CANOpen::DS301 &node)
 {
     home_count++;
-    feedback.home_count = home_count;
-    home_action_server.publishFeedback(feedback);
+    home_feedback.home_count = home_count;
+    home_action_server.publishFeedback(home_feedback);
     if(home_count == 3) {
-        home_action_server.setSucceeded(result);  
+        home_action_server.setSucceeded(home_result);  
+    }
+}
+
+void Motion::doEnable(void)
+{
+    bool state = enable_action_server.acceptNewGoal()->enable_state;
+    char c=state?motion_enable:motion_disable;
+    enable_count = 0;
+    ROS_INFO("sending command %d", c);
+    if(write(notify_write_fd, &c, 1) != 1) {
+        //perror("Error during home notify write");
+        ROS_ERROR("Could not enable: %s", strerror(errno));
+    } else {
+        ROS_INFO("Enable goal accepted");
+        enable_action_server.acceptNewGoal();
+    }
+}
+
+void Motion::enableStateChange(CANOpen::DS301 &node)
+{
+    enable_feedback.enable_count = ++enable_count;
+    enable_action_server.publishFeedback(enable_feedback);
+    ROS_INFO("Enable report, count=%d", enable_count);
+    if(enable_count == 6) {
+        enable_result.port_enabled = port->enabled();
+        enable_result.stern_enabled = stern->enabled();
+        enable_result.starboard_enabled = starboard->enabled();
+        enable_action_server.setSucceeded(enable_result);
     }
 }
 
@@ -374,13 +421,13 @@ bool Motion::ready(void)
     return port->ready() && starboard->ready() && stern->ready() && carousel->ready();
 }
 
-void Motion::enable(void)
+void Motion::enable(bool state)
 {
-    char c='\x02';
+    char c=state?motion_enable:motion_disable;
     if(write(notify_write_fd, &c, 1) != 1) {
         perror("Error during enable notify write");
     }
-    enabled = true;
+    enabled = state;
 }
 
 void Motion::pvCallback(CANOpen::DS301 &node)

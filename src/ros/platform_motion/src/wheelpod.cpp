@@ -78,10 +78,15 @@ bool WheelPod::ready(void)
     return steering.ready() && wheel.ready();
 }
 
-void WheelPod::enable(void)
+void WheelPod::enable(bool state, CANOpen::DS301CallbackObject cb)
 {
-    steering.enable();
-    wheel.enable();
+    steering.enable(state, cb);
+    wheel.enable(state, cb);
+}
+
+bool WheelPod::enabled(void)
+{
+    return steering.enabled() && wheel.enabled();
 }
 
 void WheelPod::initialize(void)

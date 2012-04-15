@@ -37,8 +37,9 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         void drive(double angle, double omega);
         void move(Eigen::Vector2d distance, double rotation);
         void home(CANOpen::DS301CallbackObject cb);
+        void enable(bool state, CANOpen::DS301CallbackObject cb);
+        bool enabled(void);
         bool ready(void);
-        void enable(void);
 
         void getPosition(double &steering_pos, double &steering_vel,
                 double &wheel_pos, double &wheel_vel);
