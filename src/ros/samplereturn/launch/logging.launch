@@ -88,25 +88,4 @@
           ns="/stereo/right">
     </node>
 
-    <!-- Display images -->
-    <node
-        pkg="nodelet"
-        type="nodelet"
-        name="left_display"
-        args="load image_view/image /camera_process"
-        ns="/stereo/left">
-
-        <remap  from="image" to="image_color"/>
-    </node>
-    <node
-        pkg="nodelet"
-        type="nodelet"
-        name="right_display"
-        args="load image_view/image /camera_process"
-        ns="/stereo/right">
-
-        <remap from="image" to="image_color"/>
-    </node>
-
-
 </launch>
