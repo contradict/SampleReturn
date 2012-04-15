@@ -20,8 +20,8 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #set the default path for built libraries to the "lib" directory
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-include_directories (${PROJECT_SOURCE_DIR}/../../../external/linuxcan_v4/include)
-link_directories (${PROJECT_SOURCE_DIR}/../../../external/linuxcan_v4/canlib)
+include_directories (/usr/local/src/linuxcan_v4/include)
+link_directories (/usr/local/src/linuxcan_v4/canlib)
 include_directories (${PROJECT_SOURCE_DIR}/../../CANOpen/include)
 link_directories (${PROJECT_SOURCE_DIR}/../../CANOpen/build/src/)
 

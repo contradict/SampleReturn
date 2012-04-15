@@ -10,8 +10,8 @@ find_package( Boost 1.42 COMPONENTS program_options )
 include_directories( ${Boost_INCLUDE_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
 
-include_directories (${CANOPENLib_SOURCE_DIR}/../../external/linuxcan_v4/include)
-link_directories (${CANOPENLib_SOURCE_DIR}/../../external/linuxcan_v4/canlib)
+include_directories (/usr/local/src/linuxcan_v4/include)
+link_directories (/usr/local/src/linuxcan_v4/canlib)
 include_directories (${CANOPENLib_SOURCE_DIR}/include)
 link_directories (${CANOPENLib_BINARY_DIR}/canopen)
 
