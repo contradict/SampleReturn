@@ -1,0 +1,3 @@
+[submodule "src/ros/vslam"]
+	path = src/ros/vslam
+	url = git@github.com:contradict/ros-vslam
