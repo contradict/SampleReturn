@@ -204,9 +204,13 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
     uint16_t new_status_word = pdo.data[0] | (pdo.data[1]<<8);
     enum OperationMode new_mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
 
-    uint16_t rising_status = new_status_word & (~status_word);
+    uint16_t rising_status  = (~status_word) &   new_status_word;
+    uint16_t falling_status =   status_word  & (~new_status_word);
 
-    switch(new_mode_of_operation) {
+    status_word = new_status_word;
+    mode_of_operation = new_mode_of_operation;
+
+    switch(mode_of_operation) {
         case ProfilePosition:
             if(rising_status&STATUS_TARGET_REACHED) {
                 position_callback(*this);
@@ -234,8 +238,11 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
  
     }
 
-    status_word = new_status_word;
-    mode_of_operation = new_mode_of_operation;
+    if( (rising_status & STATUS_SWITCHED_ON) ||
+            (falling_status & STATUS_SWITCHED_ON) ) {
+        enable_callback(*this);
+    }
+
     //_printStatusAndMode();
 }
 
@@ -418,12 +425,26 @@ void CopleyServo::mode(enum OperationMode mode)
 }
 
 
-void CopleyServo::enable(void)
+void CopleyServo::enable(bool state,
+        DS301CallbackObject callback)
 {
-    control(
-            CONTROL_SWITCH_ON | CONTROL_ENABLE_VOLTAGE | CONTROL_ENABLE_OPERATION,
-            CONTROL_NEW_SETPOINT
-           );
+    if(state) {
+        control(
+                CONTROL_SWITCH_ON | CONTROL_ENABLE_VOLTAGE | CONTROL_ENABLE_OPERATION,
+                CONTROL_NEW_SETPOINT
+               );
+    } else {
+        control(CONTROL_RESET_FAULT,
+                CONTROL_SWITCH_ON | CONTROL_ENABLE_VOLTAGE |
+                CONTROL_ENABLE_OPERATION | CONTROL_NEW_SETPOINT
+               );
+    }
+    enable_callback = callback;
+}
+
+bool CopleyServo::enabled(void)
+{
+    return status_word & STATUS_SWITCHED_ON != 0;
 }
 
 void CopleyServo::home(DS301CallbackObject callback)

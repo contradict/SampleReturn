@@ -63,7 +63,9 @@ class CopleyServo : public DS301 {
         void modeControl(uint16_t set, uint16_t clear,enum OperationMode mode,
                 PDOCallbackObject callback=PDOCallbackObject());
 
-        void enable(void);
+        void enable(bool state=true,
+                DS301CallbackObject callback=DS301CallbackObject());
+        bool enabled(void);
 
         void home(DS301CallbackObject callback=DS301CallbackObject());
 
@@ -110,6 +112,7 @@ class CopleyServo : public DS301 {
         DS301CallbackObject home_callback;
         DS301CallbackObject position_callback;
         DS301CallbackObject pv_callback;
+        DS301CallbackObject enable_callback;
 
         bool syncProducer;
         int32_t syncInterval;
