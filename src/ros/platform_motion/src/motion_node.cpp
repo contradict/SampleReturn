@@ -8,6 +8,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
+#include <dynamic_reconfigure/server.h>
 
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeWheelPodsAction.h>
@@ -18,6 +19,7 @@
 #include <KvaserInterface.h>
 
 #include <motion/wheelpod.h>
+#include <platform_motion/PlatformParametersConfig.h>
 #include <motion/motion.h>
 
 int main(int argc, char **argv)

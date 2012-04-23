@@ -14,6 +14,7 @@
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_broadcaster.h>
+#include <dynamic_reconfigure/server.h>
 
 #include <canlib.h>
 #include <CANOpen.h>
@@ -22,6 +23,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeWheelPodsAction.h>
 #include <platform_motion/EnableWheelPodsAction.h>
+#include <platform_motion/PlatformParametersConfig.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -198,6 +200,8 @@ Motion::Motion() :
     home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
 
     enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
+
+    reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
 
 }
 
@@ -653,6 +657,15 @@ void Motion::pvCallback(CANOpen::DS301 &node)
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
     pv_counter = 6;
+}
+
+void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
+{
+    wheel_diameter = config.wheel_diameter;
+
+    port->setSteeringOffset(config.port_steering_offset);
+    starboard->setSteeringOffset(config.starboard_steering_offset);
+    stern->setSteeringOffset(config.stern_steering_offset);
 }
 
 }

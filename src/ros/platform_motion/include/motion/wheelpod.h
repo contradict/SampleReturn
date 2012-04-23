@@ -43,6 +43,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
 
         void getPosition(double &steering_pos, double &steering_vel,
                 double &wheel_pos, double &wheel_vel);
+
+        void setSteeringOffset(double offset);
     private:
         void _setMode(enum PodMode m);
         void _positionAcchieved(CANOpen::DS301 &node);
@@ -52,7 +54,7 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         long int steering_encoder_counts, wheel_encoder_counts;
         long int large_steering_move;
 
-        int velocity;
+        double desired_steering_position, desired_omega;
 
         enum PodMode currentMode;
 

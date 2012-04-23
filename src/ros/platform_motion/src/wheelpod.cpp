@@ -17,7 +17,7 @@ void WheelPod::drive(double angle, double omega)
 {
     _setMode(PodDrive);
 
-    double desired_steering_position = angle-steering_offset;
+    desired_steering_position = angle-steering_offset;
     if(desired_steering_position>steering_max) {
         desired_steering_position -= M_PI;
         omega *= -1.0;
@@ -26,8 +26,8 @@ void WheelPod::drive(double angle, double omega)
         desired_steering_position += M_PI;
         omega *= -1.0;
     }
+    desired_omega = omega;
     int position = round(steering_encoder_counts*desired_steering_position/2./M_PI);
-    velocity = round(wheel_encoder_counts*10.0*omega);
     /*
     if(abs(position - steering.position)>large_steering_move) {
         wheel.setVelocity(0);
@@ -40,6 +40,7 @@ void WheelPod::drive(double angle, double omega)
 
 void WheelPod::_positionAcchieved(CANOpen::DS301 &node)
 {
+    int velocity = round(wheel_encoder_counts*10.0*desired_omega);
     wheel.setVelocity(velocity);
 }
 
@@ -109,4 +110,26 @@ void WheelPod::getPosition(double &steering_pos, double &steering_vel, double &w
         ((double)wheel.velocity)/((double)wheel_encoder_counts)/10.;
 
 }
+
+void WheelPod::setSteeringOffset(double offset)
+{
+    double delta = offset - steering_offset;
+    steering_offset = offset;
+    desired_steering_position-=delta;
+    if(desired_steering_position>steering_max) {
+        desired_steering_position -= M_PI;
+        desired_omega *= -1.0;
+    }
+    if(desired_steering_position<steering_min) {
+        desired_steering_position += M_PI;
+        desired_omega *= -1.0;
+    }
+    if(ready()) {
+        int position = round(steering_encoder_counts*desired_steering_position/2./M_PI);
+        steering.setPosition(position,
+                CANOpen::DS301CallbackObject(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                    static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&WheelPod::_positionAcchieved)));
+    }
+}
+
 }

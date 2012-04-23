@@ -30,6 +30,11 @@ link_directories (${PROJECT_SOURCE_DIR}/../../CANOpen/build/src/)
 rosbuild_genmsg()
 #uncomment if you have defined services
 #rosbuild_gensrv()
+# dynamic reconfigure
+rosbuild_find_ros_package(dynamic_reconfigure)
+include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
+gencfg()
+
 
 #common commands for building c++ executables and libraries
 rosbuild_add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp src/lmmin.c)

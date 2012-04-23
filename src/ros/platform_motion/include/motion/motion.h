@@ -17,6 +17,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void enableStateChange(CANOpen::DS301 &node);
         void pvCallback(CANOpen::DS301 &node);
         void syncCallback(CANOpen::SYNC &sync);
+        void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
         bool intersectLines(Eigen::Vector2d d0, Eigen::Vector2d p0,
                             Eigen::Vector2d d1, Eigen::Vector2d p1,
@@ -28,6 +29,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Publisher odometry_pub;
         tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher joint_state_pub;
+        dynamic_reconfigure::Server<PlatformParametersConfig>
+            reconfigure_server;
 
         actionlib::SimpleActionServer<HomeWheelPodsAction> home_action_server;
         HomeWheelPodsFeedback home_feedback;

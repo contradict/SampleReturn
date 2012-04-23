@@ -16,6 +16,8 @@
   <depend package="nav_msgs"/>
   <depend package="geometry_msgs"/>
   <depend package="tf"/>
+  <depend package="dynamic_reconfigure"/>
+  <depend package="driver_base"/>
 
   <export>
       <cpp clfags="-I${prefix}/../../CANOpen/include" lflags="-L${prefix}/../../CANOpen/build/src -lcanopen"/>
