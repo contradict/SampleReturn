@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+      <!-- joy node -->
+      <node respawn="true" pkg="joy"
+          type="joy_node" name="joy_node" output="screen">
+          <param name="dev" type="string" value="/dev/input/js0" />
+          <param name="deadzone" value="0.05" />
+      </node>
+
+      <node pkg="platform_motion" type="teleop" name="teleop">
+          <!-- Axes -->
+          <param name="axis_linear" value="1" type="int"/>
+          <param name="axis_angular" value="0" type="int"/>
+          <param name="scale_linear" value="2" type="double"/>
+          <param name="scale_angular" value="0.5" type="double"/>
+      </node>
+
+</launch>

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+  <!-- platform node -->
+  <node pkg="platform_motion" type="motion_node" name="motion" output="log"/>
+
+  <param name="robot_description"
+      command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+
+  <node pkg="robot_state_publisher" type="state_publisher"
+      name="state_publisher" output="log"/>
+</launch>

@@ -6,4 +6,6 @@ roscore &
 
 sleep 5
 
-roslaunch samplereturn logging.launch
+roslaunch samplereturn driving_test.launch &
+#roslaunch samplereturn logging.launch &
+

@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <include file="$(find samplereturn)/launch/motion.launch"/> 
+    <include file="$(find samplereturn)/launch/camera.launch"/> 
+    <include file="$(find samplereturn)/launch/joystick.launch"/> 
+</launch>
