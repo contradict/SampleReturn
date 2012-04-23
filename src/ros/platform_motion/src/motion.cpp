@@ -12,6 +12,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
+#include <sensor_msgs/JointState.h>
 #include <tf/transform_broadcaster.h>
 
 #include <canlib.h>
@@ -85,7 +86,8 @@ Motion::Motion() :
     pv_counter(0),
     odom_position(Eigen::Vector2d::Zero()),
     odom_orientation(0),
-    odom_frame_id(0)
+    odom_frame_id(0),
+    joint_seq(0)
 {
     nh_.param("port_steering_id", port_steering_id, 4);
     nh_.param("port_wheel_id", port_wheel_id, 2);
@@ -191,6 +193,7 @@ Motion::Motion() :
     twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
 
     odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
+    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
 
     home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
 
@@ -620,6 +623,30 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         odom_trans.transform.translation.z = 0;
         odom_trans.transform.rotation = odom_quat;
         odom_broadcaster.sendTransform(odom_trans);
+        sensor_msgs::JointState joints;
+
+        joints.header.frame_id="base_link";
+        joints.header.stamp=current_time;
+        joints.header.seq=joint_seq++;
+        joints.name.push_back("port_steering_joint");
+        joints.position.push_back(port_steering);
+        joints.velocity.push_back(port_steering_velocity);
+        joints.name.push_back("port_axle");
+        joints.position.push_back(port_wheel*2*M_PI);
+        joints.velocity.push_back(port_wheel_velocity*2*M_PI);
+        joints.name.push_back("starboard_steering_joint");
+        joints.position.push_back(starboard_steering);
+        joints.velocity.push_back(starboard_steering_velocity);
+        joints.name.push_back("starboard_axle");
+        joints.position.push_back(starboard_wheel*2*M_PI);
+        joints.velocity.push_back(starboard_wheel_velocity*2*M_PI);
+        joints.name.push_back("stern_steering_joint");
+        joints.position.push_back(stern_steering);
+        joints.velocity.push_back(stern_steering_velocity);
+        joints.name.push_back("stern_axle");
+        joints.position.push_back(stern_wheel*2*M_PI);
+        joints.velocity.push_back(stern_wheel_velocity*2*M_PI);
+        joint_state_pub.publish(joints);
     }
 }
 

@@ -27,6 +27,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber twist_sub;
         ros::Publisher odometry_pub;
         tf::TransformBroadcaster odom_broadcaster;
+        ros::Publisher joint_state_pub;
 
         actionlib::SimpleActionServer<HomeWheelPodsAction> home_action_server;
         HomeWheelPodsFeedback home_feedback;
@@ -77,6 +78,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         Eigen::Vector2d odom_position;
         double odom_orientation;
         int odom_frame_id;
+        int joint_seq;
 };
 
 }
