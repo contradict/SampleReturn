@@ -129,6 +129,16 @@ void CopleyServo::_mapPDOs(void)
     map.subindex = 0;
     map.bits = 8;
     maps.push_back(map);
+    // Bus Voltage
+    map.index = 0x2201;
+    map.subindex = 0;
+    map.bits = 16;
+    maps.push_back(map);
+    // Input pins
+    map.index = 0x2190;
+    map.subindex = 0;
+    map.bits = 16;
+    maps.push_back(map);
     // Immediate event
     status_mode_pdo = mapTPDO("Status/Mode", 1, maps, 0xff,
             PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
@@ -169,6 +179,11 @@ void CopleyServo::_mapPDOs(void)
     map.subindex = 0;
     map.bits = 8;
     maps.push_back(map);
+    // outputs
+    map.index = 0x2194;
+    map.subindex = 0;
+    map.bits = 16;
+    maps.push_back(map);
     // Immediate action
     control_mode_pdo = mapRPDO("Control Word/Mode of Operation", 1, maps, 0xFF);
     bus->add(control_mode_pdo);
@@ -205,18 +220,38 @@ void CopleyServo::_initialControlWord(SDO &sdo)
             DS301CallbackObject(static_cast<TransferCallbackReceiver *>(this),
             static_cast<DS301CallbackObject::CallbackFunction>(&CopleyServo::_initialize))
            );
+    readObjectDictionary(0x2194, 0, std::tr1::shared_ptr<SDOCallbackObject>(
+                new SDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                    static_cast<SDOCallbackObject::CallbackFunction>(&CopleyServo::_initialOutputPins))));
+
+}
+
+void CopleyServo::_initialOutputPins(SDO &sdo)
+{
+    input_pins = sdo.data[0] | (sdo.data[1]<<8);
+    std::cout << "Initial output pins: " << std::hex << input_pins << std::dec
+        << std::endl;
 }
 
 void CopleyServo::statusModePDOCallback(PDO &pdo)
 {
     uint16_t new_status_word = pdo.data[0] | (pdo.data[1]<<8);
     enum OperationMode new_mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
+    uint16_t new_bus_voltage = pdo.data[3] | (pdo.data[4]<<8);
+    uint16_t new_input_pins = pdo.data[5] | (pdo.data[6]<<8);
 
     uint16_t rising_status  = (~status_word) &   new_status_word;
     uint16_t falling_status =   status_word  & (~new_status_word);
-
     status_word = new_status_word;
+
     mode_of_operation = new_mode_of_operation;
+    // bus volage register is in 0.1V steps
+    bus_voltage = new_bus_voltage/10.0;
+
+    if( input_pins ^ new_input_pins != 0) {
+        input_callback(*this, input_pins, new_input_pins);
+    }
+    input_pins = new_input_pins;
 
     switch(mode_of_operation) {
         case ProfilePosition:
@@ -420,16 +455,19 @@ std::string CopleyServo::operationModeName(enum OperationMode m)
     }
 }
 
-void CopleyServo::modeControl(uint16_t set, uint16_t clear,enum OperationMode
-        mode, PDOCallbackObject callback)
+void CopleyServo::modeControl(uint16_t set, uint16_t clear,
+        enum OperationMode mode,
+        PDOCallbackObject callback)
 {
     control_word |= set;
     control_word &= ~clear;
     mode_of_operation = mode;
     std::vector<uint8_t> data;
-    data.resize(3);
+    data.resize(5);
     *((uint16_t *)(&data[0])) = htole16(control_word);
     data[2] = mode_of_operation;
+    data[3] = output_pins&0xFF;
+    data[4] = (output_pins>>8)&0xFF;
     control_mode_pdo->send(data, callback);
 }
 
@@ -443,6 +481,12 @@ void CopleyServo::mode(enum OperationMode mode)
     modeControl(0, 0, mode);
 }
 
+void CopleyServo::output(uint16_t set, uint16_t clear)
+{
+    output_pins |= set;
+    output_pins &= ~clear;
+    modeControl(0, 0, mode_of_operation);
+}
 
 void CopleyServo::enable(bool state,
         DS301CallbackObject callback)
@@ -496,6 +540,38 @@ void CopleyServo::_positionGo(PDO &pdo)
 void CopleyServo::setPVCallback(DS301CallbackObject cb)
 {
     pv_callback = cb;
+}
+
+void CopleyServo::inputPinFunction(int pin_index, enum InputPinFunction function)
+{
+    std::vector<uint8_t> data;
+    uint16_t function_le = htole16(function);
+    uint8_t *pd = (uint8_t *)&function_le;
+    std::copy(pd, pd+sizeof(uint16_t), std::back_inserter(data));
+    writeObjectDictionary(0x2192, pin_index, data);
+}
+
+void CopleyServo::outputPinFunction(int pin_index, enum OutputPinFunction function,
+        std::vector<uint8_t> parameters,
+        bool activeLow)
+{
+    std::vector<uint8_t> data;
+    uint16_t funcword = function;
+    if(activeLow) {
+        funcword |= 1<<8;
+    } else {
+        funcword &= ~(1<<8);
+    }
+    uint16_t function_le = htole16(funcword);
+    uint8_t *pd = (uint8_t *)&function_le;
+    std::copy(pd, pd+sizeof(uint16_t), std::back_inserter(data));
+    std::copy(parameters.begin(), parameters.end(), std::back_inserter(data));
+    writeObjectDictionary(0x2193, pin_index, data);
+}
+
+void CopleyServo::setInputCallback(InputChangeCallback cb)
+{
+    input_callback = cb;
 }
 
 }

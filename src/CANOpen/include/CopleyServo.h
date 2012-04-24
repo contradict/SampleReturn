@@ -14,6 +14,48 @@ enum OperationMode {
     CyclicSynchronousTorque = 10,
 };
 
+enum InputPinFunction {
+    NoFunction,
+    Reserved,
+    RisingEdgeReset,
+    FallingEdgeReset,
+    PositiveLimitActiveHigh,
+    PositiveLimitActiveLow,
+    NegativeLimitActiveHigh,
+    NegativeLimitActiveLow,
+    MotorTemperatureSensorActiveHigh,
+    MotorTemperatureSensorActiveLow,
+    DisableHighClearFaluts,
+    DisableLowClearFaults,
+    RisingResetDisableHigh,
+    FallingResetDisableLow,
+    HomeActiveHigh,
+    HomeActiveLow,
+    DisableHigh,
+    DisableLow,
+    PWMSynchronization,
+    HaltHigh,
+    HaltLow,
+    HighResolutionDivideHigh,
+    HighResolutionDivideLow,
+    HighSpeedPositionCaptureRising,
+    HighSpeedPositionCaptureFalling,
+    CounterRising,
+    CounterFalling
+};
+
+enum OutputPinFunction {
+    ManufacturerStatus,
+    LatchedEventStatus,
+    Manual,
+    TrajectoryStatus,
+    PositionBetween,
+    PositionCrossesRising,
+    PositionCrossesFalling,
+    PositionCrossesAny
+};
+
+
 #define CONTROL_SWITCH_ON        0x0001
 #define CONTROL_ENABLE_VOLTAGE   0x0002
 #define CONTROL_QUICK_STOP       0x0004
@@ -77,27 +119,60 @@ class CopleyServo : public DS301 {
 
         bool ready(void);
 
-        uint16_t status_word;
-        uint16_t control_word;
-        enum OperationMode mode_of_operation;
+        void inputPinFunction(int pin_index, enum InputPinFunction function);
+        void outputPinFunction(int pin_index, enum OutputPinFunction function,
+                std::vector<uint8_t> parameters, bool activeLow);
+        void output(uint16_t set, uint16_t clear);
+
+        class InputChangeCallback {
+            public:
+                typedef void (TransferCallbackReceiver::*CallbackFunction)(CopleyServo &cls,
+                        uint16_t old_pins, uint16_t new_pins);
+                InputChangeCallback(TransferCallbackReceiver *r,
+                               CallbackFunction fn
+                               ) :
+                    r(r), fn(fn) {};
+                InputChangeCallback(std::tr1::shared_ptr<TransferCallbackReceiver> sr,
+                               CallbackFunction fn
+                              ) :
+                    r(NULL), sr(sr), fn(fn) {};
+                 InputChangeCallback() :
+                    r(NULL),
+                    fn(NULL) {};
+
+                virtual void operator()(CopleyServo &cls, uint16_t old_pins, uint16_t
+                        new_pins)
+                {
+                    if(r != NULL && fn != NULL) ((*r).*fn)(cls, old_pins, new_pins);
+                    else if(sr != NULL && fn != NULL) ((*sr).*fn)(cls, old_pins,
+                            new_pins);
+                };
+
+            private:
+                TransferCallbackReceiver *r;
+                std::tr1::shared_ptr<TransferCallbackReceiver> sr;
+                CallbackFunction fn;
+        };
+        void setInputCallback(InputChangeCallback cb);
         void setPVCallback(DS301CallbackObject cb);
         void setEMCYCallback(DS301CallbackObject cb);
 
         int32_t position;
         int32_t velocity;
         bool gotPV;
-
     private:
         void syncCallback(SYNC &sync);
-        void _initialize(DS301 &node);
-        void _mapPDOs(void);
         void emcyCallback(EMCY &emcy);
         void statusModePDOCallback(PDO &pdo);
         void positionVelocityPDOCallback(PDO &pdo);
+
+        void _initialize(DS301 &node);
+        void _mapPDOs(void);
         void _printStatusAndMode(void);
 
         void _initialModeOfOperation(SDO &sdo);
         void _initialControlWord(SDO &sdo);
+        void _initialOutputPins(SDO &sdo);
 
         void _setPositionValue(PDO &pdo);
         void _positionGo(PDO &pdo);
@@ -117,11 +192,20 @@ class CopleyServo : public DS301 {
         DS301CallbackObject pv_callback;
         DS301CallbackObject enable_callback;
         DS301CallbackObject emcy_callback;
+        InputChangeCallback input_callback;
 
         bool syncProducer;
         int32_t syncInterval;
         bool allReady;
         bool mapsCreated;
+
+        uint16_t status_word;
+        uint16_t input_pins;
+        uint16_t output_pins;
+        uint16_t control_word;
+        double bus_voltage;
+        enum OperationMode mode_of_operation;
+
 };
 
 }
