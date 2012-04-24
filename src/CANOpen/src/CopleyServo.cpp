@@ -494,7 +494,7 @@ void CopleyServo::enable(bool state,
     if(state) {
         control(
                 CONTROL_SWITCH_ON | CONTROL_ENABLE_VOLTAGE | CONTROL_ENABLE_OPERATION,
-                CONTROL_NEW_SETPOINT
+                CONTROL_RESET_FAULT | CONTROL_NEW_SETPOINT
                );
     } else {
         control(CONTROL_RESET_FAULT,
