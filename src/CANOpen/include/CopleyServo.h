@@ -54,8 +54,6 @@ class CopleyServo : public DS301 {
         CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus);
         CopleyServo(long int node_id, int sync_interval, std::tr1::shared_ptr<Bus> bus);
 
-        void pvCallback(DS301CallbackObject cb);
-
         void initialize(void);
 
         void control(uint16_t set, uint16_t clear);
@@ -82,6 +80,8 @@ class CopleyServo : public DS301 {
         uint16_t status_word;
         uint16_t control_word;
         enum OperationMode mode_of_operation;
+        void setPVCallback(DS301CallbackObject cb);
+
         int32_t position;
         int32_t velocity;
         bool gotPV;

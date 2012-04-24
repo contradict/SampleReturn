@@ -474,7 +474,7 @@ void CopleyServo::_positionGo(PDO &pdo)
     modeControl(CONTROL_NEW_SETPOINT | CONTROL_CHANGE_SET_IMMEDIATE, 0, ProfilePosition);
 }
 
-void CopleyServo::pvCallback(DS301CallbackObject cb)
+void CopleyServo::setPVCallback(DS301CallbackObject cb)
 {
     pv_callback = cb;
 }

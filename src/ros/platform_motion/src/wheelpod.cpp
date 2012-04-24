@@ -9,8 +9,8 @@ namespace platform_motion {
 
 void WheelPod::pvCallbacks(CANOpen::DS301CallbackObject wheelcb, CANOpen::DS301CallbackObject steeringcb)
 {
-    wheel.pvCallback(wheelcb);
-    steering.pvCallback(steeringcb);
+    wheel.setPVCallback(wheelcb);
+    steering.setPVCallback(steeringcb);
 }
 
 void WheelPod::drive(double angle, double omega)
