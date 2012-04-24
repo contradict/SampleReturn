@@ -49,12 +49,16 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
     sync(std::tr1::shared_ptr<SYNC>(new SYNC(node_id,
          SYNCCallbackObject(static_cast<TransferCallbackReceiver *>(this),
                             static_cast<SYNCCallbackObject::CallbackFunction>(&CopleyServo::syncCallback))))),
+    emcy(std::tr1::shared_ptr<EMCY>(new EMCY(node_id,
+         EMCYCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                            static_cast<EMCYCallbackObject::CallbackFunction>(&CopleyServo::emcyCallback))))),
     syncProducer(false),
     allReady(false),
     gotPV(false),
     mapsCreated(false)
 {
     bus->add(sync);
+    bus->add(emcy);
 }
 
 CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_ptr<Bus> bus) :
@@ -64,6 +68,9 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
     sync(std::tr1::shared_ptr<SYNC>(new SYNC(node_id,
          SYNCCallbackObject(static_cast<TransferCallbackReceiver *>(this),
                             static_cast<SYNCCallbackObject::CallbackFunction>(&CopleyServo::syncCallback))))),
+    emcy(std::tr1::shared_ptr<EMCY>(new EMCY(node_id,
+         EMCYCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                            static_cast<EMCYCallbackObject::CallbackFunction>(&CopleyServo::emcyCallback))))),
     syncProducer(true),
     syncInterval(sync_interval),
     allReady(false),
@@ -71,6 +78,7 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
     mapsCreated(false)
 {
     bus->add(sync);
+    bus->add(emcy);
 }
 
 
@@ -352,6 +360,17 @@ void CopleyServo::syncCallback(SYNC &sync)
             !allReady) {
         allReady=true;
     }
+}
+
+void CopleyServo::emcyCallback(EMCY &emcy)
+{
+    emcy_callback(*this);
+    std::cout << "EMERGENCY: " << emcy.error_string() << std::endl;
+}
+
+void CopleyServo::setEMCYCallback(DS301CallbackObject cb)
+{
+    emcy_callback = cb;
 }
 
 bool CopleyServo::ready(void)

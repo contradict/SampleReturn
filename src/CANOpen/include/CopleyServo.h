@@ -81,6 +81,7 @@ class CopleyServo : public DS301 {
         uint16_t control_word;
         enum OperationMode mode_of_operation;
         void setPVCallback(DS301CallbackObject cb);
+        void setEMCYCallback(DS301CallbackObject cb);
 
         int32_t position;
         int32_t velocity;
@@ -90,6 +91,7 @@ class CopleyServo : public DS301 {
         void syncCallback(SYNC &sync);
         void _initialize(DS301 &node);
         void _mapPDOs(void);
+        void emcyCallback(EMCY &emcy);
         void statusModePDOCallback(PDO &pdo);
         void positionVelocityPDOCallback(PDO &pdo);
         void _printStatusAndMode(void);
@@ -101,6 +103,7 @@ class CopleyServo : public DS301 {
         void _positionGo(PDO &pdo);
 
         std::tr1::shared_ptr<SYNC> sync;
+        std::tr1::shared_ptr<EMCY> emcy;
 
         std::tr1::shared_ptr<TPDO> status_mode_pdo;
         std::tr1::shared_ptr<TPDO> position_velocity_pdo;
@@ -113,6 +116,7 @@ class CopleyServo : public DS301 {
         DS301CallbackObject position_callback;
         DS301CallbackObject pv_callback;
         DS301CallbackObject enable_callback;
+        DS301CallbackObject emcy_callback;
 
         bool syncProducer;
         int32_t syncInterval;
