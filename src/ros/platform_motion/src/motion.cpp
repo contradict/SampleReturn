@@ -373,7 +373,7 @@ void Motion::doHome(void)
         ROS_ERROR("Could not home: %s", strerror(errno));
         perror("Error during home notify write");
     } else {
-        ROS_INFO("Enable goal accepted");
+        ROS_INFO("Home goal accepted");
         home_action_server.acceptNewGoal();
     }
 }
@@ -396,10 +396,14 @@ void Motion::doEnable(void)
     ROS_INFO("sending command %d", c);
     if(write(notify_write_fd, &c, 1) != 1) {
         //perror("Error during home notify write");
-        ROS_ERROR("Could not enable: %s", strerror(errno));
+        const std::string error(strerror(errno));
+        ROS_ERROR("Could not enable: %s", error.c_str());
+        enable_result.port_enabled = false;
+        enable_result.stern_enabled = false;
+        enable_result.starboard_enabled = false;
+        enable_action_server.setAborted(enable_result, error);
     } else {
         ROS_INFO("Enable goal accepted");
-        enable_action_server.acceptNewGoal();
     }
 }
 
