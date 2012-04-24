@@ -3,7 +3,11 @@
 <launch>
 
   <!-- platform node -->
-  <node pkg="platform_motion" type="motion_node" name="motion" output="log"/>
+  <node pkg="platform_motion" type="motion_node" name="motion" output="log">
+      <param name="port_steering_offset" type="double" value="0.1131"/>
+      <param name="staroard_steering_offset" type="double" value="-0.062832"/>
+      <param name="stern_steering_offset" type="double" value="-0.081681"/>
+  </node>
 
   <param name="robot_description"
       command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
