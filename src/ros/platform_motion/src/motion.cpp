@@ -680,9 +680,11 @@ void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t leve
     starboard->setSteeringOffset(config.starboard_steering_offset);
     stern->setSteeringOffset(config.stern_steering_offset);
     carousel_offset = config.carousel_offset;
-    carousel->setPosition(
-            (desired_carousel_position - carousel_offset)*
-            carousel_encoder_counts/2./M_PI);
+    if(carousel->ready()) {
+        carousel->setPosition(
+                (desired_carousel_position - carousel_offset)*
+                carousel_encoder_counts/2./M_PI);
+    }
 }
 
 void Motion::carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg)
