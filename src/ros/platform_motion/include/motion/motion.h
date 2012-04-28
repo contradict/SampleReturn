@@ -11,6 +11,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
     private:
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg);
         void doHome(void);
         void homeComplete(CANOpen::DS301 &node);
         void doEnable(void);
@@ -26,6 +27,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::NodeHandle nh_;
 
         ros::Subscriber twist_sub;
+        ros::Subscriber carousel_sub;
         ros::Publisher odometry_pub;
         tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher joint_state_pub;
@@ -51,6 +53,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         int stern_steering_id, stern_wheel_id;
         double stern_steering_min, stern_steering_max, stern_steering_offset;
         int carousel_id;
+        double carousel_offset, desired_carousel_position;
         int sync_interval;
 
         double wheel_diameter;
@@ -58,7 +61,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         double width, length;
         double center_pt_x, center_pt_y;
 
-        int steering_encoder_counts, wheel_encoder_counts;
+        int steering_encoder_counts, wheel_encoder_counts,
+            carousel_encoder_counts;
         int large_steering_move;
 
         int CAN_channel, CAN_baud;

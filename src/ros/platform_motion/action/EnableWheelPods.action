@@ -5,6 +5,7 @@ bool enable_state
 bool port_enabled
 bool starboard_enabled
 bool stern_enabled
+bool carousel_enabled
 ---
 #feedback definition
 int8 enable_count

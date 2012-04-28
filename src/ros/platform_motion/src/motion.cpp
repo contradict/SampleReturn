@@ -110,6 +110,8 @@ Motion::Motion() :
     nh_.param("stern_steering_offset", stern_steering_offset,  0.0);
 
     nh_.param("carousel_id", carousel_id, 1);
+    nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
+    nh_.param("carousel_offset", carousel_offset, 0.0);
     nh_.param("sync_interval", sync_interval, 50000);
 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
@@ -194,6 +196,9 @@ Motion::Motion() :
 
     twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
 
+    carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
+            this);
+
     odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
     joint_state_pub = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
 
@@ -272,18 +277,21 @@ void Motion::runBus(void)
                             port->home(hcb);
                             starboard->home(hcb);
                             stern->home(hcb);
+                            carousel->home(hcb);
                             break;
                         case motion_enable:
                             ROS_INFO( "enable" );
                             port->enable(true, ecb);
                             starboard->enable(true, ecb);
                             stern->enable(true, ecb);
+                            carousel->enable(true, ecb);
                             break;
                         case motion_disable:
                             ROS_INFO( "disable" );
                             port->enable(false, ecb);
                             starboard->enable(false, ecb);
                             stern->enable(false, ecb);
+                            carousel->enable(false, ecb);
                             break;
                          case motion_initialize:
                             ROS_INFO( "initialize" );
@@ -390,7 +398,7 @@ void Motion::homeComplete(CANOpen::DS301 &node)
     home_count++;
     home_feedback.home_count = home_count;
     home_action_server.publishFeedback(home_feedback);
-    if(home_count == 3) {
+    if(home_count == 4) {
         home_action_server.setSucceeded(home_result);  
     }
 }
@@ -408,6 +416,7 @@ void Motion::doEnable(void)
         enable_result.port_enabled = false;
         enable_result.stern_enabled = false;
         enable_result.starboard_enabled = false;
+        enable_result.carousel_enabled = false;
         enable_action_server.setAborted(enable_result, error);
     } else {
         ROS_INFO("Enable goal accepted");
@@ -419,10 +428,11 @@ void Motion::enableStateChange(CANOpen::DS301 &node)
     enable_feedback.enable_count = ++enable_count;
     enable_action_server.publishFeedback(enable_feedback);
     ROS_INFO("Enable report, count=%d", enable_count);
-    if(enable_count == 6) {
+    if(enable_count == 7) {
         enable_result.port_enabled = port->enabled();
         enable_result.stern_enabled = stern->enabled();
         enable_result.starboard_enabled = starboard->enabled();
+        enable_result.carousel_enabled = carousel->enabled();
         enable_action_server.setSucceeded(enable_result);
     }
 }
@@ -650,13 +660,16 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         joints.name.push_back("stern_axle");
         joints.position.push_back(stern_wheel*2*M_PI);
         joints.velocity.push_back(stern_wheel_velocity*2*M_PI);
+        joints.name.push_back("carousel_joint");
+        joints.position.push_back((carousel->position*2*M_PI/carousel_encoder_counts)+carousel_offset);
+        joints.velocity.push_back(carousel->velocity*2*M_PI/10./carousel_encoder_counts);
         joint_state_pub.publish(joints);
     }
 }
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
-    pv_counter = 6;
+    pv_counter = 7;
 }
 
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
@@ -666,6 +679,20 @@ void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t leve
     port->setSteeringOffset(config.port_steering_offset);
     starboard->setSteeringOffset(config.starboard_steering_offset);
     stern->setSteeringOffset(config.stern_steering_offset);
+    carousel_offset = config.carousel_offset;
+    carousel->setPosition(
+            (desired_carousel_position - carousel_offset)*
+            carousel_encoder_counts/2./M_PI);
+}
+
+void Motion::carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg)
+{
+    tf::Quaternion q;
+    tf::quaternionMsgToTF(*qmsg, q);
+    desired_carousel_position = tf::getYaw(q); 
+    carousel->setPosition(
+            (desired_carousel_position - carousel_offset)*
+            carousel_encoder_counts/2./M_PI);
 }
 
 }
