@@ -200,7 +200,7 @@ Motion::Motion() :
             this);
 
     odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
-    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
+    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
 
     home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
 
@@ -637,8 +637,8 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         odom_trans.transform.translation.z = 0;
         odom_trans.transform.rotation = odom_quat;
         odom_broadcaster.sendTransform(odom_trans);
-        sensor_msgs::JointState joints;
 
+        sensor_msgs::JointState joints;
         joints.header.frame_id="base_link";
         joints.header.stamp=current_time;
         joints.header.seq=joint_seq++;
