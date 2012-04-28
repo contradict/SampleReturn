@@ -9,6 +9,10 @@
       <param name="stern_steering_offset" type="double" value="-0.15708"/>
   </node>
 
+  <node pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
+  </node>
+
+
   <param name="robot_description"
       command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
 
