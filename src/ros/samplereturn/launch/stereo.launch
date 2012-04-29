@@ -9,7 +9,7 @@
         type="nodelet"
         name="camera_process"
         args="manager"
-        output="screen"
+        output="log"
         >
     </node>
     <node
@@ -17,7 +17,9 @@
          type="nodelet"
          name="left"
          args="load camera1394/driver /camera_process"
-         ns="/stereo">
+         ns="/stereo"
+         output="log"
+         >
 
         <param name="guid" type="string" value="00b09d0100a8563d"/>
         <param name="video_mode" value="640x480_mono8"/>
@@ -34,7 +36,9 @@
          type="nodelet"
          name="right"
          args="load camera1394/driver /camera_process"
-         ns="/stereo">
+         ns="/stereo"
+         output="log"
+         >
 
         <param name="guid" type="string" value="00b09d0100a8566e"/>
         <param name="video_mode" value="640x480_mono8"/>
@@ -52,13 +56,17 @@
           type="nodelet"
           name="debayer_left"
           args="load image_proc/debayer /camera_process"
-          ns="/stereo/left">
+          ns="/stereo/left"
+          output="log"
+          >
     </node>
     <node pkg="nodelet"
           type="nodelet"
           name="debayer_right"
           args="load image_proc/debayer /camera_process"
-          ns="/stereo/right">
+          ns="/stereo/right"
+          output="log"
+          >
     </node>
 
     <!-- Display images -->
@@ -67,16 +75,20 @@
         type="nodelet"
         name="left_display"
         args="load image_view/image /camera_process"
-        ns="/stereo/left">
+        ns="/stereo/left"
+        output="log"
+        >
 
-        <remap  from="image" to="image_mono"/>
+        <remap  from="image" to="image_color"/>
     </node>
     <node
         pkg="nodelet"
         type="nodelet"
         name="right_display"
         args="load image_view/image /camera_process"
-        ns="/stereo/right">
+        ns="/stereo/right"
+        output="log"
+        >
 
         <remap from="image" to="image_color"/>
     </node>
@@ -88,6 +100,7 @@
         name="rect_left"
         args="load image_proc/rectify /camera_process"
         ns="/stereo/left"
+        output="log"
         >
         <remap from="image" to="image_mono"/>
     </node>
@@ -97,16 +110,20 @@
         name="rect_right"
         args="load image_proc/rectify /camera_process"
         ns="/stereo/right"
+        output="log"
         >
         <remap from="image" to="image_mono"/>
     </node>
 
     <!-- Display rectified images -->
+    <!--
     <node
         pkg="image_view"
         type="image_view"
         name="left_rect_display"
-        ns="/stereo/left/">
+        ns="/stereo/left/"
+        output="log"
+        >
 
         <remap from="image" to="image_rect"/>
     </node>
@@ -114,10 +131,13 @@
         pkg="image_view"
         type="image_view"
         name="right_rect_display"
-        ns="/stereo/right/">
+        ns="/stereo/right/"
+        output="log"
+        >
 
         <remap from="image" to="image_rect"/>
     </node>
+    -->
 
     <!-- Compute Stereo -->
     <node
@@ -126,6 +146,7 @@
         name="stereo_image_disparity"
         args="load stereo_image_proc/disparity /camera_process"
         ns="/stereo"
+        output="log"
         >
         <param name="correlation_window_size" type="int" value="17"/>
         <param name="min_disparity" type="int" value="0"/>
@@ -142,6 +163,7 @@
         name="stereo_image_points"
         args="load stereo_image_proc/point_cloud2 /camera_process"
         ns="/stereo"
+        output="log"
         >
         <param name="approximate_sync" type="bool" value="true"/>
         <remap from="left/image_rect_color" to="left/image_color"/>
@@ -154,6 +176,7 @@
         name="vis_disparity"
         args="load image_view/disparity /camera_process"
         ns="/stereo"
+        output="log"
         >
 
         <remap from="image" to="disparity"/>
@@ -175,7 +198,7 @@
     </node>
     -->
 
-    <node pkg="sync_images" type="sync_images" name="sync_images">
+    <node pkg="sync_images" type="sync_images" name="sync_images" output="log">
       <param name="pub_topic_left"  value="sync/left/image_rect"/>
       <param name="pub_topic_right" value="sync/right/image_rect"/>
       <param name="pub_info_left"   value="sync/left/camera_info"/>
@@ -188,25 +211,40 @@
 
   <!-- Run stereo VSLAM on wide stereo data -->
   <group ns="/sync">
-    <node name="stereo_vslam_node" pkg="vslam_system" type="stereo_vslam_node" args="$(find vocabulary_tree)/holidays.tree $(find vocabulary_tree)/holidays.weights $(find vslam_system)/data/calonder.rtc" output="screen" cwd="node" />
+      <node name="stereo_vslam_node"
+            pkg="vslam_system"
+            type="stereo_vslam_node"
+            args="$(find vocabulary_tree)/holidays.tree $(find vocabulary_tree)/holidays.weights $(find vslam_system)/data/calonder.rtc"
+            cwd="node"
+            output="screen"
+            />
+        <!--launch-prefix="/usr/bin/xterm -e /usr/bin/gdb - -args"-->
   </group>
 
-  <node name="vo_tracks_view" pkg="image_view" type="image_view">
+  <node name="vo_tracks_view" pkg="image_view" type="image_view" output="log">
     <remap from="image" to="/vslam/vo_tracks/image" />
   </node>
 
 
   <!-- Publishes the voxel grid to rviz for display -->
-  <node pkg="costmap_2d" type="costmap_2d_markers" name="voxel_visualizer">
+  <node pkg="costmap_2d"
+      type="costmap_2d_markers"
+      name="voxel_visualizer"
+      output="log"
+      >
     <remap from="voxel_grid" to="/costmap_node/costmap/voxel_grid"/>
   </node>
 
-  <node pkg="costmap_2d" type="costmap_2d_cloud" name="voxel_visualizer_cloud">
+  <node pkg="costmap_2d"
+      type="costmap_2d_cloud"
+      name="voxel_visualizer_cloud"
+      output="log"
+      >
     <remap from="voxel_grid" to="/costmap_node/costmap/voxel_grid"/>
   </node>
 
   <!-- Run the costmap node -->
-  <node name="costmap_node" pkg="costmap_2d" type="costmap_2d_node" >
+  <node name="costmap_node" pkg="costmap_2d" type="costmap_2d_node" output="log">
     <rosparam file="$(find samplereturn)/launch/example_params.yaml" command="load" ns="costmap" />
   </node>
 

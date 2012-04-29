@@ -60,4 +60,6 @@
           ns="/stereo/right">
     </node>
 
+    <!-- DSLR Camera Service Server --> 
+    <node pkg="photo" type="photo_node" name="photo_node"/>
 </launch>

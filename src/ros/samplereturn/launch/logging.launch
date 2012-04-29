@@ -9,7 +9,12 @@
       type="record"
       name="record"
       output="log"
-      args="odometry tf stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info">
+      args="odometry tf stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info caming">
   </node>
+
+  <!-- DSLR Client and Publisher-->
+   <!-- The wait between captures is hard-coded at 3.0 seconds,
+        I'll make this a param at some point -->
+   <node pkg="sample_return" type="camlogger" name="camlogger"/>
 
 </launch>

@@ -13,6 +13,8 @@
   <depend package="image_proc"/>
   <depend package="stereo_image_proc"/>
   <depend package="camera_calibration"/>
+  <depend package="photo"/>
+  <depend package="sensor_msgs"/>
 
 </package>
 
