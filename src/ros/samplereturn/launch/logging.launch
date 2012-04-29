@@ -12,7 +12,7 @@
         type="record"
         name="record"
         output="log"
-        args="odometry tf stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info"/>
+        args="odometry tf stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info camimg"/>
 
   <!-- joy node -->
   <node respawn="true" pkg="joy"
@@ -27,7 +27,13 @@
      <param name="axis_angular" value="0" type="int"/>
      <param name="scale_linear" value="2" type="double"/>
      <param name="scale_angular" value="1.57" type="double"/>
-  </node>
+   </node>
+
+   <!-- DSLR Camera Service Server, Client, and Publisher-->
+   <!-- The wait between captures is hard-coded at 3.0 seconds,
+        I'll make this a param at some point -->
+   <node pkg="sample_return" type="camlogger" name="camlogger"/>
+   <node pkg="photo" type="photo_node" name="photo_node"/>
 
     <!-- IEEE1394 camera driver -->
     <!-- Nodelet Host process -->
