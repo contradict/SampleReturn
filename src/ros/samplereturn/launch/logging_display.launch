@@ -4,19 +4,17 @@
 
     <!-- Display images -->
     <node
-        pkg="nodelet"
-        type="nodelet"
+        pkg="image_view"
+        type="image_view"
         name="left_display"
-        args="load image_view/image /camera_process"
         ns="/stereo/left">
 
         <remap  from="image" to="image_color"/>
     </node>
     <node
-        pkg="nodelet"
-        type="nodelet"
+        pkg="image_view"
+        type="image_view"
         name="right_display"
-        args="load image_view/image /camera_process"
         ns="/stereo/right">
 
         <remap from="image" to="image_color"/>
