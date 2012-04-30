@@ -7,10 +7,13 @@ import rospy
 import numpy as np
 
 def capture_image():
-  rospy.wait_for_service('photo/capture')
+  rospy.logdebug("waiting for photo service")
+  rospy.wait_for_service('photo_node/capture')
   try:
-    capture = rospy.ServiceProxy('photo/capture', Capture, persistent=True)
+    rospy.logdebug("requesting photo")
+    capture = rospy.ServiceProxy('photo_node/capture', Capture, persistent=True)
     img = capture()
+    rospy.logdebug("received photo")
     return img.image
   except rospy.ServiceException, e:
     print "Service Call Failed: %s"%e
@@ -21,6 +24,7 @@ def camlogger():
   rospy.init_node('camlogger')
   while not rospy.is_shutdown():
     img = capture_image()
+    rospy.logdebug("img (%d, %d)", img.width, img.height)
     pub.publish(img)
     rospy.sleep(3.0)
 
