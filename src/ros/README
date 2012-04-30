@@ -10,3 +10,4 @@ Add the path to this directory to ROS_PACKAGE_PATH.
 also need
 ros-electric-joystick-drivers
 ros-electric-camera-drivers
+bosch-
