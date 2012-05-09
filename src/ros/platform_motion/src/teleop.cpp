@@ -52,16 +52,16 @@ Teleop::Teleop():
   hac("home_wheelpods"),
   eac("enable_wheelpods")
 {
-    nh_.param("axis_linear_x", linear_x, linear_x);
-    nh_.param("axis_linear_y", linear_y, linear_y);
-    nh_.param("axis_angular_z", angular_z, angular_z);
-    nh_.param("button_homing", button_homing, button_homing);
-    nh_.param("button_enable", button_enable, button_enable);
-    nh_.param("button_disable", button_disable, button_disable);
-    nh_.param("scale_angular", a_scale_, a_scale_);
-    nh_.param("exponent_angular", a_exp_, a_exp_);
-    nh_.param("scale_linear", l_scale_, l_scale_);
-    nh_.param("exponent_linear", l_exp_, l_exp_);
+    nh_.param("/teleop/axis_linear_x", linear_x, linear_x);
+    nh_.param("/teleop/axis_linear_y", linear_y, linear_y);
+    nh_.param("/teleop/axis_angular_z", angular_z, angular_z);
+    nh_.param("/teleop/button_homing", button_homing, button_homing);
+    nh_.param("/teleop/button_enable", button_enable, button_enable);
+    nh_.param("/teleop/button_disable", button_disable, button_disable);
+    nh_.param("/teleop/scale_angular", a_scale_, a_scale_);
+    nh_.param("/teleop/exponent_angular", a_exp_, a_exp_);
+    nh_.param("/teleop/scale_linear", l_scale_, l_scale_);
+    nh_.param("/teleop/exponent_linear", l_exp_, l_exp_);
 
     twist_pub_ = nh_.advertise<geometry_msgs::Twist>("twist", 1);
 
