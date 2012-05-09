@@ -1,0 +1,22 @@
+Ad Hoc wifi
+https://help.ubuntu.com/community/WifiDocs/Adhoc
+
+Ubuntu IPV6
+https://wiki.ubuntu.com/IPv6
+
+Multiple-machine ROS
+http://www.ros.org/wiki/ROS/Tutorials/MultipleMachines
+
+cdist man pages
+http://www.nico.schottelius.org/software/cdist/man/latest/
+
+vim tips
+http://sontek.net/turning-vim-into-a-modern-python-ide
+http://clipboarded.blogspot.com/2007/10/vim-as-ide.html
+http://arstechnica.com/open-source/guides/2009/05/vim-made-easy-how-to-get-your-favorite-ide-features-in-vim.ars
+
+ros gdb
+http://www.ros.org/wiki/roslaunch/Tutorials/Roslaunch%20Nodes%20in%20Valgrind%20or%20GDB
+
+ros actionlib
+http://www.ros.org/wiki/actionlib_tutorials
