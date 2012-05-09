@@ -22,38 +22,17 @@
     <material name="carousel">
         <color rgba="0.1 0.8 0.2 1.0"/>
     </material>
-    <!-- the big triangle -->
-    <link name="base_link">
-        <inertial>
-            <origin xyz="0.75 0.5 0.05" /> 
-            <mass value="1.0" />
-            <inertia  ixx="0.140" ixy="0.0"  ixz="0.0"  iyy="0.105"  iyz="0.0" izz="0.246" />
-        </inertial>
-        <visual>
-            <origin xyz="0 0 0"/>
-            <geometry>
-                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" />
-            </geometry>
-            <material name="plate"/>
-        </visual>
-        <collision>
-            <origin xyz="0 0 0"/>
-            <geometry>
-                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" />
-            </geometry>
-        </collision>
-    </link>
     <xacro:macro name="wheel_module" params="name position">
         <joint name="${name}_suspension_joint" type="revolute">
             <axis xyz="0 0 1"/>
             <limit upper="1.57" lower="-1.57" effort="100" velocity="3.14"/>
-            <parent link="base_link"/>
+            <parent link="body_triangle"/>
             <child link="${name}_suspension"/>
-            <origin xyz="${position}"/>
+            <origin xyz="${position}" rpy="0 0 1.57"/>
         </joint>
         <link name="${name}_suspension">
             <visual>
-                <origin xyz="0 0 ${-suspension_height/2}"/>
+                <origin xyz="0 0 ${-suspension_height/2}" rpy="0 0 -1.57"/>
                 <geometry>
                     <cylinder length="${suspension_height}" radius="0.075"/>
                 </geometry>
@@ -166,21 +145,38 @@
         <!-- END RIGHT CAMERA -->
     </xacro:macro>
 
+    <link name="base_link">
+    </link>
+    <joint name="base_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="body_triangle"/>
+        <origin xyz="1.5 0 0" rpy="0 0 0.0"/>
+    </joint>
+    <!-- the big triangle -->
+    <link name="body_triangle">
+        <visual>
+            <origin xyz="0.0 -0.75 0" rpy="0 0 1.57"/>
+            <geometry>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" />
+            </geometry>
+            <material name="plate"/>
+        </visual>
+    </link>
     <!-- define suspension properties -->
     <xacro:property name="wheel_diameter" value="0.33"/>
     <xacro:property name="wheel_width" value="0.09"/>
     <xacro:property name="yoke_thickness" value="0.1"/>
     <xacro:property name="suspension_height" value="0.15"/>
     <!-- instantiate 3 modules -->
-    <xacro:wheel_module name="rear" position="0.75 1.30 0"/>
-    <xacro:wheel_module name="right_front" position="0.170 0.105 0"/>
-    <xacro:wheel_module name="left_front" position="1.330 0.105 0"/>
+    <xacro:wheel_module name="stern" position="-1.3 0 0"/>
+    <xacro:wheel_module name="port" position="0.0 0.5625 0"/>
+    <xacro:wheel_module name="starboard" position="0.0 -0.5625 0"/>
 
     <!-- instantiate navigation pair -->
     <xacro:stereo_pair name="navigation" baseline="0.30" />
     <!-- attach navigation pair -->
     <joint name="navigation_stereo_pair_joint" type="fixed">
-        <parent link="base_link"/>
+        <parent link="body_triangle"/>
         <child link="navigation_baseline_bar"/>
         <!-- macro defines camera with lenses facing along +z -->
         <!-- rpy is pi/2 + 16.5 degree down tilt -->
@@ -190,23 +186,50 @@
         suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
         -->
         <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="0.75 0.5 0.900" rpy="1.8588 0 0"/>
+        <origin xyz="0.015 0.0 0.990" rpy="1.745 0 1.57"/>
+    </joint>
+
+    <link name="search_camera_body">
+        <visual>
+            <geometry>
+                <box size="0.10 0.08 0.05"/>
+            </geometry>
+            <material name="sensor"/>
+        </visual>
+    </link>
+    <link name="search_camera_lens">
+        <visual>
+            <geometry>
+                <cylinder length="0.10" radius="0.035"/>
+            </geometry>
+            <material name="lens"/>
+        </visual>
+    </link>
+    <joint name="search_lens_joint" type="fixed">
+        <parent link="search_camera_body"/>
+        <child link="search_camera_lens"/>
+        <origin xyz="0.0 0.0 0.025" rpy="0 0 0"/>
+    </joint>
+    <joint name="search_camera_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="search_camera_body"/>
+        <origin xyz="0.10 0.0 1.0" rpy="1.65 0 1.57"/>
     </joint>
 
     <!-- carousel -->
     <link name="carousel">
         <visual>
             <geometry>
-                <cylinder length="0.250" radius="0.6"/>
+                <cylinder length="0.216" radius="0.406"/>
             </geometry>
             <material name="carousel"/>
         </visual>
     </link>
     <joint name="carousel_joint" type="continuous">
-        <parent link="base_link"/>
+        <parent link="body_triangle"/>
         <child link="carousel"/>
         <axis xyz="0 0 1"/>
-        <origin xyz="0.75 0.5 -0.125"/>
+        <origin xyz="-0.239 0.0 -0.121"/>
     </joint>
 
 </robot>
