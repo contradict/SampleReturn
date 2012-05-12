@@ -230,15 +230,20 @@ Motion::~Motion()
     close(notify_write_fd);
 }
 
-/*
 void Motion::shutdown(void)
 {
-    port->enable(false);
-    stern->enable(false);
-    starboard->enable(false);
-    carousel->enable(false);
+    enable_count = 0;
+    enable(false);
+
+    for(int i=0;i<50;i++){
+        if(enable_count>=7) {
+            break;
+        } else {
+            ros::Duration(0.010).sleep();
+        }
+    }
 }
-*/
+
 enum motion_command {
     motion_drive=0,
     motion_home=1,
@@ -437,15 +442,18 @@ void Motion::doEnable(void)
 
 void Motion::enableStateChange(CANOpen::DS301 &node)
 {
-    enable_feedback.enable_count = ++enable_count;
-    enable_action_server.publishFeedback(enable_feedback);
-    ROS_INFO("Enable report, count=%d", enable_count);
-    if(enable_count == 7) {
-        enable_result.port_enabled = port->enabled();
-        enable_result.stern_enabled = stern->enabled();
-        enable_result.starboard_enabled = starboard->enabled();
-        enable_result.carousel_enabled = carousel->enabled();
-        enable_action_server.setSucceeded(enable_result);
+    ++enable_count;
+    if(enable_action_server.isActive()){
+        enable_feedback.enable_count = enable_count;
+        enable_action_server.publishFeedback(enable_feedback);
+        ROS_INFO("Enable report, count=%d", enable_count);
+        if(enable_count == 7) {
+            enable_result.port_enabled = port->enabled();
+            enable_result.stern_enabled = stern->enabled();
+            enable_result.starboard_enabled = starboard->enabled();
+            enable_result.carousel_enabled = carousel->enabled();
+            enable_action_server.setSucceeded(enable_result);
+        }
     }
 }
 

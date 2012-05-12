@@ -5,6 +5,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         Motion();
         ~Motion();
         void start(void);
+        void shutdown(void);
         void runBus(void);
         bool ready(void);
         void enable(bool state = true);

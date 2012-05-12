@@ -30,6 +30,6 @@ int main(int argc, char **argv)
     m.start();
     ROS_INFO("spin");
     ros::spin();
-    //m.shutdown();
+    m.shutdown();
 }
 
