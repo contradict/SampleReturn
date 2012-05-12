@@ -24,6 +24,7 @@
 #include <platform_motion/HomeWheelPodsAction.h>
 #include <platform_motion/EnableWheelPodsAction.h>
 #include <platform_motion/PlatformParametersConfig.h>
+#include <platform_motion/GPIO.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -148,8 +149,13 @@ Motion::Motion() :
 
     pbus->add(psync);
 
+    CANOpen::CopleyServo::InputChangeCallback
+        gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                static_cast<CANOpen::CopleyServo::InputChangeCallback::CallbackFunction>(&Motion::gpioCallback));
+
     carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
             CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
+    carousel->setInputCallback(gpiocb);
 
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
@@ -166,7 +172,7 @@ Motion::Motion() :
                  wheel_encoder_counts,
                  large_steering_move
                 ));
-    port->pvCallbacks(pvcb, pvcb);
+    port->setCallbacks(pvcb, pvcb, gpiocb);
 
     starboard = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
@@ -179,7 +185,7 @@ Motion::Motion() :
                  wheel_encoder_counts,
                  large_steering_move
                 ));
-    starboard->pvCallbacks(pvcb, pvcb);
+    starboard->setCallbacks(pvcb, pvcb, gpiocb);
 
     stern = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
@@ -192,15 +198,21 @@ Motion::Motion() :
                  wheel_encoder_counts,
                  large_steering_move
                 ));
-    stern->pvCallbacks(pvcb, pvcb);
+    stern->setCallbacks(pvcb, pvcb, gpiocb);
 
     twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
 
     carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
             this);
 
+    gpio_sub = nh_.subscribe("gpio_write", 2, &Motion::gpioSubscriptionCallback,
+            this);
+
     odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
+
     joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
+
+    gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
 
     home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
 
@@ -664,6 +676,40 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         joints.position.push_back((carousel->position*2*M_PI/carousel_encoder_counts)+carousel_offset);
         joints.velocity.push_back(carousel->velocity*2*M_PI/10./carousel_encoder_counts);
         joint_state_pub.publish(joints);
+    }
+}
+
+void Motion::gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins)
+{
+    platform_motion::GPIO gpio;
+
+    gpio.servo_id = svo.node_id;
+    gpio.previous_pin_states = old_pins;
+    gpio.new_pin_states = new_pins;
+    gpio.pin_mask = 0xFFFF;
+    gpio_pub.publish(gpio);
+}
+
+void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio)
+{
+    uint16_t set   = gpio->pin_mask & ( gpio->new_pin_states & ~gpio->previous_pin_states);
+    uint16_t clear = gpio->pin_mask & (~gpio->new_pin_states &  gpio->previous_pin_states);
+    if(gpio->servo_id == carousel_id) {
+            carousel->output(set, clear);
+    } else if(gpio->servo_id == port_steering_id) {
+            port->steering.output(set, clear);
+    } else if(gpio->servo_id == port_wheel_id) {
+            port->wheel.output(set, clear);
+    } else if(gpio->servo_id == starboard_steering_id) {
+            starboard->steering.output(set, clear);
+    } else if(gpio->servo_id == starboard_wheel_id) {
+            starboard->wheel.output(set, clear);
+    } else if(gpio->servo_id == stern_steering_id) {
+            stern->steering.output(set, clear);
+    } else if(gpio->servo_id == stern_wheel_id) {
+            stern->wheel.output(set, clear);
+    } else {
+            ROS_ERROR("Unknonw servo_id in GPIO: %d", gpio->servo_id);
     }
 }
 

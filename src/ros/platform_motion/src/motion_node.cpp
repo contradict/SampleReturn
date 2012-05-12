@@ -13,6 +13,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeWheelPodsAction.h>
 #include <platform_motion/EnableWheelPodsAction.h>
+#include <platform_motion/GPIO.h>
 
 #include <canlib.h>
 #include <CANOpen.h>

@@ -30,7 +30,9 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
             currentMode(PodUninitialized)
             {};
 
-        void pvCallbacks(CANOpen::DS301CallbackObject wheelcb, CANOpen::DS301CallbackObject steeringcb);
+        void setCallbacks(CANOpen::DS301CallbackObject wheelcb,
+                          CANOpen::DS301CallbackObject steeringcb,
+                          CANOpen::CopleyServo::InputChangeCallback gpiocb);
 
         void initialize(void);
 
@@ -45,11 +47,13 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
                 double &wheel_pos, double &wheel_vel);
 
         void setSteeringOffset(double offset);
+
+        CANOpen::CopleyServo steering, wheel;
+
     private:
         void _setMode(enum PodMode m);
         void _positionAcchieved(CANOpen::DS301 &node);
 
-        CANOpen::CopleyServo steering, wheel;
         double steering_min, steering_max, steering_offset;
         long int steering_encoder_counts, wheel_encoder_counts;
         long int large_steering_move;

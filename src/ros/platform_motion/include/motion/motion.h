@@ -12,11 +12,13 @@ class Motion : public CANOpen::TransferCallbackReceiver {
     private:
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg);
+        void gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio);
         void doHome(void);
         void homeComplete(CANOpen::DS301 &node);
         void doEnable(void);
         void enableStateChange(CANOpen::DS301 &node);
         void pvCallback(CANOpen::DS301 &node);
+        void gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins);
         void syncCallback(CANOpen::SYNC &sync);
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
@@ -28,7 +30,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         ros::Subscriber twist_sub;
         ros::Subscriber carousel_sub;
+        ros::Subscriber gpio_sub;
         ros::Publisher odometry_pub;
+        ros::Publisher gpio_pub;
         tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher joint_state_pub;
         dynamic_reconfigure::Server<PlatformParametersConfig>
