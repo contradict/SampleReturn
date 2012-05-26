@@ -5,16 +5,22 @@
   <!-- rosbag record -->
   <!--
   -->
-  <node pkg="rosbag"
+  <node machine="navigate"
+      pkg="rosbag"
       type="record"
       name="record"
       output="log"
-      args="odometry tf joint_state carousel stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info camimg">
+      args="odometry tf joint_state carousel stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info">
   </node>
 
   <!-- DSLR Client and Publisher-->
    <!-- The wait between captures is hard-coded at 3.0 seconds,
         I'll make this a param at some point -->
-   <node pkg="samplereturn" type="camlogger.py" name="camlogger"/>
-
+   <node machine="search" pkg="samplereturn" type="camlogger.py" name="camlogger"/>
+   <node machine="search"
+      pkg="rosbag"
+      type="record"
+      name="record"
+      output="log"
+      args="camimg"/>
 </launch>

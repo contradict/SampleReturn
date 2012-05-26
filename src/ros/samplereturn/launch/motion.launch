@@ -3,20 +3,20 @@
 <launch>
 
   <!-- platform node -->
-  <node pkg="platform_motion" type="motion_node" name="motion" output="log">
+  <node machine="navigate" pkg="platform_motion" type="motion_node" name="motion" output="log">
       <param name="port_steering_offset" type="double" value="0.155"/>
       <param name="starboard_steering_offset" type="double" value="-0.20106"/>
       <param name="stern_steering_offset" type="double" value="-0.15708"/>
   </node>
 
-  <node pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
+  <node machine="navigate" pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
   </node>
 
 
   <param name="robot_description"
       command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
 
-  <node pkg="robot_state_publisher" type="state_publisher"
+  <node machine="navigate" pkg="robot_state_publisher" type="state_publisher"
       name="state_publisher" output="log"/>
 
 </launch>

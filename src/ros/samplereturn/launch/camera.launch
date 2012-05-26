@@ -4,6 +4,7 @@
     <!-- IEEE1394 camera driver -->
     <!-- Nodelet Host process -->
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="camera_process"
@@ -12,6 +13,7 @@
         >
     </node>
     <node
+         machine="navigate"
          pkg="nodelet"
          type="nodelet"
          name="left"
@@ -29,6 +31,7 @@
         <remap from="camera" to="left" />
     </node>
     <node
+         machine="navigate"
          pkg="nodelet"
          type="nodelet"
          name="right"
@@ -47,13 +50,17 @@
     </node>
 
     <!-- Debayer -->
-    <node pkg="nodelet"
+    <node
+          machine="navigate"
+          pkg="nodelet"
           type="nodelet"
           name="debayer_left"
           args="load image_proc/debayer /camera_process"
           ns="/stereo/left">
     </node>
-    <node pkg="nodelet"
+    <node
+          machine="navigate"
+          pkg="nodelet"
           type="nodelet"
           name="debayer_right"
           args="load image_proc/debayer /camera_process"
@@ -61,5 +68,5 @@
     </node>
 
     <!-- DSLR Camera Service Server --> 
-    <node pkg="photo" type="photo_node" name="photo_node"/>
+    <node machine="search" pkg="photo" type="photo_node" name="photo_node"/>
 </launch>
