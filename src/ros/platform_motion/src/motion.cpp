@@ -133,12 +133,40 @@ Motion::Motion() :
     stern_pos << 0, 0;
     body_pt << center_pt_x, center_pt_y;
 
+    twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
+
+    carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
+            this);
+
+    gpio_sub = nh_.subscribe("gpio_write", 2, &Motion::gpioSubscriptionCallback,
+            this);
+
+    odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
+
+    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
+
+    gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
+
+    home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
+
+    enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
+
+    reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
+
+}
+
+bool Motion::openBus(void)
+{
     std::tr1::shared_ptr<CANOpen::KvaserInterface> pintf(new CANOpen::KvaserInterface(
                                                 CAN_channel,
                                                 CAN_baud
                                                ));
 
     CAN_fd = pintf->getFD();
+
+    if(CAN_fd<0) {
+        return false;
+    }
 
     pbus = std::tr1::shared_ptr<CANOpen::Bus>(new CANOpen::Bus(pintf, false));
 
@@ -200,26 +228,7 @@ Motion::Motion() :
                 ));
     stern->setCallbacks(pvcb, pvcb, gpiocb);
 
-    twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
-
-    carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
-            this);
-
-    gpio_sub = nh_.subscribe("gpio_write", 2, &Motion::gpioSubscriptionCallback,
-            this);
-
-    odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
-
-    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
-
-    gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
-
-    home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
-
-    enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
-
-    reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
-
+    return true;
 }
 
 Motion::~Motion()
@@ -255,6 +264,10 @@ enum motion_command {
 void Motion::runBus(void)
 {
     struct pollfd pfd[2];
+    while(!openBus()) {
+        ROS_ERROR("Could not open CAN bus, trying again in 5 seconds");
+        ros::Duration(5.0).sleep();
+    }
     pfd[0].fd = CAN_fd;
     pfd[0].events = POLLIN | POLLOUT;
     pfd[1].fd = notify_read_fd;

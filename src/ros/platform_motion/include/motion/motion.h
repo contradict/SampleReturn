@@ -11,6 +11,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void enable(bool state = true);
 
     private:
+        bool openBus(void);
+
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg);
         void gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio);
