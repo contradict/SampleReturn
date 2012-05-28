@@ -17,6 +17,8 @@
       command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
 
   <node machine="navigate" pkg="robot_state_publisher" type="state_publisher"
-      name="state_publisher" output="log"/>
+      name="state_publisher" output="log">
+      <remap from="joint_states" to="platform_joint_state"/>
+  </node>
 
 </launch>
