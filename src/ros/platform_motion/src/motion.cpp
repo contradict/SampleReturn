@@ -748,15 +748,20 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
 {
     wheel_diameter = config.wheel_diameter;
+    port_steering_offset = config.port_steering_offset;
+    starboard_steering_offset = config.starboard_steering_offset;
+    stern_steering_offset = config.stern_steering_offset;
 
-    port->setSteeringOffset(config.port_steering_offset);
-    starboard->setSteeringOffset(config.starboard_steering_offset);
-    stern->setSteeringOffset(config.stern_steering_offset);
-    carousel_offset = config.carousel_offset;
-    if(carousel->ready()) {
-        carousel->setPosition(
-                (desired_carousel_position - carousel_offset)*
-                carousel_encoder_counts/2./M_PI);
+    if( CAN_fd>0 ) {
+        port->setSteeringOffset(config.port_steering_offset);
+        starboard->setSteeringOffset(config.starboard_steering_offset);
+        stern->setSteeringOffset(config.stern_steering_offset);
+        carousel_offset = config.carousel_offset;
+        if(carousel->ready()) {
+            carousel->setPosition(
+                    (desired_carousel_position - carousel_offset)*
+                    carousel_encoder_counts/2./M_PI);
+        }
     }
 }
 
