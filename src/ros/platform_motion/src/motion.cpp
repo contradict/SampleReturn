@@ -742,7 +742,7 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
-    pv_counter = 7;
+    pv_counter = carousel_motion?7:6;
 }
 
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
