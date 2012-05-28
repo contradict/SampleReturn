@@ -62,6 +62,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         int carousel_id;
         double carousel_offset, desired_carousel_position;
         int sync_interval;
+        bool carousel_motion;
 
         double wheel_diameter;
 

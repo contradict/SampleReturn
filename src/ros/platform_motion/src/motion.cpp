@@ -82,6 +82,7 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
 Motion::Motion() :
     home_action_server(nh_, "home_wheelpods", false),
     enable_action_server(nh_, "enable_wheelpods", false),
+    CAN_fd(-1),
     enabled(false),
     last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
     odom_count(1), odom_counter(1),
@@ -114,6 +115,7 @@ Motion::Motion() :
     nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
     nh_.param("carousel_offset", carousel_offset, 0.0);
     nh_.param("sync_interval", sync_interval, 50000);
+    nh_.param("enable_carousel_motion", carousel_motion, false);
 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
     nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
@@ -241,6 +243,8 @@ Motion::~Motion()
 
 void Motion::shutdown(void)
 {
+    if(CAN_fd < 0)
+        return;
     enable_count = 0;
     enable(false);
 
@@ -264,16 +268,18 @@ enum motion_command {
 void Motion::runBus(void)
 {
     struct pollfd pfd[2];
-    while(!openBus()) {
+    int ret=0;
+    CAN_thread_run=true;
+    while(!openBus() && CAN_thread_run ) {
         ROS_ERROR("Could not open CAN bus, trying again in 5 seconds");
         ros::Duration(5.0).sleep();
     }
+    if( ! CAN_thread_run )
+        return;
     pfd[0].fd = CAN_fd;
     pfd[0].events = POLLIN | POLLOUT;
     pfd[1].fd = notify_read_fd;
     pfd[1].events = POLLIN;
-    int ret=0;
-    CAN_thread_run=true;
     while(ret >= 0 && CAN_thread_run ){
         ret = poll(pfd, 2, POLL_TIMEOUT_MS);
         if(ret>0) {
@@ -412,7 +418,7 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
 
 void Motion::doHome(void)
 {
-    home_count = 0;
+    home_count = carousel_motion?0:1;
     char c=motion_home;
     if(write(notify_write_fd, &c, 1) != 1) {
         ROS_ERROR("Could not home: %s", strerror(errno));
@@ -437,7 +443,7 @@ void Motion::doEnable(void)
 {
     bool state = enable_action_server.acceptNewGoal()->enable_state;
     char c=state?motion_enable:motion_disable;
-    enable_count = 0;
+    enable_count = carousel_motion?0:1;
     ROS_INFO("sending command %d", c);
     if(write(notify_write_fd, &c, 1) != 1) {
         //perror("Error during home notify write");
@@ -730,7 +736,7 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
     } else if(gpio->servo_id == stern_wheel_id) {
             stern->wheel.output(set, clear);
     } else {
-            ROS_ERROR("Unknonw servo_id in GPIO: %d", gpio->servo_id);
+            ROS_ERROR("Unknown servo_id in GPIO: %d", gpio->servo_id);
     }
 }
 
