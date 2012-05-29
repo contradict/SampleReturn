@@ -54,6 +54,9 @@ class DS301 : public TransferCallbackReceiver {
 
         void enableSync(bool enable);
         void setSyncInterval(uint32_t interval_us);
+
+        const unsigned long node_id;
+
     private:
         void mapPDO(std::tr1::shared_ptr<PDO> ppdo,
                     std::vector<struct PDOMap> mapped,
@@ -69,7 +72,6 @@ class DS301 : public TransferCallbackReceiver {
 
         void readPDO(std::tr1::shared_ptr<PDO> ppdo);
 
-        const unsigned long node_id;
         bool EXTENDED;
 
         bool inCheck;

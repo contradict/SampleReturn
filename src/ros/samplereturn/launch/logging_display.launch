@@ -3,22 +3,41 @@
 <launch>
 
     <!-- Display images -->
+
+    <!-- Navigation -->
     <node
         pkg="image_view"
         type="image_view"
-        name="left_display"
-        ns="/stereo/left">
+        name="left_navigation_display"
+        ns="/navigation_stereo/left">
 
         <remap  from="image" to="image_color"/>
     </node>
     <node
         pkg="image_view"
         type="image_view"
-        name="right_display"
-        ns="/stereo/right">
+        name="right_navigation_display"
+        ns="/navigation_stereo/right">
 
         <remap from="image" to="image_color"/>
     </node>
 
+    <!-- Manipulator -->
+    <node
+        pkg="image_view"
+        type="image_view"
+        name="left_manipulator_display"
+        ns="/manipulator_stereo/left">
+
+        <remap  from="image" to="image_color"/>
+    </node>
+    <node
+        pkg="image_view"
+        type="image_view"
+        name="right_manipulator_display"
+        ns="/manipulator_stereo/right">
+
+        <remap from="image" to="image_color"/>
+    </node>
 
 </launch>

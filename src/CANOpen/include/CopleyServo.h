@@ -126,7 +126,8 @@ class CopleyServo : public DS301 {
 
         class InputChangeCallback {
             public:
-                typedef void (TransferCallbackReceiver::*CallbackFunction)(CopleyServo &cls,
+                typedef void
+                    (TransferCallbackReceiver::*CallbackFunction)(CopleyServo &svo,
                         uint16_t old_pins, uint16_t new_pins);
                 InputChangeCallback(TransferCallbackReceiver *r,
                                CallbackFunction fn

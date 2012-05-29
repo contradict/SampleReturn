@@ -24,6 +24,7 @@
 #include <platform_motion/HomeWheelPodsAction.h>
 #include <platform_motion/EnableWheelPodsAction.h>
 #include <platform_motion/PlatformParametersConfig.h>
+#include <platform_motion/GPIO.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -81,6 +82,7 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
 Motion::Motion() :
     home_action_server(nh_, "home_wheelpods", false),
     enable_action_server(nh_, "enable_wheelpods", false),
+    CAN_fd(-1),
     enabled(false),
     last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
     odom_count(1), odom_counter(1),
@@ -110,7 +112,10 @@ Motion::Motion() :
     nh_.param("stern_steering_offset", stern_steering_offset,  0.0);
 
     nh_.param("carousel_id", carousel_id, 1);
+    nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
+    nh_.param("carousel_offset", carousel_offset, 0.0);
     nh_.param("sync_interval", sync_interval, 50000);
+    nh_.param("enable_carousel_motion", carousel_motion, false);
 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
     nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
@@ -130,12 +135,40 @@ Motion::Motion() :
     stern_pos << 0, 0;
     body_pt << center_pt_x, center_pt_y;
 
+    twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
+
+    carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
+            this);
+
+    gpio_sub = nh_.subscribe("gpio_write", 2, &Motion::gpioSubscriptionCallback,
+            this);
+
+    odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
+
+    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
+
+    gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
+
+    home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
+
+    enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
+
+    reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
+
+}
+
+bool Motion::openBus(void)
+{
     std::tr1::shared_ptr<CANOpen::KvaserInterface> pintf(new CANOpen::KvaserInterface(
                                                 CAN_channel,
                                                 CAN_baud
                                                ));
 
     CAN_fd = pintf->getFD();
+
+    if(CAN_fd<0) {
+        return false;
+    }
 
     pbus = std::tr1::shared_ptr<CANOpen::Bus>(new CANOpen::Bus(pintf, false));
 
@@ -146,8 +179,13 @@ Motion::Motion() :
 
     pbus->add(psync);
 
+    CANOpen::CopleyServo::InputChangeCallback
+        gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                static_cast<CANOpen::CopleyServo::InputChangeCallback::CallbackFunction>(&Motion::gpioCallback));
+
     carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
             CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
+    carousel->setInputCallback(gpiocb);
 
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
@@ -164,7 +202,7 @@ Motion::Motion() :
                  wheel_encoder_counts,
                  large_steering_move
                 ));
-    port->pvCallbacks(pvcb, pvcb);
+    port->setCallbacks(pvcb, pvcb, gpiocb);
 
     starboard = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
@@ -177,7 +215,7 @@ Motion::Motion() :
                  wheel_encoder_counts,
                  large_steering_move
                 ));
-    starboard->pvCallbacks(pvcb, pvcb);
+    starboard->setCallbacks(pvcb, pvcb, gpiocb);
 
     stern = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
@@ -190,19 +228,9 @@ Motion::Motion() :
                  wheel_encoder_counts,
                  large_steering_move
                 ));
-    stern->pvCallbacks(pvcb, pvcb);
+    stern->setCallbacks(pvcb, pvcb, gpiocb);
 
-    twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
-
-    odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
-    joint_state_pub = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
-
-    home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
-
-    enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
-
-    reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
-
+    return true;
 }
 
 Motion::~Motion()
@@ -213,15 +241,22 @@ Motion::~Motion()
     close(notify_write_fd);
 }
 
-/*
 void Motion::shutdown(void)
 {
-    port->enable(false);
-    stern->enable(false);
-    starboard->enable(false);
-    carousel->enable(false);
+    if(CAN_fd < 0)
+        return;
+    enable_count = 0;
+    enable(false);
+
+    for(int i=0;i<50;i++){
+        if(enable_count>=7) {
+            break;
+        } else {
+            ros::Duration(0.010).sleep();
+        }
+    }
 }
-*/
+
 enum motion_command {
     motion_drive=0,
     motion_home=1,
@@ -233,12 +268,18 @@ enum motion_command {
 void Motion::runBus(void)
 {
     struct pollfd pfd[2];
+    int ret=0;
+    CAN_thread_run=true;
+    while(!openBus() && CAN_thread_run ) {
+        ROS_ERROR("Could not open CAN bus, trying again in 5 seconds");
+        ros::Duration(5.0).sleep();
+    }
+    if( ! CAN_thread_run )
+        return;
     pfd[0].fd = CAN_fd;
     pfd[0].events = POLLIN | POLLOUT;
     pfd[1].fd = notify_read_fd;
     pfd[1].events = POLLIN;
-    int ret=0;
-    CAN_thread_run=true;
     while(ret >= 0 && CAN_thread_run ){
         ret = poll(pfd, 2, POLL_TIMEOUT_MS);
         if(ret>0) {
@@ -272,18 +313,21 @@ void Motion::runBus(void)
                             port->home(hcb);
                             starboard->home(hcb);
                             stern->home(hcb);
+                            carousel->home(hcb);
                             break;
                         case motion_enable:
                             ROS_INFO( "enable" );
                             port->enable(true, ecb);
                             starboard->enable(true, ecb);
                             stern->enable(true, ecb);
+                            carousel->enable(true, ecb);
                             break;
                         case motion_disable:
                             ROS_INFO( "disable" );
                             port->enable(false, ecb);
                             starboard->enable(false, ecb);
                             stern->enable(false, ecb);
+                            carousel->enable(false, ecb);
                             break;
                          case motion_initialize:
                             ROS_INFO( "initialize" );
@@ -374,7 +418,7 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
 
 void Motion::doHome(void)
 {
-    home_count = 0;
+    home_count = carousel_motion?0:1;
     char c=motion_home;
     if(write(notify_write_fd, &c, 1) != 1) {
         ROS_ERROR("Could not home: %s", strerror(errno));
@@ -390,7 +434,7 @@ void Motion::homeComplete(CANOpen::DS301 &node)
     home_count++;
     home_feedback.home_count = home_count;
     home_action_server.publishFeedback(home_feedback);
-    if(home_count == 3) {
+    if(home_count == 4) {
         home_action_server.setSucceeded(home_result);  
     }
 }
@@ -399,7 +443,7 @@ void Motion::doEnable(void)
 {
     bool state = enable_action_server.acceptNewGoal()->enable_state;
     char c=state?motion_enable:motion_disable;
-    enable_count = 0;
+    enable_count = carousel_motion?0:1;
     ROS_INFO("sending command %d", c);
     if(write(notify_write_fd, &c, 1) != 1) {
         //perror("Error during home notify write");
@@ -408,6 +452,7 @@ void Motion::doEnable(void)
         enable_result.port_enabled = false;
         enable_result.stern_enabled = false;
         enable_result.starboard_enabled = false;
+        enable_result.carousel_enabled = false;
         enable_action_server.setAborted(enable_result, error);
     } else {
         ROS_INFO("Enable goal accepted");
@@ -416,14 +461,18 @@ void Motion::doEnable(void)
 
 void Motion::enableStateChange(CANOpen::DS301 &node)
 {
-    enable_feedback.enable_count = ++enable_count;
-    enable_action_server.publishFeedback(enable_feedback);
-    ROS_INFO("Enable report, count=%d", enable_count);
-    if(enable_count == 6) {
-        enable_result.port_enabled = port->enabled();
-        enable_result.stern_enabled = stern->enabled();
-        enable_result.starboard_enabled = starboard->enabled();
-        enable_action_server.setSucceeded(enable_result);
+    ++enable_count;
+    if(enable_action_server.isActive()){
+        enable_feedback.enable_count = enable_count;
+        enable_action_server.publishFeedback(enable_feedback);
+        ROS_INFO("Enable report, count=%d", enable_count);
+        if(enable_count == 7) {
+            enable_result.port_enabled = port->enabled();
+            enable_result.stern_enabled = stern->enabled();
+            enable_result.starboard_enabled = starboard->enabled();
+            enable_result.carousel_enabled = carousel->enabled();
+            enable_action_server.setSucceeded(enable_result);
+        }
     }
 }
 
@@ -627,8 +676,8 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         odom_trans.transform.translation.z = 0;
         odom_trans.transform.rotation = odom_quat;
         odom_broadcaster.sendTransform(odom_trans);
-        sensor_msgs::JointState joints;
 
+        sensor_msgs::JointState joints;
         joints.header.frame_id="base_link";
         joints.header.stamp=current_time;
         joints.header.seq=joint_seq++;
@@ -650,22 +699,80 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         joints.name.push_back("stern_axle");
         joints.position.push_back(stern_wheel*2*M_PI);
         joints.velocity.push_back(stern_wheel_velocity*2*M_PI);
+        joints.name.push_back("carousel_joint");
+        joints.position.push_back((carousel->position*2*M_PI/carousel_encoder_counts)+carousel_offset);
+        joints.velocity.push_back(carousel->velocity*2*M_PI/10./carousel_encoder_counts);
         joint_state_pub.publish(joints);
+    }
+}
+
+void Motion::gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins)
+{
+    platform_motion::GPIO gpio;
+
+    gpio.servo_id = svo.node_id;
+    gpio.previous_pin_states = old_pins;
+    gpio.new_pin_states = new_pins;
+    gpio.pin_mask = 0xFFFF;
+    gpio_pub.publish(gpio);
+}
+
+void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio)
+{
+    uint16_t set   = gpio->pin_mask & ( gpio->new_pin_states & ~gpio->previous_pin_states);
+    uint16_t clear = gpio->pin_mask & (~gpio->new_pin_states &  gpio->previous_pin_states);
+    if(gpio->servo_id == carousel_id) {
+            carousel->output(set, clear);
+    } else if(gpio->servo_id == port_steering_id) {
+            port->steering.output(set, clear);
+    } else if(gpio->servo_id == port_wheel_id) {
+            port->wheel.output(set, clear);
+    } else if(gpio->servo_id == starboard_steering_id) {
+            starboard->steering.output(set, clear);
+    } else if(gpio->servo_id == starboard_wheel_id) {
+            starboard->wheel.output(set, clear);
+    } else if(gpio->servo_id == stern_steering_id) {
+            stern->steering.output(set, clear);
+    } else if(gpio->servo_id == stern_wheel_id) {
+            stern->wheel.output(set, clear);
+    } else {
+            ROS_ERROR("Unknown servo_id in GPIO: %d", gpio->servo_id);
     }
 }
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
-    pv_counter = 6;
+    pv_counter = carousel_motion?7:6;
 }
 
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
 {
     wheel_diameter = config.wheel_diameter;
+    port_steering_offset = config.port_steering_offset;
+    starboard_steering_offset = config.starboard_steering_offset;
+    stern_steering_offset = config.stern_steering_offset;
 
-    port->setSteeringOffset(config.port_steering_offset);
-    starboard->setSteeringOffset(config.starboard_steering_offset);
-    stern->setSteeringOffset(config.stern_steering_offset);
+    if( CAN_fd>0 ) {
+        port->setSteeringOffset(config.port_steering_offset);
+        starboard->setSteeringOffset(config.starboard_steering_offset);
+        stern->setSteeringOffset(config.stern_steering_offset);
+        carousel_offset = config.carousel_offset;
+        if(carousel->ready()) {
+            carousel->setPosition(
+                    (desired_carousel_position - carousel_offset)*
+                    carousel_encoder_counts/2./M_PI);
+        }
+    }
+}
+
+void Motion::carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg)
+{
+    tf::Quaternion q;
+    tf::quaternionMsgToTF(*qmsg, q);
+    desired_carousel_position = tf::getYaw(q); 
+    carousel->setPosition(
+            (desired_carousel_position - carousel_offset)*
+            carousel_encoder_counts/2./M_PI);
 }
 
 }

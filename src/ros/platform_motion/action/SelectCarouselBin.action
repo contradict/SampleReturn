@@ -1,0 +1,9 @@
+# Goal
+uint8 bin_index
+---
+# Result
+bool bin_selected
+---
+# Feedback
+uint8 current_bin
+

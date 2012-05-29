@@ -1,20 +1,38 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-
+    <machine name="search"
+             address="moline"
+             ros-root="/opt/ros/electric/ros"
+             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
+             user="robot"
+    />
+    <machine name="navigate"
+             address="blue18"
+             ros-root="/opt/ros/electric/ros"
+             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
+             user="robot"
+    />
+ 
   <!-- rosbag record -->
   <!--
   -->
-  <node pkg="rosbag"
+  <node machine="navigate"
+      pkg="rosbag"
       type="record"
-      name="record"
+      name="navigate_record"
       output="log"
-      args="odometry tf joint_state carousel stereo/right/image_raw stereo/left/image_raw stereo/right/camera_info stereo/left/camera_info camimg">
+      args="odometry tf platform_joint_state carousel navigation_stereo/right/image_raw navigation_stereo/left/image_raw navigation_stereo/right/camera_info navigation_stereo/left/camera_info">
   </node>
 
   <!-- DSLR Client and Publisher-->
    <!-- The wait between captures is hard-coded at 3.0 seconds,
         I'll make this a param at some point -->
-   <node pkg="samplereturn" type="camlogger.py" name="camlogger"/>
-
+   <node machine="search" pkg="samplereturn" type="camlogger.py" name="camlogger"/>
+   <node machine="search"
+      pkg="rosbag"
+      type="record"
+      name="search_record"
+      output="log"
+      args="camimg manipulator_stereo/left/image_raw manipulator_stereo/right/image_raw maniplator_stereo/left/camera_info manipulator_stereo/right/camera_info"/>
 </launch>

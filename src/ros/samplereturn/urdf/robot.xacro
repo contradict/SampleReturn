@@ -84,7 +84,7 @@
             </visual>
         </link>
         <!-- BEGIN LEFT CAMERA -->
-        <joint name="${name_left_camera_joint" type="fixed">
+        <joint name="${name}_left_camera_joint" type="fixed">
             <parent link="${name}_baseline_bar"/>
             <child link="${name}_left_camera"/>
             <origin xyz="${baseline/2} 0 0"/>
@@ -187,6 +187,23 @@
         -->
         <!-- so camera should be at 1.4 - deck -->
         <origin xyz="0.015 0.0 0.990" rpy="1.745 0 1.57"/>
+    </joint>
+
+    <!-- instantiate manipulator pair -->
+    <xacro:stereo_pair name="manipulator" baseline="0.30" />
+    <!-- attach navigation pair -->
+    <joint name="manipulator_stereo_pair_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="manipulator_baseline_bar"/>
+        <!-- macro defines camera with lenses facing along +z -->
+        <!-- rpy is pi/2 + 16.5 degree down tilt -->
+        <!-- height of bottom of deck (origin) is -->
+        <!-- suspension_height + yoke_height - yoke_offset + wheel_radius -->
+        <!--
+        suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
+        -->
+        <!-- so camera should be at 1.4 - deck -->
+        <origin xyz="-0.20 0.0 0.040" rpy="1.745 0 1.57"/>
     </joint>
 
     <link name="search_camera_body">

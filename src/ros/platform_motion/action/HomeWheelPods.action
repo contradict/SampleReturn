@@ -4,6 +4,7 @@
 bool port_homed
 bool starboard_homed
 bool stern_homed
+bool carousel_homed
 ---
 #feedback definition
 int8 home_count

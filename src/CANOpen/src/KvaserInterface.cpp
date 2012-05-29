@@ -172,8 +172,9 @@ int KvaserInterface::readMessage(struct Message &m)
 
 int KvaserInterface::getFD()
 {
-    int fd;
-    canGetRawHandle(handle, &fd);
+    int fd=-1;
+    if(handle>=0)
+        canGetRawHandle(handle, &fd);
     return fd;
 }
 

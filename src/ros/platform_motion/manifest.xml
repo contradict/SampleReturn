@@ -20,7 +20,7 @@
   <depend package="driver_base"/>
 
   <export>
-      <cpp clfags="-I${prefix}/../../CANOpen/include" lflags="-L${prefix}/../../CANOpen/build/src -lcanopen"/>
+      <cpp cflags="-I${prefix}/../../CANOpen/include" lflags="-L${prefix}/../../CANOpen/build/src -lcanopen"/>
   </export>
 
 </package>
