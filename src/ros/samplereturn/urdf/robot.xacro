@@ -87,7 +87,7 @@
         <joint name="${name}_left_camera_joint" type="fixed">
             <parent link="${name}_baseline_bar"/>
             <child link="${name}_left_camera"/>
-            <origin xyz="${baseline/2} 0 0"/>
+            <origin xyz="${-baseline/2} 0 0"/>
         </joint>
         <link name="${name}_left_camera">
             <visual>
@@ -119,7 +119,7 @@
         <joint name="${name}_right_camera_joint" type="fixed">
             <parent link="${name}_baseline_bar"/>
             <child link="${name}_right_camera"/>
-            <origin xyz="${-baseline/2} 0 0"/>
+            <origin xyz="${baseline/2} 0 0"/>
         </joint>
         <link name="${name}_right_camera">
             <visual>
@@ -186,7 +186,7 @@
         suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
         -->
         <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="0.015 0.0 0.990" rpy="1.745 0 1.57"/>
+        <origin xyz="0.015 0.0 0.990" rpy="-2.00 0 -1.57"/>
     </joint>
 
     <!-- instantiate manipulator pair -->
@@ -203,7 +203,7 @@
         suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
         -->
         <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="-0.20 0.0 0.040" rpy="1.745 0 1.57"/>
+        <origin xyz="-0.20 0.0 0.040" rpy="-2.80 0 -1.57"/>
     </joint>
 
     <link name="search_camera_body">
@@ -230,7 +230,7 @@
     <joint name="search_camera_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="search_camera_body"/>
-        <origin xyz="0.10 0.0 1.0" rpy="1.65 0 1.57"/>
+        <origin xyz="0.10 0.0 1.0" rpy="-1.77 0 -1.57"/>
     </joint>
 
     <!-- carousel -->
