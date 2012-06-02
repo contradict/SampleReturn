@@ -22,7 +22,8 @@ class CarouselIndexer(object):
                 self.jointStateCallback)
 
         self.goal_index = None
-        self.server = actionlib.SimpleActionServer('select_carousel_bin', SelectCarouselBinAction)
+        self.server = actionlib.SimpleActionServer('select_carousel_bin',
+                SelectCarouselBinAction, auto_start=False)
         self.server.register_goal_callback(self.selectBin)
         self.server.register_preempt_callback(self.preempt)
         self.server.start()
