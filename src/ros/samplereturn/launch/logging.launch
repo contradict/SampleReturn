@@ -13,7 +13,7 @@
              ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
              user="robot"
     />
- 
+
   <!-- rosbag record -->
   <!--
   -->
@@ -34,5 +34,5 @@
       type="record"
       name="search_record"
       output="log"
-      args="camimg manipulator_stereo/left/image_raw manipulator_stereo/right/image_raw maniplator_stereo/left/camera_info manipulator_stereo/right/camera_info"/>
+      args="camimg manipulator_stereo/left/image_raw manipulator_stereo/right/image_raw manipulator_stereo/left/camera_info manipulator_stereo/right/camera_info"/>
 </launch>
