@@ -35,8 +35,10 @@ class PersistantData:
 
   def SetWristAngle(self, angle):
     # set the wrist angle to the given value
-    # XXX TODO: make this work
     self.wristAngleGoal = angle
+
+    # tell the publisher to do it
+    self.wristPosPublisher.publish(self.wristAngleGoal)
 
   def WristJointCallback(self, data):
     # check out the state of the goal and notify anyone who may be waiting for
@@ -55,8 +57,7 @@ class PersistantData:
 
   def GetWristAngle(self):
     # return the current wrist angle
-    # XXX TODO: probably change this once WristJointCallback is changed
-    return self.currentWristAngle
+    return self.currentWristState.current_pos
 
   def NotifyOnArmDelta(self, delta):
     # notifies the caller (via self.armCV when the arm has moved delta or more
