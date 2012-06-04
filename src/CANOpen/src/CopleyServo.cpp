@@ -565,6 +565,9 @@ void CopleyServo::outputPinFunction(int pin_index, enum OutputPinFunction functi
     uint16_t function_le = htole16(funcword);
     uint8_t *pd = (uint8_t *)&function_le;
     std::copy(pd, pd+sizeof(uint16_t), std::back_inserter(data));
+    if(parameters.size()<4) {
+        parameters.resize(4, 0);
+    }
     std::copy(parameters.begin(), parameters.end(), std::back_inserter(data));
     writeObjectDictionary(0x2193, pin_index, data);
 }
