@@ -463,11 +463,9 @@ void CopleyServo::modeControl(uint16_t set, uint16_t clear,
     control_word &= ~clear;
     mode_of_operation = mode;
     std::vector<uint8_t> data;
-    data.resize(5);
-    *((uint16_t *)(&data[0])) = htole16(control_word);
-    data[2] = mode_of_operation;
-    data[3] = output_pins&0xFF;
-    data[4] = (output_pins>>8)&0xFF;
+    Transfer::pack(control_word, data);
+    Transfer::pack(mode_of_operation, data);
+    Transfer::pack(output_pins, data);
     control_mode_pdo->send(data, callback);
 }
 
@@ -545,9 +543,7 @@ void CopleyServo::setPVCallback(DS301CallbackObject cb)
 void CopleyServo::inputPinFunction(int pin_index, enum InputPinFunction function)
 {
     std::vector<uint8_t> data;
-    uint16_t function_le = htole16(function);
-    uint8_t *pd = (uint8_t *)&function_le;
-    std::copy(pd, pd+sizeof(uint16_t), std::back_inserter(data));
+    Transfer::pack(function, data);
     writeObjectDictionary(0x2192, pin_index, data);
 }
 
@@ -562,9 +558,7 @@ void CopleyServo::outputPinFunction(int pin_index, enum OutputPinFunction functi
     } else {
         funcword &= ~(1<<8);
     }
-    uint16_t function_le = htole16(funcword);
-    uint8_t *pd = (uint8_t *)&function_le;
-    std::copy(pd, pd+sizeof(uint16_t), std::back_inserter(data));
+    Transfer::pack(funcword, data);
     if(parameters.size()<4) {
         parameters.resize(4, 0);
     }
