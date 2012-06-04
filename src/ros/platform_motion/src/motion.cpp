@@ -743,6 +743,11 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
     pv_counter = carousel_motion?7:6;
+    if(carousel->ready()) {
+        carousel->outputPinFunction(1, CANOpen::Manual, std::vector<uint8_t>(), false);
+        carousel->outputPinFunction(2, CANOpen::Manual, std::vector<uint8_t>(), false);
+        carousel->outputPinFunction(3, CANOpen::Manual, std::vector<uint8_t>(), false);
+    }
 }
 
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
