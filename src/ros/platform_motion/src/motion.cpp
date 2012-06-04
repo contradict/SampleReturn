@@ -8,6 +8,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
@@ -21,8 +22,8 @@
 #include <KvaserInterface.h>
 
 #include <actionlib/server/simple_action_server.h>
-#include <platform_motion/HomeWheelPodsAction.h>
-#include <platform_motion/EnableWheelPodsAction.h>
+#include <platform_motion/HomeAction.h>
+#include <platform_motion/Enable.h>
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion/GPIO.h>
 #include <motion/wheelpod.h>
@@ -31,7 +32,7 @@
 
 #include <motion/lmmin.h>
 
-#define POLL_TIMEOUT_MS 100
+#define POLL_TIMEOUT_MS 10
 
 namespace platform_motion {
 
@@ -80,10 +81,14 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
 
 
 Motion::Motion() :
-    home_action_server(nh_, "home_wheelpods", false),
-    enable_action_server(nh_, "enable_wheelpods", false),
+    home_pods_action_server(nh_, "home_wheelpods", false),
+    home_carousel_action_server(nh_, "home_carousel", false),
     CAN_fd(-1),
-    enabled(false),
+    gpio_enabled(false),
+    pods_enabled(false),
+    desired_pod_state(false),
+    carousel_enabled(false),
+    desired_carousel_state(false),
     last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
     odom_count(1), odom_counter(1),
     port_vel_sum(0), starboard_vel_sum(0), stern_vel_sum(0),
@@ -115,7 +120,6 @@ Motion::Motion() :
     nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
     nh_.param("carousel_offset", carousel_offset, 0.0);
     nh_.param("sync_interval", sync_interval, 50000);
-    nh_.param("enable_carousel_motion", carousel_motion, false);
 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
     nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
@@ -130,10 +134,16 @@ Motion::Motion() :
     nh_.param("CAN_channel", CAN_channel, 0);
     nh_.param("CAN_baud", CAN_baud, 1000000);
 
+    nh_.param("enable_wait_timeout_ms", enable_wait_timeout, 150);
+
     port_pos << length, width/2;
     starboard_pos << length, -width/2;
     stern_pos << 0, 0;
     body_pt << center_pt_x, center_pt_y;
+    enable_pods_server = nh_.advertiseService("enable_wheel_pods",
+            &Motion::enableWheelPodsCallback, this);
+    enable_carousel_server = nh_.advertiseService("enable_carousel",
+            &Motion::enableCarouselCallback, this);
 
     twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
 
@@ -149,9 +159,8 @@ Motion::Motion() :
 
     gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
 
-    home_action_server.registerGoalCallback(boost::bind(&Motion::doHome, this));
-
-    enable_action_server.registerGoalCallback(boost::bind(&Motion::doEnable, this));
+    home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
+    home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
 
     reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
 
@@ -237,37 +246,28 @@ Motion::~Motion()
 {
     CAN_thread_run = false;
     CAN_thread.join();
-    close(notify_read_fd);
-    close(notify_write_fd);
 }
 
 void Motion::shutdown(void)
 {
     if(CAN_fd < 0)
         return;
-    enable_count = 0;
-    enable(false);
+    enable_pods_count = 6;
+    enable_pods(false);
+    boost::system_time now=boost::get_system_time();
+    boost::unique_lock<boost::mutex> pod_lock(enable_pods_mutex);
+    while( pods_enabled == true )
+        enable_pods_cond.timed_wait(pod_lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+    enable_carousel(false);
+    boost::unique_lock<boost::mutex> carousel_lock(enable_carousel_mutex);
+    while( carousel_enabled == true )
+        enable_carousel_cond.timed_wait(carousel_lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
 
-    for(int i=0;i<50;i++){
-        if(enable_count>=7) {
-            break;
-        } else {
-            ros::Duration(0.010).sleep();
-        }
-    }
 }
-
-enum motion_command {
-    motion_drive=0,
-    motion_home=1,
-    motion_enable=2,
-    motion_initialize=3,
-    motion_disable=4
-};
 
 void Motion::runBus(void)
 {
-    struct pollfd pfd[2];
+    struct pollfd pfd;
     int ret=0;
     CAN_thread_run=true;
     while(!openBus() && CAN_thread_run ) {
@@ -276,77 +276,22 @@ void Motion::runBus(void)
     }
     if( ! CAN_thread_run )
         return;
-    pfd[0].fd = CAN_fd;
-    pfd[0].events = POLLIN | POLLOUT;
-    pfd[1].fd = notify_read_fd;
-    pfd[1].events = POLLIN;
+    pfd.fd = CAN_fd;
+    pfd.events = POLLIN | POLLOUT;
     while(ret >= 0 && CAN_thread_run ){
-        ret = poll(pfd, 2, POLL_TIMEOUT_MS);
+        ret = poll(&pfd, 1, POLL_TIMEOUT_MS);
         if(ret>0) {
-            if(pfd[0].revents) {
-                bool canRead = pfd[0].revents&POLLIN;
-                bool canWrite = pfd[0].revents&POLLOUT;
+            if(pfd.revents) {
+                bool canRead = pfd.revents&POLLIN;
+                bool canWrite = pfd.revents&POLLOUT;
+                boost::unique_lock<boost::mutex> lock(CAN_mutex);
                 pbus->runonce(canRead, canWrite);
-                pfd[0].events |= POLLIN;
+                lock.unlock();
+                pfd.events |= POLLIN;
                 if(canWrite) {
-                    pfd[0].events |= POLLOUT;
+                    pfd.events |= POLLOUT;
                 } else {
-                    pfd[0].events &= ~POLLOUT;
-                }
-            } else if(pfd[1].revents) {
-                char c;
-                if(read(notify_read_fd, &c, 1) == 1){
-                    CANOpen::DS301CallbackObject
-                        hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
-                                static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeComplete));
-                    CANOpen::DS301CallbackObject
-                        ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
-                                static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::enableStateChange));
-                    switch(c) {
-                        case motion_drive:
-                            port->drive(angle_port, v_port);
-                            starboard->drive(angle_starboard, -v_starboard);
-                            stern->drive(angle_stern, -v_stern);
-                            break;
-                        case motion_home:
-                            ROS_INFO( "Home" );
-                            port->home(hcb);
-                            starboard->home(hcb);
-                            stern->home(hcb);
-                            carousel->home(hcb);
-                            break;
-                        case motion_enable:
-                            ROS_INFO( "enable" );
-                            port->enable(true, ecb);
-                            starboard->enable(true, ecb);
-                            stern->enable(true, ecb);
-                            carousel->enable(true, ecb);
-                            break;
-                        case motion_disable:
-                            ROS_INFO( "disable" );
-                            port->enable(false, ecb);
-                            starboard->enable(false, ecb);
-                            stern->enable(false, ecb);
-                            carousel->enable(false, ecb);
-                            break;
-                         case motion_initialize:
-                            ROS_INFO( "initialize" );
-                            port->initialize();
-                            starboard->initialize();
-                            stern->initialize();
-                            carousel->initialize();
-                            break;
-                        default:
-                            ROS_ERROR("Unrecognized motion command: %d", c);
-                            break;
-                    }
-                } else {
-                    std::string errstring("Error during notify read: ");
-                    errstring += strerror(errno);
-                    ROS_ERROR( "%s", errstring.c_str() );
-                }
-                if(pbus->canSend()) {
-                    pfd[0].events |= POLLOUT;
+                    pfd.events &= ~POLLOUT;
                 }
             }
         }
@@ -355,24 +300,21 @@ void Motion::runBus(void)
  
 void Motion::start(void)
 {
-    int pipe_fds[2];
-    if(pipe(pipe_fds)<0) {
-        perror("Error creating pipe fds");
-    }
-    notify_read_fd = pipe_fds[0];
-    notify_write_fd = pipe_fds[1];
     ROS_INFO("Start CAN bus thread");
     CAN_thread = boost::thread(boost::bind(&Motion::runBus, this));
-    ROS_INFO("Start home server");
-    home_action_server.start();
-    ROS_INFO("Start enable server");
-    enable_action_server.start();
+    ROS_INFO("Start home pods server");
+    home_pods_action_server.start();
+    ROS_INFO("Start home carousel server");
+    home_carousel_action_server.start();
     ROS_INFO("Send initialize notification");
-    char c=motion_initialize;
-    if(write(notify_write_fd, &c, 1) != 1) {
-        perror("Error during start notify write");
-    }
+    ROS_INFO("Initialize all servos" );
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    port->initialize();
+    starboard->initialize();
+    stern->initialize();
+    carousel->initialize();
 }
+
 
 void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
@@ -410,84 +352,135 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
     angle_starboard = M_PI_2 - atan2( sin(phi) + kappa*width/2,
                                  kappa*length - cos(phi)
                                );
-    char c=motion_drive;
-    if(write(notify_write_fd, &c, 1) != 1) {
-        perror("Error during move notify write");
-    }
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    port->drive(angle_port, v_port);
+    starboard->drive(angle_starboard, -v_starboard);
+    stern->drive(angle_stern, -v_stern);
 }
 
-void Motion::doHome(void)
+
+
+void Motion::doHomePods(void)
 {
-    home_count = carousel_motion?0:1;
-    char c=motion_home;
-    if(write(notify_write_fd, &c, 1) != 1) {
-        ROS_ERROR("Could not home: %s", strerror(errno));
-        perror("Error during home notify write");
-    } else {
-        ROS_INFO("Home goal accepted");
-        home_action_server.acceptNewGoal();
-    }
+    home_pods_count = 3;
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    ROS_INFO("Home pods goal accepted");
+    home_pods_action_server.acceptNewGoal();
+    CANOpen::DS301CallbackObject
+        hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homePodsComplete));
+    port->home(hcb);
+    starboard->home(hcb);
+    stern->home(hcb);
 }
 
-void Motion::homeComplete(CANOpen::DS301 &node)
+void Motion::doHomeCarousel(void)
 {
-    home_count++;
-    home_feedback.home_count = home_count;
-    home_action_server.publishFeedback(home_feedback);
-    if(home_count == 4) {
-        home_action_server.setSucceeded(home_result);  
-    }
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    ROS_INFO("Home carousel goal accepted");
+    home_carousel_action_server.acceptNewGoal();
+    CANOpen::DS301CallbackObject
+        hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeCarouselComplete));
+    carousel->home(hcb);
 }
 
-void Motion::doEnable(void)
+void Motion::homePodsComplete(CANOpen::DS301 &node)
 {
-    bool state = enable_action_server.acceptNewGoal()->enable_state;
-    char c=state?motion_enable:motion_disable;
-    enable_count = carousel_motion?0:1;
-    ROS_INFO("sending command %d", c);
-    if(write(notify_write_fd, &c, 1) != 1) {
-        //perror("Error during home notify write");
-        const std::string error(strerror(errno));
-        ROS_ERROR("Could not enable: %s", error.c_str());
-        enable_result.port_enabled = false;
-        enable_result.stern_enabled = false;
-        enable_result.starboard_enabled = false;
-        enable_result.carousel_enabled = false;
-        enable_action_server.setAborted(enable_result, error);
-    } else {
-        ROS_INFO("Enable goal accepted");
-    }
-}
-
-void Motion::enableStateChange(CANOpen::DS301 &node)
-{
-    ++enable_count;
-    if(enable_action_server.isActive()){
-        enable_feedback.enable_count = enable_count;
-        enable_action_server.publishFeedback(enable_feedback);
-        ROS_INFO("Enable report, count=%d", enable_count);
-        if(enable_count == 7) {
-            enable_result.port_enabled = port->enabled();
-            enable_result.stern_enabled = stern->enabled();
-            enable_result.starboard_enabled = starboard->enabled();
-            enable_result.carousel_enabled = carousel->enabled();
-            enable_action_server.setSucceeded(enable_result);
+    if(home_pods_count>0) home_pods_count--;
+    if(home_pods_action_server.isActive()) {
+        home_pods_feedback.home_count = home_pods_count;
+        home_pods_action_server.publishFeedback(home_pods_feedback);
+        if(home_pods_count == 0) {
+            home_pods_action_server.setSucceeded(home_pods_result);  
         }
     }
 }
+
+void Motion::homeCarouselComplete(CANOpen::DS301 &node)
+{
+    home_carousel_action_server.setSucceeded(home_carousel_result);  
+}
+
 
 bool Motion::ready(void)
 {
     return port->ready() && starboard->ready() && stern->ready() && carousel->ready();
 }
 
-void Motion::enable(bool state)
+bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
+                                     platform_motion::Enable::Response &resp)
 {
-    char c=state?motion_enable:motion_disable;
-    if(write(notify_write_fd, &c, 1) != 1) {
-        perror("Error during enable notify write");
+    if( pods_enabled == req.state)
+        return true;
+    enable_pods_count=6;
+    boost::system_time now=boost::get_system_time();
+    boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
+    bool notified=false;
+    enable_pods(req.state);
+    while( ! pods_enabled==req.state )
+        notified = enable_pods_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+    if(notified)
+        resp.state = pods_enabled;
+    return notified;
+}
+
+void Motion::podEnableStateChange(CANOpen::DS301 &node)
+{
+    if(enable_pods_count>0) --enable_pods_count;
+    ROS_INFO("Enable report, count=%d", enable_pods_count);
+    if(enable_pods_count == 0) {
+        enable_pods_cond.notify_one();
+        pods_enabled = desired_pod_state;
     }
-    enabled = state;
+}
+
+void Motion::carouselEnableStateChange(CANOpen::DS301 &node)
+{
+    enable_carousel_cond.notify_one();
+    carousel_enabled = desired_carousel_state;
+}
+
+void Motion::enable_pods(bool state)
+{
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    ROS_INFO( "enable pods: %s",  state?"true":"false");
+
+    CANOpen::DS301CallbackObject
+        ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::podEnableStateChange));
+    desired_pod_state = state;
+    port->enable(state, ecb);
+    starboard->enable(state, ecb);
+    stern->enable(state, ecb);
+}
+
+bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
+                                    platform_motion::Enable::Response &resp)
+{
+    if(carousel_enabled == req.state)
+        return true;
+    boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
+    bool notified=false;
+    boost::system_time now=boost::get_system_time();
+    enable_carousel(req.state);
+    while( ! carousel_enabled==req.state )
+        notified = enable_carousel_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+    if(notified)
+        resp.state = carousel_enabled;
+    return notified;
+}
+
+void Motion::enable_carousel(bool state)
+{
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    ROS_INFO( "enable carousel: %s",  state?"true":"false");
+
+    CANOpen::DS301CallbackObject
+        ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::carouselEnableStateChange));
+    desired_carousel_state = state;
+    carousel->enable(state, ecb);
 }
 
 void Motion::pvCallback(CANOpen::DS301 &node)
@@ -721,6 +714,7 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
 {
     uint16_t set   = gpio->pin_mask & ( gpio->new_pin_states & ~gpio->previous_pin_states);
     uint16_t clear = gpio->pin_mask & (~gpio->new_pin_states &  gpio->previous_pin_states);
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
     if(gpio->servo_id == carousel_id) {
             carousel->output(set, clear);
     } else if(gpio->servo_id == port_steering_id) {
@@ -742,11 +736,12 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
-    pv_counter = carousel_motion?7:6;
-    if(carousel->ready()) {
+    pv_counter = 7;
+    if(carousel->ready() && !gpio_enabled ) {
         carousel->outputPinFunction(1, CANOpen::Manual, std::vector<uint8_t>(), false);
         carousel->outputPinFunction(2, CANOpen::Manual, std::vector<uint8_t>(), false);
         carousel->outputPinFunction(3, CANOpen::Manual, std::vector<uint8_t>(), false);
+        gpio_enabled=true;
     }
 }
 

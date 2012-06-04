@@ -8,7 +8,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void shutdown(void);
         void runBus(void);
         bool ready(void);
-        void enable(bool state = true);
+        void enable_pods(bool state = true);
+        void enable_carousel(bool state = true);
 
     private:
         bool openBus(void);
@@ -16,10 +17,16 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg);
         void gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio);
-        void doHome(void);
-        void homeComplete(CANOpen::DS301 &node);
-        void doEnable(void);
-        void enableStateChange(CANOpen::DS301 &node);
+        void doHomePods(void);
+        void doHomeCarousel(void);
+        void homePodsComplete(CANOpen::DS301 &node);
+        void homeCarouselComplete(CANOpen::DS301 &node);
+        bool enableWheelPodsCallback(platform_motion::Enable::Request &req,
+                                     platform_motion::Enable::Response &resp);
+        bool enableCarouselCallback(platform_motion::Enable::Request &req,
+                                    platform_motion::Enable::Response &resp);
+        void podEnableStateChange(CANOpen::DS301 &node);
+        void carouselEnableStateChange(CANOpen::DS301 &node);
         void pvCallback(CANOpen::DS301 &node);
         void gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins);
         void syncCallback(CANOpen::SYNC &sync);
@@ -41,15 +48,24 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         dynamic_reconfigure::Server<PlatformParametersConfig>
             reconfigure_server;
 
-        actionlib::SimpleActionServer<HomeWheelPodsAction> home_action_server;
-        HomeWheelPodsFeedback home_feedback;
-        HomeWheelPodsResult home_result;
-        int home_count;
-        actionlib::SimpleActionServer<EnableWheelPodsAction> enable_action_server;
-        EnableWheelPodsFeedback enable_feedback;
-        EnableWheelPodsResult enable_result;
-        int enable_count;
+        actionlib::SimpleActionServer<HomeAction> home_pods_action_server;
+        HomeFeedback home_pods_feedback;
+        HomeResult home_pods_result;
+        int home_pods_count;
 
+        actionlib::SimpleActionServer<HomeAction> home_carousel_action_server;
+        HomeFeedback home_carousel_feedback;
+        HomeResult home_carousel_result;
+
+        ros::ServiceServer enable_pods_server;
+        int enable_pods_count;
+        boost::mutex enable_pods_mutex;
+        boost::condition_variable enable_pods_cond;
+
+        ros::ServiceServer enable_carousel_server;
+        boost::mutex enable_carousel_mutex;
+        boost::condition_variable enable_carousel_cond;
+ 
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
 
@@ -62,7 +78,6 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         int carousel_id;
         double carousel_offset, desired_carousel_position;
         int sync_interval;
-        bool carousel_motion;
 
         double wheel_diameter;
 
@@ -75,12 +90,19 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         int CAN_channel, CAN_baud;
         int CAN_fd;
+        boost::mutex CAN_mutex;
         std::tr1::shared_ptr<CANOpen::Bus> pbus;
         boost::thread CAN_thread;
         bool CAN_thread_run;
         int notify_read_fd, notify_write_fd;
 
-        bool enabled;
+        bool gpio_enabled;
+
+        int enable_wait_timeout;
+        bool pods_enabled;
+        bool desired_pod_state;
+        bool carousel_enabled;
+        bool desired_carousel_state;
 
         Eigen::Vector2d starboard_pos, port_pos, stern_pos;
         Eigen::Vector2d body_pt;
