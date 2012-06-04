@@ -270,10 +270,12 @@ void Motion::runBus(void)
     struct pollfd pfd;
     int ret=0;
     CAN_thread_run=true;
+    boost::unique_lock<boost::mutex> open_lock(CAN_mutex);
     while(!openBus() && CAN_thread_run ) {
         ROS_ERROR("Could not open CAN bus, trying again in 5 seconds");
         ros::Duration(5.0).sleep();
     }
+    open_lock.unlock();
     if( ! CAN_thread_run )
         return;
     pfd.fd = CAN_fd;
@@ -284,9 +286,9 @@ void Motion::runBus(void)
             if(pfd.revents) {
                 bool canRead = pfd.revents&POLLIN;
                 bool canWrite = pfd.revents&POLLOUT;
-                boost::unique_lock<boost::mutex> lock(CAN_mutex);
+                boost::unique_lock<boost::mutex> run_lock(CAN_mutex);
                 pbus->runonce(canRead, canWrite);
-                lock.unlock();
+                run_lock.unlock();
                 pfd.events |= POLLIN;
                 if(canWrite) {
                     pfd.events |= POLLOUT;
