@@ -179,6 +179,8 @@ bool Motion::openBus(void)
         return false;
     }
 
+    ROS_INFO("Opened bus, fd %d", CAN_fd);
+
     pbus = std::tr1::shared_ptr<CANOpen::Bus>(new CANOpen::Bus(pintf, false));
 
     std::tr1::shared_ptr<CANOpen::SYNC> psync(new CANOpen::SYNC(0,
@@ -238,6 +240,11 @@ bool Motion::openBus(void)
                  large_steering_move
                 ));
     stern->setCallbacks(pvcb, pvcb, gpiocb);
+
+    port->initialize();
+    starboard->initialize();
+    stern->initialize();
+    carousel->initialize();
 
     return true;
 }
@@ -310,11 +317,6 @@ void Motion::start(void)
     home_carousel_action_server.start();
     ROS_INFO("Send initialize notification");
     ROS_INFO("Initialize all servos" );
-    boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    port->initialize();
-    starboard->initialize();
-    stern->initialize();
-    carousel->initialize();
 }
 
 
