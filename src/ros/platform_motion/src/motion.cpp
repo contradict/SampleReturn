@@ -11,6 +11,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <ros/ros.h>
+#include <std_msgs/Float64.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/JointState.h>
@@ -794,11 +795,9 @@ void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t leve
     }
 }
 
-void Motion::carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg)
+void Motion::carouselCallback(const std_msgs::Float64::ConstPtr fmsg)
 {
-    tf::Quaternion q;
-    tf::quaternionMsgToTF(*qmsg, q);
-    desired_carousel_position = tf::getYaw(q); 
+    desired_carousel_position = fmsg->data; 
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     carousel->setPosition(
             (desired_carousel_position - carousel_offset)*
