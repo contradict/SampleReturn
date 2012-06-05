@@ -713,25 +713,15 @@ void Motion::gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t
 
 void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio)
 {
-    uint16_t set   = gpio->pin_mask & ( gpio->new_pin_states & ~gpio->previous_pin_states);
-    uint16_t clear = gpio->pin_mask & (~gpio->new_pin_states &  gpio->previous_pin_states);
-    boost::unique_lock<boost::mutex> lock(CAN_mutex);
     if(gpio->servo_id == carousel_id) {
-            carousel->output(set, clear);
-    } else if(gpio->servo_id == port_steering_id) {
-            port->steering.output(set, clear);
-    } else if(gpio->servo_id == port_wheel_id) {
-            port->wheel.output(set, clear);
-    } else if(gpio->servo_id == starboard_steering_id) {
-            starboard->steering.output(set, clear);
-    } else if(gpio->servo_id == starboard_wheel_id) {
-            starboard->wheel.output(set, clear);
-    } else if(gpio->servo_id == stern_steering_id) {
-            stern->steering.output(set, clear);
-    } else if(gpio->servo_id == stern_wheel_id) {
-            stern->wheel.output(set, clear);
+        boost::unique_lock<boost::mutex> lock(CAN_mutex);
+        uint16_t current = carousel->getOutputPins();
+        uint16_t set   = gpio->pin_mask & ( gpio->new_pin_states & ~current);
+        uint16_t clear = gpio->pin_mask & (~gpio->new_pin_states &  current);
+        carousel->output(set, clear);
     } else {
             ROS_ERROR("Unknown servo_id in GPIO: %d", gpio->servo_id);
+            return;
     }
 }
 
