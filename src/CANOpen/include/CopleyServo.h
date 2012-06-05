@@ -159,6 +159,9 @@ class CopleyServo : public DS301 {
         void setPVCallback(DS301CallbackObject cb);
         void setEMCYCallback(DS301CallbackObject cb);
 
+        uint16_t getInputPins(void){return input_pins;};
+        uint16_t getOutputPins(void){return output_pins;};
+
         int32_t position;
         int32_t velocity;
         bool gotPV;
