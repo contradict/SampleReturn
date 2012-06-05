@@ -201,7 +201,6 @@ bool Motion::openBus(void)
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
                           
-
     port = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  port_steering_id,
@@ -315,8 +314,6 @@ void Motion::start(void)
     home_pods_action_server.start();
     ROS_INFO("Start home carousel server");
     home_carousel_action_server.start();
-    ROS_INFO("Send initialize notification");
-    ROS_INFO("Initialize all servos" );
 }
 
 
@@ -757,6 +754,7 @@ void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t leve
     stern_steering_offset = config.stern_steering_offset;
 
     if( CAN_fd>0 ) {
+        boost::unique_lock<boost::mutex> lock(CAN_mutex);
         port->setSteeringOffset(config.port_steering_offset);
         starboard->setSteeringOffset(config.starboard_steering_offset);
         stern->setSteeringOffset(config.stern_steering_offset);
@@ -774,6 +772,7 @@ void Motion::carouselCallback(const geometry_msgs::Quaternion::ConstPtr qmsg)
     tf::Quaternion q;
     tf::quaternionMsgToTF(*qmsg, q);
     desired_carousel_position = tf::getYaw(q); 
+    boost::unique_lock<boost::mutex> lock(CAN_mutex);
     carousel->setPosition(
             (desired_carousel_position - carousel_offset)*
             carousel_encoder_counts/2./M_PI);
