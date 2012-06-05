@@ -3,8 +3,8 @@
 #include <sensor_msgs/Joy.h>
 
 #include <actionlib/client/simple_action_client.h>
-#include <platform_motion/HomeWheelPodsAction.h>
-#include <platform_motion/EnableWheelPodsAction.h>
+#include <platform_motion/HomeAction.h>
+#include <platform_motion/Enable.h>
 
 
 class Teleop
@@ -27,9 +27,7 @@ private:
   ros::Publisher twist_pub_;
   ros::Subscriber joy_sub_;
   bool homing, homed;
-  bool enabling, enabled;
-  actionlib::SimpleActionClient<platform_motion::HomeWheelPodsAction> hac;
-  actionlib::SimpleActionClient<platform_motion::EnableWheelPodsAction> eac;
+  actionlib::SimpleActionClient<platform_motion::HomeAction> home_pods;
   
 };
 
@@ -47,10 +45,7 @@ Teleop::Teleop():
   a_exp_(2),
   homing(false),
   homed(false),
-  enabling(false),
-  enabled(false),
-  hac("home_wheelpods"),
-  eac("enable_wheelpods")
+  home_pods("home_wheelpods")
 {
     nh_.param("/teleop/axis_linear_x", linear_x, linear_x);
     nh_.param("/teleop/axis_linear_y", linear_y, linear_y);
@@ -74,15 +69,15 @@ void Teleop::doHoming(void)
     homing=true;
     homed=false;
     ROS_INFO("Waiting for homing server");
-    if(!hac.waitForServer(ros::Duration(5.0))) {
+    if(!home_pods.waitForServer(ros::Duration(5.0))) {
         ROS_ERROR("Timeout waiting for homing server");
         homing=false;
         return;
     }
     ROS_INFO("Send home goal");
-    platform_motion::HomeWheelPodsGoal g;
-    hac.sendGoal(g);
-    if(!hac.waitForResult(ros::Duration(60.0))) {
+    platform_motion::HomeGoal g;
+    home_pods.sendGoal(g);
+    if(!home_pods.waitForResult(ros::Duration(60.0))) {
         ROS_ERROR("Timeout waiting for homing");
     } else {
         homed=true;
@@ -93,24 +88,14 @@ void Teleop::doHoming(void)
 
 void Teleop::doEnable(bool state)
 {
-    enabling=true;
-    ROS_INFO("Waiting for enable server");
-    if(!eac.waitForServer(ros::Duration(5.0))) {
-        ROS_ERROR("Timeout waiting for enable server");
-        enabling=false;
-        return;
-    }
-    ROS_INFO("Send enable goal: %s", state?"true":"false");
-    platform_motion::EnableWheelPodsGoal g;
-    g.enable_state = state;
-    eac.sendGoal(g);
-    if(!eac.waitForResult(ros::Duration(5.0))) {
-        ROS_ERROR("Timeout waiting for enable");
+    platform_motion::Enable enmsg;
+    enmsg.request.state=state;
+    ROS_INFO("calling enable pods: %s ", state?"enable":"disable");
+    if(ros::service::call("/enable_wheel_pods", enmsg)) {
+        ROS_INFO("wheel pods %s complete", state?"enable":"disable");
     } else {
-        ROS_INFO("enable complete");
-        enabled = eac.getResult()->stern_enabled;
+        ROS_ERROR("enable wheel pods failed");
     }
-    enabling=false;
 }
 
 
