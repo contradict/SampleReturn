@@ -85,6 +85,7 @@ Motion::Motion() :
     home_carousel_action_server(nh_, "home_carousel", false),
     CAN_fd(-1),
     gpio_enabled(false),
+    carousel_setup(false),
     pods_enabled(false),
     desired_pod_state(false),
     carousel_enabled(false),
@@ -731,32 +732,40 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
     pv_counter = 7;
-    if(carousel->ready() && !gpio_enabled ) {
-        carousel->inputPinPullups(0x0003);
-        carousel->outputPinFunction(1, CANOpen::Manual, std::vector<uint8_t>(), false);
-        carousel->outputPinFunction(2, CANOpen::Manual, std::vector<uint8_t>(), false);
-        carousel->outputPinFunction(3, CANOpen::Manual, std::vector<uint8_t>(), false);
-        // set trajectory jerk limit
-        std::vector<uint8_t> data;
-        uint32_t jerk_limit = rint(carousel_jerk_limit*carousel_encoder_counts/100);
-        CANOpen::Transfer::pack((uint32_t)jerk_limit, data); // 100 counts/second^3
-        carousel->writeObjectDictionary(0x2121, 0, data);
-        // profile velocity during position move
-        data.clear();
-        int32_t profile_velocity=rint(carousel_profile_velocity*carousel_encoder_counts/0.1);
-        CANOpen::Transfer::pack(profile_velocity, data); // 0.1 counts/sec
-        carousel->writeObjectDictionary(0x6081, 0, data);
-        // profile acceleration, used to slow down at the end of
-        // an s-curve
-        data.clear();
-        int32_t profile_acceleration=rint(carousel_profile_acceleration*carousel_encoder_counts/10);
-        CANOpen::Transfer::pack(profile_acceleration, data); // 10 counts/sec
-        carousel->writeObjectDictionary(0x6083, 0, data);
-        // motion profile type
-        data.clear();
-        CANOpen::Transfer::pack((int16_t)3, data); // s-curve
-        carousel->writeObjectDictionary(0x6086, 0, data);
-        gpio_enabled=true;
+    if(carousel->ready()) {
+        if(!carousel_setup ) {
+            // set trajectory jerk limit
+            std::vector<uint8_t> data;
+            uint32_t jerk_limit = rint(carousel_jerk_limit*carousel_encoder_counts/100);
+            CANOpen::Transfer::pack((uint32_t)jerk_limit, data); // 100 counts/second^3
+            carousel->writeObjectDictionary(0x2121, 0, data);
+            // profile velocity during position move
+            data.clear();
+            int32_t profile_velocity=rint(carousel_profile_velocity*carousel_encoder_counts/0.1);
+            CANOpen::Transfer::pack(profile_velocity, data); // 0.1 counts/sec
+            carousel->writeObjectDictionary(0x6081, 0, data);
+            // profile acceleration, used to slow down at the end of
+            // an s-curve
+            data.clear();
+            int32_t profile_acceleration=rint(carousel_profile_acceleration*carousel_encoder_counts/10);
+            CANOpen::Transfer::pack(profile_acceleration, data); // 10 counts/sec
+            carousel->writeObjectDictionary(0x6083, 0, data);
+            // motion profile type
+            data.clear();
+            CANOpen::Transfer::pack((int16_t)3, data); // s-curve
+            carousel->writeObjectDictionary(0x6086, 0, data);
+            carousel_setup=true;
+        }
+        if(!gpio_enabled) {
+            carousel->inputPinPullups(0x0003);
+            std::vector<uint8_t> parameters;
+            /* Calling any of these crahses the amp
+            carousel->outputPinFunction(1, CANOpen::Manual, parameters, false);
+            carousel->outputPinFunction(2, CANOpen::Manual, parameters, false);
+            carousel->outputPinFunction(3, CANOpen::Manual, parameters, false);
+            */
+            gpio_enabled=true;
+        }
     }
 }
 

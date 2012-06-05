@@ -101,6 +101,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         int notify_read_fd, notify_write_fd;
 
         bool gpio_enabled;
+        bool carousel_setup;
 
         int enable_wait_timeout;
         bool pods_enabled;
