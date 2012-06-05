@@ -10,9 +10,11 @@
   <url>http://ros.org/wiki/manipulator</url>
   <depend package="platform_motion"/>
   <depend package="dynamixel_controllers"/>
+  <depend package="dynamixel_msgs"/>
   <depend package="rospy"/>
   <depend package="actionlib"/>
   <depend package="smach"/>
+  <depend package="smach_ros"/>
   <depend package="std_msgs"/>
 
 </package>

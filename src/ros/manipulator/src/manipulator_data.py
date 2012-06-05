@@ -85,7 +85,7 @@ class PersistantData:
         self.armCV.release()
 
     elif self.armTorqueGoal != None:
-      if (!data.is_moving) && (abs(data.load - self.armTorqueGoal) <= 0.05):
+      if (not data.is_moving) and (abs(data.load - self.armTorqueGoal) <= 0.05):
         # if we get really close to the desired arm torque, call it good enough
         # and notify.
         self.armCV.acquire()
@@ -122,7 +122,7 @@ class PersistantData:
         self.handCV.release()
 
     elif self.handTorqueGoal != None:
-      if (!data.is_moving) && (abs(data.load - self.handTorqueGoal) <= 0.05):
+      if (not data.is_moving) and (abs(data.load - self.handTorqueGoal) <= 0.05):
         # acquire the lock and notify all
         self.handCV.acquire()
         self.handTorqueGoal = None

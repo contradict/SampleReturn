@@ -75,7 +75,7 @@ class StartMovingArm(smach.State):
     # for now, assume it always works if we get here.
     return 'success'
 
-def WaitForArmStop(smach.State):
+class WaitForArmStop(smach.State):
   # once the arm is moving, wait for it to hit stuff.
   def __init__(self, dataStore, limit):
     smach.State.__init__(self,
@@ -101,7 +101,7 @@ def WaitForArmStop(smach.State):
     # for now, assume success always actually happens
     return 'success'
 
-def StartMovingHand(smach.State):
+class StartMovingHand(smach.State):
   # when the hand starts closing, wait for it to move before watching for
   # torque
   def __init__(self, dataStore, minHandMovement=0.02):
@@ -124,7 +124,7 @@ def StartMovingHand(smach.State):
     # for now, assume it always worked
     return 'success'
 
-def WaitForHandStop(smach.State):
+class WaitForHandStop(smach.State):
   # when the hand is moving, wait for it to actually hit a torque limit
   def __init__(self, dataStore, limit):
     smach.State.__init__(self,

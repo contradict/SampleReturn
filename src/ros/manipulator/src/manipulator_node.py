@@ -9,7 +9,7 @@ import smach_ros
 
 import std_msgs
 
-from dynamixel_msgs import JointState
+from dynamixel_msgs.msg import JointState
 import dynamixel_controllers
 
 from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, ManipulatorGrabResult
