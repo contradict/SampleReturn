@@ -729,6 +729,7 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 {
     pv_counter = 7;
     if(carousel->ready() && !gpio_enabled ) {
+        carousel->inputPinPullups(0x0003);
         carousel->outputPinFunction(1, CANOpen::Manual, std::vector<uint8_t>(), false);
         carousel->outputPinFunction(2, CANOpen::Manual, std::vector<uint8_t>(), false);
         carousel->outputPinFunction(3, CANOpen::Manual, std::vector<uint8_t>(), false);
