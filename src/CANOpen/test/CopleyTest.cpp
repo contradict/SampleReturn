@@ -37,7 +37,9 @@ enum ToolOperation {
     DisableSync,
     Enable,
     SetVelocity,
-    SetPosition
+    SetPosition,
+    GPIOMode,
+    GPIOValue
 };
 
 
@@ -66,6 +68,8 @@ int main(int argc, char * argv[])
             ("position,p", po::value<int32_t>()->default_value(0),
              "counts")
             ("keep-going,k", po::bool_switch()->default_value(false))
+            ("pin-index,i", po::value<int>()->default_value(1), "index")
+            ("pin-value,b", po::value<uint16_t>()->default_value(0), "index")
             ;
 
         po::options_description hidden("Hidden options");
@@ -119,6 +123,10 @@ int main(int argc, char * argv[])
         op = SetVelocity;
     } else if(opstr.compare("position") == 0){
         op = SetPosition;
+    } else if(opstr.compare("gpiomode") == 0){
+        op = GPIOMode;
+    } else if(opstr.compare("gpiovalue") == 0){
+        op = GPIOValue;
     } else {
         std::cout << "Unknown operation: " << opstr << std::endl;
         return 1;
@@ -134,7 +142,8 @@ int main(int argc, char * argv[])
 
     std::tr1::shared_ptr<Bus> pbus(new Bus(pintf, true));
 
-    CopleyServo servo(device_id, pbus);
+    CopleyServo servo(device_id, 50000, pbus);
+    servo.initialize();
 
     float sync_interval_sec;
     uint32_t sync_interval_usec;
@@ -164,6 +173,8 @@ int main(int argc, char * argv[])
     bool keepgoing=true;
     bool opdone=false;
     int32_t velocity, position;
+    int pin_index;
+    uint16_t pin_value;
     while(ret >= 0 && keepgoing ){
         ret = poll(pfd, 2, POLL_TIMEOUT_MS);
         if(ret>0){
@@ -200,15 +211,31 @@ int main(int argc, char * argv[])
                 case Enable:
                     servo.enable();
                     break;
-                 case SetVelocity:
+                case SetVelocity:
                     velocity = vm["velocity"].as<int32_t>();
                     servo.setVelocity(velocity);
                     break;
-                 case SetPosition:
+                case SetPosition:
                     position = vm["position"].as<int32_t>();
                     servo.setPosition(position);
                     break;
-             }
+                case GPIOMode:
+                    pin_index = vm["pin-index"].as<int>();
+                    std::cout << "setting mode on pin " << pin_index << std::endl;
+                    servo.outputPinFunction(pin_index, Manual,
+                                            std::vector<uint8_t>(), false);
+                    break;
+                case GPIOValue:
+                    pin_value = vm["pin-value"].as<uint16_t>();
+                    servo.outputPinFunction(1, Manual,
+                                            std::vector<uint8_t>(), false);
+                    servo.outputPinFunction(2, Manual,
+                                            std::vector<uint8_t>(), false);
+                    servo.outputPinFunction(3, Manual,
+                                            std::vector<uint8_t>(), false);
+                    servo.output(pin_value&0x03, (~pin_value)&0x03);
+                    break;
+            }
             opdone=true;
         }
     }
