@@ -1,7 +1,5 @@
 # a class to store data for the manipulator states.
 import threading
-import roslib
-import rospy
 
 # some of the nodes need access to subscriptions and global crud
 # so encapsulate it all in one datastore
