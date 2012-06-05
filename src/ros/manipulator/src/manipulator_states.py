@@ -146,3 +146,15 @@ class WaitForHandStop(smach.State):
 
     # assume success at this point
     return 'success'
+
+class ErrorState(smach.State):
+  # handle any errors that show up
+  def __init__(self, dataStore):
+    smach.State.__init__(self, outcomes=['failure'] )
+    self.dataStore = dataStore
+
+  def execute(self, userdata):
+    # XXX TODO: actual erorr handling!
+    # well did we succeed or fail at failing?
+    return 'failure'
+

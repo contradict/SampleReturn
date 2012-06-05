@@ -447,6 +447,12 @@ def main():
         transitions = {'succeeded':'success'}
     )
 
+    smach.StateMachine.add(
+        'ERROR',
+        manipulator_states.ErrorState(dataStore),
+        transitions = {'failure':'aborted'}
+    )
+
   # now that the state machine is fully defined, make the action server wrapper
   wrapper = smach_ros.ActionServerWrapper(
       'manipulator_grab', ManipulatorGrabAction,
