@@ -55,6 +55,32 @@ enum OutputPinFunction {
     PositionCrossesAny
 };
 
+struct PVTData {
+    bool relative;
+    uint8_t duration_ms;
+    uint32_t position;
+    uint32_t velocity;
+};
+
+struct PVTMove {
+    std::vector<struct PVTData> points;
+    int segment_id;
+    int executing_segment;
+    DS301CallbackObject callback;
+};
+
+#define PVT_COMMAND_CLEAR_BUFFER           (0x80|0)
+#define PVT_COMMAND_POP_SEGMENTS           (0X80|1)
+#define PVT_COMMAND_CLEAR_ERRORS           (0X80|2)
+#define PVT_COMMAND_ZERO_SEGMENT_ID        (0X80|3)
+#define PVT_BUFFER_FORMAT_PVT              (0<<3)
+#define PVT_BUFFER_FORMAT_PVT_FAST         (1<<3)
+#define PVT_BUFFER_FORMAT_RELATIVE         (2<<3)
+#define PVT_BUFFER_FORMAT_RELATIVE_FAST    (3<<3)
+#define PVT_BUFFER_FORMAT_INITIAL_POSITION (4<<3)
+#define PVT_BUFFER_FORMAT_PT               (5<<3)
+#define PVT_BUFFER_FORMAT_PT_RELATIVE      (6<<3)
+#define PVT_BUFFER_LENGTH                  32
 
 #define CONTROL_SWITCH_ON        0x0001
 #define CONTROL_ENABLE_VOLTAGE   0x0002
@@ -162,6 +188,9 @@ class CopleyServo : public DS301 {
         uint16_t getInputPins(void){return input_pins;};
         uint16_t getOutputPins(void){return output_pins;};
 
+        void pvtMove(std::vector<struct PVTData> points, bool preempt=false,
+                DS301CallbackObject callback=DS301CallbackObject());
+
         int32_t position;
         int32_t velocity;
         bool gotPV;
@@ -170,6 +199,7 @@ class CopleyServo : public DS301 {
         void emcyCallback(EMCY &emcy);
         void statusModePDOCallback(PDO &pdo);
         void positionVelocityPDOCallback(PDO &pdo);
+        void trajectoryStatusPDOCallback(PDO &pdo);
 
         void _initialize(DS301 &node);
         void _mapPDOs(void);
@@ -182,15 +212,19 @@ class CopleyServo : public DS301 {
         void _setPositionValue(PDO &pdo);
         void _positionGo(PDO &pdo);
 
+        void startPVTMove(void);
+
         std::tr1::shared_ptr<SYNC> sync;
         std::tr1::shared_ptr<EMCY> emcy;
 
         std::tr1::shared_ptr<TPDO> status_mode_pdo;
         std::tr1::shared_ptr<TPDO> position_velocity_pdo;
+        std::tr1::shared_ptr<TPDO> trajectory_buffer_status_pdo;
 
         std::tr1::shared_ptr<RPDO> control_mode_pdo;
         std::tr1::shared_ptr<RPDO> position_pdo;
         std::tr1::shared_ptr<RPDO> velocity_pdo;
+        std::tr1::shared_ptr<RPDO> ip_move_segment_pdo;
 
         DS301CallbackObject home_callback;
         DS301CallbackObject position_callback;
@@ -211,6 +245,10 @@ class CopleyServo : public DS301 {
         double bus_voltage;
         enum OperationMode mode_of_operation;
 
+        std::vector<std::tr1::shared_ptr<struct PVTMove> > pvt_moves;
+
+        void sendNextPoint(uint16_t segment_id, std::vector<struct PVTData>::iterator point);
+        void sendPoints(std::vector<struct PVTData> &points, int &start, int count);
 };
 
 }

@@ -162,11 +162,31 @@ void CopleyServo::_mapPDOs(void)
                 static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::positionVelocityPDOCallback)));
     bus->add(position_velocity_pdo);
 
-    // Disable sending of TPDO3-4
+    maps.clear();
+    map.index = 0x2010;
+    map.subindex = 0;
+    map.bits = 32;
+    maps.push_back(map);
+    trajectory_buffer_status_pdo = mapTPDO("Trajectory Buffer Status", 3, maps, 0xff,
+            PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::trajectoryStatusPDOCallback)));
+    bus->add(trajectory_buffer_status_pdo);
+
     std::vector<uint8_t> data;
     data.push_back(0);
-    writeObjectDictionary(0x1802, 2, data);
+    // Disable sending of TPDO4
     writeObjectDictionary(0x1803, 2, data);
+    if(syncProducer) {
+        // TPDO5 is timestamp
+        maps.clear();
+        map.index = 0x1013;
+        map.subindex = 0;
+        map.bits = 32;
+        maps.push_back(map);
+        // every other sync message 
+        mapTPDO("High Resolution Time Stamp", 5, maps, 0x02);
+        // no need to remember this one, just for syncing the amplifiers
+    }
 
     // Control Word
     maps.clear();
@@ -195,7 +215,7 @@ void CopleyServo::_mapPDOs(void)
     map.bits = 32;
     maps.push_back(map);
     // Commit on sync
-    position_pdo = mapRPDO("Position Commanded Value", 2, maps, 0xFF);
+    position_pdo = mapRPDO("Position Commanded Value", 2, maps, 0x01);
     bus->add(position_pdo);
 
     // Target Velocity
@@ -205,8 +225,28 @@ void CopleyServo::_mapPDOs(void)
     map.bits = 32;
     maps.push_back(map);
     // Commit on sync
-    velocity_pdo = mapRPDO("Target Velocity", 3, maps, 0);
+    velocity_pdo = mapRPDO("Target Velocity", 3, maps, 0x01);
     bus->add(velocity_pdo);
+
+    // IP move segment command
+    maps.clear();
+    map.index = 0x2010;
+    map.subindex = 0;
+    map.bits = 64;
+    maps.push_back(map);
+    // immediate action
+    ip_move_segment_pdo = mapRPDO("IP move segment", 4, maps, 0xFF);
+
+    // Time stamp receiver
+    if(!syncProducer) {
+        maps.clear();
+        map.index = 0x1013;
+        map.subindex = 0;
+        map.bits = 32;
+        maps.push_back(map);
+        // set immediately
+        mapRPDO("Time Stamp Receiver", 5, maps, 0);
+    }
 
     mapsCreated = true;
 }
@@ -360,17 +400,6 @@ void CopleyServo::positionVelocityPDOCallback(PDO &pdo)
     pv_callback(*this);
     //std::cout << "Position: " << position << " Velocity: " << velocity << std::endl;
 }
-
-/*
-   bool CopleyServo::getPV(uint32_t &P, uint32_t &V, bool clear)
-{
-    bool gotPV_ = gotPV;
-    P = position;
-    V = velocity;
-    if(clear) gotPV=false;
-    return gotPV_;
-}
-*/
 
 void CopleyServo::syncCallback(SYNC &sync)
 {
@@ -577,6 +606,113 @@ void CopleyServo::outputPinFunction(int pin_index, enum OutputPinFunction functi
 void CopleyServo::setInputCallback(InputChangeCallback cb)
 {
     input_callback = cb;
+}
+
+void CopleyServo::pvtMove(std::vector<struct PVTData> points, bool preempt, DS301CallbackObject callback)
+{
+    if(mode_of_operation != InterpolatedPosition)
+        modeControl(0, CONTROL_NEW_SETPOINT | CONTROL_CHANGE_SET_IMMEDIATE, InterpolatedPosition);
+
+    std::shared_ptr<struct PVTMove> move(new struct PVTMove);
+    move->points = points;
+    move->segment_id = 0;
+    move->executing_segment = 0;
+    move->callback = callback;
+ 
+    if(preempt && pvt_moves.size()>0) {
+        pvt_moves.erase(pvt_moves.begin()+1, pvt_moves.end());
+        std::shared_ptr<struct PVTMove> current_move = pvt_moves[0];
+        // leave 3 in the buffer to prevent underflow
+        if(current_move->executing_segment + 3 <= current_move->points.size()) {
+            std::vector<uint8_t> data;
+            Transfer::pack((uint8_t)(PVT_COMMAND_POP_SEGMENTS), data);
+            int dropped_segments = current_move->segment_id-current_move->executing_segment-3;
+            Transfer::pack((uint8_t)(dropped_segments), data);
+            ip_move_segment_pdo->send(data);
+            // drop unused segments from move
+            current_move->points.erase(current_move->points.begin() +
+                                         current_move->executing_segment+3,
+                                       current_move->points.end());
+            current_move->callback(*this);
+            current_move->callback = callback;
+        }
+        // append new segments
+        current_move->points.insert(current_move->points.end(), move->points.begin(), move->points.end());
+        // next callback will refill buffer
+    } else {
+        pvt_moves.push_back(move);
+        if(pvt_moves.size() == 1) {
+            // reset counter
+            ip_move_segment_pdo->send((uint8_t)PVT_COMMAND_ZERO_SEGMENT_ID);
+            startPVTMove();
+        }
+    }
+}
+
+void CopleyServo::startPVTMove()
+{
+    std::shared_ptr<struct PVTMove> move=pvt_moves[0];
+
+    std::vector<struct PVTData>::iterator point=move->points.begin();
+    // send initial point if absolute
+    if( ! point->relative){
+        std::vector<uint8_t> data;
+        Transfer::pack((uint8_t)(((move->segment_id++)&0x03) | PVT_BUFFER_FORMAT_INITIAL_POSITION), data);
+        Transfer::pack((uint32_t)(point->position), data);
+        ip_move_segment_pdo->send(data);
+    }
+    point++;
+    sendPoints(move->points, move->segment_id, 3); 
+    // start motion
+    modeControl( CONTROL_NEW_SETPOINT, 0, InterpolatedPosition);
+}
+
+void CopleyServo::trajectoryStatusPDOCallback(PDO &pdo)
+{
+    uint16_t segment_id;
+    Transfer::unpack(pdo.data, 0, segment_id);
+    uint8_t free_slots=pdo.data[2];
+    uint8_t flags = pdo.data[3];
+
+    std::shared_ptr<struct PVTMove> move=pvt_moves[0];
+    move->executing_segment = move->segment_id - (PVT_BUFFER_LENGTH-free_slots);
+    if(segment_id==move->points.size()){
+        move->callback(*this);
+        pvt_moves.erase(pvt_moves.begin());
+        if(pvt_moves.size()>0)
+            startPVTMove();
+        return;
+    }
+    sendPoints(move->points, move->segment_id, free_slots);
+}
+
+void CopleyServo::sendPoints(std::vector<struct PVTData> &points, int &start, int count)
+{
+    std::vector<struct PVTData>::iterator point=points.begin();
+    point += start;
+    for(int i=0;i<count;i++) {
+        sendNextPoint(start++, point);
+        point++;
+        if(point == points.end()) {
+            break;
+        }
+    }
+}
+
+void CopleyServo::sendNextPoint(uint16_t segment_id, std::vector<struct PVTData>::iterator point)
+{
+    std::vector<uint8_t> data;
+    Transfer::pack( (uint8_t)(((segment_id++)&0x03) |
+                              (point->relative?PVT_BUFFER_FORMAT_RELATIVE:PVT_BUFFER_FORMAT_PVT)),
+                    data);
+    Transfer::pack((uint8_t)(point->duration_ms), data);
+    Transfer::pack((uint32_t)(point->position), data);
+    // position is 24 bits
+    data.pop_back();
+    Transfer::pack((uint32_t)(point->velocity), data);
+    // velocity is 24 bits
+    data.pop_back();
+    ip_move_segment_pdo->send(data);
 }
 
 }
