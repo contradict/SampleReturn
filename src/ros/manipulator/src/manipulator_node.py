@@ -53,6 +53,7 @@ def main():
   )
 
   # wait for all the dynamixel services to actually come live.
+  rospy.loginfo('Waiting for wristJointController services...')
   rospy.wait_for_service('wristJointController/set_speed')
   rospy.wait_for_service('wristJointController/torque_enable')
   rospy.wait_for_service('wristJointController/set_compliance_slope')
@@ -60,6 +61,7 @@ def main():
   rospy.wait_for_service('wristJointController/set_compliance_punch')
   rospy.wait_for_service('wristJointController/set_torque_limit')
 
+  rospy.loginfo('Waiting for armJointController services...')
   rospy.wait_for_service('armJointController/set_speed')
   rospy.wait_for_service('armJointController/torque_enable')
   rospy.wait_for_service('armJointController/set_compliance_slope')
@@ -67,6 +69,7 @@ def main():
   rospy.wait_for_service('armJointController/set_compliance_punch')
   rospy.wait_for_service('armJointController/set_torque_limit')
 
+  rospy.loginfo('Waiting for handJointController services...')
   rospy.wait_for_service('handJointController/set_speed')
   rospy.wait_for_service('handJointController/torque_enable')
   rospy.wait_for_service('handJointController/set_compliance_slope')
