@@ -464,7 +464,7 @@ void CopleyServo::modeControl(uint16_t set, uint16_t clear,
     mode_of_operation = mode;
     std::vector<uint8_t> data;
     Transfer::pack(control_word, data);
-    Transfer::pack(mode_of_operation, data);
+    Transfer::pack((uint8_t)mode_of_operation, data);
     Transfer::pack(output_pins, data);
     control_mode_pdo->send(data, callback);
 }
