@@ -547,6 +547,14 @@ void CopleyServo::inputPinFunction(int pin_index, enum InputPinFunction function
     writeObjectDictionary(0x2192, pin_index, data);
 }
 
+void CopleyServo::inputPinPullups(uint16_t pullups)
+{
+    std::vector<uint8_t> data;
+    Transfer::pack(pullups, data);
+    writeObjectDictionary(0x2191, 0, data);
+}
+
+
 void CopleyServo::outputPinFunction(int pin_index, enum OutputPinFunction function,
         std::vector<uint8_t> parameters,
         bool activeLow)

@@ -120,6 +120,7 @@ class CopleyServo : public DS301 {
         bool ready(void);
 
         void inputPinFunction(int pin_index, enum InputPinFunction function);
+        void inputPinPullups(uint16_t pullups);
         void outputPinFunction(int pin_index, enum OutputPinFunction function,
                 std::vector<uint8_t> parameters, bool activeLow);
         void output(uint16_t set, uint16_t clear);
