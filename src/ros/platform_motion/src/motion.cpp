@@ -731,7 +731,11 @@ void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
-    pv_counter = 7;
+    pv_counter=0;
+    if(carousel_enabled)
+        pv_counter += 1;
+    if(pods_enabled)
+        pv_counter += 6;
     if(carousel->ready()) {
         if(!carousel_setup ) {
             // set trajectory jerk limit
