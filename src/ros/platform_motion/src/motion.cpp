@@ -120,7 +120,10 @@ Motion::Motion() :
     nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
     nh_.param("carousel_offset", carousel_offset, 0.0);
     nh_.param("sync_interval", sync_interval, 50000);
-
+    nh_.param("carousel_jerk_limit", carousel_jerk_limit, 5.0); // rev/s^3
+    nh_.param("carousel_profile_velocity", carousel_profile_velocity, 0.25); // rev/s
+    nh_.param("carousel_profile_acceleration", carousel_profile_acceleration, 0.3); // rev/s^2
+ 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
     nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
     nh_.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
@@ -733,6 +736,26 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
         carousel->outputPinFunction(1, CANOpen::Manual, std::vector<uint8_t>(), false);
         carousel->outputPinFunction(2, CANOpen::Manual, std::vector<uint8_t>(), false);
         carousel->outputPinFunction(3, CANOpen::Manual, std::vector<uint8_t>(), false);
+        // set trajectory jerk limit
+        std::vector<uint8_t> data;
+        uint32_t jerk_limit = rint(carousel_jerk_limit*carousel_encoder_counts/100);
+        CANOpen::Transfer::pack((uint32_t)jerk_limit, data); // 100 counts/second^3
+        carousel->writeObjectDictionary(0x2121, 0, data);
+        // profile velocity during position move
+        data.clear();
+        int32_t profile_velocity=rint(carousel_profile_velocity*carousel_encoder_counts/0.1);
+        CANOpen::Transfer::pack(profile_velocity, data); // 0.1 counts/sec
+        carousel->writeObjectDictionary(0x6081, 0, data);
+        // profile acceleration, used to slow down at the end of
+        // an s-curve
+        data.clear();
+        int32_t profile_acceleration=rint(carousel_profile_acceleration*carousel_encoder_counts/10);
+        CANOpen::Transfer::pack(profile_acceleration, data); // 10 counts/sec
+        carousel->writeObjectDictionary(0x6083, 0, data);
+        // motion profile type
+        data.clear();
+        CANOpen::Transfer::pack((int16_t)3, data); // s-curve
+        carousel->writeObjectDictionary(0x6086, 0, data);
         gpio_enabled=true;
     }
 }

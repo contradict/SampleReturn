@@ -88,6 +88,10 @@ class Motion : public CANOpen::TransferCallbackReceiver {
             carousel_encoder_counts;
         int large_steering_move;
 
+        double carousel_jerk_limit;
+        double carousel_profile_velocity;
+        double carousel_profile_acceleration;
+
         int CAN_channel, CAN_baud;
         int CAN_fd;
         boost::mutex CAN_mutex;
