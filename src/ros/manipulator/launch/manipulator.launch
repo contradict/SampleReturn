@@ -1,0 +1,60 @@
+<!-- -*- mode: XML -*- -->
+
+<launch>
+  <!-- load up the manager. this thing gets the actual serial port -->
+  <node name="dynamixel_manager" pkg="dynamixel_controllers" type="controller_manager.py" required="true" output="screen">
+    <rosparam>
+      namespace: dxl_manager
+      serial_ports:
+        manipulator_port:
+          port_name: "/dev/ttyUSB0"
+          baud_rate: 100000
+          min_motor_id: 0
+          max_motor_id: 512
+          update_rate: 20
+    </rosparam>
+  </node>
+
+  <!-- load the yaml file that defines which motor is which and what kind
+       of controller they each get -->
+  <rosparam file="$(find manipulator)/config/manipulator.yaml" command="load"/>
+
+  <!-- start up the joint controllers! -->
+  <node
+    name="dynamixel_controller_spawner"
+    pkg="dynamixel_controllers"
+    type="controller_spawner.py"
+    args="--manager=dxl_manager --port=manipulator_port --type=simple wristJointController armJointController handJointController"
+    output="screen"
+  />
+
+  <!-- now the sacry part, the manipulator node! -->
+  <node
+    name="manipulator"
+    pkg="manipulator"
+    type="manipulator_node.py"
+    output="screen"
+  >
+    <rosparam>
+      wrist_min_pos: 0
+      wrist_max_pos: 3
+      wrist_speed: 1.0
+      wrist_torque: 0.5
+
+      arm_down_speed: 1.0
+      arm_down_torque: 0.8
+      arm_up_speed: -1.0
+      arm_up_torque: 0.5
+      arm_hold_torque: 0.1
+
+      hand_min_pos: 0
+      hand_max_pos: 6
+      hand_close_speed: 1.0
+      hand_open_speed: 1.0
+      hand_close_torque: 0.8
+      hand_open_torque: 0.5
+      hand_hold_torque: 0.1
+    </rosparam>
+  </node>
+
+</launch>
