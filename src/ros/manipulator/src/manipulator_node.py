@@ -10,9 +10,7 @@ import smach_ros
 from std_msgs.msg import Float64
 
 from dynamixel_msgs.msg import JointState
-from dynamixel_controllers.srv import SetSpeed, TorqueEnable, SetTorqueLimit
-from dynamixel_controllers.srv import SetCompliancePunch, SetComplianceMargin
-from dynamixel_controllers.srv import SetComplianceSlope
+from dynamixel_controllers.srv import *
 
 from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, ManipulatorGrabResult
 
@@ -214,33 +212,29 @@ def main():
                        'failure':'ERROR'}
     )
 
-    ss_arm_down=SetSpeed()
-    ss_arm_down.data=dataStore.armDownSpeed
+    
     smach.StateMachine.add(
       'SETUP_ARM_SPEED_DOWN',
-      smach_ros.ServiceState('armJointController/set_speed',
+      smach_ros.ServiceState('/armJointController/set_speed',
         SetSpeed,
-        request = ss_arm_down),
+        request = SetSpeedRequest(speed=dataStore.armDownSpeed)),
       transitions={'succeeded':'SETUP_ARM_TORQUE_DOWN'}
     )
 
-    tl_arm_down=SetTorqueLimit()
-    tl_arm_down.data=dataStore.armDownTorque
+    
     smach.StateMachine.add(
       'SETUP_ARM_TORQUE_DOWN',
       smach_ros.ServiceState('armJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_arm_down),
+        request = SetTorqueLimitRequest(abs(dataStore.armDownTorque))),
       transitions = {'succeeded':'SETUP_ARM_TORQUE_ENABLE_DOWN'}
     )
 
-    te_true = TorqueEnable()
-    te_true.data=True
     smach.StateMachine.add(
         'SETUP_ARM_TORQUE_ENABLE_DOWN',
-        smach_ros.ServiceState('armJointController/set_torque_enable',
+        smach_ros.ServiceState('armJointController/torque_enable',
           TorqueEnable,
-          request = te_true),
+          request = TorqueEnableRequest(True)),
         transitions = {'succeeded':'START_MOVING_ARM_DOWN'}
     )
 
@@ -258,43 +252,37 @@ def main():
                        'failure':'ERROR'}
     )
 
-    tl_arm_hold = SetTorqueLimit()
-    tl_arm_hold.data=dataStore.armHoldTorque
     smach.StateMachine.add(
       'SETUP_ARM_HOLD_DOWN',
       smach_ros.ServiceState('armJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_arm_hold
+        request = SetTorqueLimitRequest( abs(dataStore.armHoldTorque) )
         ),
       transitions = {'succeeded':'SETUP_HAND_SPEED_CLOSE'}
     )
 
-    ss_hand_close = SetSpeed()
-    ss_hand_close.data = dataStore.handCloseSpeed
     smach.StateMachine.add(
         'SETUP_HAND_SPEED_CLOSE',
       smach_ros.ServiceState('handJointController/set_speed',
         SetSpeed,
-        request = ss_hand_close),
+        request = SetSpeedRequest( dataStore.handCloseSpeed )),
       transitions={'succeeded':'SETUP_HAND_TORQUE_CLOSE'}
     )
 
-    tl_hand_close = SetTorqueLimit()
-    tl_hand_close.data = dataStore.handCloseTorque
     smach.StateMachine.add(
       'SETUP_HAND_TORQUE_CLOSE',
       smach_ros.ServiceState('handJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_hand_close
+        request = SetTorqueLimitRequest( abs(dataStore.handCloseTorque) )
         ),
       transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_CLOSE'}
     )
 
     smach.StateMachine.add(
         'SETUP_HAND_TORQUE_ENABLE_CLOSE',
-        smach_ros.ServiceState('handJointController/set_torque_enable',
+        smach_ros.ServiceState('handJointController/torque_enable',
           TorqueEnable,
-          request = te_true),
+          request = TorqueEnableRequest(True)),
         transitions = {'succeeded':'START_MOVING_HAND_CLOSE'}
     )
 
@@ -313,43 +301,37 @@ def main():
                        'failure':'ERROR'}
     )
 
-    tl_hand_hold = SetTorqueLimit()
-    tl_hand_hold.data = dataStore.handHoldTorque
     smach.StateMachine.add(
       'SETUP_HAND_HOLD_CLOSE',
       smach_ros.ServiceState('handJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_hand_hold
+        request = SetTorqueLimitRequest( abs(dataStore.handHoldTorque) )
         ),
       transitions = {'succeeded':'SETUP_ARM_SPEED_UP'}
     )
 
-    ss_arm_up = SetSpeed()
-    ss_arm_up.data = dataStore.armUpSpeed
     smach.StateMachine.add(
       'SETUP_ARM_SPEED_UP',
       smach_ros.ServiceState('armJointController/set_speed',
         SetSpeed,
-        request = ss_arm_up),
+        request = SetSpeedRequest( dataStore.armUpSpeed )),
       transitions={'succeeded':'SETUP_ARM_TORQUE_UP'}
     )
 
-    tl_arm_up = SetTorqueLimit()
-    tl_arm_up.data = dataStore.armUpTorque
     smach.StateMachine.add(
       'SETUP_ARM_TORQUE_UP',
       smach_ros.ServiceState('armJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_arm_up
+        request = SetTorqueLimitRequest( abs(dataStore.armUpTorque) )
         ),
       transitions = {'succeeded':'SETUP_ARM_TORQUE_ENABLE_UP'}
     )
 
     smach.StateMachine.add(
         'SETUP_ARM_TORQUE_ENABLE_UP',
-        smach_ros.ServiceState('armJointController/set_torque_enable',
+        smach_ros.ServiceState('armJointController/torque_enable',
           TorqueEnable,
-          request = te_true),
+          request = TorqueEnableRequest(True)),
         transitions = {'succeeded':'START_MOVING_ARM_UP'}
     )
 
@@ -367,13 +349,11 @@ def main():
                        'failure':'ERROR'}
     )
 
-    tl_arm_hold = SetTorqueLimit()
-    tl_arm_hold.data = dataStore.armHoldTorque
     smach.StateMachine.add(
       'SETUP_ARM_HOLD_UP',
       smach_ros.ServiceState('armJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_arm_hold
+        request = SetTorqueLimitRequest( abs(dataStore.armHoldTorque) )
         ),
       transitions = {'succeeded':'GET_BIN'}
     )
@@ -389,23 +369,19 @@ def main():
         transitions = {'succeeded':'SETUP_HAND_SPEED_OPEN'}
     )
 
-    ss_hand_open = SetSpeed()
-    ss_hand_open = dataStore.handOpenSpeed
     smach.StateMachine.add(
         'SETUP_HAND_SPEED_OPEN',
       smach_ros.ServiceState('handJointController/set_speed',
         SetSpeed,
-        request = ss_hand_open),
+        request = SetSpeedRequest( dataStore.handOpenSpeed ) ),
       transitions={'succeeded':'SETUP_HAND_TORQUE_OPEN'}
     )
 
-    tl_hand_open = SetTorqueLimit()
-    tl_hand_open.data = dataStore.handOpenTorque
     smach.StateMachine.add(
       'SETUP_HAND_TORQUE_OPEN',
       smach_ros.ServiceState('handJointController/set_torque_limit',
         SetTorqueLimit,
-        request = tl_hand_open
+        request = SetTorqueLimitRequest( abs(dataStore.handOpenTorque) )
         ),
       transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_OPEN'}
     )
