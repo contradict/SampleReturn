@@ -456,6 +456,9 @@ def main():
       goal_key = 'goal'
   )
 
+  sls = smach_ros.IntrospectionServer('smach_grab_introspection', sm, '/START')
+  sls.start()
+
   # according to the docs, run_server is non blocking, so spin is needed.
   wrapper.run_server()
 
