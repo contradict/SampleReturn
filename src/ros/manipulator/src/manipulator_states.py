@@ -1,6 +1,7 @@
 # this is where all the states for the manipulator will be defined.
 
 import smach
+from manipulator.msg import ManipulatorGrabFeedback
 
 class HandleGoal(smach.State):
   # this state might not be useful.
@@ -16,10 +17,10 @@ class HandleGoal(smach.State):
 
   def execute(self, userData):
     # store the current goal in dataStore for safe keeping
-    self.dataStore.currentActionGoal = userdata.goal
+    self.dataStore.currentActionGoal = userData.goal
 
     # set the wrist angle output
-    userdata.wrist_angle = userdata.goal.wrist_angle
+    userData.wrist_angle = userData.goal.wrist_angle
 
     # success!
     return 'success'
@@ -46,7 +47,7 @@ class RotateWrist(smach.State):
     self.dataStore.wristCV.wait()
 
     # check to make sure we got the right wrist angle
-    if abs(self.dataStore.GetWristAngle - userdata.wrist_angle) <= 0.01:
+    if abs(self.dataStore.GetWristAngle() - userdata.wrist_angle) <= 0.01:
       return 'success'
     else:
       return 'failure'
@@ -71,6 +72,7 @@ class StartMovingArm(smach.State):
 
     # wait on the condition variable
     self.dataStore.armCV.wait()
+    self.dataStore.armCV.release()
 
     # for now, assume it always works if we get here.
     return 'success'
