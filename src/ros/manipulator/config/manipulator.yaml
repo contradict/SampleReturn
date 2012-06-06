@@ -22,7 +22,7 @@ armJointController:
     id: 10
     init: 1023
     min: 0
-    max: 1023
+    max: 0
 
 handJointController:
   controller:
@@ -34,5 +34,5 @@ handJointController:
   motor:
     id: 12
     init: 500
-    min: 20
-    max: 600
+    min: 0
+    max: 0
