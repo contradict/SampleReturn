@@ -31,13 +31,12 @@ transform_tolerance: 0.3
 obstacle_range: 5.0
 max_obstacle_height: 2.0
 raytrace_range: 5.0
-#footprint: [[-0.325, -0.325], [-0.325, 0.325], [0.325, 0.325], [0.46, 0.0], [0.325, -0.325]]
-footprint: [[-0.75, 0.0], [0.75, 0.0], [0.0, -1.5]]
+#footprint: [[-0.75, 0.0], [0.75, 0.0], [0.0, -1.5]]
+footprint: [[1.5, -0.75], [1.5, 0.75], [0.0, 0.0]]
 #robot_radius: 0.46
 footprint_padding: 0.01
 inflation_radius: 0.55
 cost_scaling_factor: 10.0
 lethal_cost_threshold: 100
 observation_sources: point_cloud_sensor
-point_cloud_sensor: {data_type: PointCloud2, topic: /stereo/points2, sensor_frame: "navigation_stereo",
-  observation_persistence: 1.0, marking: true, clearing: false, max_obstacle_height: 2.0, min_obstacle_height: 0.0, obstacle_range: 5.0, raytrace_range: 5.0}
+point_cloud_sensor: {data_type: PointCloud2, topic: /navigation_stereo/points2, observation_persistence: 1.0, marking: true, clearing: false, max_obstacle_height: 2.0, min_obstacle_height: 0.0, obstacle_range: 5.0, raytrace_range: 5.0}
