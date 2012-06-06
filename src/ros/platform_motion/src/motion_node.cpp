@@ -6,13 +6,14 @@
 #include <Eigen/Dense>
 
 #include <ros/ros.h>
+#include <std_msgs/Float64.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
 #include <dynamic_reconfigure/server.h>
 
 #include <actionlib/server/simple_action_server.h>
-#include <platform_motion/HomeWheelPodsAction.h>
-#include <platform_motion/EnableWheelPodsAction.h>
+#include <platform_motion/HomeAction.h>
+#include <platform_motion/Enable.h>
 #include <platform_motion/GPIO.h>
 
 #include <canlib.h>

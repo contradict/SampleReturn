@@ -120,6 +120,7 @@ class CopleyServo : public DS301 {
         bool ready(void);
 
         void inputPinFunction(int pin_index, enum InputPinFunction function);
+        void inputPinPullups(uint16_t pullups);
         void outputPinFunction(int pin_index, enum OutputPinFunction function,
                 std::vector<uint8_t> parameters, bool activeLow);
         void output(uint16_t set, uint16_t clear);
@@ -157,6 +158,9 @@ class CopleyServo : public DS301 {
         void setInputCallback(InputChangeCallback cb);
         void setPVCallback(DS301CallbackObject cb);
         void setEMCYCallback(DS301CallbackObject cb);
+
+        uint16_t getInputPins(void){return input_pins;};
+        uint16_t getOutputPins(void){return output_pins;};
 
         int32_t position;
         int32_t velocity;

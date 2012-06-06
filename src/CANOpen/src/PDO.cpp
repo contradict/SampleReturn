@@ -164,32 +164,32 @@ void RPDO::send(std::vector<uint8_t> &data, PDOCallbackObject callback)
 void RPDO::send(uint8_t value, PDOCallbackObject callback)
 {
     std::vector<uint8_t> data;
-    data.resize(1);
-    data[0] = value;
+    data.clear();
+    pack(value, data);
     send(data, callback);
 }
 
 void RPDO::send(uint16_t value, PDOCallbackObject callback)
 {
     std::vector<uint8_t> data;
-    data.resize(2);
-    *((uint16_t *)(&data[0])) = htole16(value);
+    data.clear();
+    pack(value, data);
     send(data, callback);
 }
 
 void RPDO::send(uint32_t value, PDOCallbackObject callback)
 {
     std::vector<uint8_t> data;
-    data.resize(4);
-    *((uint32_t *)(&data[0])) = htole32(value);
+    data.clear();
+    pack(value, data);
     send(data, callback);
 }
 
 void RPDO::send(int32_t value, PDOCallbackObject callback)
 {
     std::vector<uint8_t> data;
-    data.resize(4);
-    *((int32_t *)(&data[0])) = htole32(value);
+    data.clear();
+    pack(value, data);
     send(data, callback);
 }
 

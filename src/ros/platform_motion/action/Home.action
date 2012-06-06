@@ -1,10 +1,8 @@
 #goal definition
+int8 home_count
 ---
 #result definition
-bool port_homed
-bool starboard_homed
-bool stern_homed
-bool carousel_homed
+bool[] homed
 ---
 #feedback definition
 int8 home_count

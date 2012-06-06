@@ -35,6 +35,15 @@ class Transfer : public TransferCallbackReceiver {
 
         virtual std::string getName(void){return name;};
 
+        static void pack(uint8_t value, std::vector<uint8_t> &data);
+        static void pack(uint16_t value, std::vector<uint8_t> &data);
+        static void pack(uint32_t value, std::vector<uint8_t> &data);
+        static void pack(int32_t value, std::vector<uint8_t> &data);
+
+        static void unpack(std::vector<uint8_t> data, int index, int16_t &value);
+        static void unpack(std::vector<uint8_t> data, int index, uint16_t &value);
+        static void unpack(std::vector<uint8_t> data, int index, int32_t &value);
+        static void unpack(std::vector<uint8_t> data, int index, uint32_t &value);
     protected:
 
         const std::string name;

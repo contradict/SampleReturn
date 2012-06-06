@@ -45,7 +45,7 @@
 55,0,Brake/Stop Activation Velocity,0
 56,0,Motor Back Emf Constant,2400
 6a,0,Commanded Current Ramp,0
-70,0,Output 1 Config,100:44007f:0
+70,0,Output 1 Config,0:0:0
 78,0,Input 1 Config,11
 79,0,Input 2 Config,0
 7a,0,Input 3 Config,0
@@ -53,8 +53,8 @@
 7c,0,Input 5 Config,0
 7d,0,Input 6 Config,0
 80,0,Amp Model Number,ACP-090-36
-8a,0,Voltage Sense,2255
-92,0,Amp Name,Stern Wheel
+8a,0,Voltage Sense,2268
+92,0,Amp Name,Port Wheel
 98,0,Function Generator Config,8193
 99,0,Function Generator Frequency,2
 9a,0,Function Generator Amplitude,20000
@@ -80,7 +80,7 @@ ae,0,Current Loop Offset,0
 64,0,Motor Electrical Distance,100000
 65,0,Motor Encoder Direction,0
 6c,0,Position Capture Control Register,0
-71,0,Output 2 Config,100:4000:0
+71,0,Output 2 Config,0:0:0
 8e,0,Amp Ref Scale,11220
 af,0,Amp Options Register,2
 b1,0,Increment Rate,0
