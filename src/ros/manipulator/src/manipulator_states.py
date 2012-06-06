@@ -59,6 +59,7 @@ class RotateWrist(smach.State):
 
     # wait until the wrist gets to the right place.
     self.dataStore.wristCV.wait()
+    self.dataStore.wristCV.release()
 
     # check to make sure we got the right wrist angle
     if abs(self.dataStore.GetWristAngle() - userdata.wrist_angle) <= 0.01:
@@ -127,6 +128,7 @@ class WaitForArmStop(smach.State):
     # now wait on the condition variable for the torque to reach the right
     # limit
     self.dataStore.armCV.wait()
+    self.dataStore.armCV.release()
 
     # for now, assume success always actually happens
     return 'success'
@@ -156,6 +158,7 @@ class StartMovingHand(smach.State):
 
     # wait for notification indicating success
     self.dataStore.handCV.wait()
+    self.dataStore.handCV.release()
 
     # for now, assume it always worked
     return 'success'
@@ -185,6 +188,7 @@ class WaitForHandStop(smach.State):
 
     # wait on the lock
     self.dataStore.handCV.wait()
+    self.dataStore.handCV.release()
 
     # assume success at this point
     return 'success'
