@@ -11,11 +11,17 @@ class HandleGoal(smach.State):
     smach.State.__init__(self,
         outcomes=['success'],
         input_keys=['goal'],
-        output_keys=['wrist_angle']
+        output_keys=['wrist_angle', 'action_feedback']
     )
     self.dataStore = dataStore
 
   def execute(self, userData):
+    # set the feedback key. apparently this is needed?
+    # documentation would be nice, smach dudes
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = "Starting"
+    userData.action_feedback = fb
+
     # store the current goal in dataStore for safe keeping
     self.dataStore.currentActionGoal = userData.goal
 
@@ -29,13 +35,21 @@ class RotateWrist(smach.State):
   def __init__(self, dataStore):
     smach.State.__init__(self, 
         outcomes=['success', 'failure'],
-        input_keys=['wrist_angle']
+        input_keys=['wrist_angle'],
+        output_keys=['action_feedback']
     )
     # save a reference to the persistant data
     self.dataStore = dataStore
 
   def execute(self, userdata):
     # actually make things happen
+
+    # set the feedback key. apparently this is needed?
+    # documentation would be nice, smach dudes
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = "rotating wrist"
+    userdata.action_feedback = fb
+
 
     # acquire the condition variable for the wrist
     self.dataStore.wristCV.acquire()
@@ -57,7 +71,8 @@ class StartMovingArm(smach.State):
   # moving and just waits for the arm to get to a specific position
   def __init__(self, dataStore, minArmMovement=0.5):
     smach.State.__init__(self,
-        outcomes=['success', 'failure']
+        outcomes=['success', 'failure'],
+        output_keys=['action_feedback']
     )
     self.dataStore = dataStore
     # store how much movement counts as enough
@@ -65,6 +80,12 @@ class StartMovingArm(smach.State):
 
   def execute(self, userdata):
     # actually do stuff, mostly just wait for the arm to move.
+
+    # 
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = "start moving arm"
+    userdata.action_feedback = fb
+
     # get the lock first.
     self.dataStore.armCV.acquire()
     # request a delta of like 20 degrees of movement
@@ -81,7 +102,8 @@ class WaitForArmStop(smach.State):
   # once the arm is moving, wait for it to hit stuff.
   def __init__(self, dataStore, limit):
     smach.State.__init__(self,
-        outcomes=['success', 'failure']
+        outcomes=['success', 'failure'],
+        output_keys=['action_feedback']
     )
     self.dataStore = dataStore
     # limit is the torque limit we're waiting for
@@ -92,6 +114,12 @@ class WaitForArmStop(smach.State):
 
     # get the arm lock.
     self.dataStore.armCV.acquire()
+
+    # 
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = self.__class__.__name__
+    userdata.action_feedback = fb
+
 
     # tell the dataStore that we'd like to know about the arm's torque
     self.dataStore.NotifyOnArmTorque(self.limit)
@@ -108,7 +136,8 @@ class StartMovingHand(smach.State):
   # torque
   def __init__(self, dataStore, minHandMovement=0.02):
     smach.State.__init__(self,
-        outcomes=['success', 'failure']
+        outcomes=['success', 'failure'],
+        output_keys=['action_feedback']
     )
     self.dataStore = dataStore
     self.minHandMovement = minHandMovement
@@ -116,6 +145,11 @@ class StartMovingHand(smach.State):
   def execute(self, userdata):
     # get the hand lock
     self.dataStore.handCV.acquire()
+    # 
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = self.__class__.__name__
+    userdata.action_feedback = fb
+
 
     # as the dataStore to notify when the hand has moved a bit
     self.dataStore.NotifyOnHandDelta(self.minHandMovement)
@@ -130,7 +164,8 @@ class WaitForHandStop(smach.State):
   # when the hand is moving, wait for it to actually hit a torque limit
   def __init__(self, dataStore, limit):
     smach.State.__init__(self,
-        outcomes=['success', 'failure']
+        outcomes=['success', 'failure'],
+        output_keys=['action_feedback']
     )
     self.dataStore = dataStore
     # limit is the torque limit we're waiting for
@@ -139,6 +174,11 @@ class WaitForHandStop(smach.State):
   def execute(self, userdata):
     # get the hand lock
     self.dataStore.handCV.acquire()
+    # 
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = self.__class__.__name__
+    userdata.action_feedback = fb
+
 
     # ask for the hand torque limit notification
     self.dataStore.NotifyOnHandTorque(self.limit)
