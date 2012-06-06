@@ -6,10 +6,10 @@ wristJointController:
   joint_name: wristJoint
   joint_speed: 1.0
   motor:
-    id: 0
-    init: 512
-    min: 0
-    max: 512
+    id: 11
+    init: 68
+    min: 30
+    max: 409
 
 armJointController:
   controller:
@@ -19,10 +19,10 @@ armJointController:
   joint_name: armJoint
   joint_speed: 2.0
   motor:
-    id: 1
-    init: 0
+    id: 10
+    init: 1023
     min: 0
-    max: 0
+    max: 1023
 
 handJointController:
   controller:
@@ -32,7 +32,7 @@ handJointController:
   joint_name: handJoint
   joint_speed: 2.0
   motor:
-    id: 2
-    init: 0
-    min: 0
-    max: 0
+    id: 12
+    init: 500
+    min: 20
+    max: 600
