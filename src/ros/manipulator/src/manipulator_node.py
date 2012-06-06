@@ -7,14 +7,16 @@ import actionlib
 import smach
 import smach_ros
 
-import std_msgs
+from std_msgs.msg import Float64
 
 from dynamixel_msgs.msg import JointState
-import dynamixel_controllers
+from dynamixel_controllers.srv import SetSpeed, TorqueEnable, SetTorqueLimit
+from dynamixel_controllers.srv import SetCompliancePunch, SetComplianceMargin
+from dynamixel_controllers.srv import SetComplianceSlope
 
 from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, ManipulatorGrabResult
 
-from platform_motion.msg import SelectCarouselBinAction
+from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 
 import manipulator_states
 from manipulator_data import PersistantData
@@ -82,77 +84,77 @@ def main():
   # possibly do some error recovery.
   dataStore.wristSetSpeedService = rospy.ServiceProxy(
       'wristJointController/set_speed',
-      dynamixel_controllers.srv.SetSpeed
+      SetSpeed
   )
   dataStore.wristSetTorqueEnableService = rospy.ServiceProxy(
       'wristJointController/torque_enable',
-      dynamixel_controllers.srv.TorqueEnable
+      TorqueEnable
   )
   dataStore.wristSetComplianceSlopeService = rospy.ServiceProxy(
       'wristJointController/set_compliance_slope',
-      dynamixel_controllers.srv.SetComplianceSlope
+      SetComplianceSlope
   )
   dataStore.wristSetComplianceMarginService = rospy.ServiceProxy(
       'wristJointController/set_compliance_margin',
-      dynamixel_controllers.srv.SetComplianceMargin
+      SetComplianceMargin
   )
   dataStore.wristSetCompliancePunchService = rospy.ServiceProxy(
       'wristJointController/set_compliance_punch',
-      dynamixel_controllers.srv.SetCompliancePunch
+      SetCompliancePunch
   )
   dataStore.wristSetTorqueLimitService = rospy.ServiceProxy(
       'wristJointController/set_torque_limit',
-      dynamixel_controllers.srv.SetTorqueLimit
+      SetTorqueLimit
   )
 
   dataStore.armSetSpeedService = rospy.ServiceProxy(
       'armJointController/set_speed',
-      dynamixel_controllers.srv.SetSpeed
+      SetSpeed
   )
   dataStore.armSetTorqueEnableService = rospy.ServiceProxy(
       'armJointController/torque_enable',
-      dynamixel_controllers.srv.TorqueEnable
+      TorqueEnable
   )
   dataStore.armSetComplianceSlopeService = rospy.ServiceProxy(
       'armJointController/set_compliance_slope',
-      dynamixel_controllers.srv.SetComplianceSlope
+      SetComplianceSlope
   )
   dataStore.armSetComplianceMarginService = rospy.ServiceProxy(
       'armJointController/set_compliance_margin',
-      dynamixel_controllers.srv.SetComplianceMargin
+      SetComplianceMargin
   )
   dataStore.armSetCompliancePunchService = rospy.ServiceProxy(
       'armJointController/set_compliance_punch',
-      dynamixel_controllers.srv.SetCompliancePunch
+      SetCompliancePunch
   )
   dataStore.armSetTorqueLimitService = rospy.ServiceProxy(
       'armJointController/set_torque_limit',
-      dynamixel_controllers.srv.SetTorqueLimit
+      SetTorqueLimit
   )
 
   dataStore.handSetSpeedService = rospy.ServiceProxy(
       'handJointController/set_speed',
-      dynamixel_controllers.srv.SetSpeed
+      SetSpeed
   )
   dataStore.handSetTorqueEnableService = rospy.ServiceProxy(
       'handJointController/torque_enable',
-      dynamixel_controllers.srv.TorqueEnable
+      TorqueEnable
   )
   dataStore.handSetComplianceSlopeService = rospy.ServiceProxy(
       'handJointController/set_compliance_slope',
-      dynamixel_controllers.srv.SetComplianceSlope
+      SetComplianceSlope
   )
   dataStore.handSetComplianceMarginService = rospy.ServiceProxy(
       'handJointController/set_compliance_margin',
-      dynamixel_controllers.srv.SetComplianceMargin
+      SetComplianceMargin
   )
   dataStore.handSetCompliancePunchService = rospy.ServiceProxy(
       'handJointController/set_compliance_punch',
-      dynamixel_controllers.srv.SetCompliancePunch
+      SetCompliancePunch
   )
   dataStore.handSetTorqueLimitService = rospy.ServiceProxy(
       'handJointController/set_torque_limit',
-      dynamixel_controllers.srv.SetTorqueLimit
+      SetTorqueLimit
   )
 
   # set the dataStore as the subscriber to the joint state controller state
@@ -178,17 +180,17 @@ def main():
   # make publishers for the dataStore as well
   dataStore.wristPosPublisher = rospy.Publisher(
       'wristJointController/command',
-      std_msgs.float64
+      Float64
   )
 
   dataStore.armJointPosPublisher = rospy.Publisher(
       'armJointController/command',
-      std_msgs.float64
+      Float64
   )
 
   dataStore.handJointPosPublisher = rospy.Publisher(
       'handJointController/command',
-      std_msgs.float64
+      Float64
   )
 
   # start actually creating the state machine!
@@ -212,29 +214,33 @@ def main():
                        'failure':'ERROR'}
     )
 
+    ss_arm_down=SetSpeed()
+    ss_arm_down.data=dataStore.armDownSpeed
     smach.StateMachine.add(
       'SETUP_ARM_SPEED_DOWN',
       smach_ros.ServiceState('armJointController/set_speed',
-        dynamixel_controllers.srv.SetSpeed,
-        request = dynamixel_controllers.srv.SetSpeed(dataStore.armDownSpeed)),
+        SetSpeed,
+        request = ss_arm_down),
       transitions={'succeeded':'SETUP_ARM_TORQUE_DOWN'}
     )
 
+    tl_arm_down=SetTorqueLimit()
+    tl_arm_down.data=dataStore.armDownTorque
     smach.StateMachine.add(
       'SETUP_ARM_TORQUE_DOWN',
       smach_ros.ServiceState('armJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.armDownTorque)
-        ),
+        SetTorqueLimit,
+        request = tl_arm_down),
       transitions = {'succeeded':'SETUP_ARM_TORQUE_ENABLE_DOWN'}
     )
 
+    te_true = TorqueEnable()
+    te_true.data=True
     smach.StateMachine.add(
         'SETUP_ARM_TORQUE_ENABLE_DOWN',
         smach_ros.ServiceState('armJointController/set_torque_enable',
-          dynamixel_controllers.srv.SetTorqueEnable,
-          request = dynamixel_controllers.srv.SetTorqueEnable(True)),
+          TorqueEnable,
+          request = te_true),
         transitions = {'succeeded':'START_MOVING_ARM_DOWN'}
     )
 
@@ -252,31 +258,34 @@ def main():
                        'failure':'ERROR'}
     )
 
+    tl_arm_hold = SetTorqueLimit()
+    tl_arm_hold.data=dataStore.armHoldTorque
     smach.StateMachine.add(
       'SETUP_ARM_HOLD_DOWN',
       smach_ros.ServiceState('armJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.armHoldTorque)
+        SetTorqueLimit,
+        request = tl_arm_hold
         ),
       transitions = {'succeeded':'SETUP_HAND_SPEED_CLOSE'}
     )
 
+    ss_hand_close = SetSpeed()
+    ss_hand_close.data = dataStore.handCloseSpeed
     smach.StateMachine.add(
         'SETUP_HAND_SPEED_CLOSE',
       smach_ros.ServiceState('handJointController/set_speed',
-        dynamixel_controllers.srv.SetSpeed,
-        request = dynamixel_controllers.srv.SetSpeed(
-          dataStore.handCloseSpeed)),
+        SetSpeed,
+        request = ss_hand_close),
       transitions={'succeeded':'SETUP_HAND_TORQUE_CLOSE'}
     )
 
+    tl_hand_close = SetTorqueLimit()
+    tl_hand_close.data = dataStore.handCloseTorque
     smach.StateMachine.add(
       'SETUP_HAND_TORQUE_CLOSE',
       smach_ros.ServiceState('handJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.handCloseTorque)
+        SetTorqueLimit,
+        request = tl_hand_close
         ),
       transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_CLOSE'}
     )
@@ -284,12 +293,12 @@ def main():
     smach.StateMachine.add(
         'SETUP_HAND_TORQUE_ENABLE_CLOSE',
         smach_ros.ServiceState('handJointController/set_torque_enable',
-          dynamixel_controllers.srv.SetTorqueEnable,
-          request = dynamixel_controllers.srv.SetTorqueEnable(True)),
+          TorqueEnable,
+          request = te_true),
         transitions = {'succeeded':'START_MOVING_HAND_CLOSE'}
     )
 
-    smach.SateMachine.add(
+    smach.StateMachine.add(
         'START_MOVING_HAND_CLOSE',
         manipulator_states.StartMovingHand(dataStore),
         transitions = {'success':'WAIT_FOR_HAND_CLOSE',
@@ -304,30 +313,34 @@ def main():
                        'failure':'ERROR'}
     )
 
+    tl_hand_hold = SetTorqueLimit()
+    tl_hand_hold.data = dataStore.handHoldTorque
     smach.StateMachine.add(
       'SETUP_HAND_HOLD_CLOSE',
       smach_ros.ServiceState('handJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.handHoldTorque)
+        SetTorqueLimit,
+        request = tl_hand_hold
         ),
       transitions = {'succeeded':'SETUP_ARM_SPEED_UP'}
     )
 
+    ss_arm_up = SetSpeed()
+    ss_arm_up.data = dataStore.armUpSpeed
     smach.StateMachine.add(
       'SETUP_ARM_SPEED_UP',
       smach_ros.ServiceState('armJointController/set_speed',
-        dynamixel_controllers.srv.SetSpeed,
-        request = dynamixel_controllers.srv.SetSpeed(dataStore.armUpSpeed)),
+        SetSpeed,
+        request = ss_arm_up),
       transitions={'succeeded':'SETUP_ARM_TORQUE_UP'}
     )
 
+    tl_arm_up = SetTorqueLimit()
+    tl_arm_up.data = dataStore.armUpTorque
     smach.StateMachine.add(
       'SETUP_ARM_TORQUE_UP',
       smach_ros.ServiceState('armJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.armUpTorque)
+        SetTorqueLimit,
+        request = tl_arm_up
         ),
       transitions = {'succeeded':'SETUP_ARM_TORQUE_ENABLE_UP'}
     )
@@ -335,8 +348,8 @@ def main():
     smach.StateMachine.add(
         'SETUP_ARM_TORQUE_ENABLE_UP',
         smach_ros.ServiceState('armJointController/set_torque_enable',
-          dynamixel_controllers.srv.SetTorqueEnable,
-          request = dynamixel_controllers.srv.SetTorqueEnable(True)),
+          TorqueEnable,
+          request = te_true),
         transitions = {'succeeded':'START_MOVING_ARM_UP'}
     )
 
@@ -354,18 +367,19 @@ def main():
                        'failure':'ERROR'}
     )
 
+    tl_arm_hold = SetTorqueLimit()
+    tl_arm_hold.data = dataStore.armHoldTorque
     smach.StateMachine.add(
       'SETUP_ARM_HOLD_UP',
       smach_ros.ServiceState('armJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.armHoldTorque)
+        SetTorqueLimit,
+        request = tl_arm_hold
         ),
       transitions = {'succeeded':'GET_BIN'}
     )
 
     # XXX TODO: use a different way to get a bin!
-    carouselBin = SelectCarouselBinAction()
+    carouselBin = SelectCarouselBinGoal()
     carouselBin.bin_index = 5
     smach.StateMachine.add(
         'GET_BIN',
@@ -375,34 +389,37 @@ def main():
         transitions = {'succeeded':'SETUP_HAND_SPEED_OPEN'}
     )
 
+    ss_hand_open = SetSpeed()
+    ss_hand_open = dataStore.handOpenSpeed
     smach.StateMachine.add(
         'SETUP_HAND_SPEED_OPEN',
       smach_ros.ServiceState('handJointController/set_speed',
-        dynamixel_controllers.srv.SetSpeed,
-        request = dynamixel_controllers.srv.SetSpeed(
-          dataStore.handOpenSpeed)),
+        SetSpeed,
+        request = ss_hand_open),
       transitions={'succeeded':'SETUP_HAND_TORQUE_OPEN'}
     )
 
+    tl_hand_open = SetTorqueLimit()
+    tl_hand_open.data = dataStore.handOpenTorque
     smach.StateMachine.add(
       'SETUP_HAND_TORQUE_OPEN',
       smach_ros.ServiceState('handJointController/set_torque_limit',
-        dynamixel_controllers.srv.SetTorqueLimit,
-        request = dyamixel_controllers.srv.SetTorqueLimit(
-          dataStore.handOpenTorque)
+        SetTorqueLimit,
+        request = tl_hand_open
         ),
       transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_OPEN'}
     )
 
+    
     smach.StateMachine.add(
         'SETUP_HAND_TORQUE_ENABLE_OPEN',
         smach_ros.ServiceState('handJointController/set_torque_enable',
-          dynamixel_controllers.srv.SetTorqueEnable,
-          request = dynamixel_controllers.srv.SetTorqueEnable(True)),
+          TorqueEnable,
+          request = te_true),
         transitions = {'succeeded':'START_MOVING_HAND_OPEN'}
     )
 
-    smach.SateMachine.add(
+    smach.StateMachine.add(
         'START_MOVING_HAND_OPEN',
         manipulator_states.StartMovingHand(dataStore),
         transitions = {'success':'WAIT_FOR_HAND_OPEN',
@@ -418,16 +435,18 @@ def main():
     )
 
     # disable hand torque enable after the hand has opened
+    te_false = TorqueEnable()
+    te_false.data = False
     smach.StateMachine.add(
         'SETUP_HAND_LIMP',
         smach_ros.ServiceState('handJointController/set_torque_enable',
-          dynamixel_controllers.srv.SetTorqueEnable,
-          request = dynamixel_controllers.srv.SetTorqueEnable(False)),
+          TorqueEnable,
+          request = te_false),
         transitions = {'succeeded':'CLEAR_CAROUSEL'}
     )
 
     # XXX TODO: use a different way to get a bin!
-    carouselBin = SelectCarouselBinAction()
+    carouselBin = SelectCarouselBinGoal()
     carouselBin.bin_index = 0
     smach.StateMachine.add(
         'CLEAR_CAROUSEL',
@@ -442,8 +461,8 @@ def main():
     smach.StateMachine.add(
         'SETUP_ARM_LIMP',
         smach_ros.ServiceState('armJointController/set_torque_enable',
-          dynamixel_controllers.srv.SetTorqueEnable,
-          request = dynamixel_controllers.srv.SetTorqueEnable(False)),
+          TorqueEnable,
+          request = te_false),
         transitions = {'succeeded':'success'}
     )
 
