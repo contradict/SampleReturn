@@ -389,9 +389,9 @@ def main():
     
     smach.StateMachine.add(
         'SETUP_HAND_TORQUE_ENABLE_OPEN',
-        smach_ros.ServiceState('handJointController/set_torque_enable',
+        smach_ros.ServiceState('handJointController/torque_enable',
           TorqueEnable,
-          request = te_true),
+          request = TorqueEnableRequest(True)),
         transitions = {'succeeded':'START_MOVING_HAND_OPEN'}
     )
 
@@ -411,13 +411,11 @@ def main():
     )
 
     # disable hand torque enable after the hand has opened
-    te_false = TorqueEnable()
-    te_false.data = False
     smach.StateMachine.add(
         'SETUP_HAND_LIMP',
-        smach_ros.ServiceState('handJointController/set_torque_enable',
+        smach_ros.ServiceState('handJointController/torque_enable',
           TorqueEnable,
-          request = te_false),
+          request = TorqueEnableRequest(False)),
         transitions = {'succeeded':'CLEAR_CAROUSEL'}
     )
 
@@ -436,9 +434,9 @@ def main():
     # clear
     smach.StateMachine.add(
         'SETUP_ARM_LIMP',
-        smach_ros.ServiceState('armJointController/set_torque_enable',
+        smach_ros.ServiceState('armJointController/torque_enable',
           TorqueEnable,
-          request = te_false),
+          request = TorqueEnableRequest(False)),
         transitions = {'succeeded':'success'}
     )
 
