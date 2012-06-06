@@ -85,7 +85,11 @@ class PersistantData:
         self.armCV.release()
 
     elif self.armTorqueGoal != None:
-      if (not data.is_moving) and (abs(data.load - self.armTorqueGoal) <= 0.05):
+      delta = abs(data.load - self.armTorqueGoal)
+      print "load: %f goal: %f delta: %f"%(
+                data.load, self.armTorqueGoal, delta)
+      print "velocity : ", data.velocity
+      if ( abs(data.velocity) < 0.05 ) and (delta <= 0.05):
         # if we get really close to the desired arm torque, call it good enough
         # and notify.
         self.armCV.acquire()
