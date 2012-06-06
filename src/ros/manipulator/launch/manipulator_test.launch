@@ -49,17 +49,17 @@
       wrist_speed: 1.0
       wrist_torque: 0.5
 
-      arm_down_speed: 1.0
-      arm_down_torque: 0.5
-      arm_up_speed: -1.0
-      arm_up_torque: 0.5
+      arm_down_speed: -2.0
+      arm_down_torque: -0.25
+      arm_up_speed: 1.5
+      arm_up_torque: 0.4
       arm_hold_torque: 0.1
 
       hand_min_pos: 0.35
       hand_max_pos: 3.1
-      hand_close_speed: -1.0
-      hand_open_speed: 1.0
-      hand_close_torque: 0.8
+      hand_close_speed: -2.0
+      hand_open_speed: 2.0
+      hand_close_torque: -0.4
       hand_open_torque: 0.5
       hand_hold_torque: 0.1
     </rosparam>
