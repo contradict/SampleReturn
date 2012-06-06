@@ -27,28 +27,28 @@ def main():
   dataStore = PersistantData()
 
   # get a boatload of parameters from the param server
-  dataStore.wristMinPos = rospy.get_param('wrist_min_pos')
-  dataStore.wristMaxPos = rospy.get_param('wrist_max_pos')
-  dataStore.wristSpeed = rospy.get_param('wrist_speed', 1.0)
-  dataStore.wristTorque = rospy.get_param('wrist_torque', 0.5)
+  dataStore.wristMinPos = rospy.get_param('manipulator/wrist_min_pos')
+  dataStore.wristMaxPos = rospy.get_param('manipulator/wrist_max_pos')
+  dataStore.wristSpeed = rospy.get_param('manipulator/wrist_speed', 1.0)
+  dataStore.wristTorque = rospy.get_param('manipulator/wrist_torque', 0.5)
 
-  dataStore.armDownSpeed = rospy.get_param('arm_down_speed', 1.0)
-  dataStore.armDownTorque = rospy.get_param('arm_down_torque', 0.8)
-  dataStore.armUpSpeed = rospy.get_param('arm_up_speed', 1.0)
-  dataStore.armUpTorque = rospy.get_param('arm_up_torque', 0.5)
-  dataStore.armHoldTorque = rospy.get_param('arm_hold_torque',
+  dataStore.armDownSpeed = rospy.get_param('manipulator/arm_down_speed', 1.0)
+  dataStore.armDownTorque = rospy.get_param('manipulator/arm_down_torque', 0.8)
+  dataStore.armUpSpeed = rospy.get_param('manipulator/arm_up_speed', 1.0)
+  dataStore.armUpTorque = rospy.get_param('manipulator/arm_up_torque', 0.5)
+  dataStore.armHoldTorque = rospy.get_param('manipulator/arm_hold_torque',
       dataStore.armUpTorque
   )
 
-  dataStore.handMinPos = rospy.get_param('hand_min_pos')
-  dataStore.handMaxPos = rospy.get_param('hand_max_pos')
-  dataStore.handCloseSpeed = rospy.get_param('hand_close_speed', 1.0)
-  dataStore.handOpenSpeed = rospy.get_param('hand_open_speed',
+  dataStore.handMinPos = rospy.get_param('manipulator/hand_min_pos')
+  dataStore.handMaxPos = rospy.get_param('manipulator/hand_max_pos')
+  dataStore.handCloseSpeed = rospy.get_param('manipulator/hand_close_speed', 1.0)
+  dataStore.handOpenSpeed = rospy.get_param('manipulator/hand_open_speed',
       dataStore.handCloseSpeed
   )
-  dataStore.handCloseTorque = rospy.get_param('hand_close_torque', 0.8)
-  dataStore.handOpenTorque = rospy.get_param('hand_open_torque', 0.5)
-  dataStore.handHoldTorque = rospy.get_param('hand_hold_torque',
+  dataStore.handCloseTorque = rospy.get_param('manipulator/hand_close_torque', 0.8)
+  dataStore.handOpenTorque = rospy.get_param('manipulator/hand_open_torque', 0.5)
+  dataStore.handHoldTorque = rospy.get_param('manipulator/hand_hold_torque',
       dataStore.handOpenTorque
   )
 
