@@ -283,20 +283,16 @@ def main():
         smach_ros.ServiceState('handJointController/torque_enable',
           TorqueEnable,
           request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'START_MOVING_HAND_CLOSE'}
+        transitions = {'succeeded':'CLOSE_HAND'}
     )
 
     smach.StateMachine.add(
-        'START_MOVING_HAND_CLOSE',
-        manipulator_states.StartMovingHand(dataStore),
-        transitions = {'success':'WAIT_FOR_HAND_CLOSE',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-        'WAIT_FOR_HAND_CLOSE',
-        manipulator_states.WaitForHandStop(dataStore,
-          dataStore.handCloseTorque),
+        'CLOSE_HAND',
+        manipulator_states.MoveHand(
+          dataStore,
+          dataStore.handMinPos,
+          dataStore.handCloseTorque
+        ),
         transitions = {'success':'SETUP_HAND_HOLD_CLOSE',
                        'failure':'ERROR'}
     )
@@ -386,26 +382,21 @@ def main():
       transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_OPEN'}
     )
 
-    
     smach.StateMachine.add(
         'SETUP_HAND_TORQUE_ENABLE_OPEN',
         smach_ros.ServiceState('handJointController/torque_enable',
           TorqueEnable,
           request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'START_MOVING_HAND_OPEN'}
+        transitions = {'succeeded':'OPEN_HAND'}
     )
 
     smach.StateMachine.add(
-        'START_MOVING_HAND_OPEN',
-        manipulator_states.StartMovingHand(dataStore),
-        transitions = {'success':'WAIT_FOR_HAND_OPEN',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-        'WAIT_FOR_HAND_OPEN',
-        manipulator_states.WaitForHandStop(dataStore,
-          dataStore.handOpenTorque),
+        'OPEN_HAND',
+        manipulator_states.MoveHand(
+          dataStore,
+          dataStore.handMaxPos,
+          dataStore.handOpenTorque
+        ),
         transitions = {'success':'SETUP_HAND_LIMP',
                        'failure':'ERROR'}
     )
