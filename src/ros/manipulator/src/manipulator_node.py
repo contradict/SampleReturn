@@ -208,6 +208,42 @@ def main():
     smach.StateMachine.add(
         'ROTATE_WRIST',
         manipulator_states.RotateWrist(dataStore),
+        transitions = {'success':'SETUP_HAND_SPEED_OPEN_INIT',
+                       'failure':'ERROR'}
+    )
+
+    smach.StateMachine.add(
+        'SETUP_HAND_SPEED_OPEN_INIT',
+      smach_ros.ServiceState('handJointController/set_speed',
+        SetSpeed,
+        request = SetSpeedRequest( dataStore.handOpenSpeed ) ),
+      transitions={'succeeded':'SETUP_HAND_TORQUE_OPEN_INIT'}
+    )
+
+    smach.StateMachine.add(
+      'SETUP_HAND_TORQUE_OPEN_INIT',
+      smach_ros.ServiceState('handJointController/set_torque_limit',
+        SetTorqueLimit,
+        request = SetTorqueLimitRequest( abs(dataStore.handOpenTorque) )
+        ),
+      transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_OPEN_INIT'}
+    )
+
+    smach.StateMachine.add(
+        'SETUP_HAND_TORQUE_ENABLE_OPEN_INIT',
+        smach_ros.ServiceState('handJointController/torque_enable',
+          TorqueEnable,
+          request = TorqueEnableRequest(True)),
+        transitions = {'succeeded':'OPEN_HAND_INIT'}
+    )
+
+    smach.StateMachine.add(
+        'OPEN_HAND_INIT',
+        manipulator_states.MoveHand(
+          dataStore,
+          dataStore.handMaxPos,
+          dataStore.handOpenTorque
+        ),
         transitions = {'success':'SETUP_ARM_SPEED_DOWN',
                        'failure':'ERROR'}
     )
