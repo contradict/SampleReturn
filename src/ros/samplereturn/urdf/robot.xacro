@@ -23,7 +23,7 @@
         <color rgba="0.1 0.8 0.2 1.0"/>
     </material>
     <xacro:macro name="wheel_module" params="name position">
-        <joint name="${name}_suspension_joint" type="revolute">
+        <joint name="${name}_steering_joint" type="revolute">
             <axis xyz="0 0 1"/>
             <limit upper="1.57" lower="-1.57" effort="100" velocity="3.14"/>
             <parent link="body_triangle"/>
