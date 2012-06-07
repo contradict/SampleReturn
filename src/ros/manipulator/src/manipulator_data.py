@@ -20,6 +20,7 @@ class PersistantData:
     self.currentArmState = None
 
     self.handCV = threading.Condition()
+    self.handPosDeltaGoal = None
     self.handPosGoal = None
     self.handTorqueGoal = None
     self.currentHandState = None
@@ -100,9 +101,15 @@ class PersistantData:
     # store the arm position
     self.currentArmState = data
 
+  def SetHandPos(self, pos):
+    # sets the hand pos. yay
+    self.handPosGoal = pos
+
+    self.handJointPosPublisher.publish(self.handPosGoal)
+
   def NotifyOnHandDelta(self, delta):
     # notifies the caller via self.handCV when the hand has moved delta or more
-    self.handPosGoal = delta
+    self.handPosDeltaGoal = delta
     if self.currentHandState != None:
       self.handPosAtGoalStart = self.currentHandState.current_pos
     else:
@@ -116,19 +123,30 @@ class PersistantData:
   def HandJointCallback(self, data):
     # listen to the state of the hand joint and notify listeners as needed
     if self.handPosGoal != None:
-      if self.handPosAtGoalStart == None:
-        self.handPosAtGoalStart = data.current_pos
-      elif abs(self.handPosAtGoalStart - data.current_pos) >= self.handPosGoal:
-        # the hand has moved enough to count as having moved!
+      print 'hand pos: %s' %(str(data.current_pos))
+      if abs(self.handPosGoal - data.current_pos) <= 0.02:
         self.handCV.acquire()
         self.handPosGoal = None
+        self.handTorqueGoal = None
         self.handCV.notifyAll()
         self.handCV.release()
 
-    elif self.handTorqueGoal != None:
+    if self.handPosDeltaGoal != None:
+      if self.handPosAtGoalStart == None:
+        self.handPosAtGoalStart = data.current_pos
+      elif abs(self.handPosAtGoalStart - data.current_pos) >= self.handPosDeltaGoal:
+        # the hand has moved enough to count as having moved!
+        self.handCV.acquire()
+        self.handPosDeltaGoal = None
+        self.handCV.notifyAll()
+        self.handCV.release()
+
+    if self.handTorqueGoal != None:
+      print '\thand torque: %s' %(str(data.load))
       if (not data.is_moving) and (abs(data.load - self.handTorqueGoal) <= 0.05):
         # acquire the lock and notify all
         self.handCV.acquire()
+        self.handPosGoal = None
         self.handTorqueGoal = None
         self.handCV.notifyAll()
         self.handCV.release()
