@@ -133,6 +133,43 @@ class WaitForArmStop(smach.State):
     # for now, assume success always actually happens
     return 'success'
 
+class MoveHand(smach.State):
+  def __init__(self, dataStore, pos, torqueLimit):
+    smach.State.__init__(self, 
+        outcomes=['success', 'failure'],
+        output_keys=['action_feedback']
+    )
+    # save a reference to the persistant data
+    self.dataStore = dataStore
+
+    self.pos = pos
+    self.torqueLimit = torqueLimit
+
+  def execute(self, userdata):
+    # actually make things happen
+
+    # set the feedback key. apparently this is needed?
+    # documentation would be nice, smach dudes
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = "moving hand"
+    userdata.action_feedback = fb
+
+
+    # acquire the condition variable for the wrist
+    self.dataStore.handCV.acquire()
+
+    # ask the dataStore to make the wrist angle correct
+    self.dataStore.SetHandPos(self.pos)
+    self.dataStore.NotifyOnHandTorque(self.torqueLimit)
+
+    # wait until the wrist gets to the right place.
+    self.dataStore.handCV.wait()
+    self.dataStore.handCV.release()
+
+    # failure is not an option! well, ok it is an option, but that option
+    # is like never taken...
+    return 'success'
+
 class StartMovingHand(smach.State):
   # when the hand starts closing, wait for it to move before watching for
   # torque
