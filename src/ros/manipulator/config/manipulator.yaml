@@ -27,12 +27,12 @@ armJointController:
 handJointController:
   controller:
     package: dynamixel_controllers
-    module: joint_torque_controller
-    type: JointTorqueController
+    module: joint_position_controller
+    type: JointPositionController
   joint_name: handJoint
   joint_speed: 2.0
   motor:
     id: 12
-    init: 500
-    min: 0
-    max: 0
+    init: 0
+    min: 68
+    max: 650
