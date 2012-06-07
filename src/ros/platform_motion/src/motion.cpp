@@ -199,13 +199,14 @@ bool Motion::openBus(void)
         gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                 static_cast<CANOpen::CopleyServo::InputChangeCallback::CallbackFunction>(&Motion::gpioCallback));
 
-    carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
-            CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
-    carousel->setInputCallback(gpiocb);
-
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
                           
+    carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
+            CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
+    carousel->setInputCallback(gpiocb);
+    carousel->setPVCallback(pvcb);
+
     port = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  port_steering_id,
