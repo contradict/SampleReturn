@@ -420,6 +420,7 @@ bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
 {
     if( pods_enabled == req.state)
         return true;
+    desired_pod_state = req.state;
     enable_pods_count=6;
     boost::system_time now=boost::get_system_time();
     boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
@@ -456,7 +457,6 @@ void Motion::enable_pods(bool state)
     CANOpen::DS301CallbackObject
         ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::podEnableStateChange));
-    desired_pod_state = state;
     port->enable(state, ecb);
     starboard->enable(state, ecb);
     stern->enable(state, ecb);
@@ -467,6 +467,7 @@ bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
 {
     if(carousel_enabled == req.state)
         return true;
+    desired_carousel_state = req.state;
     boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
     bool notified=false;
     boost::system_time now=boost::get_system_time();
