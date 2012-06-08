@@ -122,6 +122,4 @@
         <param name="rot" type="string" value="pi/2"/>
     </node>
 
-    <!-- DSLR Camera Service Server --> 
-    <node machine="search" pkg="photo" type="photo_node" name="photo_node"/>
 </launch>
