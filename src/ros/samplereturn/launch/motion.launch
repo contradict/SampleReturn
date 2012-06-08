@@ -3,7 +3,14 @@
 <launch>
 
   <!-- platform node -->
-  <node machine="navigate" pkg="platform_motion" type="motion_node" name="motion" output="log">
+  <node
+      machine="navigate"
+      pkg="platform_motion"
+      type="motion_node"
+      name="motion"
+      output="log"
+      >
+      <!--launch-prefix="xterm -e gdb -ex run - -args"-->
       <param name="port_steering_offset" type="double" value="0.155"/>
       <param name="starboard_steering_offset" type="double" value="-0.20106"/>
       <param name="stern_steering_offset" type="double" value="-0.15708"/>

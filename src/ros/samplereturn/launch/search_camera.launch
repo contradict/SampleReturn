@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <!-- DSLR Camera Service Server --> 
+    <node machine="search" pkg="photo" type="photo_node" name="photo_node"/>
+</launch>
