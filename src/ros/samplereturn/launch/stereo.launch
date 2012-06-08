@@ -245,7 +245,7 @@
 
   <!-- Run the costmap node -->
   <node name="costmap_node" pkg="costmap_2d" type="costmap_2d_node" output="log">
-    <rosparam file="$(find samplereturn)/launch/example_params.yaml" command="load" ns="costmap" />
+    <rosparam file="$(find samplereturn)/config/costmap_params.yaml" command="load" ns="costmap" />
   </node>
 
   <!-- Run the tf broadcaster and fake odometry -->

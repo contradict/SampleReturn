@@ -5,7 +5,7 @@
     <!-- Run the costmap node -->
     <node machine="navigate" name="costmap_node" pkg="costmap_2d" type="costmap_2d_node"
         ns="navigation">
-        <rosparam file="$(find samplereturn)/launch/example_params.yaml" command="load" ns="costmap" />
+        <rosparam file="$(find samplereturn)/config/costmap_params.yaml" command="load" ns="costmap" />
     </node>
 
     <!-- Publishes the voxel grid to rviz for display -->
