@@ -35,6 +35,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         ros::NodeHandle nh_;
 
+        tf::TransformListener listener;
+        std::string child_frame_id;
+
         ros::Subscriber twist_sub;
         ros::Subscriber carousel_sub;
         ros::Subscriber gpio_sub;

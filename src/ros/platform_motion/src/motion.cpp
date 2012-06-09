@@ -15,6 +15,7 @@
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/JointState.h>
 #include <dynamic_reconfigure/server.h>
+#include <tf/transform_listener.h>
 
 #include <canlib.h>
 #include <CANOpen.h>
@@ -48,17 +49,13 @@ Motion::Motion() :
 {
 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
+    nh_.param<std::string>("child_frame_id", child_frame_id, "base_link");
 
-    nh_.param("robot_width", width, 1.3);
-    nh_.param("robot_length", length, 1.125);
-    nh_.param("center_pt_x", center_pt_x, 1.125);
+    nh_.param("center_pt_x", center_pt_x, 0.0);
     nh_.param("center_pt_y", center_pt_y, 0.0);
 
     nh_.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
 
-    port_pos << length, width/2;
-    starboard_pos << length, -width/2;
-    stern_pos << 0, 0;
     body_pt << center_pt_x, center_pt_y;
     enable_pods_server = nh_.advertiseService("enable_wheel_pods",
             &Motion::enableWheelPodsCallback, this);
@@ -283,8 +280,18 @@ void Motion::start(void)
     home_pods_action_server.start();
     ROS_INFO("Start home carousel server");
     home_carousel_action_server.start();
+    ROS_INFO("Waiting for transforms");
+    ros::Time current = ros::Time(0);
+    ros::Duration wait(1.0);
+    while( !(
+             listener.waitForTransform(child_frame_id, std::string("port_suspension"), current, wait) && 
+             listener.waitForTransform(child_frame_id, std::string("starboard_suspension"), current, wait) &&
+             listener.waitForTransform(child_frame_id, std::string("stern_suspension"), current, wait)
+            )
+         )
+        ROS_INFO("Still Waiting for transforms");
+    ROS_INFO("Got all transforms");
 }
-
 
 void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
@@ -293,6 +300,37 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
     double body_omega = twist->angular.z;
     Eigen::Vector2d center_pos;
     double kappa, phi;
+    double v_stern, v_starboard, v_port;
+    double angle_stern, angle_starboard, angle_port;
+
+    ros::Time current(0);
+    tf::StampedTransform port_tf, starboard_tf, stern_tf;
+
+    Eigen::Vector2d starboard_pos, port_pos, stern_pos;
+    try {
+        listener.lookupTransform(child_frame_id, "port_suspension", current, port_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up port_suspension: %s", ex.what());
+        return;
+    }
+    port_pos = Eigen::Vector2d(port_tf.getOrigin().x(), port_tf.getOrigin().y());
+
+    try {
+        listener.lookupTransform(child_frame_id, "starboard_suspension", current, starboard_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up starboard_suspension: %s", ex.what());
+        return;
+    }
+    stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
+
+    try {
+        listener.lookupTransform(child_frame_id, "stern_suspension", current, stern_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up stern_suspension: %s", ex.what());
+        return;
+    }
+    starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
+
     if(fabs(body_omega)>0) {
         if(body_speed>0) {
             Eigen::Vector2d center_dir;
@@ -316,11 +354,11 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
         v_stern = v_starboard = v_port = body_speed/M_PI/wheel_diameter;
     }
     angle_stern = phi-M_PI_2;
-    angle_port = M_PI_2 - atan2( sin(phi) - kappa*width/2,
-                                      kappa*length - cos(phi)
+    angle_port = M_PI_2 - atan2( sin(phi) - kappa*(port_pos(1)-body_pt(1))/2,
+                                      kappa*(port_pos(0)-body_pt(0)) - cos(phi)
                                     );
-    angle_starboard = M_PI_2 - atan2( sin(phi) + kappa*width/2,
-                                 kappa*length - cos(phi)
+    angle_starboard = M_PI_2 - atan2( sin(phi) + kappa*(port_pos(1)-body_pt(1))/2,
+                                 kappa*(port_pos(0)-body_pt(0)) - cos(phi)
                                );
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     port->drive(angle_port, v_port);
