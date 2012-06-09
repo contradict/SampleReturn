@@ -75,13 +75,13 @@ def print_details(
         dir = 'above'
     print "%3.1fm at %d pixels %s center"%(D, abs(Y_D), dir)
     print "At %3.1fm, 1 vertical pixel is %7.4fm on the ground"%(D,
-        (-1.0*pw)*dDdyi(Y_D*pw, h, f, psi))
+        (-1.0*pw)*dDsqdyi(Y_D*pw, h, f, psi))
     top_row = max(Y_D, -Ny/2)
     yi_r = linspace(top_row, Ny/2, Ny/2-top_row + 1)
     fig = pylab.figure(1)
     fig.clf()
     ax1 = fig.add_subplot(311)
-    ax1.plot(yi_r, -dDdyi(yi_r*pw, h, f, psi)*pw)
+    ax1.plot(yi_r, -dDsqdyi(yi_r*pw, h, f, psi)*pw)
     ax1.set_ylabel('distance per pixel\non ground')
     ax1.set_ylim((0,1.0))
     ax2 = fig.add_subplot(312, sharex=ax1)
@@ -107,6 +107,6 @@ def disparity_calcs(f=0.0045, B=0.3):
         print " %3dpx        %5.2fm"%(d,f*B/d/pw)
 
 # Current best guess
-disparity_calcs(B=0.3)
-print_details(f=0.0045, h=1.45, rotate=True)
+disparity_calcs(f=0.0035, B=0.3)
+print_details(f=0.0035, h=1.45, rotate=False)
 
