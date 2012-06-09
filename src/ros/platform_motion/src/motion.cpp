@@ -496,12 +496,12 @@ void Motion::pvCallback(CANOpen::DS301 &node)
         double port_wheel_velocity, starboard_wheel_velocity,
                stern_wheel_velocity;
 
-        port->getPosition(port_steering, port_steering_velocity,
-                port_wheel, port_wheel_velocity);
-        starboard->getPosition(starboard_steering, starboard_steering_velocity,
-                starboard_wheel, starboard_wheel_velocity);
-        stern->getPosition(stern_steering, stern_steering_velocity,
-                stern_wheel, stern_wheel_velocity);
+        port->getPosition(&port_steering, &port_steering_velocity,
+                &port_wheel, &port_wheel_velocity);
+        starboard->getPosition(&starboard_steering, &starboard_steering_velocity,
+                &starboard_wheel, &starboard_wheel_velocity);
+        stern->getPosition(&stern_steering, &stern_steering_velocity,
+                &stern_wheel, &stern_wheel_velocity);
 
         starboard_wheel *= -1;
         starboard_wheel_velocity *= -1;

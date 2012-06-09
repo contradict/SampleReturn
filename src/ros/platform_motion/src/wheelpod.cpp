@@ -100,18 +100,22 @@ void WheelPod::initialize(void)
     wheel.initialize();
 }
 
-void WheelPod::getPosition(double &steering_pos, double &steering_vel, double &wheel_pos, double &wheel_vel)
+void WheelPod::getPosition(double *steering_pos, double *steering_vel, double *wheel_pos, double *wheel_vel)
 {
-    steering_pos =
-        ((double)steering.position)/((double)steering_encoder_counts)*2*M_PI +
-        steering_offset;
-    steering_vel =
-        ((double)steering.velocity)/((double)steering_encoder_counts)*2*M_PI/10.;
+    if(steering_pos)
+        *steering_pos =
+            ((double)steering.position)/((double)steering_encoder_counts)*2*M_PI +
+            steering_offset;
+    if(steering_vel)
+        *steering_vel =
+            ((double)steering.velocity)/((double)steering_encoder_counts)*2*M_PI/10.;
 
-    wheel_pos =
-        ((double)wheel.position)/((double)wheel_encoder_counts);
-    wheel_vel =
-        ((double)wheel.velocity)/((double)wheel_encoder_counts)/10.;
+    if(wheel_pos)
+        *wheel_pos =
+            ((double)wheel.position)/((double)wheel_encoder_counts);
+    if(wheel_vel)
+        *wheel_vel =
+            ((double)wheel.velocity)/((double)wheel_encoder_counts)/10.;
 
 }
 
