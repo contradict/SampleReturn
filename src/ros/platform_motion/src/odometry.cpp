@@ -284,9 +284,9 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             ROS_ERROR("Error looking up starboard_suspension: %s", ex.what());
             return;
         }
-        data.stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
-        data.stern_delta = stern_delta*stern_wheel_direction;
-        data.stern_vel = stern_wheel_velocity;
+        data.starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
+        data.starboard_delta = starboard_delta*starboard_wheel_direction;
+        data.starboard_vel = starboard_wheel_velocity;
 
         try {
             listener.lookupTransform(child_frame_id, "stern_suspension", current, stern_tf );
@@ -294,9 +294,9 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             ROS_ERROR("Error looking up stern_suspension: %s", ex.what());
             return;
         }
-        data.starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
-        data.starboard_delta = starboard_delta*starboard_wheel_direction;
-        data.starboard_vel = starboard_wheel_velocity;
+        data.stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
+        data.stern_delta = stern_delta*stern_wheel_direction;
+        data.stern_vel = stern_wheel_velocity;
 
         double xytheta[3] = {0.0, 0.0, 0.0};
         lm_status_struct status;

@@ -16,6 +16,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void createServos(void);
 
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
+                const char *joint_name, double *steering, double *speed);
         void carouselCallback(const std_msgs::Float64::ConstPtr fmsg);
         void gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio);
         void doHomePods(void);
@@ -70,8 +72,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         double wheel_diameter;
 
-        double width, length;
         double center_pt_x, center_pt_y;
+        double min_wheel_speed;
 
         int carousel_encoder_counts;
         double carousel_jerk_limit;
