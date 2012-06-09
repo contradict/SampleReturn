@@ -46,46 +46,15 @@ Motion::Motion() :
     pv_counter(0),
     joint_seq(0)
 {
-    nh_.param("port_steering_id", port_steering_id, 4);
-    nh_.param("port_wheel_id", port_wheel_id, 2);
-    nh_.param("port_steering_min", port_steering_min, -M_PI_2);
-    nh_.param("port_steering_max", port_steering_max,  M_PI_2);
-    nh_.param("port_steering_offset", port_steering_offset,  0.0);
 
-    nh_.param("starboard_steering_id", starboard_steering_id, 7);
-    nh_.param("starboard_wheel_id", starboard_wheel_id, 6);
-    nh_.param("starboard_steering_min", starboard_steering_min, -M_PI_2);
-    nh_.param("starboard_steering_max", starboard_steering_max,  M_PI_2);
-    nh_.param("starboard_steering_offset", starboard_steering_offset,  0.0);
-
-    nh_.param("stern_steering_id", stern_steering_id, 3);
-    nh_.param("stern_wheel_id", stern_wheel_id, 5);
-    nh_.param("stern_steering_min", stern_steering_min, -M_PI_2);
-    nh_.param("stern_steering_max", stern_steering_max,  M_PI_2);
-    nh_.param("stern_steering_offset", stern_steering_offset,  0.0);
-
-    nh_.param("carousel_id", carousel_id, 1);
-    nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
-    nh_.param("carousel_offset", carousel_offset, 0.0);
-    nh_.param("sync_interval", sync_interval, 50000);
-    nh_.param("carousel_jerk_limit", carousel_jerk_limit, 5.0); // rev/s^3
-    nh_.param("carousel_profile_velocity", carousel_profile_velocity, 0.25); // rev/s
-    nh_.param("carousel_profile_acceleration", carousel_profile_acceleration, 0.3); // rev/s^2
- 
     nh_.param("wheel_diameter", wheel_diameter, 0.330);
-    nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
-    nh_.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
-    nh_.param("large_steering_move", large_steering_move, 30);
 
     nh_.param("robot_width", width, 1.3);
     nh_.param("robot_length", length, 1.125);
     nh_.param("center_pt_x", center_pt_x, 1.125);
     nh_.param("center_pt_y", center_pt_y, 0.0);
 
-    nh_.param("CAN_channel", CAN_channel, 0);
-    nh_.param("CAN_baud", CAN_baud, 1000000);
-
-    nh_.param("enable_wait_timeout_ms", enable_wait_timeout, 150);
+    nh_.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
 
     port_pos << length, width/2;
     starboard_pos << length, -width/2;
@@ -117,6 +86,11 @@ Motion::Motion() :
 
 bool Motion::openBus(void)
 {
+    int CAN_channel, CAN_baud;
+ 
+    nh_.param("CAN_channel", CAN_channel, 0);
+    nh_.param("CAN_baud", CAN_baud, 1000000);
+
     std::tr1::shared_ptr<CANOpen::KvaserInterface> pintf(new CANOpen::KvaserInterface(
                                                 CAN_channel,
                                                 CAN_baud
@@ -139,6 +113,22 @@ bool Motion::openBus(void)
 
     pbus->add(psync);
 
+    return true;
+}
+
+void Motion::createServos()
+{
+    int port_steering_id, port_wheel_id;
+    double port_steering_min, port_steering_max, port_steering_offset;
+    int starboard_steering_id, starboard_wheel_id;
+    double starboard_steering_min, starboard_steering_max, starboard_steering_offset;
+    int stern_steering_id, stern_wheel_id;
+    double stern_steering_min, stern_steering_max, stern_steering_offset;
+    int carousel_id;
+    int sync_interval;
+    int steering_encoder_counts, wheel_encoder_counts;
+    int large_steering_move;
+
     CANOpen::CopleyServo::InputChangeCallback
         gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                 static_cast<CANOpen::CopleyServo::InputChangeCallback::CallbackFunction>(&Motion::gpioCallback));
@@ -146,11 +136,15 @@ bool Motion::openBus(void)
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
                           
-    carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
-            CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
-    carousel->setInputCallback(gpiocb);
-    carousel->setPVCallback(pvcb);
+    nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
+    nh_.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
+    nh_.param("large_steering_move", large_steering_move, 30);
 
+    nh_.param("port_steering_id", port_steering_id, 4);
+    nh_.param("port_wheel_id", port_wheel_id, 2);
+    nh_.param("port_steering_min", port_steering_min, -M_PI_2);
+    nh_.param("port_steering_max", port_steering_max,  M_PI_2);
+    nh_.param("port_steering_offset", port_steering_offset,  0.0);
     port = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  port_steering_id,
@@ -164,6 +158,11 @@ bool Motion::openBus(void)
                 ));
     port->setCallbacks(pvcb, pvcb, gpiocb);
 
+    nh_.param("starboard_steering_id", starboard_steering_id, 7);
+    nh_.param("starboard_wheel_id", starboard_wheel_id, 6);
+    nh_.param("starboard_steering_min", starboard_steering_min, -M_PI_2);
+    nh_.param("starboard_steering_max", starboard_steering_max,  M_PI_2);
+    nh_.param("starboard_steering_offset", starboard_steering_offset,  0.0);
     starboard = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  starboard_steering_id,
@@ -177,6 +176,12 @@ bool Motion::openBus(void)
                 ));
     starboard->setCallbacks(pvcb, pvcb, gpiocb);
 
+
+    nh_.param("stern_steering_id", stern_steering_id, 3);
+    nh_.param("stern_wheel_id", stern_wheel_id, 5);
+    nh_.param("stern_steering_min", stern_steering_min, -M_PI_2);
+    nh_.param("stern_steering_max", stern_steering_max,  M_PI_2);
+    nh_.param("stern_steering_offset", stern_steering_offset,  0.0);
     stern = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  stern_steering_id,
@@ -190,12 +195,23 @@ bool Motion::openBus(void)
                 ));
     stern->setCallbacks(pvcb, pvcb, gpiocb);
 
+
+    nh_.param("carousel_id", carousel_id, 1);
+    nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
+    nh_.param("carousel_offset", carousel_offset, 0.0);
+    nh_.param("sync_interval", sync_interval, 50000);
+    nh_.param("carousel_jerk_limit", carousel_jerk_limit, 5.0); // rev/s^3
+    nh_.param("carousel_profile_velocity", carousel_profile_velocity, 0.25); // rev/s
+    nh_.param("carousel_profile_acceleration", carousel_profile_acceleration, 0.3); // rev/s^2
+    carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
+            CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
+    carousel->setInputCallback(gpiocb);
+    carousel->setPVCallback(pvcb);
+
     port->initialize();
     starboard->initialize();
     stern->initialize();
     carousel->initialize();
-
-    return true;
 }
 
 Motion::~Motion()
@@ -234,6 +250,9 @@ void Motion::runBus(void)
     open_lock.unlock();
     if( ! CAN_thread_run )
         return;
+
+    createServos();
+
     pfd.fd = CAN_fd;
     pfd.events = POLLIN | POLLOUT;
     while(ret >= 0 && CAN_thread_run ){
@@ -309,8 +328,6 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
     stern->drive(angle_stern, -v_stern);
 }
 
-
-
 void Motion::doHomePods(void)
 {
     home_pods_count = 3;
@@ -352,7 +369,6 @@ void Motion::homeCarouselComplete(CANOpen::DS301 &node)
 {
     home_carousel_action_server.setSucceeded(home_carousel_result);  
 }
-
 
 bool Motion::ready(void)
 {
@@ -506,7 +522,7 @@ void Motion::gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t
 
 void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio)
 {
-    if(gpio->servo_id == carousel_id) {
+    if((unsigned long)gpio->servo_id == carousel->node_id) {
         boost::unique_lock<boost::mutex> lock(CAN_mutex);
         uint16_t current = carousel->getOutputPins();
         uint16_t set   = gpio->pin_mask & ( gpio->new_pin_states & ~current);
@@ -567,9 +583,6 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
 {
     wheel_diameter = config.wheel_diameter;
-    port_steering_offset = config.port_steering_offset;
-    starboard_steering_offset = config.starboard_steering_offset;
-    stern_steering_offset = config.stern_steering_offset;
 
     if( CAN_fd>0 ) {
         boost::unique_lock<boost::mutex> lock(CAN_mutex);
