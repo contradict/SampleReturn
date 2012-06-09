@@ -41,9 +41,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber twist_sub;
         ros::Subscriber carousel_sub;
         ros::Subscriber gpio_sub;
-        ros::Publisher odometry_pub;
         ros::Publisher gpio_pub;
-        tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher joint_state_pub;
         dynamic_reconfigure::Server<PlatformParametersConfig>
             reconfigure_server;
@@ -109,17 +107,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool carousel_enabled;
         bool desired_carousel_state;
 
-        Eigen::Vector2d starboard_pos, port_pos, stern_pos;
         Eigen::Vector2d body_pt;
-        double v_stern, v_starboard, v_port;
-        double angle_stern, angle_starboard, angle_port;
-        double last_starboard_wheel, last_port_wheel, last_stern_wheel;
-        int odom_count, odom_counter;
-        double port_vel_sum, starboard_vel_sum, stern_vel_sum;
         int pv_counter;
-        Eigen::Vector2d odom_position;
-        double odom_orientation;
-        int odom_frame_id;
         int joint_seq;
 };
 

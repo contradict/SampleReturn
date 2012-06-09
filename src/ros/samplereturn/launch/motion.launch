@@ -16,6 +16,9 @@
       <param name="stern_steering_offset" type="double" value="-0.15708"/>
   </node>
 
+  <node machine="navigate" pkg="platform_motion" type="odometry" name="odometry" output="log">
+  </node>
+
   <node machine="navigate" pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
   </node>
 

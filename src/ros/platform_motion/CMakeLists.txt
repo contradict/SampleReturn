@@ -38,7 +38,7 @@ gencfg()
 
 
 #common commands for building c++ executables and libraries
-rosbuild_add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp src/lmmin.c)
+rosbuild_add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
 #target_link_libraries(${PROJECT_NAME} another_library)
 rosbuild_add_boost_directories()
 rosbuild_link_boost(${PROJECT_NAME} thread)
@@ -48,3 +48,5 @@ target_link_libraries(motion_node canopen)
 target_link_libraries(motion_node canlib)
 
 rosbuild_add_executable(teleop src/teleop.cpp)
+
+rosbuild_add_executable(odometry src/odometry.cpp src/lmmin.c)
