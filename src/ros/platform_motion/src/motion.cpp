@@ -54,6 +54,8 @@ Motion::Motion() :
     nh_.param("center_pt_x", center_pt_x, 0.0);
     nh_.param("center_pt_y", center_pt_y, 0.0);
 
+    nh_.param("min_wheel_speed", min_wheel_speed, 0.0005);
+
     nh_.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
 
     body_pt << center_pt_x, center_pt_y;
@@ -296,75 +298,65 @@ void Motion::start(void)
 void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
     Eigen::Vector2d body_vel( twist->linear.x, twist->linear.y );
-    double body_speed = body_vel.norm();
     double body_omega = twist->angular.z;
-    Eigen::Vector2d center_pos;
-    double kappa, phi;
-    double v_stern, v_starboard, v_port;
-    double angle_stern, angle_starboard, angle_port;
+    double stern_wheel_speed, starboard_wheel_speed, port_wheel_speed;
+    double stern_steering_angle, starboard_steering_angle, port_steering_angle;
 
-    ros::Time current(0);
-    tf::StampedTransform port_tf, starboard_tf, stern_tf;
 
-    Eigen::Vector2d starboard_pos, port_pos, stern_pos;
-    try {
-        listener.lookupTransform(child_frame_id, "port_suspension", current, port_tf );
-    } catch( tf::TransformException ex) {
-        ROS_ERROR("Error looking up port_suspension: %s", ex.what());
+    stern->getPosition(&stern_steering_angle, NULL, NULL, NULL);
+    if(0>computePod(body_vel, body_omega, body_pt, "stern_suspension",
+                &stern_steering_angle, &stern_wheel_speed)) {
         return;
     }
-    port_pos = Eigen::Vector2d(port_tf.getOrigin().x(), port_tf.getOrigin().y());
 
-    try {
-        listener.lookupTransform(child_frame_id, "starboard_suspension", current, starboard_tf );
-    } catch( tf::TransformException ex) {
-        ROS_ERROR("Error looking up starboard_suspension: %s", ex.what());
+    port->getPosition(&port_steering_angle, NULL, NULL, NULL);
+    if(0>computePod(body_vel, body_omega, body_pt, "port_suspension",
+                &port_steering_angle, &port_wheel_speed)) {
         return;
     }
-    stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
 
-    try {
-        listener.lookupTransform(child_frame_id, "stern_suspension", current, stern_tf );
-    } catch( tf::TransformException ex) {
-        ROS_ERROR("Error looking up stern_suspension: %s", ex.what());
+    starboard->getPosition(&starboard_steering_angle, NULL, NULL, NULL);
+    if(0>computePod(body_vel, body_omega, body_pt, "starboard_suspension",
+                &starboard_steering_angle, &starboard_wheel_speed)){
         return;
     }
-    starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
 
-    if(fabs(body_omega)>0) {
-        if(body_speed>0) {
-            Eigen::Vector2d center_dir;
-            center_dir << -body_vel[1], body_vel[0];
-            center_dir *= copysign(1.0/body_speed, body_omega);
-            kappa = fabs(body_omega)/body_speed;
-            center_pos = body_pt + center_dir/kappa;
-        } else {
-            kappa = 1./body_pt.norm();
-            center_pos = body_pt;
-        }
-        phi = atan2(center_pos[1], center_pos[0]);
-        v_stern = center_pos.norm()*body_omega/M_PI/wheel_diameter;
-        v_port =
-            (center_pos-port_pos).norm()*body_omega/M_PI/wheel_diameter;
-        v_starboard =
-            (center_pos-starboard_pos).norm()*body_omega/M_PI/wheel_diameter;
-    } else {
-        kappa = 0;
-        phi = atan2(body_vel[1], body_vel[0])+M_PI_2;
-        v_stern = v_starboard = v_port = body_speed/M_PI/wheel_diameter;
-    }
-    angle_stern = phi-M_PI_2;
-    angle_port = M_PI_2 - atan2( sin(phi) - kappa*(port_pos(1)-body_pt(1))/2,
-                                      kappa*(port_pos(0)-body_pt(0)) - cos(phi)
-                                    );
-    angle_starboard = M_PI_2 - atan2( sin(phi) + kappa*(port_pos(1)-body_pt(1))/2,
-                                 kappa*(port_pos(0)-body_pt(0)) - cos(phi)
-                               );
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    port->drive(angle_port, v_port);
-    starboard->drive(angle_starboard, -v_starboard);
-    stern->drive(angle_stern, -v_stern);
+    port->drive(port_steering_angle, port_wheel_speed);
+    starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
+    stern->drive(stern_steering_angle, -stern_wheel_speed);
 }
+
+int Motion::computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
+        const char *joint_name, double *steering, double *speed)
+{
+    tf::StampedTransform pod_tf;
+    ros::Time current(0);
+    try {
+        listener.lookupTransform(child_frame_id, joint_name, current, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", joint_name, ex.what());
+        return -1;
+    }
+    //ROS_DEBUG("%s at (%f, %f)", joint_name, port_tf.getOrigin().x(), port_tf.getOrigin().y());
+    Eigen::Vector2d pod_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+    Eigen::Vector2d pod_vect = pod_pos - body_pt;
+    Eigen::Vector2d pod_perp(-pod_vect(1), pod_vect(0));
+    Eigen::Vector2d pod_vel = body_vel + pod_perp*body_omega;
+
+    *speed = pod_vel.norm();
+    if(*speed>min_wheel_speed) {
+        *steering = atan2(pod_vel(1), pod_vel(0));
+        *speed /= M_PI*wheel_diameter;
+        return 0;
+    } else {
+        *speed = 0;
+        return 1;
+    }
+
+}
+
+
 
 void Motion::doHomePods(void)
 {
