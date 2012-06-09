@@ -418,34 +418,44 @@ bool Motion::ready(void)
 bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
                                      platform_motion::Enable::Response &resp)
 {
-    if( pods_enabled == req.state)
-        return true;
-    desired_pod_state = req.state;
-    enable_pods_count=6;
-    boost::system_time now=boost::get_system_time();
-    boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
     bool notified=false;
+    boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
+    boost::system_time now=boost::get_system_time();
     enable_pods(req.state);
-    while( ! pods_enabled==req.state )
-        notified = enable_pods_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
-    if(notified)
-        resp.state = pods_enabled;
+    notified = enable_pods_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+    resp.state = pods_enabled;
     return notified;
 }
+
+bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
+                                    platform_motion::Enable::Response &resp)
+{
+    bool notified=false;
+    boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
+    boost::system_time now=boost::get_system_time();
+    enable_carousel(req.state);
+    notified = enable_carousel_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+    resp.state = carousel_enabled;
+    return notified;
+}
+
 
 void Motion::podEnableStateChange(CANOpen::DS301 &node)
 {
     if(enable_pods_count>0) --enable_pods_count;
-    ROS_INFO("Enable report, count=%d", enable_pods_count);
+    ROS_INFO("Enable report from %ld, count=%d", node.node_id, enable_pods_count);
     if(enable_pods_count == 0) {
-        enable_pods_cond.notify_one();
+        boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
+        enable_pods_cond.notify_all();
         pods_enabled = desired_pod_state;
     }
 }
 
 void Motion::carouselEnableStateChange(CANOpen::DS301 &node)
 {
-    enable_carousel_cond.notify_one();
+    ROS_INFO("Enable report from %ld, carousel", node.node_id);
+    boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
+    enable_carousel_cond.notify_all();
     carousel_enabled = desired_carousel_state;
 }
 
@@ -453,6 +463,8 @@ void Motion::enable_pods(bool state)
 {
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     ROS_INFO( "enable pods: %s",  state?"true":"false");
+    enable_pods_count=6;
+    desired_pod_state = state;
 
     CANOpen::DS301CallbackObject
         ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
@@ -462,32 +474,15 @@ void Motion::enable_pods(bool state)
     stern->enable(state, ecb);
 }
 
-bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
-                                    platform_motion::Enable::Response &resp)
-{
-    if(carousel_enabled == req.state)
-        return true;
-    desired_carousel_state = req.state;
-    boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
-    bool notified=false;
-    boost::system_time now=boost::get_system_time();
-    enable_carousel(req.state);
-    while( ! carousel_enabled==req.state )
-        notified = enable_carousel_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
-    if(notified)
-        resp.state = carousel_enabled;
-    return notified;
-}
-
 void Motion::enable_carousel(bool state)
 {
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     ROS_INFO( "enable carousel: %s",  state?"true":"false");
+    desired_carousel_state = state;
 
     CANOpen::DS301CallbackObject
         ecb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::carouselEnableStateChange));
-    desired_carousel_state = state;
     carousel->enable(state, ecb);
 }
 
