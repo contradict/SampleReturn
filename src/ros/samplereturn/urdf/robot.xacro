@@ -166,9 +166,9 @@
     <!-- the big triangle -->
     <link name="body_triangle">
         <visual>
-            <origin xyz="0.0 -0.75 0" rpy="0 0 1.57"/>
+            <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
             <geometry>
-                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="1 1 0.03"/>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.86 0.75 0.03"/>
             </geometry>
             <material name="plate"/>
         </visual>
@@ -180,9 +180,9 @@
     </joint>
     <link name="top_triangle">
         <visual>
-            <origin xyz="0.0 -0.75 0" rpy="0 0 1.57"/>
+            <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
             <geometry>
-                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="1 1 0.03"/>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.86 0.75 0.03"/>
             </geometry>
             <material name="plate"/>
         </visual>
