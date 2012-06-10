@@ -242,9 +242,9 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     lookupJointValue(joint_state, "starboard_axle", &starboard_wheel, &starboard_wheel_velocity);
     lookupJointValue(joint_state, "stern_axle", &stern_wheel, &stern_wheel_velocity);
 
-    port_delta = (port_wheel - last_port_wheel)*M_PI*wheel_diameter;
-    starboard_delta = (starboard_wheel - last_starboard_wheel)*M_PI*wheel_diameter;
-    stern_delta = (stern_wheel - last_stern_wheel)*M_PI*wheel_diameter;
+    port_delta = (port_wheel - last_port_wheel)*wheel_diameter/2.;
+    starboard_delta = (starboard_wheel - last_starboard_wheel)*wheel_diameter/2.;
+    stern_delta = (stern_wheel - last_stern_wheel)*wheel_diameter/2.;
     //ROS_DEBUG( "delta: (%6.4f, %6.4f, %6.4f)", port_delta, starboard_delta, stern_delta);
 
     double max_abs_delta = std::max(fabs(starboard_delta), fabs(port_delta));
