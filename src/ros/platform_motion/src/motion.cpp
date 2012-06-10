@@ -395,7 +395,10 @@ void Motion::homePodsComplete(CANOpen::DS301 &node)
         home_pods_feedback.home_count = home_pods_count;
         home_pods_action_server.publishFeedback(home_pods_feedback);
         if(home_pods_count == 0) {
-            home_pods_action_server.setSucceeded(home_pods_result);  
+            home_pods_action_server.setSucceeded(home_pods_result);
+            port->drive(0, 0);
+            starboard->drive(0, 0);
+            stern->drive(0, 0);
         }
     }
 }
