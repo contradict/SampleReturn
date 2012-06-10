@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <machine name="search"
+             address="moline"
+             ros-root="/opt/ros/electric/ros"
+             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
+             user="robot"
+             />
+    <include file="$(find samplereturn)/launch/manipulator_camera.launch"/> 
+</launch>
