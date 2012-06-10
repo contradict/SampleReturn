@@ -35,6 +35,7 @@
 namespace platform_motion {
 
 Motion::Motion() :
+    param_nh("~"),
     home_pods_action_server(nh_, "home_wheelpods", false),
     home_carousel_action_server(nh_, "home_carousel", false),
     CAN_fd(-1),
@@ -48,15 +49,19 @@ Motion::Motion() :
     joint_seq(0)
 {
 
-    nh_.param("wheel_diameter", wheel_diameter, 0.330);
-    nh_.param<std::string>("child_frame_id", child_frame_id, "base_link");
+    ROS_INFO("Started in namespace %s", nh_.getNamespace().c_str());
 
-    nh_.param("center_pt_x", center_pt_x, 0.0);
-    nh_.param("center_pt_y", center_pt_y, 0.0);
+    ROS_INFO("param in namespace %s", param_nh.getNamespace().c_str());
 
-    nh_.param("min_wheel_speed", min_wheel_speed, 0.0005);
+    param_nh.param("wheel_diameter", wheel_diameter, 0.330);
+    param_nh.param<std::string>("child_frame_id", child_frame_id, "base_link");
 
-    nh_.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
+    param_nh.param("center_pt_x", center_pt_x, 0.0);
+    param_nh.param("center_pt_y", center_pt_y, 0.0);
+
+    param_nh.param("min_wheel_speed", min_wheel_speed, 0.0005);
+
+    param_nh.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
 
     body_pt << center_pt_x, center_pt_y;
     enable_pods_server = nh_.advertiseService("enable_wheel_pods",
@@ -87,7 +92,7 @@ bool Motion::openBus(void)
 {
     int CAN_channel, CAN_baud;
  
-    nh_.param("CAN_channel", CAN_channel, 0);
+    param_nh.param("CAN_channel", CAN_channel, 0);
     nh_.param("CAN_baud", CAN_baud, 1000000);
 
     std::tr1::shared_ptr<CANOpen::KvaserInterface> pintf(new CANOpen::KvaserInterface(
@@ -135,15 +140,15 @@ void Motion::createServos()
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
                           
-    nh_.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
-    nh_.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
-    nh_.param("large_steering_move", large_steering_move, 30);
+    param_nh.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
+    param_nh.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
+    param_nh.param("large_steering_move", large_steering_move, 30);
 
-    nh_.param("port_steering_id", port_steering_id, 4);
-    nh_.param("port_wheel_id", port_wheel_id, 2);
-    nh_.param("port_steering_min", port_steering_min, -M_PI_2);
-    nh_.param("port_steering_max", port_steering_max,  M_PI_2);
-    nh_.param("port_steering_offset", port_steering_offset,  0.0);
+    param_nh.param("port_steering_id", port_steering_id, 4);
+    param_nh.param("port_wheel_id", port_wheel_id, 2);
+    param_nh.param("port_steering_min", port_steering_min, -M_PI_2);
+    param_nh.param("port_steering_max", port_steering_max,  M_PI_2);
+    param_nh.param("port_steering_offset", port_steering_offset,  0.0);
     port = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  port_steering_id,
@@ -157,11 +162,11 @@ void Motion::createServos()
                 ));
     port->setCallbacks(pvcb, pvcb, gpiocb);
 
-    nh_.param("starboard_steering_id", starboard_steering_id, 7);
-    nh_.param("starboard_wheel_id", starboard_wheel_id, 6);
-    nh_.param("starboard_steering_min", starboard_steering_min, -M_PI_2);
-    nh_.param("starboard_steering_max", starboard_steering_max,  M_PI_2);
-    nh_.param("starboard_steering_offset", starboard_steering_offset,  0.0);
+    param_nh.param("starboard_steering_id", starboard_steering_id, 7);
+    param_nh.param("starboard_wheel_id", starboard_wheel_id, 6);
+    param_nh.param("starboard_steering_min", starboard_steering_min, -M_PI_2);
+    param_nh.param("starboard_steering_max", starboard_steering_max,  M_PI_2);
+    param_nh.param("starboard_steering_offset", starboard_steering_offset,  0.0);
     starboard = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  starboard_steering_id,
@@ -176,11 +181,11 @@ void Motion::createServos()
     starboard->setCallbacks(pvcb, pvcb, gpiocb);
 
 
-    nh_.param("stern_steering_id", stern_steering_id, 3);
-    nh_.param("stern_wheel_id", stern_wheel_id, 5);
-    nh_.param("stern_steering_min", stern_steering_min, -M_PI_2);
-    nh_.param("stern_steering_max", stern_steering_max,  M_PI_2);
-    nh_.param("stern_steering_offset", stern_steering_offset,  0.0);
+    param_nh.param("stern_steering_id", stern_steering_id, 3);
+    param_nh.param("stern_wheel_id", stern_wheel_id, 5);
+    param_nh.param("stern_steering_min", stern_steering_min, -M_PI_2);
+    param_nh.param("stern_steering_max", stern_steering_max,  M_PI_2);
+    param_nh.param("stern_steering_offset", stern_steering_offset,  0.0);
     stern = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  stern_steering_id,
@@ -195,13 +200,13 @@ void Motion::createServos()
     stern->setCallbacks(pvcb, pvcb, gpiocb);
 
 
-    nh_.param("carousel_id", carousel_id, 1);
-    nh_.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
-    nh_.param("carousel_offset", carousel_offset, 0.0);
-    nh_.param("sync_interval", sync_interval, 50000);
-    nh_.param("carousel_jerk_limit", carousel_jerk_limit, 5.0); // rev/s^3
-    nh_.param("carousel_profile_velocity", carousel_profile_velocity, 0.25); // rev/s
-    nh_.param("carousel_profile_acceleration", carousel_profile_acceleration, 0.3); // rev/s^2
+    param_nh.param("carousel_id", carousel_id, 1);
+    param_nh.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
+    param_nh.param("carousel_offset", carousel_offset, 0.0);
+    param_nh.param("sync_interval", sync_interval, 50000);
+    param_nh.param("carousel_jerk_limit", carousel_jerk_limit, 5.0); // rev/s^3
+    param_nh.param("carousel_profile_velocity", carousel_profile_velocity, 0.25); // rev/s
+    param_nh.param("carousel_profile_acceleration", carousel_profile_acceleration, 0.3); // rev/s^2
     carousel = std::tr1::shared_ptr<CANOpen::CopleyServo>(new
             CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
     carousel->setInputCallback(gpiocb);

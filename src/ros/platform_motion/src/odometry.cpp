@@ -93,10 +93,11 @@ OdometryNode::OdometryNode() :
     odom_position(Eigen::Vector2d::Zero()),
     odom_orientation(0)
 {
-    nh_.param<std::string>("odom_frame_id", odom_frame_id, "odom");
-    nh_.param<std::string>("child_frame_id", child_frame_id, "base_link");
-    nh_.param("delta_threshold", delta_threshold, 0.001);
-    nh_.param("wheel_diameter", wheel_diameter, 0.33);
+    ros::NodeHandle param_nh("~");
+    param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
+    param_nh.param<std::string>("child_frame_id", child_frame_id, "base_link");
+    param_nh.param("delta_threshold", delta_threshold, 0.01);
+    param_nh.param("wheel_diameter", wheel_diameter, 0.314);
 
     joint_state_sub = nh_.subscribe("platform_joint_state", 2, &OdometryNode::jointStateCallback,
             this);

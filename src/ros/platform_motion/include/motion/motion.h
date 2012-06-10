@@ -36,6 +36,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
         ros::NodeHandle nh_;
+        ros::NodeHandle param_nh;
+
 
         tf::TransformListener listener;
         std::string child_frame_id;
