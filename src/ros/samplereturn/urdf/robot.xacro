@@ -152,9 +152,9 @@
     <xacro:property name="suspension_length" value="0.35"/>
     <xacro:property name="suspension_mounting_height" value="0.26"/>
     <!-- instantiate 3 modules -->
-    <xacro:wheel_module name="stern" position="-1.3 0 ${suspension_mounting_height}"/>
-    <xacro:wheel_module name="port" position="0.0 0.5625 ${suspension_mounting_height}"/>
-    <xacro:wheel_module name="starboard" position="0.0 -0.5625 ${suspension_mounting_height}"/>
+    <xacro:wheel_module name="stern" position="-1.126 0 ${suspension_mounting_height}"/>
+    <xacro:wheel_module name="port" position="0.0 0.650 ${suspension_mounting_height}"/>
+    <xacro:wheel_module name="starboard" position="0.0 -0.650 ${suspension_mounting_height}"/>
     <link name="base_link">
     </link>
     <joint name="base_joint" type="fixed">
