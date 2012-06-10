@@ -41,6 +41,8 @@
         <param name="min_height" value="-0.35"/>
         <param name="max_height" value="0.1"/>
         <param name="range_max" value="10"/>
+        <param name="angle_max" value="0.55"/>
+        <param name="angle_min" value="-0.55"/>
     </node>
 
     <node
@@ -50,7 +52,9 @@
         ns="/navigation"
         >
         <param name="maxUrange" value="10"/>
-        <param name="map_update_interval" value="2.5"/>
+        <param name="maxRange" value="10.5"/>
+        <param name="map_update_interval" value="2.0"/>
+        <param name="temporalUpdate" value="1.0"/>
     </node>
     <!-- Run the fake localization -->
     <!--
@@ -58,7 +62,5 @@
         <remap from="base_pose_ground_truth" to="odometry"/>
     </node>
     -->
-
-
 
 </launch>
