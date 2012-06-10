@@ -2,7 +2,7 @@
 import roslib; roslib.load_manifest('samplereturn')
 from photo.srv import *
 from rospy.numpy_msg import numpy_msg
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image,CameraInfo
 import rospy
 import numpy as np
 
@@ -21,12 +21,14 @@ def capture_image():
 def camlogger():
   topic = 'camimg'
   pub = rospy.Publisher(topic,Image)
-  rospy.init_node('camlogger')
+  info_pub = rospy.Publisher(info_topic,CameraInfo)
+  rospy.init_node('camlogger',log_level=rospy.DEBUG)
+  r = rospy.Rate(1)
   while not rospy.is_shutdown():
     img = capture_image()
     rospy.logdebug("img (%d, %d)", img.width, img.height)
     pub.publish(img)
-    rospy.sleep(3.0)
+    r.sleep()
 
 if __name__=="__main__":
   try:
