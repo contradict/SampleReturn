@@ -9,6 +9,7 @@
     </node>
 
     <!-- Publishes the voxel grid to rviz for display -->
+    <!--
     <node machine="navigate" pkg="costmap_2d" type="costmap_2d_markers" name="voxel_visualizer"
         ns="navigation/costmap_node/costmap">
     </node>
@@ -16,10 +17,6 @@
     <node machine="navigate" pkg="costmap_2d" type="costmap_2d_cloud" name="voxel_visualizer_cloud"
         ns="navigation/costmap_node/costmap">
     </node>
-
-    <!-- Run the fake localization -->
-    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
-        <remap from="base_pose_ground_truth" to="odometry"/>
-    </node>
+    -->
 
 </launch>

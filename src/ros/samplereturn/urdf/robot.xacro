@@ -250,6 +250,15 @@
         <origin xyz="0.10 0.0 1.0" rpy="-1.77 0 -1.57"/>
     </joint>
 
+    <!--fake laser scanner-->
+    <link name="fake_laser">
+    </link>
+    <joint name="fake_laser_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="fake_laser"/>
+        <origin xyz="0 0 0" rpy="-1.57 0 -1.57"/>
+    </joint>
+
     <!-- carousel -->
     <link name="carousel">
         <visual>

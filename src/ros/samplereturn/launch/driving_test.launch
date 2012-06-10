@@ -21,5 +21,6 @@
     <include file="$(find samplereturn)/launch/costmap.launch"/> 
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/> 
     <include file="$(find samplereturn)/launch/search_camera.launch"/> 
+    <include file="$(find samplereturn)/launch/gmapping.launch"/> 
     <include file="$(find samplereturn)/launch/joystick.launch"/> 
 </launch>
