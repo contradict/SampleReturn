@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="throttle"
+        args="load pointcloud_to_laserscan/CloudThrottle manager"
+        ns="/navigation"
+        output="screen"
+        >
+        <remap from="cloud_in" to="points2"/>
+        <remap from="cloud_out" to="cloud_throttled"/>
+        <param name="max_rate" value="20.0"/>
+    </node>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="transform"
+        args="load pcl/PassThrough manager"
+        ns="/navigation"
+        output="screen"
+        >
+        <remap from="transform/input" to="cloud_throttled"/>
+        <param name="input_frame" value="body_triangle"/>
+        <param name="output_frame" value="fake_laser"/>
+        <param name="use_indices" value="false"/>
+        <param name="filter_limit_min" value="-0.4"/>
+        <param name="filter_limit_max" value="0.1"/>
+    </node>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="pc2ls"
+        args="load pointcloud_to_laserscan/CloudToScan manager"
+        ns="/navigation"
+        output="screen"
+        >
+        <remap from="cloud" to="transform/output"/>
+        <param name="output_frame_id" value="body_triangle"/>
+        <param name="min_height" value="-0.35"/>
+        <param name="max_height" value="0.1"/>
+        <param name="range_max" value="10"/>
+        <param name="angle_max" value="0.55"/>
+        <param name="angle_min" value="-0.55"/>
+    </node>
+
+    <node
+        pkg="gmapping"
+        type="slam_gmapping"
+        name="too_easy"
+        ns="/navigation"
+        >
+        <param name="maxUrange" value="10"/>
+        <param name="maxRange" value="10.5"/>
+        <param name="map_update_interval" value="2.0"/>
+        <param name="temporalUpdate" value="1.0"/>
+    </node>
+    <!-- Run the fake localization -->
+    <!--
+    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
+        <remap from="base_pose_ground_truth" to="odometry"/>
+    </node>
+    -->
+
+</launch>

@@ -13,8 +13,11 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
     private:
         bool openBus(void);
+        void createServos(void);
 
         void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
+                const char *joint_name, double *steering, double *speed);
         void carouselCallback(const std_msgs::Float64::ConstPtr fmsg);
         void gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio);
         void doHomePods(void);
@@ -32,19 +35,19 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void syncCallback(CANOpen::SYNC &sync);
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
-        bool intersectLines(Eigen::Vector2d d0, Eigen::Vector2d p0,
-                            Eigen::Vector2d d1, Eigen::Vector2d p1,
-                            Eigen::Vector2d &pi);
-
         ros::NodeHandle nh_;
+        ros::NodeHandle param_nh;
+
+
+        tf::TransformListener listener;
+        std::string child_frame_id;
 
         ros::Subscriber twist_sub;
         ros::Subscriber carousel_sub;
         ros::Subscriber gpio_sub;
-        ros::Publisher odometry_pub;
         ros::Publisher gpio_pub;
-        tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher joint_state_pub;
+
         dynamic_reconfigure::Server<PlatformParametersConfig>
             reconfigure_server;
 
@@ -69,36 +72,22 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
 
-        int port_steering_id, port_wheel_id;
-        double port_steering_min, port_steering_max, port_steering_offset;
-        int starboard_steering_id, starboard_wheel_id;
-        double starboard_steering_min, starboard_steering_max, starboard_steering_offset;
-        int stern_steering_id, stern_wheel_id;
-        double stern_steering_min, stern_steering_max, stern_steering_offset;
-        int carousel_id;
-        double carousel_offset, desired_carousel_position;
-        int sync_interval;
-
         double wheel_diameter;
 
-        double width, length;
         double center_pt_x, center_pt_y;
+        double min_wheel_speed;
 
-        int steering_encoder_counts, wheel_encoder_counts,
-            carousel_encoder_counts;
-        int large_steering_move;
-
+        int carousel_encoder_counts;
         double carousel_jerk_limit;
         double carousel_profile_velocity;
         double carousel_profile_acceleration;
+        double carousel_offset, desired_carousel_position;
 
-        int CAN_channel, CAN_baud;
         int CAN_fd;
         boost::mutex CAN_mutex;
         std::tr1::shared_ptr<CANOpen::Bus> pbus;
         boost::thread CAN_thread;
         bool CAN_thread_run;
-        int notify_read_fd, notify_write_fd;
 
         bool gpio_enabled;
         bool carousel_setup;
@@ -109,17 +98,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool carousel_enabled;
         bool desired_carousel_state;
 
-        Eigen::Vector2d starboard_pos, port_pos, stern_pos;
         Eigen::Vector2d body_pt;
-        double v_stern, v_starboard, v_port;
-        double angle_stern, angle_starboard, angle_port;
-        double last_starboard_wheel, last_port_wheel, last_stern_wheel;
-        int odom_count, odom_counter;
-        double port_vel_sum, starboard_vel_sum, stern_vel_sum;
         int pv_counter;
-        Eigen::Vector2d odom_position;
-        double odom_orientation;
-        int odom_frame_id;
         int joint_seq;
 };
 

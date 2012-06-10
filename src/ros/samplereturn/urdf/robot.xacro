@@ -2,7 +2,7 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <robot
     xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
-    name="awesome_robot">
+    name="">
     <enableGravity>false</enableGravity>
     <material name="plate">
         <color rgba="0.0 0.8 0.0 1.0"/>
@@ -23,7 +23,7 @@
         <color rgba="0.1 0.8 0.2 1.0"/>
     </material>
     <xacro:macro name="wheel_module" params="name position">
-        <joint name="${name}_suspension_joint" type="revolute">
+        <joint name="${name}_steering_joint" type="revolute">
             <axis xyz="0 0 1"/>
             <limit upper="1.57" lower="-1.57" effort="100" velocity="3.14"/>
             <parent link="body_triangle"/>
@@ -32,9 +32,9 @@
         </joint>
         <link name="${name}_suspension">
             <visual>
-                <origin xyz="0 0 ${-suspension_height/2}" rpy="0 0 -1.57"/>
+                <origin xyz="0 0 ${-suspension_length/2}" rpy="0 0 -1.57"/>
                 <geometry>
-                    <cylinder length="${suspension_height}" radius="0.075"/>
+                    <cylinder length="${suspension_length}" radius="0.06"/>
                 </geometry>
                 <material name="suspension"/>
             </visual>
@@ -44,14 +44,13 @@
             <child link="${name}_yoke"/>
             <!-- z puts yoke at bottom of suspension since last number is
             yoke_height/2 -->
-            <origin xyz="0 0 ${-suspension_height-wheel_diameter*1.25/4}"/>
+            <origin xyz="0 0 ${-suspension_length}"/>
         </joint>
         <link name="${name}_yoke">
             <visual>
+                <origin xyz="0 0 ${-yoke_height/2}" rpy="0 0 0"/>
                 <geometry>
-                    <!-- 2.25 and 1.25 are aribtrary factors to make things look nice -->
-                    <!-- be sure to check _yoke_joint and _axle if you change z -->
-                    <box size="${wheel_width*2.25} ${yoke_thickness} ${wheel_diameter*1.25/2}"/>
+                    <box size="0.18 0.15 ${yoke_height}"/>
                 </geometry>
                 <material name="suspension"/>
             </visual>
@@ -62,7 +61,7 @@
             <parent link="${name}_yoke"/>
             <child link="${name}_wheel"/>
             <!-- 1.25 must match factor in yoke, 0.125 is (1.25-1)/2 -->
-            <origin xyz="0 0 ${-wheel_diameter*1.25/4+wheel_diameter*0.125/2}" rpy="0 1.57 0 "/>
+            <origin xyz="0 0 ${-axle_offset}" rpy="0 1.57 0 "/>
         </joint>
         <link name="${name}_wheel">
             <visual>
@@ -145,32 +144,50 @@
         <!-- END RIGHT CAMERA -->
     </xacro:macro>
 
+    <!-- define suspension properties -->
+    <xacro:property name="wheel_diameter" value="0.33"/>
+    <xacro:property name="wheel_width" value="0.09"/>
+    <xacro:property name="yoke_height" value="0.3"/>
+    <xacro:property name="axle_offset" value="0.25"/>
+    <xacro:property name="suspension_length" value="0.35"/>
+    <xacro:property name="suspension_mounting_height" value="0.26"/>
+    <!-- instantiate 3 modules -->
+    <xacro:wheel_module name="stern" position="-1.126 0 ${suspension_mounting_height}"/>
+    <xacro:wheel_module name="port" position="0.0 0.650 ${suspension_mounting_height}"/>
+    <xacro:wheel_module name="starboard" position="0.0 -0.650 ${suspension_mounting_height}"/>
     <link name="base_link">
     </link>
     <joint name="base_joint" type="fixed">
         <parent link="base_link"/>
         <child link="body_triangle"/>
-        <origin xyz="1.5 0 0" rpy="0 0 0.0"/>
+        <origin xyz="0 0 ${wheel_diameter/2 + axle_offset + suspension_length - suspension_mounting_height}" rpy="0 0 0"/>
+        <!--<origin xyz="0 0 0" rpy="0 0 0"/>-->
     </joint>
     <!-- the big triangle -->
     <link name="body_triangle">
         <visual>
-            <origin xyz="0.0 -0.75 0" rpy="0 0 1.57"/>
+            <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
             <geometry>
-                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" />
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.86 0.75 0.03"/>
             </geometry>
             <material name="plate"/>
         </visual>
     </link>
-    <!-- define suspension properties -->
-    <xacro:property name="wheel_diameter" value="0.33"/>
-    <xacro:property name="wheel_width" value="0.09"/>
-    <xacro:property name="yoke_thickness" value="0.1"/>
-    <xacro:property name="suspension_height" value="0.15"/>
-    <!-- instantiate 3 modules -->
-    <xacro:wheel_module name="stern" position="-1.3 0 0"/>
-    <xacro:wheel_module name="port" position="0.0 0.5625 0"/>
-    <xacro:wheel_module name="starboard" position="0.0 -0.5625 0"/>
+    <joint name="body_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="top_triangle"/>
+        <origin xyz="0 0 0.155" rpy="0 0 0"/>
+    </joint>
+    <link name="top_triangle">
+        <visual>
+            <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
+            <geometry>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.86 0.75 0.03"/>
+            </geometry>
+            <material name="plate"/>
+        </visual>
+    </link>
+
 
     <!-- instantiate navigation pair -->
     <xacro:stereo_pair name="navigation" baseline="0.30" />
@@ -233,6 +250,15 @@
         <origin xyz="0.10 0.0 1.0" rpy="-1.77 0 -1.57"/>
     </joint>
 
+    <!--fake laser scanner-->
+    <link name="fake_laser">
+    </link>
+    <joint name="fake_laser_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="fake_laser"/>
+        <origin xyz="0 0 0" rpy="-1.57 0 -1.57"/>
+    </joint>
+
     <!-- carousel -->
     <link name="carousel">
         <visual>
@@ -248,6 +274,4 @@
         <axis xyz="0 0 1"/>
         <origin xyz="-0.239 0.0 -0.121"/>
     </joint>
-
 </robot>
-

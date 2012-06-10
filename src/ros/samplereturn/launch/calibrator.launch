@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <!-- Calibration tool -->
+
+    <arg name="cameras" default="navigation"/>
+    <node
+        pkg="camera_calibration"
+        type="cameracalibrator.py"
+        name="calibrator"
+        args="--size 9x6 --square 0.120 --approximate .020"
+        >
+        <remap from="right" to="/$(arg cameras)/right/image_mono"/>
+        <remap from="left" to="/$(arg cameras)/left/image_mono"/>
+        <remap from="right_camera" to="/$(arg cameras)/right"/>
+        <remap from="left_camera" to="/$(arg cameras)/left"/>
+      </node>
+
+</launch>
