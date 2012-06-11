@@ -128,8 +128,17 @@ class CarouselIndexer(object):
         self.server.set_preempted(result=self._selectBinResult)
  
     def send_carousel_position(self, index):
-        angle = self.carousel_bin_angles[index]
-        rospy.logdebug( "sending %d: %f", index, angle )
+        if self.carousel_position is None:
+            rospy.logerr( "No position yet" )
+        requested_angle = self.carousel_bin_angles[index]
+        delta_angle = self.despun_position - requested_angle
+        if delta_angle>math.pi:
+            delta_angle -= 2*math.pi
+        if delta_angle<-math.pi:
+            delta_angle += 2*math.pi
+        rospy.loginfo("r: %f despun: %f delta: %f", requested_angle, self.despun_position, delta_angle)
+        angle = self.carousel_position - delta_angle
+        rospy.loginfo( "sending %d: %f", index, angle )
         self.angle_pub.publish(Float64(angle))
 
 if __name__ == "__main__":
