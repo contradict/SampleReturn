@@ -17,8 +17,10 @@ from platform_motion.msg import HomeAction, HomeGoal
 class CarouselIndexer(object):
     _selectBinFeedback = SelectCarouselBinFeedback()
     _selectBinResult = SelectCarouselBinResult()
-    def __init__(self, bins):
+    def __init__(self, bins, bin_tolerance):
         self.carousel_bin_angles = np.array(bins);
+        self.bin_tolerance = bin_tolerance
+        self.carousel_position = None
         self.current_index = None
         self.joy_goal = None
         self.angle_pub = rospy.Publisher('carousel', Float64)
@@ -47,45 +49,53 @@ class CarouselIndexer(object):
                 rospy.logwarn( "server active, joystick ignored" )
                 return
             if self.joy_goal is None:
-                rospy.logwarn( "no initial joystick position, ignored" )
-                return
+               self.joy_goal = self.current_index 
             if self.current_index != self.joy_goal:
                 rospy.loginfo( "waiting to arrive at joy goal %d: %d", self.joy_goal, self.current_index)
+                return
             if(joy_msg.axes[4]<0):
-                rospy.logdebug( "increment" )
+                rospy.loginfo( "increment" )
                 index = self.joy_goal + 1
                 index %= len(self.carousel_bin_angles)
                 self.joy_goal = index
                 self.send_carousel_position(index)
             elif(joy_msg.axes[4]>0):
-                rospy.logdebug( "decrement" )
+                rospy.loginfo( "decrement" )
                 index = self.joy_goal - 1
                 index %= len(self.carousel_bin_angles)
                 self.joy_goal = index
                 self.send_carousel_position(index)
         if(joy_msg.buttons[0]):
             rospy.loginfo( "enable" )
-            self.enable_service(True)
+            try:
+                self.enable_service(True)
+            except rospy.ServiceException, e:
+                rospy.logerr("Unable to enable carousel: %s", e)
         elif(joy_msg.buttons[3]):
             rospy.loginfo( "disable" )
             try:
                 self.enable_service(False)
             except rospy.ServiceException, e:
-                rospy.logerr("Unable to enable carousel: %s", e)
+                rospy.logerr("Unable to disable carousel: %s", e)
         elif(joy_msg.buttons[4]):
             rospy.loginfo( "home" )
             self.home_client.send_goal(HomeGoal())
 
     def jointStateCallback(self, joint_msg):
-        if self.current_index is None:
-            rospy.logdebug( "got joint message" )
-        carousel_position =\
+        if self.carousel_position is None:
+            rospy.loginfo( "got joint message" )
+        self.carousel_position =\
                 joint_msg.position[joint_msg.name.index("carousel_joint")]
-        self.current_index = np.argmin(
-                np.abs(self.carousel_bin_angles -
-                       carousel_position%(2*math.pi)))
-        if self.joy_goal is None:
-            self.joy_goal = self.current_index
+        self.despun_position = self.carousel_position%(2*math.pi)
+        if self.despun_position>math.pi:
+            self.despun_position -= 2*math.pi
+        bin_distance = np.abs( self.carousel_bin_angles -
+                               self.despun_position )
+        closest_bin = np.argmin(bin_distance)
+        if bin_distance[closest_bin] < self.bin_tolerance:
+            if closest_bin != self.current_index:
+                rospy.loginfo( "at bin %d", closest_bin)
+                self.current_index = closest_bin
         if self.server.is_active():
             if self.current_index == self.goal_index:
                 self._selectBinResult.bin_selected = True
@@ -118,15 +128,24 @@ class CarouselIndexer(object):
         self.server.set_preempted(result=self._selectBinResult)
  
     def send_carousel_position(self, index):
-        angle = self.carousel_bin_angles[index]
-        rospy.logdebug( "sending %d: %f", index, angle )
+        if self.carousel_position is None:
+            rospy.logerr( "No position yet" )
+        requested_angle = self.carousel_bin_angles[index]
+        delta_angle = self.despun_position - requested_angle
+        if delta_angle>math.pi:
+            delta_angle -= 2*math.pi
+        if delta_angle<-math.pi:
+            delta_angle += 2*math.pi
+        rospy.loginfo("r: %f despun: %f delta: %f", requested_angle, self.despun_position, delta_angle)
+        angle = self.carousel_position - delta_angle
+        rospy.loginfo( "sending %d: %f", index, angle )
         self.angle_pub.publish(Float64(angle))
 
 if __name__ == "__main__":
     rospy.init_node("carousel_indexer")
     pos_bin_angles = np.radians( [0, 48.5, 73.5, 98.0, 127.5, 162.5])
     bin_angles = np.r_[pos_bin_angles, -pos_bin_angles[:0:-1]]
-    rospy.logdebug("bin angles: %s", bin_angles)
-    ci = CarouselIndexer(bin_angles)
+    rospy.loginfo("bin angles: %s", bin_angles)
+    ci = CarouselIndexer(bin_angles, 0.02)
     rospy.spin()
 

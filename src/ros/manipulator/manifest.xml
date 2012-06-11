@@ -1,0 +1,22 @@
+<package>
+  <description brief="manipulator">
+
+     manipulator
+
+  </description>
+  <author>fred zyda</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/manipulator</url>
+  <depend package="platform_motion"/>
+  <depend package="dynamixel_controllers"/>
+  <depend package="dynamixel_msgs"/>
+  <depend package="rospy"/>
+  <depend package="actionlib"/>
+  <depend package="smach"/>
+  <depend package="smach_ros"/>
+  <depend package="std_msgs"/>
+
+</package>
+
+

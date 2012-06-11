@@ -7,7 +7,7 @@
         name="throttle"
         args="load pointcloud_to_laserscan/CloudThrottle manager"
         ns="/navigation"
-        output="screen"
+        output="log"
         >
         <remap from="cloud_in" to="points2"/>
         <remap from="cloud_out" to="cloud_throttled"/>
@@ -19,7 +19,7 @@
         name="transform"
         args="load pcl/PassThrough manager"
         ns="/navigation"
-        output="screen"
+        output="log"
         >
         <remap from="transform/input" to="cloud_throttled"/>
         <param name="input_frame" value="body_triangle"/>
@@ -34,7 +34,7 @@
         name="pc2ls"
         args="load pointcloud_to_laserscan/CloudToScan manager"
         ns="/navigation"
-        output="screen"
+        output="log"
         >
         <remap from="cloud" to="transform/output"/>
         <param name="output_frame_id" value="body_triangle"/>
@@ -50,6 +50,7 @@
         type="slam_gmapping"
         name="too_easy"
         ns="/navigation"
+        output="log"
         >
         <param name="maxUrange" value="10"/>
         <param name="maxRange" value="10.5"/>

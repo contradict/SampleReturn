@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<launch>
+  <machine name="search"
+           address="moline"
+           ros-root="/opt/ros/electric/ros"
+           ros-package-path="$(env ROS_PACKAGE_PATH)"
+           user="$(env USER)"
+  />
+  <include file="$(find manipulator)/launch/manipulator.launch"/> 
+</launch>
