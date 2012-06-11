@@ -18,6 +18,8 @@ class PersistantData:
     self.armPosGoal = None
     self.armTorqueGoal = None
     self.currentArmState = None
+    self.armVelocityHistory = []
+    self.armVelocityHistoryLen = 10
 
     self.handCV = threading.Condition()
     self.handPosDeltaGoal = None
@@ -71,9 +73,25 @@ class PersistantData:
     # notifies the caller (via self.armCV) when the arm reaches torqe and stops
     # moving
     self.armTorqueGoal = torque
+    # also reset the velocity history on the arm. we're looking for it to
+    # stop moving
+    self.armVelocityHistory = []
 
   def ArmJointCallback(self, data):
     # listen to the state of the arm joint and do notifications as needed.
+    # update the arm velocity history
+    avgVelocityHistory = None
+    if len(self.armVelocityHistory) < self.armVelocityHistoryLen:
+      self.armVelocityHistory.append(data.velocity)
+    else:
+      self.armVelocityHistory = self.armVelocityHistory[1:] + [data.velocity]
+      # in this case we actually had enough velocity history to compute average
+      # over time, so do it
+      avgVelocityHistory = 0
+      for v in self.armVelocityHistory:
+        avgVelocityHistory += v
+      avgVelocityHistory /= len(self.armVelocityHistory)
+
     if self.armPosGoal != None:
       if self.armPosAtGoalStart == None:
         # it may be possible to have a goal before getting any arm pos messages
@@ -89,10 +107,16 @@ class PersistantData:
       delta = abs(data.load - self.armTorqueGoal)
       print "load: %f goal: %f delta: %f"%(
                 data.load, self.armTorqueGoal, delta)
-      print "velocity : ", data.velocity
+      print "velocity:%f, velocityHistory:%s" % (data.velocity,
+          str(avgVelocityHistory))
       if ( abs(data.velocity) < 0.05 ) and (delta <= 0.05):
         # if we get really close to the desired arm torque, call it good enough
         # and notify.
+        self.armCV.acquire()
+        self.armTorqueGoal = None
+        self.armCV.notifyAll()
+        self.armCV.release()
+      elif (avgVelocityHistory is not None) and (abs(avgVelocityHistory) < 0.1):
         self.armCV.acquire()
         self.armTorqueGoal = None
         self.armCV.notifyAll()
