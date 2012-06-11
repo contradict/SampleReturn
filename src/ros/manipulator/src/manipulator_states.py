@@ -134,7 +134,7 @@ class WaitForArmStop(smach.State):
     return 'success'
 
 class MoveHand(smach.State):
-  def __init__(self, dataStore, pos, torqueLimit):
+  def __init__(self, dataStore, pos, torqueLimit, setStopPos=False):
     smach.State.__init__(self, 
         outcomes=['success', 'failure'],
         output_keys=['action_feedback']
@@ -144,6 +144,7 @@ class MoveHand(smach.State):
 
     self.pos = pos
     self.torqueLimit = torqueLimit
+    self.setStopPos = setStopPos
 
   def execute(self, userdata):
     # actually make things happen
@@ -160,7 +161,7 @@ class MoveHand(smach.State):
 
     # ask the dataStore to make the wrist angle correct
     self.dataStore.SetHandPos(self.pos)
-    self.dataStore.NotifyOnHandTorque(self.torqueLimit)
+    self.dataStore.NotifyOnHandTorque(self.torqueLimit, self.setStopPos)
 
     # wait until the wrist gets to the right place.
     self.dataStore.handCV.wait()

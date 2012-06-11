@@ -325,7 +325,8 @@ def main():
         manipulator_states.MoveHand(
           dataStore,
           dataStore.handMinPos,
-          dataStore.handCloseTorque
+          dataStore.handCloseTorque,
+          setStopPos=True
         ),
         transitions = {'success':'SETUP_HAND_HOLD_CLOSE',
                        'failure':'ERROR'}

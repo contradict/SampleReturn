@@ -34,6 +34,7 @@ class PersistantData:
     self.currentHandState = None
     self.handVelocityHistory = []
     self.handVelocityHistoryLen = 10
+    self.handResetToStoppedPos = False
 
     # I'm going to assume that the node that owns the instance of this class
     # will do the actual setup of the publishers and subscriptions, but save
@@ -147,12 +148,16 @@ class PersistantData:
     else:
       self.handPosAtGoalStart = None
 
-  def NotifyOnHandTorque(self, torque):
+  def NotifyOnHandTorque(self, torque, resetToStoppedPos=False):
     # notifiy the caller via self.handCV when the torque has reached the
     # desired limit and the hand has stopped moving
+    # if resetToStoppedPos is true, the hand's new goal will be the position
+    # it stopped in with the torque goal.
     self.handTorqueGoal = torque
     # reset the hand velocity history
     self.handVelocityHistory = []
+    # save the resetToStoppedPos
+    self.handResetToStoppedPos = resetToStoppedPos
 
   def HandJointCallback(self, data):
     # listen to the state of the hand joint and notify listeners as needed
@@ -193,6 +198,10 @@ class PersistantData:
         self.handCV.acquire()
         self.handPosGoal = None
         self.handTorqueGoal = None
+        # respect the hand stopped pos if needed
+        if self.handResetToStoppedPos:
+          self.handJointPosPublisher.publish(data.current_pos)
+          self.handResetToStoppedPos = False
         self.handCV.notifyAll()
         self.handCV.release()
       elif (avgVelocityHistory is not None) and (abs(avgVelocityHistory) < 0.1):
@@ -200,6 +209,9 @@ class PersistantData:
         self.handCV.acquire()
         self.handPosGoal = None
         self.handTorqueGoal = None
+        if self.handResetToStoppedPos:
+          self.handJointPosPublisher.publish(data.current_pos)
+          self.handResetToStoppedPos = False
         self.handCV.notifyAll()
         self.handCV.release()
 
