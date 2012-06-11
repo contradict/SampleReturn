@@ -282,8 +282,32 @@ def main():
     smach.StateMachine.add(
         'WAIT_FOR_ARM_STOP_DOWN',
         manipulator_states.WaitForArmStop(dataStore, dataStore.armDownTorque),
-        transitions = {'success':'SETUP_ARM_HOLD_DOWN',
+        transitions = {'success':'SETUP_ARM_SPEED_SLIGHTLY_UP',
                        'failure':'ERROR'}
+    )
+
+    # back the arm up a bit...
+    smach.StateMachine.add(
+      'SETUP_ARM_SPEED_SLIGHTLY_UP',
+      smach_ros.ServiceState('/armJointController/set_speed',
+        SetSpeed,
+        request = SetSpeedRequest(speed=(0.25 * dataStore.armUpSpeed))),
+      transitions={'succeeded':'WAIT_FOR_ARM_SLIGHTLY_UP'}
+    )
+
+    smach.StateMachine.add(
+        'WAIT_FOR_ARM_SLIGHTLY_UP',
+        manipulator_states.StartMovingArm(dataStore, minArmMovement=0.025),
+        transitions = {'success':'SETUP_ARM_SPEED_SLIGHTLY_UP_STOP',
+                       'failure':'ERROR'}
+    )
+
+    smach.StateMachine.add(
+      'SETUP_ARM_SPEED_SLIGHTLY_UP_STOP',
+      smach_ros.ServiceState('/armJointController/set_speed',
+        SetSpeed,
+        request = SetSpeedRequest(speed=-0.1)),
+      transitions={'succeeded':'SETUP_ARM_HOLD_DOWN'}
     )
 
     smach.StateMachine.add(
