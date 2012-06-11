@@ -1,0 +1,19 @@
+local_costmap:
+    global_frame: odom
+    robot_base_frame: base_link
+    update_frequency: 5.0
+    publish_frequency: 2.0
+    static_map: false
+    rolling_window: true
+    width: 15.0
+    height: 15.0
+    static_map: false
+    rolling_window: true
+    #START VOXEL STUFF
+    map_type: voxel
+    origin_z: 0.05
+    z_resolution: 0.10
+    z_voxels: 16
+    unknown_threshold: 5
+    mark_threshold: 2
+    #END VOXEL STUFF
