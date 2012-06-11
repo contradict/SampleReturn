@@ -26,6 +26,8 @@ class PersistantData:
     self.handPosGoal = None
     self.handTorqueGoal = None
     self.currentHandState = None
+    self.handVelocityHistory = []
+    self.handVelocityHistoryLen = 10
 
     # I'm going to assume that the node that owns the instance of this class
     # will do the actual setup of the publishers and subscriptions, but save
@@ -143,9 +145,22 @@ class PersistantData:
     # notifiy the caller via self.handCV when the torque has reached the
     # desired limit and the hand has stopped moving
     self.handTorqueGoal = torque
+    # reset the hand velocity history
+    self.handVelocityHistory = []
 
   def HandJointCallback(self, data):
     # listen to the state of the hand joint and notify listeners as needed
+    # figure out the average velocity of the hand over the history
+    avgVelocityHistory = None
+    if len(self.handVelocityHistory) < self.handVelocityHistoryLen:
+      self.handVelocityHistory.append(data.velocity)
+    else:
+      self.handVelocityHistory = self.handVelocityHistory[1:] + [data.velocity]
+      avgVelocityHistory = 0
+      for v in self.handVelocityHistory:
+        avgVelocityHistory += v
+      avgVelocityHistory /= len(self.handVelocityHistory)
+
     if self.handPosGoal != None:
       print 'hand pos: %s' %(str(data.current_pos))
       if abs(self.handPosGoal - data.current_pos) <= 0.02:
@@ -168,6 +183,13 @@ class PersistantData:
     if self.handTorqueGoal != None:
       print '\thand torque: %s' %(str(data.load))
       if (not data.is_moving) and (abs(data.load - self.handTorqueGoal) <= 0.05):
+        # acquire the lock and notify all
+        self.handCV.acquire()
+        self.handPosGoal = None
+        self.handTorqueGoal = None
+        self.handCV.notifyAll()
+        self.handCV.release()
+      elif (avgVelocityHistory is not None) and (abs(avgVelocityHistory) < 0.1):
         # acquire the lock and notify all
         self.handCV.acquire()
         self.handPosGoal = None
