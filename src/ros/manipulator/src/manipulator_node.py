@@ -202,7 +202,105 @@ def main():
     smach.StateMachine.add(
         'START',
         manipulator_states.HandleGoal(dataStore),
-        transitions = {'success':'ROTATE_WRIST'}
+        transitions = {'success':'ROTATE_WRIST',
+                       'setupNeeded':'START_SETUP'}
+    )
+
+    smach.StateMachine.add(
+      'START_SETUP',
+      smach_ros.ServiceState('armJointController/set_speed',
+        SetSpeed,
+        request = SetSpeedRequest( dataStore.armUpSpeed )),
+      transitions={'succeeded':'INITIALIZING_SETUP_ARM_TORQUE_UP'}
+    )
+
+    smach.StateMachine.add(
+      'INITIALIZING_SETUP_ARM_TORQUE_UP',
+      smach_ros.ServiceState('armJointController/set_torque_limit',
+        SetTorqueLimit,
+        request = SetTorqueLimitRequest( abs(dataStore.armUpTorque) )
+        ),
+      transitions = {'succeeded':'INITIALIZING_SETUP_ARM_TORQUE_ENABLE_UP'}
+    )
+
+    smach.StateMachine.add(
+        'INITIALIZING_SETUP_ARM_TORQUE_ENABLE_UP',
+        smach_ros.ServiceState('armJointController/torque_enable',
+          TorqueEnable,
+          request = TorqueEnableRequest(True)),
+        transitions = {'succeeded':'INITIALIZING_WAIT_FOR_ARM_STOP_UP'}
+    )
+
+    smach.StateMachine.add(
+        'INITIALIZING_WAIT_FOR_ARM_STOP_UP',
+        manipulator_states.WaitForArmStop(dataStore, dataStore.armUpTorque),
+        transitions = {'success':'INITIALIZING_SETUP_ARM_HOLD_UP',
+                       'failure':'ERROR'}
+    )
+
+    smach.StateMachine.add(
+      'INITIALIZING_SETUP_ARM_HOLD_UP',
+      smach_ros.ServiceState('armJointController/set_torque_limit',
+        SetTorqueLimit,
+        request = SetTorqueLimitRequest( abs(dataStore.armHoldTorque) )
+        ),
+      transitions = {'succeeded':'INITIALIZING_SETUP_HAND_TORQUE_OPEN_INIT'}
+    )
+
+    smach.StateMachine.add(
+      'INITIALIZING_SETUP_HAND_TORQUE_OPEN_INIT',
+      smach_ros.ServiceState('handJointController/set_torque_limit',
+        SetTorqueLimit,
+        request = SetTorqueLimitRequest( abs(dataStore.handOpenTorque) )
+        ),
+      transitions = {'succeeded':'INITIALIZING_SETUP_HAND_TORQUE_ENABLE_OPEN_INIT'}
+    )
+
+    smach.StateMachine.add(
+        'INITIALIZING_SETUP_HAND_TORQUE_ENABLE_OPEN_INIT',
+        smach_ros.ServiceState('handJointController/torque_enable',
+          TorqueEnable,
+          request = TorqueEnableRequest(True)),
+        transitions = {'succeeded':'INITIALIZING_OPEN_HAND_INIT'}
+    )
+
+    smach.StateMachine.add(
+        'INITIALIZING_OPEN_HAND_INIT',
+        manipulator_states.MoveHand(
+          dataStore,
+          dataStore.handMaxPos,
+          dataStore.handOpenTorque
+        ),
+        transitions = {'success':'INITIALIZING_CLEAR_CAROUSEL',
+                       'failure':'ERROR'}
+    )
+
+    carouselBin = SelectCarouselBinGoal()
+    carouselBin.bin_index = 0
+    smach.StateMachine.add(
+        'INITIALIZING_CLEAR_CAROUSEL',
+        smach_ros.SimpleActionState('select_carousel_bin',
+          SelectCarouselBinAction,
+          goal=carouselBin),
+        transitions = {'succeeded':'INITIALIZING_SETUP_ARM_LIMP'}
+    )
+
+    # turn off arm torque enable to make the arm go limp after carousel is
+    # clear
+    smach.StateMachine.add(
+        'INITIALIZING_SETUP_ARM_LIMP',
+        smach_ros.ServiceState('armJointController/torque_enable',
+          TorqueEnable,
+          request = TorqueEnableRequest(False)),
+        transitions = {'succeeded':'FINISH_SETUP'}
+    )
+
+    smach.StateMachine.add(
+        'FINISH_SETUP',
+        manipulator_states.FinishSetup(dataStore),
+        transitions = {'success':'ROTATE_WRIST',
+                       'failure':'ERROR',
+                       'fromError':'aborted'}
     )
 
     smach.StateMachine.add(
@@ -493,7 +591,8 @@ def main():
     smach.StateMachine.add(
         'ERROR',
         manipulator_states.ErrorState(dataStore),
-        transitions = {'failure':'aborted'}
+        transitions = {'failure':'aborted',
+                       'success':'START_SETUP'}
     )
 
   # now that the state machine is fully defined, make the action server wrapper

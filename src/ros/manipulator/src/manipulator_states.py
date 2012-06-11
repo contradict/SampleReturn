@@ -9,7 +9,7 @@ class HandleGoal(smach.State):
   # rotation so RotateWrist can take it as input.
   def __init__(self, dataStore):
     smach.State.__init__(self,
-        outcomes=['success'],
+        outcomes=['success', 'setupNeeded'],
         input_keys=['goal'],
         output_keys=['wrist_angle', 'action_feedback']
     )
@@ -27,6 +27,39 @@ class HandleGoal(smach.State):
 
     # set the wrist angle output
     userData.wrist_angle = userData.goal.wrist_angle
+
+    # if we're not in a known state, return setup needed
+    if not self.dataStore.inKnownState:
+      return 'setupNeeded'
+
+    # success!
+    return 'success'
+
+class FinishSetup(smach.State):
+  def __init__(self, dataStore):
+    smach.State.__init__(self,
+        outcomes=['success', 'failure', 'fromError'],
+        output_keys=['wrist_angle', 'action_feedback']
+    )
+    self.dataStore = dataStore
+
+  def execute(self, userData):
+    # set the feedback key. apparently this is needed?
+    # documentation would be nice, smach dudes
+    fb = ManipulatorGrabFeedback()
+    fb.current_state = "FinishedStartup"
+    userData.action_feedback = fb
+
+    # set the wrist angle output
+    userData.wrist_angle = self.dataStore.currentActionGoal.wrist_angle
+
+    # we should be in a known state now
+    self.dataStore.inKnownState = True
+
+    # if we got here from an error, return that
+    if self.dataStore.hadError:
+      self.dataStore.hadError = False
+      return 'fromError'
 
     # success!
     return 'success'
@@ -234,11 +267,14 @@ class WaitForHandStop(smach.State):
 class ErrorState(smach.State):
   # handle any errors that show up
   def __init__(self, dataStore):
-    smach.State.__init__(self, outcomes=['failure'] )
+    smach.State.__init__(self, outcomes=['failure', 'success'] )
     self.dataStore = dataStore
 
   def execute(self, userdata):
-    # XXX TODO: actual erorr handling!
+    # tell the dataStore we had an error, if it didn't already know
+    if not self.dataStore.hadError:
+      self.dataStore.hadError = True
+      return 'success'
     # well did we succeed or fail at failing?
     return 'failure'
 
