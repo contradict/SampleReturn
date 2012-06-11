@@ -248,7 +248,6 @@ def main():
                        'failure':'ERROR'}
     )
 
-    
     smach.StateMachine.add(
       'SETUP_ARM_SPEED_DOWN',
       smach_ros.ServiceState('/armJointController/set_speed',
@@ -257,7 +256,6 @@ def main():
       transitions={'succeeded':'SETUP_ARM_TORQUE_DOWN'}
     )
 
-    
     smach.StateMachine.add(
       'SETUP_ARM_TORQUE_DOWN',
       smach_ros.ServiceState('armJointController/set_torque_limit',
