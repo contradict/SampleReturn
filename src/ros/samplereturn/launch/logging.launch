@@ -22,7 +22,7 @@
       type="record"
       name="navigate_record"
       output="log"
-      args="odometry tf platform_joint_state carousel navigation_stereo/right/image_raw navigation_stereo/left/image_raw navigation_stereo/right/camera_info navigation_stereo/left/camera_info">
+      args="odometry tf platform_joint_state carousel navigation/right/image_raw navigation/left/image_raw navigation/right/camera_info navigation/left/camera_info">
   </node>
 
   <!-- DSLR Client and Publisher-->
@@ -34,5 +34,5 @@
       type="record"
       name="search_record"
       output="log"
-      args="camimg manipulator_stereo/left/image_raw manipulator_stereo/right/image_raw manipulator_stereo/left/camera_info manipulator_stereo/right/camera_info"/>
+      args="camimg manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info"/>
 </launch>
