@@ -62,7 +62,7 @@ class RotateWrist(smach.State):
     self.dataStore.wristCV.release()
 
     # check to make sure we got the right wrist angle
-    if abs(self.dataStore.GetWristAngle() - userdata.wrist_angle) <= 0.01:
+    if abs(self.dataStore.GetWristAngle() - userdata.wrist_angle) <= 0.025:
       return 'success'
     else:
       return 'failure'

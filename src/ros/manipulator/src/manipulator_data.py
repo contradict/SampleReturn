@@ -54,7 +54,8 @@ class PersistantData:
     # check out the state of the goal and notify anyone who may be waiting for
     # the wrist to reach a specific state.
     if self.wristAngleGoal != None:
-      if abs(data.current_pos - self.wristAngleGoal) < 0.01:
+      print 'wrist pos: %f' %(data.current_pos)
+      if abs(data.current_pos - self.wristAngleGoal) < 0.025:
         # if we have a goal and we just met it, notify all and release the
         # condition variable
         self.wristCV.acquire()
