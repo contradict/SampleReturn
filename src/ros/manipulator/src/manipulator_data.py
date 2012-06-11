@@ -9,6 +9,12 @@ class PersistantData:
     # starts.
     self.currentActionGoal = None
 
+    # is in known state is false if the manipulator hasn't been moved ever
+    self.inKnownState = False
+
+    # if we have an error hadError is true
+    self.hadError = False
+
     # make condition variables for the various things the states care about.
     self.wristCV = threading.Condition()
     self.wristAngleGoal = None
