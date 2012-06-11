@@ -3,77 +3,11 @@
 <!-- -*- mode: XML -*- -->
 
 <launch>
-  <node respawn="true" pkg="joy"
-      type="joy_node" name="joy_node" output="screen">
-      <param name="dev" type="string" value="/dev/input/js0" />
-      <param name="deadzone" value="0.05" />
-  </node>
-
-  <!-- load up the manager. this thing gets the actual serial port -->
-  <node name="dynamixel_manager" pkg="dynamixel_controllers" type="controller_manager.py" required="true" output="screen">
-    <rosparam>
-      namespace: dxl_manager
-      serial_ports:
-        manipulator_port:
-          port_name: "/dev/ttyUSB0"
-          baud_rate: 57600
-          min_motor_id: 10
-          max_motor_id: 12
-          update_rate: 20
-    </rosparam>
-  </node>
-
-  <!-- load the yaml file that defines which motor is which and what kind
-       of controller they each get -->
-  <rosparam file="$(find manipulator)/config/manipulator.yaml" command="load"/>
-
-  <!-- start up the joint controllers! -->
-  <node
-    name="dynamixel_controller_spawner"
-    pkg="dynamixel_controllers"
-    type="controller_spawner.py"
-    args="--manager=dxl_manager --port=manipulator_port --type=simple wristJointController armJointController handJointController"
-    output="screen"
+  <machine name="search"
+           address="moline"
+           ros-root="/opt/ros/electric/ros"
+           ros-package-path="$(env ROS_PACKAGE_PATH)"
+           user="$(env USER)"
   />
-
-  <!-- now the sacry part, the manipulator node! -->
-  <node
-    name="manipulator"
-    pkg="manipulator"
-    type="manipulator_node.py"
-    output="screen"
-  >
-    <rosparam>
-      wrist_min_pos: 0
-      wrist_max_pos: 2.09
-      wrist_speed: 1.0
-      wrist_torque: 0.5
-
-      arm_down_speed: -2.0
-      arm_down_torque: -0.25
-      arm_up_speed: 1.5
-      arm_up_torque: 0.4
-      arm_hold_torque: 0.1
-
-      hand_min_pos: 0.35
-      hand_max_pos: 3.1
-      hand_close_speed: -2.0
-      hand_open_speed: 2.0
-      hand_close_torque: -0.4
-      hand_open_torque: 0.5
-      hand_hold_torque: 0.1
-    </rosparam>
-  </node>
-
-  <node
-    name="manipulator_test"
-    pkg="manipulator"
-    type="manipulator_test_node.py"
-    output="screen"
-  >
-    <rosparam>
-      button_grab: 4
-    </rosparam>
-  </node>
-
+  <include file="$(find manipulator)/launch/manipulator.launch"/> 
 </launch>
