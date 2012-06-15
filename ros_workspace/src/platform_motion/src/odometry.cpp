@@ -111,6 +111,7 @@ class OdometryNode {
         double odom_orientation;
         double wheel_diameter;
         double delta_threshold;
+        double unexplainable_jump;
         std::string odom_frame_id, child_frame_id;
 };
 
@@ -124,8 +125,11 @@ OdometryNode::OdometryNode() :
     param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
     param_nh.param<std::string>("child_frame_id", child_frame_id, "base_link");
     param_nh.param("delta_threshold", delta_threshold, 0.01);
+    param_nh.param("unexplainable_jump", unexplainable_jump, 12.0);
     param_nh.param("wheel_diameter", wheel_diameter, 0.314);
 
+    ROS_INFO("delta_threshold: %f", delta_threshold);
+    ROS_INFO("unexplainable_jump : %f", unexplainable_jump);
     joint_state_sub = nh_.subscribe("platform_joint_state", 2, &OdometryNode::jointStateCallback,
             this);
     odometry_pub = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
@@ -287,6 +291,17 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
 
     double max_abs_delta = std::max(fabs(starboard_delta), fabs(port_delta));
     max_abs_delta = std::max(max_abs_delta, fabs(stern_delta));
+
+    double min_abs_delta = std::min(fabs(starboard_delta), fabs(port_delta));
+    min_abs_delta = std::min(min_abs_delta, fabs(stern_delta));
+
+    if(min_abs_delta>unexplainable_jump) {
+        last_port_wheel = port_wheel;
+        last_starboard_wheel = starboard_wheel;
+        last_stern_wheel = stern_wheel;
+        return;
+    }
+
 
     nav_msgs::Odometry odo;
 
