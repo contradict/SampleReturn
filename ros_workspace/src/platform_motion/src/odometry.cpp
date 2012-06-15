@@ -15,11 +15,14 @@ namespace platform_motion {
 
 struct lmmin_data {
     Eigen::Vector2d body_pt;
-    Eigen::Vector2d port_pos, port_delta;
+    Eigen::Vector2d port_pos, port_dir;
+    double port_delta;
     double port_vel;
-    Eigen::Vector2d stern_pos, stern_delta;
+    Eigen::Vector2d stern_pos, stern_dir;
+    double stern_delta;
     double stern_vel;
-    Eigen::Vector2d starboard_pos, starboard_delta;
+    Eigen::Vector2d starboard_pos, starboard_dir;
+    double starboard_delta;
     double starboard_vel;
 };
 
@@ -42,13 +45,13 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
 
     Eigen::Vector2d port_error =
         R*(data->port_pos - data->body_pt) + data->body_pt + T
-        - (data->port_pos + data->port_delta);
+        - (data->port_pos + data->port_dir*data->port_delta);
     Eigen::Vector2d stern_error =
         R*(data->stern_pos - data->body_pt) + data->body_pt + T
-        - (data->stern_pos + data->stern_delta);
+        - (data->stern_pos + data->stern_dir*data->stern_delta);
     Eigen::Vector2d starboard_error =
         R*(data->starboard_pos - data->body_pt) + data->body_pt + T
-        - (data->starboard_pos + data->starboard_delta);
+        - (data->starboard_pos + data->starboard_dir*data->starboard_delta);
 
     fvec[0] = port_error(0);
     fvec[1] = port_error(1);
@@ -277,7 +280,8 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             return;
         }
         data.port_pos = Eigen::Vector2d(port_tf.getOrigin().x(), port_tf.getOrigin().y());
-        data.port_delta = port_delta*port_wheel_direction;
+        data.port_dir = port_wheel_direction;
+        data.port_delta = port_delta;
         data.port_vel = port_wheel_velocity;
 
         try {
@@ -287,7 +291,8 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             return;
         }
         data.starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
-        data.starboard_delta = starboard_delta*starboard_wheel_direction;
+        data.starboard_delta = starboard_delta;
+        data.starboard_dir = starboard_wheel_direction;
         data.starboard_vel = starboard_wheel_velocity;
 
         try {
@@ -297,7 +302,8 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             return;
         }
         data.stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
-        data.stern_delta = stern_delta*stern_wheel_direction;
+        data.stern_delta = stern_delta;
+        data.stern_dir = stern_wheel_direction;
         data.stern_vel = stern_wheel_velocity;
 
         double xytheta[3] = {0.0, 0.0, 0.0};
