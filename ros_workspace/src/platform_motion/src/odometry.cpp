@@ -105,6 +105,7 @@ class OdometryNode {
         tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher odometry_pub;
 
+        bool first;
         double last_starboard_wheel, last_port_wheel, last_stern_wheel;
         Eigen::Vector2d odom_position;
         double odom_orientation;
@@ -114,6 +115,7 @@ class OdometryNode {
 };
 
 OdometryNode::OdometryNode() :
+    first(true),
     last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
     odom_position(Eigen::Vector2d::Zero()),
     odom_orientation(0)
@@ -268,6 +270,15 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     lookupJointValue(joint_state, "port_axle", &port_wheel, &port_wheel_velocity);
     lookupJointValue(joint_state, "starboard_axle", &starboard_wheel, &starboard_wheel_velocity);
     lookupJointValue(joint_state, "stern_axle", &stern_wheel, &stern_wheel_velocity);
+
+    if(first) {
+        last_port_wheel = port_wheel;
+        last_starboard_wheel = starboard_wheel;
+        last_stern_wheel = stern_wheel;
+        first = false;
+        ROS_INFO("set initial wheel angles: %f %f %f", last_port_wheel, last_starboard_wheel, last_stern_wheel);
+        return;
+    }
 
     port_delta = (port_wheel - last_port_wheel)*wheel_diameter/2.;
     starboard_delta = (starboard_wheel - last_starboard_wheel)*wheel_diameter/2.;
