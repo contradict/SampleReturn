@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+    <include file="$(find samplereturn)/launch/search_camera.launch"/>
+
     <!-- Object Detector -->
     <node machine="search" pkg="samplereturn" type="objectdetector.py" name="objectdetector"/>
 </launch>
