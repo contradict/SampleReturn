@@ -54,8 +54,19 @@
         >
         <param name="maxUrange" value="10"/>
         <param name="maxRange" value="10.5"/>
+        <!-- motion model parameters, stddev of gaussian-->
+        <!-- rotation/rotation -->
+        <param name="srr" value="6e-3"/>
+        <!-- translation/translation -->
+        <param name="stt" value="1e-2"/>
+        <!-- rotation/translation -->
+        <param name="srt" value="1e-3"/>
+        <!-- translation/rotation -->
+        <param name="str" value="1e-3"/>
         <param name="map_update_interval" value="2.0"/>
         <param name="temporalUpdate" value="1.0"/>
+        <param name="angularUpdate" value="0.2"/>
+        <param name="linearUpdate" value="1.0"/>
     </node>
     <!-- Run the fake localization -->
     <!--
