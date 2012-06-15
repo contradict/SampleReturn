@@ -46,12 +46,34 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
     Eigen::Vector2d port_error =
         R*(data->port_pos - data->body_pt) + data->body_pt + T
         - (data->port_pos + data->port_dir*data->port_delta);
+    ROS_DEBUG("port_pos(%f %f) body_pt(%f %f)\nT(%f %f) theta(%f)\nport_dir(%f %f) port_delta(%f)\nport_error(%f %f)",
+            data->port_pos[0], data->port_pos[1],
+            data->body_pt[0], data->body_pt[1],
+            T[0], T[1], theta,
+            data->port_dir[0], data->port_dir[1],
+            data->port_delta,
+            port_error[0], port_error[1]);
     Eigen::Vector2d stern_error =
         R*(data->stern_pos - data->body_pt) + data->body_pt + T
         - (data->stern_pos + data->stern_dir*data->stern_delta);
+    ROS_DEBUG("stern_pos(%f %f) body_pt(%f %f)\nT(%f %f) theta(%f)\nstern_dir(%f %f) stern_delta(%f)\nstern_error(%f %f)",
+            data->stern_pos[0], data->stern_pos[1],
+            data->body_pt[0], data->body_pt[1],
+            T[0], T[1], theta,
+            data->stern_dir[0], data->stern_dir[1],
+            data->stern_delta,
+            stern_error[0], stern_error[1]);
     Eigen::Vector2d starboard_error =
         R*(data->starboard_pos - data->body_pt) + data->body_pt + T
         - (data->starboard_pos + data->starboard_dir*data->starboard_delta);
+    ROS_DEBUG("starboard_pos(%f %f) body_pt(%f %f)\nT(%f %f) theta(%f)\nstarboard_dir(%f %f) starboard_delta(%f)\nstarboard_error(%f %f)",
+            data->starboard_pos[0], data->starboard_pos[1],
+            data->body_pt[0], data->body_pt[1],
+            T[0], T[1], theta,
+            data->starboard_dir[0], data->starboard_dir[1],
+            data->starboard_delta,
+            starboard_error[0], starboard_error[1]);
+
 
     fvec[0] = port_error(0);
     fvec[1] = port_error(1);
