@@ -22,12 +22,12 @@
 28,0,Velocity Vi,0
 2f,0,Programmed Velocity Command,0
 31,0,Velocity Gains Scalor,0
-36,0,Velocity Loop Acceleration Limit,1500
-37,0,Velocity Loop Deceleration Limit,1500
-39,0,Velocity Fast Stop Ramp,1500
-3a,0,Velocity Loop Velocity Limit,450000
+36,0,Velocity Loop Acceleration Limit,5461
+37,0,Velocity Loop Deceleration Limit,5461
+39,0,Velocity Fast Stop Ramp,5461
+3a,0,Velocity Loop Velocity Limit,983040
 3f,0,Velocity Tracking Time,100
-3e,0,Velocity Tracking Window,400000
+3e,0,Velocity Tracking Window,873813
 41,0,Motor Manufacturer,Portescap
 42,0,Motor Model Number,35NT2r 82 426SP 50
 43,0,Motor Units,0
@@ -42,7 +42,7 @@
 4e,0,Motor Wiring,0
 53,0,Brake/Stop Delay Time,0
 54,0,Motor Brake Delay Time,0
-55,0,Brake/Stop Activation Velocity,0
+55,0,Motor Brake Activation Velocity,0
 56,0,Motor Back Emf Constant,540
 6a,0,Commanded Current Ramp,0
 70,0,Output 1 Config,2:0:0
@@ -53,7 +53,7 @@
 7c,0,Input 5 Config,0
 7d,0,Input 6 Config,0
 80,0,Amp Model Number,ACP-090-36
-8a,0,Voltage Sense,2252
+8a,0,Voltage Sense,2248
 92,0,Amp Name,Carousel
 98,0,Function Generator Config,2
 99,0,Function Generator Frequency,1
@@ -138,7 +138,7 @@ c2,0,Home Configuration,560
 c3,0,Home Velocity Fast,16667
 c4,0,Home Velocity Slow,8333
 c5,0,Home Accel/Decel,5000
-c6,0,Home Offset,1650
+c6,0,Home Offset,200
 c7,0,Home Current,111
 ce,0,Trajectory Max Jerk,1000
 d0,0,Input 9 Config,0
@@ -159,9 +159,9 @@ f8,0,Input 9 Debounce Time,0
 f9,0,Input 10 Debounce Time,0
 fa,0,Input 11 Debounce Time,0
 fb,0,Input 12 Debounce Time,0
-103,0,Network address Input Map,0
+103,0,Network address Input Map,-2147483648
 116,0,CANopen quick stop code,2
 117,0,CANopen shutdown option code,0
 118,0,CANopen disable option code,1
 119,0,CANopen halt option code,1
-11a,0,Amp Scaling Config,0
+11a,0,Amp Scaling Config,-1
