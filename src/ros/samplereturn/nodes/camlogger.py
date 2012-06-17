@@ -21,7 +21,7 @@ def capture_image():
 def camlogger():
   topic = 'camimg'
   pub = rospy.Publisher(topic,Image)
-  info_pub = rospy.Publisher(info_topic,CameraInfo)
+  #info_pub = rospy.Publisher(info_topic,CameraInfo)
   rospy.init_node('camlogger',log_level=rospy.DEBUG)
   r = rospy.Rate(1)
   while not rospy.is_shutdown():
