@@ -61,9 +61,9 @@
       hand_max_pos: 3.31
       hand_close_speed: 2.0
       hand_open_speed: 2.0
-      hand_close_torque: -0.2
+      hand_close_torque: 1.0
       hand_open_torque: 0.5
-      hand_hold_torque: 0.1
+      hand_hold_torque: 0.4
     </rosparam>
   </node>
 </launch>
