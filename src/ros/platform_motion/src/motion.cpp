@@ -56,14 +56,8 @@ Motion::Motion() :
     param_nh.param("wheel_diameter", wheel_diameter, 0.330);
     param_nh.param<std::string>("child_frame_id", child_frame_id, "base_link");
 
-    param_nh.param("center_pt_x", center_pt_x, 0.0);
-    param_nh.param("center_pt_y", center_pt_y, 0.0);
-
-    param_nh.param("min_wheel_speed", min_wheel_speed, 0.0005);
-
     param_nh.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
 
-    body_pt << center_pt_x, center_pt_y;
     enable_pods_server = nh_.advertiseService("enable_wheel_pods",
             &Motion::enableWheelPodsCallback, this);
     enable_carousel_server = nh_.advertiseService("enable_carousel",
@@ -132,6 +126,7 @@ void Motion::createServos()
     int sync_interval;
     int steering_encoder_counts, wheel_encoder_counts;
     int large_steering_move;
+    double min_wheel_speed;
 
     CANOpen::CopleyServo::InputChangeCallback
         gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
@@ -143,6 +138,8 @@ void Motion::createServos()
     param_nh.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
     param_nh.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
     param_nh.param("large_steering_move", large_steering_move, 30);
+    param_nh.param("min_wheel_speed", min_wheel_speed, 0.0005);
+
 
     param_nh.param("port_steering_id", port_steering_id, 4);
     param_nh.param("port_wheel_id", port_wheel_id, 2);
@@ -151,14 +148,17 @@ void Motion::createServos()
     param_nh.param("port_steering_offset", port_steering_offset,  0.0);
     port = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
+                 "port_steering",
                  port_steering_id,
-                 port_wheel_id,
                  port_steering_min,
                  port_steering_max,
                  port_steering_offset,
                  steering_encoder_counts,
+                 "port_wheel",
+                 port_wheel_id,
                  wheel_encoder_counts,
-                 large_steering_move
+                 wheel_diameter,
+                 min_wheel_speed
                 ));
     port->setCallbacks(pvcb, pvcb, gpiocb);
 
@@ -169,14 +169,17 @@ void Motion::createServos()
     param_nh.param("starboard_steering_offset", starboard_steering_offset,  0.0);
     starboard = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
+                 "starboard_steering",
                  starboard_steering_id,
-                 starboard_wheel_id,
                  starboard_steering_min,
                  starboard_steering_max,
                  starboard_steering_offset,
                  steering_encoder_counts,
+                 "starboard_wheel",
+                 starboard_wheel_id,
                  wheel_encoder_counts,
-                 large_steering_move
+                 wheel_diameter,
+                 min_wheel_speed
                 ));
     starboard->setCallbacks(pvcb, pvcb, gpiocb);
 
@@ -188,14 +191,17 @@ void Motion::createServos()
     param_nh.param("stern_steering_offset", stern_steering_offset,  0.0);
     stern = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
+                 "stern_steering",
                  stern_steering_id,
-                 stern_wheel_id,
                  stern_steering_min,
                  stern_steering_max,
                  stern_steering_offset,
                  steering_encoder_counts,
+                 "stern_wheel",
+                 stern_wheel_id,
                  wheel_encoder_counts,
-                 large_steering_move
+                 wheel_diameter,
+                 min_wheel_speed
                 ));
     stern->setCallbacks(pvcb, pvcb, gpiocb);
 
@@ -290,6 +296,7 @@ void Motion::start(void)
     ROS_INFO("Waiting for transforms");
     ros::Time current = ros::Time(0);
     ros::Duration wait(1.0);
+    tf::TransformListener listener;
     while( !(
              listener.waitForTransform(child_frame_id, std::string("port_suspension"), current, wait) && 
              listener.waitForTransform(child_frame_id, std::string("starboard_suspension"), current, wait) &&
@@ -307,60 +314,21 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
     double stern_wheel_speed, starboard_wheel_speed, port_wheel_speed;
     double stern_steering_angle, starboard_steering_angle, port_steering_angle;
 
-
-    stern->getPosition(&stern_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, "stern_suspension",
-                &stern_steering_angle, &stern_wheel_speed)) {
+    if(0>stern->driveBody(body_vel, body_omega, child_frame_id,
+                &stern_steering_angle, &stern_wheel_speed))
         return;
-    }
-
-    port->getPosition(&port_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, "port_suspension",
-                &port_steering_angle, &port_wheel_speed)) {
+    if(0>starboard->driveBody(body_vel, body_omega, child_frame_id,
+                &starboard_steering_angle, &starboard_wheel_speed))
         return;
-    }
-
-    starboard->getPosition(&starboard_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, "starboard_suspension",
-                &starboard_steering_angle, &starboard_wheel_speed)){
+    if(0>port->driveBody(body_vel, body_omega, child_frame_id,
+                &port_steering_angle, &port_wheel_speed))
         return;
-    }
 
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     port->drive(port_steering_angle, port_wheel_speed);
     starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
     stern->drive(stern_steering_angle, -stern_wheel_speed);
 }
-
-int Motion::computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
-        const char *joint_name, double *steering, double *speed)
-{
-    tf::StampedTransform pod_tf;
-    ros::Time current(0);
-    try {
-        listener.lookupTransform(child_frame_id, joint_name, current, pod_tf );
-    } catch( tf::TransformException ex) {
-        ROS_ERROR("Error looking up %s: %s", joint_name, ex.what());
-        return -1;
-    }
-    //ROS_DEBUG("%s at (%f, %f)", joint_name, port_tf.getOrigin().x(), port_tf.getOrigin().y());
-    Eigen::Vector2d pod_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
-    Eigen::Vector2d pod_vect = pod_pos - body_pt;
-    Eigen::Vector2d pod_perp(-pod_vect(1), pod_vect(0));
-    Eigen::Vector2d pod_vel = body_vel + pod_perp*body_omega;
-
-    *speed = pod_vel.norm();
-    if(*speed>min_wheel_speed) {
-        *steering = atan2(pod_vel(1), pod_vel(0));
-        *speed /= M_PI*wheel_diameter;
-        return 0;
-    } else {
-        *speed = 0;
-        return 1;
-    }
-
-}
-
 
 
 void Motion::doHomePods(void)
@@ -620,7 +588,9 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
 {
-    wheel_diameter = config.wheel_diameter;
+    port->wheel_diameter = config.wheel_diameter;
+    starboard->wheel_diameter = config.wheel_diameter;
+    stern->wheel_diameter = config.wheel_diameter;
 
     if( CAN_fd>0 ) {
         boost::unique_lock<boost::mutex> lock(CAN_mutex);

@@ -3,6 +3,10 @@
 #include <Eigen/Dense>
 #include <CANOpen.h>
 
+#include <tf/tf.h>
+#include <tf/transform_listener.h>
+#include <geometry_msgs/Twist.h>
+
 #include <motion/wheelpod.h>
 
 namespace platform_motion {
@@ -40,6 +44,41 @@ void WheelPod::drive(double angle, double omega)
     steering.setPosition(position,
             CANOpen::DS301CallbackObject(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                 static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&WheelPod::_positionAcchieved)));
+}
+
+int WheelPod::driveBody(Eigen::Vector2d body_vel, double body_omega, std::string body_frame,
+        double *steering, double *speed)
+{
+    getPosition(steering, NULL, NULL, NULL);
+    int err=computePodVelocity(body_vel, body_omega, body_frame, steering, speed);
+    return err;
+}
+
+int WheelPod::computePodVelocity(Eigen::Vector2d body_vel, double body_omega, std::string body_frame,
+        double *steering, double *speed)
+{
+    tf::StampedTransform pod_tf;
+    ros::Time current(0);
+    try {
+        listener.lookupTransform(steering_joint_name, body_frame, current, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", steering_joint_name.c_str(), ex.what());
+        return -1;
+    }
+    //ROS_DEBUG("%s at (%f, %f)", joint_name, port_tf.getOrigin().x(), port_tf.getOrigin().y());
+    Eigen::Vector2d pod_vect( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+    Eigen::Vector2d pod_perp(-pod_vect(1), pod_vect(0));
+    Eigen::Vector2d pod_vel = body_vel + pod_perp*body_omega;
+
+    *speed = pod_vel.norm();
+    if(*speed>min_wheel_speed) {
+        *steering = atan2(pod_vel(1), pod_vel(0));
+        *speed /= M_PI*wheel_diameter;
+        return 0;
+    } else {
+        *speed = 0;
+        return 1;
+    }
 }
 
 void WheelPod::_positionAcchieved(CANOpen::DS301 &node)

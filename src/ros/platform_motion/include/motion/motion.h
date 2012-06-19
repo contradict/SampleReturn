@@ -38,8 +38,6 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;
 
-
-        tf::TransformListener listener;
         std::string child_frame_id;
 
         ros::Subscriber twist_sub;
@@ -75,7 +73,6 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         double wheel_diameter;
 
         double center_pt_x, center_pt_y;
-        double min_wheel_speed;
 
         int carousel_encoder_counts;
         double carousel_jerk_limit;
