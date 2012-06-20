@@ -24,6 +24,7 @@ As submitted to WPI in January. Needs an update.
  * Double check camera FOV, perhaps new brackets
  * Stiffen Wheel Yokes?
  * Lighter deck plates?
+ * Cut carousel to accommodate samples hanging below gripper fingers
 
 ##User Interface
  * Speech Synthesis
