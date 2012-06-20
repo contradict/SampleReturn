@@ -40,6 +40,7 @@ As submitted to WPI in January. Needs an update.
 ##Motion
  * Tune velocity loops
  * Trajectory Following (as opposed to velocity control)
+
 ##Gripper
  * Full position mode control
  * Switch to MX64?
