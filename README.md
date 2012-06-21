@@ -6,7 +6,7 @@ The source code and data for our robot
  * Survey
 
 ##Robot Name
- * "" 
+ * Artemis (greek goddess, huntress, Apollo's twin sister, all around bad-ass chick)
 
 
 ## Proposal
@@ -22,12 +22,13 @@ As submitted to WPI in January. Needs an update.
 
 ##Mechanical
  * Double check camera FOV, perhaps new brackets
- * Stiffen Wheel Yokes?
+ * Stiffen Wheel Yokes? (might not be a good idea.  some flexibility is typical in lightweight designs, e.g. airplane wings)
  * Lighter deck plates?
- * Cut carousel to accommodate samples hanging below gripper fingers
+ * Cut carousel down 2" or so to accommodate samples hanging below gripper fingers
+ * Add lightweight omni-directional speaker for audio feedback
 
 ##User Interface
- * Speech Synthesis
+ * Speech Synthesis (or maybe just pre-recorded messages, e.g. "I found one!", "Picking one up", "Returning to home")
  * Soft Shutdown switch
  * Flashing Lights as described in rules
  * Mode Switch
@@ -50,6 +51,7 @@ As submitted to WPI in January. Needs an update.
    * wrist angle
    * expected grip width
  * proper visual servo
+ * Add sticky foam pads to gripper fingers
 
 ##Navigation
  * Test ScaViSLAM on our problem
@@ -65,6 +67,7 @@ As submitted to WPI in January. Needs an update.
  * select global planning technique
  * select local planning technique
  * State Machine (or real planner?)
+ * Watchdog algorithm that, for example, "starts over" if she thinks the whole place has been searched but not all the samples have been found
 
 ##Sample Sensors
  * Wood Block
