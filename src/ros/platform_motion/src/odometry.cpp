@@ -113,10 +113,11 @@ void OdometryNode::init()
              listener.waitForTransform(child_frame_id, std::string("port_suspension"), current, wait) && 
              listener.waitForTransform(child_frame_id, std::string("starboard_suspension"), current, wait) &&
              listener.waitForTransform(child_frame_id, std::string("stern_suspension"), current, wait)
-            )
+            ) && ros::ok()
          )
         ROS_INFO("Still Waiting for transforms");
-    ROS_INFO("Got all transforms");
+    if( ros::ok() )
+        ROS_INFO("Got all transforms");
 }
 
 void OdometryNode::fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool stopped)

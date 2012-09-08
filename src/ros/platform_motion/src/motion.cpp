@@ -250,6 +250,10 @@ void Motion::runBus(void)
     while(!openBus() && CAN_thread_run ) {
         ROS_ERROR("Could not open CAN bus, trying again in 5 seconds");
         ros::Duration(5.0).sleep();
+        if( ! ros::ok() ) {
+            CAN_thread_run = false;
+            break;
+        }
     }
     open_lock.unlock();
     if( ! CAN_thread_run )
@@ -294,10 +298,11 @@ void Motion::start(void)
              listener.waitForTransform(child_frame_id, std::string("port_suspension"), current, wait) && 
              listener.waitForTransform(child_frame_id, std::string("starboard_suspension"), current, wait) &&
              listener.waitForTransform(child_frame_id, std::string("stern_suspension"), current, wait)
-            )
+            ) && ros::ok()
          )
         ROS_INFO("Still Waiting for transforms");
-    ROS_INFO("Got all transforms");
+    if( ros::ok() )
+        ROS_INFO("Got all transforms");
 }
 
 void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
