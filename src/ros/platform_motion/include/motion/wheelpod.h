@@ -55,12 +55,20 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
 
         void setSteeringOffset(double offset);
 
+        void bodyToPod(const std::vector<geometry_msgs::Pose> &body_position,
+                       const std::vector<geometry_msgs::Twist> &body_velocity,
+                       std::string body_frame,
+                       std::vector<struct CANOpen::PVTData> *pod_steer,
+                       std::vector<struct CANOpen::PVTData> *pod_wheel
+                      );
+
         CANOpen::CopleyServo steering, wheel;
 
         double wheel_diameter;
     private:
         int computePodVelocity(Eigen::Vector2d body_vel, double body_omega, std::string body_frame,
                 double *steering, double *speed);
+        int lookupPodPosition(Eigen::Vector2d *pod_pos);
         void _setMode(enum PodMode m);
         void _positionAcchieved(CANOpen::DS301 &node);
 

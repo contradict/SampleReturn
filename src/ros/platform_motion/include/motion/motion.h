@@ -34,17 +34,23 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins);
         void syncCallback(CANOpen::SYNC &sync);
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
-
+        void trajectoryCallback(const platform_motion::Trajectory::ConstPtr trajectory);
+        
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;
 
         std::string child_frame_id;
 
         ros::Subscriber twist_sub;
+
+        ros::Subscriber trajectory_sub;
+
         ros::Subscriber carousel_sub;
-        ros::Subscriber gpio_sub;
-        ros::Publisher gpio_pub;
+
         ros::Publisher joint_state_pub;
+
+        ros::Publisher gpio_pub;
+        ros::Subscriber gpio_sub;
 
         dynamic_reconfigure::Server<PlatformParametersConfig>
             reconfigure_server;

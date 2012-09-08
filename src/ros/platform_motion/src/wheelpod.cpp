@@ -5,6 +5,7 @@
 
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
+#include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Twist.h>
 
 #include <motion/wheelpod.h>
@@ -54,25 +55,32 @@ int WheelPod::driveBody(Eigen::Vector2d body_vel, double body_omega, std::string
     return err;
 }
 
-int WheelPod::computePodVelocity(Eigen::Vector2d body_vel, double body_omega, std::string body_frame,
-        double *steering, double *speed)
+int WheelPod::lookupPodPosition(std::string body_frame, tf::Pose *pod_pose)
 {
-    tf::StampedTransform pod_tf;
     ros::Time current(0);
     try {
-        listener.lookupTransform(steering_joint_name, body_frame, current, pod_tf );
+        listener.lookupTransform(steering_joint_name, body_frame, current, *pod_pose );
     } catch( tf::TransformException ex) {
         ROS_ERROR("Error looking up %s: %s", steering_joint_name.c_str(), ex.what());
         return -1;
     }
     //ROS_DEBUG("%s at (%f, %f)", joint_name, port_tf.getOrigin().x(), port_tf.getOrigin().y());
-    Eigen::Vector2d pod_vect( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
-    Eigen::Vector2d pod_perp(-pod_vect(1), pod_vect(0));
-    Eigen::Vector2d pod_vel = body_vel + pod_perp*body_omega;
+    return 0;
+}
 
-    *speed = pod_vel.norm();
+int WheelPod::computePodVelocity(tf::Vector3 body_vel, double body_omega, std::string body_frame,
+        double *steering, double *speed)
+{
+    tf::Pose pod_pose;
+    int err = lookupPodPosition(body_frame, &pod_pose);
+    if(err<0)
+        return err;
+    tf::Vector3 omega_vect(0, 0, body_omega);
+    tf::Vector3 pod_vel = body_vel + omega_vect.cross(pod_pose.getOrigin());
+
+    *speed = pod_vel.length();
     if(*speed>min_wheel_speed) {
-        *steering = atan2(pod_vel(1), pod_vel(0));
+        *steering = atan2(pod_vel.y(), pod_vel.x());
         *speed /= M_PI*wheel_diameter;
         return 0;
     } else {
@@ -80,6 +88,94 @@ int WheelPod::computePodVelocity(Eigen::Vector2d body_vel, double body_omega, st
         return 1;
     }
 }
+
+int WheelPod::bodyToPod( const std::vector<geometry_msgs::PoseStamped> &body_position,
+                         const std::vector<geometry_msgs::Twist> &body_velocity,
+                         std::string body_frame,
+                         std::vector<struct CANOpen::PVTData> *pod_steer,
+                         std::vector<struct CANOpen::PVTData> *pod_wheel
+                        )
+{
+    std::vector<geometry_msgs::Pose>::const_iterator p=body_position.begin();
+    std::vector<geometry_msgs::Twist>::const_iterator v=body_velocity.begin();
+    struct CANOpen::PVTData steer_point, wheel_point;
+
+    tf::Pose pod_pose;
+    int err = lookupPodPosition(odom_frame, &position);
+    if(err<0)
+        return err;
+
+    computePodMove( pod_pose,
+                    *p, *v,
+                    *p, *v,
+                    &steer_point, &wheel_point);
+
+
+void WheelPod::computePodMove( const tf::Pose &position,
+                               const geometry_msgs::PoseStamped &prev_pos,
+                               const geometry_msgs::Twist &prev_vel,
+                               const geometry_msgs::PoseStamped &pos,
+                               const geometry_msgs::Twist &vel,
+                               struct CANOpen::PVTData *steer_point,
+                               struct CANOpen::PVTData *wheel_point)
+{
+    tf::Quaternion body_q;
+    double body_yaw;
+    double steer_angle, steer_velocity;
+    double wheel_angle, wheel_velocity;
+
+    // retrieve next desired orientation
+    tf::Pose p;
+    tf::poseMsgToTF( *pos, p);
+
+    // vector from desired odom position to desired pod position
+    tf::Vector3 pod_offset = position.inverse*
+
+    // initialize previous position, velocity to first point
+    Eigen::Vector3d ep(p->position.x, p->position.y, 0);
+    prev_pod_position = ep + pod_offset;
+
+    Eigen::Vector3d rvec(v->angular.x, v->angular.y, v->angular.z);
+    prev_pod_velocity = Eigen::Vector3d(v->linear.x, v->linear.y, v->linear.z) +
+                        pod_offset.cross(rvec);
+
+    // if not moving, use relative steering move since no
+    // new direction is available
+    if(prev_pod_velocity.norm()>0.01) {
+        steer_angle = atan2(pod_velocity[1], pod_velocity[0]) - body_yaw;
+        steer_point.relative = false;
+    } else {
+        steer_angle = 0;
+        steer_point.relative = true;
+    }
+    steer_point.position = steering_encoder_counts*steer_angle/2.0/M_PI;
+    steer_point.velocity = 
+
+    p++, v++;
+    for(/* p, v created above */; p<body_position.end(); p++,v++) {
+
+        tf::quaternionMsgToTF(p->orientation, body_q);
+        Eigen::Rotation2D<double> body_rotation(tf::getYaw(body_q));
+        pod_offset.head(2) = body_rotation*(position-body_pt);
+        pod_offset(2) = 0;
+        Eigen::Vector3d ep(p->position.x, p->position.y);
+        pod_position = ep+pod_offset;
+
+        Eigen::Vector3d rvec(v->angular.x, v->angular.y, v->angular.z);
+        pod_velocity = Eigen::Vector3d(v->linear.x, v->linear.y, v->linear.z) +
+                       pod_offset.cross(rvec);
+
+        if(pod_velocity.norm()>0.01) {
+            steer_angle = atan2(pod_velocity[1], pod_velocity[0]);
+            steer_point.relative = false;
+        } else {
+            steer_angle = 0;
+            steer_point.relative = true;
+        }
+    }
+}
+
+
 
 void WheelPod::_positionAcchieved(CANOpen::DS301 &node)
 {

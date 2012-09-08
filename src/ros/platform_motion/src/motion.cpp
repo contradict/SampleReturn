@@ -14,6 +14,10 @@
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/JointState.h>
+
+
+#include <tf/transform_listener.h>
+
 #include <dynamic_reconfigure/server.h>
 #include <tf/transform_listener.h>
 
@@ -26,6 +30,7 @@
 #include <platform_motion/Enable.h>
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion/GPIO.h>
+#include <platform_motion/Trajectory.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -64,6 +69,7 @@ Motion::Motion() :
             &Motion::enableCarouselCallback, this);
 
     twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
+    trajectory_sub = nh_.subscribe("trajectory", 2, &Motion::trajectoryCallback, this);
 
     carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
             this);
@@ -135,6 +141,7 @@ void Motion::createServos()
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
                           
+
     param_nh.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
     param_nh.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
     param_nh.param("large_steering_move", large_steering_move, 30);
@@ -146,6 +153,7 @@ void Motion::createServos()
     param_nh.param("port_steering_min", port_steering_min, -M_PI_2);
     param_nh.param("port_steering_max", port_steering_max,  M_PI_2);
     param_nh.param("port_steering_offset", port_steering_offset,  0.0);
+
     port = std::tr1::shared_ptr<WheelPod>(new WheelPod(
                  pbus,
                  "port_steering",
@@ -330,6 +338,24 @@ void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
     stern->drive(stern_steering_angle, -stern_wheel_speed);
 }
 
+void Motion::trajectoryCallback(const platform_motion::Trajectory::ConstPtr trajectory)
+{
+    //first turn sequence of body position, velocity into a sequence
+    //of wheel pod position, velocity
+    std::vector<struct CANOpen::PVTData> starboard_steer, starboard_wheel,
+                                port_steer, port_wheel,
+                                stern_steer, stern_wheel;
+    starboard->bodyToPod(trajectory->position, trajectory->velocity,
+                         child_frame_id,
+                         &starboard_steer, &starboard_wheel);
+    port->bodyToPod(trajectory->position, trajectory->velocity,
+                    child_frame_id,
+                    &port_steer, &port_wheel);
+    stern->bodyToPod(trajectory->position, trajectory->velocity,
+                     child_frame_id,
+                     &stern_steer, &stern_wheel);
+
+}
 
 void Motion::doHomePods(void)
 {

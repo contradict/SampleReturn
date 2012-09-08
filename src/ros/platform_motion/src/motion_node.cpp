@@ -15,6 +15,7 @@
 #include <platform_motion/HomeAction.h>
 #include <platform_motion/Enable.h>
 #include <platform_motion/GPIO.h>
+#include <platform_motion/Trajectory.h>
 
 #include <canlib.h>
 #include <CANOpen.h>
