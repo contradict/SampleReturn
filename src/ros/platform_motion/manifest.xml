@@ -10,7 +10,7 @@
   <url>https://github.com/contradict/SampleReturn</url>
   <depend package="roscpp"/>
   <depend package="joy"/>
-  <depend package="eigen"/>
+  <rosdep name="eigen"/>
   <depend package="actionlib_msgs"/>
   <depend package="actionlib"/>
   <depend package="nav_msgs"/>
