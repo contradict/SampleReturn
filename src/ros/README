@@ -7,7 +7,8 @@ libsuitesparse-dev
 
 Add the path to this directory to ROS_PACKAGE_PATH.
 
-also need
-ros-electric-joystick-drivers
-ros-electric-camera-drivers
-bosch-
+ROS packages:
+ros-fuerte-desktop-full
+ros-fuerte-joystick-drivers
+ros-fuerte-dynamixel-motor
+ros-fuerte-bosch-drivers
