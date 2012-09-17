@@ -18,7 +18,6 @@
   <depend package="platform_motion"/>
   <depend package="robot_setup_tf"/>
   <depend package="sync_images"/>
-  <depend package="vslam_system"/>
 
 </package>
 
