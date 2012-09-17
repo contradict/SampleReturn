@@ -3,8 +3,7 @@
 <launch>
     <machine name="search"
              address="moline"
-             ros-root="/opt/ros/electric/ros"
-             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
+             env-loader="$(find samplereturn)/launch/env.sh"
              user="robot"
              />
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/> 

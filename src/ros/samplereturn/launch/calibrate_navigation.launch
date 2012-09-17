@@ -3,8 +3,7 @@
 <launch>
     <machine name="navigate"
              address="blue18"
-             ros-root="/opt/ros/electric/ros"
-             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
+             env-loader="$(find samplereturn)/launch/env.sh"
              user="robot"
              />
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/> 
