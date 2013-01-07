@@ -113,7 +113,7 @@ The navigation and search cameras are mounted at the top of a pyramidal frame ab
 \label{fig_bot_manipulator}
 \end{figure}
 
-The challenge rules specify an 80kg mass limit. Our current design comes in at exactly this weight limit.
+The challenge rules specify an 80kg mass limit. Our current design comes in just under this weight limit.
 
 %\input{massbudget}
 \section{Manipulator}\label{Manipulator}
@@ -123,12 +123,12 @@ Early in the design process, a variety of manipulators were considered for the t
 
 \section{Electronics}\label{Electronics}
 
-The electronics system breaks down into four main components: energy storage, power distribution, actuators, and control. Energy is stored in two lithium iron phosphate battery packs packaged by PingBattery\footnote{\url{http://www.pingbattery.com}}. It feeds through the main power switch to directly drive the wheel motors at 48V and into DC/DC converters to drive the cameras, warning beacon, computers, and manipulator servos at 12V. The E-stop is a latching push button switch sitting between the battery stack and all motor controllers and servos; activating it completely disconnects power from these actuators. The drive and steering motors are brushed DC motors with planetary gearboxes, each controlled by a Copely Accelnet \footnote{\url{http://www.copleycontrols.com/}} motor controller. The manipulator open/close, rotate, and lift axes are driven with Dynamixel RX-64 \footnote{\url{http://www.robotis.com/xe/dynamixel_en}} servomotors. Compute is provided by a pair of MiniITX computers: one handling navigation and mapping and one handling search and manipulation.
+The electronics system breaks down into four main components: energy storage, power distribution, actuators, and control. Energy is stored in two lithium iron phosphate battery packs packaged by PingBattery\footnote{\url{http://www.pingbattery.com}}. It feeds through the main power switch to the wheel motor controllers at 48V and into DC/DC converters to drive the cameras, warning beacon, computers, and manipulator servos at 12V. The E-stop is a latching push button switch sitting between the battery stack and all motor controllers and servos; activating it completely disconnects power from these actuators. The drive and steering motors are brushed DC motors with planetary gearboxes, each controlled by a Copley Accelnet \footnote{\url{http://www.copleycontrols.com/}} motor controller. The manipulator open/close, rotate, and lift axes are driven with Dynamixel RX-64 \footnote{\url{http://www.robotis.com/xe/dynamixel_en}} servomotors. Compute is provided by a pair of MiniITX computers: one handling navigation and mapping and one handling search and manipulation.
 
 \section{Perception}\label{Perception}
-The environmental perception system consists of two stereo pairs and one high-resolution search camera. One stereo pair faces forward and provides the primary obstacle avoidance and navigation sensing. The other stereo pair is associated with the manipulator and provides close-in tracking and guidance for item collection. The search camera is positioned above the robot looking forward with a wide field of view and is used by all the long-range object detectors while searching for items to be collected.
+The environmental perception system consists of two stereo pairs and one high-resolution search camera. One stereo pair faces forward and provides the primary obstacle avoidance and navigation sensing. The other stereo pair is associated with the manipulator and provides close-in tracking and guidance for item collection. The search camera is positioned above the robot looking forward with a wide field of view and is used by all the long-range object detection algorithms while searching for items to be collected.
 
-The navigational perception system consists of 6 wheel encoders (one for the steering and drive axis of each wheel pod) for odometery, MEMS gyroscopes and precision inclinometers for attitude estimation. The attitude estimate is used to help stabilize the navigation estimate and to help align the search camera with the navigation map. We explored the possiblity of an odometery caster to provide estimates of distance traveled, but it was determined that the encoders on the wheels are of sufficient quality to render one unnecessary.
+The navigational perception system consists of 6 wheel encoders (one for the steering and drive axis of each wheel pod) for odometry, MEMS gyroscopes and precision inclinometers for attitude estimation. The attitude estimate is used to help stabilize the navigation estimate and to help align the search camera with the navigation map. We explored the possiblity of an odometry caster to provide estimates of distance traveled, but it was determined that the encoders on the wheels are of sufficient quality to render one unnecessary.
 
 \section{Software}\label{Software}
 Our software uses the ROS framework \footnote{\url{http://www.ros.org/}} to provide structure and inter-module communication. In addition, ROS has a large library of general-purpose modules which allows us to take advantage of significant expertise outside of our immediate team.
@@ -140,7 +140,7 @@ Our software uses the ROS framework \footnote{\url{http://www.ros.org/}} to prov
 \caption{Navigation data flow}
 \label{fig_df_nav}
 \end{figure}
-Figure~\ref{fig_df_nav} gives an overview of the navigation system dataflow. The primary navigation utility is visual odometery as described in \cite{HStrasDWO}. This is used to form a global feature map for large-scale navigation. The output of this system is used throughout the robot to relate measurements separated in time and space.
+Figure~\ref{fig_df_nav} gives an overview of the navigation system dataflow. The primary navigation utility is visual odometry as described in \cite{HStrasDWO}. This is used to form a global feature map for large-scale navigation. The output of this system is used throughout the robot to relate measurements separated in time and space.
 
 In addition, a local 2.5D occupancy grid is made based on obstacle detections for maneuver planning. This occupancy grid incorporates a local piece of the global data provided by satellite imagery as a prior on obstacle occupancy of a cell.
 
