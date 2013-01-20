@@ -1,0 +1,6 @@
+[submodule "ros_workspace/src/dynamixel_motor"]
+	path = ros_workspace/src/dynamixel_motor
+	url = git@github.com:contradict/dynamixel_motor
+[submodule "ros_workspace/src/executive_smach"]
+	path = ros_workspace/src/executive_smach
+	url = git@github.com:contradict/executive_smach
