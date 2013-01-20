@@ -1,0 +1,3 @@
+run catkin_make here to create the catkin workspace structure
+
+then source devel/setup.bash to point all paths at this workspace
