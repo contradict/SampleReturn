@@ -1,0 +1,33 @@
+<package>
+    <name>samplereturn</name>
+    <version>0.2.0</version>
+    <description>
+
+        Collection of pieces too small to have their own
+        package and dependencies on other packages needed
+        for this robot.
+
+    </description>
+    <author>contradict</author>
+    <license>BSD</license>
+    <maintainer email="contradict@gmail.com">contradict</maintainer>
+    <url>https://github.com/contradict/SampleReturn</url>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>rospy</build_depend>
+
+    <run_depend>rospy</run_depend>
+    <run_depend>nodelet</run_depend>
+    <run_depend>stereo_image_proc</run_depend>
+    <run_depend>image_proc</run_depend>
+    <run_depend>camera_calibration</run_depend>
+    <run_depend>sensor_msgs</run_depend>
+    <run_depend>platform_motion</run_depend>
+    <run_depend>robot_setup_tf</run_depend>
+    <run_depend>sync_images</run_depend>
+    <!--
+    <depend package="photo"/>
+    -->
+
+</package>
