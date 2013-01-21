@@ -13,6 +13,7 @@ find_package(catkin REQUIRED
         std_msgs
         tf
         dynamic_reconfigure
+        canopen
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -59,6 +60,7 @@ catkin_package(
         message_runtime
         actionlib_msgs
         actionlib
+        canopen
 )
 
 include_directories(
@@ -66,13 +68,6 @@ include_directories(
     ${Eigen_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${catkin_INCLUDE_DIRS}
-    /usr/local/src/linuxcan_v4/include
-    ${PROJECT_SOURCE_DIR}/../../../src/CANOpen/include
-    )
-
-link_directories(
-    /usr/local/src/linuxcan_v4/canlib
-    ${PROJECT_SOURCE_DIR}/../../../src/CANOpen/build/src
     )
 
 #common commands for building c++ executables and libraries
@@ -80,8 +75,6 @@ add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
 add_executable(motion_node src/motion_node.cpp)
 target_link_libraries(motion_node
     ${PROJECT_NAME}
-    canopen
-    canlib
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
