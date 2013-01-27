@@ -22,6 +22,7 @@ ssh -n ${account} \
      git submodule update -f --init || exit 1; \
      pushd ros_workspace 2>&1 >>/dev/null || exit 1; \
      . /opt/ros/groovy/setup.bash; \
+     rm -rf build; \
      catkin_init_workspace src 2>&1 >>/dev/null && true; \
      catkin_make --force-cmake install || exit 1; \
      popd 2>&1 >>/dev/null; \
