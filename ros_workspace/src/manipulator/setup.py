@@ -7,7 +7,7 @@ d = generate_distutils_setup(
            scripts=['src/manipulator_node.py',
                     'src/manipulator_test_node.py'],
            packages=['manipulator'],
-           package_dir={'': 'src'}
+           package_dir={'manipulator': 'src'}
           )
 
 setup(**d)
