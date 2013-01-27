@@ -93,6 +93,7 @@ target_link_libraries(odometry
 
 install(
     TARGETS
+      ${PROJECT_NAME}
       motion_node
       teleop
       odometry
