@@ -32,3 +32,7 @@ include_directories(
     )
 
 add_library(nodelet_image_rot90 src/image_rot90_nodelet.cpp)
+
+install(TARGETS nodelet_image_rot90
+       LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       )
