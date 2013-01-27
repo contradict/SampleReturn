@@ -1,7 +1,11 @@
 #!/bin/bash
 
 remote=$1
-branch=$(git describe --contains --all HEAD)
+if [ -n "${2}" ]; then
+    branch=${2}
+else
+    branch=$(git describe --contains --all HEAD)
+fi
 thisdir=`dirname $0`
 
 git push -f ${remote} ${branch} || exit 1
@@ -25,6 +29,6 @@ ssh -n ${account} \
         if ping -c1 -w1 sr2-internal 2>&1 >>/dev/null; then \
             git remote | grep sr2-internal 2>&1 >>/dev/null || \
                 git remote add sr2-internal robot@sr2-internal:Desktop/SampleReturn; \
-            ${0} sr2-internal || exit 1; \
+            ${0} sr2-internal ${branch} || exit 1; \
         fi; \
      fi"
