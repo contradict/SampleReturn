@@ -50,7 +50,7 @@ generate_messages(
 
 # dynamic reconfigure
 generate_dynamic_reconfigure_options(
-    cfg/platform.cfg
+    cfg/PlatformParameters.cfg
 )
 
 catkin_package(
