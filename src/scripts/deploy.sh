@@ -24,7 +24,7 @@ ssh -n -f ${account} \
      popd 2>&1 >>/dev/null; \
      if [ \`hostname\` = 'sr1' ]; then \
         if ping -c1 -w1 sr2 2>&1 >>/dev/null; then \
-            git branch | grep sr2-internal 2>&1 >>/dev/null || \
+            git remote | grep sr2-internal 2>&1 >>/dev/null || \
                 git remote add sr2-internal robot@sr2:Desktop/SampleReturn; \
             ${0} sr2-internal || exit 1; \
         fi; \
