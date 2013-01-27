@@ -5,6 +5,7 @@ find_package(catkin REQUIRED
     COMPONENTS
         roscpp
         roslib
+        rospy
         rosconsole
         message_generation
         actionlib_msgs
@@ -19,6 +20,8 @@ find_package(catkin REQUIRED
 find_package(Boost REQUIRED COMPONENTS thread)
 
 find_package(Eigen REQUIRED)
+
+catkin_python_setup()
 
 # messages
 add_message_files(
