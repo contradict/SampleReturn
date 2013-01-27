@@ -11,7 +11,7 @@ account=$(echo ${rmt} | cut -d":" -f1)
 host=$(echo ${account} | cut -d"@" -f2)
 rmtdir=$(echo ${rmt} | cut -d":" -f2)
 
-ssh -n -f ${account} \
+ssh -n ${account} \
     "cd ${rmtdir}; \
      git checkout --detach ${branch} || exit 1; \
      git reset --hard ${branch} || exit 1; \
