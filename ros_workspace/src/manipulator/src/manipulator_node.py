@@ -16,8 +16,8 @@ from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, Mani
 
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 
-import manipulator_states
-from manipulator_data import PersistantData
+from manipulator import manipulator_states
+from manipulator.manipulator_data import PersistantData
 
 def main():
   # init the ros node
