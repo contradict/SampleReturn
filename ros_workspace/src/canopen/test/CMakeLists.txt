@@ -32,3 +32,13 @@ target_link_libraries(Copley
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
     )
+
+install(
+    TARGETS
+        readbus
+        Transfer
+        Copley
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
