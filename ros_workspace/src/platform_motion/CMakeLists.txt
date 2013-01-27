@@ -91,3 +91,12 @@ target_link_libraries(odometry
     ${catkin_LIBRARIES}
 )
 
+install(
+    TARGETS
+      motion_node
+      teleop
+      odometry
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
