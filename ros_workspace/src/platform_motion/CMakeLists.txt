@@ -60,6 +60,7 @@ catkin_package(
     CATKIN_DEPENDS
         roslib
         roscpp
+        rospy
         message_runtime
         actionlib_msgs
         actionlib
