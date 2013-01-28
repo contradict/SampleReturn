@@ -2,9 +2,8 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <machine name="navigate"
-             address="blue18"
-             ros-root="/opt/ros/electric/ros"
-             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
+             address="sr1-internal"
+             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
              user="robot"
     />
     <include file="$(find samplereturn)/launch/motion.launch"/> 
