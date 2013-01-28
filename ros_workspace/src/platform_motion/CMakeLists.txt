@@ -21,8 +21,6 @@ find_package(Boost REQUIRED COMPONENTS thread)
 
 find_package(Eigen REQUIRED)
 
-catkin_python_setup()
-
 # messages
 add_message_files(
     DIRECTORY msg
@@ -104,4 +102,10 @@ install(
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(
+    PROGRAMS
+        nodes/carousel_indexer.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
