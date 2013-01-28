@@ -39,3 +39,9 @@ catkin_package(
         actionlib
 )
 
+install(
+    PROGRAMS
+        nodes/manipulator_node.py
+        nodes/manipulator_test_node.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
