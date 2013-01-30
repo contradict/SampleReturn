@@ -36,3 +36,8 @@ add_library(nodelet_image_rot90 src/image_rot90_nodelet.cpp)
 install(TARGETS nodelet_image_rot90
        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
        )
+
+install(FILES nodelet_image_rot90.xml
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+

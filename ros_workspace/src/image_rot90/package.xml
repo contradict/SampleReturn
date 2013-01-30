@@ -33,6 +33,9 @@
     <run_depend>cv_bridge</run_depend>
     <run_depend>opencv2</run_depend>
 
+    <export>
+        <nodelet plugin="${prefix}/nodelet_image_rot90.xml" />
+    </export>
 
 </package>
 
