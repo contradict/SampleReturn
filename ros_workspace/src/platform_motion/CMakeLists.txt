@@ -31,7 +31,7 @@ add_message_files(
 # services
 add_service_files(
     DIRECTORY srv
-    FILES Enable
+    FILES Enable.srv
 )
 
 # actions
