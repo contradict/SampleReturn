@@ -8,8 +8,8 @@
 83,0,Amp Continuous Current,1200
 82,0,Amp Peak Current,3600
 88,0,Amp Peak Current Time,1000
-0,0,Current Cp,4882
-1,0,Current Ci,1244
+0,0,Current Cp,5014
+1,0,Current Ci,725
 2,0,Programmed Current Command,0
 19,0,Analog Input Scale,2000
 1a,0,Analog Input Offset,0
@@ -18,7 +18,7 @@
 23,0,User Peak Current Time Limit,10000
 24,0,Desired State,30
 26,0,Analog Input Deadband,0
-27,0,Velocity Vp,4000
+27,0,Velocity Vp,4500
 28,0,Velocity Vi,200
 2f,0,Programmed Velocity Command,0
 31,0,Velocity Gains Scalor,0
@@ -45,7 +45,7 @@
 55,0,Brake/Stop Activation Velocity,0
 56,0,Motor Back Emf Constant,2400
 6a,0,Commanded Current Ramp,0
-70,0,Output 1 Config,0:0:0
+70,0,Output 1 Config,100:44007f:0
 78,0,Input 1 Config,11
 79,0,Input 2 Config,0
 7a,0,Input 3 Config,0
@@ -53,9 +53,9 @@
 7c,0,Input 5 Config,0
 7d,0,Input 6 Config,0
 80,0,Amp Model Number,ACP-090-36
-8a,0,Voltage Sense,2268
-92,0,Amp Name,Port Wheel
-98,0,Function Generator Config,8193
+8a,0,Voltage Sense,2256
+92,0,Amp Name,Starboard Wheel
+98,0,Function Generator Config,0
 99,0,Function Generator Frequency,2
 9a,0,Function Generator Amplitude,20000
 9b,0,Function Generator Duty Cycle,1000
@@ -72,7 +72,7 @@ ae,0,Current Loop Offset,0
 4f,0,Motor Hall Offset,0
 50,0,Motor Hall Type,0
 52,0,Motor Hall Wiring,0
-5f,0,Velocity Loop Output Filter,8448:100:0:183:366:183:-14287:32767:6986
+5f,0,Velocity Loop Output Filter,8448:700:0:16380:32760:16380:-10857:7648:2154
 60,0,Motor Encoder Type,1
 61,0,Motor Encoder Units,0
 62,0,Motor Encoder Counts,4000
@@ -80,7 +80,7 @@ ae,0,Current Loop Offset,0
 64,0,Motor Electrical Distance,100000
 65,0,Motor Encoder Direction,0
 6c,0,Position Capture Control Register,0
-71,0,Output 2 Config,0:0:0
+71,0,Output 2 Config,100:4000:0
 8e,0,Amp Ref Scale,11220
 af,0,Amp Options Register,2
 b1,0,Increment Rate,0
@@ -89,11 +89,11 @@ ba,0,Position Following Error Limit,10000
 bb,0,Position Following Warning Limit,5000
 bc,0,Position Tracking Window,2500
 bd,0,Position Tracking Window Time,10
-c8,0,Trajectory Profile Mode,256
-ca,0,Trajectory Position Command,5000
-cb,0,Trajectory Max Velocity,500000
-cc,0,Trajectory Max Accel,100000
-cd,0,Trajectory Max Decel,100000
+c8,0,Trajectory Profile Mode,2
+ca,0,Trajectory Position Command,-1
+cb,0,Trajectory Max Velocity,1250
+cc,0,Trajectory Max Accel,4000
+cd,0,Trajectory Max Decel,4000
 cf,0,Trajectory Abort Decel,100000
 f0,0,Input 1 Debounce Time,0
 f1,0,Input 2 Debounce Time,0
