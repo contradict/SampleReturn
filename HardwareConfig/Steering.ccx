@@ -8,8 +8,8 @@
 83,0,Amp Continuous Current,1200
 82,0,Amp Peak Current,3600
 88,0,Amp Peak Current Time,1000
-0,0,Current Cp,11000
-1,0,Current Ci,1000
+0,0,Current Cp,6353
+1,0,Current Ci,1704
 2,0,Programmed Current Command,0
 19,0,Analog Input Scale,1306
 1a,0,Analog Input Offset,0
@@ -25,9 +25,9 @@
 36,0,Velocity Loop Acceleration Limit,3033
 37,0,Velocity Loop Deceleration Limit,3033
 39,0,Velocity Fast Stop Ramp,3033
-3a,0,Velocity Loop Velocity Limit,480033
+3a,0,Velocity Loop Velocity Limit,480034
 3f,0,Velocity Tracking Time,100
-3e,0,Velocity Tracking Window,20013
+3e,0,Velocity Tracking Window,20012
 41,0,Motor Manufacturer,Midwest Motion
 42,0,Motor Model Number,MMP TM55-48V GP52-124
 43,0,Motor Units,1
@@ -42,7 +42,7 @@
 4e,0,Motor Wiring,0
 53,0,Brake/Stop Delay Time,0
 54,0,Motor Brake Delay Time,0
-55,0,Motor Brake Activation Velocity,0
+55,0,Brake/Stop Activation Velocity,0
 56,0,Motor Back Emf Constant,960
 6a,0,Commanded Current Ramp,0
 70,0,Output 1 Config,100:4000000:0
@@ -57,7 +57,7 @@
 92,0,Amp Name,Starboard Steering
 98,0,Function Generator Config,8193
 99,0,Function Generator Frequency,2
-9a,0,Function Generator Amplitude,50000
+9a,0,Function Generator Amplitude,48000
 9b,0,Function Generator Duty Cycle,1000
 a5,0,Input Configuration Register,14
 a7,0,Fault Mask,671
@@ -79,7 +79,7 @@ ae,0,Current Loop Offset,0
 63,0,Motor Encoder Resolution,100
 64,0,Motor Electrical Distance,100000
 65,0,Motor Encoder Direction,0
-6c,0,Position Capture Control Register,0
+6c,0,Position Capture Control Register,13
 71,0,Output 2 Config,102:0:0
 8e,0,Amp Ref Scale,11220
 af,0,Amp Options Register,2
