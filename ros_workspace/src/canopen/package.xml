@@ -1,0 +1,15 @@
+<package>
+    <name>canopen</name>
+    <version>0.2.0</version>
+    <description>
+        Libraries to interact with CANOpen devices,
+        includes basic DS301 profile and DS401 specialized
+        for Copley servo amplifiers.
+    </description>
+    <author>contradict</author>
+    <license>BSD</license>
+    <maintainer email="contradict@gmail.com">contradict</maintainer>
+    <url>https://github.com/contradict/SampleReturn</url>
+
+    <buildtool_depend>catkin</buildtool_depend>
+</package>

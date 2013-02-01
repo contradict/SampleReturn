@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+  <!-- platform node -->
+  <node
+      machine="navigate"
+      pkg="platform_motion"
+      type="motion_node"
+      name="motion"
+      output="log"
+      >
+      <!--launch-prefix="xterm -e gdb -ex run - -args"-->
+      <param name="port_steering_offset" type="double" value="0.232"/>
+      <param name="starboard_steering_offset" type="double" value="-0.22"/>
+      <param name="stern_steering_offset" type="double" value=" 0.018"/>
+
+      <param name="carousel_id" type="int" value="5"/>
+      <param name="stern_wheel_id" type="int" value="1"/>
+      
+      <param name="wheel_diameter" type="double" value="0.314"/>
+  </node>
+
+  <node machine="navigate" pkg="platform_motion" type="odometry" name="odometry" output="log">
+      <param name="wheel_diameter" type="double" value="0.314"/>
+  </node>
+
+  <node machine="navigate" pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
+  </node>
+
+
+  <param name="robot_description"
+      command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+
+  <node machine="navigate" pkg="robot_state_publisher" type="robot_state_publisher"
+      name="state_publisher" output="log">
+      <remap from="joint_states" to="platform_joint_state"/>
+  </node>
+
+</launch>

@@ -2,27 +2,23 @@ digraph navigation {
     NP  [label="Navigation Stereo Pair"];
     RT  [label="Calibration and\nRectification"];
     DC  [label="Dense Stereo\nCorrespondence"];
-    FD  [label="Feature Detection"];
     IN  [label="Inertial Measurements"];
     WO  [label="Odometery"];
-    VO  [label="Visual Odometery and\nPose Estimation"];
-    FM  [label="Feature Group Mapping"];
+    VO  [label="Double Window Optimization"];
     OD  [label="Obstacle Detection"];
     OOG [label="Obstacle\nOccupancy Grid"];
+    EKF [label="State Estimation"];
 
     NP->RT;
     RT->DC;
-    RT->FD;
-    DC->VO;
-    FD->VO;
-    IN->VO;
-    WO->VO;
-    FD->FM;
-    VO->FM;
-    FM->VO;
-    VO->OOG;
+    RT->VO;
+    IN->EKF;
+    WO->EKF;
+    EKF->OOG;
     DC->OD;
     OD->OOG;
+    VO->EKF;
+    EKF->OD
 }
 
 digraph search {

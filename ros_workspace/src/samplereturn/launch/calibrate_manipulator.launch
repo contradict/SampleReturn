@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <machine name="search"
+             address="moline"
+             env-loader="$(find samplereturn)/launch/env.sh"
+             user="robot"
+             />
+    <include file="$(find samplereturn)/launch/manipulator_camera.launch"/> 
+</launch>
