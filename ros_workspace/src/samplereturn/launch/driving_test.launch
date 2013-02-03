@@ -2,12 +2,12 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <machine name="search"
-             address="sr2-internal"
+             address="sr2"
              env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
              user="robot"
     />
     <machine name="navigate"
-             address="sr1-internal"
+             address="sr1"
              env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
              user="robot"
              />

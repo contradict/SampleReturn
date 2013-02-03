@@ -27,9 +27,9 @@ ssh -n ${account} \
      catkin_make --force-cmake install || exit 1; \
      popd 2>&1 >>/dev/null; \
      if [ \`hostname\` = 'sr1' ]; then \
-        if ping -c1 -w1 sr2-internal 2>&1 >>/dev/null; then \
-            git remote | grep sr2-internal 2>&1 >>/dev/null || \
-                git remote add sr2-internal robot@sr2-internal:Desktop/SampleReturn; \
-            ${0} sr2-internal ${branch} || exit 1; \
+        if ping -c1 -w1 sr2 2>&1 >>/dev/null; then \
+            git remote | grep sr2 2>&1 >>/dev/null || \
+                git remote add sr2 robot@sr2:Desktop/SampleReturn; \
+            ${0} sr2 ${branch} || exit 1; \
         fi; \
      fi"
