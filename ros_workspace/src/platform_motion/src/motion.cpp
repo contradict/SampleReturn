@@ -144,8 +144,8 @@ void Motion::createServos()
     param_nh.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
     param_nh.param("large_steering_move", large_steering_move, 30);
 
-    param_nh.param("port_steering_id", port_steering_id, 4);
-    param_nh.param("port_wheel_id", port_wheel_id, 2);
+    param_nh.getParam("port_steering_id", port_steering_id);
+    param_nh.getParam("port_wheel_id", port_wheel_id);
     param_nh.param("port_steering_min", port_steering_min, -M_PI_2);
     param_nh.param("port_steering_max", port_steering_max,  M_PI_2);
     param_nh.param("port_steering_offset", port_steering_offset,  0.0);
@@ -162,8 +162,8 @@ void Motion::createServos()
                 ));
     port->setCallbacks(pvcb, pvcb, gpiocb);
 
-    param_nh.param("starboard_steering_id", starboard_steering_id, 7);
-    param_nh.param("starboard_wheel_id", starboard_wheel_id, 6);
+    param_nh.getParam("starboard_steering_id", starboard_steering_id);
+    param_nh.getParam("starboard_wheel_id", starboard_wheel_id);
     param_nh.param("starboard_steering_min", starboard_steering_min, -M_PI_2);
     param_nh.param("starboard_steering_max", starboard_steering_max,  M_PI_2);
     param_nh.param("starboard_steering_offset", starboard_steering_offset,  0.0);
@@ -181,8 +181,8 @@ void Motion::createServos()
     starboard->setCallbacks(pvcb, pvcb, gpiocb);
 
 
-    param_nh.param("stern_steering_id", stern_steering_id, 3);
-    param_nh.param("stern_wheel_id", stern_wheel_id, 5);
+    param_nh.getParam("stern_steering_id", stern_steering_id);
+    param_nh.getParam("stern_wheel_id", stern_wheel_id);
     param_nh.param("stern_steering_min", stern_steering_min, -M_PI_2);
     param_nh.param("stern_steering_max", stern_steering_max,  M_PI_2);
     param_nh.param("stern_steering_offset", stern_steering_offset,  0.0);
@@ -200,7 +200,7 @@ void Motion::createServos()
     stern->setCallbacks(pvcb, pvcb, gpiocb);
 
 
-    param_nh.param("carousel_id", carousel_id, 1);
+    param_nh.getParam("carousel_id", carousel_id);
     param_nh.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
     param_nh.param("carousel_offset", carousel_offset, 0.0);
     param_nh.param("sync_interval", sync_interval, 50000);
