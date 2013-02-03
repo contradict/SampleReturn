@@ -12,3 +12,15 @@ catkin_package(
     CATKIN_DEPENDS
         rospy
 )
+
+foreach( d
+        launch
+        config
+        calibration
+        Media
+        urdf)
+    install(DIRECTORY ${d}
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+        USE_SOURCE_PERMISSIONS
+        )
+endforeach()
