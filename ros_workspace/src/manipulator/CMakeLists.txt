@@ -45,3 +45,12 @@ install(
         nodes/manipulator_test_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+foreach( d
+        launch
+        config
+       )
+     install(DIRECTORY ${d}
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+        USE_SOURCE_PERMISSIONS
+        )
+endforeach()
