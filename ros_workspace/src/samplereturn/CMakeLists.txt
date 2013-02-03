@@ -24,3 +24,10 @@ foreach( d
         USE_SOURCE_PERMISSIONS
         )
 endforeach()
+install(
+    PROGRAMS
+       nodes/camlogger.py
+       nodes/image_desync.py
+       nodes/lights.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
