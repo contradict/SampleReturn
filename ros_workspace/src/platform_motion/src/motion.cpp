@@ -372,25 +372,47 @@ void Motion::doHomePods(void)
 {
     home_pods_count = 3;
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    ROS_INFO("Home pods goal accepted");
     home_pods_action_server.acceptNewGoal();
-    CANOpen::DS301CallbackObject
-        hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
-            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homePodsComplete));
-    port->home(hcb);
-    starboard->home(hcb);
-    stern->home(hcb);
+    if(pods_enabled == true)
+    {
+        ROS_INFO("Home pods goal accepted");
+        CANOpen::DS301CallbackObject
+            hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                    static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homePodsComplete));
+        port->home(hcb);
+        starboard->home(hcb);
+        stern->home(hcb);
+    }
+    else
+    {
+        ROS_INFO("Home pods goal aborted - not enabled");
+        home_pods_result.homed.clear();
+        home_pods_result.homed.push_back(false);
+        home_pods_result.homed.push_back(false);
+        home_pods_result.homed.push_back(false);
+        home_pods_action_server.setAborted(home_pods_result, "Pods not enabled");
+    }
 }
 
 void Motion::doHomeCarousel(void)
 {
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    ROS_INFO("Home carousel goal accepted");
-    home_carousel_action_server.acceptNewGoal();
-    CANOpen::DS301CallbackObject
-        hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
-            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeCarouselComplete));
-    carousel->home(hcb);
+    if(carousel_enabled)
+    {
+        ROS_INFO("Home carousel goal accepted");
+        home_carousel_action_server.acceptNewGoal();
+        CANOpen::DS301CallbackObject
+            hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeCarouselComplete));
+        carousel->home(hcb);
+    }
+    else
+    {
+        ROS_INFO("Home carousel goal aborted - not enabled");
+        home_carousel_result.homed.clear();
+        home_carousel_result.homed.push_back(false);
+        home_carousel_action_server.setAborted(home_carousel_result, "Carousel not enabled");
+    }
 }
 
 void Motion::homePodsComplete(CANOpen::DS301 &node)
