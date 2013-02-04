@@ -26,7 +26,5 @@
          <include file="$(find samplereturn)/launch/gmapping.launch"/>
     -->
     <include file="$(find samplereturn)/launch/joystick.launch"/> 
-    <!-- not wired yet
-         <include file="$(find manipulator)/launch/manipulator.launch"/>
-    -->
+    <include file="$(find manipulator)/launch/manipulator.launch"/>
 </launch>
