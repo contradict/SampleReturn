@@ -8,7 +8,7 @@
         pkg="camera_calibration"
         type="cameracalibrator.py"
         name="calibrator"
-        args="--size 9x6 --square 0.120 --approximate .020"
+        args="--size 9x6 --square 0.076 -p checkerboard"
         >
         <remap from="right" to="/$(arg cameras)/right/image_mono"/>
         <remap from="left" to="/$(arg cameras)/left/image_mono"/>

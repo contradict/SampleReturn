@@ -2,8 +2,8 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <machine name="navigate"
-             address="blue18"
-             env-loader="$(find samplereturn)/launch/env.sh"
+             address="sr1"
+             env-loader="$(find samplereturn)/../../env.sh"
              user="robot"
              />
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/> 
