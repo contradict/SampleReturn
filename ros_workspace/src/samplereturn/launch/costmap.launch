@@ -13,10 +13,10 @@
     <node machine="navigate" pkg="costmap_2d" type="costmap_2d_markers" name="voxel_visualizer"
         ns="navigation/costmap_node/costmap">
     </node>
+    -->
 
     <node machine="navigate" pkg="costmap_2d" type="costmap_2d_cloud" name="voxel_visualizer_cloud"
         ns="navigation/costmap_node/costmap">
     </node>
-    -->
 
 </launch>
