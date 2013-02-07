@@ -79,7 +79,6 @@
         ns="/navigation/left"
         output="log"
         >
-        <remap from="image" to="image_mono"/>
     </node>
     <node
         pkg="nodelet"
@@ -89,7 +88,7 @@
         ns="/navigation/left"
         output="log"
         >
-        <remap from="image" to="image_color"/>
+        <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
     </node>
     <node
@@ -100,9 +99,19 @@
         ns="/navigation/right"
         output="log"
         >
-        <remap from="image" to="image_mono"/>
     </node>
-
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="rect_color"
+        args="load image_proc/rectify /navigation/manager"
+        ns="/navigation/right"
+        output="log"
+        >
+        <remap from="image_mono" to="image_color"/>
+        <remap from="image_rect" to="image_rect_color"/>
+    </node>
+ 
     <!-- Compute Stereo -->
     <node
         pkg="nodelet"
