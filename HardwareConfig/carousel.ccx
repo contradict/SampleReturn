@@ -4,32 +4,32 @@
 87,0,Amp Family,2
 40,0,Motor Type,16
 89,0,Amp Max Voltage,910
-84,0,Amp ISense,4200
-83,0,Amp Continuous Current,1200
-82,0,Amp Peak Current,3600
+84,0,Amp ISense,1400
+83,0,Amp Continuous Current,600
+82,0,Amp Peak Current,1200
 88,0,Amp Peak Current Time,1000
-0,0,Current Cp,694
-1,0,Current Ci,487
+0,0,Current Cp,221
+1,0,Current Ci,142
 2,0,Programmed Current Command,0
-19,0,Analog Input Scale,1731
+19,0,Analog Input Scale,1200
 1a,0,Analog Input Offset,0
-21,0,User Peak Current Limit,1000
-22,0,User Continuous Current Limit,230
-23,0,User Peak Current Time Limit,1000
+21,0,User Peak Current Limit,1200
+22,0,User Continuous Current Limit,221
+23,0,User Peak Current Time Limit,1288
 24,0,Desired State,30
 26,0,Analog Input Deadband,0
-27,0,Velocity Vp,1500
-28,0,Velocity Vi,0
+27,0,Velocity Vp,1000
+28,0,Velocity Vi,200
 2f,0,Programmed Velocity Command,0
 31,0,Velocity Gains Scalor,0
-36,0,Velocity Loop Acceleration Limit,5461
-37,0,Velocity Loop Deceleration Limit,5461
-39,0,Velocity Fast Stop Ramp,5461
-3a,0,Velocity Loop Velocity Limit,983040
+36,0,Velocity Loop Acceleration Limit,3000
+37,0,Velocity Loop Deceleration Limit,3000
+39,0,Velocity Fast Stop Ramp,3000
+3a,0,Velocity Loop Velocity Limit,1500000
 3f,0,Velocity Tracking Time,100
-3e,0,Velocity Tracking Window,873813
+3e,0,Velocity Tracking Window,400000
 41,0,Motor Manufacturer,Portescap
-42,0,Motor Model Number,35NT2r 82 426SP 50
+42,0,Motor Model Number,35NT2R 82 426SP 50
 43,0,Motor Units,0
 44,0,Motor Inertia,71400
 46,0,Motor Brake,1
@@ -38,63 +38,63 @@
 4a,0,Motor Inductance,40
 4b,0,Motor Peak Torque,90000
 4c,0,Motor Continuous Torque,11500
-4d,0,Motor Velocity Limit,900000
+4d,0,Motor Velocity Limit,3000000
 4e,0,Motor Wiring,0
 53,0,Brake/Stop Delay Time,0
 54,0,Motor Brake Delay Time,0
 55,0,Motor Brake Activation Velocity,0
 56,0,Motor Back Emf Constant,540
 6a,0,Commanded Current Ramp,0
-70,0,Output 1 Config,2:0:0
+70,0,Output 1 Config,102:0:0
 78,0,Input 1 Config,11
 79,0,Input 2 Config,0
 7a,0,Input 3 Config,0
 7b,0,Input 4 Config,0
 7c,0,Input 5 Config,0
 7d,0,Input 6 Config,0
-80,0,Amp Model Number,ACP-090-36
-8a,0,Voltage Sense,2248
+80,0,Amp Model Number,800-1593B
+8a,0,Voltage Sense,2282
 92,0,Amp Name,Carousel
 98,0,Function Generator Config,2
 99,0,Function Generator Frequency,1
-9a,0,Function Generator Amplitude,500
+9a,0,Function Generator Amplitude,200000
 9b,0,Function Generator Duty Cycle,1000
-a5,0,Input Configuration Register,15
+a5,0,Input Configuration Register,7
 a7,0,Fault Mask,671
 a8,0,Digital Command Config,0
 a9,0,Digital Command Scaling,1
-ad,0,Hardware Type,523
+ad,0,Hardware Type,521
 ae,0,Current Loop Offset,0
-30,0,Position Pp,7000
-33,0,Position Vff,0
-34,0,Position Aff,0
-45,0,Motor Pole Pairs,2
-4f,0,Motor Hall Offset,0
+30,0,Position Pp,50
+33,0,Position Vff,600
+34,0,Position Aff,100
+45,0,Motor Pole Pairs,1
+4f,0,Motor Hall Offset,-30
 50,0,Motor Hall Type,0
-52,0,Motor Hall Wiring,0
+52,0,Motor Hall Wiring,115
 5f,0,Velocity Loop Output Filter,8448:200:0:775:1550:775:-12774:32763:5813
-60,0,Motor Encoder Type,1
+60,0,Motor Encoder Type,3
 61,0,Motor Encoder Units,0
-62,0,Motor Encoder Counts,4000
+62,0,Motor Encoder Counts,2000
 63,0,Motor Encoder Resolution,100
 64,0,Motor Electrical Distance,100000
-65,0,Motor Encoder Direction,0
+65,0,Motor Encoder Direction,1
 6c,0,Position Capture Control Register,13
-71,0,Output 2 Config,2:0:0
+71,0,Output 2 Config,102:0:0
 8e,0,Amp Ref Scale,11220
 af,0,Amp Options Register,2
-b1,0,Increment Rate,0
+b1,0,Increment Rate,90
 b2,0,Commutation Mode,4
-ba,0,Position Following Error Limit,2147483647
-bb,0,Position Following Warning Limit,5000
-bc,0,Position Tracking Window,2500
+ba,0,Position Following Error Limit,4000
+bb,0,Position Following Warning Limit,2000
+bc,0,Position Tracking Window,1000
 bd,0,Position Tracking Window Time,10
 c8,0,Trajectory Profile Mode,257
-ca,0,Trajectory Position Command,100
-cb,0,Trajectory Max Velocity,166667
-cc,0,Trajectory Max Accel,5000
-cd,0,Trajectory Max Decel,750000
-cf,0,Trajectory Abort Decel,750000
+ca,0,Trajectory Position Command,2500
+cb,0,Trajectory Max Velocity,26667
+cc,0,Trajectory Max Accel,8000
+cd,0,Trajectory Max Decel,8000
+cf,0,Trajectory Abort Decel,20000
 f0,0,Input 1 Debounce Time,0
 f1,0,Input 2 Debounce Time,0
 f2,0,Input 3 Debounce Time,0
@@ -113,34 +113,34 @@ f5,0,Input 6 Debounce Time,0
 be,0,Software Limit Deceleration,0
 e4,0,Phase Init Current,442
 e5,0,Phase Init Time,400
-58,0,Gear Ratio,65537
+58,0,Gear Ratio,65611
 b6,0,PWM Deadband,1000
 ea,0,Detent Correction Gain,0
 57,0,Micro Steps Per Rev.,0
 59,0,Hall Velocity Shift,0
-5a,0,Multi Mode Port Configuration,0
-5b,0,Position Encoder Resolution,10000
+5a,0,Multi Mode Port Configuration,1
+5b,0,Position Encoder Resolution,4000
 5c,0,Position Encoder Direction,0
 5d,0,Position Encoder Type,1
 67,0,Analog Encoder Shift,0
 6b,0,Velocity Loop Command Filter,-7936:200:0:775:1550:775:-12774:32763:5813
 6f,0,PWM Mode,0
-72,0,Output 3 Config,2:0:0
-73,0,Output 4 Config,0:0:0
+72,0,Output 3 Config,102:0:0
+73,0,Output 4 Config,102:0:0
 7e,0,Input 7 Config,0
 7f,0,Input 8 Config,0
-b3,0,Analog Encoder Scale,6667
+b3,0,Analog Encoder Scale,0
 b8,0,Positive Software Limit,0
 b9,0,Negative Software Limit,0
 bf,0,Home Current Delay Time,250
-c1,0,Node ID configuration,2048
-c2,0,Home Configuration,560
-c3,0,Home Velocity Fast,16667
-c4,0,Home Velocity Slow,8333
-c5,0,Home Accel/Decel,5000
-c6,0,Home Offset,200
+c1,0,Node ID configuration,1
+c2,0,Home Configuration,544
+c3,0,Home Velocity Fast,2000
+c4,0,Home Velocity Slow,667
+c5,0,Home Accel/Decel,400
+c6,0,Home Offset,-310
 c7,0,Home Current,111
-ce,0,Trajectory Max Jerk,1000
+ce,0,Trajectory Max Jerk,600
 d0,0,Input 9 Config,0
 d1,0,Input 10 Config,0
 d2,0,Input 11 Config,0
@@ -150,7 +150,7 @@ d9,0,Regen Continuous Power,0
 da,0,Regen Peak Power,0
 db,0,Regen Peak Power Time,0
 e1,0,Regen Resistor Model Number,None
-e3,0,Position Loop Gains Multiplier,10
+e3,0,Position Loop Gains Multiplier,3750
 e8,0,uStep Holding Current,0
 e9,0,uStep Run To Hold Time,0
 f6,0,Input 7 Debounce Time,0
@@ -164,4 +164,3 @@ fb,0,Input 12 Debounce Time,0
 117,0,CANopen shutdown option code,0
 118,0,CANopen disable option code,1
 119,0,CANopen halt option code,1
-11a,0,Amp Scaling Config,-1
