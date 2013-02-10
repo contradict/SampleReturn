@@ -18,7 +18,8 @@ foreach( d
         config
         calibration
         Media
-        urdf)
+        urdf
+        maps)
     install(DIRECTORY ${d}
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
         USE_SOURCE_PERMISSIONS
