@@ -2,18 +2,47 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <node
+        machine="navigate"
         name="mover"
-        package="navigation"
+        pkg="move_base"
         type="move_base"
         ns="/planner"
         output="log"
         >
-        <remap from="map" to="/navigation/map"/>
+        <!--
+        launch-prefix="screen -d -m gdb - -args"
+        -->
+        <remap from="odom" to="/odometry"/>
+        <remap from="cmd_vel" to="/twist"/>
+
         <rosparam file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find samplereturn)/config/costmap_local_params.yaml" command="load"/>
         <rosparam file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find samplereturn)/config/costmap_global_params.yaml" command="load"/>
+
+        <param name="planner_frequency" type="double" value="10.0"/>
+        <param name="base_global_planner" type="string" value="carrot_planner/CarrotPlanner"/>
+        <param name="base_local_planner" type="string" value="dwa_local_planner/DWAPlannerROS"/>
         <rosparam file="$(find samplereturn)/config/base_local_planner_params.yaml" command="load"/>
+    </node>
+
+    <node
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_cloud"
+        name="voxel_visualizer_cloud"
+        ns="/planner/mover/local_costmap">
+    </node>
+
+
+    <node
+        name="map_server"
+        pkg="map_server"
+        type="map_server"
+        ns="/planner"
+        output="log"
+        args="$(find samplereturn)/config/map_server.yaml"
+        >
     </node>
 
 </launch>

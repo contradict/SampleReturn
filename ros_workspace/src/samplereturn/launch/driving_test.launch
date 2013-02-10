@@ -18,14 +18,18 @@
     <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
         <remap from="base_pose_ground_truth" to="odometry"/>
     </node>
+    <!--
+    -->
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/> 
-    <include file="$(find samplereturn)/launch/costmap.launch"/> 
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
     <include file="$(find samplereturn)/launch/search_camera.launch"/> 
-    <!-- not ported to groovy?
-         <include file="$(find samplereturn)/launch/gmapping.launch"/>
+    <!--
+    <include file="$(find samplereturn)/launch/costmap.launch"/>
+    <include file="$(find samplereturn)/launch/gmapping.launch"/>
     -->
     <include file="$(find samplereturn)/launch/joystick.launch"/> 
     <include file="$(find manipulator)/launch/manipulator.launch"/>
-    <include file="$(find manipulator)/launch/planner.launch"/>
+    <!--
+    <include file="$(find samplereturn)/launch/planner.launch"/>
+    -->
 </launch>
