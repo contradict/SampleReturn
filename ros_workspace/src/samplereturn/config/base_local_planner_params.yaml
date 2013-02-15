@@ -34,7 +34,7 @@ DWAPlannerROS:
     #scaling_speed: 0.25
     #max_scaling_factor: 0.2
     #sim_granularity: 0.025
-    #sim_time: 1.7
+    sim_time: 10.0
     #stop_time_buffer: 0.2
     #trans_stopped_vel: 0.1
     use_dwa: true
