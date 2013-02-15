@@ -5,9 +5,9 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Status1
-        - /Robot Outline1
+        - /All Plans1
       Splitter Ratio: 0.5
-    Tree Height: 644
+    Tree Height: 1028
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -19,6 +19,7 @@ Panels:
   - Class: rviz/Views
     Expanded:
       - /Current View1
+      - /Current View1/Focal Point1
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
@@ -47,133 +48,14 @@ Visualization Manager:
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
-      Enabled: true
+      Enabled: false
       Links:
-        body_triangle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        carousel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        manipulator_baseline_bar:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        manipulator_left_camera:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        manipulator_left_camera_lens:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        manipulator_right_camera:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        manipulator_right_camera_lens:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        navigation_baseline_bar:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        navigation_left_camera:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        navigation_left_camera_lens:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        navigation_right_camera:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        navigation_right_camera_lens:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        port_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        port_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        port_yoke:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        search_camera_body:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        search_camera_lens:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        starboard_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        starboard_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        starboard_yoke:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        stern_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        stern_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        stern_yoke:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        top_triangle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
+        {}
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Alpha: 1
       Autocompute Intensity Bounds:
@@ -297,7 +179,7 @@ Visualization Manager:
       Value: false
     - Alpha: 1
       Autocompute Intensity Bounds:
-        Max Intensity: 4096
+        Max Intensity: 651.57
         Min Intensity: 0
         Value: true
       Autocompute Value Bounds:
@@ -305,18 +187,18 @@ Visualization Manager:
         Min Value: -10
         Value: true
       Axis: Z
-      Channel Name: intensity
+      Channel Name: total_cost
       Class: rviz/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: ""
+      Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Name: cost_cloud
-      Position Transformer: ""
-      Queue Size: 10
+      Position Transformer: XYZ
+      Queue Size: 1
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.01
+      Size (m): 0.05
       Style: Flat Squares
       Topic: /planner/mover/DWAPlannerROS/cost_cloud
       Use Fixed Frame: true
@@ -324,7 +206,7 @@ Visualization Manager:
         Max Color: 255; 255; 255
         Min Color: 0; 0; 0
         Value: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds:
         Max Intensity: 4096
@@ -339,15 +221,15 @@ Visualization Manager:
       Class: rviz/PointCloud2
       Color: 255; 255; 255
       Color Transformer: ""
-      Decay Time: 0
+      Decay Time: 1
       Enabled: false
       Name: trajectory_cloud
       Position Transformer: ""
-      Queue Size: 10
+      Queue Size: 1
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.01
-      Style: Flat Squares
+      Size (m): 0.1
+      Style: Spheres
       Topic: /planner/mover/DWAPlannerROS/trajectory_cloud
       Use Fixed Frame: true
       Use rainbow:
@@ -358,25 +240,25 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 25; 255; 0
-      Enabled: false
+      Color: 85; 255; 255
+      Enabled: true
       Name: global_plan
       Topic: /planner/mover/DWAPlannerROS/global_plan
-      Value: false
+      Value: true
     - Alpha: 1
-      Buffer Length: 1
+      Buffer Length: 10
       Class: rviz/Path
       Color: 25; 255; 0
-      Enabled: false
+      Enabled: true
       Name: local_plan
       Topic: /planner/mover/DWAPlannerROS/local_plan
-      Value: false
+      Value: true
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.1
       Class: rviz/Pose
       Color: 255; 25; 0
-      Enabled: false
+      Enabled: true
       Head Length: 0.3
       Head Radius: 0.1
       Name: Current Goal
@@ -384,13 +266,42 @@ Visualization Manager:
       Shaft Radius: 0.05
       Shape: Arrow
       Topic: /planner/mover/current_goal
-      Value: false
+      Value: true
     - Arrow Length: 0.3
       Class: rviz/PoseArray
       Color: 255; 25; 0
-      Enabled: false
+      Enabled: true
       Name: PoseArray
       Topic: /particlecloud
+      Value: true
+    - Alpha: 1
+      Class: rviz/GridCells
+      Color: 25; 255; 0
+      Enabled: false
+      Name: Global Obstacles
+      Topic: /planner/mover/global_costmap/obstacles
+      Value: false
+    - Class: rviz/TF
+      Enabled: false
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
+    - Alpha: 1
+      Buffer Length: 400
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: false
+      Name: All Plans
+      Topic: ""
       Value: false
   Enabled: true
   Global Options:
@@ -401,7 +312,6 @@ Visualization Manager:
     - Class: rviz/Interact
     - Class: rviz/MoveCamera
     - Class: rviz/Select
-    - Class: rviz/Measure
     - Class: rviz/SetInitialPose
       Topic: /initialpose
     - Class: rviz/SetGoal
@@ -410,29 +320,29 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 26.1505
+      Distance: 20.3335
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -4.10813
+        Y: -0.508008
+        Z: -0.426434
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.1448
+      Pitch: 0.669797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.6754
+      Yaw: 3.17041
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 882
+  Height: 1266
   Hide Left Dock: false
   Hide Right Dock: false
   Navigation Left:
     collapsed: false
   Navigation Right:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001d000000313fc0200000006fb000000100044006900730070006c006100790073010000004100000313000000dd00fffffffb0000001200530065006c0065006300740069006f006e0000000313000002cc0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000001e004e0061007600690067006100740069006f006e0020004c006500660074020000029200000109000001fb00000190fb00000020004e0061007600690067006100740069006f006e002000520069006700680074020000049b00000103000002c10000020a000000010000010f00000313fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000004100000313000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b2000000000000000000000002000009bf000000a9fc0100000002fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730300000e2e000001590000018500000077fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002bf00fffffffb0000000800540069006d00650100000000000004500000000000000000000004ac0000031300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000001d000000493fc0200000006fb000000100044006900730070006c006100790073010000004100000493000000dd00fffffffb0000001200530065006c0065006300740069006f006e0000000313000002cc0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000001e004e0061007600690067006100740069006f006e0020004c006500660074020000029200000109000001fb00000190fb00000020004e0061007600690067006100740069006f006e002000520069006700680074020000049b00000103000002c10000020a000000010000010f00000493fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000001230000006400fffffffb0000000a00560069006500770073010000016a0000036a000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b2000000000000000000000002000009bf000000a9fc0100000002fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730300000e2e000001590000018500000077fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002bf00fffffffb0000000800540069006d00650100000000000004500000000000000000000004ef0000049300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -441,6 +351,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1943
+  Width: 2010
   X: 60
   Y: 24
