@@ -9,7 +9,7 @@ DWAPlannerROS:
 
     # m/s
     max_vel_x: 2.0
-    min_vel_x: 0.05
+    min_vel_x: 0.0
     max_vel_y: 2.0
     min_vel_y: 0.05
     min_trans_vel: 0.05
