@@ -27,7 +27,7 @@ DWAPlannerROS:
     #occdist_scale: 0.01
     #oscillation_reset_angle: 0.2
     #oscillation_reset_dist: 0.05
-    #path_distance_bias: 32
+    path_distance_bias: 50
     #prune_plan: true
     #restore_defaults: false
     #rot_stopped_vel: 0.1
