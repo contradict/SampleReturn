@@ -72,6 +72,7 @@
 
     <!-- Rectify images -->
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="rect"
@@ -81,6 +82,7 @@
         >
     </node>
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="rect_color"
@@ -92,6 +94,7 @@
         <remap from="image_rect" to="image_rect_color"/>
     </node>
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="rect"
@@ -101,6 +104,7 @@
         >
     </node>
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="rect_color"
@@ -114,6 +118,7 @@
  
     <!-- Compute Stereo -->
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="stereo_image_disparity"
@@ -131,6 +136,7 @@
 
     <!-- Compute Stereo Point Cloud -->
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="stereo_image_points"
