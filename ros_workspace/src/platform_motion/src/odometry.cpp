@@ -162,7 +162,7 @@ OdometryNode::OdometryNode() :
 {
     ros::NodeHandle param_nh("~");
     param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
-    param_nh.param<std::string>("child_frame_id", child_frame_id, "base_link");
+    param_nh.param<std::string>("child_frame_id", child_frame_id, "/base_link");
     param_nh.param("delta_threshold", delta_threshold, 0.01);
     param_nh.param("velocity_emphasis", velocity_emphasis, 1.0);
     param_nh.param("unexplainable_jump", unexplainable_jump, 12.0);
@@ -182,9 +182,9 @@ void OdometryNode::init()
     ros::Time current = ros::Time(0);
     ros::Duration wait(1.0);
     while( !(
-             listener.waitForTransform(child_frame_id, std::string("port_suspension"), current, wait) && 
-             listener.waitForTransform(child_frame_id, std::string("starboard_suspension"), current, wait) &&
-             listener.waitForTransform(child_frame_id, std::string("stern_suspension"), current, wait)
+             listener.waitForTransform(child_frame_id, std::string("/port_suspension"), current, wait) &&
+             listener.waitForTransform(child_frame_id, std::string("/starboard_suspension"), current, wait) &&
+             listener.waitForTransform(child_frame_id, std::string("/stern_suspension"), current, wait)
             ) && ros::ok()
          )
         ROS_INFO("Still Waiting for transforms");
@@ -367,7 +367,7 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
         data.body_pt = Eigen::Vector2d(0,0);
 
         try {
-            listener.lookupTransform(child_frame_id, "port_suspension", current, port_tf );
+            listener.lookupTransform(child_frame_id, "/port_suspension", current, port_tf );
         } catch( tf::TransformException ex) {
             ROS_ERROR("Error looking up port_suspension: %s", ex.what());
             return;
@@ -378,7 +378,7 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
         data.port_vel = port_vel_sum/vel_sum_count;
 
         try {
-            listener.lookupTransform(child_frame_id, "starboard_suspension", current, starboard_tf );
+            listener.lookupTransform(child_frame_id, "/starboard_suspension", current, starboard_tf );
         } catch( tf::TransformException ex) {
             ROS_ERROR("Error looking up starboard_suspension: %s", ex.what());
             return;
@@ -389,7 +389,7 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
         data.starboard_vel = starboard_vel_sum/vel_sum_count;
 
         try {
-            listener.lookupTransform(child_frame_id, "stern_suspension", current, stern_tf );
+            listener.lookupTransform(child_frame_id, "/stern_suspension", current, stern_tf );
         } catch( tf::TransformException ex) {
             ROS_ERROR("Error looking up stern_suspension: %s", ex.what());
             return;
