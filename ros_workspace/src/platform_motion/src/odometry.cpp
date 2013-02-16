@@ -137,6 +137,7 @@ class OdometryNode {
         ros::Publisher odometry_pub;
 
         bool first;
+        ros::Time last_joint_message;
         double last_starboard_wheel, last_port_wheel, last_stern_wheel;
         double starboard_vel_sum, port_vel_sum, stern_vel_sum;
         int vel_sum_count;
@@ -314,15 +315,6 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     lookupJointValue(joint_state, "starboard_axle", &starboard_wheel, &starboard_wheel_velocity);
     lookupJointValue(joint_state, "stern_axle", &stern_wheel, &stern_wheel_velocity);
 
-    if(first) {
-        last_port_wheel = port_wheel;
-        last_starboard_wheel = starboard_wheel;
-        last_stern_wheel = stern_wheel;
-        first = false;
-        ROS_INFO("set initial wheel angles: %f %f %f", last_port_wheel, last_starboard_wheel, last_stern_wheel);
-        return;
-    }
-
     port_delta = (port_wheel - last_port_wheel)*wheel_diameter/2.;
     starboard_delta = (starboard_wheel - last_starboard_wheel)*wheel_diameter/2.;
     stern_delta = (stern_wheel - last_stern_wheel)*wheel_diameter/2.;
@@ -333,28 +325,33 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     stern_vel_sum += stern_wheel_velocity*wheel_diameter/2;
     vel_sum_count += 1;
 
-    double max_abs_delta = std::max(fabs(starboard_delta), fabs(port_delta));
-    max_abs_delta = std::max(max_abs_delta, fabs(stern_delta));
-
     double min_abs_delta = std::min(fabs(starboard_delta), fabs(port_delta));
     min_abs_delta = std::min(min_abs_delta, fabs(stern_delta));
 
-    if(min_abs_delta>unexplainable_jump) {
+    bool jump=min_abs_delta>unexplainable_jump;
+    if(jump) {
+        ROS_ERROR("Large odometry jump, resetting deltas: %f", min_abs_delta);
+    }
+
+    if(first || jump) {
         last_port_wheel = port_wheel;
         last_starboard_wheel = starboard_wheel;
         last_stern_wheel = stern_wheel;
+        port_vel_sum = starboard_vel_sum = stern_vel_sum = 0;
+        vel_sum_count = 0;
+        last_joint_message = joint_state->header.stamp;
+        ROS_INFO("set initial wheel angles: %f %f %f", last_port_wheel, last_starboard_wheel, last_stern_wheel);
+        first = false;
         return;
     }
 
-
     nav_msgs::Odometry odo;
+
+    double max_abs_delta = std::max(fabs(starboard_delta), fabs(port_delta));
+    max_abs_delta = std::max(max_abs_delta, fabs(stern_delta));
 
     bool moving = max_abs_delta>delta_threshold;
     if(moving) {
-        last_port_wheel = port_wheel;
-        last_starboard_wheel = starboard_wheel;
-        last_stern_wheel = stern_wheel;
-
         Eigen::Vector2d port_wheel_direction(cos(port_steering), sin(port_steering));
         Eigen::Vector2d stern_wheel_direction(cos(stern_steering), sin(stern_steering));
         Eigen::Vector2d starboard_wheel_direction(cos(starboard_steering), sin(starboard_steering));
@@ -428,6 +425,14 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             if(odom_orientation < 0) odom_orientation += 2*M_PI;
             odom_velocity = xytheta[3];
             odom_omega = xytheta[4];
+
+            starboard_vel_sum = port_vel_sum = stern_vel_sum = 0;
+            vel_sum_count = 0;
+
+            last_port_wheel = port_wheel;
+            last_starboard_wheel = starboard_wheel;
+            last_stern_wheel = stern_wheel;
+            last_joint_message = joint_state->header.stamp;
         }
     }
     fillOdoMsg(&odo, joint_state->header.stamp, !moving);
