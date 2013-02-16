@@ -28,91 +28,90 @@ struct lmmin_data {
 };
 
 
+Eigen::Vector2d computePositionError(
+        Eigen::Matrix2d R, Eigen::Vector2d T,
+        Eigen::Vector2d dir, double delta, Eigen::Vector2d pos,
+        Eigen::Vector2d body_pt)
+{
+   return R*(pos - body_pt) + body_pt + T - (pos + dir*delta);
+}
+
+double computeVelocityError(
+        Eigen::Matrix2d Rdot, Eigen::Vector2d V,
+        Eigen::Vector2d dir, double vel, Eigen::Vector2d pos,
+        Eigen::Vector2d body_pt)
+{
+   return (Rdot*(pos - body_pt) + V).dot(dir) - vel;
+}
+
 void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double *fvec, int *info)
 {
     const struct lmmin_data *data = reinterpret_cast<const struct lmmin_data *>(vdata);
 
-    double x,y,theta,vx,vy,omega;
+    double x,y,theta,v,omega;
 
     x=xytheta[0];
     y=xytheta[1];
     theta=xytheta[2];
-    vx=xytheta[3];
-    vy=xytheta[4];
-    omega=xytheta[5];
+    v=xytheta[3];
+    omega=xytheta[4];
+
+    ROS_DEBUG("x: %e y: %e theta: %e v: %e omega: %e", x, y, theta, v, omega);
+    ROS_DEBUG_STREAM("body_pt:" << data->body_pt.transpose());
+    ROS_DEBUG_STREAM("port_pos:" << data->port_pos.transpose() <<
+                     " port_dir:" << data->port_dir);
+    ROS_DEBUG_STREAM("starboard_pos:" << data->starboard_pos.transpose() <<
+                     " starboard_dir:" << data->starboard_dir);
+    ROS_DEBUG_STREAM("stern_pos:" << data->stern_pos.transpose() <<
+                     " stern_dir:" << data->stern_dir);
 
     Eigen::Matrix2d R;
     R << cos(theta), -sin(theta),
          sin(theta),  cos(theta);
 
     Eigen::Vector2d T(x, y);
-    Eigen::Vector2d V(vx, vy);
+    Eigen::Vector2d V=v*T.normalized();
+    ROS_DEBUG_STREAM("V: " << V );
 
-    Eigen::Vector2d port_error =
-        R*(data->port_pos - data->body_pt) + data->body_pt + T
-        - (data->port_pos + data->port_dir*data->port_delta);
-    ROS_DEBUG("port_pos(%f %f) body_pt(%f %f)\nT(%f %f) theta(%f)\nport_dir(%f %f) port_delta(%f)\nport_error(%f %f)",
-            data->port_pos[0], data->port_pos[1],
-            data->body_pt[0], data->body_pt[1],
-            T[0], T[1], theta,
-            data->port_dir[0], data->port_dir[1],
+    Eigen::Vector2d port_error = computePositionError(R, T, data->port_dir, data->port_delta, data->port_pos, data->body_pt);
+    ROS_DEBUG("port_delta(%f) port_error(%f %f)",
             data->port_delta,
             port_error[0], port_error[1]);
-    Eigen::Vector2d stern_error =
-        R*(data->stern_pos - data->body_pt) + data->body_pt + T
-        - (data->stern_pos + data->stern_dir*data->stern_delta);
-    ROS_DEBUG("stern_pos(%f %f) body_pt(%f %f)\nT(%f %f) theta(%f)\nstern_dir(%f %f) stern_delta(%f)\nstern_error(%f %f)",
-            data->stern_pos[0], data->stern_pos[1],
-            data->body_pt[0], data->body_pt[1],
-            T[0], T[1], theta,
-            data->stern_dir[0], data->stern_dir[1],
-            data->stern_delta,
-            stern_error[0], stern_error[1]);
-    Eigen::Vector2d starboard_error =
-        R*(data->starboard_pos - data->body_pt) + data->body_pt + T
-        - (data->starboard_pos + data->starboard_dir*data->starboard_delta);
-    ROS_DEBUG("starboard_pos(%f %f) body_pt(%f %f)\nT(%f %f) theta(%f)\nstarboard_dir(%f %f) starboard_delta(%f)\nstarboard_error(%f %f)",
-            data->starboard_pos[0], data->starboard_pos[1],
-            data->body_pt[0], data->body_pt[1],
-            T[0], T[1], theta,
-            data->starboard_dir[0], data->starboard_dir[1],
+    Eigen::Vector2d starboard_error = computePositionError(R, T, data->starboard_dir, data->starboard_delta, data->starboard_pos, data->body_pt);
+    ROS_DEBUG("starboard_delta(%f) starboard_error(%f %f)",
             data->starboard_delta,
             starboard_error[0], starboard_error[1]);
+    Eigen::Vector2d stern_error = computePositionError(R, T, data->stern_dir, data->stern_delta, data->stern_pos, data->body_pt);
+    ROS_DEBUG("stern_delta(%f) stern_error(%f %f)",
+            data->stern_delta,
+            stern_error[0], stern_error[1]);
 
     Eigen::Matrix2d Rdot;
     Rdot << -sin(theta)*omega, -cos(theta)*omega,
              cos(theta)*omega, -sin(theta)*omega;
-    Eigen::Vector2d starboard_velocity_error =
-        Rdot*(data->starboard_pos - data->body_pt) + V
-        - data->starboard_dir*data->starboard_vel;
-    ROS_DEBUG("V(%f %f) omega(%f) starboard_vel(%f)\nstarboard_velocity_error(%f %f)",
-            V[0], V[1], omega, data->starboard_vel,
-            starboard_velocity_error[0], starboard_velocity_error[1]);
-    Eigen::Vector2d port_velocity_error =
-        Rdot*(data->port_pos - data->body_pt) + V
-        - data->port_dir*data->port_vel;
-    ROS_DEBUG("V(%f %f) omega(%f) port_vel(%f)\nport_velocity_error(%f %f)",
-            V[0], V[1], omega, data->port_vel,
-            port_velocity_error[0], port_velocity_error[1]);
-    Eigen::Vector2d stern_velocity_error =
-        Rdot*(data->stern_pos - data->body_pt) + V
-        - data->stern_dir*data->stern_vel;
-    ROS_DEBUG("V(%f %f) omega(%f) stern_vel(%f)\nstern_velocity_error(%f %f)",
-            V[0], V[1], omega, data->stern_vel,
-            stern_velocity_error[0], stern_velocity_error[1]);
+    double port_velocity_error = computeVelocityError(Rdot, V, data->port_dir, data->port_vel, data->port_pos, data->body_pt);
+    ROS_DEBUG("port_vel(%f) port_velocity_error(%f)", data->port_vel, port_velocity_error);
+    double starboard_velocity_error = computeVelocityError(Rdot, V, data->starboard_dir, data->starboard_vel, data->starboard_pos, data->body_pt);
+    ROS_DEBUG("starboard_vel(%f) starboard_velocity_error(%f)", data->starboard_vel, starboard_velocity_error);
+    double stern_velocity_error = computeVelocityError(Rdot, V, data->stern_dir, data->stern_vel, data->stern_pos, data->body_pt);
+    ROS_DEBUG("stern_vel(%f) stern_velocity_error(%f)", data->stern_vel, stern_velocity_error);
 
     fvec[0] = port_error(0);
     fvec[1] = port_error(1);
-    fvec[2] = stern_error(0);
-    fvec[3] = stern_error(1);
-    fvec[4] = starboard_error(0);
-    fvec[5] = starboard_error(1);
-    fvec[6] = port_velocity_error[0]*data->interval*data->velocity_emphasis;
-    fvec[7] = port_velocity_error[1]*data->interval*data->velocity_emphasis;
-    fvec[8] = stern_velocity_error[0]*data->interval*data->velocity_emphasis;
-    fvec[9] = stern_velocity_error[1]*data->interval*data->velocity_emphasis;
-    fvec[10] = starboard_velocity_error[0]*data->interval*data->velocity_emphasis;
-    fvec[11] = starboard_velocity_error[1]*data->interval*data->velocity_emphasis;
+    fvec[2] = starboard_error(0);
+    fvec[3] = starboard_error(1);
+    fvec[4] = stern_error(0);
+    fvec[5] = stern_error(1);
+    fvec[6] = port_velocity_error;
+    fvec[7] = starboard_velocity_error;
+    fvec[8] = stern_velocity_error;
+    fvec[9] = v-T.norm()/data->interval;
+
+    ROS_DEBUG( "fvec: [%f %f %f %f %f %f %f %f %f %f]",
+            fvec[0], fvec[1], fvec[2],
+            fvec[3], fvec[4], fvec[5],
+            fvec[6], fvec[7], fvec[8],
+            fvec[9]);
 
     *info = 1;
 }
@@ -143,7 +142,7 @@ class OdometryNode {
         int vel_sum_count;
         Eigen::Vector2d odom_position;
         double odom_orientation;
-        Eigen::Vector2d odom_velocity;
+        double odom_velocity;
         double odom_omega;
         double wheel_diameter;
         double delta_threshold;
@@ -198,8 +197,8 @@ void OdometryNode::fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool sto
     odo->child_frame_id = child_frame_id;
     odo->header.stamp = stamp;
 
-    odo->twist.twist.linear.x = odom_velocity[0];
-    odo->twist.twist.linear.y = odom_velocity[1];
+    odo->twist.twist.linear.x = odom_velocity*cos(odom_orientation);
+    odo->twist.twist.linear.y = odom_velocity*sin(odom_orientation);
     odo->twist.twist.linear.z = 0;
     odo->twist.twist.angular.x = 0;
     odo->twist.twist.angular.y = 0;
@@ -399,24 +398,27 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
         data.stern_dir = stern_wheel_direction;
         data.stern_vel = stern_vel_sum/vel_sum_count;
 
-        data.interval = 0.050*vel_sum_count;
+        double interval = (joint_state->header.stamp - last_joint_message).toSec();
+
+        data.interval = interval;
         data.velocity_emphasis = velocity_emphasis;
 
-        starboard_vel_sum = port_vel_sum = stern_vel_sum = 0;
-        vel_sum_count = 0;
-
-        double xytheta[6] = {0.0, 0.0, 0.0, odom_velocity[0], odom_velocity[1], odom_omega};
+        double xytheta[5] =
+        {0.1*cos(odom_orientation)*interval, 0.1*sin(odom_orientation)*interval,
+            odom_omega*interval, odom_velocity, odom_omega};
         lm_status_struct status;
         lm_control_struct control = lm_control_double;
+        control.maxcall=500;
         control.printflags = 0;
-        lmmin( 6, xytheta, 12, &data, lmmin_evaluate, &control, &status, NULL);
+        lmmin( 5, xytheta, 10, &data, lmmin_evaluate, &control, &status, NULL);
 
         if(status.info>4) {
             // minimization failed
             ROS_ERROR( "%s", (std::string("Minimization failed: ") +
                         lm_infmsg[status.info]).c_str() );
         } else {
-            ROS_DEBUG( "optimum(%e): %e %e %e %e %e %e", status.fnorm, xytheta[0], xytheta[1], xytheta[2], xytheta[3], xytheta[4], xytheta[5]);
+            ROS_DEBUG( "optimization complete %d: %s, %d evaluations", status.info, lm_infmsg[status.info], status.nfev );
+            ROS_DEBUG( "optimum(%e): %e %e %e %e %e", status.fnorm, xytheta[0], xytheta[1], xytheta[2], xytheta[3], xytheta[4]);
             Eigen::Matrix2d R;
             R << cos(odom_orientation), -sin(odom_orientation),
               sin(odom_orientation),  cos(odom_orientation);
@@ -424,8 +426,8 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             odom_orientation += xytheta[2];
             if(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
             if(odom_orientation < 0) odom_orientation += 2*M_PI;
-            odom_velocity = Eigen::Vector2d(xytheta[3], xytheta[4]);
-            odom_omega = xytheta[5];
+            odom_velocity = xytheta[3];
+            odom_omega = xytheta[4];
         }
     }
     fillOdoMsg(&odo, joint_state->header.stamp, !moving);
