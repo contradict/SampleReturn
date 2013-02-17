@@ -168,7 +168,7 @@ OdometryNode::OdometryNode() :
     ros::NodeHandle param_nh("~");
     param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
     param_nh.param<std::string>("child_frame_id", child_frame_id, "/base_link");
-    param_nh.param("delta_threshold", delta_threshold, 0.01);
+    param_nh.param("delta_threshold", delta_threshold, 0.025);
     param_nh.param("min_translation_norm", min_translation_norm, 0.001);
     param_nh.param("unexplainable_jump", unexplainable_jump, 12.0);
     param_nh.param("wheel_diameter", wheel_diameter, 0.314);
