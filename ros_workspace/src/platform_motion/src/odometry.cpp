@@ -25,6 +25,7 @@ struct lmmin_data {
     double starboard_delta;
     double starboard_vel;
     double interval;
+    double min_translation_norm;
 };
 
 
@@ -70,8 +71,12 @@ void lmmin_evaluate(const double *xytheta, int m_dat, const void *vdata, double 
          sin(theta),  cos(theta);
 
     Eigen::Vector2d T(x, y);
-    Eigen::Vector2d V=v*T.normalized();
-    ROS_DEBUG_STREAM("V: " << V );
+    Eigen::Vector2d V;
+    if( T.norm() > data->min_translation_norm)
+        V=v*T.normalized();
+    else
+        V=Eigen::Vector2d::Zero();
+    ROS_DEBUG_STREAM("V: " << V.transpose() );
 
     Eigen::Vector2d port_error = computePositionError(R, T, data->port_dir, data->port_delta, data->port_pos, data->body_pt);
     ROS_DEBUG("port_delta(%f) port_error(%f %f)",
@@ -143,10 +148,11 @@ class OdometryNode {
         int vel_sum_count;
         Eigen::Vector2d odom_position;
         double odom_orientation;
-        double odom_velocity;
+        Eigen::Vector2d odom_velocity;
         double odom_omega;
         double wheel_diameter;
         double delta_threshold;
+        double min_translation_norm;
         double unexplainable_jump;
         std::string odom_frame_id, child_frame_id;
 };
@@ -163,6 +169,7 @@ OdometryNode::OdometryNode() :
     param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
     param_nh.param<std::string>("child_frame_id", child_frame_id, "/base_link");
     param_nh.param("delta_threshold", delta_threshold, 0.01);
+    param_nh.param("min_translation_norm", min_translation_norm, 0.001);
     param_nh.param("unexplainable_jump", unexplainable_jump, 12.0);
     param_nh.param("wheel_diameter", wheel_diameter, 0.314);
 
@@ -195,8 +202,8 @@ void OdometryNode::fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool sto
     odo->child_frame_id = child_frame_id;
     odo->header.stamp = stamp;
 
-    odo->twist.twist.linear.x = odom_velocity*cos(odom_orientation);
-    odo->twist.twist.linear.y = odom_velocity*sin(odom_orientation);
+    odo->twist.twist.linear.x = odom_velocity[0];
+    odo->twist.twist.linear.y = odom_velocity[1];
     odo->twist.twist.linear.z = 0;
     odo->twist.twist.angular.x = 0;
     odo->twist.twist.angular.y = 0;
@@ -395,10 +402,11 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
         double interval = (joint_state->header.stamp - last_joint_message).toSec();
 
         data.interval = interval;
+        data.min_translation_norm = min_translation_norm;
 
         double xytheta[5] =
         {0.1*cos(odom_orientation)*interval, 0.1*sin(odom_orientation)*interval,
-            odom_omega*interval, odom_velocity, odom_omega};
+            odom_omega*interval, odom_velocity.norm(), odom_omega};
         lm_status_struct status;
         lm_control_struct control = lm_control_double;
         control.maxcall=500;
@@ -415,11 +423,15 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             Eigen::Matrix2d R;
             R << cos(odom_orientation), -sin(odom_orientation),
               sin(odom_orientation),  cos(odom_orientation);
-            odom_position += R*Eigen::Vector2d(xytheta[0], xytheta[1]);
+            Eigen::Vector2d T=R*Eigen::Vector2d(xytheta[0], xytheta[1]);
+            odom_position += T;
             odom_orientation += xytheta[2];
             if(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
             if(odom_orientation < 0) odom_orientation += 2*M_PI;
-            odom_velocity = xytheta[3];
+            if(T.norm() > min_translation_norm)
+                odom_velocity = xytheta[3]*T.normalized();
+            else
+                odom_velocity = Eigen::Vector2d::Zero();
             odom_omega = xytheta[4];
 
             starboard_vel_sum = port_vel_sum = stern_vel_sum = 0;
