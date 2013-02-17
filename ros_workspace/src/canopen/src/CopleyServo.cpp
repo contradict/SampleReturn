@@ -129,16 +129,6 @@ void CopleyServo::_mapPDOs(void)
     map.subindex = 0;
     map.bits = 8;
     maps.push_back(map);
-    // Bus Voltage
-    map.index = 0x2201;
-    map.subindex = 0;
-    map.bits = 16;
-    maps.push_back(map);
-    // Input pins
-    map.index = 0x2190;
-    map.subindex = 0;
-    map.bits = 16;
-    maps.push_back(map);
     // Immediate event
     status_mode_pdo = mapTPDO("Status/Mode", 1, maps, 0xff,
             PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
@@ -162,10 +152,26 @@ void CopleyServo::_mapPDOs(void)
                 static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::positionVelocityPDOCallback)));
     bus->add(position_velocity_pdo);
 
-    // Disable sending of TPDO3-4
+    maps.clear();
+    // Bus Voltage
+    map.index = 0x2201;
+    map.subindex = 0;
+    map.bits = 16;
+    maps.push_back(map);
+    // Input pins
+    map.index = 0x2190;
+    map.subindex = 0;
+    map.bits = 16;
+    maps.push_back(map);
+    // Every 1 sync messages
+    input_pdo = mapTPDO("Inputs", 3, maps, 0x01,
+            PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
+                static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::inputPDOCallback)));
+    bus->add(input_pdo);
+
+    // Disable sending of TPDO4
     std::vector<uint8_t> data;
     data.push_back(0);
-    writeObjectDictionary(0x1802, 2, data);
     writeObjectDictionary(0x1803, 2, data);
 
     // Control Word
@@ -237,21 +243,12 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
 {
     uint16_t new_status_word = pdo.data[0] | (pdo.data[1]<<8);
     enum OperationMode new_mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
-    uint16_t new_bus_voltage = pdo.data[3] | (pdo.data[4]<<8);
-    uint16_t new_input_pins = pdo.data[5] | (pdo.data[6]<<8);
 
     uint16_t rising_status  = (~status_word) &   new_status_word;
     uint16_t falling_status =   status_word  & (~new_status_word);
     status_word = new_status_word;
 
     mode_of_operation = new_mode_of_operation;
-    // bus volage register is in 0.1V steps
-    bus_voltage = new_bus_voltage/10.0;
-
-    if( input_pins ^ new_input_pins != 0) {
-        input_callback(*this, input_pins, new_input_pins);
-    }
-    input_pins = new_input_pins;
 
     switch(mode_of_operation) {
         case ProfilePosition:
@@ -355,10 +352,23 @@ void CopleyServo::positionVelocityPDOCallback(PDO &pdo)
                          ((uint32_t)pdo.data[5]<<8) |
                          ((uint32_t)pdo.data[6]<<16) |
                          ((uint32_t)pdo.data[7]<<24));
-
     gotPV = true;
     pv_callback(*this);
     //std::cout << "Position: " << position << " Velocity: " << velocity << std::endl;
+}
+
+void CopleyServo::inputPDOCallback(PDO &pdo)
+{
+    uint16_t new_bus_voltage = pdo.data[0] | (pdo.data[1]<<8);
+    uint16_t new_input_pins = pdo.data[2] | (pdo.data[3]<<8);
+    // bus volage register is in 0.1V steps
+    bus_voltage = new_bus_voltage/10.0;
+
+    if( (input_pins ^ new_input_pins) != 0) {
+        input_callback(*this, input_pins, new_input_pins);
+    }
+    input_pins = new_input_pins;
+
 }
 
 /*
