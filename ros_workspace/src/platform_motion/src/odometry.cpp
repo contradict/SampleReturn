@@ -323,6 +323,7 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     starboard_delta = (starboard_wheel - last_starboard_wheel)*wheel_diameter/2.;
     stern_delta = (stern_wheel - last_stern_wheel)*wheel_diameter/2.;
     ROS_DEBUG( "delta: (%6.4f, %6.4f, %6.4f)", port_delta, starboard_delta, stern_delta);
+    ROS_DEBUG( "vel: (%6.4f, %6.4f, %6.4f)", port_wheel_velocity, starboard_wheel_velocity, stern_wheel_velocity);
 
     starboard_vel_sum += starboard_wheel_velocity*wheel_diameter/2;
     port_vel_sum += port_wheel_velocity*wheel_diameter/2;
@@ -441,6 +442,16 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
             last_starboard_wheel = starboard_wheel;
             last_stern_wheel = stern_wheel;
             last_joint_message = joint_state->header.stamp;
+        }
+    }
+    else
+    { // not moving
+        if( fabs(port_wheel_velocity) < 1e-3 &&
+            fabs(starboard_wheel_velocity) < 1e-3 &&
+            fabs(stern_wheel_velocity) < 1e-3)
+        {
+            odom_velocity = Eigen::Vector2d::Zero();
+            odom_omega = 0;
         }
     }
     fillOdoMsg(&odo, joint_state->header.stamp, !moving);
