@@ -35,6 +35,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void syncCallback(CANOpen::SYNC &sync);
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
+        void statusPublishCallback(const ros::TimerEvent& event);
+
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;
 
@@ -47,6 +49,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber gpio_sub;
         ros::Publisher gpio_pub;
         ros::Publisher joint_state_pub;
+        ros::Publisher battery_voltage_pub;
+
+        ros::Timer status_publish_timer;
 
         dynamic_reconfigure::Server<PlatformParametersConfig>
             reconfigure_server;

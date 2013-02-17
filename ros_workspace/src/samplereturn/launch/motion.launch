@@ -24,6 +24,8 @@
       <param name="port_wheel_id" type="int" value="7"/>
 
       <param name="wheel_diameter" type="double" value="0.314"/>
+
+      <param name="status_publish_interval" type="double" value="15.0"/>
   </node>
 
   <node machine="navigate" pkg="platform_motion" type="odometry" name="odometry" output="log">

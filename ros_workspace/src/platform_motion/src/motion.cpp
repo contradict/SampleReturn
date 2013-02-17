@@ -81,11 +81,16 @@ Motion::Motion() :
 
     gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
 
+    battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
+
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
 
     reconfigure_server.setCallback(boost::bind(&Motion::reconfigureCallback, this, _1, _2));
 
+    double status_publish_interval;
+    param_nh.param("status_publish_interval", status_publish_interval, 60.0);
+    status_publish_timer = nh_.createTimer(ros::Duration(status_publish_interval), &Motion::statusPublishCallback, this);
 }
 
 bool Motion::openBus(void)
@@ -672,4 +677,20 @@ void Motion::carouselCallback(const std_msgs::Float64::ConstPtr fmsg)
             carousel_encoder_counts/2./M_PI);
 }
 
+
+void Motion::statusPublishCallback(const ros::TimerEvent& event)
+{
+    if(carousel_setup) {
+        platform_motion::GPIO gpio;
+        gpio.servo_id = carousel->node_id;
+        gpio.previous_pin_states = carousel->getInputPins();
+        gpio.new_pin_states = gpio.previous_pin_states;
+        gpio.pin_mask = 0xFFFF;
+        gpio_pub.publish(gpio);
+
+        std_msgs::Float64 voltage;
+        voltage.data = carousel->bus_voltage;
+        battery_voltage_pub.publish(voltage);
+    }
+}
 }
