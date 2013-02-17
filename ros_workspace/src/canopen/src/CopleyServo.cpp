@@ -234,8 +234,8 @@ void CopleyServo::_initialControlWord(SDO &sdo)
 
 void CopleyServo::_initialOutputPins(SDO &sdo)
 {
-    input_pins = sdo.data[0] | (sdo.data[1]<<8);
-    std::cout << "Initial output pins: " << std::hex << input_pins << std::dec
+    output_pins = sdo.data[0] | (sdo.data[1]<<8);
+    std::cout << "Initial output pins: " << std::hex << output_pins << std::dec
         << std::endl;
 }
 
