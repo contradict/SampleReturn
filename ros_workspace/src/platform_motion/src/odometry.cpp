@@ -24,7 +24,7 @@ struct lmmin_data {
     Eigen::Vector2d starboard_pos, starboard_dir;
     double starboard_delta;
     double starboard_vel;
-    double interval, velocity_emphasis;
+    double interval;
 };
 
 
@@ -147,7 +147,6 @@ class OdometryNode {
         double odom_omega;
         double wheel_diameter;
         double delta_threshold;
-        double velocity_emphasis;
         double unexplainable_jump;
         std::string odom_frame_id, child_frame_id;
 };
@@ -164,12 +163,10 @@ OdometryNode::OdometryNode() :
     param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
     param_nh.param<std::string>("child_frame_id", child_frame_id, "/base_link");
     param_nh.param("delta_threshold", delta_threshold, 0.01);
-    param_nh.param("velocity_emphasis", velocity_emphasis, 1.0);
     param_nh.param("unexplainable_jump", unexplainable_jump, 12.0);
     param_nh.param("wheel_diameter", wheel_diameter, 0.314);
 
     ROS_INFO("delta_threshold: %f", delta_threshold);
-    ROS_INFO("velocity_emphasis : %f", velocity_emphasis);
     ROS_INFO("unexplainable_jump : %f", unexplainable_jump);
     joint_state_sub = nh_.subscribe("platform_joint_state", 2, &OdometryNode::jointStateCallback,
             this);
@@ -398,7 +395,6 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
         double interval = (joint_state->header.stamp - last_joint_message).toSec();
 
         data.interval = interval;
-        data.velocity_emphasis = velocity_emphasis;
 
         double xytheta[5] =
         {0.1*cos(odom_orientation)*interval, 0.1*sin(odom_orientation)*interval,
