@@ -27,6 +27,7 @@
     <run_depend>robot_setup_tf</run_depend>
     <run_depend>sync_images</run_depend>
     <run_depend>photo</run_depend>
+    <run_depend>sound_play</run_depend>
     <run_depend>navigation</run_depend>
 
 </package>

@@ -30,5 +30,6 @@ install(
        nodes/camlogger.py
        nodes/image_desync.py
        nodes/lights.py
+       nodes/announce_voltage.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

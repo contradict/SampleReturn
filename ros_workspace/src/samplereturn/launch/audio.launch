@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+    <node
+        name="navigation_audio"
+        machine="navigate"
+        pkg="sound_play"
+        type="soundplay_node.py"
+        ns="audio"
+        >
+        <remap from="robotsound" to="navigate"/>
+    </node>
+
+    <node
+        name="search_audio"
+        machine="search"
+        pkg="sound_play"
+        type="soundplay_node.py"
+        ns="audio"
+        >
+        <remap from="robotsound" to="search"/>
+    </node>
+
+    <node
+        name="voltage_announcer"
+        machine="navigate"
+        pkg="samplereturn"
+        type="announce_voltage.py"
+        ns="audio"/>
+</launch>
