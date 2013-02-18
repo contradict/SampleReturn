@@ -6,7 +6,7 @@ transform_tolerance: 0.3
 
 footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
 inflation_radius: 1.55
-circumscribed_radius: 3.0
+circumscribed_radius: 2.0
 
 cost_scaling_factor: 10.0
 lethal_cost_threshold: 100
