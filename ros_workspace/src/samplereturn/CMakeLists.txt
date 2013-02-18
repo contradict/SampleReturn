@@ -31,5 +31,6 @@ install(
        nodes/image_desync.py
        nodes/lights.py
        nodes/announce_voltage.py
+       nodes/pause_switch.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

@@ -44,4 +44,10 @@
       <remap from="joint_states" to="platform_joint_state"/>
   </node>
 
+    <node
+        name="pause_switch"
+        pkg="samplereturn"
+        type="pause_switch.py"
+        machine="navigate"/>
+
 </launch>
