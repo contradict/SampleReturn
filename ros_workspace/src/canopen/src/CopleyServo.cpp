@@ -283,6 +283,11 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
         enable_callback(*this);
     }
 
+    if( rising_status | falling_status)
+    {
+        status_callback(*this);
+    }
+
     //_printStatusAndMode();
 }
 
@@ -417,6 +422,12 @@ void CopleyServo::setEMCYCallback(DS301CallbackObject cb)
 {
     emcy_callback = cb;
 }
+
+void CopleyServo::setStatusCallback(DS301CallbackObject cb)
+{
+    status_callback = cb;
+}
+
 
 bool CopleyServo::ready(void)
 {
