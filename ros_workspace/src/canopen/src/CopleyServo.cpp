@@ -141,8 +141,8 @@ void CopleyServo::_mapPDOs(void)
     map.subindex = 0;
     map.bits = 32;
     maps.push_back(map);
-    // Actual Velocity
-    map.index = 0x6069;
+    // Load Encoder Velocity
+    map.index = 0x2231;
     map.subindex = 0;
     map.bits = 32;
     maps.push_back(map);
@@ -275,12 +275,17 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
             break;
         default:
             break;
- 
+
     }
 
     if( (rising_status & STATUS_SWITCHED_ON) ||
             (falling_status & STATUS_SWITCHED_ON) ) {
         enable_callback(*this);
+    }
+
+    if( rising_status | falling_status)
+    {
+        status_callback(*this);
     }
 
     //_printStatusAndMode();
@@ -417,6 +422,12 @@ void CopleyServo::setEMCYCallback(DS301CallbackObject cb)
 {
     emcy_callback = cb;
 }
+
+void CopleyServo::setStatusCallback(DS301CallbackObject cb)
+{
+    status_callback = cb;
+}
+
 
 bool CopleyServo::ready(void)
 {

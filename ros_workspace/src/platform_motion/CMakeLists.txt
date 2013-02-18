@@ -26,6 +26,7 @@ add_message_files(
     DIRECTORY msg
     FILES
         GPIO.msg
+        ServoStatus.msg
 )
 
 # services
@@ -92,6 +93,9 @@ target_link_libraries(odometry
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
+
+catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
+    src/acceleration_limit.cpp)
 
 install(
     TARGETS

@@ -119,6 +119,12 @@ void WheelPod::getPosition(double *steering_pos, double *steering_vel, double *w
 
 }
 
+void WheelPod::getStatusWord(uint16_t *steering_status, uint16_t *wheel_status)
+{
+    *steering_status = steering.getStatusWord();
+    *wheel_status = wheel.getStatusWord();
+}
+
 void WheelPod::setSteeringOffset(double offset)
 {
     double delta = offset - steering_offset;

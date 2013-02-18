@@ -158,9 +158,11 @@ class CopleyServo : public DS301 {
         void setInputCallback(InputChangeCallback cb);
         void setPVCallback(DS301CallbackObject cb);
         void setEMCYCallback(DS301CallbackObject cb);
+        void setStatusCallback(DS301CallbackObject cb);
 
         uint16_t getInputPins(void){return input_pins;};
         uint16_t getOutputPins(void){return output_pins;};
+        uint16_t getStatusWord(void){return status_word;};
 
         int32_t position;
         int32_t velocity;
@@ -199,6 +201,7 @@ class CopleyServo : public DS301 {
         DS301CallbackObject position_callback;
         DS301CallbackObject pv_callback;
         DS301CallbackObject enable_callback;
+        DS301CallbackObject status_callback;
         DS301CallbackObject emcy_callback;
         InputChangeCallback input_callback;
 
