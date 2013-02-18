@@ -20,25 +20,21 @@ class PauseSwitch(object):
 
     def gpio(self, gpio):
         if gpio.servo_id == self.servo_id:
-            # GPIO is active low, so these are reversed
-            if (gpio.new_pin_states & self.button_mask):
-                self.pause(False)
-            else:
-                self.pause(True)
+            self.pause((gpio.new_pin_states & self.button_mask) != 0)
 
     def pause(self, state):
         if self.paused == state:
             return
         try:
-            self.enable_service(state)
-            if state:
-                self.say("Pause switch enabled")
+            srv_resp=self.enable_service(state)
+            self.paused=srv_resp.state
+            if self.paused:
+                self.say("System active")
             else:
-                self.say("Pause switch disabled")
-            self.paused = state
+                self.say("System paused")
         except rospy.ServiceException, e:
             rospy.logerr("Unable to use wheelpod enable service: %s", e)
-            self.say("Pause switch failed")
+            self.say("Pause switch failed.")
 
     def say(self, utterance):
         msg = SoundRequest()
