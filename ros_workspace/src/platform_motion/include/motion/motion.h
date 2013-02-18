@@ -33,6 +33,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void pvCallback(CANOpen::DS301 &node);
         void gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins);
         void syncCallback(CANOpen::SYNC &sync);
+        void statusCallback(CANOpen::DS301 &node);
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
         void statusPublishCallback(const ros::TimerEvent& event);
@@ -50,6 +51,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Publisher gpio_pub;
         ros::Publisher joint_state_pub;
         ros::Publisher battery_voltage_pub;
+        ros::Publisher status_pub;
 
         ros::Timer status_publish_timer;
 

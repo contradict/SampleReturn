@@ -26,6 +26,7 @@ add_message_files(
     DIRECTORY msg
     FILES
         GPIO.msg
+        ServoStatus.msg
 )
 
 # services

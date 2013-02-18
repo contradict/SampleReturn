@@ -26,6 +26,7 @@
 #include <platform_motion/Enable.h>
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion/GPIO.h>
+#include <platform_motion/ServoStatus.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -82,6 +83,8 @@ Motion::Motion() :
     gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
 
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
+
+    status_pub = nh_.advertise<ServoStatus>("status_word", 1);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -144,7 +147,10 @@ void Motion::createServos()
 
     CANOpen::DS301CallbackObject pvcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::pvCallback));
-                          
+
+    CANOpen::DS301CallbackObject stcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::statusCallback));
+
     param_nh.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
     param_nh.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
     param_nh.param("large_steering_move", large_steering_move, 30);
@@ -166,6 +172,8 @@ void Motion::createServos()
                  large_steering_move
                 ));
     port->setCallbacks(pvcb, pvcb, gpiocb);
+    port->steering.setStatusCallback(stcb);
+    port->wheel.setStatusCallback(stcb);
 
     param_nh.getParam("starboard_steering_id", starboard_steering_id);
     param_nh.getParam("starboard_wheel_id", starboard_wheel_id);
@@ -184,6 +192,8 @@ void Motion::createServos()
                  large_steering_move
                 ));
     starboard->setCallbacks(pvcb, pvcb, gpiocb);
+    starboard->steering.setStatusCallback(stcb);
+    starboard->wheel.setStatusCallback(stcb);
 
 
     param_nh.getParam("stern_steering_id", stern_steering_id);
@@ -203,7 +213,8 @@ void Motion::createServos()
                  large_steering_move
                 ));
     stern->setCallbacks(pvcb, pvcb, gpiocb);
-
+    stern->steering.setStatusCallback(stcb);
+    stern->wheel.setStatusCallback(stcb);
 
     param_nh.getParam("carousel_id", carousel_id);
     param_nh.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
@@ -216,6 +227,7 @@ void Motion::createServos()
             CANOpen::CopleyServo(carousel_id, sync_interval, pbus));
     carousel->setInputCallback(gpiocb);
     carousel->setPVCallback(pvcb);
+    carousel->setStatusCallback(stcb);
 
     port->initialize();
     starboard->initialize();
@@ -502,7 +514,7 @@ void Motion::enable_pods(bool state)
     port->enable(state, ecb);
     starboard->enable(state, ecb);
     stern->enable(state, ecb);
-}
+} 
 
 void Motion::enable_carousel(bool state)
 {
@@ -677,7 +689,6 @@ void Motion::carouselCallback(const std_msgs::Float64::ConstPtr fmsg)
             carousel_encoder_counts/2./M_PI);
 }
 
-
 void Motion::statusPublishCallback(const ros::TimerEvent& event)
 {
     if(carousel_setup) {
@@ -692,5 +703,46 @@ void Motion::statusPublishCallback(const ros::TimerEvent& event)
         voltage.data = carousel->bus_voltage;
         battery_voltage_pub.publish(voltage);
     }
+
+    ServoStatus status;
+    uint16_t steering_status, wheel_status;
+    port->getStatusWord( &steering_status, &wheel_status);
+    status.servo_id=port->steering.node_id;
+    status.status_word = steering_status;
+    status_pub.publish(status);
+    status.servo_id=port->wheel.node_id;
+    status.status_word = wheel_status;
+    status_pub.publish(status);
+
+    starboard->getStatusWord( &steering_status, &wheel_status);
+    status.servo_id=starboard->steering.node_id;
+    status.status_word = steering_status;
+    status_pub.publish(status);
+    status.servo_id=starboard->wheel.node_id;
+    status.status_word = wheel_status;
+    status_pub.publish(status);
+
+    stern->getStatusWord( &steering_status, &wheel_status);
+    status.servo_id=stern->steering.node_id;
+    status.status_word = steering_status;
+    status_pub.publish(status);
+    status.servo_id=stern->wheel.node_id;
+    status.status_word = wheel_status;
+    status_pub.publish(status);
+
+    status.servo_id = carousel->node_id;
+    status.status_word = carousel->getStatusWord();
+    status_pub.publish(status);
 }
+
+void Motion::statusCallback(CANOpen::DS301 &node)
+{
+    CANOpen::CopleyServo *svo = static_cast<CANOpen::CopleyServo*>(&node);
+    ServoStatus status;
+
+    status.servo_id=svo->node_id;
+    status.status_word = svo->getStatusWord();
+    status_pub.publish(status);
+}
+
 }
