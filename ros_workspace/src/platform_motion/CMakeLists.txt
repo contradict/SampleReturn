@@ -142,5 +142,6 @@ install(
 install(
     PROGRAMS
         nodes/carousel_indexer.py
+        nodes/sinusoid_test.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
