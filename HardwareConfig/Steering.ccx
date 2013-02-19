@@ -89,12 +89,12 @@ ba,0,Position Following Error Limit,10000
 bb,0,Position Following Warning Limit,5000
 bc,0,Position Tracking Window,2500
 bd,0,Position Tracking Window Time,10
-c8,0,Trajectory Profile Mode,257
-ca,0,Trajectory Position Command,1000
-cb,0,Trajectory Max Velocity,6666667
-cc,0,Trajectory Max Accel,200000
-cd,0,Trajectory Max Decel,200000
-cf,0,Trajectory Abort Decel,417000
+c8,0,Trajectory Profile Mode,256
+ca,0,Trajectory Position Command,-1000
+cb,0,Trajectory Max Velocity,25000
+cc,0,Trajectory Max Accel,2000
+cd,0,Trajectory Max Decel,2000
+cf,0,Trajectory Abort Decel,200000
 f0,0,Input 1 Debounce Time,0
 f1,0,Input 2 Debounce Time,0
 f2,0,Input 3 Debounce Time,0
@@ -140,7 +140,7 @@ c4,0,Home Velocity Slow,8333
 c5,0,Home Accel/Decel,2000
 c6,0,Home Offset,0
 c7,0,Home Current,150
-ce,0,Trajectory Max Jerk,1668000
+ce,0,Trajectory Max Jerk,50000
 d0,0,Input 9 Config,0
 d1,0,Input 10 Config,0
 d2,0,Input 11 Config,0
