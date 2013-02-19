@@ -12,31 +12,40 @@ class VoltageAnnouncer(object):
         self.voice = rospy.get_param("voice", "kal_diphone")
         self.servo_id = rospy.get_param("servo_id", 1)
         self.button_mask = rospy.get_param("button_mask", 4)
+        self.lowVoltageLimit = rospy.get_param("lowVoltageLimit", 49)
         rospy.Subscriber("/gpio_read", GPIO, self.gpio)
-        rospy.Subscriber("/battery_voltage", Float64, self.voltage)
+        rospy.Subscriber("/battery_voltage", Float64, self.voltageCallBack)
         self.voltage = None
-        self.audio_pub=rospy.Publisher("/audio/navigate", SoundRequest)
+        self.audioPub=rospy.Publisher("/audio/navigate", SoundRequest)
         rospy.spin()
 
     def gpio(self, gpio):
         if gpio.servo_id == self.servo_id:
             if ((gpio.previous_pin_states ^ gpio.new_pin_states) &
                     self.button_mask):
-                self.say_voltage()
+                self.sayVoltage()
 
-    def voltage(self, float):
+    def voltageCallBack(self, float):
         self.voltage=float.data
+        rospy.logdebug("voltage_announcer received voltage %f", self.voltage)
+        if (self.voltage <= self.lowVoltageLimit):
+            msg = SoundRequest()
+            msg.sound = SoundRequest.SAY
+            msg.command = SoundRequest.PLAY_ONCE
+            msg.arg2 = 'voice.select "%s"'%self.voice
+            msg.arg = "Warning. Battery voltage, %4.1f"%self.voltage
+            self.audioPub.publish(msg)
 
-    def say_voltage(self):
+    def sayVoltage(self):
         msg = SoundRequest()
         msg.sound = SoundRequest.SAY
         msg.command = SoundRequest.PLAY_ONCE
+        msg.arg2 = 'voice.select "%s"'%self.voice
         if self.voltage is not None:
-            msg.arg = "Battery voltage %4.1f"%self.voltage
+            msg.arg = "Battery voltage, %4.1f"%self.voltage
         else:
             msg.arg = "No battery voltage reported"
-        msg.arg2 = 'voice.select "%s"'%self.voice
-        self.audio_pub.publish(msg)
+        self.audioPub.publish(msg)
 
 if __name__=="__main__":
     VoltageAnnouncer()

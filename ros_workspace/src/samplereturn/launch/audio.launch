@@ -27,5 +27,8 @@
         machine="navigate"
         pkg="samplereturn"
         type="announce_voltage.py"
-        ns="audio"/>
+        ns="audio">
+        <param name="voice" type="string" value="kal_diphone"/>
+        <param name="lowVoltageLimit" type="double" value="49"/>
+    </node>
 </launch>
