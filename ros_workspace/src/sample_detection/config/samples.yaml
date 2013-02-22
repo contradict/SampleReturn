@@ -1,0 +1,16 @@
+# This is placeholder for the file that will describe the color models
+# of the samples for which to search
+red_puck:
+  mean: 255.0
+  covariance:
+    rows: 3
+    cols: 3
+    data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+  channel: a
+orange_pipe:
+  mean: 126.0
+  covariance:
+    rows: 3
+    cols: 3
+    data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+  channel: b
