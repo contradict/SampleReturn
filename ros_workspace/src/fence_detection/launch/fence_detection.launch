@@ -26,6 +26,8 @@
         >
         <param name="approximate_sync" type="bool" value="true"/>
         <remap from="left/image_rect_color" to="fence_img"/>
+        <remap from="left/camera_info" to="/navigation/left/camera_info"/>
+        <remap from="right/camera_info" to="/navigation/right/camera_info"/>
         <remap from="disparity" to="fence_disp"/>
     </node>
 
