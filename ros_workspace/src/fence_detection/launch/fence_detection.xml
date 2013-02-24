@@ -5,6 +5,7 @@
 
     <!-- Fence Nodelet Host process -->
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="manager"
@@ -15,6 +16,7 @@
 
     <!-- Compute Stereo Point Cloud -->
     <node
+        machine="navigate"
         pkg="nodelet"
         type="nodelet"
         name="stereo_image_points"
@@ -29,6 +31,7 @@
 
     <!-- Fence Detector -->
     <node
+        machine="navigate"
         pkg="fence_detection"
         type="fence_detection.py"
         name="fence_detection"
@@ -42,19 +45,21 @@
 
     <!-- Fence Map -->
     <node
-      pkg="costmap_2d"
-      type="costmap_2d_node"
-      name="costmap_node"
-      ns="fence"
-      output="log">
-      <rosparam file="$(find fence_detection)/config/costmap_params.yaml" command="load" ns="fence"/>
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_node"
+        name="costmap_node"
+        ns="fence"
+        output="log">
+        <rosparam file="$(find fence_detection)/config/costmap_params.yaml" command="load" ns="fence"/>
     </node>
 
     <node
-      pkg="costmap_2d"
-      type="costmap_2d_cloud"
-      name="voxel_visualizer_clous"
-      ns="fence">
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_cloud"
+        name="voxel_visualizer_clous"
+        ns="fence">
     </node>
 
 </launch>
