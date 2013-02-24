@@ -60,10 +60,8 @@ catkin_package(
         roslib
         roscpp
         rospy
-        message_runtime
-        actionlib_msgs
-        actionlib
         canopen
+        message_generation
 )
 
 include_directories(
