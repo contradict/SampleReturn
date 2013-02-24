@@ -80,7 +80,7 @@ catkin_package(
 ## Mark executable scripts (Python etc.) for installation
 ## not required for python when using catkin_python_setup()
  install(PROGRAMS
-   scripts/fence_detection.py
+   nodes/fence_detection.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
@@ -97,6 +97,10 @@ catkin_package(
 #   FILES_MATCHING PATTERN "*.h"
 #   PATTERN ".svn" EXCLUDE
 # )
+install(DIRECTORY launch
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    USE_SOURCE_PERMISSIONS
+    )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
