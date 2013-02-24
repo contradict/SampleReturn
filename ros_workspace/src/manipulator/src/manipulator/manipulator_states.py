@@ -172,7 +172,7 @@ class MoveHand(smach.State):
         outcomes=['success', 'failure'],
         output_keys=['action_feedback']
     )
-    # save a reference to the persistant data
+    # save a reference to the persistent data
     self.dataStore = dataStore
 
     self.pos = pos

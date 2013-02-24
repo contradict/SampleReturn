@@ -17,14 +17,14 @@ from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, Mani
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 
 from manipulator import manipulator_states
-from manipulator.manipulator_data import PersistantData
+from manipulator.manipulator_data import PersistentData
 
 def main():
   # init the ros node
   rospy.init_node("manipulator")
 
-  # set up the persistant data for the smach states
-  dataStore = PersistantData()
+  # set up the persistent data for the smach states
+  dataStore = PersistentData()
 
   # get a boatload of parameters from the param server
   dataStore.wristMinPos = rospy.get_param('manipulator/wrist_min_pos')

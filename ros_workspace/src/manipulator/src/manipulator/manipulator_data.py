@@ -3,7 +3,7 @@ import threading
 
 # some of the nodes need access to subscriptions and global crud
 # so encapsulate it all in one datastore
-class PersistantData:
+class PersistentData:
   def __init__(self):
     # store the current goal, hopefully will get set right after the action
     # starts.
