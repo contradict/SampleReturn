@@ -1,5 +1,5 @@
-<!-- Launches the fence detector node-->
 <?xml version="1.0"?>
+<!-- Launches the fence detector node-->
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
