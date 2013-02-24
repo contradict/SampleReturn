@@ -60,7 +60,7 @@
         machine="navigate"
         pkg="costmap_2d"
         type="costmap_2d_cloud"
-        name="voxel_visualizer_clous"
+        name="voxel_visualizer_cloud"
         ns="fence">
     </node>
 
