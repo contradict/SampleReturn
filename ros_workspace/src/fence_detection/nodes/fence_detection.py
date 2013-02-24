@@ -45,14 +45,19 @@ class fence_detection(object):
     # For some reason, cv_bridge is setting the step to 640, not 4*640
     # fixing this manually
     self.disp_out.image.step = 2560
+    self.disp_out.header = self.header
 
-    self.img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(masked_img),'bgr8'))
+    img_out = self.bridge.cv_to_imgmsg(cv2.cv.fromarray(masked_img),'bgr8')
+    img_out.header = Image.header
+
+    self.img_pub.publish(img_out)
     self.disp_pub.publish(self.disp_out)
 
   def handle_disp(self,DisparityImage):
     self.disp_img = np.asarray(self.bridge.imgmsg_to_cv(DisparityImage.image))
     self.min_disparity = DisparityImage.min_disparity
     self.max_disparity = DisparityImage.max_disparity
+    self.header = DisparityImage.header
 
   #def extract_points(self):
 
