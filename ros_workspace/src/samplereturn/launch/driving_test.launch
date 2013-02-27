@@ -31,4 +31,5 @@
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/> 
     <include file="$(find samplereturn)/launch/planner.launch"/>
+    <include file="$(find samplereturn)/launch/odometry.launch"/>
 </launch>
