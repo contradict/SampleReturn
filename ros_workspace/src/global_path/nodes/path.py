@@ -6,7 +6,6 @@ import numpy as np
 import threading
 import time
 import os
-from skimage import data # TODO why is this necessary?
 from collections import namedtuple
 from matplotlib import pyplot
 import matplotlib.cm as cm
@@ -97,19 +96,10 @@ def generate_candidates(point, radius, map_width, map_height):
     return [p for p in candidates if 0 < p.x < map_width and 0 < p.y < map_height]
 
 def angle_between_clock(vec1, vec2):
-    # TODO This is retarded just change vec order
     """Finds the angle between two vectors in a clockwise direction (can be > 180)"""
     angle = angle_between(vec1, vec2)
     cross = np.cross(vec1, vec2)
     if cross < 0:
-        angle = (2*math.pi) - angle
-    return angle
-
-def angle_between_counterclock(vec1, vec2):
-    """Finds the angle between two vectors in a clockwise direction (can be > 180)"""
-    angle = angle_between(vec1, vec2)
-    cross = np.cross(vec1, vec2)
-    if cross > 0:
         angle = (2*math.pi) - angle
     return angle
 
@@ -136,7 +126,11 @@ def get_next_waypoint(robot_position, fence_map):
         else:
             #pyplot.scatter(p.x, p.y, c='g')
             bounded_candidates.append(p)
-            
+    
+    # We're nowhere near the fence - just go a consistent direction until you hit fence.
+    if len(bounded_candidates) == 0:
+        return candidates[0]
+    
     # TODO: Check for past-fence
     # TODO: Optimize for target fence distance if multiple candidates left
     
@@ -170,20 +164,6 @@ def loop(fence_map, start):
             print "I think I'm infinite looping aaaaaagh break"
             break
     return path
-
-def scoot_in(penult, ult):
-    # todo make this relative to step size
-    delt_x = (ult.x-penult.x) * 1.5
-    delt_y = (ult.y-penult.y) * 1.5
-    return Point(ult.x-delt_y,ult.y+delt_x)
-
-def path_to_fence_map(path):
-    # TODO - how performant is this?
-    img = Image.new(mode='L', size=(600,600))
-    pdraw = ImageDraw.Draw(img)
-    pdraw.polygon([(p.x,p.y) for p in path], outline="white")
-    fence_map = np.asarray(img)
-    return fence_map
 
 def shrink_poly(path):
     OFFSET = 20
@@ -252,7 +232,7 @@ def explore(fence_map, start):
         print "area:", area
         
 def main():
-    image = Image.open(os.path.join('test_data','corridor.png')).convert("L")
+    image = Image.open(os.path.join('..','test_data','corridor.png')).convert("L")
     image = np.asarray(image)
 
     start = Point(x=166, y=229) #corridor.png
