@@ -7,3 +7,9 @@
 [submodule "ros_workspace/src/photo"]
 	path = ros_workspace/src/photo
 	url = git://github.com/contradict/bosch_photo
+[submodule "ros_workspace/src/bfl"]
+	path = ros_workspace/src/bfl
+	url = git://github.com/contradict/ros-bfl
+[submodule "ros_workspace/src/navigation"]
+	path = ros_workspace/src/navigation
+	url = git://github.com/contradict/ros-navigation
