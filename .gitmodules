@@ -7,3 +7,6 @@
 [submodule "ros_workspace/src/photo"]
 	path = ros_workspace/src/photo
 	url = git://github.com/contradict/bosch_photo
+[submodule "ros_workspace/src/viso2"]
+	path = ros_workspace/src/viso2
+	url = git@github.com:contradict/viso2.git
