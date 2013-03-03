@@ -42,6 +42,7 @@
   <node machine="navigate" pkg="robot_state_publisher" type="robot_state_publisher"
       name="state_publisher" output="log">
       <remap from="joint_states" to="platform_joint_state"/>
+      <param name="publish_frequency" type="double" value="10"/>
   </node>
 
     <node
