@@ -81,6 +81,7 @@ target_link_libraries(motion_node
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
+add_dependencies(${PROJECT_NAME} platform_motion_gencpp)
 
 add_executable(teleop src/teleop.cpp)
 target_link_libraries(teleop
