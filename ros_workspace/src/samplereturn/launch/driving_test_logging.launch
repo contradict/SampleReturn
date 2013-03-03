@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <machine name="search"
+             address="sr2"
+             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
+             user="robot"
+    />
+    <machine name="navigate"
+             address="sr1"
+             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
+             user="robot"
+             />
+
+    <param name="use_sim_time" value="False" type="bool"/>
+
+    <include file="$(find samplereturn)/launch/motion.launch"/>
+    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
+        <remap from="base_pose_ground_truth" to="odometry"/>
+    </node>
+    <!--
+    -->
+    <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
+    <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
+    <include file="$(find samplereturn)/launch/search_camera.launch"/>
+    <!--
+    <include file="$(find samplereturn)/launch/costmap.launch"/>
+    <include file="$(find samplereturn)/launch/gmapping.launch"/>
+    -->
+    <include file="$(find samplereturn)/launch/joystick.launch"/>
+    <include file="$(find manipulator)/launch/manipulator.launch"/>
+    <include file="$(find samplereturn)/launch/audio.launch"/>
+    <include file="$(find samplereturn)/launch/planner.launch"/>
+
+  <!-- rosbag record -->
+  <!--
+  -->
+  <node machine="navigate"
+      pkg="rosbag"
+      type="record"
+      name="navigate_record"
+      output="log"
+      args="odometry tf platform_joint_state carousel navigation/right/image_raw navigation/left/image_raw navigation/right/camera_info navigation/left/camera_info">
+  </node>
+
+  <!-- DSLR Client and Publisher-->
+   <node machine="search" pkg="samplereturn" type="camlogger.py" name="camlogger"/>
+   <node machine="search"
+      pkg="rosbag"
+      type="record"
+      name="search_record"
+      output="log"
+      args="cam_img cam_info manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info"/>
+</launch>
