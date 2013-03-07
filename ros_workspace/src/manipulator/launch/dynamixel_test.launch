@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<!-- This is a launch file for testing a single dynamixel -->
+<launch>
+  <!-- load up the manager. this thing gets the actual serial port -->
+  <node
+    name="dynamixel_manager"
+    pkg="dynamixel_controllers"
+    type="controller_manager.py"
+    required="true"
+    output="log">
+    <rosparam>
+      namespace: dxl_manager
+      serial_ports:
+        test_port:
+          port_name: "/dev/ttyUSB0"
+          baud_rate: 57600
+          min_motor_id: 10
+          max_motor_id: 12
+          update_rate: 20
+    </rosparam>
+  </node>
+
+  <!-- load the yaml file that defines the dynamixel attributes -->
+  <rosparam file="$(find manipulator)/config/dynamixel_test.yaml" command="load"/>
+
+  <!-- start up the controller -->
+  <node
+    name="dynamixel_controller_spawner"
+    pkg="dynamixel_controllers"
+    type="controller_spawner.py"
+    args="--manager=dxl_manager --port=test_port --type=simple dynamixel_test_controller"
+    output="log"
+  />
+
+  <!-- load a node with services to control the dynamixel -->
+  <node
+    name="dynamixel_test"
+    pkg="manipulator"
+    type="dynamixel_test_node.py"
+    output="log"
+  >
+  
+    <rosparam>
+    </rosparam>
+
+  </node>
+</launch>

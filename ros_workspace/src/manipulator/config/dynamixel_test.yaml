@@ -1,0 +1,12 @@
+dynamixel_test_controller:
+  controller:
+    package: dynamixel_controllers
+    module: joint_position_controller
+    type: JointPositionController
+  joint_name: wristJoint
+  joint_speed: 2.0
+  motor:
+    id: 12
+    init: 0
+    min: 0
+    max: 4095
