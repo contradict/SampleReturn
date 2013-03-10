@@ -24,6 +24,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeAction.h>
 #include <platform_motion/Enable.h>
+#include <platform_motion/SelectCommandSource.h>
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion/GPIO.h>
 #include <platform_motion/ServoStatus.h>
@@ -39,6 +40,7 @@ Motion::Motion() :
     param_nh("~"),
     home_pods_action_server(nh_, "home_wheelpods", false),
     home_carousel_action_server(nh_, "home_carousel", false),
+    command_source(COMMAND_SOURCE_NONE),
     CAN_fd(-1),
     gpio_enabled(false),
     carousel_setup(false),
@@ -70,7 +72,11 @@ Motion::Motion() :
     enable_carousel_server = nh_.advertiseService("enable_carousel",
             &Motion::enableCarouselCallback, this);
 
-    twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
+    select_command_server = nh_.advertiseService("select_command_source",
+            &Motion::selectCommandSourceCallback, this);
+    planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
+    joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
+    servo_sub = nh_.subscribe("servo_command", 2, &Motion::servoTwistCallback, this);
 
     carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
             this);
@@ -322,7 +328,68 @@ void Motion::start(void)
         ROS_INFO("Got all transforms");
 }
 
-void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
+void Motion::plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
+{
+    if(command_source == COMMAND_SOURCE_PLANNER)
+        handleTwist(twist);
+}
+
+void Motion::joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
+{
+    if(command_source == COMMAND_SOURCE_JOYSTICK)
+        handleTwist(twist);
+}
+
+void Motion::servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
+{
+    if(command_source == COMMAND_SOURCE_SERVO)
+        handleTwist(twist);
+}
+
+bool Motion::selectCommandSourceCallback(platform_motion::SelectCommandSource::Request &req,
+                                          platform_motion::SelectCommandSource::Response &resp)
+{
+    resp.valid=true;
+    resp.source=req.source;
+    if(req.source == std::string("Joystick"))
+        command_source=COMMAND_SOURCE_JOYSTICK;
+    else if(req.source == std::string("Planner"))
+        command_source=COMMAND_SOURCE_PLANNER;
+    else if(req.source == std::string("Servo"))
+        command_source=COMMAND_SOURCE_SERVO;
+    else if(req.source == std::string("None"))
+    {
+        command_source=COMMAND_SOURCE_NONE;
+        geometry_msgs::Twist *twist = new geometry_msgs::Twist();
+        twist->linear.x=0;
+        twist->linear.y=0;
+        twist->angular.z=0;
+        handleTwist(geometry_msgs::Twist::ConstPtr(twist));
+    }
+    else
+    {
+        ROS_ERROR("Unrecognized command source %s", req.source.c_str());
+        switch(command_source)
+        {
+            case COMMAND_SOURCE_PLANNER:
+                resp.source="Planner";
+                break;
+            case COMMAND_SOURCE_JOYSTICK:
+                resp.source="Joystick";
+                break;
+            case COMMAND_SOURCE_SERVO:
+                resp.source="Servo";
+                break;
+            case COMMAND_SOURCE_NONE:
+                resp.source="None";
+                break;
+        }
+        resp.valid=false;
+    }
+    return true;
+}
+
+void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
 {
     Eigen::Vector2d body_vel( twist->linear.x, twist->linear.y );
     double body_omega = twist->angular.z;

@@ -32,7 +32,9 @@ add_message_files(
 # services
 add_service_files(
     DIRECTORY srv
-    FILES Enable.srv
+    FILES
+        Enable.srv
+        SelectCommandSource.srv
 )
 
 # actions
@@ -80,6 +82,7 @@ target_link_libraries(motion_node
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencpp)
 
 add_executable(teleop src/teleop.cpp)
 target_link_libraries(teleop
