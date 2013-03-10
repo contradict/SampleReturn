@@ -739,33 +739,68 @@ void Motion::statusPublishCallback(const ros::TimerEvent& event)
     }
 
     ServoStatus status;
-    uint16_t steering_status, wheel_status;
-    port->getStatusWord( &steering_status, &wheel_status);
+    std::stringstream status_stream;
+    std::stringstream mode_stream;
+
+    port->steering.writeStatus(status_stream);
+    port->steering.writeMode(mode_stream);
     status.servo_id=port->steering.node_id;
-    status.status_word = steering_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
+
+    port->wheel.writeStatus(status_stream);
+    port->wheel.writeMode(mode_stream);
     status.servo_id=port->wheel.node_id;
-    status.status_word = wheel_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
 
-    starboard->getStatusWord( &steering_status, &wheel_status);
+    starboard->steering.writeStatus(status_stream);
+    starboard->steering.writeMode(mode_stream);
     status.servo_id=starboard->steering.node_id;
-    status.status_word = steering_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
+
+    starboard->wheel.writeStatus(status_stream);
+    starboard->wheel.writeMode(mode_stream);
     status.servo_id=starboard->wheel.node_id;
-    status.status_word = wheel_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
 
-    stern->getStatusWord( &steering_status, &wheel_status);
+    stern->steering.writeStatus(status_stream);
+    stern->steering.writeMode(mode_stream);
     status.servo_id=stern->steering.node_id;
-    status.status_word = steering_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
-    status.servo_id=stern->wheel.node_id;
-    status.status_word = wheel_status;
-    status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
 
+    stern->wheel.writeStatus(status_stream);
+    stern->wheel.writeMode(mode_stream);
+    status.servo_id=stern->wheel.node_id;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
+    status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
+
+    carousel->writeStatus(status_stream);
+    carousel->writeMode(mode_stream);
     status.servo_id = carousel->node_id;
-    status.status_word = carousel->getStatusWord();
+    status.status = status_stream.str();
+    status.mode = mode_stream.str();
     status_pub.publish(status);
 }
 
@@ -773,9 +808,14 @@ void Motion::statusCallback(CANOpen::DS301 &node)
 {
     CANOpen::CopleyServo *svo = static_cast<CANOpen::CopleyServo*>(&node);
     ServoStatus status;
+    std::stringstream status_stream;
+    std::stringstream mode_stream;
 
+    svo->writeStatus(status_stream);
+    svo->writeMode(mode_stream);
     status.servo_id=svo->node_id;
-    status.status_word = svo->getStatusWord();
+    status.status = status_stream.str();
+    status.mode = mode_stream.str();
     status_pub.publish(status);
 }
 
