@@ -291,9 +291,24 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
     //_printStatusAndMode();
 }
 
-void CopleyServo::_printStatusAndMode(void)
+void CopleyServo::_printStatusAndMode()
 {
-    std::cout << "Status: " <<
+    std::cout << "Status: ";
+    writeStatus(std::cout);
+    std::cout << std::endl;
+    std::cout << "Mode of Operation: ";
+    writeMode(std::cout);
+    std::cout << std::endl;
+}
+
+void CopleyServo::writeMode(std::ostream &out)
+{
+    out << operationModeName(mode_of_operation);
+}
+
+void CopleyServo::writeStatus(std::ostream &out)
+{
+    out << "Status: " <<
         ((status_word&STATUS_READY)?"Ready to Switch On, ":"") <<
         ((status_word&STATUS_SWITCHED_ON)?"Switched On, ":"") <<
         ((status_word&STATUS_OPERATION_ENABLED)?"Operation Enabled, ":"") <<
@@ -308,23 +323,23 @@ void CopleyServo::_printStatusAndMode(void)
         ((status_word&STATUS_INTERNAL_LIMIT)?"Internal Limit, ":"");
      switch(mode_of_operation) {
         case ProfilePosition:
-            std::cout << ((status_word&STATUS_SETPOINT_ACK)?"Setpoint Ack, ":"") <<
+            out << ((status_word&STATUS_SETPOINT_ACK)?"Setpoint Ack, ":"") <<
                          ((status_word&STATUS_FOLLOWING_ERROR)?"Following Error, ":"");
             break;
         case ProfileVelocity:
-            std::cout << ((status_word&STATUS_SPEED_ZERO)?"Speed==0, ":"") <<
+            out << ((status_word&STATUS_SPEED_ZERO)?"Speed==0, ":"") <<
                          ((status_word&STATUS_MAXIMUM_SLIPPAGE)?"Maximum Slippage Error, ":"");
             break;
         case ProfileTorque:
-            std::cout << ((status_word&STATUS_RESERVED_PT12)?"Reserved (PT12), ":"") <<
+            out << ((status_word&STATUS_RESERVED_PT12)?"Reserved (PT12), ":"") <<
                          ((status_word&STATUS_RESERVED_PT13)?"Reserved (PT13), ":"");
             break;
         case Homing:
-            std::cout << ((status_word&STATUS_HOMING_ATTAINED)?"Homing Attained, ":"") <<
+            out << ((status_word&STATUS_HOMING_ATTAINED)?"Homing Attained, ":"") <<
                          ((status_word&STATUS_HOMING_ERROR)?"Homing Error, ":"");
             break;
         case InterpolatedPosition:
-            std::cout << ((status_word&STATUS_INTERPOLATED_POSITION)?"Interpolated Position Active, ":"") <<
+            out << ((status_word&STATUS_INTERPOLATED_POSITION)?"Interpolated Position Active, ":"") <<
                          ((status_word&STATUS_RESERVED_IP13)?"Reserved (IP13), ":"");
             break;
         case CyclicSynchonousPosition:
@@ -339,11 +354,9 @@ void CopleyServo::_printStatusAndMode(void)
         default:
             break;
     }
-    std::cout << ((status_word&STATUS_PERFORMING_MOVE)?"Performing Move, ":"") <<
-                 ((status_word&STATUS_RESERVED_15)?"Reserved (15)":"") <<
-                 std::endl;
+    out << ((status_word&STATUS_PERFORMING_MOVE)?"Performing Move, ":"") <<
+                 ((status_word&STATUS_RESERVED_15)?"Reserved (15)":"");
 
-    std::cout << "Mode of Operation: " << operationModeName(mode_of_operation) << std::endl;
 }
 
 void CopleyServo::positionVelocityPDOCallback(PDO &pdo)
