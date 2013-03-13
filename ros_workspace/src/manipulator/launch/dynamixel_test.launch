@@ -31,20 +31,8 @@
     name="dynamixel_controller_spawner"
     pkg="dynamixel_controllers"
     type="controller_spawner.py"
-    args="--manager=dxl_manager --port=test_port --type=simple dynamixel_test_controller"
+    args="--manager=dxl_manager --port=test_port --type=simple dynamixel_test_controller1 dynamixel_test_controller2"
     output="log"
-  />
+    />
 
-  <!-- load a node with services to control the dynamixel -->
-  <node
-    name="dynamixel_test"
-    pkg="manipulator"
-    type="dynamixel_test_node.py"
-    output="log"
-  >
-  
-    <rosparam>
-    </rosparam>
-
-  </node>
 </launch>
