@@ -75,6 +75,7 @@ include_directories(
 
 #common commands for building c++ executables and libraries
 add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencpp)
 add_executable(motion_node src/motion_node.cpp)
 target_link_libraries(motion_node
     ${PROJECT_NAME}
