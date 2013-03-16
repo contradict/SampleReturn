@@ -36,6 +36,7 @@
 
 
     <node
+        machine="navigate"
         name="map_server"
         pkg="map_server"
         type="map_server"
