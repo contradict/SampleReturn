@@ -49,7 +49,14 @@
         <remap from="camera" to="right" />
     </node>
 
- 
+    <!-- emit synchronization error -->
+    <node
+        machine="search"
+        pkg="samplereturn"
+        type="image_desync.py"
+        name="image_desync"
+        ns="/manipulator"/>
+
     <!-- Debayer -->
     <node
           machine="search"

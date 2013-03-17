@@ -52,6 +52,14 @@
     </node>
     </group>
 
+    <!-- emit synchronization error -->
+    <node
+        machine="navigate"
+        pkg="samplereturn"
+        type="image_desync.py"
+        name="image_desync"
+        ns="/navigation"/>
+
     <!-- Debayer -->
     <node
           machine="navigate"
