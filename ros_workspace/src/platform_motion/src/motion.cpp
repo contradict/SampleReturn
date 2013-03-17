@@ -90,7 +90,7 @@ Motion::Motion() :
 
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
 
-    status_pub = nh_.advertise<ServoStatus>("status_word", 1);
+    status_pub = nh_.advertise<ServoStatus>("status_word", 10);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
