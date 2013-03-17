@@ -63,7 +63,10 @@
         pkg="samplereturn"
         type="image_desync.py"
         name="image_desync"
-        ns="/navigation"/>
+        ns="/navigation">
+        <param name="manager_node_name" type="string" value="/navigation/manager"/>
+        <param name="sync_wait" type="double" value="30"/>
+    </node>
 
     <!-- Debayer -->
     <node
