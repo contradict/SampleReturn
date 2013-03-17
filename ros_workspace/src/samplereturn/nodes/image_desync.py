@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import roslib; roslib.load_manifest('samplereturn')
 from std_msgs.msg import Float64
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CameraInfo
 import rospy
 
 
@@ -9,14 +9,14 @@ class image_desync(object):
     def __init__(self):
         self.timestamps={'left':[], 'right':[]}
         self.pub = rospy.Publisher('desync', Float64)
-        self.left_sub = rospy.Subscriber('left/image_raw', Image,
-                lambda im, name='left': self.callback(name, im))
-        self.right_sub = rospy.Subscriber('right/image_raw', Image,
-                lambda im, name='right': self.callback(name, im))
+        self.left_sub = rospy.Subscriber('left/camera_info', CameraInfo,
+                lambda info, name='left': self.info_callback(name, info))
+        self.right_sub = rospy.Subscriber('right/camera_info', CameraInfo,
+                lambda info, name='right': self.info_callback(name, info))
 
 
-    def callback(self, name, image):
-        self.timestamps[name].append(image.header.stamp)
+    def info_callback(self, name, info):
+        self.timestamps[name].append(info.header.stamp)
         if len(self.timestamps[name]) >2:
            self.timestamps[name].pop(0)
         if name=='left' and all([len(x)==2 for x in self.timestamps.itervalues()]):
