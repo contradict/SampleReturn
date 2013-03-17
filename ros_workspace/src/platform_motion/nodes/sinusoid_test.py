@@ -42,8 +42,11 @@ class SinusoidTest(object):
 
     def compute_velocity(self):
         self.theta=self.theta_magnitude*math.sin(self.phase)
-        self.vx=self.velocity*math.cos(self.theta)
-        self.vy=self.velocity*math.sin(self.theta)
+        #self.vx=self.velocity*math.cos(self.theta)
+        #self.vy=self.velocity*math.sin(self.theta)
+        #self.vt=0
+        self.vx=self.velocity*math.cos(self.phase)
+        self.vy=0
         self.vt=0
 
     def send_twist(self, phase):
