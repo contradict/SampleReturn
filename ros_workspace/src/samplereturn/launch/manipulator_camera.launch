@@ -10,6 +10,7 @@
         args="manager"
         ns="/manipulator"
         output="log"
+        respawn="true"
         >
     </node>
     <node
@@ -18,7 +19,9 @@
          type="nodelet"
          name="left"
          args="load camera1394/driver /manipulator/manager"
-         ns="/manipulator">
+         ns="/manipulator"
+         respawn="true"
+         >
 
         <param name="guid" type="string" value="00b09d0100a85650"/>
         <param name="video_mode" value="640x480_mono8"/>
@@ -36,7 +39,9 @@
          type="nodelet"
          name="right"
          args="load camera1394/driver /manipulator/manager"
-         ns="/manipulator">
+         ns="/manipulator"
+         respawn="true"
+         >
 
         <param name="guid" type="string" value="00b09d0100a85642"/>
         <param name="video_mode" value="640x480_mono8"/>
@@ -64,7 +69,9 @@
           type="nodelet"
           name="debayer"
           args="load image_proc/debayer /manipulator/manager"
-          ns="/manipulator/left">
+          ns="/manipulator/left"
+          respawn="true"
+          >
           <remap from="image_mono" to="debayer/image_mono"/>
           <remap from="image_color" to="debayer/image_color"/>
     </node>
@@ -74,7 +81,9 @@
           type="nodelet"
           name="debayer"
           args="load image_proc/debayer /manipulator/manager"
-          ns="/manipulator/right">
+          ns="/manipulator/right"
+          respawn="true"
+          >
           <remap from="image_mono" to="debayer/image_mono"/>
           <remap from="image_color" to="debayer/image_color"/>
      </node>
@@ -86,7 +95,9 @@
         type="nodelet"
         name="image_rot90_mono"
         args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/left">
+        ns="/manipulator/left"
+        respawn="true"
+        >
 
         <remap from="rot90/image_raw_in" to="debayer/image_mono"/>
         <remap from="rot90/image_raw_rot" to="image_mono"/>
@@ -98,7 +109,9 @@
         type="nodelet"
         name="image_rot90_mono"
         args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/right">
+        ns="/manipulator/right"
+        respawn="true"
+        >
 
         <remap from="rot90/image_raw_in" to="debayer/image_mono"/>
         <remap from="rot90/image_raw_rot" to="image_mono"/>
@@ -110,7 +123,9 @@
         type="nodelet"
         name="image_rot90_color"
         args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/left">
+        ns="/manipulator/left"
+        respawn="true"
+        >
 
         <remap from="rot90/image_raw_in" to="debayer/image_color"/>
         <remap from="rot90/image_raw_rot" to="image_color"/>
@@ -122,7 +137,9 @@
         type="nodelet"
         name="image_rot90_color"
         args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/right">
+        ns="/manipulator/right"
+        respawn="true"
+        >
 
         <remap from="rot90/image_raw_in" to="debayer/image_color"/>
         <remap from="rot90/image_raw_rot" to="image_color"/>
