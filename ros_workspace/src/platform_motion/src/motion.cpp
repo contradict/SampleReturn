@@ -457,9 +457,9 @@ void Motion::doHomePods(void)
 {
     home_pods_count = 3;
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    home_pods_action_server.acceptNewGoal();
-    if(pods_enabled == true)
+    if(pods_enabled == true && command_source == COMMAND_SOURCE_NONE)
     {
+        home_pods_action_server.acceptNewGoal();
         ROS_INFO("Home pods goal accepted");
         CANOpen::DS301CallbackObject
             hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
