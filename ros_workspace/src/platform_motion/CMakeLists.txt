@@ -90,7 +90,10 @@ target_link_libraries(teleop
     ${catkin_LIBRARIES}
 )
 
-add_executable(odometry src/odometry.cpp src/lmmin.c)
+add_executable(odometry
+    src/odometry.cpp
+    src/lmmin.c
+    src/least_squares_odometry_lmmin.cpp)
 target_link_libraries(odometry
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
