@@ -30,4 +30,6 @@
     <include file="$(find samplereturn)/launch/joystick.launch"/> 
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/> 
+
+    <include file="$(find executive)/launch/executive.launch"/>
 </launch>

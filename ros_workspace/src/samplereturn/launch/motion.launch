@@ -46,10 +46,11 @@
       <param name="publish_frequency" type="double" value="10"/>
   </node>
 
-    <node
-        name="pause_switch"
-        pkg="samplereturn"
-        type="pause_switch.py"
-        machine="navigate"/>
-
+  <node
+      machine="navigate"
+      pkg="samplereturn"
+      type="pause_switch.py"
+      name="pause_switch"
+      output="log"
+      />
 </launch>

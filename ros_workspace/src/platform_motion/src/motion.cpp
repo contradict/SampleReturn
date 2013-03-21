@@ -90,7 +90,7 @@ Motion::Motion() :
 
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
 
-    status_pub = nh_.advertise<ServoStatus>("status_word", 1);
+    status_pub = nh_.advertise<ServoStatus>("status_word", 10);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -386,6 +386,7 @@ bool Motion::selectCommandSourceCallback(platform_motion::SelectCommandSource::R
         }
         resp.valid=false;
     }
+    ROS_INFO("Selected command source %s", req.source.c_str());
     return true;
 }
 
@@ -456,9 +457,9 @@ void Motion::doHomePods(void)
 {
     home_pods_count = 3;
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    home_pods_action_server.acceptNewGoal();
-    if(pods_enabled == true)
+    if(pods_enabled == true && command_source == COMMAND_SOURCE_NONE)
     {
+        home_pods_action_server.acceptNewGoal();
         ROS_INFO("Home pods goal accepted");
         CANOpen::DS301CallbackObject
             hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
@@ -469,12 +470,13 @@ void Motion::doHomePods(void)
     }
     else
     {
-        ROS_INFO("Home pods goal aborted - not enabled");
+        const char * reason=pods_enabled ? "Command source not None" : "Pods not enabled";
+        ROS_INFO("Home pods goal aborted - %s", reason);
         home_pods_result.homed.clear();
         home_pods_result.homed.push_back(false);
         home_pods_result.homed.push_back(false);
         home_pods_result.homed.push_back(false);
-        home_pods_action_server.setAborted(home_pods_result, "Pods not enabled");
+        home_pods_action_server.setAborted(home_pods_result, reason);
     }
 }
 
@@ -502,6 +504,7 @@ void Motion::doHomeCarousel(void)
 void Motion::homePodsComplete(CANOpen::DS301 &node)
 {
     if(home_pods_count>0) home_pods_count--;
+    ROS_INFO("homed servo %ld, count %d", node.node_id, home_pods_count);
     if(home_pods_action_server.isActive()) {
         home_pods_feedback.home_count = home_pods_count;
         home_pods_action_server.publishFeedback(home_pods_feedback);
@@ -516,6 +519,7 @@ void Motion::homePodsComplete(CANOpen::DS301 &node)
 
 void Motion::homeCarouselComplete(CANOpen::DS301 &node)
 {
+    ROS_INFO("homed carousel");
     home_carousel_action_server.setSucceeded(home_carousel_result);  
 }
 
