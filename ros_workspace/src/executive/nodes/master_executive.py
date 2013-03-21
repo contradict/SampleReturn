@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import sys
-# still a rosbuild package, this is annoying
-sys.path.append('/opt/ros/groovy/stacks/executive_teer/teer_ros/src')
 import rospy
 import rosnode
+# still a rosbuild package, this is annoying
+sys.path.append('/opt/ros/groovy/stacks/executive_teer/teer_ros/src')
 import teer_ros
 import actionlib
 
@@ -91,12 +91,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         msg.arg = utterance
         msg.arg2 = 'voice.select "%s"'%self.voice
         self.proclamations.append(msg)
-        yield teer_ros.Pass()
 
     def announcer(self):
         while True:
-            yield teer_ros.WaitCondition(
-                    lambda: len(self.proclamations)>0)
+            if(len(self.proclamations)==0):
+                yield teer_ros.WaitDuration(0.1)
+                continue
+            #yield teer_ros.WaitCondition(
+            #        lambda: len(self.proclamations)>0)
             msg = self.proclamations.pop(0)
             self.navigation_audio.publish(msg)
             rospy.logwarn("executive announce: %s", msg.arg)
@@ -105,32 +107,32 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     #----   Tasks   ----
     def start_robot(self):
-        self.new_task(self.announcer())
-        self.announce("Waiting for camera startup")
-        yield teer_ros.WaitCondition(
-                lambda: self.navigation_camera_status is not None and \
+        camera_ready = lambda: self.navigation_camera_status is not None and \
                         self.manipulator_camera_status is not None and \
                         self.navigation_camera_status.data=="Ready" and \
-                        self.manipulator_camera_status.data=="Ready")
-        
-        self.announce("Waiting for system enable.")
-        yield teer_ros.WaitCondition(
-                lambda: self.pause_state is not None and \
-                        not self.pause_state.data)
+                        self.manipulator_camera_status.data=="Ready"
+        if not camera_ready():
+            self.announce("Waiting for cameras")
+            yield teer_ros.WaitCondition(camera_ready)
+        enabled = lambda: self.pause_state is not None and \
+                          not self.pause_state.data
+        if not enabled():
+            self.announce("Waiting for system enable.")
+            yield teer_ros.WaitCondition(enabled)
+        self.announce("homing")
         self.platform_motion_input_select("None")
-        self.announce("Waiting for homing servers")
+        yield teer_ros.WaitDuration(0.1)
         while True:
-            if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6)):
-                # and self.home_carousel.wait_for_server(rospy.Duration(1e-6)):
+            if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6))\
+               and self.home_carousel.wait_for_server(rospy.Duration(1e-6)):
                 break
             yield teer_ros.WaitDuration(0.1)
-        self.announce("homing")
-        self.home_wheelpods.send_goal(platform_msg.HomeGoal())
-        #self.home_carousel.send_goal(platform_msg.HomeGoal())
+        self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
+        self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
         while True:
             wheelpods_done = self.home_wheelpods.wait_for_result(rospy.Duration(1e-6))
-            #carousel_done = self.home_carousel.wait_for_result(rospy.Duration(1e-6))
-            if wheelpods_done: #and carousel_done:
+            carousel_done = self.home_carousel.wait_for_result(rospy.Duration(1e-6))
+            if wheelpods_done and carousel_done:
                 break
             yield teer_ros.WaitDuration(0.10)
 
@@ -160,6 +162,7 @@ def start_node():
     rospy.init_node('master_executive')
     sched = SampleReturnScheduler()
     # kick off startup task
+    sched.new_task(sched.announcer())
     sched.new_task(sched.start_robot())
     sched.run()
 
