@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<launch>
+	<node
+		name="visual_servo"
+		pkg="visual_servo"
+		type="visual_servo_node.py"
+		required="true"
+		output="log">
+	</node>
+</launch>
