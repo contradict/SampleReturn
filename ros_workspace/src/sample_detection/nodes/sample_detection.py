@@ -29,7 +29,7 @@ class sample_detection(object):
 
     self.mser = cv2.MSER()
 
-    if rospy.get_param('enable_debug',False):
+    if rospy.get_param('~enable_debug',True):
       debug_img_topic = 'debug_img'
       self.debug_img_pub = rospy.Publisher(debug_img_topic, Image)
 
@@ -43,21 +43,21 @@ class sample_detection(object):
       self.sample_points[s] = rospy.Publisher(topic, PointStamped)
       topic = s + '_imgpoints'
       self.sample_imgpoints[s] = rospy.Publisher(topic, Point)
+      #topic = s + '_disparity'
+      #self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
 
 
   def handle_mono_img(self, Image):
     detections = self.find_samples(Image)
-    rospy.logerr('handle_mono')
     for d in detections:
       if detections[d]['location'] is None:
-        rospy.logerr('location is none')
         continue
       else:
-        rospy.logerr('location is something')
         location = detections[d]['location']
         self.sample_imgpoints[d].publish(x=location[0],y=location[1])
+        self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
         # Intersects a camera ray with a flat ground plane
-        #project_region(location)
+        #self.project_centroid(location)
 
   def handle_left_img(self, Image):
     detections = self.find_samples(Image)
@@ -67,6 +67,9 @@ class sample_detection(object):
       else:
         location = detections[d]['location']
         self.sample_imgpoints[d].publish(x=location[0],y=location[1])
+        # For now, only publish the left image as a debug
+        self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
+        # Grab associated part of disparity image
 
   def handle_right_img(self, Image):
     detections = self.find_samples(Image)
@@ -76,15 +79,17 @@ class sample_detection(object):
       else:
         location = detections[d]['location']
         self.sample_imgpoints[d].publish(x=location[0],y=location[1])
+        # Grab associated part of disparity image
 
   def handle_disp(self,DisparityImage):
     self.disp_img = np.asarray(self.bridge.imgmsg_to_cv(DisparityImage.image))
+    self.disp_header = DisparityImage.header
     #self.min_disparity = DisparityImage.min_disparity
     #self.max_disparity = DisparityImage.max_disparity
-    #self.header = DisparityImage.header
 
   def find_samples(self, Image):
     self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
+    self.debug_img = self.img.copy()
     lab = cv2.cvtColor(self.img, cv2.COLOR_BGR2LAB)
     a_regions = self.mser.detect(lab[:,:,1] ,None)
     a_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in a_regions]
@@ -97,21 +102,21 @@ class sample_detection(object):
       detections[s]['location'] = None
       if self.samples[s]['channel'] == 'a':
         for h in a_hulls:
-          mean = self.compute_color_mean(h,self.img).astype(np.float32)
+          mean = self.compute_color_mean(h,self.img,'lab').astype(np.float32)
           cols = self.samples[s]['covariance']['cols']
           rows = self.samples[s]['covariance']['rows']
           model_covariance = np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols)
           dist = cv2.Mahalanobis(mean,np.asarray(self.samples[s]['mean'],np.float32),model_covariance)
-          rospy.logerr(dist)
           if dist < detections[s]['min_dist']:
             detections[s]['min_dist'] = dist
             moments = cv2.moments(h)
             # converts to x,y
             location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
             detections[s]['location'] = location
+            cv2.polylines(self.debug_img,h,1,(255,0,255),3)
       elif self.samples[s]['channel'] == 'b':
         for h in b_hulls:
-          mean = self.compute_color_mean(h,self.img).astype(np.float32)
+          mean = self.compute_color_mean(h,self.img,'rgb').astype(np.float32)
           cols = self.samples[s]['covariance']['cols']
           rows = self.samples[s]['covariance']['rows']
           model_covariance = np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols)
@@ -122,6 +127,7 @@ class sample_detection(object):
             # converts to x,y
             location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
             detections[s]['location'] = location
+            cv2.polylines(self.debug_img,h,1,(255,255,0),3)
     return detections
 
   def handle_info(self, CameraInfo):
@@ -134,12 +140,14 @@ class sample_detection(object):
     self.w = CameraInfo.width
     self.frame_id = CameraInfo.header.frame_id
 
-  def project_regions(self,centroid):
+  def project_centroid(self,centroid):
     # project image coordinates into ray from camera, intersect with ground plane
     point = np.zeros((1,1,2))
     point[0,0,0] = centroid[0]
     point[0,0,1] = centroid[1]
-    rect_point = cv2.undistortPoints(centroid,self.K,self.D)
+    rospy.logerr(np.asarray(self.K).reshape((3,3)))
+    rect_point = cv2.undistortPoints(point,np.asarray(self.K).reshape((3,3)),np.asarray(self.D))
+    rospy.logerr(rect_point)
     x = rect_point[0,0,0]
     y = rect_point[0,0,1]
     r = np.sqrt(x**2 + y**2)
@@ -148,17 +156,29 @@ class sample_detection(object):
     #self.tf_listener.lookupTransform('/base_link',self.frame_id)
     self.tf_listener.transform('/base_link',self.frame_id)
 
-  def compute_color_mean(self,hull,img):
-    acc = np.array([0,0,0])
-    count = 0
-    r = cv2.boundingRect(hull)
-    for i in range(r[3]):
-      for j in range(r[2]):
-        if cv2.pointPolygonTest(hull,(i,j),False):
-          acc += img[r[1]+i,r[0]+j,:]
-          count += 1
-    mean = acc/count
-    return mean
+  def compute_color_mean(self,hull,img,color_space):
+    if color_space == 'rgb':
+      acc = np.array([0,0,0])
+      count = 0
+      r = cv2.boundingRect(hull)
+      for i in range(r[3]):
+        for j in range(r[2]):
+          if cv2.pointPolygonTest(hull,(i,j),False):
+            acc += img[r[1]+i,r[0]+j,:]
+            count += 1
+      mean = acc/count
+      return mean
+    elif color_space == 'lab' or color == 'hsv':
+      acc = np.array([0,0])
+      count = 0
+      r = cv2.boundingRect(hull)
+      for i in range(r[3]):
+        for j in range(r[2]):
+          if cv2.pointPolygonTest(hull,(i,j),False):
+            acc += img[r[1]+i,r[0]+j,1:]
+            count += 1
+      mean = acc/count
+      return mean
 
 if __name__=="__main__":
   try:

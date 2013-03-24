@@ -1,21 +1,29 @@
 # This is placeholder for the file that will describe the color models
 # of the samples for which to search
 red_puck:
-  mean: [255.0,255.0,255.0]
+  mean: [182.0,163.0]
+  #covariance:
+  #  rows: 3
+  #  cols: 3
+  #  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
   covariance:
-    rows: 3
-    cols: 3
-    data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+    rows: 2
+    cols: 2
+    data: [6,10,10,17]
   channel: a
-  min_dist: 1000.0
+  min_dist: 100.0
 orange_pipe:
-  mean: [255.0,255.0,255.0]
+  mean: [192.0,193.0]
+  #covariance:
+  #  rows: 3
+  #  cols: 3
+  #  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
   covariance:
-    rows: 3
-    cols: 3
-    data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
-  channel: b
-  min_dist: 1000.0
+    rows: 2
+    cols: 2
+    data: [6,10,10,17]
+  channel: a
+  min_dist: 100.0
 #mser:
 #  delta:
 #  min_area:
