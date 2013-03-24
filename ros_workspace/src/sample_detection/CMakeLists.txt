@@ -45,10 +45,9 @@ find_package(catkin REQUIRED COMPONENTS cv_bridge rospy sensor_msgs)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES sample_detection
-#  CATKIN_DEPENDS cv_bridge rospy sensor_msgs
-#  DEPENDS system_lib
+  LIBRARIES sample_detection
+  CATKIN_DEPENDS cv_bridge rospy sensor_msgs
+  DEPENDS system_lib
 )
 
 ###########
@@ -80,10 +79,10 @@ catkin_package(
 
 ## Mark executable scripts (Python etc.) for installation
 ## not required for python when using catkin_python_setup()
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+ install(PROGRAMS
+   nodes/sample_detecion.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS sample_detection sample_detection_node
