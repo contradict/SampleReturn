@@ -114,6 +114,7 @@ class sample_detection(object):
             location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
             detections[s]['location'] = location
             cv2.polylines(self.debug_img,h,1,(255,0,255),3)
+            cv2.putText(self.debug_img,s,(int(location[0]),int(location[1])),cv2.FONT_HERSHEY_PLAIN,2,(0,255,255))
       elif self.samples[s]['channel'] == 'b':
         for h in b_hulls:
           mean = self.compute_color_mean(h,self.img,'rgb').astype(np.float32)
@@ -128,6 +129,7 @@ class sample_detection(object):
             location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
             detections[s]['location'] = location
             cv2.polylines(self.debug_img,h,1,(255,255,0),3)
+            cv2.putText(self.debug_img,s,(int(location[0]),int(location[1])),cv2.FONT_HERSHEY_PLAIN,2,(0,255,255))
     return detections
 
   def handle_info(self, CameraInfo):
