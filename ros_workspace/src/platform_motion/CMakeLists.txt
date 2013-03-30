@@ -90,11 +90,12 @@ target_link_libraries(teleop
     ${catkin_LIBRARIES}
 )
 
-add_executable(odometry
-    src/odometry.cpp
+add_executable(least_squares_odometry
+    src/odometry_node.cpp
+    src/least_squares_odometry_node.cpp
     src/lmmin.c
     src/least_squares_odometry_lmmin.cpp)
-target_link_libraries(odometry
+target_link_libraries(least_squares_odometry
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
@@ -107,7 +108,7 @@ install(
       ${PROJECT_NAME}
       motion_node
       teleop
-      odometry
+      least_squares_odometry
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

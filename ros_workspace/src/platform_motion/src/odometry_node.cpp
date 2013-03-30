@@ -1,13 +1,12 @@
 #include <string>
 
 #include "odometry/odometry_node.h"
-#include "odometry/least_squares_odometry_lmmin.h"
 
 namespace platform_motion {
 
 OdometryNode::OdometryNode() :
     first(true),
-    last_starboard_wheel(0), last_port_wheel(0), last_stern_wheel(0),
+    last_starboard_distance(0), last_port_distance(0), last_stern_distance(0),
     starboard_vel_sum(0), port_vel_sum(0), stern_vel_sum(0),
     vel_sum_count(0),
     odom_position(Eigen::Vector2d::Zero()),
@@ -148,17 +147,12 @@ bool OdometryNode::lookupJointValue(const sensor_msgs::JointState::ConstPtr &joi
     return false;
 }
 
-
-void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr joint_state)
+void OdometryNode::fillMeasurements(const sensor_msgs::JointState::ConstPtr joint_state, struct odometry_measurements *data)
 {
     double port_steering, starboard_steering, stern_steering;
-    double port_steering_velocity, starboard_steering_velocity,
-           stern_steering_velocity;
+    double port_steering_velocity, starboard_steering_velocity, stern_steering_velocity;
     double port_wheel, starboard_wheel, stern_wheel;
-    double port_wheel_velocity, starboard_wheel_velocity,
-           stern_wheel_velocity;
-
-    double port_delta, starboard_delta, stern_delta;
+    double port_wheel_velocity, starboard_wheel_velocity, stern_wheel_velocity;
 
     lookupJointValue(joint_state, "port_steering_joint", &port_steering, &port_steering_velocity);
     lookupJointValue(joint_state, "starboard_steering_joint", &starboard_steering, &starboard_steering_velocity);
@@ -167,9 +161,13 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     lookupJointValue(joint_state, "starboard_axle", &starboard_wheel, &starboard_wheel_velocity);
     lookupJointValue(joint_state, "stern_axle", &stern_wheel, &stern_wheel_velocity);
 
-    port_delta = (port_wheel - last_port_wheel)*wheel_diameter/2.;
-    starboard_delta = (starboard_wheel - last_starboard_wheel)*wheel_diameter/2.;
-    stern_delta = (stern_wheel - last_stern_wheel)*wheel_diameter/2.;
+    data->port_distance = port_wheel*wheel_diameter/2.;
+    data->starboard_distance = starboard_wheel*wheel_diameter/2.;
+    data->stern_distance = stern_wheel*wheel_diameter/2.;
+
+    data->port_delta = (data->port_distance - last_port_distance);
+    data->starboard_delta = (data->starboard_distance - last_starboard_distance);
+    data->stern_delta = (data->stern_distance - last_stern_distance);
     //ROS_DEBUG( "delta: (%6.4f, %6.4f, %6.4f)", port_delta, starboard_delta, stern_delta);
     //ROS_DEBUG( "vel: (%6.4f, %6.4f, %6.4f)", port_wheel_velocity, starboard_wheel_velocity, stern_wheel_velocity);
 
@@ -178,8 +176,52 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     stern_vel_sum += stern_wheel_velocity*wheel_diameter/2;
     vel_sum_count += 1;
 
-    double min_abs_delta = std::min(fabs(starboard_delta), fabs(port_delta));
-    min_abs_delta = std::min(min_abs_delta, fabs(stern_delta));
+    data->port_vel = port_vel_sum/vel_sum_count;
+    data->starboard_vel = starboard_vel_sum/vel_sum_count;
+    data->stern_vel = stern_vel_sum/vel_sum_count;
+
+    data->port_dir = Eigen::Vector2d(cos(port_steering), sin(port_steering));
+    data->stern_dir = Eigen::Vector2d(cos(stern_steering), sin(stern_steering));
+    data->starboard_dir = Eigen::Vector2d(cos(starboard_steering), sin(starboard_steering));
+
+    ros::Time current(0);
+    tf::StampedTransform port_tf, starboard_tf, stern_tf;
+
+    data->body_pt = Eigen::Vector2d(0,0);
+
+    try {
+        listener.lookupTransform(child_frame_id, "/port_suspension", current, port_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up port_suspension: %s", ex.what());
+        return;
+    }
+    data->port_pos = Eigen::Vector2d(port_tf.getOrigin().x(), port_tf.getOrigin().y());
+
+    try {
+        listener.lookupTransform(child_frame_id, "/starboard_suspension", current, starboard_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up starboard_suspension: %s", ex.what());
+        return;
+    }
+    data->starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
+
+    try {
+        listener.lookupTransform(child_frame_id, "/stern_suspension", current, stern_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up stern_suspension: %s", ex.what());
+        return;
+    }
+    data->stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
+
+    data->interval = (joint_state->header.stamp - last_joint_message).toSec();
+
+    data->min_translation_norm = min_translation_norm;
+}
+
+bool OdometryNode::detectJump(const struct odometry_measurements &data, ros::Time stamp)
+{
+    double min_abs_delta = std::min(fabs(data.starboard_delta), fabs(data.port_delta));
+    min_abs_delta = std::min(min_abs_delta, fabs(data.stern_delta));
 
     bool jump=min_abs_delta>unexplainable_jump;
     if(jump) {
@@ -187,122 +229,51 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     }
 
     if(first || jump) {
-        last_port_wheel = port_wheel;
-        last_starboard_wheel = starboard_wheel;
-        last_stern_wheel = stern_wheel;
+        last_port_distance = data.port_distance;
+        last_starboard_distance = data.starboard_distance;
+        last_stern_distance = data.stern_distance;
         port_vel_sum = starboard_vel_sum = stern_vel_sum = 0;
         vel_sum_count = 0;
-        last_joint_message = joint_state->header.stamp;
-        ROS_INFO("set initial wheel angles: %f %f %f", last_port_wheel, last_starboard_wheel, last_stern_wheel);
+        last_joint_message = stamp;
+        ROS_INFO("set initial wheel distance: %f %f %f", last_port_distance, last_starboard_distance, last_stern_distance);
         first = false;
-        return;
+        return true;
     }
+    return false;
+}
+
+void OdometryNode::resetReferencePose(const struct odometry_measurements &data, const ros::Time &stamp)
+{
+    starboard_vel_sum = port_vel_sum = stern_vel_sum = 0;
+    vel_sum_count = 0;
+
+    last_port_distance = data.port_distance;
+    last_starboard_distance = data.starboard_distance;
+    last_stern_distance = data.stern_distance;
+    last_joint_message = stamp;
+}
+
+bool OdometryNode::isMoving(const struct odometry_measurements &data)
+{
+    double max_abs_delta = std::max(fabs(data.starboard_delta), fabs(data.port_delta));
+    max_abs_delta = std::max(max_abs_delta, fabs(data.stern_delta));
+
+    return max_abs_delta>delta_threshold;
+}
+
+void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr joint_state)
+{
+    struct odometry_measurements data;
+
+    fillMeasurements(joint_state, &data);
+
+    if(detectJump(data, joint_state->header.stamp))
+        return;
+
+    computeOdometry(data, joint_state->header.stamp);
 
     nav_msgs::Odometry odo;
-
-    double max_abs_delta = std::max(fabs(starboard_delta), fabs(port_delta));
-    max_abs_delta = std::max(max_abs_delta, fabs(stern_delta));
-
-    bool moving = max_abs_delta>delta_threshold;
-    if(moving) {
-        Eigen::Vector2d port_wheel_direction(cos(port_steering), sin(port_steering));
-        Eigen::Vector2d stern_wheel_direction(cos(stern_steering), sin(stern_steering));
-        Eigen::Vector2d starboard_wheel_direction(cos(starboard_steering), sin(starboard_steering));
-
-        ros::Time current(0);
-        tf::StampedTransform port_tf, starboard_tf, stern_tf;
-
-        struct lmmin_data data;
-        data.body_pt = Eigen::Vector2d(0,0);
-
-        try {
-            listener.lookupTransform(child_frame_id, "/port_suspension", current, port_tf );
-        } catch( tf::TransformException ex) {
-            ROS_ERROR("Error looking up port_suspension: %s", ex.what());
-            return;
-        }
-        data.port_pos = Eigen::Vector2d(port_tf.getOrigin().x(), port_tf.getOrigin().y());
-        data.port_dir = port_wheel_direction;
-        data.port_delta = port_delta;
-        data.port_vel = port_vel_sum/vel_sum_count;
-
-        try {
-            listener.lookupTransform(child_frame_id, "/starboard_suspension", current, starboard_tf );
-        } catch( tf::TransformException ex) {
-            ROS_ERROR("Error looking up starboard_suspension: %s", ex.what());
-            return;
-        }
-        data.starboard_pos = Eigen::Vector2d(starboard_tf.getOrigin().x(), starboard_tf.getOrigin().y());
-        data.starboard_delta = starboard_delta;
-        data.starboard_dir = starboard_wheel_direction;
-        data.starboard_vel = starboard_vel_sum/vel_sum_count;
-
-        try {
-            listener.lookupTransform(child_frame_id, "/stern_suspension", current, stern_tf );
-        } catch( tf::TransformException ex) {
-            ROS_ERROR("Error looking up stern_suspension: %s", ex.what());
-            return;
-        }
-        data.stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
-        data.stern_delta = stern_delta;
-        data.stern_dir = stern_wheel_direction;
-        data.stern_vel = stern_vel_sum/vel_sum_count;
-
-        double interval = (joint_state->header.stamp - last_joint_message).toSec();
-
-        data.interval = interval;
-        data.min_translation_norm = min_translation_norm;
-
-        double xytheta[5] =
-        {0.1*cos(odom_orientation)*interval, 0.1*sin(odom_orientation)*interval,
-            odom_omega*interval, odom_velocity.norm(), odom_omega};
-        lm_status_struct status;
-        lm_control_struct control = lm_control_double;
-        control.maxcall=500;
-        control.printflags = 0;
-        lmmin( 5, xytheta, 10, &data, lmmin_evaluate, &control, &status, NULL);
-
-        if(status.info>4) {
-            // minimization failed
-            ROS_ERROR( "%s", (std::string("Minimization failed: ") +
-                        lm_infmsg[status.info]).c_str() );
-        } else {
-            //ROS_DEBUG( "optimization complete %d: %s, %d evaluations", status.info, lm_infmsg[status.info], status.nfev );
-            //ROS_DEBUG( "optimum(%e): %e %e %e %e %e", status.fnorm, xytheta[0], xytheta[1], xytheta[2], xytheta[3], xytheta[4]);
-            Eigen::Matrix2d R;
-            R << cos(odom_orientation), -sin(odom_orientation),
-              sin(odom_orientation),  cos(odom_orientation);
-            Eigen::Vector2d T=R*Eigen::Vector2d(xytheta[0], xytheta[1]);
-            odom_position += T;
-            odom_orientation += xytheta[2];
-            if(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
-            if(odom_orientation < 0) odom_orientation += 2*M_PI;
-            if(T.norm() > min_translation_norm)
-                odom_velocity = xytheta[3]*T.normalized();
-            else
-                odom_velocity = Eigen::Vector2d::Zero();
-            odom_omega = xytheta[4];
-
-            starboard_vel_sum = port_vel_sum = stern_vel_sum = 0;
-            vel_sum_count = 0;
-
-            last_port_wheel = port_wheel;
-            last_starboard_wheel = starboard_wheel;
-            last_stern_wheel = stern_wheel;
-            last_joint_message = joint_state->header.stamp;
-        }
-    }
-    else
-    { // not moving
-        if( fabs(port_wheel_velocity) < 1e-3 &&
-            fabs(starboard_wheel_velocity) < 1e-3 &&
-            fabs(stern_wheel_velocity) < 1e-3)
-        {
-            odom_velocity = Eigen::Vector2d::Zero();
-            odom_omega = 0;
-        }
-    }
-    fillOdoMsg(&odo, joint_state->header.stamp, !moving);
+    fillOdoMsg(&odo, joint_state->header.stamp, isMoving(data));
     odometry_pub.publish(odo);
 
     geometry_msgs::TransformStamped odom_trans;
@@ -317,18 +288,3 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
 }
 
 }
-
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "odometry");
-
-    platform_motion::OdometryNode on;
-
-    on.init();
-
-    ros::spin();
-
-    return 0;
-}
-
-
