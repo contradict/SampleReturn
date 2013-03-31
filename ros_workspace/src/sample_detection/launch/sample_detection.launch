@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+    <node
+	  machine="search"
+      pkg="sample_detection"
+      type="sample_detection.py"
+      name="sample_detection"
+      ns="sample_detection">
+      <param name="samples" type="string" value="$(find sample_detection)/config/samples.yaml"/>
+      <remap from="mono_img" to="/navigation/left/image_rect_color"/>
+      <remap from="cam_info" to="/navigation/left/camera_info"/>
+    </node>
+</launch>

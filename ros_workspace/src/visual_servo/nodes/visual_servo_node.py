@@ -19,7 +19,7 @@ class VisualServo:
 		rospy.Subscriber('/sample_detection/red_puck_imgpoints', Point, self.object_point_callback)
 		rospy.Subscriber('/navigation/left/camera_info', CameraInfo, self.camera_left_info_callback)
 		rospy.Subscriber('/navigation/right/camera_info', CameraInfo, self.camera_right_info_callback)
-		self._publisher = rospy.Publisher('/odometry/twist', Twist)
+		self._publisher = rospy.Publisher('/servo_command', Twist)
 		self._camera_left_width = -1
 		self._camera_left_height = -1
 		self._camera_right_width = -1

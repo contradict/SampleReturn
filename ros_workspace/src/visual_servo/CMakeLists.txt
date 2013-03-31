@@ -96,6 +96,11 @@ install(
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+install(DIRECTORY launch
+		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+		USE_SOURCE_PERMISSIONS
+)
+
 ## Mark executables and/or libraries for installation
 # install(TARGETS visual_servo visual_servo_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

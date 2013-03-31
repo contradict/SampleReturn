@@ -79,10 +79,15 @@ catkin_package(
 
 ## Mark executable scripts (Python etc.) for installation
 ## not required for python when using catkin_python_setup()
- install(PROGRAMS
-   nodes/sample_detection.py
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
+install(PROGRAMS
+		nodes/sample_detection.py
+		DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(DIRECTORY launch
+		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+		USE_SOURCE_PERMISSIONS
+)
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS sample_detection sample_detection_node

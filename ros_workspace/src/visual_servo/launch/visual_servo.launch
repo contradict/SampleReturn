@@ -4,7 +4,7 @@
 
 <launch>
 	<node
-		machine="navigate"
+		machine="search"
 		name="visual_servo"
 		pkg="visual_servo"
 		type="visual_servo_node.py"
