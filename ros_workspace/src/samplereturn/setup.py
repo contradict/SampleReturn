@@ -8,6 +8,8 @@ d = generate_distutils_setup(
                'nodes/camlogger.py',
                'nodes/image_desync.py',
                'nodes/lights.py',
+               'nodes/announce_voltage.py',
+               'nodes/pause_switch.py',
                ],
           )
 
