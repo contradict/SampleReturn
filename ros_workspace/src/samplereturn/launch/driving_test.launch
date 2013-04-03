@@ -1,15 +1,18 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="/home/robot/Desktop"/>
+    <arg name="kind" default="install"/>
     <machine name="search"
              address="sr2"
-             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
-             user="robot"
+             env-loader="$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
     />
     <machine name="navigate"
              address="sr1"
-             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
-             user="robot"
+             env-loader="$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
              />
 
     <param name="use_sim_time" value="False" type="bool"/>
