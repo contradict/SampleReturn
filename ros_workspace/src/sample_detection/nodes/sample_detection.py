@@ -33,29 +33,27 @@ class sample_detection(object):
       debug_img_topic = 'debug_img'
       self.debug_img_pub = rospy.Publisher(debug_img_topic, Image)
 
-    self.sample_pointclouds ={}
+    self.sample_disparity ={}
     self.sample_points ={}
     self.sample_imgpoints ={}
     for s in self.samples:
-      topic = s + '_pointcloud'
-      self.sample_pointclouds[s] = rospy.Publisher(topic, PointCloud2)
       topic = s + '_pointstamped'
       self.sample_points[s] = rospy.Publisher(topic, PointStamped)
       topic = s + '_imgpoints'
       self.sample_imgpoints[s] = rospy.Publisher(topic, Point)
-      #topic = s + '_disparity'
-      #self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
+      topic = s + '_disparity'
+      self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
 
 
   def handle_mono_img(self, Image):
     detections = self.find_samples(Image)
+    self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
     for d in detections:
       if detections[d]['location'] is None:
         continue
       else:
         location = detections[d]['location']
-        self.sample_imgpoints[d].publish(x=location[0],y=location[1])
-        self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
+        self.sample_imgpoints[d].publish(x=location[0],y=location[1])#,header.stamp)
         # Intersects a camera ray with a flat ground plane
         #self.project_centroid(location)
 
@@ -70,6 +68,17 @@ class sample_detection(object):
         # For now, only publish the left image as a debug
         self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
         # Grab associated part of disparity image
+        mask = np.zeros_like(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')))
+        cv2.drawContours(mask,[detections[d]['hull']],-1,(255,255,255),-1)
+        mask = mask[:,:,0]
+        masked_disp_img = cv2.multiply(mask.astype(np.float32),self.disp_img).astype(np.float32)
+        disp_out = DisparityImage()
+        disp_out.min_disparity = self.min_disparity
+        disp_out.max_disparity = self.max_disparity
+        disp_out.image = self.bridge.cv_to_imgmsg(cv2.cv.fromarray(masked_disp_img))
+        disp_out.image.step = 2560
+        disp_out.header = self.disp_header
+        self.sample_disparity[d].publish(disp_out)
 
   def handle_right_img(self, Image):
     detections = self.find_samples(Image)
@@ -80,12 +89,23 @@ class sample_detection(object):
         location = detections[d]['location']
         self.sample_imgpoints[d].publish(x=location[0],y=location[1])
         # Grab associated part of disparity image
+        mask = np.zeros_like(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')))
+        cv2.drawContours(mask,[detections[d]['hull']],-1,(255,255,255),-1)
+        mask = mask[:,:,0]
+        masked_disp_img = cv2.multiply(mask.astype(np.float32),self.disp_img).astype(np.float32)
+        disp_out = DisparityImage()
+        disp_out.min_disparity = self.min_disparity
+        disp_out.max_disparity = self.max_disparity
+        disp_out.image = self.bridge.cv_to_imgmsg(cv2.cv.fromarray(masked_disp_img))
+        disp_out.image.step = 2560
+        disp_out.header = self.disp_header
+        self.sample_disparity[d].publish(disp_out)
 
   def handle_disp(self,DisparityImage):
     self.disp_img = np.asarray(self.bridge.imgmsg_to_cv(DisparityImage.image))
     self.disp_header = DisparityImage.header
-    #self.min_disparity = DisparityImage.min_disparity
-    #self.max_disparity = DisparityImage.max_disparity
+    self.min_disparity = DisparityImage.min_disparity
+    self.max_disparity = DisparityImage.max_disparity
 
   def find_samples(self, Image):
     self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
@@ -113,11 +133,12 @@ class sample_detection(object):
             # converts to x,y
             location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
             detections[s]['location'] = location
-            cv2.polylines(self.debug_img,h,1,(255,0,255),3)
+            detections[s]['hull'] = h
+            cv2.polylines(self.debug_img,[h],1,(255,0,255),3)
             cv2.putText(self.debug_img,s,(int(location[0]),int(location[1])),cv2.FONT_HERSHEY_PLAIN,2,(0,255,255))
       elif self.samples[s]['channel'] == 'b':
         for h in b_hulls:
-          mean = self.compute_color_mean(h,self.img,'rgb').astype(np.float32)
+          mean = self.compute_color_mean(h,self.img,'lab').astype(np.float32)
           cols = self.samples[s]['covariance']['cols']
           rows = self.samples[s]['covariance']['rows']
           model_covariance = np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols)
@@ -128,7 +149,8 @@ class sample_detection(object):
             # converts to x,y
             location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
             detections[s]['location'] = location
-            cv2.polylines(self.debug_img,h,1,(255,255,0),3)
+            detections[s]['hull'] = h
+            cv2.polylines(self.debug_img,[h],1,(255,255,0),3)
             cv2.putText(self.debug_img,s,(int(location[0]),int(location[1])),cv2.FONT_HERSHEY_PLAIN,2,(0,255,255))
     return detections
 
