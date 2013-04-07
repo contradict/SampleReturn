@@ -181,28 +181,15 @@ class sample_detection(object):
     self.tf_listener.transform('/base_link',self.frame_id)
 
   def compute_color_mean(self,hull,img,color_space):
+    mask = np.zeros_like(img)
+    cv2.drawContours(mask,[hull],-1,(255,255,255),-1)
     if color_space == 'rgb':
-      acc = np.array([0,0,0])
-      count = 0
-      r = cv2.boundingRect(hull)
-      for i in range(r[3]):
-        for j in range(r[2]):
-          if cv2.pointPolygonTest(hull,(i,j),False):
-            acc += img[r[1]+i,r[0]+j,:]
-            count += 1
-      mean = acc/count
+      mean = np.asarray(cv2.mean(img,mask[:,:,0])[:3])
       return mean
-    elif color_space == 'lab' or color == 'hsv':
-      acc = np.array([0,0])
-      count = 0
-      r = cv2.boundingRect(hull)
-      for i in range(r[3]):
-        for j in range(r[2]):
-          if cv2.pointPolygonTest(hull,(i,j),False):
-            acc += img[r[1]+i,r[0]+j,1:]
-            count += 1
-      mean = acc/count
+    elif color_space == 'lab' or color_space == 'hsv':
+      mean = np.asarray(cv2.mean(img,mask[:,:,0])[1:3])
       return mean
+
 
 if __name__=="__main__":
   try:
