@@ -109,6 +109,9 @@ def sweep_from_fence(fence_point, robot_position, candidate_point):
     return angle_between_clock(fence_vec, cand_vec)
     
 def get_next_waypoint(robot_position, fence_map):
+    """Returns a tuple of the next waypoint and a boolean indicating whether it thinks it is
+    alongside a fence (True), or trying to reach a fence (False) to be used for loop detection"""
+    
     STEP = 10
     MIN_FENCE_OFFSET = 10
     MAX_FENCE_OFFSET = 20
@@ -129,7 +132,7 @@ def get_next_waypoint(robot_position, fence_map):
     
     # We're nowhere near the fence - just go a consistent direction until you hit fence.
     if len(bounded_candidates) == 0:
-        return candidates[0]
+        return (candidates[0], False)
     
     # TODO: Check for past-fence
     # TODO: Optimize for target fence distance if multiple candidates left
@@ -145,14 +148,14 @@ def get_next_waypoint(robot_position, fence_map):
         if angle < sweep:
             winner = b
             sweep = angle
-    return winner
+    return (winner, True)
 
 def loop(fence_map, start):
     LOOP_END_DIST = 10 # How close we get to start pt
     robot = start
     path = [robot]
     while True:
-        waypoint = get_next_waypoint(robot, fence_map)
+        waypoint, alongFence = get_next_waypoint(robot, fence_map)
         #print waypoint
         path.append(waypoint)
         robot = waypoint

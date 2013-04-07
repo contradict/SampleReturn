@@ -54,7 +54,7 @@ def generate_gridcells(req):
     print "I see the robot is at %d,%d" % (req.robot_x, req.robot_y)
     adjust_view(req.robot_x, req.robot_y)
     print "Loading image"
-    image = load_image('corridor.png')
+    image = load_image('test_data/corridor.png')
     print "Converting image to gridcells"
     gridcells = image_to_gridcells(image)
     return gridcells
