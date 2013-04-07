@@ -1,0 +1,36 @@
+# This is placeholder for the file that will describe the color models
+# of the samples for which to search
+red_puck:
+  mean: [157.0,154.0]
+  covariance:
+    rows: 2
+    cols: 2
+    data: [6,10,10,17]
+  channel: a
+  min_dist: 700.0
+orange_pipe:
+  mean: [192.0,193.0]
+  covariance:
+    rows: 2
+    cols: 2
+    data: [6,10,10,17]
+  channel: a
+  min_dist: 500.0
+#pink_sphere:
+#  mean: [192.0,193.0]
+#  covariance:
+#    rows: 2
+#    cols: 2
+#    data: [6,10,10,17]
+#  channel: b
+#  min_dist: 100.0
+#mser:
+#  delta:
+#  min_area:
+#  max_area:
+#  max_variation:
+#  min_diversity:
+#  max_evolution:
+#  area_threshold:
+#  min_margin:
+#  edge_blur_size:
