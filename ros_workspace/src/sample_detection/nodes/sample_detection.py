@@ -14,16 +14,16 @@ from tf import TransformListener
 class sample_detection(object):
   def __init__(self):
     rospy.init_node('sample_detection',anonymous=True)
-    self.mono_img_sub = rospy.Subscriber('mono_img',Image, self.handle_mono_img)
-    self.left_img_sub = rospy.Subscriber('left_img',Image, self.handle_left_img)
-    self.right_img_sub = rospy.Subscriber('right_img',Image, self.handle_right_img)
-    self.disp_sub = rospy.Subscriber('disp',DisparityImage, self.handle_disp)
+    self.mono_img_sub = rospy.Subscriber('mono_img',Image, queue_size=1,callback=self.handle_mono_img)
+    self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
+    self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
+    self.disp_sub = rospy.Subscriber('disp',DisparityImage, queue_size=1,callback=self.handle_disp)
     self.cam_info_sub = rospy.Subscriber('cam_info',CameraInfo, self.handle_info)
     self.tf_listener = TransformListener()
 
     self.bridge = CvBridge()
 
-    sample_file = rospy.get_param('~samples')
+    sample_file = rospy.get_param("/sample_detection/samples")
     stream = file(sample_file,'r')
     self.samples = yaml.load(stream)
 
@@ -181,28 +181,15 @@ class sample_detection(object):
     self.tf_listener.transform('/base_link',self.frame_id)
 
   def compute_color_mean(self,hull,img,color_space):
+    mask = np.zeros_like(img)
+    cv2.drawContours(mask,[hull],-1,(255,255,255),-1)
     if color_space == 'rgb':
-      acc = np.array([0,0,0])
-      count = 0
-      r = cv2.boundingRect(hull)
-      for i in range(r[3]):
-        for j in range(r[2]):
-          if cv2.pointPolygonTest(hull,(i,j),False):
-            acc += img[r[1]+i,r[0]+j,:]
-            count += 1
-      mean = acc/count
+      mean = np.asarray(cv2.mean(img,mask[:,:,0])[:3])
       return mean
-    elif color_space == 'lab' or color == 'hsv':
-      acc = np.array([0,0])
-      count = 0
-      r = cv2.boundingRect(hull)
-      for i in range(r[3]):
-        for j in range(r[2]):
-          if cv2.pointPolygonTest(hull,(i,j),False):
-            acc += img[r[1]+i,r[0]+j,1:]
-            count += 1
-      mean = acc/count
+    elif color_space == 'lab' or color_space == 'hsv':
+      mean = np.asarray(cv2.mean(img,mask[:,:,0])[1:3])
       return mean
+
 
 if __name__=="__main__":
   try:
