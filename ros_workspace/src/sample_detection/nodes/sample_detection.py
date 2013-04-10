@@ -14,16 +14,16 @@ from tf import TransformListener
 class sample_detection(object):
   def __init__(self):
     rospy.init_node('sample_detection',anonymous=True)
-    self.mono_img_sub = rospy.Subscriber('mono_img',Image, self.handle_mono_img)
-    self.left_img_sub = rospy.Subscriber('left_img',Image, self.handle_left_img)
-    self.right_img_sub = rospy.Subscriber('right_img',Image, self.handle_right_img)
-    self.disp_sub = rospy.Subscriber('disp',DisparityImage, self.handle_disp)
+    self.mono_img_sub = rospy.Subscriber('mono_img',Image, queue_size=1,callback=self.handle_mono_img)
+    self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
+    self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
+    self.disp_sub = rospy.Subscriber('disp',DisparityImage, queue_size=1,callback=self.handle_disp)
     self.cam_info_sub = rospy.Subscriber('cam_info',CameraInfo, self.handle_info)
     self.tf_listener = TransformListener()
 
     self.bridge = CvBridge()
 
-    sample_file = rospy.get_param('~samples')
+    sample_file = rospy.get_param("/sample_detection/samples")
     stream = file(sample_file,'r')
     self.samples = yaml.load(stream)
 
