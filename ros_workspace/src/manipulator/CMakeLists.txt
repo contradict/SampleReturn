@@ -21,7 +21,10 @@ catkin_python_setup()
 add_service_files(
     DIRECTORY srv
     FILES
+        VelocityStandoff.srv
         TorqueStandoff.srv
+        TorqueHold.srv
+        GoToPosition.srv
 )
 
 # actions
