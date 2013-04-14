@@ -16,10 +16,10 @@
       serial_ports:
         manipulator_port:
           port_name: "/dev/ttyUSB0"
-          baud_rate: 57600
+          baud_rate: 200000
           min_motor_id: 10
           max_motor_id: 12
-          update_rate: 20
+          update_rate: 10
     </rosparam>
   </node>
 
@@ -33,37 +33,31 @@
     name="dynamixel_controller_spawner"
     pkg="dynamixel_controllers"
     type="controller_spawner.py"
-    args="--manager=dxl_manager --port=manipulator_port --type=simple wristJointController armJointController handJointController"
+    args="--manager=dxl_manager --port=manipulator_port --type=simple manipulator/arm_joint manipulator/wrist_joint manipulator/hand_joint"
     output="log"
   />
 
-  <!-- now the sacry part, the manipulator node! -->
+  <!-- now the scary part, the manipulator node! -->
   <node
     machine="search"
     name="manipulator"
     pkg="manipulator"
+    ns="manipulator"
     type="manipulator_node.py"
     output="log"
   >
     <rosparam>
-      wrist_min_pos: 0
-      wrist_max_pos: 2.09
-      wrist_speed: 1.0
-      wrist_torque: 0.5
+      arm_down_velocity: -1.0  
+      arm_down_torque: 0.4
+      arm_down_standoff: 0.05
 
-      arm_down_speed: -4.0
-      arm_down_torque: 0.9
-      arm_up_speed: 3.0
-      arm_up_torque: 0.9
-      arm_hold_torque: 0.5
+      arm_up_velocity: 1.0
+      arm_up_torque: 0.6
+      arm_up_standoff: 0.02
+        
+      hand_open_position: 2.7
 
-      hand_min_pos: 0.4
-      hand_max_pos: 3.31
-      hand_close_speed: 2.0
-      hand_open_speed: 2.0
-      hand_close_torque: 1.0
-      hand_open_torque: 0.5
-      hand_hold_torque: 0.4
+      wrist_zero_position: 0.36
     </rosparam>
   </node>
 </launch>
