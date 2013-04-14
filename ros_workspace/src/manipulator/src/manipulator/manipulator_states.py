@@ -3,278 +3,42 @@
 import smach
 from manipulator.msg import ManipulatorGrabFeedback
 
-class HandleGoal(smach.State):
-  # this state might not be useful.
-  # get the goal and stuff it in dataStore. also, output the desired wrist
-  # rotation so RotateWrist can take it as input.
-  def __init__(self, dataStore):
+
+class ProcessGoal(smach.State):
+  def __init__(self):
     smach.State.__init__(self,
-        outcomes=['success', 'setupNeeded'],
+        outcomes=['succeeded', 'invalid_goal'],
         input_keys=['goal'],
-        output_keys=['wrist_angle', 'action_feedback']
+        output_keys=['wrist_angle', 'target_bin', 'grip_torque', 'grip_dimension', 'action_feedback']
     )
-    self.dataStore = dataStore
-
-  def execute(self, userData):
-    # set the feedback key. apparently this is needed?
-    # documentation would be nice, smach dudes
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = "Starting"
-    userData.action_feedback = fb
-
-    # store the current goal in dataStore for safe keeping
-    self.dataStore.currentActionGoal = userData.goal
-
-    # set the wrist angle output
-    userData.wrist_angle = userData.goal.wrist_angle
-
-    # if we're not in a known state, return setup needed
-    if not self.dataStore.inKnownState:
-      return 'setupNeeded'
-
-    # success!
-    return 'success'
-
-class FinishSetup(smach.State):
-  def __init__(self, dataStore):
-    smach.State.__init__(self,
-        outcomes=['success', 'failure', 'fromError'],
-        output_keys=['wrist_angle', 'action_feedback']
-    )
-    self.dataStore = dataStore
-
-  def execute(self, userData):
-    # set the feedback key. apparently this is needed?
-    # documentation would be nice, smach dudes
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = "FinishedStartup"
-    userData.action_feedback = fb
-
-    # set the wrist angle output
-    userData.wrist_angle = self.dataStore.currentActionGoal.wrist_angle
-
-    # we should be in a known state now
-    self.dataStore.inKnownState = True
-
-    # if we got here from an error, return that
-    if self.dataStore.hadError:
-      self.dataStore.hadError = False
-      return 'fromError'
-
-    # success!
-    return 'success'
-
-class RotateWrist(smach.State):
-  def __init__(self, dataStore):
-    smach.State.__init__(self, 
-        outcomes=['success', 'failure'],
-        input_keys=['wrist_angle'],
-        output_keys=['action_feedback']
-    )
-    # save a reference to the persistant data
-    self.dataStore = dataStore
-
   def execute(self, userdata):
-    # actually make things happen
-
-    # set the feedback key. apparently this is needed?
-    # documentation would be nice, smach dudes
+    # set the feedback key
     fb = ManipulatorGrabFeedback()
-    fb.current_state = "rotating wrist"
+    fb.current_state = "Processing Goal"
     userdata.action_feedback = fb
 
+    # ensure that the goal is valid 
+    if userdata.goal.wrist_angle > 1.7: 
+      return 'invalid_goal'
 
-    # acquire the condition variable for the wrist
-    self.dataStore.wristCV.acquire()
+    # set the outputs
+    userdata.wrist_angle = userdata.goal.wrist_angle
+    userdata.target_bin = userdata.goal.target_bin
+    userdata.grip_torque = userdata.goal.grip_torque
+    userdata.grip_dimension = userdata.goal.grip_dimension
+    
 
-    # ask the dataStore to make the wrist angle correct
-    self.dataStore.SetWristAngle(userdata.wrist_angle)
-
-    # wait until the wrist gets to the right place.
-    self.dataStore.wristCV.wait()
-    self.dataStore.wristCV.release()
-
-    # check to make sure we got the right wrist angle
-    if abs(self.dataStore.GetWristAngle() - userdata.wrist_angle) <= 0.025:
-      return 'success'
-    else:
-      return 'failure'
-
-class StartMovingArm(smach.State):
-  # this class goes after a couple of servic states that actually get the arm
-  # moving and just waits for the arm to get to a specific position
-  def __init__(self, dataStore, minArmMovement=0.5):
-    smach.State.__init__(self,
-        outcomes=['success', 'failure'],
-        output_keys=['action_feedback']
-    )
-    self.dataStore = dataStore
-    # store how much movement counts as enough
-    self.minArmMovement = minArmMovement
-
-  def execute(self, userdata):
-    # actually do stuff, mostly just wait for the arm to move.
-
-    # 
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = "start moving arm"
-    userdata.action_feedback = fb
-
-    # get the lock first.
-    self.dataStore.armCV.acquire()
-    # request a delta of like 20 degrees of movement
-    self.dataStore.NotifyOnArmDelta(self.minArmMovement)
-
-    # wait on the condition variable
-    self.dataStore.armCV.wait()
-    self.dataStore.armCV.release()
-
-    # for now, assume it always works if we get here.
-    return 'success'
-
-class WaitForArmStop(smach.State):
-  # once the arm is moving, wait for it to hit stuff.
-  def __init__(self, dataStore, limit):
-    smach.State.__init__(self,
-        outcomes=['success', 'failure'],
-        output_keys=['action_feedback']
-    )
-    self.dataStore = dataStore
-    # limit is the torque limit we're waiting for
-    self.limit = limit
-
-  def execute(self, userdata):
-    # actually do stuff, like waiting. yay waiting!
-
-    # get the arm lock.
-    self.dataStore.armCV.acquire()
-
-    # 
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = self.__class__.__name__
-    userdata.action_feedback = fb
-
-
-    # tell the dataStore that we'd like to know about the arm's torque
-    self.dataStore.NotifyOnArmTorque(self.limit)
-
-    # now wait on the condition variable for the torque to reach the right
-    # limit
-    self.dataStore.armCV.wait()
-    self.dataStore.armCV.release()
-
-    # for now, assume success always actually happens
-    return 'success'
-
-class MoveHand(smach.State):
-  def __init__(self, dataStore, pos, torqueLimit, setStopPos=False):
-    smach.State.__init__(self, 
-        outcomes=['success', 'failure'],
-        output_keys=['action_feedback']
-    )
-    # save a reference to the persistent data
-    self.dataStore = dataStore
-
-    self.pos = pos
-    self.torqueLimit = torqueLimit
-    self.setStopPos = setStopPos
-
-  def execute(self, userdata):
-    # actually make things happen
-
-    # set the feedback key. apparently this is needed?
-    # documentation would be nice, smach dudes
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = "moving hand"
-    userdata.action_feedback = fb
-
-
-    # acquire the condition variable for the wrist
-    self.dataStore.handCV.acquire()
-
-    # ask the dataStore to make the wrist angle correct
-    self.dataStore.SetHandPos(self.pos)
-    self.dataStore.NotifyOnHandTorque(self.torqueLimit, self.setStopPos)
-
-    # wait until the wrist gets to the right place.
-    self.dataStore.handCV.wait()
-    self.dataStore.handCV.release()
-
-    # failure is not an option! well, ok it is an option, but that option
-    # is like never taken...
-    return 'success'
-
-class StartMovingHand(smach.State):
-  # when the hand starts closing, wait for it to move before watching for
-  # torque
-  def __init__(self, dataStore, minHandMovement=0.02):
-    smach.State.__init__(self,
-        outcomes=['success', 'failure'],
-        output_keys=['action_feedback']
-    )
-    self.dataStore = dataStore
-    self.minHandMovement = minHandMovement
-
-  def execute(self, userdata):
-    # get the hand lock
-    self.dataStore.handCV.acquire()
-    # 
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = self.__class__.__name__
-    userdata.action_feedback = fb
-
-
-    # as the dataStore to notify when the hand has moved a bit
-    self.dataStore.NotifyOnHandDelta(self.minHandMovement)
-
-    # wait for notification indicating success
-    self.dataStore.handCV.wait()
-    self.dataStore.handCV.release()
-
-    # for now, assume it always worked
-    return 'success'
-
-class WaitForHandStop(smach.State):
-  # when the hand is moving, wait for it to actually hit a torque limit
-  def __init__(self, dataStore, limit):
-    smach.State.__init__(self,
-        outcomes=['success', 'failure'],
-        output_keys=['action_feedback']
-    )
-    self.dataStore = dataStore
-    # limit is the torque limit we're waiting for
-    self.limit = limit
-
-  def execute(self, userdata):
-    # get the hand lock
-    self.dataStore.handCV.acquire()
-    # 
-    fb = ManipulatorGrabFeedback()
-    fb.current_state = self.__class__.__name__
-    userdata.action_feedback = fb
-
-
-    # ask for the hand torque limit notification
-    self.dataStore.NotifyOnHandTorque(self.limit)
-
-    # wait on the lock
-    self.dataStore.handCV.wait()
-    self.dataStore.handCV.release()
-
-    # assume success at this point
-    return 'success'
+    return 'succeeded' 
 
 class ErrorState(smach.State):
   # handle any errors that show up
-  def __init__(self, dataStore):
-    smach.State.__init__(self, outcomes=['failure', 'success'] )
-    self.dataStore = dataStore
-
+  def __init__(self):
+    smach.State.__init__(self, outcomes=['failure', 'succeeded'] )
+    
   def execute(self, userdata):
     # tell the dataStore we had an error, if it didn't already know
-    if not self.dataStore.hadError:
-      self.dataStore.hadError = True
-      return 'success'
+    if not self.userdata.error:
+      return 'succeeded'
     # well did we succeed or fail at failing?
     return 'failure'
 
