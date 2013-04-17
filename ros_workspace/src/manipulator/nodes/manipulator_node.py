@@ -17,8 +17,6 @@ from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, Mani
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 
 from manipulator import manipulator_states
-from manipulator.manipulator_data import PersistentData
-
 
 from manipulator.srv import VelocityStandoff, VelocityStandoffRequest
 from manipulator.srv import TorqueStandoff, TorqueStandoffRequest
