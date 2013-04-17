@@ -47,7 +47,7 @@ class PauseSwitch(object):
                 "Operation Enabled" in status_word.status
         rospy.logdebug("carousel: %s, wheelpods: %s", self.carousel_servo_status,
                 self.wheelpod_servo_status)
-
+    
     def say(self, utterance):
         msg = SoundRequest()
         msg.sound = SoundRequest.SAY

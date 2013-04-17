@@ -108,10 +108,10 @@ class CarouselIndexer(object):
         goal = self.server.accept_new_goal()
         if self.current_index is None:
             rospy.logerr("bin slection goal received, but no joint_state yet")
-            self.server.set_aborted(text="bin slection goal received, but no joint_state yet")
+            self.server.set_aborted(text="bin selection goal received, but no joint_state yet")
             return
         if goal.bin_index<0 or goal.bin_index>=len(self.carousel_bin_angles):
-            msg="bin slection goal received, index %d out of range [0, %d)"%(
+            msg="bin selection goal received, index %d out of range [0, %d)"%(
                 goal.bin_index, len(self.carousel_bin_angles))
             rospy.logerr(msg)
             self.server.set_aborted(text=msg)

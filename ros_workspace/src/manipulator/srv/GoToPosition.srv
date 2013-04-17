@@ -1,0 +1,4 @@
+# See Dynamixel documentation for details
+float64 position
+---
+string result

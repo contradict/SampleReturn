@@ -18,6 +18,15 @@ find_package(catkin REQUIRED
 
 catkin_python_setup()
 
+add_service_files(
+    DIRECTORY srv
+    FILES
+        VelocityStandoff.srv
+        TorqueStandoff.srv
+        TorqueHold.srv
+        GoToPosition.srv
+)
+
 # actions
 add_action_files(
     DIRECTORY action
