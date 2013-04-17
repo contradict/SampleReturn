@@ -3,9 +3,9 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <machine name="search"
-             address="localhost"
-             env-loader="/home/zlizer/src/SampleReturn/ros_workspace/devel/env.sh"
-             user="zlizer"
+             address="sr2"
+             env-loader="/home/brandon/AppliedMinds/SampleReturn/ros_workspace/devel/env.sh"
+             user="brandon"
     />
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
 
