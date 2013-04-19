@@ -4,6 +4,15 @@
 
 namespace platform_motion {
 
+std::ostream & operator<< (std::ostream &out, const odometry_measurements &m)
+{
+    out << "port: (" << m.port_pos.transpose() << ") (" << m.port_dir.transpose() << ") " << m.port_distance << " " << m.port_delta << " " << m.port_vel << " " << m.port_angle << std::endl;
+    out << "stern: (" << m.stern_pos.transpose() << ") (" << m.stern_dir.transpose() << ") " << m.stern_distance << " " << m.stern_delta << " " << m.stern_vel << " " << m.stern_angle << std::endl;
+    out << "starboard: (" << m.starboard_pos.transpose() << ") (" << m.starboard_dir.transpose() << ") " << m.starboard_distance << " " << m.starboard_delta << " " << m.starboard_vel << " " << m.starboard_angle << std::endl;
+    return out;
+}
+
+
 OdometryNode::OdometryNode() :
     first(true),
     last_starboard_distance(0), last_port_distance(0), last_stern_distance(0),

@@ -29,6 +29,7 @@ struct odometry_measurements {
     double interval;
     double min_translation_norm;
 };
+std::ostream & operator<< (std::ostream &out, const odometry_measurements &m);
 
 class OdometryNode {
     public:

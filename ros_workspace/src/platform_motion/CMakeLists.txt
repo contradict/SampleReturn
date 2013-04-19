@@ -113,6 +113,7 @@ target_link_libraries(EKF_odometry
 )
 
 add_executable(test_EKF_odometry
+    src/odometry_node.cpp
     src/test_EKF_odometry.cpp
     src/wheelpodmeasurementpdf.cpp
     )
