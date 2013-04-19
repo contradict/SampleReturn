@@ -36,30 +36,27 @@ MatrixWrapper::Matrix
 WheelPodMeasurementPdf::dfGet(unsigned int i) const
 {
     MatrixWrapper::Matrix pod_direction = computePodDirections();
-    MatrixWrapper::Matrix df(3,6);
+    MatrixWrapper::Matrix df(3,3);
 
     if(i==0)
     {
-        //[[ dv0/dx     dv0/dy     dv0/dtheta dv0/dvx    dv0/dvy    dv0/domega]
-        // [ dv1/dx     dv1/dy     dv1/dtheta dv1/dvx    dv1/dvy    dv1/domega]
-        // [ dv2/dx     dv2/dy     dv2/dtheta dv2/dvx    dv2/dvy    dv2/domega]]
+        //[[ dv0/dvx    dv0/dvy    dv0/domega]
+        // [ dv1/dvx    dv1/dvy    dv1/domega]
+        // [ dv2/dvx    dv2/dvy    dv2/domega]]
 
-        df(1,1) = 0; df(1,2) = 0; df(1,3) = 0;
-        df(1,4) = pod_direction(1,1);
-        df(1,5) = pod_direction(2,1);
-        df(1,6) = -1.0*pod_positions(2,1)*pod_direction(1,1)
+        df(1,1) = pod_direction(1,1);
+        df(1,2) = pod_direction(2,1);
+        df(1,3) = -1.0*pod_positions(2,1)*pod_direction(1,1)
                   +    pod_positions(1,1)*pod_direction(2,1);
 
-        df(2,1) = 0; df(2,2) = 0; df(2,3) = 0;
-        df(2,4) = pod_direction(1,2);
-        df(2,5) = pod_direction(2,2);
-        df(2,6) = -1*pod_positions(2,2)*pod_direction(1,2)
+        df(2,1) = pod_direction(1,2);
+        df(2,2) = pod_direction(2,2);
+        df(2,3) = -1*pod_positions(2,2)*pod_direction(1,2)
                   +  pod_positions(1,2)*pod_direction(2,2);
 
-        df(3,1) = 0; df(3,2) = 0; df(3,3) = 0;
-        df(3,4) = pod_direction(1,3);
-        df(3,5) = pod_direction(2,3);
-        df(3,6) = -1*pod_positions(2,3)*pod_direction(1,3)
+        df(3,1) = pod_direction(1,3);
+        df(3,2) = pod_direction(2,3);
+        df(3,3) = -1*pod_positions(2,3)*pod_direction(1,3)
                   +  pod_positions(1,3)*pod_direction(2,3);
     }
     else
@@ -77,16 +74,16 @@ WheelPodMeasurementPdf::ExpectedValueGet(void) const
     MatrixWrapper::ColumnVector z(3);
 
     MatrixWrapper::ColumnVector vel(3);
-    vel(1) = state(4);
-    vel(2) = state(5);
+    vel(1) = state(1);
+    vel(2) = state(2);
     vel(3) = 0;
     std::cerr << "state: " << state << std::endl;
     std::cerr << "vel: " << vel << std::endl;
 
     MatrixWrapper::Matrix omegaCross(3,3);
     omegaCross = 0;
-    omegaCross(1, 2) = -state(6);
-    omegaCross(2, 1) =  state(6);
+    omegaCross(1, 2) = -state(3);
+    omegaCross(2, 1) =  state(3);
 
     MatrixWrapper::Matrix pod_direction = computePodDirections();
     std::cerr << "dir: " << pod_direction << std::endl;

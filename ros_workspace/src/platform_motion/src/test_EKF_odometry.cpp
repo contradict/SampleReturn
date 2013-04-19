@@ -21,37 +21,27 @@ int main(int argc, char** argv)
      * Linear system model      *
      ***************************/
 
-    double dt=0.050;
-    MatrixWrapper::Matrix A(6,6);
-    A(1,1) = 1.0; A(1,2) = 0.0; A(1,3) = 0.0; A(1,4) = 1.0*dt; A(1,5) = 0.0; A(1,6) = 0.0;
-    A(2,1) = 0.0; A(2,2) = 1.0; A(2,3) = 0.0; A(2,4) = 0.0; A(2,5) = 1.0*dt; A(2,6) = 0.0;
-    A(3,1) = 0.0; A(3,2) = 0.0; A(3,3) = 1.0; A(3,4) = 0.0; A(3,5) = 0.0; A(3,6) = 1.0*dt;
-    A(4,1) = 0.0; A(4,2) = 0.0; A(4,3) = 0.0; A(4,4) = 1.0; A(4,5) = 0.0; A(4,6) = 0.0;
-    A(5,1) = 0.0; A(5,2) = 0.0; A(5,3) = 0.0; A(5,4) = 0.0; A(5,5) = 1.0; A(5,6) = 0.0;
-    A(6,1) = 0.0; A(6,2) = 0.0; A(6,3) = 0.0; A(6,4) = 0.0; A(6,5) = 0.0; A(6,6) = 1.0;
+    MatrixWrapper::Matrix A(3,3);
+    A(1,1) = 1.0; A(1,2) = 0.0; A(1,3) = 0.0;
+    A(2,1) = 0.0; A(2,2) = 1.0; A(2,3) = 0.0;
+    A(3,1) = 0.0; A(3,2) = 0.0; A(3,3) = 1.0;
 
     std::vector<MatrixWrapper::Matrix> vA(1);
     vA[0] = A;
 
     // create gaussian
-    MatrixWrapper::ColumnVector sysNoise_Mu(6);
+    MatrixWrapper::ColumnVector sysNoise_Mu(3);
     sysNoise_Mu = 0;
 
-    double sigma_system_noise_x = 0.01;
-    double sigma_system_noise_y = 0.01;
-    double sigma_system_noise_theta = 0.02;
     double sigma_system_noise_vx = 0.05;
     double sigma_system_noise_vy = 0.05;
     double sigma_system_noise_omega = 0.10;
 
-    MatrixWrapper::SymmetricMatrix sysNoise_Cov(6);
+    MatrixWrapper::SymmetricMatrix sysNoise_Cov(3);
     sysNoise_Cov = 0.0;
-    sysNoise_Cov(1,1) = sigma_system_noise_x;
-    sysNoise_Cov(2,2) = sigma_system_noise_y;
-    sysNoise_Cov(3,3) = sigma_system_noise_theta;
-    sysNoise_Cov(4,4) = sigma_system_noise_vx;
-    sysNoise_Cov(5,5) = sigma_system_noise_vy;
-    sysNoise_Cov(6,6) = sigma_system_noise_omega;
+    sysNoise_Cov(1,1) = sigma_system_noise_vx;
+    sysNoise_Cov(2,2) = sigma_system_noise_vy;
+    sysNoise_Cov(3,3) = sigma_system_noise_omega;
 
     BFL::Gaussian system_Uncertainty(sysNoise_Mu, sysNoise_Cov);
     sys_pdf = new BFL::LinearAnalyticConditionalGaussian(vA, system_Uncertainty);
@@ -85,21 +75,16 @@ int main(int argc, char** argv)
      ***************************/
     // Continuous Gaussian prior (for Kalman filters)
 
-    double sigma_prior_pos = 1.00;
-    double sigma_prior_theta = 0.10;
     double sigma_prior_vel = 0.05;
     double sigma_prior_omega = 0.01;
 
-    MatrixWrapper::ColumnVector prior_Mu(6);
+    MatrixWrapper::ColumnVector prior_Mu(3);
     prior_Mu = 0;
-    MatrixWrapper::SymmetricMatrix prior_Cov(6);
+    MatrixWrapper::SymmetricMatrix prior_Cov(3);
     prior_Cov = 0;
-    prior_Cov(1,1) = sigma_prior_pos;
-    prior_Cov(2,2) = sigma_prior_pos;
-    prior_Cov(3,3) = sigma_prior_theta;
-    prior_Cov(4,4) = sigma_prior_vel;
-    prior_Cov(5,5) = sigma_prior_vel;
-    prior_Cov(6,6) = sigma_prior_omega;
+    prior_Cov(1,1) = sigma_prior_vel;
+    prior_Cov(2,2) = sigma_prior_vel;
+    prior_Cov(3,3) = sigma_prior_omega;
     prior = new BFL::Gaussian(prior_Mu,prior_Cov);
 
     /******************************
