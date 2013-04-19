@@ -30,11 +30,10 @@ struct odometry_measurements {
     double min_translation_norm;
 };
 
-
 class OdometryNode {
     public:
         OdometryNode(void);
-        void init(void);
+        virtual void init(void);
 
     protected:
         bool lookupJointValue(const sensor_msgs::JointState::ConstPtr &joint_state,
