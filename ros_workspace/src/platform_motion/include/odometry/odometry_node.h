@@ -40,6 +40,7 @@ class OdometryNode {
         void fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool stopped);
         void jointStateCallback(const sensor_msgs::JointState::ConstPtr joint_state);
         bool isMoving(const struct odometry_measurements &data);
+        void getPodPositions(struct odometry_measurements *data);
         void fillMeasurements(const sensor_msgs::JointState::ConstPtr joint_state, struct odometry_measurements *data);
         bool detectJump(const struct odometry_measurements &data, ros::Time stamp);
         void resetReferencePose(const struct odometry_measurements &data, const ros::Time &stamp);
@@ -67,6 +68,9 @@ class OdometryNode {
         double min_translation_norm;
         double unexplainable_jump;
         std::string odom_frame_id, child_frame_id;
+
+        struct odometry_measurements data;
+
 };
 
 }

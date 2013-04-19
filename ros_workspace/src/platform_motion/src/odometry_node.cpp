@@ -41,6 +41,7 @@ void OdometryNode::init()
         ROS_INFO("Still Waiting for transforms");
     if( ros::ok() )
         ROS_INFO("Got all transforms");
+    getPodPositions(&data);
 }
 
 void OdometryNode::fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool stopped)
@@ -184,10 +185,17 @@ void OdometryNode::fillMeasurements(const sensor_msgs::JointState::ConstPtr join
     data->stern_dir = Eigen::Vector2d(cos(stern_steering), sin(stern_steering));
     data->starboard_dir = Eigen::Vector2d(cos(starboard_steering), sin(starboard_steering));
 
+    data->body_pt = Eigen::Vector2d(0,0);
+
+    data->interval = (joint_state->header.stamp - last_joint_message).toSec();
+
+    data->min_translation_norm = min_translation_norm;
+}
+
+void OdometryNode::getPodPositions(struct odometry_measurements *data)
+{
     ros::Time current(0);
     tf::StampedTransform port_tf, starboard_tf, stern_tf;
-
-    data->body_pt = Eigen::Vector2d(0,0);
 
     try {
         listener.lookupTransform(child_frame_id, "/port_suspension", current, port_tf );
@@ -212,10 +220,6 @@ void OdometryNode::fillMeasurements(const sensor_msgs::JointState::ConstPtr join
         return;
     }
     data->stern_pos = Eigen::Vector2d(stern_tf.getOrigin().x(), stern_tf.getOrigin().y());
-
-    data->interval = (joint_state->header.stamp - last_joint_message).toSec();
-
-    data->min_translation_norm = min_translation_norm;
 }
 
 bool OdometryNode::detectJump(const struct odometry_measurements &data, ros::Time stamp)
@@ -263,8 +267,6 @@ bool OdometryNode::isMoving(const struct odometry_measurements &data)
 
 void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr joint_state)
 {
-    struct odometry_measurements data;
-
     fillMeasurements(joint_state, &data);
 
     if(detectJump(data, joint_state->header.stamp))
