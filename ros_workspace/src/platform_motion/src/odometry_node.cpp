@@ -182,8 +182,11 @@ void OdometryNode::fillMeasurements(const sensor_msgs::JointState::ConstPtr join
     data->stern_vel = stern_vel_sum/vel_sum_count;
 
     data->port_dir = Eigen::Vector2d(cos(port_steering), sin(port_steering));
+    data->port_angle = port_steering;
     data->stern_dir = Eigen::Vector2d(cos(stern_steering), sin(stern_steering));
+    data->stern_angle = stern_steering;
     data->starboard_dir = Eigen::Vector2d(cos(starboard_steering), sin(starboard_steering));
+    data->starboard_angle = starboard_steering;
 
     data->body_pt = Eigen::Vector2d(0,0);
 

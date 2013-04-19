@@ -15,14 +15,17 @@ struct odometry_measurements {
     double port_distance;
     double port_delta;
     double port_vel;
+    double port_angle;
     Eigen::Vector2d stern_pos, stern_dir;
     double stern_distance;
     double stern_delta;
     double stern_vel;
+    double stern_angle;
     Eigen::Vector2d starboard_pos, starboard_dir;
     double starboard_distance;
     double starboard_delta;
     double starboard_vel;
+    double starboard_angle;
     double interval;
     double min_translation_norm;
 };
