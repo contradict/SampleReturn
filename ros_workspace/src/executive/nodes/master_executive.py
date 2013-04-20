@@ -109,9 +109,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def start_robot(self):
         yield teer_ros.WaitDuration(2.0)
         camera_ready = lambda: self.navigation_camera_status is not None and \
-                        self.manipulator_camera_status is not None and \
-                        self.navigation_camera_status.data=="Ready" and \
-                        self.manipulator_camera_status.data=="Ready"
+                        self.navigation_camera_status.data=="Ready" #and \
+                        #self.manipulator_camera_status is not None and \
+                        #self.manipulator_camera_status.data=="Ready"
         if not camera_ready():
             self.announce("Waiting for cameras")
             yield teer_ros.WaitCondition(camera_ready)
