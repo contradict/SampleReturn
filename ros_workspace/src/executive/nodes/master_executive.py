@@ -153,9 +153,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             else:
                 self.announce("Joystick control enabled")
                 self.platform_motion_input_select("Joystick")
-            pin_states = self.gpio.new_pin_states
+            pin_states =\
+            self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
             yield teer_ros.WaitCondition(
-                    lambda: self.gpio.new_pin_states != pin_states)
+                    lambda: self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH) != pin_states)
 
 
 
