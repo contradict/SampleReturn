@@ -1,11 +1,7 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <machine name="navigate"
-             address="sr1"
-             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
-             user="robot"
-             />
+    <include file="$(find samplereturn)/launch/machine_definitions.launch"/>
 
     <include file="$(find samplereturn)/launch/planner.launch"/>
 </launch>
