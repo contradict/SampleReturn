@@ -6,10 +6,10 @@
  * Contents: Public interface to the Levenberg-Marquardt core implementation.
  *
  * Author:   Joachim Wuttke 2004-2010
- * 
+ *
  * Homepage: www.messen-und-deuten.de/lmfit
  */
- 
+
 #ifndef LMMIN_H
 #define LMMIN_H
 
@@ -52,7 +52,7 @@ void lm_printout_std( int n_par, const double *par, int m_dat,
 double lm_enorm( int, const double * );
 
 /* The actual minimization. */
-void lmmin( int n_par, double *par, int m_dat, const void *data, 
+void lmmin( int n_par, double *par, int m_dat, const void *data,
             void (*evaluate) (const double *par, int m_dat, const void *data,
                               double *fvec, int *info),
             const lm_control_struct *control, lm_status_struct *status,

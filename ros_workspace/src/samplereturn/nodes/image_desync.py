@@ -82,10 +82,11 @@ class image_desync(object):
         rosnode.kill_nodes([self.manager_node_name])
         if self.sync_wait_timer is None:
             self.sync_wait_timer = rospy.Timer(rospy.Duration(self.sync_wait),
-                        self.sync_wait_timeout)
+                        self.sync_wait_timeout, oneshot=True)
 
     def sync_wait_timeout(self, event):
         rospy.logerr("Camera resync timeout, restarting manager again")
+        self.sync_wait_timer = None
         self.restart_manager()
 
     def check_desync(self, delta):

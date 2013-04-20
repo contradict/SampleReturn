@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+    <machine name="search"
+             address="sr2"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+    />
+    <machine name="navigate"
+             address="sr1"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+</launch>

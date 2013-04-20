@@ -15,6 +15,7 @@ find_package(catkin REQUIRED
         tf
         dynamic_reconfigure
         canopen
+        bfl
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -90,11 +91,38 @@ target_link_libraries(teleop
     ${catkin_LIBRARIES}
 )
 
-add_executable(odometry src/odometry.cpp src/lmmin.c)
-target_link_libraries(odometry
+add_executable(least_squares_odometry
+    src/odometry_node.cpp
+    src/least_squares_odometry_node.cpp
+    src/lmmin.c
+    src/least_squares_odometry_lmmin.cpp)
+target_link_libraries(least_squares_odometry
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
+
+add_executable(EKF_odometry
+    src/odometry_node.cpp
+    src/EKF_odometry.cpp
+    src/EKF_odometry_node.cpp
+    src/wheelpodmeasurementpdf.cpp
+    )
+target_link_libraries(EKF_odometry
+    ${Boost_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
+
+add_executable(test_EKF_odometry
+    src/odometry_node.cpp
+    src/test_EKF_odometry.cpp
+    src/wheelpodmeasurementpdf.cpp
+    )
+target_link_libraries(test_EKF_odometry
+    ${Boost_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
+
+
 
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
     src/acceleration_limit.cpp)
@@ -104,7 +132,8 @@ install(
       ${PROJECT_NAME}
       motion_node
       teleop
-      odometry
+      least_squares_odometry
+      EKF_odometry
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

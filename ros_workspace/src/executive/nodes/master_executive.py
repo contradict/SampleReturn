@@ -107,10 +107,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     #----   Tasks   ----
     def start_robot(self):
+        yield teer_ros.WaitDuration(2.0)
         camera_ready = lambda: self.navigation_camera_status is not None and \
-                        self.manipulator_camera_status is not None and \
-                        self.navigation_camera_status.data=="Ready" and \
-                        self.manipulator_camera_status.data=="Ready"
+                        self.navigation_camera_status.data=="Ready" #and \
+                        #self.manipulator_camera_status is not None and \
+                        #self.manipulator_camera_status.data=="Ready"
         if not camera_ready():
             self.announce("Waiting for cameras")
             yield teer_ros.WaitCondition(camera_ready)
@@ -144,17 +145,18 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         while True:
             rospy.loginfo("pins: %s", hex(self.gpio.new_pin_states))
             if self.gpio.new_pin_states&self.GPIO_PIN_MODE_SEARCH == 0:
-                self.announce("Entering Search mode")
+                self.announce("Entering search mode")
                 self.platform_motion_input_select("Planner")
             elif self.gpio.new_pin_states&self.GPIO_PIN_MODE_PRECACHED == 0:
-                self.announce("Retreiving precached sample")
+                self.announce("Entering pree cashed sample mode")
                 self.platform_motion_input_select("Planner")
             else:
                 self.announce("Joystick control enabled")
                 self.platform_motion_input_select("Joystick")
-            pin_states = self.gpio.new_pin_states
+            pin_states =\
+            self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
             yield teer_ros.WaitCondition(
-                    lambda: self.gpio.new_pin_states != pin_states)
+                    lambda: self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH) != pin_states)
 
 
 
