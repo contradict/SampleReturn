@@ -33,7 +33,13 @@
       <param name="odom_frame_id" type="string" value="/odom"/>
   </node>
 
-  <node machine="navigate" pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
+  <node 
+      machine="navigate" 
+      pkg="platform_motion" 
+      type="carousel_indexer.py" 
+      name="carousel_indexer"
+      output="log"
+      ns="carousel">
   </node>
 
 
