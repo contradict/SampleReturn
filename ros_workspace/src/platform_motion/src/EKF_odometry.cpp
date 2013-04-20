@@ -69,13 +69,17 @@ void EKFOdometryNode::initializeModels(void)
      * Initialise measurement model *
      ********************************/
 
-    MatrixWrapper::ColumnVector measNoise_Mu(3);
+    MatrixWrapper::ColumnVector measNoise_Mu(6);
     measNoise_Mu = 0;
-    MatrixWrapper::SymmetricMatrix measNoise_Cov(3);
+    MatrixWrapper::SymmetricMatrix measNoise_Cov(6);
     measNoise_Cov = 0;
     measNoise_Cov(1,1) = sigma_meas_noise_v;
     measNoise_Cov(2,2) = sigma_meas_noise_v;
     measNoise_Cov(3,3) = sigma_meas_noise_v;
+    measNoise_Cov(4,4) = sigma_meas_noise_v;
+    measNoise_Cov(5,5) = sigma_meas_noise_v;
+    measNoise_Cov(6,6) = sigma_meas_noise_v;
+
     BFL::Gaussian measurement_Uncertainty(measNoise_Mu, measNoise_Cov);
     MatrixWrapper::Matrix pod_positions(3,3);
     pod_positions = 0;
@@ -108,10 +112,13 @@ void EKFOdometryNode::initializeModels(void)
 void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const ros::Time &stamp)
 {
     std::cerr << data;
-    MatrixWrapper::ColumnVector measurement(3);
+    MatrixWrapper::ColumnVector measurement(6);
     measurement(1) = data.port_delta/data.interval;
-    measurement(2) = data.starboard_delta/data.interval;
-    measurement(3) = data.stern_delta/data.interval;
+    measurement(2) = 0.0;
+    measurement(3) = data.starboard_delta/data.interval;
+    measurement(4) = 0.0;
+    measurement(5) = data.stern_delta/data.interval;
+    measurement(6) = 0.0;
 
     MatrixWrapper::ColumnVector input(3);
     input(1) = data.port_angle;

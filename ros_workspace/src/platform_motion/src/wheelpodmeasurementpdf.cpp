@@ -36,28 +36,46 @@ MatrixWrapper::Matrix
 WheelPodMeasurementPdf::dfGet(unsigned int i) const
 {
     MatrixWrapper::Matrix pod_direction = computePodDirections();
-    MatrixWrapper::Matrix df(3,3);
+    MatrixWrapper::Matrix df(6,3);
 
     if(i==0)
     {
-        //[[ dv0/dvx    dv0/dvy    dv0/domega]
-        // [ dv1/dvx    dv1/dvy    dv1/domega]
-        // [ dv2/dvx    dv2/dvy    dv2/domega]]
+        //[[ dv0/dvx         dv0/dvy         dv0/domega]
+        // [ dv0_perp/dvx    dv0_perp/dvy    dv0_perp/domega]
+        // [ dv1/dvx         dv1/dvy         dv1/domega]
+        // [ dv1_perp/dvx    dv1_perp/dvy    dv1_perp/domega]
+        // [ dv2/dvx         dv2/dvy         dv2/domega]]
+        // [ dv2_perp/dvx    dv2_perp/dvy    dv2_perp/domega]]
 
-        df(1,1) = pod_direction(1,1);
-        df(1,2) = pod_direction(2,1);
+        df(1,1) =      pod_direction(1,1);
+        df(1,2) =      pod_direction(2,1);
         df(1,3) = -1.0*pod_positions(2,1)*pod_direction(1,1)
                   +    pod_positions(1,1)*pod_direction(2,1);
 
-        df(2,1) = pod_direction(1,2);
-        df(2,2) = pod_direction(2,2);
-        df(2,3) = -1*pod_positions(2,2)*pod_direction(1,2)
-                  +  pod_positions(1,2)*pod_direction(2,2);
+        df(2,1) = -1.0*pod_direction(2,1); 
+        df(2,2) =      pod_direction(1,1); 
+        df(2,3) =      pod_positions(2,1)*pod_direction(2,1)
+                  +    pod_positions(1,1)*pod_direction(1,1);
 
-        df(3,1) = pod_direction(1,3);
-        df(3,2) = pod_direction(2,3);
-        df(3,3) = -1*pod_positions(2,3)*pod_direction(1,3)
+        df(3,1) =      pod_direction(1,2);
+        df(3,2) =      pod_direction(2,2);
+        df(3,3) = -1.0*pod_positions(2,2)*pod_direction(1,2)
+                  +    pod_positions(1,2)*pod_direction(2,2);
+
+        df(4,1) = -1.0*pod_direction(2,2); 
+        df(4,2) =      pod_direction(1,2); 
+        df(4,3) =      pod_positions(2,2)*pod_direction(2,2)
+                  +    pod_positions(1,2)*pod_direction(1,2);
+
+        df(5,1) = pod_direction(1,3);
+        df(5,2) = pod_direction(2,3);
+        df(5,3) = -1*pod_positions(2,3)*pod_direction(1,3)
                   +  pod_positions(1,3)*pod_direction(2,3);
+
+        df(6,1) = -1.0*pod_direction(2,3); 
+        df(6,2) =      pod_direction(1,3); 
+        df(6,3) =      pod_positions(2,3)*pod_direction(2,3)
+                  +    pod_positions(1,3)*pod_direction(1,3);
     }
     else
     {
@@ -71,28 +89,34 @@ MatrixWrapper::ColumnVector
 WheelPodMeasurementPdf::ExpectedValueGet(void) const
 {
     MatrixWrapper::ColumnVector state = ConditionalArgumentGet(0);
-    MatrixWrapper::ColumnVector z(3);
+    MatrixWrapper::ColumnVector z(6);
 
     MatrixWrapper::ColumnVector vel(3);
     vel(1) = state(1);
     vel(2) = state(2);
     vel(3) = 0;
-    std::cerr << "state: " << state << std::endl;
-    std::cerr << "vel: " << vel << std::endl;
 
-    MatrixWrapper::Matrix omegaCross(3,3);
-    omegaCross = 0;
-    omegaCross(1, 2) = -state(3);
-    omegaCross(2, 1) =  state(3);
+    MatrixWrapper::Matrix zCross(3,3);
+    zCross = 0;
+    zCross(1, 2) = -1;
+    zCross(2, 1) =  1;
 
     MatrixWrapper::Matrix pod_direction = computePodDirections();
-    std::cerr << "dir: " << pod_direction << std::endl;
+    MatrixWrapper::Matrix pod_direction_perp = zCross*pod_direction;
 
-    z(1) = (vel + omegaCross*pod_positions.columnCopy(1)).transpose()*pod_direction.columnCopy(1);
-    z(2) = (vel + omegaCross*pod_positions.columnCopy(2)).transpose()*pod_direction.columnCopy(2);
-    z(3) = (vel + omegaCross*pod_positions.columnCopy(3)).transpose()*pod_direction.columnCopy(3);
+    MatrixWrapper::Matrix pod_circular_vel = zCross*pod_positions*state(3);
 
-    std::cerr << "z: " << z << std::endl;
+    MatrixWrapper::ColumnVector podvel;
+    podvel = (vel + pod_circular_vel.columnCopy(1));
+    z(1) = podvel.transpose()*pod_direction.columnCopy(1);
+    z(2) = podvel.transpose()*pod_direction_perp.columnCopy(1);
+    podvel = (vel + pod_circular_vel.columnCopy(2));
+    z(3) = podvel.transpose()*pod_direction.columnCopy(2);
+    z(4) = podvel.transpose()*pod_direction_perp.columnCopy(2);
+    podvel = (vel + pod_circular_vel.columnCopy(3));
+    z(5) = podvel.transpose()*pod_direction.columnCopy(3);
+    z(6) = podvel.transpose()*pod_direction_perp.columnCopy(3);
+
     return z;
 }
 
