@@ -23,21 +23,27 @@ class PauseSwitch(object):
             self.wheelpod_servo_ids])
         self.carousel_servo_status = None
 
+        rospy.loginfo('Waiting for servo controller enable service...')
+        rospy.wait_for_service('/enable_wheel_pods')
+        rospy.wait_for_service('/enable_carousel')
+        self.enable_wheelpods = rospy.ServiceProxy('/enable_wheel_pods', Enable)
+        self.enable_carousel = rospy.ServiceProxy('/enable_carousel', Enable)
+
         rospy.Subscriber("/gpio_read", GPIO, self.gpio)
         rospy.Subscriber("/status_word", ServoStatus, self.status_word)
 
         self.pause_pub = rospy.Publisher("pause_state", Bool)
         self.audio_pub = rospy.Publisher("/audio/navigate", SoundRequest)
 
-        self.enable_wheelpods = rospy.ServiceProxy('/enable_wheel_pods', Enable)
-        self.enable_carousel = rospy.ServiceProxy('/enable_carousel', Enable)
+        rospy.loginfo('Waiting for manipulator/pause service...')
+        rospy.wait_for_service('/manipulator/pause')
+        self.manipulator_pause_service = rospy.ServiceProxy('/manipulator/pause', Enable)
 
         self.paused = None
 
     def gpio(self, gpio):
         if gpio.servo_id == self.gpio_servo_id:
-            self.pause((gpio.new_pin_states & self.button_mask) ==
-                    self.button_mask)
+            self.pause((gpio.new_pin_states & self.button_mask) == self.button_mask)
 
     def status_word(self, status_word):
         if status_word.servo_id == self.carousel_servo_id:
@@ -95,23 +101,25 @@ class PauseSwitch(object):
                 self.carousel_servo_status == (not state):
             self.set_pause_state(state)
             return
-        wheelpods_paused = not self.enable("wheelpods",
-                                           self.enable_wheelpods,
-                                           not state,
-                                           self.check_wheelpod_status)
-        carousel_paused = not self.enable("carousel",
-                                          self.enable_carousel,
-                                          not state,
-                                          lambda x:x==self.carousel_servo_status)
-        if wheelpods_paused == state and carousel_paused == state:
+        wheelpods_toggled = not state == self.enable("wheelpods",
+                                                     self.enable_wheelpods,
+                                                     not state,
+                                                     self.check_wheelpod_status)
+        carousel_toggled = not state == self.enable("carousel",
+                                                    self.enable_carousel,
+                                                    not state,
+                                                    lambda x:x==self.carousel_servo_status)
+        manipulator_toggled = self.manipulator_pause_service(state).state == state
+        if wheelpods_toggled and carousel_toggled and manipulator_toggled:
             self.set_pause_state(state)
             self.announce_pause_state()
-        elif wheelpods_paused == state:
-            self.say("Wheelpods %s, carousel failed"%{True:"paused",False:"active"}[state])
-        elif carousel_paused == state:
-            self.say("Carousel %s, wheel pods failed"%{True:"paused",False:"active"}[state])
         else:
-            self.say("Pause switch failed")
+            state_str = 'paused' if state else 'active'
+            message =  "Wheelpods %s, "%(state_str if wheelpods_toggled else "failed")
+            message += "Carousel %s, "%(state_str if carousel_toggled else "failed")
+            message += "Manipulator %s. "%(state_str if manipulator_toggled else "failed")
+            self.say(message)
+       
 
 if __name__=="__main__":
     rospy.init_node('pause_switch')
