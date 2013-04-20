@@ -144,10 +144,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         while True:
             rospy.loginfo("pins: %s", hex(self.gpio.new_pin_states))
             if self.gpio.new_pin_states&self.GPIO_PIN_MODE_SEARCH == 0:
-                self.announce("Entering Search mode")
+                self.announce("Entering search mode")
                 self.platform_motion_input_select("Planner")
             elif self.gpio.new_pin_states&self.GPIO_PIN_MODE_PRECACHED == 0:
-                self.announce("Retreiving precached sample")
+                self.announce("Entering pree cashed sample mode")
                 self.platform_motion_input_select("Planner")
             else:
                 self.announce("Joystick control enabled")
