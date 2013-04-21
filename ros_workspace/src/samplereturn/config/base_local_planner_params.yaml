@@ -1,47 +1,49 @@
+controller_frequency: 10.0
 DWAPlannerROS:
     # rad/s^2
-    acc_lim_theta: 0.75
+    acc_lim_theta: 0.25
     # m/s^2
-    acc_lim_x: 1.0
-    acc_lim_y: 1.0
+    acc_lim_x: 0.5
+    acc_lim_y: 0.5
     # total translational acceleration limit
-    acc_limit_trans: 1.0
+    acc_limit_trans: 0.5
 
     # m/s
     max_vel_x: 2.0
     min_vel_x: 0.0
-    max_vel_y: 2.0
-    min_vel_y: -2.0
+    max_vel_y: 0.5
+    min_vel_y: -0.5
     min_trans_vel: 0.05
     max_trans_vel: 2.0
     # rad/s
     min_rot_vel: 0.0
-    max_rot_vel: 1.0
+    max_rot_vel: 0.75
     min_in_place_rotational_vel: 0.10
 
     publish_cost_grid_pc: true
-    #angular_sim_granularity:
-    #backward_motion_penalty:
+    # radians per sim step
+    angular_sim_granularity: 0.1
     #forward_point_distance: 0.325
-    #goal_distance_bias: 24
-    #occdist_scale: 0.01
     #oscillation_reset_angle: 0.2
     #oscillation_reset_dist: 0.05
+    #occdist_scale: 0.01
+    #backward_motion_penalty:
+    goal_distance_bias: 24
     path_distance_bias: 50
-    #prune_plan: true
-    #restore_defaults: false
+    prune_plan: false
     rot_stopped_vel: 0.05
-    #scaling_speed: 0.25
-    #max_scaling_factor: 0.2
-    #sim_granularity: 0.025
-    sim_time: 1.0
+    scaling_speed: 0.25
+    max_scaling_factor: 0.2
+    # cm per sim step
+    sim_granularity: 0.05
+    sim_time: 1.5
     #stop_time_buffer: 0.2
     trans_stopped_vel: 0.01
     use_dwa: true
-    vth_samples: 21
-    vx_samples: 3
-    vy_samples: 5
+    vth_samples: 13
+    vx_samples: 9
+    vy_samples: 7
     xy_goal_tolerance: 0.1
     yaw_goal_tolerance: 0.05
     latch_xy_goal_tolerance: true
-    #controller_frequency: 20.0
+    publish_traj_pc: true
