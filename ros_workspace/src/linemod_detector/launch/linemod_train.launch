@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- Test launch for the sample_detection node -->
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <machine name="navigate"
+             address="localhost"
+             env-loader="/home/zlizer/src/SampleReturn/ros_workspace/devel/env.sh"
+             user="zlizer"
+    />
+    <!--<include file="$(find samplereturn)/launch/navigation_camera.launch">
+        <arg name="run_cameras" value="false"/>-->
+    <include file="$(find openni_launch)/launch/openni.launch"/>
+      <node
+        pkg="cv_test"
+        type="cv_test_node"
+        name="cv_test_node">
+      <remap from="color" to="/camera/rgb/image_color"/>
+      <remap from="disparity" to="/camera/depth_registered/image_raw"/>
+    </node>
+</launch>
