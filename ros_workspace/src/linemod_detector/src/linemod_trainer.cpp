@@ -381,74 +381,6 @@ void drawResponse(const std::vector<cv::linemod::Template>& templates,
     }
   }
 }
-// Adapted from cv_timer in cv_utilities
-class Timer
-{
-public:
-  Timer() : start_(0), time_(0) {}
-
-  void start()
-  {
-    start_ = cv::getTickCount();
-  }
-
-  void stop()
-  {
-    CV_Assert(start_ != 0);
-    int64 end = cv::getTickCount();
-    time_ += end - start_;
-    start_ = 0;
-  }
-
-  double time()
-  {
-    double ret = time_ / cv::getTickFrequency();
-    time_ = 0;
-    return ret;
-  }
-
-private:
-  int64 start_, time_;
-};
-
-// Copy of cv_mouse from cv_utilities
-class Mouse
-{
-public:
-  static void start(const std::string& a_img_name)
-  {
-    cvSetMouseCallback(a_img_name.c_str(), Mouse::cv_on_mouse, 0);
-  }
-  static int event(void)
-  {
-    int l_event = m_event;
-    m_event = -1;
-    return l_event;
-  }
-  static int x(void)
-  {
-    return m_x;
-  }
-  static int y(void)
-  {
-    return m_y;
-  }
-
-private:
-  static void cv_on_mouse(int a_event, int a_x, int a_y, int, void *)
-  {
-    m_event = a_event;
-    m_x = a_x;
-    m_y = a_y;
-  }
-
-  static int m_event;
-  static int m_x;
-  static int m_y;
-};
-int Mouse::m_event;
-int Mouse::m_x;
-int Mouse::m_y;
 
 class Image_test
 {
@@ -471,15 +403,11 @@ class Image_test
   public:
   Image_test(): it(nh)
   {
-    //raw_sub = it.subscribe("navigation/left/image_raw", 1, &Image_test::rawCallback, this);
     color_sub = it.subscribe("color", 1, &Image_test::colorCallback, this);
     depth_sub = nh.subscribe("disparity", 1, &Image_test::depthCallback, this);
-    //cv::namedWindow("view");
     cv::namedWindow("color");
     cv::namedWindow("depth");
     cv::namedWindow("mask");
-    Timer timer;
-    //int num_classes = 0;
     matching_threshold = 80;
     got_color = false;
     win_size = 50;
@@ -681,27 +609,6 @@ class Image_test
       cv::rectangle(Image_test::display, pt1, pt2, CV_RGB(0,0,0), 3);
       cv::rectangle(Image_test::display, pt1, pt2, CV_RGB(255,255,0), 1);
       cv::imshow("color", color_ptr->image);
-  }
-
-  void rawCallback(const sensor_msgs::ImageConstPtr& msg)
-  {
-    cv_bridge::CvImagePtr cv_ptr;
-      try
-      {
-        cv_ptr = cv_bridge::toCvCopy(msg, "bayer_rggb8");
-      }
-      catch (cv_bridge::Exception& e)
-      {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-      }
-
-      if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
-        cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
-
-      //sources.push_back(color);
-
-      cv::imshow("view", cv_ptr->image);
   }
 };
 
