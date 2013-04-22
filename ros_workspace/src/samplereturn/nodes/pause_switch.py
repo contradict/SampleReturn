@@ -44,7 +44,8 @@ class PauseSwitch(object):
             self.carousel_servo_status = "Operation Enabled" in status_word.status
         if status_word.servo_id in self.wheelpod_servo_ids:
             self.wheelpod_servo_status[status_word.servo_id] = \
-                "Operation Enabled" in status_word.status
+                ("Operation Enabled" in status_word.status) and \
+                ("Switch On Disabled" not in status_word.status)
         rospy.logdebug("carousel: %s, wheelpods: %s", self.carousel_servo_status,
                 self.wheelpod_servo_status)
     
