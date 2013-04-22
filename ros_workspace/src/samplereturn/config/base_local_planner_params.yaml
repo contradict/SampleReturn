@@ -1,16 +1,16 @@
 controller_frequency: 10.0
 DWAPlannerROS:
     # rad/s^2
-    acc_lim_theta: 0.25
+    acc_lim_theta: 0.75
     # m/s^2
-    acc_lim_x: 0.5
-    acc_lim_y: 0.5
+    acc_lim_x: 2.0
+    acc_lim_y: 2.0
     # total translational acceleration limit
     acc_limit_trans: 0.5
 
     # m/s
     max_vel_x: 2.0
-    min_vel_x: 0.0
+    min_vel_x: -0.5
     max_vel_y: 0.5
     min_vel_y: -0.5
     min_trans_vel: 0.05
@@ -26,24 +26,24 @@ DWAPlannerROS:
     #forward_point_distance: 0.325
     #oscillation_reset_angle: 0.2
     #oscillation_reset_dist: 0.05
-    #occdist_scale: 0.01
-    #backward_motion_penalty:
-    goal_distance_bias: 24
-    path_distance_bias: 50
+    backward_motion_penalty: 0.5
+    occdist_scale: 0.01
+    goal_distance_bias: 1.5
+    path_distance_bias: 1.0
     prune_plan: false
     rot_stopped_vel: 0.05
     scaling_speed: 0.25
     max_scaling_factor: 0.2
     # cm per sim step
     sim_granularity: 0.05
-    sim_time: 1.5
+    sim_time: 2.0
     #stop_time_buffer: 0.2
     trans_stopped_vel: 0.01
     use_dwa: true
     vth_samples: 13
-    vx_samples: 9
-    vy_samples: 7
-    xy_goal_tolerance: 0.1
+    vx_samples: 11
+    vy_samples: 9
+    xy_goal_tolerance: 0.2
     yaw_goal_tolerance: 0.05
     latch_xy_goal_tolerance: true
     publish_traj_pc: true
