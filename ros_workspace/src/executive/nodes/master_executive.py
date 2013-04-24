@@ -6,6 +6,7 @@ import rosnode
 sys.path.append('/opt/ros/groovy/stacks/executive_teer/teer_ros/src')
 import teer_ros
 import actionlib
+import actionlib_msgs.msg as action_msg
 
 import std_msgs.msg as std_msgs
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
@@ -117,25 +118,38 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitCondition(camera_ready)
         enabled = lambda: self.pause_state is not None and \
                           not self.pause_state.data
-        if not enabled():
-            self.announce("Waiting for system enable.")
-            yield teer_ros.WaitCondition(enabled)
-        self.announce("homing")
-        self.platform_motion_input_select("None")
-        yield teer_ros.WaitDuration(0.1)
+
         while True:
             if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6))\
                and self.home_carousel.wait_for_server(rospy.Duration(1e-6)):
                 break
             yield teer_ros.WaitDuration(0.1)
-        self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
-        self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
+
         while True:
-            wheelpods_done = self.home_wheelpods.wait_for_result(rospy.Duration(1e-6))
-            carousel_done = self.home_carousel.wait_for_result(rospy.Duration(1e-6))
-            if wheelpods_done and carousel_done:
+            if not enabled():
+                self.announce("Waiting for system enable.")
+                yield teer_ros.WaitCondition(enabled)
+            self.announce("homing")
+            self.platform_motion_input_select("None")
+            yield teer_ros.WaitDuration(0.1)
+            self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
+            self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
+            while True:
+                wheelpods_done = self.home_wheelpods.wait_for_result(rospy.Duration(1e-6))
+                carousel_done = self.home_carousel.wait_for_result(rospy.Duration(1e-6))
+                yield teer_ros.WaitDuration(0.10)
+                wheelpods_state = self.home_wheelpods.get_state()
+                carousel_state = self.home_carousel.get_state()
+                working_states = \
+                        [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
+                if wheelpods_state not in working_states \
+                   and carousel_state not in working_states:
+                    break
+            rospy.logdebug("home results: (%d, %d)", wheelpods_state, carousel_state)
+            if self.home_wheelpods.get_state() == action_msg.GoalStatus.SUCCEEDED \
+               and self.home_carousel.get_state() == action_msg.GoalStatus.SUCCEEDED:
                 break
-            yield teer_ros.WaitDuration(0.10)
+            yield teer_ros.WaitDuration(0.75)
 
         self.new_task(self.handle_mode_switch())
 
