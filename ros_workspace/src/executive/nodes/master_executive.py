@@ -163,6 +163,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                and carousel_state == action_msg.GoalStatus.SUCCEEDED:
                 break
             yield teer_ros.WaitDuration(0.75)
+
         self.new_task(self.handle_mode_switch())
 
     def handle_mode_switch(self):
