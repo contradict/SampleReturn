@@ -83,6 +83,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def pause_state_update(self, state):
         self.pause_state = state
+        rospy.logdebug("Pause state %s", state)
 
     #----   Publisher Helpers ----
     def announce(self, utterance):
@@ -157,7 +158,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitCondition(lambda: self.gpio is not None)
 
         while True:
-            rospy.loginfo("pins: %s", hex(self.gpio.new_pin_states))
+            rospy.logdebug("pins: %s", hex(self.gpio.new_pin_states))
             if self.gpio.new_pin_states&self.GPIO_PIN_MODE_SEARCH == 0:
                 self.announce("Entering search mode")
                 self.platform_motion_input_select("Planner")
