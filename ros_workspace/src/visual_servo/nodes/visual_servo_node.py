@@ -2,10 +2,12 @@
 import sys
 import rospy
 import rosnode
+import actionlib
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Point
 from sensor_msgs.msg import CameraInfo
+from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFeedback
 
 # TODO
 # Remap the inputs and outputs in the launch file and create better names for the publish and subscription
@@ -15,7 +17,6 @@ class VisualServo:
 	"""A class to position the robot so that it can pick up an object with the manipulator"""
 	
 	def __init__(self):
-		rospy.init_node('visual_servo')
 		rospy.Subscriber('/red_puck_imgpoints', Point, self.object_point_callback)
 		rospy.Subscriber('/navigation/left/camera_info', CameraInfo, self.camera_left_info_callback)
 		rospy.Subscriber('/navigation/right/camera_info', CameraInfo, self.camera_right_info_callback)
@@ -35,6 +36,11 @@ class VisualServo:
 		self._rotation_velocity = 0.1
 		self._linear_velocity = 0.1
 		self._is_trying_to_work = True
+		self._has_succeeded = False
+		self._visual_servo_result = VisualServoResult()
+		self._visual_servo_feedback = VisualServoFeedback()
+		self._action_server = actionlib.SimeActionServer('visual_servo_action', VisualServoAction, self.do_visual_servo, False)
+		self._action_server.start()
 
 	def object_point_callback(self, data):
 		# This function does the bulk of the work.  It receives a centroid location of an object in pixel space
@@ -44,6 +50,9 @@ class VisualServo:
 			rospy.loginfo(rospy.get_name() + ": received point %s" % data)
 			self._is_trying_to_work = True
 			twist = Twist()
+
+			# TODO - Set this error appropriately
+			self._visual_servo_feedback.error = sqrt((data.x-self._camera_left_target_width)*(data.x-self._camera_left_target_width)+(data.y-self._camera_left_target_height)*(data.y-self._camera_left_target_height))
 
 			# If the object is near the top of the image, move forward
 			if data.y < self._camera_left_height*0.1:
@@ -93,7 +102,8 @@ class VisualServo:
 				twist.linear.z = 0.0
 			# Else the object should be aligned at the proper location in the image
 			else:
-				# TODO - Publish a message to let the executive know that the object is aligned
+				self._visual_servo_result.success = True
+				self._has_succeeded = True
 				twist.angular.z = 0.0
 				twist.angular.y = 0.0
 				twist.angular.x = 0.0
@@ -120,6 +130,9 @@ class VisualServo:
 		while not rospy.is_shutdown():
 			self._is_trying_to_work = False
 			rospy.sleep(self._sleep_duration)
+			if self._has_succeeded:
+				self._action_server.set_succeeded(result=self._visual_servo_result)
+				break
 			if not self._is_trying_to_work:
 				# TODO - Let the executive ROS node know that this node has failed to do anything useful for a while
 				twist = Twist()
@@ -131,7 +144,10 @@ class VisualServo:
 				twist.linear.z = 0.0
 				self._publisher.publish(twist)
 				rospy.logerr("Failed to do any work for two seconds!")
+			else:
+				self._action_server.publish_feedback(self._visual_servo_feedback)
 
 if __name__ == '__main__':
+	rospy.init_node('visual_servo')
 	visual_servo = VisualServo()
 	visual_servo.do_visual_servo()

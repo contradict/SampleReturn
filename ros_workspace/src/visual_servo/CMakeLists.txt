@@ -4,7 +4,7 @@ project(visual_servo)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS rospy std_msgs)
+find_package(catkin REQUIRED COMPONENTS rospy std_msgs actionlib actionlib_msgs actionlib message_generation)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -33,9 +33,17 @@ catkin_python_setup()
 #   Service2.srv
 # )
 
+## Generate actions 
+add_action_files(
+	DIRECTORY action
+	FILES
+		VisualServo.action
+)
+
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
     DEPENDENCIES
+		actionlib_msgs
         std_msgs
 )
 
@@ -53,6 +61,8 @@ catkin_package(
     CATKIN_DEPENDS
         rospy
         std_msgs
+		actionlib_msgs
+		actionlib
 #  DEPENDS system_lib
 )
 
