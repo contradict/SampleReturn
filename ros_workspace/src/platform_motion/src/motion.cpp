@@ -457,9 +457,9 @@ void Motion::doHomePods(void)
 {
     home_pods_count = 3;
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    home_pods_action_server.acceptNewGoal();
     if(pods_enabled == true && command_source == COMMAND_SOURCE_NONE)
     {
-        home_pods_action_server.acceptNewGoal();
         ROS_INFO("Home pods goal accepted");
         CANOpen::DS301CallbackObject
             hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
@@ -483,10 +483,10 @@ void Motion::doHomePods(void)
 void Motion::doHomeCarousel(void)
 {
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    home_carousel_action_server.acceptNewGoal();
     if(carousel_enabled)
     {
         ROS_INFO("Home carousel goal accepted");
-        home_carousel_action_server.acceptNewGoal();
         CANOpen::DS301CallbackObject
             hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                 static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeCarouselComplete));
@@ -537,6 +537,9 @@ bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
     }
     boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
     boost::system_time now=boost::get_system_time();
+    if(home_pods_action_server.isActive() && req.state == false){
+        home_pods_action_server.setAborted(home_pods_result, "Paused");
+    }
     enable_pods(req.state);
     notified = enable_pods_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
     if(!notified)
@@ -567,6 +570,9 @@ bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
     }
     boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
     boost::system_time now=boost::get_system_time();
+    if(home_carousel_action_server.isActive() && req.state == false){
+        home_carousel_action_server.setAborted(home_carousel_result, "Paused");
+    }
     enable_carousel(req.state);
     notified = enable_carousel_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
     if(!notified)
