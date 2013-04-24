@@ -73,14 +73,9 @@ class ManipulatorStateMachine(object):
     self.wrist_pause = rospy.ServiceProxy('wrist_joint/pause', Enable)
     self.hand_pause = rospy.ServiceProxy('hand_joint/pause', Enable)
             
-    #advertise the pause service and home action
-    self.pause_service = rospy.Service('pause', Enable, self.service_pause)
-    self.home_action = actionlib.SimpleActionServer('home', HomeAction, auto_start=False)
-    self.home_action.register_goal_callback(self.home_execute)
-    self.home_action.register_preempt_callback(self.home_preempt)
-    self.home_action.start()
+    #actions and services will be started after state machine declaration
     
-    # start actually creating the state machine!
+    #create the state machine!
     self.sm = smach.StateMachine(
         outcomes=['success', 'aborted', 'preempted'],
         input_keys = ['goal', 'action_result'],
@@ -247,7 +242,13 @@ class ManipulatorStateMachine(object):
     sls = smach_ros.IntrospectionServer('smach_grab_introspection', self.sm, '/START')
     sls.start()
   
+    #start action servers and services
     wrapper.run_server()
+    self.pause_service = rospy.Service('pause', Enable, self.service_pause)
+    self.home_action = actionlib.SimpleActionServer('home', HomeAction, auto_start=False)
+    self.home_action.register_goal_callback(self.home_execute)
+    self.home_action.register_preempt_callback(self.home_preempt)
+    self.home_action.start()
     
   def home_execute(self):
     self.home_action.accept_new_goal()
@@ -282,7 +283,7 @@ class ManipulatorStateMachine(object):
         self.sm.request_preempt()
         self.carousel_client.cancel_all_goals()
       else:
-        self.sm.service_preempt()
+        self.sm.service_preempt() #this clears any preempt requests in the state machine
         self.arm_pause(False)
         self.wrist_pause(False)
         self.hand_pause(False)
