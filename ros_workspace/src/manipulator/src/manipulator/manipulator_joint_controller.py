@@ -15,10 +15,23 @@ from dynamixel_controllers.joint_controller_mx import JointControllerMX
 from std_msgs.msg import Float64
 from dynamixel_msgs.msg import JointState
 
+from platform_motion.srv import Enable, EnableRequest
+
 from manipulator.srv import VelocityStandoff
 from manipulator.srv import TorqueStandoff
 from manipulator.srv import TorqueHold
 from manipulator.srv import GoToPosition
+
+# Decorator for services that should exit when this
+# controller has received a pause request.
+def check_pause(fn):
+    def check(*args):
+        if args[0].paused: return 'preempted' #do not execute service if paused
+        for result in fn(*args):
+            if result is not None: #block() returns preempted or None
+                return result
+        return "succeeded"    
+    return check
 
 class ManipulatorJointController(JointControllerMX):
     def __init__(self, dxl_io, controller_namespace, port_namespace):
@@ -28,6 +41,7 @@ class ManipulatorJointController(JointControllerMX):
         self.torque_standoff_service = rospy.Service(self.controller_namespace + '/torque_standoff', TorqueStandoff, self.torque_standoff)
         self.torque_hold_service = rospy.Service(self.controller_namespace + '/torque_hold', TorqueHold, self.torque_hold)
         self.go_to_position_service = rospy.Service(self.controller_namespace + '/go_to_position', GoToPosition, self.service_go_to_position)
+        self.pause_service = rospy.Service(self.controller_namespace + '/pause', Enable, self.service_pause)
                         
         #condition variable thingy to control waiting
         self.waitCV = threading.Condition()
@@ -50,7 +64,12 @@ class ManipulatorJointController(JointControllerMX):
         self.check_for_stop = False
         self.check_for_position = False
         self.check_current = None
-                
+        self.paused = False #start up these dynamixels active
+    
+        #record initial torque limit, to be reset after pauses
+        self.initial_torque_limit = self.torque_limit
+    
+    @check_pause            
     def velocity_standoff(self, req):
         velocity = req.velocity
         torque_limit = req.torque_limit 
@@ -67,7 +86,7 @@ class ManipulatorJointController(JointControllerMX):
         self.set_speed(velocity)
         time.sleep(.5) #allow .5 seconds for dynamixel to move
         self.check_for_stop = True
-        self.block()
+        yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
         self.set_speed(0)
         self.dxl_io.disable_feedback(self.motor_id)
@@ -78,10 +97,9 @@ class ManipulatorJointController(JointControllerMX):
         self.set_speed(previous_velocity)
         self.set_position(standoff_pos)
         self.check_for_position = True
-        self.block()
-        
-        return ("success")
-       
+        yield self.block()
+    
+    @check_pause           
     def torque_standoff(self, req):
         torque = req.torque
         if torque > 0:
@@ -91,41 +109,47 @@ class ManipulatorJointController(JointControllerMX):
         self.set_torque_control_mode_enable(True)
         self.set_goal_torque(torque)
         self.check_for_move = True
-        self.block()
+        yield self.block()
         self.check_for_stop = True
-        self.block()
+        yield self.block()
         self.set_torque_control_mode_enable(False)
-        self.go_to_position(self.joint_state.current_pos + standoff)
-               
-        return("success")
+        yield self.go_to_position(self.joint_state.current_pos + standoff)
     
+    @check_pause        
     def torque_hold(self, req):
         torque = req.torque
         self.set_torque_control_mode_enable(True)
         self.set_goal_torque(torque)
         self.check_current = torque * 0.9 
-        self.block()
+        yield self.block()
         self.check_for_stop = True
-        self.block()
-        
-        return ["success", self.joint_state.current_pos]
-           
-        
+        yield self.block()
+        yield ("succeeded", self.joint_state.current_pos)
+    
+    @check_pause    
     def go_to_position(self, position):
-        rospy.loginfo("TORQUE CONTROL STATUS: " + str(self.torque_control_mode))
+        #rospy.loginfo("TORQUE CONTROL STATUS: " + str(self.torque_control_mode))
         if self.torque_control_mode: self.set_torque_control_mode_enable(False)
         self.set_position(position)            
         self.check_for_position = True
-        self.block()
-            
-        return("success")
-
-    def process_go_to_wrapped_position(self, req):
-        pass
-   
+        yield self.block()
+                
     def service_go_to_position(self, req):
         #rospy.loginfo("Servicing go_to_position request {0:f}".format(req.position))
         return self.go_to_position(req.position)
+
+    def service_pause(self, req):
+        self.paused = req.state
+        if self.paused:
+            self.unblock()
+            self.set_torque_enable(False)
+            self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) # position mode
+            time.sleep(0.2) # sleep .2 seconds for position mode freak out
+            self.set_torque_limit(self.initial_torque_limit)
+            self.set_torque_enable(True)
+            self.go_to_position(self.joint_state.current_pos)
+        
+        return self.paused    
           
     def process_motor_states(self, state_list):
         JointControllerMX.process_motor_states(self, state_list)
@@ -164,8 +188,10 @@ class ManipulatorJointController(JointControllerMX):
     def block(self):
         self.waitCV.acquire()
         self.waitCV.wait()
+        paused = "preempted" if self.paused else None
         self.waitCV.release()
-            
+        return paused
+
     def unblock(self):
         self.waitCV.acquire()
         self.waitCV.notifyAll()

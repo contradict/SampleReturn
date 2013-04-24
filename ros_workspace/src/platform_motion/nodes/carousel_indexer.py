@@ -23,21 +23,20 @@ class CarouselIndexer(object):
         self.carousel_position = None
         self.current_index = None
         self.joy_goal = None
-        self.angle_pub = rospy.Publisher('carousel', Float64)
-        self.joy_sub = rospy.Subscriber('joy', Joy, self.joyCallback)
-        self.joint_sub = rospy.Subscriber('platform_joint_state', JointState,
+        self.angle_pub = rospy.Publisher('/carousel', Float64)
+        self.joy_sub = rospy.Subscriber('/joy', Joy, self.joyCallback)
+        self.joint_sub = rospy.Subscriber('/platform_joint_state', JointState,
                 self.jointStateCallback)
-
         self.goal_index = None
         self.server = actionlib.SimpleActionServer('select_carousel_bin',
                 SelectCarouselBinAction, auto_start=False)
         self.server.register_goal_callback(self.selectBin)
         self.server.register_preempt_callback(self.preempt)
         self.server.start()
-        rospy.loginfo( "Waiting for enable service" )
-        rospy.wait_for_service("enable_carousel")
-        self.enable_service = rospy.ServiceProxy('enable_carousel', Enable)
-        self.home_client = actionlib.SimpleActionClient('home_carousel',
+        rospy.loginfo( "Waiting for carousel enable service" )
+        rospy.wait_for_service("/enable_carousel")
+        self.enable_service = rospy.ServiceProxy('/enable_carousel', Enable)
+        self.home_client = actionlib.SimpleActionClient('/home_carousel',
                 HomeAction)
         rospy.loginfo( "Waiting for home server" )
         self.home_client.wait_for_server()
@@ -97,17 +96,18 @@ class CarouselIndexer(object):
                 rospy.loginfo( "at bin %d", closest_bin)
                 self.current_index = closest_bin
         if self.server.is_active():
+            self._selectBinFeedback.current_bin = self.current_index
+            self.server.publish_feedback(self._selectBinFeedback)
             if self.current_index == self.goal_index:
                 self._selectBinResult.bin_selected = True
                 self.server.set_succeeded(result=self._selectBinResult)
-            else:
-                self._selectBinFeedback.current_bin = self.current_index
-                self.server.publish_feedback(self._selectBinFeedback)
 
     def selectBin(self):
+        rospy.loginfo("ENTERING selectBin")
         goal = self.server.accept_new_goal()
+        rospy.loginfo("WITH GOAL: " + str(goal))
         if self.current_index is None:
-            rospy.logerr("bin slection goal received, but no joint_state yet")
+            rospy.logerr("bin selection goal received, but no joint_state yet")
             self.server.set_aborted(text="bin selection goal received, but no joint_state yet")
             return
         if goal.bin_index<0 or goal.bin_index>=len(self.carousel_bin_angles):
@@ -123,6 +123,7 @@ class CarouselIndexer(object):
             self.send_carousel_position(goal.bin_index)
 
     def preempt(self):
+        rospy.loginfo("PREEMPTING CAROUSEL INDEXER")
         self.send_carousel_position(self.current_index)
         self._selectBinResult.bin_selected = False
         self.server.set_preempted(result=self._selectBinResult)
@@ -140,6 +141,7 @@ class CarouselIndexer(object):
         angle = self.carousel_position - delta_angle
         rospy.loginfo( "sending %d: %f", index, angle )
         self.angle_pub.publish(Float64(angle))
+   
 
 if __name__ == "__main__":
     rospy.init_node("carousel_indexer")
