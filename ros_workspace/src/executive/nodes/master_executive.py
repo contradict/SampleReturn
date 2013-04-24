@@ -65,9 +65,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         # action clients
         self.home_wheelpods = actionlib.SimpleActionClient("/home_wheelpods",
-                platform_msg.HomeAction)
+                                                           platform_msg.HomeAction)
         self.home_carousel = actionlib.SimpleActionClient("/home_carousel",
-                platform_msg.HomeAction)
+                                                          platform_msg.HomeAction)
+        self.home_manipulator = actionlib.SimpleActionClient('/manipulator/home',
+                                                             platform_msg.HomeAction)
 
     #----   Subscription Handlers ----
     def gpio_update(self, gpio):
@@ -122,7 +124,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         while True:
             if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6))\
-               and self.home_carousel.wait_for_server(rospy.Duration(1e-6)):
+            and self.home_carousel.wait_for_server(rospy.Duration(1e-6))\
+            and self.home_manipulator.wait_for_server(rospy.Duration(1e-6)):
                 break
             yield teer_ros.WaitDuration(0.1)
 
@@ -131,27 +134,35 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.announce("Waiting for system enable.")
                 yield teer_ros.WaitCondition(enabled)
             self.announce("Home ing")
+            
+            working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
+
+            self.home_manipulator.send_goal(platform_msg.HomeGoal(home_count=1))
+            while True: #home manipulator first, ensure it is clear of carousel
+                yield teer_ros.WaitDuration(0.1)
+                manipulator_state = self.home_manipulator.get_state()
+                if manipulator_state not in working_states:
+                    break
+            if manipulator_state != action_msg.GoalStatus.SUCCEEDED:
+                yield teer_ros.WaitDuration(0.75)
+                continue
+            
             self.platform_motion_input_select("None")
             yield teer_ros.WaitDuration(0.1)
             self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
             self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
             while True:
-                wheelpods_done = self.home_wheelpods.wait_for_result(rospy.Duration(1e-6))
-                carousel_done = self.home_carousel.wait_for_result(rospy.Duration(1e-6))
                 yield teer_ros.WaitDuration(0.10)
                 wheelpods_state = self.home_wheelpods.get_state()
                 carousel_state = self.home_carousel.get_state()
-                working_states = \
-                        [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
                 if wheelpods_state not in working_states \
                    and carousel_state not in working_states:
                     break
             rospy.logdebug("home results: (%d, %d)", wheelpods_state, carousel_state)
-            if self.home_wheelpods.get_state() == action_msg.GoalStatus.SUCCEEDED \
-               and self.home_carousel.get_state() == action_msg.GoalStatus.SUCCEEDED:
+            if wheelpods_state == action_msg.GoalStatus.SUCCEEDED \
+               and carousel_state == action_msg.GoalStatus.SUCCEEDED:
                 break
             yield teer_ros.WaitDuration(0.75)
-
         self.new_task(self.handle_mode_switch())
 
     def handle_mode_switch(self):

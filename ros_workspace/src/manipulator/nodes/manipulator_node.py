@@ -7,6 +7,7 @@ import actionlib
 import smach
 import smach_ros
 import threading
+import time
 
 from std_msgs.msg import Float64
 from std_msgs.msg import Bool
@@ -18,6 +19,7 @@ from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, Mani
 
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 from platform_motion.srv import Enable, EnableRequest
+from platform_motion.msg import HomeAction, HomeGoal, HomeFeedback, HomeResult
 
 from manipulator import manipulator_states
 
@@ -27,6 +29,9 @@ from manipulator.srv import TorqueHold, TorqueHoldRequest
 from manipulator.srv import GoToPosition, GoToPositionRequest
 
 class ManipulatorStateMachine(object):
+  
+  _homeManipulatorFeedback = HomeFeedback()
+  _homeManipulatorResult = HomeResult()
     
   def __init__(self):
   
@@ -58,7 +63,7 @@ class ManipulatorStateMachine(object):
     rospy.wait_for_service('hand_joint/go_to_position')
   
     self.carousel_client = actionlib.SimpleActionClient('/carousel/select_carousel_bin', SelectCarouselBinAction)    
-                    
+    
     # make service proxies important services
     
     self.arm_velocity_standoff = rospy.ServiceProxy('arm_joint/velocity_standoff', VelocityStandoff)  
@@ -68,31 +73,29 @@ class ManipulatorStateMachine(object):
     self.wrist_pause = rospy.ServiceProxy('wrist_joint/pause', Enable)
     self.hand_pause = rospy.ServiceProxy('hand_joint/pause', Enable)
             
-    #home the manipulator on startup
-    
-    self.arm_velocity_standoff(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff)
-    self.wrist_go_to_position(self.wrist_zero_position)
-    self.hand_go_to_position(self.hand_open_position)
-
-    #after homing, advertise the pause service
+    #advertise the pause service and home action
     self.pause_service = rospy.Service('pause', Enable, self.service_pause)
-         
+    self.home_action = actionlib.SimpleActionServer('home', HomeAction, auto_start=False)
+    self.home_action.register_goal_callback(self.home_execute)
+    self.home_action.register_preempt_callback(self.home_preempt)
+    self.home_action.start()
+    
     # start actually creating the state machine!
     self.sm = smach.StateMachine(
         outcomes=['success', 'aborted', 'preempted'],
-        input_keys = ['goal'],
-        output_keys = ['result']
+        input_keys = ['goal', 'action_result'],
+        output_keys = ['action_result']
     )
   
     with self.sm:
            
       smach.StateMachine.add('START',
           manipulator_states.ProcessGoal(),
-          transitions = {'succeeded':'ROTATE_WRIST',
+          transitions = {'succeeded': 'ROTATE_WRIST',
                          'aborted':'ERROR'}
       )
 
-      @smach.cb_interface(input_keys=[])
+      @smach.cb_interface()
       def manipulator_response_cb(userdata, response):
         return response.result
       
@@ -178,12 +181,14 @@ class ManipulatorStateMachine(object):
       )
   
       #return carousel to bin 0
+      #this is always the last state before a successful state machine execution
       carousel_clear_bin = SelectCarouselBinGoal()
       carousel_clear_bin.bin_index = 0
       smach.StateMachine.add('CLEAR_CAROUSEL',
           smach_ros.SimpleActionState('/carousel/select_carousel_bin',
           SelectCarouselBinAction,
-          goal=carousel_clear_bin),
+          goal=carousel_clear_bin,
+          output_keys=['action_result']),
           transitions = {'succeeded':'success',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
@@ -198,7 +203,8 @@ class ManipulatorStateMachine(object):
       smach.StateMachine.add('HOME_ARM',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
-          response_cb = manipulator_response_cb),
+          response_cb = manipulator_response_cb,
+          input_keys = ['error','goal']),
           transitions = {'succeeded':'HOME_WRIST',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
@@ -234,7 +240,8 @@ class ManipulatorStateMachine(object):
         succeeded_outcomes = ['success'],
         aborted_outcomes = ['aborted'],
         preempted_outcomes = ['preempted'],
-        goal_key = 'goal'
+        goal_key = 'goal',
+        result_key = 'action_result'
     )
   
     sls = smach_ros.IntrospectionServer('smach_grab_introspection', self.sm, '/START')
@@ -242,6 +249,28 @@ class ManipulatorStateMachine(object):
   
     wrapper.run_server()
     
+  def home_execute(self):
+    self.home_action.accept_new_goal()
+    mgr = ManipulatorGrabResult() #setup the state machine userdata 
+    mgr.result = 'homed'
+    temp_userdata = smach.UserData()
+    temp_userdata['goal'] =  'home'
+    temp_userdata['error'] = None
+    temp_userdata['action_result'] = mgr
+    self.sm.set_initial_state(['HOME_ARM'])
+    outcome = self.sm.execute(temp_userdata) #call the state machine with temp_userdata
+    self.sm.set_initial_state(['START'])
+    if outcome == 'success':
+      self._homeManipulatorResult.homed = [True] #homed is a tuple/list
+      self.home_action.set_succeeded(result=self._homeManipulatorResult)
+    else:
+      self._homeManipulatorResult.homed = [False] #homed is a tuple/list
+      self.home_action.set_aborted(result=self._homeManipulatorResult)
+
+  def home_preempt(self):
+    self._homeManipulatorResult.homed = False
+    self.home_action.set_preempted(result=self._homeManipulatorResult)
+     
   def service_pause(self, req):
     pause = req.state
     if (pause != self.paused):

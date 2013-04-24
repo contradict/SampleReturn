@@ -64,7 +64,7 @@ class ManipulatorJointController(JointControllerMX):
         self.check_for_stop = False
         self.check_for_position = False
         self.check_current = None
-        self.paused = False #start up these dynamixels active
+        self.paused = True #start up these dynamixels paused
     
         #record initial torque limit, to be reset after pauses
         self.initial_torque_limit = self.torque_limit

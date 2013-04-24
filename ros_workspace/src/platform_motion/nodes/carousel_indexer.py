@@ -103,9 +103,7 @@ class CarouselIndexer(object):
                 self.server.set_succeeded(result=self._selectBinResult)
 
     def selectBin(self):
-        rospy.loginfo("ENTERING selectBin")
         goal = self.server.accept_new_goal()
-        rospy.loginfo("WITH GOAL: " + str(goal))
         if self.current_index is None:
             rospy.logerr("bin selection goal received, but no joint_state yet")
             self.server.set_aborted(text="bin selection goal received, but no joint_state yet")
@@ -123,7 +121,7 @@ class CarouselIndexer(object):
             self.send_carousel_position(goal.bin_index)
 
     def preempt(self):
-        rospy.loginfo("PREEMPTING CAROUSEL INDEXER")
+        rospy.loginfo("Preempting carousel indexer")
         self.send_carousel_position(self.current_index)
         self._selectBinResult.bin_selected = False
         self.server.set_preempted(result=self._selectBinResult)
