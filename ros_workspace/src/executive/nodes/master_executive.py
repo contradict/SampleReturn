@@ -130,7 +130,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if not enabled():
                 self.announce("Waiting for system enable.")
                 yield teer_ros.WaitCondition(enabled)
-            self.announce("homing")
+            self.announce("Home ing")
             self.platform_motion_input_select("None")
             yield teer_ros.WaitDuration(0.1)
             self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
