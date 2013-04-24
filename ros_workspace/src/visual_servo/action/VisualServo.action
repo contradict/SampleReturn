@@ -1,0 +1,8 @@
+# Goal
+bool do_align_object_to_manipulator
+---
+# Result
+bool success
+---
+# Feedback
+float32 error
