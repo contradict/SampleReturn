@@ -78,6 +78,7 @@ include_directories(include
 
 ## Declare a cpp executable
  add_executable(linemod_trainer src/linemod_trainer.cpp)
+ add_executable(linemod_detector src/linemod_detector.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -85,6 +86,9 @@ include_directories(include
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(linemod_trainer
+   ${catkin_LIBRARIES}
+ )
+ target_link_libraries(linemod_detector
    ${catkin_LIBRARIES}
  )
 
