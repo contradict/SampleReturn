@@ -117,7 +117,7 @@ WheelPodMeasurementPdf::ExpectedValueGet(void) const
     z(5) = podvel.transpose()*pod_direction.columnCopy(3);
     z(6) = podvel.transpose()*pod_direction_perp.columnCopy(3);
 
-    return z;
+    return z + AdditiveNoiseMuGet();
 }
 
 }
