@@ -89,10 +89,7 @@ class ManipulatorJointController(JointControllerMX):
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
         self.set_speed(0)
-        self.dxl_io.disable_feedback(self.motor_id)
         self.set_angle_limits(previous_cw_limit, previous_ccw_limit) #back to position mode
-        time.sleep(.2) #wait for shitty dynamixel to wake up after changing modes
-        self.dxl_io.enable_feedback(self.motor_id)
         self.set_torque_limit(previous_torque_limit)
         self.set_speed(previous_velocity)
         self.set_position(standoff_pos)
@@ -144,11 +141,9 @@ class ManipulatorJointController(JointControllerMX):
             self.unblock()
             self.set_torque_enable(False)
             self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) # position mode
-            time.sleep(0.2) # sleep .2 seconds for position mode freak out
             self.set_torque_limit(self.initial_torque_limit)
             self.set_torque_enable(True)
             self.go_to_position(self.joint_state.current_pos)
-        
         return self.paused    
           
     def process_motor_states(self, state_list):
