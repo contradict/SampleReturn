@@ -75,7 +75,8 @@ class LineMOD_Detector
 
     // Initialize LINEMOD data structures
     std::string filename;
-    detector = readLinemod("test");
+    ros::param::get("template_file", filename);
+    detector = readLinemod(filename);
     num_modalities = (int)detector->getModalities().size();
     std::cout << num_modalities << std::endl;
   }
