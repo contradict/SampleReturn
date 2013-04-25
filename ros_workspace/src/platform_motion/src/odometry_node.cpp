@@ -19,7 +19,10 @@ OdometryNode::OdometryNode() :
     starboard_vel_sum(0), port_vel_sum(0), stern_vel_sum(0),
     vel_sum_count(0),
     odom_position(Eigen::Vector2d::Zero()),
-    odom_orientation(0)
+    odom_orientation(0),
+    odom_pose_covariance(Eigen::VectorXd::Zero(36)),
+    odom_twist_covariance(Eigen::VectorXd::Zero(36)),
+    odom_twist_stopped_covariance(Eigen::VectorXd::Zero(36))
 {
     ros::NodeHandle param_nh("~");
     param_nh.param<std::string>("odom_frame_id", odom_frame_id, "odom");
@@ -51,7 +54,75 @@ void OdometryNode::init()
     if( ros::ok() )
         ROS_INFO("Got all transforms");
     getPodPositions(&data);
+    fillDefaultCovariance();
 }
+
+void OdometryNode::fillDefaultCovariance(void)
+{
+    /***************************
+     *   POSE COVARIANCE
+     ***************************/
+    // xx
+    odom_pose_covariance[0] = 0.05;
+    // yy
+    odom_pose_covariance[7] = 0.05;
+    // xy
+    odom_pose_covariance[1] = odom_pose_covariance[6] = 0.005;
+    // xyaw
+    odom_pose_covariance[5] = odom_pose_covariance[30] = 0.001;
+    // yyaw
+    odom_pose_covariance[11] = odom_pose_covariance[31] = 0.001;
+    // yaw*yaw
+    odom_pose_covariance[35] =
+        pow((2.*M_PI/((double)10000)), 2);
+    // these directions are unmeasured
+    odom_pose_covariance[14] = DBL_MAX;
+    odom_pose_covariance[21] = DBL_MAX;
+    odom_pose_covariance[28] = DBL_MAX;
+
+    /***************************
+     *   TWIST COVARIANCE
+     *     (in motion)
+     ***************************/
+    // vxvx
+    odom_twist_covariance[0] = 10.0;
+    // vyvy
+    odom_twist_covariance[7] = 10.0;
+    // vxvy
+    odom_twist_covariance[1] = odom_twist_covariance[6] = 10.0;
+    // vxomegaz
+    odom_twist_covariance[5] = odom_twist_covariance[30] = 10.0;
+    // vyomegaz
+    odom_twist_covariance[11] = odom_twist_covariance[31] = 10.0;
+    // omegaz*omegaz
+    odom_twist_covariance[35] = 10.0;
+    // unmeasured
+    odom_twist_covariance[14] = DBL_MAX;
+    odom_twist_covariance[21] = DBL_MAX;
+    odom_twist_covariance[28] = DBL_MAX;
+
+    /***************************
+     *   TWIST COVARIANCE
+     *      (stopped)
+     ***************************/
+    // vxvx
+    odom_twist_stopped_covariance[0] = 1e-10;
+    // vyvy
+    odom_twist_stopped_covariance[7] = 1e-10;
+    // vxvy
+    odom_twist_stopped_covariance[1] = odom_twist_stopped_covariance[6] = 1e-10;
+    // vxomegaz
+    odom_twist_stopped_covariance[5] = odom_twist_stopped_covariance[30] = 1e-10;
+    // vyomegaz
+    odom_twist_stopped_covariance[11] = odom_twist_stopped_covariance[31] = 1e-10;
+    // omegaz*omegaz
+    odom_twist_stopped_covariance[35] = 1e-10;
+    // unmeasured
+    odom_twist_stopped_covariance[14] = DBL_MAX;
+    odom_twist_stopped_covariance[21] = DBL_MAX;
+    odom_twist_stopped_covariance[28] = DBL_MAX;
+}
+
 
 void OdometryNode::fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool stopped)
 {
@@ -66,67 +137,15 @@ void OdometryNode::fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool sto
     odo->twist.twist.angular.y = 0;
     odo->twist.twist.angular.z = odom_omega;
 
-    if(stopped) {
-        // covariance is tiny for stopped
-        // xx
-        odo->pose.covariance[0] = 1e-10;
-        // yy
-        odo->pose.covariance[7] = 1e-10;
-        // xy
-        odo->pose.covariance[1] = odo->pose.covariance[6] = 1e-10;
-        // xyaw
-        odo->pose.covariance[5] = odo->pose.covariance[30] = 1e-10;
-        // yyaw
-        odo->pose.covariance[11] = odo->pose.covariance[31] = 1e-10;
-        // yaw*yaw
-        odo->pose.covariance[35] = 1e-10;
-        // vxvx
-        odo->twist.covariance[0] = 1e-10;
-        // vyvy
-        odo->twist.covariance[7] = 1e-10;
-        // vxvy
-        odo->twist.covariance[1] = odo->pose.covariance[6] = 1e-10;
-        // vxomegaz
-        odo->twist.covariance[5] = odo->pose.covariance[30] = 1e-10;
-        // vyomegaz
-        odo->twist.covariance[11] = odo->pose.covariance[31] = 1e-10;
-        // omegaz*omegaz
-        odo->twist.covariance[35] = 1e-10;
-    } else {
-        // xx
-        odo->pose.covariance[0] = 0.05;
-        // yy
-        odo->pose.covariance[7] = 0.05;
-        // xy
-        odo->pose.covariance[1] = odo->pose.covariance[6] = 0.005;
-        // xyaw
-        odo->pose.covariance[5] = odo->pose.covariance[30] = 0.001;
-        // yyaw
-        odo->pose.covariance[11] = odo->pose.covariance[31] = 0.001;
-        // yaw*yaw
-        odo->pose.covariance[35] =
-            pow((2.*M_PI/((double)10000)), 2);
-        // vxvx
-        odo->twist.covariance[0] = 10.0;
-        // vyvy
-        odo->twist.covariance[7] = 10.0;
-        // vxvy
-        odo->twist.covariance[1] = odo->pose.covariance[6] = 10.0;
-        // vxomegaz
-        odo->twist.covariance[5] = odo->pose.covariance[30] = 10.0;
-        // vyomegaz
-        odo->twist.covariance[11] = odo->pose.covariance[31] = 10.0;
-        // omegaz*omegaz
-        odo->twist.covariance[35] = 10.0;
+    for(int i=0;i<36;i++)
+    {
+        odo->pose.covariance[i] = odom_pose_covariance[i];
+        if(stopped) {
+            odo->twist.covariance[i] = odom_twist_stopped_covariance[i];
+        } else {
+            odo->twist.covariance[i] = odom_twist_covariance[i];
+        }
     }
-
-    // these directions are unmeasured
-    odo->pose.covariance[14] = DBL_MAX;
-    odo->pose.covariance[21] = DBL_MAX;
-    odo->pose.covariance[28] = DBL_MAX;
-    odo->twist.covariance[14] = DBL_MAX;
-    odo->twist.covariance[21] = DBL_MAX;
-    odo->twist.covariance[28] = DBL_MAX;
 
     // fill out current position
     odo->pose.pose.position.x = odom_position(0);

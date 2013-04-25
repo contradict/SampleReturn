@@ -40,6 +40,7 @@ class OdometryNode {
         bool lookupJointValue(const sensor_msgs::JointState::ConstPtr &joint_state,
                 std::string requested_name,
                 double *position, double *velocity);
+        void fillDefaultCovariance(void);
         void fillOdoMsg(nav_msgs::Odometry *odo, ros::Time stamp, bool stopped);
         void jointStateCallback(const sensor_msgs::JointState::ConstPtr joint_state);
         bool isMoving(const struct odometry_measurements &data);
@@ -62,10 +63,15 @@ class OdometryNode {
         double last_starboard_distance, last_port_distance, last_stern_distance;
         double starboard_vel_sum, port_vel_sum, stern_vel_sum;
         int vel_sum_count;
+
         Eigen::Vector2d odom_position;
         double odom_orientation;
         Eigen::Vector2d odom_velocity;
         double odom_omega;
+        Eigen::VectorXd odom_pose_covariance;
+        Eigen::VectorXd odom_twist_covariance;
+        Eigen::VectorXd odom_twist_stopped_covariance;
+
         double wheel_diameter;
         double delta_threshold;
         double min_translation_norm;
