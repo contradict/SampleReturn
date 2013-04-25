@@ -1,14 +1,14 @@
 # this is where all the states for the manipulator will be defined.
 
 import smach
-from manipulator.msg import ManipulatorGrabFeedback, ManipulatorGrabResult
+from manipulator.msg import ManipulatorFeedback, ManipulatorResult
 
 
 class ProcessGoal(smach.State):
   def __init__(self):
     smach.State.__init__(self,
-                        outcomes=['succeeded', 'aborted'],
-                        input_keys=['goal'],
+                        outcomes=['grab', 'home', 'preempted', 'aborted'],
+                        input_keys=['action_goal'],
                         output_keys=['wrist_angle',
                                      'target_bin',
                                      'grip_torque',
@@ -19,28 +19,34 @@ class ProcessGoal(smach.State):
     )
   def execute(self, userdata):
     # set the feedback key
-    fb = ManipulatorGrabFeedback()
+    fb = ManipulatorFeedback()
     fb.current_state = "START"
     userdata.action_feedback = fb
 
-    mgr = ManipulatorGrabResult()      
-    mgr.result = 'cycle complete'
+    mgr = ManipulatorResult()      
     userdata.action_result = mgr #this seems kinda lame, but set result to 
                                  #the good thing, if an error occurs it is overwritten     
     
+    if userdata.action_goal.type == 'home':
+      mgr.result = 'homed'
+      mgr.homed = True
+      return 'home'
+    else:
+      mgr.result = 'grab complete'
+     
     # ensure that the goal is valid 
     userdata.error = None
-    if userdata.goal.wrist_angle > 1.7: 
+    if userdata.action_goal.wrist_angle > 1.7: 
       userdata.error = 'invalid_goal'
       return 'aborted'
     
     # set the outputs
-    userdata.wrist_angle = userdata.goal.wrist_angle
-    userdata.target_bin = userdata.goal.target_bin
-    userdata.grip_torque = userdata.goal.grip_torque
-    userdata.grip_dimension = userdata.goal.grip_dimension
+    userdata.wrist_angle = userdata.action_goal.wrist_angle
+    userdata.target_bin = userdata.action_goal.target_bin
+    userdata.grip_torque = userdata.action_goal.grip_torque
+    userdata.grip_dimension = userdata.action_goal.grip_dimension
     
-    return 'succeeded' 
+    return 'grab' 
 
 class ErrorState(smach.State):
   # handle any errors that show up

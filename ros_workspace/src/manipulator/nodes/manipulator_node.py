@@ -15,11 +15,10 @@ from std_msgs.msg import Bool
 from dynamixel_msgs.msg import JointState
 from dynamixel_controllers.srv import *
 
-from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, ManipulatorGrabResult
+from manipulator.msg import ManipulatorAction, ManipulatorFeedback, ManipulatorResult
 
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 from platform_motion.srv import Enable, EnableRequest
-from platform_motion.msg import HomeAction, HomeGoal, HomeFeedback, HomeResult
 
 from manipulator import manipulator_states
 
@@ -30,9 +29,6 @@ from manipulator.srv import GoToPosition, GoToPositionRequest
 
 class ManipulatorStateMachine(object):
   
-  _homeManipulatorFeedback = HomeFeedback()
-  _homeManipulatorResult = HomeResult()
-    
   def __init__(self):
   
     self.paused = False
@@ -78,7 +74,7 @@ class ManipulatorStateMachine(object):
     #create the state machine!
     self.sm = smach.StateMachine(
         outcomes=['success', 'aborted', 'preempted'],
-        input_keys = ['goal', 'action_result'],
+        input_keys = ['action_goal'],
         output_keys = ['action_result']
     )
   
@@ -86,7 +82,9 @@ class ManipulatorStateMachine(object):
            
       smach.StateMachine.add('START',
           manipulator_states.ProcessGoal(),
-          transitions = {'succeeded': 'ROTATE_WRIST',
+          transitions = {'grab': 'ROTATE_WRIST',
+                         'home': 'HOME_ARM',
+                         'preempted' : 'PAUSED',
                          'aborted':'ERROR'}
       )
 
@@ -229,13 +227,13 @@ class ManipulatorStateMachine(object):
       )      
 
     #now that the state machine is fully defined, make the action server wrapper
-    wrapper = smach_ros.ActionServerWrapper(
-        'manipulator_grab', ManipulatorGrabAction,
+    manipulator_action_server = smach_ros.ActionServerWrapper(
+        'manipulator_action', ManipulatorAction,
         wrapped_container = self.sm,
         succeeded_outcomes = ['success'],
         aborted_outcomes = ['aborted'],
         preempted_outcomes = ['preempted'],
-        goal_key = 'goal',
+        goal_key = 'action_goal',
         result_key = 'action_result'
     )
   
@@ -243,54 +241,26 @@ class ManipulatorStateMachine(object):
     sls.start()
   
     #start action servers and services
-    wrapper.run_server()
+    manipulator_action_server.run_server()
     self.pause_service = rospy.Service('pause', Enable, self.service_pause)
-    self.home_action = actionlib.SimpleActionServer('home', HomeAction, auto_start=False)
-    self.home_action.register_goal_callback(self.home_execute)
-    self.home_action.register_preempt_callback(self.home_preempt)
-    self.home_action.start()
     
-  def home_execute(self):
-    self.home_action.accept_new_goal()
-    mgr = ManipulatorGrabResult() #setup the state machine userdata 
-    mgr.result = 'homed'
-    temp_userdata = smach.UserData()
-    temp_userdata['goal'] =  'home'
-    temp_userdata['error'] = None
-    temp_userdata['action_result'] = mgr
-    self.sm.set_initial_state(['HOME_ARM'])
-    outcome = self.sm.execute(temp_userdata) #call the state machine with temp_userdata
-    self.sm.set_initial_state(['START'])
-    if outcome == 'success':
-      self._homeManipulatorResult.homed = [True] #homed is a tuple/list
-      self.home_action.set_succeeded(result=self._homeManipulatorResult)
-    else:
-      self._homeManipulatorResult.homed = [False] #homed is a tuple/list
-      self.home_action.set_aborted(result=self._homeManipulatorResult)
-
-  def home_preempt(self):
-    self._homeManipulatorResult.homed = False
-    self.home_action.set_preempted(result=self._homeManipulatorResult)
-     
   def service_pause(self, req):
-    pause = req.state
-    if (pause != self.paused):
-      self.paused = pause
-      if (pause):
-        self.arm_pause(True)
-        self.wrist_pause(True)
-        self.hand_pause(True)
-        self.sm.request_preempt()
-        self.carousel_client.cancel_all_goals()
-      else:
-        self.sm.service_preempt() #this clears any preempt requests in the state machine
-        self.arm_pause(False)
-        self.wrist_pause(False)
-        self.hand_pause(False)
-        self.pauseCV.acquire()
-        self.pauseCV.notifyAll()
-        self.pauseCV.release()              
-        
+    self.paused = req.state
+    if (self.paused):
+      self.arm_pause(True)
+      self.wrist_pause(True)
+      self.hand_pause(True)
+      self.sm.request_preempt()
+      self.carousel_client.cancel_all_goals()
+    else:
+      self.sm.service_preempt() #this clears any preempt requests in the state machine
+      self.arm_pause(False)
+      self.wrist_pause(False)
+      self.hand_pause(False)
+      self.pauseCV.acquire()
+      self.pauseCV.notifyAll()
+      self.pauseCV.release()              
+      
     return self.paused
   
 if __name__=="__main__":
