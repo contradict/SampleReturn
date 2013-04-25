@@ -14,6 +14,7 @@ from sound_play.msg import SoundRequest
 import sensor_msgs.msg as sensor_msgs
 import platform_motion.msg as platform_msg
 import platform_motion.srv as platform_srv
+import manipulator.msg as manipulator_msg
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -58,18 +59,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.platform_motion_input_select = \
                 rospy.ServiceProxy("/select_command_source",
                         platform_srv.SelectCommandSource)
-        self.enable_wheelpods = rospy.ServiceProxy('enable_wheel_pods',
-                platform_srv.Enable)
-        self.enable_carousel = rospy.ServiceProxy('enable_carousel',
-                platform_srv.Enable)
 
         # action clients
         self.home_wheelpods = actionlib.SimpleActionClient("/home_wheelpods",
                                                            platform_msg.HomeAction)
         self.home_carousel = actionlib.SimpleActionClient("/home_carousel",
                                                           platform_msg.HomeAction)
-        self.home_manipulator = actionlib.SimpleActionClient('/manipulator/home',
-                                                             platform_msg.HomeAction)
+        self.home_manipulator = actionlib.SimpleActionClient('/manipulator/manipulator_action',
+                                                             manipulator_msg.ManipulatorAction)
 
     #----   Subscription Handlers ----
     def gpio_update(self, gpio):
@@ -129,7 +126,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 break
             yield teer_ros.WaitDuration(0.1)
 
-        while True:
+        while True: #this loop waits for a full, successful homing of the system
             if not enabled():
                 self.announce("Waiting for system enable.")
                 yield teer_ros.WaitCondition(enabled)
@@ -137,7 +134,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             
             working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
 
-            self.home_manipulator.send_goal(platform_msg.HomeGoal(home_count=1))
+            mh_msg = manipulator_msg.ManipulatorGoal()
+            mh_msg.type = 'home'
+            self.home_manipulator.send_goal(mh_msg)
             while True: #home manipulator first, ensure it is clear of carousel
                 yield teer_ros.WaitDuration(0.1)
                 manipulator_state = self.home_manipulator.get_state()
