@@ -6,613 +6,266 @@ import rospy
 import actionlib
 import smach
 import smach_ros
+import threading
+import time
 
 from std_msgs.msg import Float64
+from std_msgs.msg import Bool
 
 from dynamixel_msgs.msg import JointState
 from dynamixel_controllers.srv import *
 
-from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, ManipulatorGrabResult
+from manipulator.msg import ManipulatorAction, ManipulatorFeedback, ManipulatorResult
 
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
+from platform_motion.srv import Enable, EnableRequest
 
 from manipulator import manipulator_states
-from manipulator.manipulator_data import PersistantData
 
-def main():
+from manipulator.srv import VelocityStandoff, VelocityStandoffRequest
+from manipulator.srv import TorqueStandoff, TorqueStandoffRequest
+from manipulator.srv import TorqueHold, TorqueHoldRequest
+from manipulator.srv import GoToPosition, GoToPositionRequest
+
+class ManipulatorStateMachine(object):
+  
+  def __init__(self):
+  
+    self.paused = False
+    self.pauseCV = threading.Condition()
+    
+    # load the node's parameters
+    self.arm_down_velocity = rospy.get_param('~arm_down_velocity', -0.5)
+    self.arm_down_torque = rospy.get_param('~arm_down_torque', 0.5)
+    self.arm_down_standoff = rospy.get_param('~arm_down_standoff', 0.1)
+    
+    self.arm_up_velocity = rospy.get_param('~arm_up_velocity', 0.5)
+    self.arm_up_torque = rospy.get_param('~arm_up_torque', 0.6)
+    self.arm_up_standoff = rospy.get_param('~arm_up_standoff', 0.1)
+    
+    self.hand_open_position = rospy.get_param('~hand_open_position', 0.0)
+    self.grip_torque = 0.5
+    
+    self.wrist_zero_position = rospy.get_param('~wrist_zero_position', 0.0)
+    
+    # wait for all the dynamixel services to actually come live.
+    rospy.loginfo('Waiting for manipulator/wrist_joint services...')
+    rospy.wait_for_service('wrist_joint/go_to_position')
+  
+    rospy.loginfo('Waiting for manipulator/arm_joint services...')
+    rospy.wait_for_service('arm_joint/go_to_position')
+  
+    rospy.loginfo('Waiting for manipulator/hand_joint services...')
+    rospy.wait_for_service('hand_joint/go_to_position')
+  
+    self.carousel_client = actionlib.SimpleActionClient('/carousel/select_carousel_bin', SelectCarouselBinAction)    
+    
+    # make service proxies important services
+    
+    self.arm_velocity_standoff = rospy.ServiceProxy('arm_joint/velocity_standoff', VelocityStandoff)  
+    self.wrist_go_to_position = rospy.ServiceProxy('wrist_joint/go_to_position', GoToPosition)  
+    self.hand_go_to_position = rospy.ServiceProxy('hand_joint/go_to_position', GoToPosition)  
+    self.arm_pause = rospy.ServiceProxy('arm_joint/pause', Enable)
+    self.wrist_pause = rospy.ServiceProxy('wrist_joint/pause', Enable)
+    self.hand_pause = rospy.ServiceProxy('hand_joint/pause', Enable)
+            
+    #actions and services will be started after state machine declaration
+    
+    #create the state machine!
+    self.sm = smach.StateMachine(
+        outcomes=['success', 'aborted', 'preempted'],
+        input_keys = ['action_goal'],
+        output_keys = ['action_result']
+    )
+  
+    with self.sm:
+           
+      smach.StateMachine.add('START',
+          manipulator_states.ProcessGoal(),
+          transitions = {'grab': 'ROTATE_WRIST',
+                         'home': 'HOME_ARM',
+                         'preempted' : 'PAUSED',
+                         'aborted':'ERROR'}
+      )
+
+      @smach.cb_interface()
+      def manipulator_response_cb(userdata, response):
+        return response.result
+      
+      @smach.cb_interface(input_keys=['wrist_angle'])
+      def wrist_angle_cb(userdata, request):
+        return GoToPositionRequest(userdata.wrist_angle)
+  
+      smach.StateMachine.add('ROTATE_WRIST',
+          smach_ros.ServiceState('wrist_joint/go_to_position', GoToPosition,
+          request_cb = wrist_angle_cb,
+          response_cb = manipulator_response_cb,
+          input_keys = ['wrist_angle']),          
+          transitions = {'succeeded':'ARM_DOWN',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+
+      smach.StateMachine.add('ARM_DOWN',
+          smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
+          request = VelocityStandoffRequest(self.arm_down_velocity, self.arm_down_torque, self.arm_down_standoff),
+          response_cb = manipulator_response_cb),
+          transitions = {'succeeded':'GRIP_SAMPLE',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+ 
+      @smach.cb_interface(input_keys=['grip_torque'])
+      def grip_torque_cb(userdata, request):
+        return TorqueHoldRequest(-1 * userdata.grip_torque)   
+ 
+      smach.StateMachine.add('GRIP_SAMPLE',
+          smach_ros.ServiceState('hand_joint/torque_hold', TorqueHold,
+          request_cb = grip_torque_cb,
+          response_cb = manipulator_response_cb,
+          input_keys = ['grip_torque']),          
+          transitions = {'succeeded':'ARM_UP',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+
+      smach.StateMachine.add('ARM_UP',
+          smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
+          request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
+          response_cb = manipulator_response_cb),          
+          transitions = {'succeeded':'ZERO_WRIST',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      ) 
+    
+      smach.StateMachine.add('ZERO_WRIST',
+          smach_ros.ServiceState('wrist_joint/go_to_position', GoToPosition,
+          request = GoToPositionRequest(self.wrist_zero_position),
+          response_cb = manipulator_response_cb),
+          transitions = {'succeeded':'GET_BIN',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      ) 
+    
+      @smach.cb_interface(input_keys=['target_bin'])
+      def get_carousel_bin_cb(userdata, request):
+        goal = SelectCarouselBinGoal()   
+        goal.bin_index = userdata.target_bin
+        return goal 
+        
+      #carousel bin is acquired from datastore via callback method
+      smach.StateMachine.add('GET_BIN',
+          smach_ros.SimpleActionState('/carousel/select_carousel_bin',
+          SelectCarouselBinAction,
+          goal_cb=get_carousel_bin_cb,
+          input_keys = ['target_bin']),
+          transitions = {'succeeded':'OPEN_HAND',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+ 
+      smach.StateMachine.add('OPEN_HAND',
+          smach_ros.ServiceState('hand_joint/go_to_position', GoToPosition,
+          request = GoToPositionRequest(self.hand_open_position),
+          response_cb = manipulator_response_cb),          
+          transitions = {'succeeded':'CLEAR_CAROUSEL',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+  
+      #return carousel to bin 0
+      #this is always the last state before a successful state machine execution
+      carousel_clear_bin = SelectCarouselBinGoal()
+      carousel_clear_bin.bin_index = 0
+      smach.StateMachine.add('CLEAR_CAROUSEL',
+          smach_ros.SimpleActionState('/carousel/select_carousel_bin',
+          SelectCarouselBinAction,
+          goal=carousel_clear_bin,
+          output_keys=['action_result']),
+          transitions = {'succeeded':'success',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+      
+      smach.StateMachine.add('PAUSED',
+          manipulator_states.PausedState(self.pauseCV),
+          transitions ={'aborted':'aborted',
+                        'preempted':'preempted', #during a home action, return preempted immediately
+                        'succeeded':'HOME_ARM'} #during a grab action, home after unpause
+      )
+
+      smach.StateMachine.add('HOME_ARM',
+          smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
+          request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
+          response_cb = manipulator_response_cb,
+          input_keys = ['error','goal']),
+          transitions = {'succeeded':'HOME_WRIST',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      ) 
+
+      smach.StateMachine.add('HOME_WRIST',
+          smach_ros.ServiceState('wrist_joint/go_to_position', GoToPosition,
+          request = GoToPositionRequest(self.wrist_zero_position),
+          response_cb = manipulator_response_cb),
+          transitions = {'succeeded':'HOME_HAND',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+
+      smach.StateMachine.add('HOME_HAND',
+          smach_ros.ServiceState('hand_joint/go_to_position', GoToPosition,
+          request = GoToPositionRequest(self.hand_open_position),
+          response_cb = manipulator_response_cb),          
+          transitions = {'succeeded':'CLEAR_CAROUSEL',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+
+      smach.StateMachine.add('ERROR',
+          manipulator_states.ErrorState(),
+          transitions = {'error':'aborted'}
+      )      
+
+    #now that the state machine is fully defined, make the action server wrapper
+    manipulator_action_server = smach_ros.ActionServerWrapper(
+        'manipulator_action', ManipulatorAction,
+        wrapped_container = self.sm,
+        succeeded_outcomes = ['success'],
+        aborted_outcomes = ['aborted'],
+        preempted_outcomes = ['preempted'],
+        goal_key = 'action_goal',
+        result_key = 'action_result'
+    )
+  
+    sls = smach_ros.IntrospectionServer('smach_grab_introspection', self.sm, '/START')
+    sls.start()
+  
+    #start action servers and services
+    manipulator_action_server.run_server()
+    self.pause_service = rospy.Service('pause', Enable, self.service_pause)
+    
+  def service_pause(self, req):
+    self.paused = req.state
+    if (self.paused):
+      self.arm_pause(True)
+      self.wrist_pause(True)
+      self.hand_pause(True)
+      self.sm.request_preempt()
+      self.carousel_client.cancel_all_goals()
+    else:
+      self.sm.service_preempt() #this clears any preempt requests in the state machine
+      self.arm_pause(False)
+      self.wrist_pause(False)
+      self.hand_pause(False)
+      self.pauseCV.acquire()
+      self.pauseCV.notifyAll()
+      self.pauseCV.release()              
+      
+    return self.paused
+  
+if __name__=="__main__":
   # init the ros node
   rospy.init_node("manipulator")
-
-  # set up the persistant data for the smach states
-  dataStore = PersistantData()
-
-  # get a boatload of parameters from the param server
-  dataStore.wristMinPos = rospy.get_param('manipulator/wrist_min_pos')
-  dataStore.wristMaxPos = rospy.get_param('manipulator/wrist_max_pos')
-  dataStore.wristSpeed = rospy.get_param('manipulator/wrist_speed', 1.0)
-  dataStore.wristTorque = rospy.get_param('manipulator/wrist_torque', 0.5)
-
-  dataStore.armDownSpeed = rospy.get_param('manipulator/arm_down_speed', 1.0)
-  dataStore.armDownTorque = rospy.get_param('manipulator/arm_down_torque', 0.8)
-  dataStore.armUpSpeed = rospy.get_param('manipulator/arm_up_speed', 1.0)
-  dataStore.armUpTorque = rospy.get_param('manipulator/arm_up_torque', 0.5)
-  dataStore.armHoldTorque = rospy.get_param('manipulator/arm_hold_torque',
-      dataStore.armUpTorque
-  )
-
-  dataStore.handMinPos = rospy.get_param('manipulator/hand_min_pos')
-  dataStore.handMaxPos = rospy.get_param('manipulator/hand_max_pos')
-  dataStore.handCloseSpeed = rospy.get_param('manipulator/hand_close_speed', 1.0)
-  dataStore.handOpenSpeed = rospy.get_param('manipulator/hand_open_speed',
-      dataStore.handCloseSpeed
-  )
-  dataStore.handCloseTorque = rospy.get_param('manipulator/hand_close_torque', 0.8)
-  dataStore.handOpenTorque = rospy.get_param('manipulator/hand_open_torque', 0.5)
-  dataStore.handHoldTorque = rospy.get_param('manipulator/hand_hold_torque',
-      dataStore.handOpenTorque
-  )
-
-  # wait for all the dynamixel services to actually come live.
-  rospy.loginfo('Waiting for wristJointController services...')
-  rospy.wait_for_service('wristJointController/set_speed')
-  rospy.wait_for_service('wristJointController/torque_enable')
-  rospy.wait_for_service('wristJointController/set_compliance_slope')
-  rospy.wait_for_service('wristJointController/set_compliance_margin')
-  rospy.wait_for_service('wristJointController/set_compliance_punch')
-  rospy.wait_for_service('wristJointController/set_torque_limit')
-
-  rospy.loginfo('Waiting for armJointController services...')
-  rospy.wait_for_service('armJointController/set_speed')
-  rospy.wait_for_service('armJointController/torque_enable')
-  rospy.wait_for_service('armJointController/set_compliance_slope')
-  rospy.wait_for_service('armJointController/set_compliance_margin')
-  rospy.wait_for_service('armJointController/set_compliance_punch')
-  rospy.wait_for_service('armJointController/set_torque_limit')
-
-  rospy.loginfo('Waiting for handJointController services...')
-  rospy.wait_for_service('handJointController/set_speed')
-  rospy.wait_for_service('handJointController/torque_enable')
-  rospy.wait_for_service('handJointController/set_compliance_slope')
-  rospy.wait_for_service('handJointController/set_compliance_margin')
-  rospy.wait_for_service('handJointController/set_compliance_punch')
-  rospy.wait_for_service('handJointController/set_torque_limit')
-
-  # make service proxies for all of the services and give them to the dataStore
-  # it will likely only ever use them to actually initialize things and
-  # possibly do some error recovery.
-  dataStore.wristSetSpeedService = rospy.ServiceProxy(
-      'wristJointController/set_speed',
-      SetSpeed
-  )
-  dataStore.wristSetTorqueEnableService = rospy.ServiceProxy(
-      'wristJointController/torque_enable',
-      TorqueEnable
-  )
-  dataStore.wristSetComplianceSlopeService = rospy.ServiceProxy(
-      'wristJointController/set_compliance_slope',
-      SetComplianceSlope
-  )
-  dataStore.wristSetComplianceMarginService = rospy.ServiceProxy(
-      'wristJointController/set_compliance_margin',
-      SetComplianceMargin
-  )
-  dataStore.wristSetCompliancePunchService = rospy.ServiceProxy(
-      'wristJointController/set_compliance_punch',
-      SetCompliancePunch
-  )
-  dataStore.wristSetTorqueLimitService = rospy.ServiceProxy(
-      'wristJointController/set_torque_limit',
-      SetTorqueLimit
-  )
-
-  dataStore.armSetSpeedService = rospy.ServiceProxy(
-      'armJointController/set_speed',
-      SetSpeed
-  )
-  dataStore.armSetTorqueEnableService = rospy.ServiceProxy(
-      'armJointController/torque_enable',
-      TorqueEnable
-  )
-  dataStore.armSetComplianceSlopeService = rospy.ServiceProxy(
-      'armJointController/set_compliance_slope',
-      SetComplianceSlope
-  )
-  dataStore.armSetComplianceMarginService = rospy.ServiceProxy(
-      'armJointController/set_compliance_margin',
-      SetComplianceMargin
-  )
-  dataStore.armSetCompliancePunchService = rospy.ServiceProxy(
-      'armJointController/set_compliance_punch',
-      SetCompliancePunch
-  )
-  dataStore.armSetTorqueLimitService = rospy.ServiceProxy(
-      'armJointController/set_torque_limit',
-      SetTorqueLimit
-  )
-
-  dataStore.handSetSpeedService = rospy.ServiceProxy(
-      'handJointController/set_speed',
-      SetSpeed
-  )
-  dataStore.handSetTorqueEnableService = rospy.ServiceProxy(
-      'handJointController/torque_enable',
-      TorqueEnable
-  )
-  dataStore.handSetComplianceSlopeService = rospy.ServiceProxy(
-      'handJointController/set_compliance_slope',
-      SetComplianceSlope
-  )
-  dataStore.handSetComplianceMarginService = rospy.ServiceProxy(
-      'handJointController/set_compliance_margin',
-      SetComplianceMargin
-  )
-  dataStore.handSetCompliancePunchService = rospy.ServiceProxy(
-      'handJointController/set_compliance_punch',
-      SetCompliancePunch
-  )
-  dataStore.handSetTorqueLimitService = rospy.ServiceProxy(
-      'handJointController/set_torque_limit',
-      SetTorqueLimit
-  )
-
-  # set the dataStore as the subscriber to the joint state controller state
-  # messages.
-  rospy.Subscriber(
-      'wristJointController/state',
-      JointState,
-      dataStore.WristJointCallback
-  )
-
-  rospy.Subscriber(
-      'armJointController/state',
-      JointState,
-      dataStore.ArmJointCallback
-  )
-
-  rospy.Subscriber(
-      'handJointController/state',
-      JointState,
-      dataStore.HandJointCallback
-  )
-
-  # make publishers for the dataStore as well
-  dataStore.wristPosPublisher = rospy.Publisher(
-      'wristJointController/command',
-      Float64
-  )
-
-  dataStore.armJointPosPublisher = rospy.Publisher(
-      'armJointController/command',
-      Float64
-  )
-
-  dataStore.handJointPosPublisher = rospy.Publisher(
-      'handJointController/command',
-      Float64
-  )
-
-  # start actually creating the state machine!
-  sm = smach.StateMachine(
-      outcomes=['success', 'aborted', 'preempted'],
-      input_keys = ['goal'],
-      output_keys = ['result']
-  )
-
-  with sm:
-    smach.StateMachine.add(
-        'START',
-        manipulator_states.HandleGoal(dataStore),
-        transitions = {'success':'ROTATE_WRIST',
-                       'setupNeeded':'START_SETUP'}
-    )
-
-    smach.StateMachine.add(
-      'START_SETUP',
-      smach_ros.ServiceState('armJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest( dataStore.armUpSpeed )),
-      transitions={'succeeded':'INITIALIZING_SETUP_ARM_TORQUE_UP'}
-    )
-
-    smach.StateMachine.add(
-      'INITIALIZING_SETUP_ARM_TORQUE_UP',
-      smach_ros.ServiceState('armJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.armUpTorque) )
-        ),
-      transitions = {'succeeded':'INITIALIZING_SETUP_ARM_TORQUE_ENABLE_UP'}
-    )
-
-    smach.StateMachine.add(
-        'INITIALIZING_SETUP_ARM_TORQUE_ENABLE_UP',
-        smach_ros.ServiceState('armJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'INITIALIZING_WAIT_FOR_ARM_STOP_UP'}
-    )
-
-    smach.StateMachine.add(
-        'INITIALIZING_WAIT_FOR_ARM_STOP_UP',
-        manipulator_states.WaitForArmStop(dataStore, dataStore.armUpTorque),
-        transitions = {'success':'INITIALIZING_SETUP_ARM_HOLD_UP',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-      'INITIALIZING_SETUP_ARM_HOLD_UP',
-      smach_ros.ServiceState('armJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.armHoldTorque) )
-        ),
-      transitions = {'succeeded':'INITIALIZING_SETUP_HAND_TORQUE_OPEN_INIT'}
-    )
-
-    smach.StateMachine.add(
-      'INITIALIZING_SETUP_HAND_TORQUE_OPEN_INIT',
-      smach_ros.ServiceState('handJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.handOpenTorque) )
-        ),
-      transitions = {'succeeded':'INITIALIZING_SETUP_HAND_TORQUE_ENABLE_OPEN_INIT'}
-    )
-
-    smach.StateMachine.add(
-        'INITIALIZING_SETUP_HAND_TORQUE_ENABLE_OPEN_INIT',
-        smach_ros.ServiceState('handJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'INITIALIZING_OPEN_HAND_INIT'}
-    )
-
-    smach.StateMachine.add(
-        'INITIALIZING_OPEN_HAND_INIT',
-        manipulator_states.MoveHand(
-          dataStore,
-          dataStore.handMaxPos,
-          dataStore.handOpenTorque
-        ),
-        transitions = {'success':'INITIALIZING_CLEAR_CAROUSEL',
-                       'failure':'ERROR'}
-    )
-
-    carouselBin = SelectCarouselBinGoal()
-    carouselBin.bin_index = 0
-    smach.StateMachine.add(
-        'INITIALIZING_CLEAR_CAROUSEL',
-        smach_ros.SimpleActionState('select_carousel_bin',
-          SelectCarouselBinAction,
-          goal=carouselBin),
-        transitions = {'succeeded':'INITIALIZING_SETUP_ARM_LIMP'}
-    )
-
-    # turn off arm torque enable to make the arm go limp after carousel is
-    # clear
-    smach.StateMachine.add(
-        'INITIALIZING_SETUP_ARM_LIMP',
-        smach_ros.ServiceState('armJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(False)),
-        transitions = {'succeeded':'FINISH_SETUP'}
-    )
-
-    smach.StateMachine.add(
-        'FINISH_SETUP',
-        manipulator_states.FinishSetup(dataStore),
-        transitions = {'success':'ROTATE_WRIST',
-                       'failure':'ERROR',
-                       'fromError':'aborted'}
-    )
-
-    smach.StateMachine.add(
-        'ROTATE_WRIST',
-        manipulator_states.RotateWrist(dataStore),
-        transitions = {'success':'SETUP_HAND_SPEED_OPEN_INIT',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_HAND_SPEED_OPEN_INIT',
-      smach_ros.ServiceState('handJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest( dataStore.handOpenSpeed ) ),
-      transitions={'succeeded':'SETUP_HAND_TORQUE_OPEN_INIT'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_HAND_TORQUE_OPEN_INIT',
-      smach_ros.ServiceState('handJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.handOpenTorque) )
-        ),
-      transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_OPEN_INIT'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_HAND_TORQUE_ENABLE_OPEN_INIT',
-        smach_ros.ServiceState('handJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'OPEN_HAND_INIT'}
-    )
-
-    smach.StateMachine.add(
-        'OPEN_HAND_INIT',
-        manipulator_states.MoveHand(
-          dataStore,
-          dataStore.handMaxPos,
-          dataStore.handOpenTorque
-        ),
-        transitions = {'success':'SETUP_ARM_SPEED_DOWN',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_SPEED_DOWN',
-      smach_ros.ServiceState('/armJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest(speed=dataStore.armDownSpeed)),
-      transitions={'succeeded':'SETUP_ARM_TORQUE_DOWN'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_TORQUE_DOWN',
-      smach_ros.ServiceState('armJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest(abs(dataStore.armDownTorque))),
-      transitions = {'succeeded':'SETUP_ARM_TORQUE_ENABLE_DOWN'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_ARM_TORQUE_ENABLE_DOWN',
-        smach_ros.ServiceState('armJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'START_MOVING_ARM_DOWN'}
-    )
-
-    smach.StateMachine.add(
-        'START_MOVING_ARM_DOWN',
-        manipulator_states.StartMovingArm(dataStore),
-        transitions = {'success':'WAIT_FOR_ARM_STOP_DOWN',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-        'WAIT_FOR_ARM_STOP_DOWN',
-        manipulator_states.WaitForArmStop(dataStore, dataStore.armDownTorque),
-        transitions = {'success':'SETUP_ARM_SPEED_SLIGHTLY_UP',
-                       'failure':'ERROR'}
-    )
-
-    # back the arm up a bit...
-    smach.StateMachine.add(
-      'SETUP_ARM_SPEED_SLIGHTLY_UP',
-      smach_ros.ServiceState('/armJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest(speed=(0.25 * dataStore.armUpSpeed))),
-      transitions={'succeeded':'WAIT_FOR_ARM_SLIGHTLY_UP'}
-    )
-
-    smach.StateMachine.add(
-        'WAIT_FOR_ARM_SLIGHTLY_UP',
-        manipulator_states.StartMovingArm(dataStore, minArmMovement=0.025),
-        transitions = {'success':'SETUP_ARM_SPEED_SLIGHTLY_UP_STOP',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_SPEED_SLIGHTLY_UP_STOP',
-      smach_ros.ServiceState('/armJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest(speed=-0.1)),
-      transitions={'succeeded':'SETUP_ARM_HOLD_DOWN'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_HOLD_DOWN',
-      smach_ros.ServiceState('armJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.armHoldTorque) )
-        ),
-      transitions = {'succeeded':'SETUP_HAND_SPEED_CLOSE'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_HAND_SPEED_CLOSE',
-      smach_ros.ServiceState('handJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest( dataStore.handCloseSpeed )),
-      transitions={'succeeded':'SETUP_HAND_TORQUE_CLOSE'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_HAND_TORQUE_CLOSE',
-      smach_ros.ServiceState('handJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.handCloseTorque) )
-        ),
-      transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_CLOSE'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_HAND_TORQUE_ENABLE_CLOSE',
-        smach_ros.ServiceState('handJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'CLOSE_HAND'}
-    )
-
-    smach.StateMachine.add(
-        'CLOSE_HAND',
-        manipulator_states.MoveHand(
-          dataStore,
-          dataStore.handMinPos,
-          dataStore.handCloseTorque,
-          setStopPos=True
-        ),
-        transitions = {'success':'SETUP_HAND_HOLD_CLOSE',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_HAND_HOLD_CLOSE',
-      smach_ros.ServiceState('handJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.handHoldTorque) )
-        ),
-      transitions = {'succeeded':'SETUP_ARM_SPEED_UP'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_SPEED_UP',
-      smach_ros.ServiceState('armJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest( dataStore.armUpSpeed )),
-      transitions={'succeeded':'SETUP_ARM_TORQUE_UP'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_TORQUE_UP',
-      smach_ros.ServiceState('armJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.armUpTorque) )
-        ),
-      transitions = {'succeeded':'SETUP_ARM_TORQUE_ENABLE_UP'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_ARM_TORQUE_ENABLE_UP',
-        smach_ros.ServiceState('armJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'START_MOVING_ARM_UP'}
-    )
-
-    smach.StateMachine.add(
-        'START_MOVING_ARM_UP',
-        manipulator_states.StartMovingArm(dataStore),
-        transitions = {'success':'WAIT_FOR_ARM_STOP_UP',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-        'WAIT_FOR_ARM_STOP_UP',
-        manipulator_states.WaitForArmStop(dataStore, dataStore.armUpTorque),
-        transitions = {'success':'SETUP_ARM_HOLD_UP',
-                       'failure':'ERROR'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_ARM_HOLD_UP',
-      smach_ros.ServiceState('armJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.armHoldTorque) )
-        ),
-      transitions = {'succeeded':'GET_BIN'}
-    )
-
-    # XXX TODO: use a different way to get a bin!
-    carouselBin = SelectCarouselBinGoal()
-    carouselBin.bin_index = 5
-    smach.StateMachine.add(
-        'GET_BIN',
-        smach_ros.SimpleActionState('select_carousel_bin',
-          SelectCarouselBinAction,
-          goal=carouselBin),
-        transitions = {'succeeded':'SETUP_HAND_SPEED_OPEN'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_HAND_SPEED_OPEN',
-      smach_ros.ServiceState('handJointController/set_speed',
-        SetSpeed,
-        request = SetSpeedRequest( dataStore.handOpenSpeed ) ),
-      transitions={'succeeded':'SETUP_HAND_TORQUE_OPEN'}
-    )
-
-    smach.StateMachine.add(
-      'SETUP_HAND_TORQUE_OPEN',
-      smach_ros.ServiceState('handJointController/set_torque_limit',
-        SetTorqueLimit,
-        request = SetTorqueLimitRequest( abs(dataStore.handOpenTorque) )
-        ),
-      transitions = {'succeeded':'SETUP_HAND_TORQUE_ENABLE_OPEN'}
-    )
-
-    smach.StateMachine.add(
-        'SETUP_HAND_TORQUE_ENABLE_OPEN',
-        smach_ros.ServiceState('handJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(True)),
-        transitions = {'succeeded':'OPEN_HAND'}
-    )
-
-    smach.StateMachine.add(
-        'OPEN_HAND',
-        manipulator_states.MoveHand(
-          dataStore,
-          dataStore.handMaxPos,
-          dataStore.handOpenTorque
-        ),
-        transitions = {'success':'SETUP_HAND_LIMP',
-                       'failure':'ERROR'}
-    )
-
-    # disable hand torque enable after the hand has opened
-    smach.StateMachine.add(
-        'SETUP_HAND_LIMP',
-        smach_ros.ServiceState('handJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(False)),
-        transitions = {'succeeded':'CLEAR_CAROUSEL'}
-    )
-
-    # XXX TODO: use a different way to get a bin!
-    carouselBin = SelectCarouselBinGoal()
-    carouselBin.bin_index = 0
-    smach.StateMachine.add(
-        'CLEAR_CAROUSEL',
-        smach_ros.SimpleActionState('select_carousel_bin',
-          SelectCarouselBinAction,
-          goal=carouselBin),
-        transitions = {'succeeded':'SETUP_ARM_LIMP'}
-    )
-
-    # turn off arm torque enable to make the arm go limp after carousel is
-    # clear
-    smach.StateMachine.add(
-        'SETUP_ARM_LIMP',
-        smach_ros.ServiceState('armJointController/torque_enable',
-          TorqueEnable,
-          request = TorqueEnableRequest(False)),
-        transitions = {'succeeded':'success'}
-    )
-
-    smach.StateMachine.add(
-        'ERROR',
-        manipulator_states.ErrorState(dataStore),
-        transitions = {'failure':'aborted',
-                       'success':'START_SETUP'}
-    )
-
-  # now that the state machine is fully defined, make the action server wrapper
-  wrapper = smach_ros.ActionServerWrapper(
-      'manipulator_grab', ManipulatorGrabAction,
-      wrapped_container = sm,
-      succeeded_outcomes = ['success'],
-      aborted_outcomes = ['aborted'],
-      preempted_outcomes = ['preempted'],
-      goal_key = 'goal'
-  )
-
-  sls = smach_ros.IntrospectionServer('smach_grab_introspection', sm, '/START')
-  sls.start()
-
-  # according to the docs, run_server is non blocking, so spin is needed.
-  wrapper.run_server()
-
+  msm = ManipulatorStateMachine()
   rospy.spin()
-
-
-if __name__=="__main__":
-  main()

@@ -21,8 +21,10 @@
     <build_depend>tf</build_depend>
     <build_depend>dynamic_reconfigure</build_depend>
     <build_depend>canopen</build_depend>
+    <build_depend>bfl</build_depend>
 
     <run_depend>message_runtime</run_depend>
+    <run_depend>message_generation</run_depend>
     <run_depend>roslib</run_depend>
     <run_depend>roscpp</run_depend>
     <run_depend>rospy</run_depend>
@@ -33,6 +35,7 @@
     <run_depend>tf</run_depend>
     <run_depend>dynamic_reconfigure</run_depend>
     <run_depend>canopen</run_depend>
+    <run_depend>bfl</run_depend>
 
 
 </package>

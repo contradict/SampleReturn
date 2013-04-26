@@ -1,0 +1,21 @@
+<package>
+    <name>executive</name>
+    <version>0.0.1</version>
+    <description>
+        SampleReturn main executive.
+    </description>
+    <license>BSD</license>
+    <author email="contradict@gmail.com">contradict</author>
+    <maintainer email="contradict@gmail.com">contradict</maintainer>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>rospy</build_depend>
+
+    <run_depend>rospy</run_depend>
+    <run_depend>executive_teer</run_depend>
+    <run_depend>executive_teer</run_depend>
+    <run_depend>actionlib</run_depend>
+    <run_depend>sound_play</run_depend>
+
+</package>

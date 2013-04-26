@@ -24,6 +24,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion/HomeAction.h>
 #include <platform_motion/Enable.h>
+#include <platform_motion/SelectCommandSource.h>
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion/GPIO.h>
 #include <platform_motion/ServoStatus.h>
@@ -39,6 +40,7 @@ Motion::Motion() :
     param_nh("~"),
     home_pods_action_server(nh_, "home_wheelpods", false),
     home_carousel_action_server(nh_, "home_carousel", false),
+    command_source(COMMAND_SOURCE_NONE),
     CAN_fd(-1),
     gpio_enabled(false),
     carousel_setup(false),
@@ -70,7 +72,11 @@ Motion::Motion() :
     enable_carousel_server = nh_.advertiseService("enable_carousel",
             &Motion::enableCarouselCallback, this);
 
-    twist_sub = nh_.subscribe("twist", 2, &Motion::twistCallback, this);
+    select_command_server = nh_.advertiseService("select_command_source",
+            &Motion::selectCommandSourceCallback, this);
+    planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
+    joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
+    servo_sub = nh_.subscribe("servo_command", 2, &Motion::servoTwistCallback, this);
 
     carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
             this);
@@ -84,7 +90,7 @@ Motion::Motion() :
 
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
 
-    status_pub = nh_.advertise<ServoStatus>("status_word", 1);
+    status_pub = nh_.advertise<ServoStatus>("status_word", 10);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -322,7 +328,69 @@ void Motion::start(void)
         ROS_INFO("Got all transforms");
 }
 
-void Motion::twistCallback(const geometry_msgs::Twist::ConstPtr twist)
+void Motion::plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
+{
+    if(command_source == COMMAND_SOURCE_PLANNER)
+        handleTwist(twist);
+}
+
+void Motion::joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
+{
+    if(command_source == COMMAND_SOURCE_JOYSTICK)
+        handleTwist(twist);
+}
+
+void Motion::servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
+{
+    if(command_source == COMMAND_SOURCE_SERVO)
+        handleTwist(twist);
+}
+
+bool Motion::selectCommandSourceCallback(platform_motion::SelectCommandSource::Request &req,
+                                          platform_motion::SelectCommandSource::Response &resp)
+{
+    resp.valid=true;
+    resp.source=req.source;
+    if(req.source == std::string("Joystick"))
+        command_source=COMMAND_SOURCE_JOYSTICK;
+    else if(req.source == std::string("Planner"))
+        command_source=COMMAND_SOURCE_PLANNER;
+    else if(req.source == std::string("Servo"))
+        command_source=COMMAND_SOURCE_SERVO;
+    else if(req.source == std::string("None"))
+    {
+        command_source=COMMAND_SOURCE_NONE;
+        geometry_msgs::Twist *twist = new geometry_msgs::Twist();
+        twist->linear.x=0;
+        twist->linear.y=0;
+        twist->angular.z=0;
+        handleTwist(geometry_msgs::Twist::ConstPtr(twist));
+    }
+    else
+    {
+        ROS_ERROR("Unrecognized command source %s", req.source.c_str());
+        switch(command_source)
+        {
+            case COMMAND_SOURCE_PLANNER:
+                resp.source="Planner";
+                break;
+            case COMMAND_SOURCE_JOYSTICK:
+                resp.source="Joystick";
+                break;
+            case COMMAND_SOURCE_SERVO:
+                resp.source="Servo";
+                break;
+            case COMMAND_SOURCE_NONE:
+                resp.source="None";
+                break;
+        }
+        resp.valid=false;
+    }
+    ROS_INFO("Selected command source %s", req.source.c_str());
+    return true;
+}
+
+void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
 {
     Eigen::Vector2d body_vel( twist->linear.x, twist->linear.y );
     double body_omega = twist->angular.z;
@@ -390,7 +458,7 @@ void Motion::doHomePods(void)
     home_pods_count = 3;
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     home_pods_action_server.acceptNewGoal();
-    if(pods_enabled == true)
+    if(pods_enabled == true && command_source == COMMAND_SOURCE_NONE)
     {
         ROS_INFO("Home pods goal accepted");
         CANOpen::DS301CallbackObject
@@ -402,22 +470,23 @@ void Motion::doHomePods(void)
     }
     else
     {
-        ROS_INFO("Home pods goal aborted - not enabled");
+        const char * reason=pods_enabled ? "Command source not None" : "Pods not enabled";
+        ROS_INFO("Home pods goal aborted - %s", reason);
         home_pods_result.homed.clear();
         home_pods_result.homed.push_back(false);
         home_pods_result.homed.push_back(false);
         home_pods_result.homed.push_back(false);
-        home_pods_action_server.setAborted(home_pods_result, "Pods not enabled");
+        home_pods_action_server.setAborted(home_pods_result, reason);
     }
 }
 
 void Motion::doHomeCarousel(void)
 {
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
+    home_carousel_action_server.acceptNewGoal();
     if(carousel_enabled)
     {
         ROS_INFO("Home carousel goal accepted");
-        home_carousel_action_server.acceptNewGoal();
         CANOpen::DS301CallbackObject
             hcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                 static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::homeCarouselComplete));
@@ -435,6 +504,7 @@ void Motion::doHomeCarousel(void)
 void Motion::homePodsComplete(CANOpen::DS301 &node)
 {
     if(home_pods_count>0) home_pods_count--;
+    ROS_INFO("homed servo %ld, count %d", node.node_id, home_pods_count);
     if(home_pods_action_server.isActive()) {
         home_pods_feedback.home_count = home_pods_count;
         home_pods_action_server.publishFeedback(home_pods_feedback);
@@ -449,6 +519,7 @@ void Motion::homePodsComplete(CANOpen::DS301 &node)
 
 void Motion::homeCarouselComplete(CANOpen::DS301 &node)
 {
+    ROS_INFO("homed carousel");
     home_carousel_action_server.setSucceeded(home_carousel_result);  
 }
 
@@ -466,6 +537,9 @@ bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
     }
     boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
     boost::system_time now=boost::get_system_time();
+    if(home_pods_action_server.isActive() && req.state == false){
+        home_pods_action_server.setAborted(home_pods_result, "Paused");
+    }
     enable_pods(req.state);
     notified = enable_pods_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
     if(!notified)
@@ -496,6 +570,9 @@ bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
     }
     boost::unique_lock<boost::mutex> lock(enable_carousel_mutex);
     boost::system_time now=boost::get_system_time();
+    if(home_carousel_action_server.isActive() && req.state == false){
+        home_carousel_action_server.setAborted(home_carousel_result, "Paused");
+    }
     enable_carousel(req.state);
     notified = enable_carousel_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
     if(!notified)
@@ -739,33 +816,68 @@ void Motion::statusPublishCallback(const ros::TimerEvent& event)
     }
 
     ServoStatus status;
-    uint16_t steering_status, wheel_status;
-    port->getStatusWord( &steering_status, &wheel_status);
+    std::stringstream status_stream;
+    std::stringstream mode_stream;
+
+    port->steering.writeStatus(status_stream);
+    port->steering.writeMode(mode_stream);
     status.servo_id=port->steering.node_id;
-    status.status_word = steering_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
+
+    port->wheel.writeStatus(status_stream);
+    port->wheel.writeMode(mode_stream);
     status.servo_id=port->wheel.node_id;
-    status.status_word = wheel_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
 
-    starboard->getStatusWord( &steering_status, &wheel_status);
+    starboard->steering.writeStatus(status_stream);
+    starboard->steering.writeMode(mode_stream);
     status.servo_id=starboard->steering.node_id;
-    status.status_word = steering_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
+
+    starboard->wheel.writeStatus(status_stream);
+    starboard->wheel.writeMode(mode_stream);
     status.servo_id=starboard->wheel.node_id;
-    status.status_word = wheel_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
 
-    stern->getStatusWord( &steering_status, &wheel_status);
+    stern->steering.writeStatus(status_stream);
+    stern->steering.writeMode(mode_stream);
     status.servo_id=stern->steering.node_id;
-    status.status_word = steering_status;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
     status_pub.publish(status);
-    status.servo_id=stern->wheel.node_id;
-    status.status_word = wheel_status;
-    status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
 
+    stern->wheel.writeStatus(status_stream);
+    stern->wheel.writeMode(mode_stream);
+    status.servo_id=stern->wheel.node_id;
+    status.status=status_stream.str();
+    status.mode=mode_stream.str();
+    status_pub.publish(status);
+    status_stream.str("");
+    mode_stream.str("");
+
+    carousel->writeStatus(status_stream);
+    carousel->writeMode(mode_stream);
     status.servo_id = carousel->node_id;
-    status.status_word = carousel->getStatusWord();
+    status.status = status_stream.str();
+    status.mode = mode_stream.str();
     status_pub.publish(status);
 }
 
@@ -773,9 +885,14 @@ void Motion::statusCallback(CANOpen::DS301 &node)
 {
     CANOpen::CopleyServo *svo = static_cast<CANOpen::CopleyServo*>(&node);
     ServoStatus status;
+    std::stringstream status_stream;
+    std::stringstream mode_stream;
 
+    svo->writeStatus(status_stream);
+    svo->writeMode(mode_stream);
     status.servo_id=svo->node_id;
-    status.status_word = svo->getStatusWord();
+    status.status = status_stream.str();
+    status.mode = mode_stream.str();
     status_pub.publish(status);
 }
 

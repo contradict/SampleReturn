@@ -1,16 +1,14 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <machine name="search"
-             address="sr2"
-             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
-             user="robot"
-    />
-    <machine name="navigate"
-             address="sr1"
-             env-loader="/home/robot/Desktop/SampleReturn/ros_workspace/install/env.sh"
-             user="robot"
-             />
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
 
     <param name="use_sim_time" value="False" type="bool"/>
 
@@ -18,10 +16,10 @@
     <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
         <remap from="base_pose_ground_truth" to="odometry"/>
     </node>
-    <!--
-    -->
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/> 
+    <!--
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
+    -->
     <include file="$(find samplereturn)/launch/search_camera.launch"/> 
     <!--
     <include file="$(find samplereturn)/launch/costmap.launch"/>
@@ -30,6 +28,7 @@
     <include file="$(find samplereturn)/launch/joystick.launch"/> 
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/> 
-    <include file="$(find samplereturn)/launch/planner.launch"/>
     <include file="$(find samplereturn)/launch/odometry.launch"/>
+
+    <include file="$(find executive)/launch/executive.launch"/>
 </launch>

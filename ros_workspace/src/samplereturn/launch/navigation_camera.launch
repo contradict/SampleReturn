@@ -11,6 +11,7 @@
         args="manager"
         ns="/navigation"
         output="log"
+        respawn="true"
         />
     <!-- IEEE1394 camera driver -->
     <group if="$(arg run_cameras)">
@@ -20,7 +21,9 @@
          type="nodelet"
          name="left"
          args="load camera1394/driver manager"
-         ns="/navigation">
+         ns="/navigation"
+         respawn="true"
+         >
 
         <param name="guid" type="string" value="00b09d0100bb69f3"/>
         <param name="video_mode" value="640x480_mono8"/>
@@ -38,7 +41,9 @@
          type="nodelet"
          name="right"
          args="load camera1394/driver manager"
-         ns="/navigation">
+         ns="/navigation"
+         respawn="true"
+         >
 
         <param name="guid" type="string" value="00b09d0100a85719"/>
         <param name="video_mode" value="640x480_mono8"/>
@@ -52,6 +57,17 @@
     </node>
     </group>
 
+    <!-- emit synchronization error -->
+    <node
+        machine="navigate"
+        pkg="samplereturn"
+        type="image_desync.py"
+        name="image_desync"
+        ns="/navigation">
+        <param name="manager_node_name" type="string" value="/navigation/manager"/>
+        <param name="sync_wait" type="double" value="30"/>
+    </node>
+
     <!-- Debayer -->
     <node
           machine="navigate"
@@ -59,7 +75,9 @@
           type="nodelet"
           name="debayer"
           args="load image_proc/debayer /navigation/manager"
-          ns="/navigation/left">
+          ns="/navigation/left"
+          respawn="true"
+          >
     </node>
     <node
           machine="navigate"
@@ -67,7 +85,9 @@
           type="nodelet"
           name="debayer"
           args="load image_proc/debayer /navigation/manager"
-          ns="/navigation/right">
+          ns="/navigation/right"
+          respawn="true"
+          >
       </node>
 
     <!-- Rectify images -->
@@ -79,6 +99,7 @@
         args="load image_proc/rectify /navigation/manager"
         ns="/navigation/left"
         output="log"
+        respawn="true"
         >
     </node>
     <node
@@ -89,6 +110,7 @@
         args="load image_proc/rectify /navigation/manager"
         ns="/navigation/left"
         output="log"
+        respawn="true"
         >
         <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
@@ -101,6 +123,7 @@
         args="load image_proc/rectify /navigation/manager"
         ns="/navigation/right"
         output="log"
+        respawn="true"
         >
     </node>
     <node
@@ -111,6 +134,7 @@
         args="load image_proc/rectify /navigation/manager"
         ns="/navigation/right"
         output="log"
+        respawn="true"
         >
         <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
@@ -125,6 +149,7 @@
         args="load stereo_image_proc/disparity manager"
         ns="/navigation"
         output="log"
+        respawn="true"
         >
         <param name="correlation_window_size" type="int" value="17"/>
         <param name="min_disparity" type="int" value="0"/>
@@ -143,6 +168,7 @@
         args="load stereo_image_proc/point_cloud2 /navigation/manager"
         ns="/navigation"
         output="log"
+        respawn="true"
         >
         <param name="approximate_sync" type="bool" value="true"/>
     </node>

@@ -5,7 +5,10 @@ workspacepath=${mypath}/../../ros_workspace
 installpath=Desktop/SampleReturn/ros_workspace/install/
 
 pushd ${workspacepath}
-catkin_make install
+catkin_make \
+    -DCMAKE_INSTALL_PREFIX=/home/robot/Desktop/SampleReturn/ros_workspace/install \
+    -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
+    install
 popd
 
 while (( "$#" )); do

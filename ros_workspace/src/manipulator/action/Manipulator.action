@@ -1,0 +1,14 @@
+# Goal
+string type
+float64 wrist_angle
+uint8 target_bin
+float64 grip_torque
+float64 grip_dimension
+---
+# Result
+string result
+bool homed
+---
+# feedback
+string current_state
+

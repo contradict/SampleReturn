@@ -1,5 +1,12 @@
 namespace platform_motion{
 
+enum MotionCommandSource {
+    COMMAND_SOURCE_PLANNER,
+    COMMAND_SOURCE_JOYSTICK,
+    COMMAND_SOURCE_SERVO,
+    COMMAND_SOURCE_NONE
+};
+
 class Motion : public CANOpen::TransferCallbackReceiver {
     public:
         Motion();
@@ -15,7 +22,10 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool openBus(void);
         void createServos(void);
 
-        void twistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
                 const char *joint_name, double *steering, double *speed);
         void carouselCallback(const std_msgs::Float64::ConstPtr fmsg);
@@ -24,6 +34,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void doHomeCarousel(void);
         void homePodsComplete(CANOpen::DS301 &node);
         void homeCarouselComplete(CANOpen::DS301 &node);
+        bool selectCommandSourceCallback(platform_motion::SelectCommandSource::Request &req,
+                                     platform_motion::SelectCommandSource::Response &resp);
         bool enableWheelPodsCallback(platform_motion::Enable::Request &req,
                                      platform_motion::Enable::Response &resp);
         bool enableCarouselCallback(platform_motion::Enable::Request &req,
@@ -45,7 +57,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         tf::TransformListener listener;
         std::string child_frame_id;
 
-        ros::Subscriber twist_sub;
+        ros::Subscriber planner_sub;
+        ros::Subscriber joystick_sub;
+        ros::Subscriber servo_sub;
         ros::Subscriber carousel_sub;
         ros::Subscriber gpio_sub;
         ros::Publisher gpio_pub;
@@ -75,7 +89,10 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::ServiceServer enable_carousel_server;
         boost::mutex enable_carousel_mutex;
         boost::condition_variable enable_carousel_cond;
- 
+
+        ros::ServiceServer select_command_server;
+        MotionCommandSource command_source;
+
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
 

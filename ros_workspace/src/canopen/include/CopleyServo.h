@@ -164,6 +164,9 @@ class CopleyServo : public DS301 {
         uint16_t getOutputPins(void){return output_pins;};
         uint16_t getStatusWord(void){return status_word;};
 
+        void writeMode(std::ostream &out);
+        void writeStatus(std::ostream &out);
+
         int32_t position;
         int32_t velocity;
         double bus_voltage;

@@ -13,7 +13,7 @@
         launch-prefix="screen -d -m gdb - -args"
         -->
         <remap from="odom" to="/odometry"/>
-        <remap from="cmd_vel" to="/twist"/>
+        <remap from="cmd_vel" to="/planner_command"/>
 
         <rosparam file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find samplereturn)/config/costmap_local_params.yaml" command="load"/>
@@ -36,6 +36,7 @@
 
 
     <node
+        machine="navigate"
         name="map_server"
         pkg="map_server"
         type="map_server"
