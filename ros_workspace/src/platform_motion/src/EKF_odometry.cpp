@@ -130,18 +130,13 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
     MatrixWrapper::ColumnVector posterior(posteriorPDF->ExpectedValueGet());
     MatrixWrapper::SymmetricMatrix posteriorCov(posteriorPDF->CovarianceGet());
 
-    // emit in odometry frame
-    MatrixWrapper::Matrix R(2,2);
-    R(1,1) = cos(odom_orientation); R(1,2) = -sin(odom_orientation);
-    R(2,1) = sin(odom_orientation); R(2,2) =  cos(odom_orientation);
-    MatrixWrapper::ColumnVector OdometryFrameVelocity = R*posterior.sub(4,5)/data.interval;
     odom_position[0] = posterior(1);
     odom_position[1] = posterior(2);
     odom_orientation = posterior(3);
     while(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
     while(odom_orientation < 0) odom_orientation += 2*M_PI;
-    odom_velocity[0] = OdometryFrameVelocity(1);
-    odom_velocity[1] = OdometryFrameVelocity(2);
+    odom_velocity[0] = posterior(4)/data.interval;
+    odom_velocity[1] = posterior(5)/data.interval;
     odom_omega = posterior(6)/data.interval;
     // update covariance
     // odom_pose_* is x,y,yaw,roll,pitch,yaw
