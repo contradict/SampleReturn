@@ -67,9 +67,9 @@ class PausedState(smach.State):
   
   def __init__(self, pauseCV):
     smach.State.__init__(self,
-                         input_keys = ['action_result', 'action_feedback'],
+                         input_keys = ['action_goal','action_result', 'action_feedback'],
                          output_keys = ['action_result', 'action_feedback'],
-                         outcomes=['succeeded', 'aborted'])
+                         outcomes=['succeeded', 'preempted', 'aborted'])
     self.pauseCV = pauseCV
  
   def execute(self, userdata):
@@ -77,9 +77,11 @@ class PausedState(smach.State):
     userdata.action_result.result = 'paused'
     userdata.action_feedback.current_state = 'PAUSED'
     
-    self.pauseCV.acquire()
-    self.pauseCV.wait()
-    self.pauseCV.release()   
-    
-    return 'succeeded'
+    if (userdata.action_goal.type == 'home'):
+      return 'preempted'    
+    else:
+      self.pauseCV.acquire()
+      self.pauseCV.wait()
+      self.pauseCV.release()   
+      return 'succeeded'
  

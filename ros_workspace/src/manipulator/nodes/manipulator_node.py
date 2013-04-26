@@ -190,7 +190,8 @@ class ManipulatorStateMachine(object):
       smach.StateMachine.add('PAUSED',
           manipulator_states.PausedState(self.pauseCV),
           transitions ={'aborted':'aborted',
-                        'succeeded':'HOME_ARM'}
+                        'preempted':'preempted', #during a home action, return preempted immediately
+                        'succeeded':'HOME_ARM'} #during a grab action, home after unpause
       )
 
       smach.StateMachine.add('HOME_ARM',
