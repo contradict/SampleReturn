@@ -59,7 +59,7 @@ OdometryMotionPdf::dfGet(unsigned int i) const
     {
         std::cerr << "derivative not supported";
     }
-    std::cerr << "df: " << df << std::endl;
+    //std::cerr << "df: " << df << std::endl;
     return df;
 }
 
