@@ -29,21 +29,24 @@ class PauseSwitch(object):
         self.enable_wheelpods = rospy.ServiceProxy('/enable_wheel_pods', Enable)
         self.enable_carousel = rospy.ServiceProxy('/enable_carousel', Enable)
 
+        rospy.loginfo('Pause_switch waiting for manipulator/pause service...')
+        rospy.wait_for_service('/manipulator/pause')
+        self.manipulator_pause_service = rospy.ServiceProxy('/manipulator/pause', Enable)
+
         rospy.Subscriber("/gpio_read", GPIO, self.gpio)
         rospy.Subscriber("/status_word", ServoStatus, self.status_word)
 
         self.pause_pub = rospy.Publisher("pause_state", Bool)
         self.audio_pub = rospy.Publisher("/audio/navigate", SoundRequest)
 
-        rospy.loginfo('Pause_switch waiting for manipulator/pause service...')
-        rospy.wait_for_service('/manipulator/pause')
-        self.manipulator_pause_service = rospy.ServiceProxy('/manipulator/pause', Enable)
-
+        self.pause_bit_state = None
         self.paused = None
 
     def gpio(self, gpio):
         if gpio.servo_id == self.gpio_servo_id:
-            self.pause((gpio.new_pin_states & self.button_mask) == self.button_mask)
+            if self.pause_bit_state is None:
+                self.pause_bit_state = gpio.new_pin_states & self.button_mask
+            self.pause((gpio.new_pin_states & self.button_mask) == self.pause_bit_state)
 
     def status_word(self, status_word):
         if status_word.servo_id == self.carousel_servo_id:

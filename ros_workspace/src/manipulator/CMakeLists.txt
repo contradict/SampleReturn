@@ -31,7 +31,7 @@ add_service_files(
 add_action_files(
     DIRECTORY action
     FILES
-        ManipulatorGrab.action
+        Manipulator.action
 )
 
 generate_messages(

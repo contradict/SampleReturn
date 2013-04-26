@@ -7,6 +7,7 @@ import actionlib
 import smach
 import smach_ros
 import threading
+import time
 
 from std_msgs.msg import Float64
 from std_msgs.msg import Bool
@@ -14,7 +15,7 @@ from std_msgs.msg import Bool
 from dynamixel_msgs.msg import JointState
 from dynamixel_controllers.srv import *
 
-from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabFeedback, ManipulatorGrabResult
+from manipulator.msg import ManipulatorAction, ManipulatorFeedback, ManipulatorResult
 
 from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
 from platform_motion.srv import Enable, EnableRequest
@@ -27,7 +28,7 @@ from manipulator.srv import TorqueHold, TorqueHoldRequest
 from manipulator.srv import GoToPosition, GoToPositionRequest
 
 class ManipulatorStateMachine(object):
-    
+  
   def __init__(self):
   
     self.paused = False
@@ -58,7 +59,7 @@ class ManipulatorStateMachine(object):
     rospy.wait_for_service('hand_joint/go_to_position')
   
     self.carousel_client = actionlib.SimpleActionClient('/carousel/select_carousel_bin', SelectCarouselBinAction)    
-                    
+    
     # make service proxies important services
     
     self.arm_velocity_standoff = rospy.ServiceProxy('arm_joint/velocity_standoff', VelocityStandoff)  
@@ -68,31 +69,26 @@ class ManipulatorStateMachine(object):
     self.wrist_pause = rospy.ServiceProxy('wrist_joint/pause', Enable)
     self.hand_pause = rospy.ServiceProxy('hand_joint/pause', Enable)
             
-    #home the manipulator on startup
+    #actions and services will be started after state machine declaration
     
-    self.arm_velocity_standoff(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff)
-    self.wrist_go_to_position(self.wrist_zero_position)
-    self.hand_go_to_position(self.hand_open_position)
-
-    #after homing, advertise the pause service
-    self.pause_service = rospy.Service('pause', Enable, self.service_pause)
-         
-    # start actually creating the state machine!
+    #create the state machine!
     self.sm = smach.StateMachine(
         outcomes=['success', 'aborted', 'preempted'],
-        input_keys = ['goal'],
-        output_keys = ['result']
+        input_keys = ['action_goal'],
+        output_keys = ['action_result']
     )
   
     with self.sm:
            
       smach.StateMachine.add('START',
           manipulator_states.ProcessGoal(),
-          transitions = {'succeeded':'ROTATE_WRIST',
+          transitions = {'grab': 'ROTATE_WRIST',
+                         'home': 'HOME_ARM',
+                         'preempted' : 'PAUSED',
                          'aborted':'ERROR'}
       )
 
-      @smach.cb_interface(input_keys=[])
+      @smach.cb_interface()
       def manipulator_response_cb(userdata, response):
         return response.result
       
@@ -178,12 +174,14 @@ class ManipulatorStateMachine(object):
       )
   
       #return carousel to bin 0
+      #this is always the last state before a successful state machine execution
       carousel_clear_bin = SelectCarouselBinGoal()
       carousel_clear_bin.bin_index = 0
       smach.StateMachine.add('CLEAR_CAROUSEL',
           smach_ros.SimpleActionState('/carousel/select_carousel_bin',
           SelectCarouselBinAction,
-          goal=carousel_clear_bin),
+          goal=carousel_clear_bin,
+          output_keys=['action_result']),
           transitions = {'succeeded':'success',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
@@ -192,13 +190,15 @@ class ManipulatorStateMachine(object):
       smach.StateMachine.add('PAUSED',
           manipulator_states.PausedState(self.pauseCV),
           transitions ={'aborted':'aborted',
-                        'succeeded':'HOME_ARM'}
+                        'preempted':'preempted', #during a home action, return preempted immediately
+                        'succeeded':'HOME_ARM'} #during a grab action, home after unpause
       )
 
       smach.StateMachine.add('HOME_ARM',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
-          response_cb = manipulator_response_cb),
+          response_cb = manipulator_response_cb,
+          input_keys = ['error','goal']),
           transitions = {'succeeded':'HOME_WRIST',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
@@ -228,39 +228,40 @@ class ManipulatorStateMachine(object):
       )      
 
     #now that the state machine is fully defined, make the action server wrapper
-    wrapper = smach_ros.ActionServerWrapper(
-        'manipulator_grab', ManipulatorGrabAction,
+    manipulator_action_server = smach_ros.ActionServerWrapper(
+        'manipulator_action', ManipulatorAction,
         wrapped_container = self.sm,
         succeeded_outcomes = ['success'],
         aborted_outcomes = ['aborted'],
         preempted_outcomes = ['preempted'],
-        goal_key = 'goal'
+        goal_key = 'action_goal',
+        result_key = 'action_result'
     )
   
     sls = smach_ros.IntrospectionServer('smach_grab_introspection', self.sm, '/START')
     sls.start()
   
-    wrapper.run_server()
+    #start action servers and services
+    manipulator_action_server.run_server()
+    self.pause_service = rospy.Service('pause', Enable, self.service_pause)
     
   def service_pause(self, req):
-    pause = req.state
-    if (pause != self.paused):
-      self.paused = pause
-      if (pause):
-        self.arm_pause(True)
-        self.wrist_pause(True)
-        self.hand_pause(True)
-        self.sm.request_preempt()
-        self.carousel_client.cancel_all_goals()
-      else:
-        self.sm.service_preempt()
-        self.arm_pause(False)
-        self.wrist_pause(False)
-        self.hand_pause(False)
-        self.pauseCV.acquire()
-        self.pauseCV.notifyAll()
-        self.pauseCV.release()              
-        
+    self.paused = req.state
+    if (self.paused):
+      self.arm_pause(True)
+      self.wrist_pause(True)
+      self.hand_pause(True)
+      self.sm.request_preempt()
+      self.carousel_client.cancel_all_goals()
+    else:
+      self.sm.service_preempt() #this clears any preempt requests in the state machine
+      self.arm_pause(False)
+      self.wrist_pause(False)
+      self.hand_pause(False)
+      self.pauseCV.acquire()
+      self.pauseCV.notifyAll()
+      self.pauseCV.release()              
+      
     return self.paused
   
 if __name__=="__main__":
