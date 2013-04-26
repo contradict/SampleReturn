@@ -39,11 +39,14 @@ class PauseSwitch(object):
         self.pause_pub = rospy.Publisher("pause_state", Bool)
         self.audio_pub = rospy.Publisher("/audio/navigate", SoundRequest)
 
+        self.pause_bit_state = None
         self.paused = None
 
     def gpio(self, gpio):
         if gpio.servo_id == self.gpio_servo_id:
-            self.pause((gpio.new_pin_states & self.button_mask) == self.button_mask)
+            if self.pause_bit_state is None:
+                self.pause_bit_state = gpio.new_pin_states & self.button_mask
+            self.pause((gpio.new_pin_states & self.button_mask) == self.pause_bit_state)
 
     def status_word(self, status_word):
         if status_word.servo_id == self.carousel_servo_id:
