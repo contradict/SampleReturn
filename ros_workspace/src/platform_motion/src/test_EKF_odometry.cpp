@@ -5,40 +5,48 @@
 #include <pdf/gaussian.h>
 
 #include "odometry/wheelpodmeasurementpdf.h"
-#include "odometry/odometrymotionpdf.h"
 
 #include <iostream>
 
 int main(int argc, char** argv)
 {
-    BFL::AnalyticConditionalGaussian *sys_pdf;
-    BFL::AnalyticSystemModelGaussianUncertainty *sys_model;
+    BFL::LinearAnalyticConditionalGaussian *sys_pdf;
+    BFL::LinearAnalyticSystemModelGaussianUncertainty *sys_model;
     BFL::AnalyticConditionalGaussian *meas_pdf;
     BFL::AnalyticMeasurementModelGaussianUncertainty *meas_model;
     BFL::Gaussian *prior;
     BFL::ExtendedKalmanFilter *filter;
 
     /****************************
-     * NonLinear system model      *
+     * Linear system model      *
      ***************************/
 
+    MatrixWrapper::Matrix A(3,3);
+    A(1,1) = 1.0; A(1,2) = 0.0; A(1,3) = 0.0;
+    A(2,1) = 0.0; A(2,2) = 1.0; A(2,3) = 0.0;
+    A(3,1) = 0.0; A(3,2) = 0.0; A(3,3) = 1.0;
+
+    std::vector<MatrixWrapper::Matrix> vA(1);
+    vA[0] = A;
+
     // create gaussian
-    MatrixWrapper::ColumnVector sysNoise_Mu(6);
+    MatrixWrapper::ColumnVector sysNoise_Mu(3);
     sysNoise_Mu = 0;
 
-    MatrixWrapper::SymmetricMatrix sysNoise_Cov(6);
+    double sigma_system_noise_vx = 0.05;
+    double sigma_system_noise_vy = 0.05;
+    double sigma_system_noise_omega = 0.10;
+
+    MatrixWrapper::SymmetricMatrix sysNoise_Cov(3);
     sysNoise_Cov = 0.0;
-    sysNoise_Cov(1,1) = 0.01;
-    sysNoise_Cov(2,2) = 0.01;
-    sysNoise_Cov(3,3) = 0.02;
-    sysNoise_Cov(4,4) = 0.05;
-    sysNoise_Cov(5,5) = 0.05;
-    sysNoise_Cov(6,6) = 0.10;
+    sysNoise_Cov(1,1) = sigma_system_noise_vx;
+    sysNoise_Cov(2,2) = sigma_system_noise_vy;
+    sysNoise_Cov(3,3) = sigma_system_noise_omega;
 
     BFL::Gaussian system_Uncertainty(sysNoise_Mu, sysNoise_Cov);
-    sys_pdf = new platform_motion::OdometryMotionPdf(system_Uncertainty);
+    sys_pdf = new BFL::LinearAnalyticConditionalGaussian(vA, system_Uncertainty);
     // create the system model
-    sys_model = new BFL::AnalyticSystemModelGaussianUncertainty(sys_pdf);
+    sys_model = new BFL::LinearAnalyticSystemModelGaussianUncertainty(sys_pdf);
 
     /*********************************
      * Initialise measurement model *
@@ -70,21 +78,16 @@ int main(int argc, char** argv)
      ***************************/
     // Continuous Gaussian prior (for Kalman filters)
 
-    double sigma_prior_pos = 0.1;
-    double sigma_prior_theta = 0.03;
     double sigma_prior_vel = 0.05;
     double sigma_prior_omega = 0.01;
 
-    MatrixWrapper::ColumnVector prior_Mu(6);
+    MatrixWrapper::ColumnVector prior_Mu(3);
     prior_Mu = 0;
-    MatrixWrapper::SymmetricMatrix prior_Cov(6);
+    MatrixWrapper::SymmetricMatrix prior_Cov(3);
     prior_Cov = 0;
-    prior_Cov(1,1) = sigma_prior_pos;
-    prior_Cov(2,2) = sigma_prior_pos;
-    prior_Cov(3,3) = sigma_prior_theta;
-    prior_Cov(4,4) = sigma_prior_vel;
-    prior_Cov(5,5) = sigma_prior_vel;
-    prior_Cov(6,6) = sigma_prior_omega;
+    prior_Cov(1,1) = sigma_prior_vel;
+    prior_Cov(2,2) = sigma_prior_vel;
+    prior_Cov(3,3) = sigma_prior_omega;
     prior = new BFL::Gaussian(prior_Mu,prior_Cov);
 
     /******************************
@@ -109,6 +112,7 @@ int main(int argc, char** argv)
 
         // UPDATE FILTER
         filter->Update(sys_model,meas_model,measurement,input);
+        //filter->Update(sys_model);
 
         BFL::Pdf<MatrixWrapper::ColumnVector> * posteriorPDF = filter->PostGet();
         MatrixWrapper::ColumnVector posterior(posteriorPDF->ExpectedValueGet());

@@ -6,7 +6,6 @@
 
 #include "odometry/odometry_node.h"
 #include "odometry/wheelpodmeasurementpdf.h"
-#include "odometry/odometrymotionpdf.h"
 
 namespace platform_motion
 {
@@ -26,8 +25,8 @@ class EKFOdometryNode: public OdometryNode
         double sigma_prior_pos, sigma_prior_theta,
                sigma_prior_vel, sigma_prior_omega;
 
-        BFL::AnalyticConditionalGaussian *sys_pdf;
-        BFL::AnalyticSystemModelGaussianUncertainty *sys_model;
+        BFL::LinearAnalyticConditionalGaussian *sys_pdf;
+        BFL::LinearAnalyticSystemModelGaussianUncertainty *sys_model;
         BFL::AnalyticConditionalGaussian *meas_pdf;
         BFL::AnalyticMeasurementModelGaussianUncertainty *meas_model;
         BFL::Gaussian *prior;
