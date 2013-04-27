@@ -14,6 +14,7 @@ std::ostream & operator<< (std::ostream &out, const odometry_measurements &m)
 
 
 OdometryNode::OdometryNode() :
+    publish_tf(true),
     first(true),
     last_starboard_distance(0), last_port_distance(0), last_stern_distance(0),
     starboard_vel_sum(0), port_vel_sum(0), stern_vel_sum(0),
@@ -31,6 +32,7 @@ OdometryNode::OdometryNode() :
     param_nh.param("min_translation_norm", min_translation_norm, 0.001);
     param_nh.param("unexplainable_jump", unexplainable_jump, 12.0);
     param_nh.param("wheel_diameter", wheel_diameter, 0.314);
+    param_nh.param("publish_tf", publish_tf, true);
 
     ROS_INFO("delta_threshold: %f", delta_threshold);
     ROS_INFO("unexplainable_jump : %f", unexplainable_jump);
@@ -309,15 +311,18 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     fillOdoMsg(&odo, joint_state->header.stamp, isMoving(data));
     odometry_pub.publish(odo);
 
-    geometry_msgs::TransformStamped odom_trans;
-    odom_trans.header.stamp = joint_state->header.stamp;
-    odom_trans.header.frame_id = odom_frame_id;
-    odom_trans.child_frame_id = child_frame_id;
-    odom_trans.transform.translation.x = odom_position(0);
-    odom_trans.transform.translation.y = odom_position(1);
-    odom_trans.transform.translation.z = 0;
-    odom_trans.transform.rotation = tf::createQuaternionMsgFromYaw(odom_orientation);
-    odom_broadcaster.sendTransform(odom_trans);
+    if(publish_tf)
+    {
+        geometry_msgs::TransformStamped odom_trans;
+        odom_trans.header.stamp = joint_state->header.stamp;
+        odom_trans.header.frame_id = odom_frame_id;
+        odom_trans.child_frame_id = child_frame_id;
+        odom_trans.transform.translation.x = odom_position(0);
+        odom_trans.transform.translation.y = odom_position(1);
+        odom_trans.transform.translation.z = 0;
+        odom_trans.transform.rotation = tf::createQuaternionMsgFromYaw(odom_orientation);
+        odom_broadcaster.sendTransform(odom_trans);
+    }
 }
 
 }
