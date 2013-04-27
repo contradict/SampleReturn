@@ -13,6 +13,11 @@ from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFe
 # Remap the inputs and outputs in the launch file and create better names for the publish and subscription
 # strings here.
 
+def enum(**enums):
+	return type('Enum', (), enums)
+
+VisualServoStates = enum(SAFE_REGION=0, ROTATE=1, MOVE_FORWARD=2)
+
 class VisualServo:
 	"""A class to position the robot so that it can pick up an object with the manipulator"""
 	
@@ -33,14 +38,46 @@ class VisualServo:
 		self._camera_right_target_width = 150
 		self._camera_left_target_height = 256
 		self._camera_right_target_height = 256
-		self._rotation_velocity = 0.1
-		self._linear_velocity = 0.1
+		self._camera_left_target_forward_vector_x = -1
+		self._camera_left_target_forward_vector_y = -1
+		self._camera_right_target_forward_vector_x = 1
+		self._camera_right_target_forward_vector_y = -1
+		self._proportional_constant_drive_forward = 1.0
+		self._integral_constant_drive_forward = 1.0
+		self._derivative_constant_drive_forward = 1.0
+		self._proportional_constant_rotate = 1.0
+		self._integral_constant_rotate = 1.0
+		self._derivative_constant_rotate = 1.0
+		self._visual_servo_state = VisualServoStates.SAFE_REGION
 		self._is_trying_to_work = True
 		self._has_succeeded = False
+		self.reset_pid_controller()
 		self._visual_servo_result = VisualServoResult()
 		self._visual_servo_feedback = VisualServoFeedback()
-		self._action_server = actionlib.SimeActionServer('visual_servo_action', VisualServoAction, self.do_visual_servo, False)
+		self._action_server = actionlib.SimpleActionServer('visual_servo_action', VisualServoAction, self.do_visual_servo, False)
 		self._action_server.start()
+
+	def get_target_forward_line_width_at_height(self, height):
+		return (height - self._camera_left_target_height)*self._camera_left_target_forward_vector_x/self._camera_left_target_forward_vector_y + self._camera_left_target_width
+
+	def reset_pid_controller(self):
+		self._previous_error = 0
+		self._integral_error = 0
+
+	def update_pid_controller(self, error, delta_time):
+		if self._visual_servo_state == VisualServoStates.SAFE_REGION or self._visual_servo_state == VisualServoStates.MOVE_FORWARD:
+			k_p = self._proportional_constant_drive_forward
+			k_i = self._integral_constant_drive_forward
+			k_d = self._derivative_constant_drive_forward
+		elif self._visual_servo_state == VisualServoStates.ROTATE:
+			k_p = self._proportional_constant_rotate
+			k_i = self._integral_constant_rotate
+			k_d = self._derivative_constant_rotate
+		self._integral_error = self._integral_error + error*delta_time
+		derivative = (error - self._previous_error)/delta_time
+		pid_controller_output = k_p*error + k_i*self._integral_error + k_d*derivative
+		self._previous_error = error
+		return pid_controller_output
 
 	def object_point_callback(self, data):
 		# This function does the bulk of the work.  It receives a centroid location of an object in pixel space
@@ -50,66 +87,107 @@ class VisualServo:
 			rospy.loginfo(rospy.get_name() + ": received point %s" % data)
 			self._is_trying_to_work = True
 			twist = Twist()
+			twist.angular.z = 0.0
+			twist.angular.y = 0.0
+			twist.angular.x = 0.0
+			twist.linear.x = 0.0
+			twist.linear.y = 0.0
+			twist.linear.z = 0.0
 
-			# TODO - Set this error appropriately
+			# Set the action server error feedback to the distance between the centroid and the target location
 			self._visual_servo_feedback.error = sqrt((data.x-self._camera_left_target_width)*(data.x-self._camera_left_target_width)+(data.y-self._camera_left_target_height)*(data.y-self._camera_left_target_height))
 
-			# If the object is near the top of the image, move forward
-			if data.y < self._camera_left_height*0.1:
-				twist.angular.z = 0.0
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = self._linear_velocity
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-			# Else if the object is near the bottom of the image, move backwards
-			if data.y > self._camera_left_height*0.9:
-				twist.angular.z = 0.0
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = -self._linear_velocity
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-			# Else if the object is not at the target width, rotate until it is
-			elif data.x > self._camera_left_target_width+self._camera_left_width_window:
-				twist.angular.z = -self._rotation_velocity
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = 0.0
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-			elif data.x < self._camera_left_target_width-self._camera_left_width_window:
-				twist.angular.z = self._rotation_velocity
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = 0.0
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-			# Else if the object is not aligned at the right location vertically in the image, move forward or backwards
-			elif data.y < (self._camera_left_target_height-self._camera_left_height_window):
-				twist.angular.z = 0.0
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = self._linear_velocity
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-			elif data.y > (self._camera_left_target_height+self._camera_left_height_window):
-				twist.angular.z = 0.0
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = -self._linear_velocity
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-			# Else the object should be aligned at the proper location in the image
-			else:
-				self._visual_servo_result.success = True
-				self._has_succeeded = True
-				twist.angular.z = 0.0
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = 0.0
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
+			if self._visual_servo_state == VisualServoStates.SAFE_REGION:
+				# If the object is near the top of the image, move forward
+				if data.y < self._camera_left_height*0.1:
+					error = self._camera_left_height*0.15 - data.y
+					delta_time = 0.1 # TODO - THIS SHOULD BE THE TIME FROM A PointStamped DATA STRUCTURE
+					pid_controller_output = self.update_pid_controller(error, delta_time)
+					twist.angular.z = 0.0
+					twist.angular.y = 0.0
+					twist.angular.x = 0.0
+					twist.linear.x = pid_controller_output
+					twist.linear.y = 0.0
+					twist.linear.z = 0.0
+				# Else if the object is near the bottom of the image, move backwards
+				elif data.y > self._camera_left_height*0.9:
+					error = data.y - self._camera_left_height*0.85
+					delta_time = 0.1 # TODO - THIS SHOULD BE THE TIME FROM A PointStamped DATA STRUCTURE
+					pid_controller_output = self.update_pid_controller(error, delta_time)
+					twist.angular.z = 0.0
+					twist.angular.y = 0.0
+					twist.angular.x = 0.0
+					twist.linear.x = -pid_controller_output
+					twist.linear.y = 0.0
+					twist.linear.z = 0.0
+				else:
+					self._visual_servo_state = VisualServoStates.ROTATE
+					self.reset_pid_controller()
+
+			if self._visual_servo_state == VisualServoStates.ROTATE:
+				target_width = self.get_target_forward_line_width_at_height(data.y)
+				# If the object is not at the target width, rotate until it is
+				if data.x > target_width+self._camera_left_width_window:
+					error = target_width - data.x
+					delta_time = 0.1 # TODO - THIS SHOULD BE THE TIME FROM A PointStamped DATA STRUCTURE
+					pid_controller_output = self.update_pid_controller(error, delta_time)
+					twist.angular.z = -pid_controller_output
+					twist.angular.y = 0.0
+					twist.angular.x = 0.0
+					twist.linear.x = 0.0
+					twist.linear.y = 0.0
+					twist.linear.z = 0.0
+				elif data.x < target_width-self._camera_left_width_window:
+					error = target_width - data.x
+					delta_time = 0.1 # TODO - THIS SHOULD BE THE TIME FROM A PointStamped DATA STRUCTURE
+					pid_controller_output = self.update_pid_controller(error, delta_time)
+					twist.angular.z = pid_controller_output
+					twist.angular.y = 0.0
+					twist.angular.x = 0.0
+					twist.linear.x = 0.0
+					twist.linear.y = 0.0
+					twist.linear.z = 0.0
+				else:
+					self._visual_servo_state = VisualServoStates.MOVE_FORWARD
+					self.reset_pid_controller()
+
+			if self._visual_servo_state == VisualServoStates.MOVE_FORWARD:
+				# Make sure the object is still aligned with the forward line
+				target_width = self.get_target_forward_line_width_at_height(data.y)
+				if data.x > target_width+self._camera_left_width_window or data.x < target_width-self._camera_left_width_window:
+					self._visual_servo_state = VisualServoStates.ROTATE
+					self.reset_pid_controller()
+				else:
+					# If the object is not aligned at the right location along the forward vector in the image, move forward or backwards
+					if data.y < (self._camera_left_target_height-self._camera_left_height_window):
+						error = self._camera_left_target_height-self._camera_left_height_window-data.y
+						delta_time = 0.1 # TODO - THIS SHOULD BE THE TIME FROM A PointStamped DATA STRUCTURE
+						pid_controller_output = self.update_pid_controller(error, delta_time)
+						twist.angular.z = 0.0
+						twist.angular.y = 0.0
+						twist.angular.x = 0.0
+						twist.linear.x = pid_controller_output
+						twist.linear.y = 0.0
+						twist.linear.z = 0.0
+					elif data.y > (self._camera_left_target_height+self._camera_left_height_window):
+						error = data.y-(self._camera_left_target_height+self._camera_left_height_window)
+						delta_time = 0.1 # TODO - THIS SHOULD BE THE TIME FROM A PointStamped DATA STRUCTURE
+						pid_controller_output = self.update_pid_controller(error, delta_time)
+						twist.angular.z = 0.0
+						twist.angular.y = 0.0
+						twist.angular.x = 0.0
+						twist.linear.x = -pid_controller_output
+						twist.linear.y = 0.0
+						twist.linear.z = 0.0
+					# Else the object should be aligned at the proper location in the image
+					else:
+						self._has_succeeded = True
+						twist.angular.z = 0.0
+						twist.angular.y = 0.0
+						twist.angular.x = 0.0
+						twist.linear.x = 0.0
+						twist.linear.y = 0.0
+						twist.linear.z = 0.0
 
 			self._publisher.publish(twist)
 
@@ -131,18 +209,12 @@ class VisualServo:
 			self._is_trying_to_work = False
 			rospy.sleep(self._sleep_duration)
 			if self._has_succeeded:
+				self._visual_servo_result.success = True
 				self._action_server.set_succeeded(result=self._visual_servo_result)
 				break
 			if not self._is_trying_to_work:
-				# TODO - Let the executive ROS node know that this node has failed to do anything useful for a while
-				twist = Twist()
-				twist.angular.z = 0.0
-				twist.angular.y = 0.0
-				twist.angular.x = 0.0
-				twist.linear.x = 0.0
-				twist.linear.y = 0.0
-				twist.linear.z = 0.0
-				self._publisher.publish(twist)
+				self._visual_servo_result.success = False
+				self._action_server.set_succeeded(result=self._visual_servo_result)
 				rospy.logerr("Failed to do any work for two seconds!")
 			else:
 				self._action_server.publish_feedback(self._visual_servo_feedback)
