@@ -12,7 +12,7 @@
         <!--
         launch-prefix="screen -d -m gdb - -args"
         -->
-        <remap from="odom" to="/odometry"/>
+        <remap from="odom" to="/robot_pose_ekf/odom_combined"/>
         <remap from="cmd_vel" to="/planner_command"/>
 
         <rosparam file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />

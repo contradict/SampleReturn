@@ -1,45 +1,103 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-      <!-- Navigation Nodelet Host Process -->
-      <arg name="run_cameras" default="true"/>
-      <node pkg="nodelet" type="nodelet" name="manager" args="manager"
-            ns="/navigation"
-            output="log"/>
+    <!-- visual odometry node -->
+    <node
+        machine="navigate"
+        pkg="viso2_ros"
+        type="stereo_odometer"
+        name="stereo_odometer"
+        ns="/"
+        output="log"
+        >
+        <param name="base_link_frame_id" type="string" value="/base_link"/>
+        <param name="odom_frame_id" type="string" value="/visual_odom"/>
+        <param name="publish_tf" type="bool" value="false"/>
+        <remap from="/stereo/left/image" to="/navigation/left/image_rect"/>
+        <remap from="/stereo/left/camera_info" to="/navigation/left/camera_info"/>
+        <remap from="/stereo/right/image" to="/navigation/right/image_rect"/>
+        <remap from="/stereo/right/camera_info" to="/navigation/right/camera_info"/>
+        <remap from="/stereo_odometer/odometry" to="/visual_odometry"/>
+    </node>
+    <node
+        machine="navigate"
+        pkg="tf"
+        type="static_transform_publisher"
+        name="visual_odometry_transform"
+        ns="/"
+        output="log"
+        args="0 0 0 0 0 0 /map /visual_odom 33"
+        />
 
-      <!-- odometry node -->
-      <node pkg="viso2_ros" type="stereo_odometer" name="stereo_odometer">
-	<remap from="/stereo/left/image" to="/navigation/left/image_rect"/>
-	<remap from="/stereo/left/camera_info" to="/navigation/left/camera_info"/>
-	<remap from="/stereo/right/image" to="/navigation/right/image_rect"/>
-	<remap from="/stereo/right/camera_info" to="/navigation/right/camera_info"/>
-      </node>
 
-      <!-- Debayer -->
-      <node pkg="nodelet" type="nodelet" name="debayer"
-            args="load image_proc/debayer /navigation/manager"
-            ns="/navigation/left">
-	<remap from="camera_info" to="/navigation/left/camera_info"/>
-	<remap from="image_raw" to="/navigation/left/image_raw"/>
-      </node>
-      <node pkg="nodelet" type="nodelet" name="debayer"
-            args="load image_proc/debayer /navigation/manager"
-            ns="/navigation/right">
-	<remap from="camera_info" to="/navigation/right/camera_info"/>
-	<remap from="image_raw" to="/navigation/right/image_raw"/>
-      </node>
+    <!-- wheel odometry node -->
+    <node
+        machine="navigate"
+        pkg="platform_motion"
+        type="EKF_odometry"
+        name="wheel_odometer"
+        ns="/"
+        output="log"
+        >
 
-      <!-- Rectify images -->
-      <node pkg="nodelet" type="nodelet" name="rect"
-            args="load image_proc/rectify /navigation/manager"
-            ns="/navigation/left"
-            output="log">
-	<remap from="camera_info" to="/navigation/left/camera_info"/>
-      </node>
-      <node pkg="nodelet" type="nodelet" name="rect"
-            args="load image_proc/rectify /navigation/manager"
-            ns="/navigation/right"
-            output="log">
-	<remap from="camera_info" to="/navigation/right/camera_info"/>
-      </node>
+        <param name="sigma_system_noise_vx" type="double" value="0.10"/>
+        <param name="sigma_system_noise_vy" type="double" value="0.07"/>
+        <param name="sigma_system_noise_omega" type="double" value="0.05"/>
+        <param name="sigma_meas_noise_v" type="double" value="0.0005"/>
+        <param name="sigma_prior_vel" type="double" value="0.001"/>
+
+        <param name="wheel_diameter" type="double" value="0.314"/>
+        <param name="delta_threshold" type="double" value="0.001"/>
+        <param name="odom_frame_id" type="string" value="/wheel_odom"/>
+        <param name="child_frame_id" type="string" value="/base_link"/>
+        <param name="publish_tf" type="bool" value="false"/>
+        <remap from="/odometry" to="/wheel_odometry"/>
+    </node>
+    <node
+        machine="navigate"
+        pkg="tf"
+        type="static_transform_publisher"
+        name="wheel_odometry_transform"
+        ns="/"
+        output="log"
+        args="0 0 0 0 0 0 /map /wheel_odom 50"
+        />
+
+    <!-- Odometry EKF -->
+    <node
+        machine="navigate"
+        pkg="robot_pose_ekf"
+        type="robot_pose_ekf"
+        name="robot_pose_ekf"
+        ns="/"
+        output="log"
+        >
+        <param name="freq" value="50.0"/>
+        <param name="sensor_timeout" value="1.0"/>
+        <param name="imu_used" type="bool" value="false"/>
+        <param name="output_frame" type="string" value="odom_combined"/>
+        <remap from="/odom" to="/wheel_odometry"/>
+        <remap from="/vo" to="/visual_odometry"/>
+    </node>
+    <!--
+    <node
+        machine="navigate"
+        pkg="tf"
+        type="static_transform_publisher"
+        name="odometry_transform"
+        ns="/"
+        output="log"
+        args="0 0 0 0 0 0 /map /odom_combined 50"
+        />
+        -->
+
+
+    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
+        <remap from="base_pose_ground_truth" to="/robot_pose_ekf/odom_combined"/>
+        <param name="base_frame_id" type="string" value="/base_footprint"/>
+        <param name="odom_frame_id" type="string" value="/odom_combined"/>
+    </node>
+    <!--
+    -->
+
 </launch>

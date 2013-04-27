@@ -5,5 +5,39 @@
              address="TheSmooth"
              user="robot"
              />
+
+      <!-- Navigation Nodelet Host Process -->
+      <node pkg="nodelet" type="nodelet" name="manager" args="manager"
+            ns="/navigation"
+            output="log"/>
+
+      <!-- Debayer -->
+      <node pkg="nodelet" type="nodelet" name="debayer"
+            args="load image_proc/debayer /navigation/manager"
+            ns="/navigation/left">
+	<remap from="camera_info" to="/navigation/left/camera_info"/>
+	<remap from="image_raw" to="/navigation/left/image_raw"/>
+      </node>
+      <node pkg="nodelet" type="nodelet" name="debayer"
+            args="load image_proc/debayer /navigation/manager"
+            ns="/navigation/right">
+	<remap from="camera_info" to="/navigation/right/camera_info"/>
+	<remap from="image_raw" to="/navigation/right/image_raw"/>
+      </node>
+
+      <!-- Rectify images -->
+      <node pkg="nodelet" type="nodelet" name="rect"
+            args="load image_proc/rectify /navigation/manager"
+            ns="/navigation/left"
+            output="log">
+	<remap from="camera_info" to="/navigation/left/camera_info"/>
+      </node>
+      <node pkg="nodelet" type="nodelet" name="rect"
+            args="load image_proc/rectify /navigation/manager"
+            ns="/navigation/right"
+            output="log">
+	<remap from="camera_info" to="/navigation/right/camera_info"/>
+</node>
+
     <include file="$(find samplereturn)/launch/odometry.launch"/> 
 </launch>

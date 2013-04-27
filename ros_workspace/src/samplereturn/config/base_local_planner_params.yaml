@@ -1,5 +1,6 @@
 controller_frequency: 10.0
 DWAPlannerROS:
+    global_frame_id: odom_combined
     # rad/s^2
     acc_lim_theta: 0.75
     # m/s^2

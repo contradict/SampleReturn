@@ -155,6 +155,15 @@
     <xacro:wheel_module name="stern" position="-1.126 0 ${suspension_mounting_height}"/>
     <xacro:wheel_module name="port" position="0.0 0.650 ${suspension_mounting_height}"/>
     <xacro:wheel_module name="starboard" position="0.0 -0.650 ${suspension_mounting_height}"/>
+    <!--
+    -->
+    <joint name="footprint_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="base_footprint">
+    </link>
     <link name="base_link">
     </link>
     <joint name="base_joint" type="fixed">
@@ -203,7 +212,7 @@
         suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
         -->
         <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="0.015 0.0 0.990" rpy="-2.00 0 -1.57"/>
+        <origin xyz="0.015 0.0 0.990" rpy="-2.03 0 -1.57"/>
     </joint>
 
     <!-- instantiate manipulator pair -->

@@ -6,7 +6,7 @@ Panels:
       Expanded:
         - /Status1
       Splitter Ratio: 0.5
-    Tree Height: 677
+    Tree Height: 648
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -25,7 +25,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: cost_cloud
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -59,67 +59,20 @@ Visualization Manager:
       Update Interval: 0
       Value: false
       Visual Enabled: true
-    - Alpha: 1
-      Autocompute Intensity Bounds:
-        Max Intensity: 4096
-        Min Intensity: 0
-        Value: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: RGB8
-      Decay Time: 0
+    - Class: rviz/TF
       Enabled: false
-      Name: Navigation Pointcloud
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.01
-      Style: Flat Squares
-      Topic: /navigation/points2
-      Use Fixed Frame: true
-      Use rainbow:
-        Max Color: 255; 255; 255
-        Min Color: 0; 0; 0
-        Value: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
       Value: false
-    - Angle Tolerance: 0.1
-      Class: rviz/Odometry
-      Color: 255; 25; 0
-      Enabled: false
-      Keep: 100
-      Length: 1
-      Name: Odometry
-      Position Tolerance: 0.1
-      Topic: /odometry
-      Value: false
-    - Alpha: 1
-      Class: rviz/GridCells
-      Color: 255; 82; 29
-      Enabled: true
-      Name: Obstacles
-      Topic: /planner/mover/local_costmap/obstacles
-      Value: true
-    - Alpha: 1
-      Class: rviz/GridCells
-      Color: 255; 206; 89
-      Enabled: true
-      Name: Inflated Obstacles
-      Topic: /planner/mover/local_costmap/inflated_obstacles
-      Value: true
-    - Alpha: 1
-      Class: rviz/Polygon
-      Color: 25; 255; 0
-      Enabled: true
-      Name: Robot Outline
-      Topic: /planner/mover/local_costmap/robot_footprint
-      Value: true
     - Class: rviz/Image
       Enabled: false
       Image Topic: /navigation/left/image_color
@@ -143,10 +96,35 @@ Visualization Manager:
       Transport Hint: raw
       Value: false
     - Alpha: 1
-      Autocompute Intensity Bounds:
-        Max Intensity: 4096
-        Min Intensity: 0
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
         Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: RGB8
+      Decay Time: 0
+      Enabled: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: Navigation Pointcloud
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.01
+      Style: Flat Squares
+      Topic: /navigation/points2
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
         Max Value: 10
         Min Value: -10
@@ -158,6 +136,10 @@ Visualization Manager:
       Color Transformer: RGB8
       Decay Time: 0
       Enabled: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
       Name: VoxelGrid
       Position Transformer: XYZ
       Queue Size: 10
@@ -167,10 +149,44 @@ Visualization Manager:
       Style: Boxes
       Topic: /planner/mover/local_costmap/voxel_marked_cloud
       Use Fixed Frame: true
-      Use rainbow:
-        Max Color: 255; 255; 255
-        Min Color: 0; 0; 0
-        Value: true
+      Use rainbow: true
+      Value: false
+    - Angle Tolerance: 0.1
+      Class: rviz/Odometry
+      Color: 255; 25; 0
+      Enabled: true
+      Keep: 100
+      Length: 1
+      Name: Wheel Odometry
+      Position Tolerance: 0.1
+      Topic: /wheel_odometry
+      Value: true
+    - Angle Tolerance: 0.1
+      Class: rviz/Odometry
+      Color: 255; 147; 15
+      Enabled: true
+      Keep: 100
+      Length: 1
+      Name: Visual Odometry
+      Position Tolerance: 0.1
+      Topic: /visual_odometry
+      Value: true
+    - Angle Tolerance: 0.1
+      Class: rviz/Odometry
+      Color: 92; 255; 5
+      Enabled: true
+      Keep: 100
+      Length: 1
+      Name: Combined Odometry
+      Position Tolerance: 0.1
+      Topic: /robot_pose_ekf/odom_combined
+      Value: true
+    - Arrow Length: 0.3
+      Class: rviz/PoseArray
+      Color: 255; 25; 0
+      Enabled: false
+      Name: PoseArray
+      Topic: /particlecloud
       Value: false
     - Alpha: 0.7
       Class: rviz/Map
@@ -180,10 +196,35 @@ Visualization Manager:
       Topic: /planner/map
       Value: false
     - Alpha: 1
-      Autocompute Intensity Bounds:
-        Max Intensity: 0.87
-        Min Intensity: 0
-        Value: true
+      Class: rviz/GridCells
+      Color: 25; 255; 0
+      Enabled: false
+      Name: Global Obstacles
+      Topic: /planner/mover/global_costmap/obstacles
+      Value: false
+    - Alpha: 1
+      Class: rviz/GridCells
+      Color: 255; 82; 29
+      Enabled: true
+      Name: Obstacles
+      Topic: /planner/mover/local_costmap/obstacles
+      Value: true
+    - Alpha: 1
+      Class: rviz/GridCells
+      Color: 255; 206; 89
+      Enabled: true
+      Name: Inflated Obstacles
+      Topic: /planner/mover/local_costmap/inflated_obstacles
+      Value: true
+    - Alpha: 1
+      Class: rviz/Polygon
+      Color: 25; 255; 0
+      Enabled: true
+      Name: Robot Outline
+      Topic: /planner/mover/local_costmap/robot_footprint
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
         Max Value: 10
         Min Value: -10
@@ -195,6 +236,10 @@ Visualization Manager:
       Color Transformer: Intensity
       Decay Time: 0
       Enabled: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
       Name: cost_cloud
       Position Transformer: XYZ
       Queue Size: 1
@@ -204,41 +249,8 @@ Visualization Manager:
       Style: Flat Squares
       Topic: /planner/mover/DWAPlannerROS/cost_cloud
       Use Fixed Frame: true
-      Use rainbow:
-        Max Color: 255; 255; 255
-        Min Color: 0; 0; 0
-        Value: true
+      Use rainbow: true
       Value: false
-    - Alpha: 1
-      Autocompute Intensity Bounds:
-        Max Intensity: 166.214
-        Min Intensity: 166.214
-        Value: true
-      Autocompute Value Bounds:
-        Max Value: 0
-        Min Value: 0
-        Value: true
-      Axis: Z
-      Channel Name: total_cost
-      Class: rviz/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 1
-      Enabled: true
-      Name: trajectory_cloud
-      Position Transformer: XYZ
-      Queue Size: 1
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.005
-      Style: Flat Squares
-      Topic: /planner/mover/DWAPlannerROS/trajectory_cloud
-      Use Fixed Frame: true
-      Use rainbow:
-        Max Color: 255; 255; 255
-        Min Color: 0; 0; 0
-        Value: true
-      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -269,41 +281,33 @@ Visualization Manager:
       Shape: Arrow
       Topic: /planner/mover/current_goal
       Value: true
-    - Arrow Length: 0.3
-      Class: rviz/PoseArray
-      Color: 255; 25; 0
-      Enabled: false
-      Name: PoseArray
-      Topic: /particlecloud
-      Value: false
     - Alpha: 1
-      Class: rviz/GridCells
-      Color: 25; 255; 0
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 0
+        Min Value: 0
+        Value: true
+      Axis: Z
+      Channel Name: total_cost
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 1
       Enabled: false
-      Name: Global Obstacles
-      Topic: /planner/mover/global_costmap/obstacles
-      Value: false
-    - Class: rviz/TF
-      Enabled: false
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: true
-      Tree:
-        {}
-      Update Interval: 0
-      Value: false
-    - Alpha: 1
-      Buffer Length: 30
-      Class: rviz/Path
-      Color: 246; 255; 65
-      Enabled: false
+      Max Color: 255; 255; 255
+      Max Intensity: 5.1
+      Min Color: 0; 0; 0
+      Min Intensity: 2.45
       Name: All Plans
-      Topic: /planner/mover/DWAPlannerROS/all_plans
+      Position Transformer: XYZ
+      Queue Size: 1
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.005
+      Style: Flat Squares
+      Topic: /planner/mover/DWAPlannerROS/trajectory_cloud
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: false
   Enabled: true
   Global Options:
@@ -323,29 +327,29 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 18.1766
+      Distance: 15
       Focal Point:
-        X: -14.4317
-        Y: 8.98788
-        Z: -2.88538
+        X: 0
+        Y: 0
+        Z: 0
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.5048
+      Pitch: 1.5698
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.48359
+      Yaw: 3.14
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 915
+  Height: 886
   Hide Left Dock: false
   Hide Right Dock: false
   Navigation Left:
     collapsed: false
   Navigation Right:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001d000000334fc0200000006fb000000100044006900730070006c006100790073010000004100000334000000dd00fffffffb0000001200530065006c0065006300740069006f006e0000000313000002cc0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000001e004e0061007600690067006100740069006f006e0020004c006500660074020000029200000109000001fb00000190fb00000020004e0061007600690067006100740069006f006e002000520069006700680074020000049b00000103000002c10000020a000000010000010f00000334fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000cb0000006400fffffffb0000000a00560069006500770073010000011200000263000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b2000000000000000000000002000009bf000000a9fc0100000002fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730300000e2e000001590000018500000077fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000003a60000033400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000020400000317fc0200000006fb000000100044006900730070006c006100790073010000004100000317000000dd00fffffffb0000001200530065006c0065006300740069006f006e0000000313000002cc0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000001e004e0061007600690067006100740069006f006e0020004c006500660074020000029200000109000001fb00000190fb00000020004e0061007600690067006100740069006f006e002000520069006700680074020000049b00000103000002c10000020a000000010000010f00000317fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000c40000006400fffffffb0000000a00560069006500770073010000010b0000024d000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b2000000000000000000000002000009bf000000a9fc0100000002fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730300000e2e000001590000018500000077fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002f600fffffffb0000000800540069006d006501000000000000045000000000000000000000036a0000031700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -354,6 +358,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1681
+  Width: 1673
   X: -60
   Y: 18
