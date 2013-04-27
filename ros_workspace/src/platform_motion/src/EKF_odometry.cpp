@@ -129,6 +129,8 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
 
     BFL::Pdf<MatrixWrapper::ColumnVector> * posteriorPDF = filter->PostGet();
     MatrixWrapper::ColumnVector posterior(posteriorPDF->ExpectedValueGet());
+    MatrixWrapper::SymmetricMatrix posteriorCov(posteriorPDF->CovarianceGet());
+
 
     // integrate in odometry frame
     MatrixWrapper::Matrix R(2,2);
@@ -143,6 +145,22 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
     odom_velocity[0] = OdometryFrameVelocity(1)/data.interval;
     odom_velocity[1] = OdometryFrameVelocity(2)/data.interval;
     odom_omega = posterior(3);
+    double tsq = data.interval*data.interval;
+    for(int i=0;i<2;i++)
+        for(int j=0;j<2;j++)
+        {
+            // copy vx,vy
+            odom_twist_covariance[i*6+j] = posteriorCov(i+1, j+1)/tsq;
+        }
+    for(int i=0;i<2;i++)
+    {
+        // copy omega-vx,vy row
+        odom_twist_covariance[3*6+i] = posteriorCov(3, i+1)/tsq;
+        // copy omega-vx,vy column
+        odom_twist_covariance[i*6+3] = posteriorCov(i+1, 3)/tsq;
+    }
+    // copy omega-omega value
+    odom_twist_covariance[3*6+3] = posteriorCov(3, 3)/tsq;
 
     resetReferencePose(data, stamp);
 
