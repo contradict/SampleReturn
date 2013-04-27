@@ -112,11 +112,11 @@ void EKFOdometryNode::initializeModels(void)
 void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const ros::Time &stamp)
 {
     MatrixWrapper::ColumnVector measurement(6);
-    measurement(1) = data.port_delta/data.interval;
+    measurement(1) = data.port_delta;
     measurement(2) = 0.0;
-    measurement(3) = data.starboard_delta/data.interval;
+    measurement(3) = data.starboard_delta;
     measurement(4) = 0.0;
-    measurement(5) = data.stern_delta/data.interval;
+    measurement(5) = data.stern_delta;
     measurement(6) = 0.0;
 
     MatrixWrapper::ColumnVector input(3);
@@ -135,13 +135,13 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
     R(1,1) = cos(odom_orientation); R(1,2) = -sin(odom_orientation);
     R(2,1) = sin(odom_orientation); R(2,2) =  cos(odom_orientation);
     MatrixWrapper::ColumnVector OdometryFrameVelocity = R*posterior.sub(1,2);
-    odom_position[0] += data.interval*OdometryFrameVelocity(1);
-    odom_position[1] += data.interval*OdometryFrameVelocity(2);
-    odom_orientation += data.interval*posterior(3);
+    odom_position[0] += OdometryFrameVelocity(1);
+    odom_position[1] += OdometryFrameVelocity(2);
+    odom_orientation += posterior(3);
     while(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
     while(odom_orientation < 0) odom_orientation += 2*M_PI;
-    odom_velocity[0] = OdometryFrameVelocity(1);
-    odom_velocity[1] = OdometryFrameVelocity(2);
+    odom_velocity[0] = OdometryFrameVelocity(1)/data.interval;
+    odom_velocity[1] = OdometryFrameVelocity(2)/data.interval;
     odom_omega = posterior(3);
 
     resetReferencePose(data, stamp);
