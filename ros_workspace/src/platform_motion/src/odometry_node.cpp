@@ -308,7 +308,7 @@ void OdometryNode::jointStateCallback(const sensor_msgs::JointState::ConstPtr jo
     computeOdometry(data, joint_state->header.stamp);
 
     nav_msgs::Odometry odo;
-    fillOdoMsg(&odo, joint_state->header.stamp, isMoving(data));
+    fillOdoMsg(&odo, joint_state->header.stamp, !isMoving(data));
     odometry_pub.publish(odo);
 
     if(publish_tf)
