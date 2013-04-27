@@ -39,26 +39,31 @@ void EKFOdometryNode::init(void)
 void EKFOdometryNode::initializeModels(void)
 {
     /****************************
-     * NonLinear system model      *
+     * Linear system model      *
      ***************************/
 
+    MatrixWrapper::Matrix A(3,3);
+    A(1,1) = 1.0; A(1,2) = 0.0; A(1,3) = 0.0;
+    A(2,1) = 0.0; A(2,2) = 1.0; A(2,3) = 0.0;
+    A(3,1) = 0.0; A(3,2) = 0.0; A(3,3) = 1.0;
+
+    std::vector<MatrixWrapper::Matrix> vA(1);
+    vA[0] = A;
+
     // create gaussian
-    MatrixWrapper::ColumnVector sysNoise_Mu(6);
+    MatrixWrapper::ColumnVector sysNoise_Mu(3);
     sysNoise_Mu = 0;
 
-    MatrixWrapper::SymmetricMatrix sysNoise_Cov(6);
+    MatrixWrapper::SymmetricMatrix sysNoise_Cov(3);
     sysNoise_Cov = 0.0;
-    sysNoise_Cov(1,1) = sigma_system_noise_x;
-    sysNoise_Cov(2,2) = sigma_system_noise_y;
-    sysNoise_Cov(3,3) = sigma_system_noise_theta;
-    sysNoise_Cov(4,4) = sigma_system_noise_vx;
-    sysNoise_Cov(5,5) = sigma_system_noise_vy;
-    sysNoise_Cov(6,6) = sigma_system_noise_omega;
+    sysNoise_Cov(1,1) = sigma_system_noise_vx;
+    sysNoise_Cov(2,2) = sigma_system_noise_vy;
+    sysNoise_Cov(3,3) = sigma_system_noise_omega;
 
     BFL::Gaussian system_Uncertainty(sysNoise_Mu, sysNoise_Cov);
-    sys_pdf = new OdometryMotionPdf(system_Uncertainty);
+    sys_pdf = new BFL::LinearAnalyticConditionalGaussian(vA, system_Uncertainty);
     // create the system model
-    sys_model = new BFL::AnalyticSystemModelGaussianUncertainty(sys_pdf);
+    sys_model = new BFL::LinearAnalyticSystemModelGaussianUncertainty(sys_pdf);
 
     /*********************************
      * Initialise measurement model *
@@ -89,16 +94,13 @@ void EKFOdometryNode::initializeModels(void)
      * Linear prior DENSITY     *
      ***************************/
     // Continuous Gaussian prior (for Kalman filters)
-    MatrixWrapper::ColumnVector prior_Mu(6);
+    MatrixWrapper::ColumnVector prior_Mu(3);
     prior_Mu = 0;
-    MatrixWrapper::SymmetricMatrix prior_Cov(6);
+    MatrixWrapper::SymmetricMatrix prior_Cov(3);
     prior_Cov = 0;
-    prior_Cov(1,1) = sigma_prior_pos;
-    prior_Cov(2,2) = sigma_prior_pos;
-    prior_Cov(3,3) = sigma_prior_theta;
-    prior_Cov(4,4) = sigma_prior_vel;
-    prior_Cov(5,5) = sigma_prior_vel;
-    prior_Cov(6,6) = sigma_prior_omega;
+    prior_Cov(1,1) = sigma_prior_vel;
+    prior_Cov(2,2) = sigma_prior_vel;
+    prior_Cov(3,3) = sigma_prior_omega;
     prior = new BFL::Gaussian(prior_Mu,prior_Cov);
 
     /******************************
@@ -109,13 +111,13 @@ void EKFOdometryNode::initializeModels(void)
 
 void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const ros::Time &stamp)
 {
-    //std::cerr << data;
+    std::cerr << data;
     MatrixWrapper::ColumnVector measurement(6);
-    measurement(1) = data.port_delta;
+    measurement(1) = data.port_delta/data.interval;
     measurement(2) = 0.0;
-    measurement(3) = data.starboard_delta;
+    measurement(3) = data.starboard_delta/data.interval;
     measurement(4) = 0.0;
-    measurement(5) = data.stern_delta;
+    measurement(5) = data.stern_delta/data.interval;
     measurement(6) = 0.0;
 
     MatrixWrapper::ColumnVector input(3);
@@ -128,40 +130,20 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
 
     BFL::Pdf<MatrixWrapper::ColumnVector> * posteriorPDF = filter->PostGet();
     MatrixWrapper::ColumnVector posterior(posteriorPDF->ExpectedValueGet());
-    MatrixWrapper::SymmetricMatrix posteriorCov(posteriorPDF->CovarianceGet());
 
-    odom_position[0] = posterior(1);
-    odom_position[1] = posterior(2);
-    odom_orientation = posterior(3);
+    // integrate in odometry frame
+    MatrixWrapper::Matrix R(2,2);
+    R(1,1) = cos(odom_orientation); R(1,2) = -sin(odom_orientation);
+    R(2,1) = sin(odom_orientation); R(2,2) =  cos(odom_orientation);
+    MatrixWrapper::ColumnVector OdometryFrameVelocity = R*posterior.sub(1,2);
+    odom_position[0] += data.interval*OdometryFrameVelocity(1);
+    odom_position[1] += data.interval*OdometryFrameVelocity(2);
+    odom_orientation += data.interval*posterior(3);
     while(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
     while(odom_orientation < 0) odom_orientation += 2*M_PI;
-    odom_velocity[0] = posterior(4)/data.interval;
-    odom_velocity[1] = posterior(5)/data.interval;
-    odom_omega = posterior(6)/data.interval;
-    // update covariance
-    // odom_pose_* is x,y,yaw,roll,pitch,yaw
-    // odom_twist_* is vx,vy,vyaw,omega_roll,omega_pitch,omgea_yaw
-    // posterior is x,y,yaw,vx,vy,omega_yaw
-    for(int i=0;i<2;i++)
-        for(int j=0;j<2;j++)
-        {
-            // copy x,y
-            odom_pose_covariance[i*6+j] = posteriorCov(i+1, j+1);
-            // copy vx,vy
-            odom_twist_covariance[i*6+j] = posteriorCov(i+4, j+4);
-        }
-    for(int i=0;i<2;i++)
-    {
-        // copy theta-x,y row
-        odom_pose_covariance[3*6+i] = posteriorCov(3,i+1);
-        odom_twist_covariance[3*6+i] = posteriorCov(6, i+4);
-        // copy theta-x,y column
-        odom_pose_covariance[i*6+3] = posteriorCov(i+1,3);
-        odom_twist_covariance[i*6+3] = posteriorCov(i+4, 6);
-    }
-    // copy theta-theta value
-    odom_pose_covariance[3*6+3] = posteriorCov(3, 3);
-    odom_twist_covariance[3*6+3] = posteriorCov(6, 6);
+    odom_velocity[0] = OdometryFrameVelocity(1);
+    odom_velocity[1] = OdometryFrameVelocity(2);
+    odom_omega = posterior(3);
 
     resetReferencePose(data, stamp);
 

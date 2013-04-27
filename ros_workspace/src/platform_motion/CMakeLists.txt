@@ -106,7 +106,6 @@ add_executable(EKF_odometry
     src/EKF_odometry.cpp
     src/EKF_odometry_node.cpp
     src/wheelpodmeasurementpdf.cpp
-    src/odometrymotionpdf.cpp
     )
 target_link_libraries(EKF_odometry
     ${Boost_LIBRARIES}
@@ -117,7 +116,6 @@ add_executable(test_EKF_odometry
     src/odometry_node.cpp
     src/test_EKF_odometry.cpp
     src/wheelpodmeasurementpdf.cpp
-    src/odometrymotionpdf.cpp
     )
 target_link_libraries(test_EKF_odometry
     ${Boost_LIBRARIES}
