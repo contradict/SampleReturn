@@ -111,7 +111,6 @@ void EKFOdometryNode::initializeModels(void)
 
 void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const ros::Time &stamp)
 {
-    std::cerr << data;
     MatrixWrapper::ColumnVector measurement(6);
     measurement(1) = data.port_delta/data.interval;
     measurement(2) = 0.0;
