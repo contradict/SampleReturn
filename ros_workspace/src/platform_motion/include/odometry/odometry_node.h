@@ -55,6 +55,7 @@ class OdometryNode {
 
         ros::Subscriber joint_state_sub;
 
+        bool publish_tf;
         tf::TransformBroadcaster odom_broadcaster;
         ros::Publisher odometry_pub;
 
