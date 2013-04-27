@@ -142,9 +142,9 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
     odom_orientation += posterior(3);
     while(odom_orientation > 2*M_PI) odom_orientation -= 2*M_PI;
     while(odom_orientation < 0) odom_orientation += 2*M_PI;
-    odom_velocity[0] = OdometryFrameVelocity(1)/data.interval;
-    odom_velocity[1] = OdometryFrameVelocity(2)/data.interval;
-    odom_omega = posterior(3);
+    odom_velocity[0] = posterior(1)/data.interval;
+    odom_velocity[1] = posterior(2)/data.interval;
+    odom_omega = posterior(3)/data.interval;
     double tsq = data.interval*data.interval;
     for(int i=0;i<2;i++)
         for(int j=0;j<2;j++)
