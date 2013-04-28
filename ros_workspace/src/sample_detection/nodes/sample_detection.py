@@ -40,7 +40,7 @@ class sample_detection(object):
       topic = s + '_pointstamped'
       self.sample_points[s] = rospy.Publisher(topic, PointStamped)
       topic = s + '_imgpoints'
-      self.sample_imgpoints[s] = rospy.Publisher(topic, Point)
+      self.sample_imgpoints[s] = rospy.Publisher(topic, PointStamped)
       topic = s + '_disparity'
       self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
 
@@ -53,7 +53,8 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        self.sample_imgpoints[d].publish(x=location[0],y=location[1])#,header.stamp)
+        now = rospy.get_rostime()
+        self.sample_imgpoints[d].publish(point.x=location[0],point.y=location[1],header.stamp.secs=now.secs,header.stamp.nsecs=now.nsecs)#,header.stamp)
         # Intersects a camera ray with a flat ground plane
         #self.project_centroid(location)
 
@@ -64,7 +65,8 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        self.sample_imgpoints[d].publish(x=location[0],y=location[1])
+        now = rospy.get_rostime()
+        self.sample_imgpoints[d].publish(point.x=location[0],point.y=location[1],header.stamp.secs=now.secs,header.stamp.nsecs=now.nsecs)
         # For now, only publish the left image as a debug
         self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
         # Grab associated part of disparity image
@@ -87,7 +89,8 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        self.sample_imgpoints[d].publish(x=location[0],y=location[1])
+        now = rospy.get_rostime()
+        self.sample_imgpoints[d].publish(point.x=location[0],point.y=location[1],header.stamp.secs=now.secs,header.stamp.nsecs=now.nsecs)
         # Grab associated part of disparity image
         mask = np.zeros_like(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')))
         cv2.drawContours(mask,[detections[d]['hull']],-1,(255,255,255),-1)
