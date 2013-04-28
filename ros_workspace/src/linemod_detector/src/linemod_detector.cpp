@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <stereo_msgs/DisparityImage.h>
+#include <linemod_detector/NamedPoint.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
@@ -57,6 +58,8 @@ class LineMOD_Detector
   image_transport::Subscriber color_sub;
   ros::Subscriber depth_sub;
   ros::Subscriber disp_sub;
+  ros::Publisher img_point_pub;
+  ros::Publisher point_pub;
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
   cv::Mat display;
@@ -65,6 +68,7 @@ class LineMOD_Detector
   int num_modalities;
   int num_classes;
   bool got_color;
+  float pub_threshold;
 
   public:
   LineMOD_Detector(): it(nh)
@@ -72,12 +76,15 @@ class LineMOD_Detector
     color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
     depth_sub = nh.subscribe("depth", 1, &LineMOD_Detector::depthCallback, this);
     disp_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
+    img_point_pub = nh.advertise<linemod_detector::NamedPoint>("img_point", 1);
+    point_pub = nh.advertise<linemod_detector::NamedPoint>("point", 1);
     matching_threshold = 80;
     got_color = false;
 
     // Initialize LINEMOD data structures
     std::string filename;
     ros::param::get("template_file", filename);
+    ros::param::get("pub_threshold", pub_threshold);
     detector = readLinemod(filename);
     num_modalities = (int)detector->getModalities().size();
     std::cout << num_modalities << std::endl;
@@ -136,6 +143,11 @@ class LineMOD_Detector
           // Draw matching template
           const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
+          std::cout << "pub_threshold " << LineMOD_Detector::pub_threshold << std::endl;
+          if (m.similarity > LineMOD_Detector::pub_threshold)
+          {
+            LineMOD_Detector::publishPoint(templates, m, depth_img);
+          }
 
         }
       }
@@ -193,6 +205,11 @@ class LineMOD_Detector
           // Draw matching template
           const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
+          std::cout << "pub_threshold " << LineMOD_Detector::pub_threshold << std::endl;
+          if (m.similarity > LineMOD_Detector::pub_threshold)
+          {
+            LineMOD_Detector::publishPoint(templates, m, depth_ptr->image);
+          }
 
         }
       }
@@ -220,6 +237,36 @@ class LineMOD_Detector
     LineMOD_Detector::display = color_ptr->image.clone();
     LineMOD_Detector::color_img = lab_img;
 
+  }
+
+  ///void extractRegion(const cv::linemod::Template& temp, cv::Mat& disp)
+  ///{
+  ///  // This is going to take a detected template and disparity image, grab
+  ///  // the region of the template, and publish a NamedPoint message
+  ///  int size = temp->features.size();
+  ///  for (int i = 0; (i < size; i++)
+  ///}
+
+  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m, cv::Mat& depth)
+  {
+    linemod_detector::NamedPoint img_point_msg;
+    linemod_detector::NamedPoint point_msg;
+    img_point_msg.name = m.class_id;
+    //img_point_msg.header =
+    // We only care about the base pyramid level gradient modality
+    img_point_msg.point.x = m.x + templates[1].width/2;
+    img_point_msg.point.y = m.y + templates[1].height/2;
+
+    LineMOD_Detector::img_point_pub.publish(img_point_msg);
+    //if (cv::sum(depth(cv::Rect(0,0,100,100))) != 0)
+    //{
+    //}
+    //std::cout << "Max " << cv::sum(depth(cv::Rect(0,0,100,100))) << std::endl;
+
+    //Check for non-zero
+    //Drop too close or too far
+    //Grab remaining extrema, compute mean
+    //The farpoints will probably be ground, the close will be the near side of the object
   }
 };
 
