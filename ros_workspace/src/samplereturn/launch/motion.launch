@@ -25,7 +25,7 @@
 
       <param name="wheel_diameter" type="double" value="0.314"/>
 
-      <param name="status_publish_interval" type="double" value="15.0"/>
+      <param name="status_publish_interval" type="double" value="1.0"/>
   </node>
 
   <node
