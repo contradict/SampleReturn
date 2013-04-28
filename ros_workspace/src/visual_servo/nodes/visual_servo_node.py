@@ -34,20 +34,20 @@ class VisualServo:
 		self._camera_left_height_window = 5
 		self._camera_right_width_window = 3
 		self._camera_right_height_window = 5
-		self._camera_left_target_width = 330
+		self._camera_left_target_width = 317
 		self._camera_right_target_width = 150
 		self._camera_left_target_height = 256
 		self._camera_right_target_height = 256
-		self._camera_left_target_forward_vector_x = -1
-		self._camera_left_target_forward_vector_y = -1
+		self._camera_left_target_forward_vector_x = -16
+		self._camera_left_target_forward_vector_y = -255
 		self._camera_right_target_forward_vector_x = 1
 		self._camera_right_target_forward_vector_y = -1
-		self._proportional_constant_drive_forward = 1.0
-		self._integral_constant_drive_forward = 1.0
-		self._derivative_constant_drive_forward = 1.0
-		self._proportional_constant_rotate = 1.0
-		self._integral_constant_rotate = 1.0
-		self._derivative_constant_rotate = 1.0
+		self._proportional_constant_drive_forward = 0.01
+		self._integral_constant_drive_forward = 0.0
+		self._derivative_constant_drive_forward = 0.0
+		self._proportional_constant_rotate = 0.01
+		self._integral_constant_rotate = 0.0
+		self._derivative_constant_rotate = 0.0
 		self._visual_servo_state = VisualServoStates.SAFE_REGION
 		self._is_trying_to_work = True
 		self._has_succeeded = False
@@ -211,7 +211,7 @@ class VisualServo:
 		self._camera_right_width_window = max(1, data.width*0.01)
 		self._camera_right_height_window = max(1, data.height*0.01)
 
-	def do_visual_servo(self):
+	def do_visual_servo(self, goal):
 		self._sleep_duration = rospy.Duration(2)
 		while not rospy.is_shutdown():
 			self._is_trying_to_work = False
@@ -230,4 +230,5 @@ class VisualServo:
 if __name__ == '__main__':
 	rospy.init_node('visual_servo')
 	visual_servo = VisualServo()
-	visual_servo.do_visual_servo()
+	#visual_servo.do_visual_servo(True)
+	rospy.spin()
