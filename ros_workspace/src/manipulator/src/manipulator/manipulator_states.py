@@ -1,7 +1,7 @@
 # this is where all the states for the manipulator will be defined.
 
 import smach
-from manipulator.msg import ManipulatorFeedback, ManipulatorResult
+from manipulator.msg import ManipulatorFeedback, ManipulatorResult, ManipulatorGoal
 
 
 class ProcessGoal(smach.State):
@@ -27,7 +27,7 @@ class ProcessGoal(smach.State):
     userdata.action_result = mgr #this seems kinda lame, but set result to 
                                  #the good thing, if an error occurs it is overwritten     
     
-    if userdata.action_goal.type == 'home':
+    if userdata.action_goal.type == ManipulatorGoal.HOME:
       mgr.result = 'homed'
       mgr.homed = True
       return 'home'
@@ -84,4 +84,3 @@ class PausedState(smach.State):
       self.pauseCV.wait()
       self.pauseCV.release()   
       return 'succeeded'
- 
