@@ -69,6 +69,9 @@ class LineMOD_Detector
   int num_classes;
   bool got_color;
   float pub_threshold;
+  float min_depth;
+  float max_depth;
+  float min_count;
 
   public:
   LineMOD_Detector(): it(nh)
@@ -81,10 +84,14 @@ class LineMOD_Detector
     matching_threshold = 80;
     got_color = false;
 
-    // Initialize LINEMOD data structures
     std::string filename;
     ros::param::get("template_file", filename);
     ros::param::get("pub_threshold", pub_threshold);
+    ros::param::get("min_depth", min_depth);
+    ros::param::get("max_depth", max_depth);
+    ros::param::get("min_count", min_count);
+
+    // Initialize LINEMOD data structures
     detector = readLinemod(filename);
     num_modalities = (int)detector->getModalities().size();
     std::cout << num_modalities << std::endl;
@@ -143,7 +150,6 @@ class LineMOD_Detector
           // Draw matching template
           const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
-          std::cout << "pub_threshold " << LineMOD_Detector::pub_threshold << std::endl;
           if (m.similarity > LineMOD_Detector::pub_threshold)
           {
             LineMOD_Detector::publishPoint(templates, m, depth_img);
@@ -239,14 +245,6 @@ class LineMOD_Detector
 
   }
 
-  ///void extractRegion(const cv::linemod::Template& temp, cv::Mat& disp)
-  ///{
-  ///  // This is going to take a detected template and disparity image, grab
-  ///  // the region of the template, and publish a NamedPoint message
-  ///  int size = temp->features.size();
-  ///  for (int i = 0; (i < size; i++)
-  ///}
-
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m, cv::Mat& depth)
   {
     linemod_detector::NamedPoint img_point_msg;
@@ -258,15 +256,29 @@ class LineMOD_Detector
     img_point_msg.point.y = m.y + templates[1].height/2;
 
     LineMOD_Detector::img_point_pub.publish(img_point_msg);
-    //if (cv::sum(depth(cv::Rect(0,0,100,100))) != 0)
-    //{
-    //}
-    //std::cout << "Max " << cv::sum(depth(cv::Rect(0,0,100,100))) << std::endl;
 
     //Check for non-zero
-    //Drop too close or too far
-    //Grab remaining extrema, compute mean
-    //The farpoints will probably be ground, the close will be the near side of the object
+    cv::Rect r(m.x,m.y,templates[1].width,templates[1].height);
+    cv::Mat r_img = depth(r).clone();
+    r_img.convertTo(r_img, CV_32F);
+    cv::imshow("r_img",r_img);
+    char key = (char)cv::waitKey(10);
+    int count = cv::countNonZero(r_img);
+    if (count > LineMOD_Detector::min_count)
+    {
+      //Drop too close or too far
+      cv::threshold(r_img,r_img,LineMOD_Detector::min_depth, 0, cv::THRESH_TOZERO);
+      cv::threshold(r_img,r_img,LineMOD_Detector::max_depth, 0, cv::THRESH_TOZERO_INV);
+      //Grab remaining extrema, compute mean
+      //The farpoints will probably be ground, the close will be the near side of the object
+      r_img = r_img.reshape(0,1);
+      cv::sort(r_img,r_img,CV_SORT_DESCENDING);
+      double sum = cv::sum(r_img.colRange(0,10))(0) + cv::sum(r_img.colRange(count-10,count))(0);
+      double ave = sum/20;
+      //The average is the average depth in mm
+      //Now we reproject the center point
+      //std::cout << ave << std::endl;
+    }
   }
 };
 
