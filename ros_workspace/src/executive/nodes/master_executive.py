@@ -18,8 +18,8 @@ import platform_motion.msg as platform_msg
 import platform_motion.srv as platform_srv
 import manipulator.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
-import linemod_detector.msg as detector_msg
-import movebase_msg.msg as move_base_msg
+import move_base_msgs.msg as move_base_msg
+import visual_servo.msg as visual_servo_msg
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -62,9 +62,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.manipulator_status_update)
         rospy.Subscriber("/pause_state", std_msgs.Bool,
                 self.pause_state_update)
-        rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
-                self.sample_detection_nav_update)
-        rospy.Subscriber("/manipulator/sample_detections", detector_msg.NamedPoint,
+        #rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
+        #        self.sample_detection_nav_update)
+        rospy.Subscriber("/red_puck_image_points", geometry_msg.PointStamped,
                 self.sample_detection_man_update)
 
         self.transformer = tf.Transformer(False, rospy.Duration(10.0))
@@ -87,8 +87,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         self.move_base = actionlib.SimpleActionClient("/planner/move_base",
                 move_base_msg.MoveBaseAction)
-        self.servo = actionlib.SimpleActionClient("/servo/acquire",
-                visual_servo_msg.AcquireAction)
+        self.servo = actionlib.SimpleActionClient("/visual_servo_action",
+                visual_servo_msg.VisualServoAction)
 
     #----   Subscription Handlers ----
     def gpio_update(self, gpio):
@@ -128,19 +128,20 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 continue
             #yield teer_ros.WaitCondition(
             #        lambda: len(self.proclamations)>0)
-            msg = self.proclamations.pop(0)
+            msg = self.proclamations[0]
             self.navigation_audio.publish(msg)
             rospy.logwarn("executive announce: %s", msg.arg)
             duration = self.speech_delay + self.speech_rate*len(msg.arg)
             yield teer_ros.WaitDuration(duration)
+            self.proclamations.pop(0)
 
     #----   Tasks   ----
     def start_robot(self):
         yield teer_ros.WaitDuration(2.0)
         camera_ready = lambda: self.navigation_camera_status is not None and \
-                        self.navigation_camera_status.data=="Ready" #and \
-                        #self.manipulator_camera_status is not None and \
-                        #self.manipulator_camera_status.data=="Ready"
+                        self.navigation_camera_status.data=="Ready" and \
+                        self.manipulator_camera_status is not None and \
+                        self.manipulator_camera_status.data=="Ready"
         if not camera_ready():
             self.announce("Waiting for cameras")
             yield teer_ros.WaitCondition(camera_ready)
@@ -159,9 +160,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.announce("Waiting for system enable.")
                 yield teer_ros.WaitCondition(enabled)
             self.announce("Home ing")
-            
+
             mh_msg = manipulator_msg.ManipulatorGoal()
-            mh_msg.type = 'home'
+            mh_msg.type = mh_msg.HOME
             self.home_manipulator.send_goal(mh_msg)
             while True: #home manipulator first, ensure it is clear of carousel
                 yield teer_ros.WaitDuration(0.1)
@@ -171,7 +172,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if manipulator_state != action_msg.GoalStatus.SUCCEEDED:
                 yield teer_ros.WaitDuration(0.75)
                 continue
-            
+
             self.platform_motion_input_select("None")
             yield teer_ros.WaitDuration(0.1)
             self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
@@ -216,8 +217,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             self.announce("distance to sample %3.1 meters"%feedback.distance)
 
     def retrieve_precached_sample(self):
-        self.current_nav_sample = None
+
+        # set sample to None so we know when the first point arrives
         self.current_man_sample = None
+        # switch control to the motion planner and drive to the expected
+        # position
         self.platform_motion_input_select("Planner")
         expected_position = move_base_msg.MoveBaseGoal()
         expected_position.target_pose.header.stamp=rospy.Time.now()
@@ -229,25 +233,15 @@ class SampleReturnScheduler(teer_ros.Scheduler):
           geometry_msg.Quaterion(*tf.transformations.quaternion_from_euler(0,0,0))
         self.announce("Moving to expected sample position")
         self.move_base.send_goal(expected_position)
+        # wait for the manipulator camera to see the object
         yield teer_ros.WaitCondition(
-                lambda: self.current_nav_sample is not None and \
-                self.current_nav_sample.name=="Pre-cached Sample")
+                lambda: self.current_man_sample is not None)
         self.move_base.cancel_goal()
-        self.announce("%s detected, resetting goal"%self.current_nav_sample.name)
-        target_frame = self.current_nav_sample.header.frame
-        trans, quat = tf.lookupTransform('/map', target_frame, rospy.Time())
-        actual_position = expected_position
-        actual_position.target_pose.header.stamp=rospy.Time.now()
-        actual_position.pose.position.x = self.current_nav_sample.point.x+trans[0]
-        actual_position.pose.position.y = self.current_nav_sample.point.y+trans[0]
-        self.mover_base.send_goal(actual_position)
-        yield teer_ros.WaitCondition(
-                lambda: self.current_man_sample is not None and \
-                        self.current_nav_sample.name=="Pre-cached Sample")
-        self.move_base.cancel_goal()
+
+        # switch to visual servo control
         self.platform_motion_input_select("Servo")
-        self.announce("%s in manipulator view, switching to servo control"%self.current_man_sample)
-        self.servo.send_goal(visual_servo_msg.AcquireGoal(),
+        self.announce("sample in manipulator view, switching to servo control")
+        self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb
                             )
         while True:
@@ -257,7 +251,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 break
         self.announce("Servo success, triggering manipulator sequence")
 
-        self.manipulator.send_goal(manipulator_msg.ManipulatorGrabGoal())
+        # grab the sample
+        manip_goal = manipulator_msg.ManipulatorGoal()
+        manip_goal.type=manip_goal.GRAB
+        manip_goal.target_bin = 1
+        manip_goal.grip_torque = 0.5
+        self.manipulator.send_goal(manip_goal)
         while True:
             yield teer_ros.WaitDuration(0.1)
             state = self.manipulator.get_state()
@@ -265,6 +264,22 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 break
 
         self.announce("Sample retreived, returning to starting point")
+
+        # spin in place to point at home
+        spin_goal = move_base_msg.MoveBaseGoal()
+        spin_goal.target_pose.header.stamp=rospy.Time.now()
+        spin_goal.target_pose.header.frame_id='/map'
+        current_pose = transformer.lookupTransform('/base_link', '/map', rospy.Time(0))
+        spin_goal.target_pose.pose.position = geometry_msg.Pose(*current_pose.origin)
+        spin_goal.target_pose.pose.orientation= \
+          geometry_msg.Quaterion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
+        self.move_base.send_goal(spin_goal)
+        while True:
+            yield teer_ros.WaitDuration(0.1)
+            state = self.move_base.get_state()
+            if state not in self.working_states:
+                break
+        # drive back to (0,0,0)
         home_goal = move_base_msg.MoveBaseGoal()
         home_goal.target_pose.header.stamp=rospy.Time.now()
         home_goal.target_pose.header.frame_id='/map'
