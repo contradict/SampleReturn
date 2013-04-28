@@ -8,5 +8,6 @@
       <param name="samples" type="string" value="$(find sample_detection)/config/manipulator_samples.yaml"/>
       <remap from="mono_img" to="/manipulator/left/image_rect_color"/>
       <remap from="cam_info" to="/manipulator/left/camera_info"/>
+      <remap from="disp" to="/manipulator/disparity"/>
     </node>
 </launch>
