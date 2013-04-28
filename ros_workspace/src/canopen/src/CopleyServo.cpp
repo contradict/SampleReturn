@@ -422,6 +422,9 @@ void CopleyServo::syncCallback(SYNC &sync)
             gotPV &&
             !allReady) {
         allReady=true;
+        modeControl(CONTROL_SWITCH_ON|CONTROL_ENABLE_VOLTAGE|CONTROL_RESET_FAULT|CONTROL_QUICK_STOP,
+                    CONTROL_ENABLE_OPERATION|CONTROL_HALT,
+                    ProfilePosition );
     }
 }
 

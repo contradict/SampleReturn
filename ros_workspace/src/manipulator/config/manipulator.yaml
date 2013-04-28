@@ -1,38 +1,38 @@
-wristJointController:
+manipulator/arm_joint:
   controller:
-    package: dynamixel_controllers
-    module: joint_position_controller
-    type: JointPositionController
-  joint_name: wristJoint
+    package: manipulator  
+    module: manipulator_joint_controller
+    type: ManipulatorJointController
+  joint_name: arm
   joint_speed: 1.0
-  motor:
-    id: 11
-    init: 68
-    min: 30
-    max: 409
-
-armJointController:
-  controller:
-    package: dynamixel_controllers
-    module: joint_torque_controller
-    type: JointTorqueController
-  joint_name: armJoint
-  joint_speed: 2.0
+  joint_torque_limit: 1.0
   motor:
     id: 10
-    init: 1023
-    min: 0
-    max: 0
+    cw_limit: 0
+    ccw_limit: 6.28165
 
-handJointController:
+manipulator/wrist_joint:
   controller:
-    package: dynamixel_controllers
-    module: joint_position_controller
-    type: JointPositionController
-  joint_name: handJoint
-  joint_speed: 2.0
+    package: manipulator
+    module: manipulator_joint_controller
+    type: ManipulatorJointController
+  joint_name: wrist
+  joint_speed: 1.0
+  joint_torque_limit: 1.0
+  motor:
+    id: 11
+    cw_limit: 0
+    ccw_limit: 2.0
+
+manipulator/hand_joint:
+  controller:
+    package: manipulator
+    module: manipulator_joint_controller
+    type: ManipulatorJointController
+  joint_name: hand
+  joint_speed: 1.0
+  joint_torque_limit: 1.0
   motor:
     id: 12
-    init: 0
-    min: 68
-    max: 650
+    cw_limit: .5
+    ccw_limit: 2.7

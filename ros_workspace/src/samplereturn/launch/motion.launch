@@ -25,15 +25,26 @@
 
       <param name="wheel_diameter" type="double" value="0.314"/>
 
-      <param name="status_publish_interval" type="double" value="15.0"/>
+      <param name="status_publish_interval" type="double" value="1.0"/>
   </node>
 
-  <node machine="navigate" pkg="platform_motion" type="odometry" name="odometry" output="log">
+  <node
+      machine="navigate"
+      pkg="platform_motion"
+      type="EKF_odometry"
+      name="odometry"
+      output="log">
       <param name="wheel_diameter" type="double" value="0.314"/>
       <param name="odom_frame_id" type="string" value="/odom"/>
   </node>
 
-  <node machine="navigate" pkg="platform_motion" type="carousel_indexer.py" name="carousel_indexer" output="log">
+  <node 
+      machine="navigate" 
+      pkg="platform_motion" 
+      type="carousel_indexer.py" 
+      name="carousel_indexer"
+      output="log"
+      ns="carousel">
   </node>
 
 

@@ -6,6 +6,7 @@ import rosnode
 sys.path.append('/opt/ros/groovy/stacks/executive_teer/teer_ros/src')
 import teer_ros
 import actionlib
+import actionlib_msgs.msg as action_msg
 
 import std_msgs.msg as std_msgs
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
@@ -13,6 +14,7 @@ from sound_play.msg import SoundRequest
 import sensor_msgs.msg as sensor_msgs
 import platform_motion.msg as platform_msg
 import platform_motion.srv as platform_srv
+import manipulator.msg as manipulator_msg
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -57,16 +59,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.platform_motion_input_select = \
                 rospy.ServiceProxy("/select_command_source",
                         platform_srv.SelectCommandSource)
-        self.enable_wheelpods = rospy.ServiceProxy('enable_wheel_pods',
-                platform_srv.Enable)
-        self.enable_carousel = rospy.ServiceProxy('enable_carousel',
-                platform_srv.Enable)
 
         # action clients
         self.home_wheelpods = actionlib.SimpleActionClient("/home_wheelpods",
-                platform_msg.HomeAction)
+                                                           platform_msg.HomeAction)
         self.home_carousel = actionlib.SimpleActionClient("/home_carousel",
-                platform_msg.HomeAction)
+                                                          platform_msg.HomeAction)
+        self.home_manipulator = actionlib.SimpleActionClient('/manipulator/manipulator_action',
+                                                             manipulator_msg.ManipulatorAction)
 
     #----   Subscription Handlers ----
     def gpio_update(self, gpio):
@@ -82,6 +82,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def pause_state_update(self, state):
         self.pause_state = state
+        rospy.logdebug("Pause state %s", state)
 
     #----   Publisher Helpers ----
     def announce(self, utterance):
@@ -107,34 +108,60 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     #----   Tasks   ----
     def start_robot(self):
+        yield teer_ros.WaitDuration(2.0)
         camera_ready = lambda: self.navigation_camera_status is not None and \
-                        self.manipulator_camera_status is not None and \
-                        self.navigation_camera_status.data=="Ready" and \
-                        self.manipulator_camera_status.data=="Ready"
+                        self.navigation_camera_status.data=="Ready" #and \
+                        #self.manipulator_camera_status is not None and \
+                        #self.manipulator_camera_status.data=="Ready"
         if not camera_ready():
             self.announce("Waiting for cameras")
             yield teer_ros.WaitCondition(camera_ready)
         enabled = lambda: self.pause_state is not None and \
                           not self.pause_state.data
-        if not enabled():
-            self.announce("Waiting for system enable.")
-            yield teer_ros.WaitCondition(enabled)
-        self.announce("homing")
-        self.platform_motion_input_select("None")
-        yield teer_ros.WaitDuration(0.1)
+
         while True:
             if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6))\
-               and self.home_carousel.wait_for_server(rospy.Duration(1e-6)):
+            and self.home_carousel.wait_for_server(rospy.Duration(1e-6))\
+            and self.home_manipulator.wait_for_server(rospy.Duration(1e-6)):
                 break
             yield teer_ros.WaitDuration(0.1)
-        self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
-        self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
-        while True:
-            wheelpods_done = self.home_wheelpods.wait_for_result(rospy.Duration(1e-6))
-            carousel_done = self.home_carousel.wait_for_result(rospy.Duration(1e-6))
-            if wheelpods_done and carousel_done:
+
+        while True: #this loop waits for a full, successful homing of the system
+            if not enabled():
+                self.announce("Waiting for system enable.")
+                yield teer_ros.WaitCondition(enabled)
+            self.announce("Home ing")
+            
+            working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
+
+            mh_msg = manipulator_msg.ManipulatorGoal()
+            mh_msg.type = 'home'
+            self.home_manipulator.send_goal(mh_msg)
+            while True: #home manipulator first, ensure it is clear of carousel
+                yield teer_ros.WaitDuration(0.1)
+                manipulator_state = self.home_manipulator.get_state()
+                if manipulator_state not in working_states:
+                    break
+            if manipulator_state != action_msg.GoalStatus.SUCCEEDED:
+                yield teer_ros.WaitDuration(0.75)
+                continue
+            
+            self.platform_motion_input_select("None")
+            yield teer_ros.WaitDuration(0.1)
+            self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
+            self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
+            while True:
+                yield teer_ros.WaitDuration(0.10)
+                wheelpods_state = self.home_wheelpods.get_state()
+                carousel_state = self.home_carousel.get_state()
+                if wheelpods_state not in working_states \
+                   and carousel_state not in working_states:
+                    break
+            rospy.logdebug("home results: (%d, %d)", wheelpods_state, carousel_state)
+            if wheelpods_state == action_msg.GoalStatus.SUCCEEDED \
+               and carousel_state == action_msg.GoalStatus.SUCCEEDED:
                 break
-            yield teer_ros.WaitDuration(0.10)
+            yield teer_ros.WaitDuration(0.75)
 
         self.new_task(self.handle_mode_switch())
 
@@ -142,19 +169,20 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitCondition(lambda: self.gpio is not None)
 
         while True:
-            rospy.loginfo("pins: %s", hex(self.gpio.new_pin_states))
+            rospy.logdebug("pins: %s", hex(self.gpio.new_pin_states))
             if self.gpio.new_pin_states&self.GPIO_PIN_MODE_SEARCH == 0:
-                self.announce("Entering Search mode")
+                self.announce("Entering search mode")
                 self.platform_motion_input_select("Planner")
             elif self.gpio.new_pin_states&self.GPIO_PIN_MODE_PRECACHED == 0:
-                self.announce("Retreiving precached sample")
+                self.announce("Entering pree cashed sample mode")
                 self.platform_motion_input_select("Planner")
             else:
                 self.announce("Joystick control enabled")
                 self.platform_motion_input_select("Joystick")
-            pin_states = self.gpio.new_pin_states
+            pin_states =\
+            self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
             yield teer_ros.WaitCondition(
-                    lambda: self.gpio.new_pin_states != pin_states)
+                    lambda: self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH) != pin_states)
 
 
 

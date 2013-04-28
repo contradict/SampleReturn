@@ -1,0 +1,5 @@
+# See Dynamixel documentation for details
+float64 torque
+---
+string result
+float64 position
