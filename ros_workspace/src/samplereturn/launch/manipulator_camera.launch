@@ -149,4 +149,87 @@
         <param name="rot" type="string" value="pi/2"/>
     </node>
 
+    <!-- Rectify images -->
+    <node
+        machine="search"
+        pkg="nodelet"
+        type="nodelet"
+        name="rect"
+        args="load image_proc/rectify /manipulator/manager"
+        ns="/manipulator/left"
+        output="log"
+        respawn="true"
+        >
+    </node>
+    <node
+        machine="search"
+        pkg="nodelet"
+        type="nodelet"
+        name="rect_color"
+        args="load image_proc/rectify /manipulator/manager"
+        ns="/manipulator/left"
+        output="log"
+        respawn="true"
+        >
+        <remap from="image_mono" to="image_color"/>
+        <remap from="image_rect" to="image_rect_color"/>
+    </node>
+    <node
+        machine="search"
+        pkg="nodelet"
+        type="nodelet"
+        name="rect"
+        args="load image_proc/rectify /manipulator/manager"
+        ns="/manipulator/right"
+        output="log"
+        respawn="true"
+        >
+    </node>
+    <node
+        machine="search"
+        pkg="nodelet"
+        type="nodelet"
+        name="rect_color"
+        args="load image_proc/rectify /manipulator/manager"
+        ns="/manipulator/right"
+        output="log"
+        respawn="true"
+        >
+        <remap from="image_mono" to="image_color"/>
+        <remap from="image_rect" to="image_rect_color"/>
+    </node>
+
+    <!-- Compute Stereo -->
+    <node
+        machine="search"
+        pkg="nodelet"
+        type="nodelet"
+        name="stereo_image_disparity"
+        args="load stereo_image_proc/disparity manager"
+        ns="/manipulator"
+        output="log"
+        respawn="true"
+        >
+        <param name="correlation_window_size" type="int" value="17"/>
+        <param name="min_disparity" type="int" value="30"/>
+        <param name="disparity_range" type="int" value="128"/>
+        <param name="uniqueness_ratio" type="int" value="5"/>
+        <param name="texture_threshold" type="int" value="1000"/>
+        <param name="approximate_sync" type="bool" value="true"/>
+    </node>
+
+    <!-- Compute Stereo Point Cloud -->
+    <node
+        machine="search"
+        pkg="nodelet"
+        type="nodelet"
+        name="stereo_image_points"
+        args="load stereo_image_proc/point_cloud2 /manipulator/manager"
+        ns="/manipulator"
+        output="log"
+        respawn="true"
+        >
+        <param name="approximate_sync" type="bool" value="true"/>
+    </node>
+
 </launch>
