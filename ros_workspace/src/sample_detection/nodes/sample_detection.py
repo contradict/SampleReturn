@@ -12,6 +12,7 @@ from cv_bridge import CvBridge
 from tf import TransformListener
 
 class sample_detection(object):
+
   def __init__(self):
     rospy.init_node('sample_detection',anonymous=True)
     self.mono_img_sub = rospy.Subscriber('mono_img',Image, queue_size=1,callback=self.handle_mono_img)
@@ -44,6 +45,12 @@ class sample_detection(object):
       topic = s + '_disparity'
       self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
 
+  def create_point_stamped(self, location):
+    msg = PointStamped()
+    msg.header.stamp = rospy.Time.now()
+    msg.point.x=location[0]
+    msg.point.y=location[1]
+    return msg
 
   def handle_mono_img(self, Image):
     detections = self.find_samples(Image)
@@ -53,8 +60,7 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        now = rospy.get_rostime()
-        self.sample_imgpoints[d].publish(point.x=location[0],point.y=location[1],header.stamp.secs=now.secs,header.stamp.nsecs=now.nsecs)#,header.stamp)
+        self.sample_imgpoints[d].publish(self.create_point_stamped(location))
         # Intersects a camera ray with a flat ground plane
         #self.project_centroid(location)
 
@@ -65,8 +71,7 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        now = rospy.get_rostime()
-        self.sample_imgpoints[d].publish(point.x=location[0],point.y=location[1],header.stamp.secs=now.secs,header.stamp.nsecs=now.nsecs)
+        self.sample_imgpoints[d].publish(self.create_point_stamped(location))
         # For now, only publish the left image as a debug
         self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
         # Grab associated part of disparity image
@@ -89,8 +94,7 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        now = rospy.get_rostime()
-        self.sample_imgpoints[d].publish(point.x=location[0],point.y=location[1],header.stamp.secs=now.secs,header.stamp.nsecs=now.nsecs)
+        self.sample_imgpoints[d].publish(self.create_point_stamped(location))
         # Grab associated part of disparity image
         mask = np.zeros_like(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')))
         cv2.drawContours(mask,[detections[d]['hull']],-1,(255,255,255),-1)
