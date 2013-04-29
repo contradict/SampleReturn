@@ -58,11 +58,13 @@ class LineMOD_Detector
   image_transport::Subscriber color_sub;
   ros::Subscriber depth_sub;
   ros::Subscriber disp_sub;
+  ros::Subscriber cam_info_sub;
   ros::Publisher img_point_pub;
   ros::Publisher point_pub;
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
   cv::Mat display;
+  cv::Mat K;
   cv::Ptr<cv::linemod::Detector> detector;
   int matching_threshold;
   int num_modalities;
@@ -79,10 +81,12 @@ class LineMOD_Detector
     color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
     depth_sub = nh.subscribe("depth", 1, &LineMOD_Detector::depthCallback, this);
     disp_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
+    cam_info_sub = nh.subscribe("cam_info", 1, &LineMOD_Detector::cameraInfoCallback, this);
     img_point_pub = nh.advertise<linemod_detector::NamedPoint>("img_point", 1);
     point_pub = nh.advertise<linemod_detector::NamedPoint>("point", 1);
     matching_threshold = 80;
     got_color = false;
+    K = cv::Mat(3,3,CV_64FC1);
 
     std::string filename;
     ros::param::get("template_file", filename);
@@ -95,6 +99,18 @@ class LineMOD_Detector
     detector = readLinemod(filename);
     num_modalities = (int)detector->getModalities().size();
     std::cout << num_modalities << std::endl;
+  }
+
+  void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  {
+    for (int i = 0; (i < 3); i++)
+    {
+      for (int j = 0; (j < 3); j++)
+      {
+        LineMOD_Detector::K.at<double>(i,j) = msg.K.at(3*i+j);
+      }
+    }
+    std::cout << LineMOD_Detector::K << std::endl;
   }
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
