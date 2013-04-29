@@ -404,7 +404,7 @@ class Image_test
   Image_test(): it(nh)
   {
     color_sub = it.subscribe("color", 1, &Image_test::colorCallback, this);
-    depth_sub = nh.subscribe("disparity", 1, &Image_test::depthCallback, this);
+    depth_sub = nh.subscribe("depth", 1, &Image_test::depthCallback, this);
     cv::namedWindow("color");
     cv::namedWindow("depth");
     cv::namedWindow("mask");
