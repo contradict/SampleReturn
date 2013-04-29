@@ -75,9 +75,9 @@ include_directories(include
 )
 
 ## Declare a cpp library
-# add_library(cv_test
-#   src/${PROJECT_NAME}/cv_test.cpp
-# )
+ add_library(new_modalities
+   src/new_modalities.cpp
+ )
 
 ## Declare a cpp executable
  add_executable(linemod_trainer src/linemod_trainer.cpp)
@@ -89,6 +89,7 @@ include_directories(include
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(linemod_trainer
+   new_modalities
    ${catkin_LIBRARIES}
  )
  target_link_libraries(linemod_detector
