@@ -64,7 +64,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.pause_state_update)
         #rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
         #        self.sample_detection_nav_update)
-        rospy.Subscriber("/red_puck_image_points", geometry_msg.PointStamped,
+        rospy.Subscriber("/red_puck_imgpoints", geometry_msg.PointStamped,
                 self.sample_detection_man_update)
 
         self.transformer = tf.Transformer(False, rospy.Duration(10.0))
