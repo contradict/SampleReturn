@@ -44,6 +44,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         super(SampleReturnScheduler,self).__init__()
 
         # ordinary variables
+        self.last_servo_feedback = None
 
         # node parameters
         self.voice = rospy.get_param("~voice", "kal_diphone")
@@ -224,8 +225,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
 
     def servo_feedback_cb(self, feedback):
-        if len(self.proclamations) == 0:
+        now = rospy.Time.now()
+        if self.last_servo_feedback is None:
+            self.last_servo_feedback = now
             self.announce("distance to sample %3.1f pixels"%feedback.error)
+        if len(self.proclamations) == 0 and\
+           now-self.last_servo_feedback>self.servo_feedback_interval:
+            self.announce("distance to sample %3.1f pixels"%feedback.error)
+            self.last_servo_feedback = now
 
     def get_current_robot_pose(self):
         self.listener.waitForTransform('/map', '/base_link',
