@@ -10,7 +10,7 @@ import actionlib
 import actionlib_msgs.msg as action_msg
 import tf
 
-import std_msgs.msg as std_msgs
+import std_msgs.msg as std_msg
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 from sound_play.msg import SoundRequest
 import sensor_msgs.msg as sensor_msgs
@@ -57,11 +57,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
-        rospy.Subscriber("/navigation/camera_status", std_msgs.String,
+        rospy.Subscriber("/navigation/camera_status", std_msg.String,
                 self.navigation_status_update)
-        rospy.Subscriber("/manipulator/camera_status", std_msgs.String,
+        rospy.Subscriber("/manipulator/camera_status", std_msg.String,
                 self.manipulator_status_update)
-        rospy.Subscriber("/pause_state", std_msgs.Bool,
+        rospy.Subscriber("/pause_state", std_msg.Bool,
                 self.pause_state_update)
         #rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
         #        self.sample_detection_nav_update)
@@ -228,7 +228,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.listener.waitForTransform('/map', '/base_link',
                 rospy.Time(0), rospy.Duration(10.0))
         position, quaternion = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
-        hdr = std_msgs.Header(0, rospy.Time.now(), '/map')
+        hdr = std_msg.Header(0, rospy.Time.now(), '/map')
         pose = geometry_msg.PoseStamped(hdr,
                 geometry_msg.Pose(
                     geometry_msg.Point(*position),
