@@ -25,7 +25,7 @@
 		<param name='camera_right_target_forward_vector_x' type='double' value='16'/>
 		<param name='camera_right_target_forward_vector_y' type='double' value='255'/>
 		<param name='loop_frequency' type='double' value='10.0'/>
-		<param name='new_state_wait_time', type='double' value='1.0'/>
+		<param name='new_state_wait_time' type='double' value='1.0'/>
 		<param name='no_input_stop_wait_time' type='double' value='0.5'/>
 		<param name='proportional_constant_drive_forward' type='double' value='0.0009'/>
 		<param name='integral_constant_drive_forward' type='double' value='0.0'/>
