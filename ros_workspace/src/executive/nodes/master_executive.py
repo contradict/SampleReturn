@@ -197,13 +197,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitCondition(lambda: self.gpio is not None)
 
         while True:
+            tid=None
             rospy.logdebug("pins: %s", hex(self.gpio.new_pin_states))
             if self.gpio.new_pin_states&self.GPIO_PIN_MODE_SEARCH == 0:
                 self.announce("Entering search mode")
                 self.platform_motion_input_select("Planner")
             elif self.gpio.new_pin_states&self.GPIO_PIN_MODE_PRECACHED == 0:
                 self.announce("Entering pree cashed sample mode")
-                self.retrieve_precached_sample()
+                tid = self.new_task(self.retrieve_precached_sample())
             else:
                 self.announce("Joystick control enabled")
                 self.platform_motion_input_select("Joystick")
@@ -211,6 +212,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
             yield teer_ros.WaitCondition(
                     lambda: self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH) != pin_states)
+            if tid is not None:
+                try:
+                    self.kill_task(tid)
+                except:
+                    pass
+
 
 
     def servo_feedback_cb(self, feedback):
@@ -257,10 +264,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitCondition(
                 lambda: self.current_man_sample is not None)
         self.move_base.cancel_goal()
+        yield teer_ros.WaitDuration(0.5)
 
         # switch to visual servo control
-        self.platform_motion_input_select("Servo")
         self.announce("sample in manipulator view, switching to servo control")
+        self.platform_motion_input_select("Servo")
         self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb
                             )
