@@ -83,8 +83,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                                                            platform_msg.HomeAction)
         self.home_carousel = actionlib.SimpleActionClient("/home_carousel",
                                                           platform_msg.HomeAction)
-        self.home_manipulator = actionlib.SimpleActionClient('/manipulator/manipulator_action',
-                                                             manipulator_msg.ManipulatorAction)
+        self.manipulator = actionlib.SimpleActionClient('/manipulator/manipulator_action',
+                                                        manipulator_msg.ManipulatorAction)
 
         self.move_base = actionlib.SimpleActionClient("/planner/move_base",
                 move_base_msg.MoveBaseAction)
@@ -152,7 +152,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         while True:
             if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6))\
             and self.home_carousel.wait_for_server(rospy.Duration(1e-6))\
-            and self.home_manipulator.wait_for_server(rospy.Duration(1e-6)):
+            and self.manipulator.wait_for_server(rospy.Duration(1e-6)):
                 break
             yield teer_ros.WaitDuration(0.1)
 
@@ -164,10 +164,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
             mh_msg = manipulator_msg.ManipulatorGoal()
             mh_msg.type = mh_msg.HOME
-            self.home_manipulator.send_goal(mh_msg)
+            self.manipulator.send_goal(mh_msg)
             while True: #home manipulator first, ensure it is clear of carousel
                 yield teer_ros.WaitDuration(0.1)
-                manipulator_state = self.home_manipulator.get_state()
+                manipulator_state = self.manipulator.get_state()
                 if manipulator_state not in self.working_states:
                     break
             if manipulator_state != action_msg.GoalStatus.SUCCEEDED:
