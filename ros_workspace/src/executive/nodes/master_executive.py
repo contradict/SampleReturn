@@ -97,7 +97,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     #----   Subscription Handlers ----
     def gpio_update(self, gpio):
-        self.gpio = gpio
+        if gpio.servo_id == self.gpio_servo_id:
+            if gpio.new_pin_states != self.gpio.new_pin_states:
+                rospy.loginfo("gpio: %s", gpio)
+            self.gpio = gpio
 
     def navigation_status_update(self, status):
         if self.navigation_camera_status != status:
