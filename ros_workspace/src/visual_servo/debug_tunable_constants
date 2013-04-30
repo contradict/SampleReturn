@@ -1,0 +1,13 @@
+proportional_linear_constant: 0.00090
+integral_linear_constant: 0.0
+derivative_linear_constant: 0.0
+proportional_angular_constant: 0.0017
+integral_angular_constant: 0.0
+derivative_angular_constant: 0.0
+target_window_halfwidth_rotate: 3
+target_window_halfwidth_move_forward: 3
+target_window_halfheight_move_forward: 6
+camera_left_target_pixel_x: 325
+camera_left_target_pixel_y: 256
+camera_right_target_pixel_x: 150
+camera_right_target_pixel_y: 256

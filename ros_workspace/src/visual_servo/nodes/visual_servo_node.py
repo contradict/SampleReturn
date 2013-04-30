@@ -9,10 +9,9 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo
-from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, PidConstants
+from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, TunableConstants
 
 # TODO
-# Rename 'width' and 'height' to 'x' and 'y' where appropriate
 # Remap the inputs and outputs in the launch file and create better names for the publish and subscription
 # strings here.
 
@@ -25,43 +24,40 @@ class VisualServo:
 	"""A class to position the robot so that it can pick up an object with the manipulator"""
 	
 	def __init__(self):
-		self._safe_region_percentage = rospy.get_param('safe_region_percentage', 0.1)
-		self._camera_left_width = -1
-		self._camera_left_height = -1
-		self._camera_right_width = -1
-		self._camera_right_height = -1
-		self._camera_left_width_window_rotate = rospy.get_param('camera_left_width_window_rotate', 3)
-		self._camera_right_width_window_rotate = rospy.get_param('camera_right_width_window_rotate', 3)
-		self._camera_left_width_window_forward = rospy.get_param('camera_left_width_window_forward', 6)
-		self._camera_left_height_window_forward = rospy.get_param('camera_left_height_window_forward', 8)
-		self._camera_right_width_window_forward = rospy.get_param('camera_right_width_window_forward', 6)
-		self._camera_right_height_window_forward = rospy.get_param('camera_right_height_window_forward', 8)
-		self._camera_left_target_width = rospy.get_param('camera_left_target_width', 317)
-		self._camera_right_target_width = rospy.get_param('camera_right_target_width', 150)
-		self._camera_left_target_height = rospy.get_param('camera_left_target_height', 256)
-		self._camera_right_target_height = rospy.get_param('camera_right_target_height', 256)
-		self._camera_left_target_forward_vector_x = rospy.get_param('camera_left_target_forward_vector_x', -16)
-		self._camera_left_target_forward_vector_y = rospy.get_param('camera_left_target_forward_vector_y', -255)
-		self._camera_right_target_forward_vector_x = rospy.get_param('camera_right_target_forward_vector_x', 16)
-		self._camera_right_target_forward_vector_y = rospy.get_param('camera_right_target_forward_vector_y', 255)
-		self._loop_frequency = rospy.get_param('loop_frequency', 10.0)
-		self._new_state_wait_time = rospy.get_param('new_state_wait_time', 1.0)
+		self._safe_region_percentage = rospy.get_param('~safe_region_percentage', 0.1)
+		self._camera_left_image_width = -1
+		self._camera_left_image_height = -1
+		self._camera_right_image_width = -1
+		self._camera_right_image_height = -1
+		self._target_window_halfwidth_rotate = rospy.get_param('~target_window_halfwidth_rotate', 3)
+		self._target_window_halfwidth_move_forward = rospy.get_param('~target_window_halfwidth_move_forward', 6)
+		self._target_window_halfheight_move_forward = rospy.get_param('~target_window_halfheight_move_forward', 8)
+		self._camera_left_target_pixel_x = rospy.get_param('~camera_left_target_pixel_x', 317)
+		self._camera_right_target_pixel_x = rospy.get_param('~camera_right_target_pixel_x', 150)
+		self._camera_left_target_pixel_y = rospy.get_param('~camera_left_target_pixel_y', 256)
+		self._camera_right_target_pixel_y = rospy.get_param('~camera_right_target_pixel_y', 256)
+		self._camera_left_target_forward_vector_x = rospy.get_param('~camera_left_target_forward_vector_x', -16)
+		self._camera_left_target_forward_vector_y = rospy.get_param('~camera_left_target_forward_vector_y', -255)
+		self._camera_right_target_forward_vector_x = rospy.get_param('~camera_right_target_forward_vector_x', 16)
+		self._camera_right_target_forward_vector_y = rospy.get_param('~camera_right_target_forward_vector_y', 255)
+		self._loop_frequency = rospy.get_param('~loop_frequency', 10.0)
+		self._new_state_wait_time = rospy.get_param('~new_state_wait_time', 1.0)
 		self._new_state_wait_timer = 0.0
-		self._no_input_stop_wait_time = rospy.get_param('no_input_stop_wait_time', 0.5)
+		self._no_input_stop_wait_time = rospy.get_param('~no_input_stop_wait_time', 0.5)
 		self._stop_wait_timer = 0.0
-		self._proportional_constant_drive_forward = rospy.get_param('proportional_constant_drive_forward', 0.01)
-		self._integral_constant_drive_forward = rospy.get_param('integral_constant_drive_forward', 0.0)
-		self._derivative_constant_drive_forward = rospy.get_param('derivative_constant_drive_forward', 0.0)
-		self._proportional_constant_rotate = rospy.get_param('proportional_constant_rotate', 0.01)
-		self._integral_constant_rotate = rospy.get_param('integral_constant_rotate', 0.0)
-		self._derivative_constant_rotate = rospy.get_param('derivative_constant_rotate', 0.0)
+		self._proportional_constant_drive_forward = rospy.get_param('~proportional_constant_drive_forward', 0.01)
+		self._integral_constant_drive_forward = rospy.get_param('~integral_constant_drive_forward', 0.0)
+		self._derivative_constant_drive_forward = rospy.get_param('~derivative_constant_drive_forward', 0.0)
+		self._proportional_constant_rotate = rospy.get_param('~proportional_constant_rotate', 0.01)
+		self._integral_constant_rotate = rospy.get_param('~integral_constant_rotate', 0.0)
+		self._derivative_constant_rotate = rospy.get_param('~derivative_constant_rotate', 0.0)
 		self.goto_state(VisualServoStates.SAFE_REGION)
 		self.reset()
 
 		rospy.Subscriber('/red_puck_imgpoints', PointStamped, self.object_point_callback, None, 1)
 		rospy.Subscriber('/navigation/left/camera_info', CameraInfo, self.camera_left_info_callback, None, 1)
 		rospy.Subscriber('/navigation/right/camera_info', CameraInfo, self.camera_right_info_callback, None, 1)
-		rospy.Subscriber('/debug/update_pid_constants', PidConstants, self.update_pid_constants, None, 1)
+		rospy.Subscriber('/debug/debug_update_constants', TunableConstants, self.debug_update_constants, None, 1)
 		self._publisher = rospy.Publisher('/servo_command', Twist)
 
 		self._visual_servo_result = VisualServoResult()
@@ -75,23 +71,20 @@ class VisualServo:
 		self._previous_point = False
 		self.reset_pid_controller()
 
-	def update_pid_constants(self, pid_constants):
-		self._proportional_constant_drive_forward = pid_constants.proportional_linear_constant
-		self._integral_constant_drive_forward = pid_constants.integral_linear_constant
-		self._derivative_constant_drive_forward = pid_constants.derivative_linear_constant
-		self._proportional_constant_rotate = pid_constants.proportional_angular_constant
-		self._integral_constant_rotate = pid_constants.integral_angular_constant
-		self._derivative_constant_rotate = pid_constants.derivative_angular_constant
-		self._camera_left_width_window_rotate = pid_constants.camera_left_width_window_rotate
-		self._camera_right_width_window_rotate = pid_constants.camera_right_width_window_rotate
-		self._camera_left_width_window_forward = pid_constants.camera_left_width_window_forward
-		self._camera_left_height_window_forward = pid_constants.camera_left_height_window_forward
-		self._camera_right_width_window_forward = pid_constants.camera_right_width_window_forward
-		self._camera_right_height_window_forward = pid_constants.camera_right_height_window_forward
-		self._camera_left_target_width = pid_constants.camera_left_target_width
-		self._camera_left_target_height = pid_constants.camera_left_target_height
-		self._camera_right_target_width = pid_constants.camera_right_target_width
-		self._camera_right_target_height = pid_constants.camera_right_target_height
+	def debug_update_constants(self, tunable_constants):
+		self._proportional_constant_drive_forward = tunable_constants.proportional_linear_constant
+		self._integral_constant_drive_forward = tunable_constants.integral_linear_constant
+		self._derivative_constant_drive_forward = tunable_constants.derivative_linear_constant
+		self._proportional_constant_rotate = tunable_constants.proportional_angular_constant
+		self._integral_constant_rotate = tunable_constants.integral_angular_constant
+		self._derivative_constant_rotate = tunable_constants.derivative_angular_constant
+		self._target_window_halfwidth_rotate = tunable_constants.target_window_halfwidth_rotate
+		self._target_window_halfwidth_move_forward = tunable_constants.target_window_halfwidth_move_forward
+		self._target_window_halfheight_move_forward = tunable_constants.target_window_halfheight_move_forward
+		self._camera_left_target_pixel_x = tunable_constants.camera_left_target_pixel_x
+		self._camera_left_target_pixel_y = tunable_constants.camera_left_target_pixel_y
+		self._camera_right_target_pixel_x = tunable_constants.camera_right_target_pixel_x
+		self._camera_right_target_pixel_y = tunable_constants.camera_right_target_pixel_y
 
 
 	def goto_state(self, new_state):
@@ -99,8 +92,8 @@ class VisualServo:
 		self._new_state_wait_timer = self._new_state_wait_time
 		self.reset_pid_controller()
 
-	def get_target_forward_line_width_at_height(self, height):
-		return (height - self._camera_left_target_height)*self._camera_left_target_forward_vector_x/self._camera_left_target_forward_vector_y + self._camera_left_target_width
+	def get_target_forward_line_pixel_x(self, pixel_y):
+		return (pixel_y - self._camera_left_target_pixel_y)*self._camera_left_target_forward_vector_x/self._camera_left_target_forward_vector_y + self._camera_left_target_pixel_x
 
 	def reset_pid_controller(self):
 		self._previous_error = 0
@@ -126,7 +119,7 @@ class VisualServo:
 
 	def object_point_callback(self, data):
 		# This function receives a centroid location of an object in pixel space
-		if self._camera_left_width > 0 and self._camera_left_height > 0 and self._camera_right_width > 0 and self._camera_right_height > 0:
+		if self._camera_left_image_width > 0 and self._camera_left_image_height > 0 and self._camera_right_image_width > 0 and self._camera_right_image_height > 0:
 			rospy.loginfo(rospy.get_name() + ": received point %s" % data.point)
 
 			self._previous_point = data.point
@@ -166,15 +159,15 @@ class VisualServo:
 			self._stop_wait_timer = 0.0
 
 		# Set the action server error feedback to the distance between the centroid and the target location
-		self._visual_servo_feedback.error = math.sqrt((point.x-self._camera_left_target_width)*(point.x-self._camera_left_target_width)+(point.y-self._camera_left_target_height)*(point.y-self._camera_left_target_height))
+		self._visual_servo_feedback.error = math.sqrt((point.x-self._camera_left_target_pixel_x)*(point.x-self._camera_left_target_pixel_x)+(point.y-self._camera_left_target_pixel_y)*(point.y-self._camera_left_target_pixel_y))
 
 		# Debug output
 		rospy.loginfo(rospy.get_name() + "Current state: %s" % self._visual_servo_state)
 
 		if self._visual_servo_state == VisualServoStates.SAFE_REGION:
 			# If the object is near the top of the image, move forward
-			if point.y < self._camera_left_height*self._safe_region_percentage:
-				error = self._camera_left_height*(self._safe_region_percentage+0.05) - point.y
+			if point.y < self._camera_left_image_height*self._safe_region_percentage:
+				error = self._camera_left_image_height*(self._safe_region_percentage+0.05) - point.y
 				pid_controller_output = self.update_pid_controller(error, delta_time)
 				twist.angular.z = 0.0
 				twist.angular.y = 0.0
@@ -183,8 +176,8 @@ class VisualServo:
 				twist.linear.y = 0.0
 				twist.linear.z = 0.0
 			# Else if the object is near the bottom of the image, move backwards
-			elif point.y > self._camera_left_height*(1.0-self._safe_region_percentage):
-				error = point.y - self._camera_left_height*(1.0-self._safe_region_percentage-0.05)
+			elif point.y > self._camera_left_image_height*(1.0-self._safe_region_percentage):
+				error = point.y - self._camera_left_image_height*(1.0-self._safe_region_percentage-0.05)
 				pid_controller_output = self.update_pid_controller(error, delta_time)
 				twist.angular.z = 0.0
 				twist.angular.y = 0.0
@@ -196,9 +189,9 @@ class VisualServo:
 				self.goto_state(VisualServoStates.ROTATE)
 
 		if self._visual_servo_state == VisualServoStates.ROTATE:
-			target_width = self.get_target_forward_line_width_at_height(point.y)
+			target_width = self.get_target_forward_line_pixel_x(point.y)
 			# If the object is not at the target width, rotate until it is
-			if point.x > target_width+self._camera_left_width_window_rotate:
+			if point.x > target_width+self._target_window_halfwidth_rotate:
 				error = point.x - target_width
 				pid_controller_output = self.update_pid_controller(error, delta_time)
 				twist.angular.z = -pid_controller_output
@@ -207,7 +200,7 @@ class VisualServo:
 				twist.linear.x = 0.0
 				twist.linear.y = 0.0
 				twist.linear.z = 0.0
-			elif point.x < target_width-self._camera_left_width_window_rotate:
+			elif point.x < target_width-self._target_window_halfwidth_rotate:
 				error = target_width - point.x
 				pid_controller_output = self.update_pid_controller(error, delta_time)
 				twist.angular.z = pid_controller_output
@@ -221,13 +214,13 @@ class VisualServo:
 
 		if self._visual_servo_state == VisualServoStates.MOVE_FORWARD:
 			# Make sure the object is still aligned with the forward line
-			target_width = self.get_target_forward_line_width_at_height(point.y)
-			if point.x > target_width+self._camera_left_width_window_forward or point.x < target_width-self._camera_left_width_window_forward:
+			target_width = self.get_target_forward_line_pixel_x(point.y)
+			if point.x > target_width+self._target_window_halfwidth_move_forward or point.x < target_width-self._target_window_halfwidth_move_forward:
 				self.goto_state(VisualServoStates.ROTATE)
 			else:
 				# If the object is not aligned at the right location along the forward vector in the image, move forward or backwards
-				if point.y < (self._camera_left_target_height-self._camera_left_height_window_forward):
-					error = self._camera_left_target_height-self._camera_left_height_window_forward-point.y
+				if point.y < (self._camera_left_target_pixel_y-self._target_window_halfheight_move_forward):
+					error = self._camera_left_target_pixel_y-self._target_window_halfheight_move_forward-point.y
 					pid_controller_output = self.update_pid_controller(error, delta_time)
 					twist.angular.z = 0.0
 					twist.angular.y = 0.0
@@ -235,8 +228,8 @@ class VisualServo:
 					twist.linear.x = pid_controller_output
 					twist.linear.y = 0.0
 					twist.linear.z = 0.0
-				elif point.y > (self._camera_left_target_height+self._camera_left_height_window_forward):
-					error = point.y-(self._camera_left_target_height+self._camera_left_height_window_forward)
+				elif point.y > (self._camera_left_target_pixel_y+self._target_window_halfheight_move_forward):
+					error = point.y-(self._camera_left_target_pixel_y+self._target_window_halfheight_move_forward)
 					pid_controller_output = self.update_pid_controller(error, delta_time)
 					twist.angular.z = 0.0
 					twist.angular.y = 0.0
@@ -297,12 +290,12 @@ class VisualServo:
 		self._publisher.publish(twist)
 
 	def camera_left_info_callback(self, data):
-		self._camera_left_width = data.width;
-		self._camera_left_height = data.height;
+		self._camera_left_image_width = data.width;
+		self._camera_left_image_height = data.height;
 
 	def camera_right_info_callback(self, data):
-		self._camera_right_width = data.width;
-		self._camera_right_height = data.height;
+		self._camera_right_image_width = data.width;
+		self._camera_right_image_height = data.height;
 
 	def run_visual_servo_action(self, goal):
 		update_rate = rospy.Rate(self._loop_frequency)
