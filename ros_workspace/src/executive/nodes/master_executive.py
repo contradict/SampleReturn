@@ -46,14 +46,17 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # ordinary variables
 
         # node parameters
-        self.voice = rospy.get_param("voice", "kal_diphone")
-        self.maximum_desync = rospy.get_param("maximum_desync", 0.10)
-        self.desync_wait_count = rospy.get_param("desync_wait_count", 5)
-        self.resync_wait = rospy.get_param("resync_wait", 10)
-        self.speech_delay = rospy.get_param("speech_delay", 0.8)
-        self.speech_rate = rospy.get_param("speech_rate", 0.07)
-        self.precached_sample_distance = rospy.get_param("precached_sample_distance", 2.0)
+        self.voice = rospy.get_param("~voice", "kal_diphone")
+        self.maximum_desync = rospy.get_param("~maximum_desync", 0.10)
+        self.desync_wait_count = rospy.get_param("~desync_wait_count", 5)
+        self.resync_wait = rospy.get_param("~resync_wait", 10)
+        self.speech_delay = rospy.get_param("~speech_delay", 0.8)
+        self.speech_rate = rospy.get_param("~speech_rate", 0.07)
+        self.precached_sample_distance = rospy.get_param("~precached_sample_distance", 2.0)
         rospy.loginfo("distance: %f", self.precached_sample_distance)
+        self.servo_feedback_interval =\
+            rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
+        self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
