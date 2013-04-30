@@ -52,7 +52,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.resync_wait = rospy.get_param("resync_wait", 10)
         self.speech_delay = rospy.get_param("speech_delay", 0.8)
         self.speech_rate = rospy.get_param("speech_rate", 0.07)
-        self.precached_sample_distance = rospy.get_param("precached_sample_distance", 10.0)
+        self.precached_sample_distance = rospy.get_param("precached_sample_distance", 2.0)
+        rospy.loginfo("distance: %f", self.precached_sample_distance)
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
