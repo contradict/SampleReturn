@@ -71,6 +71,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         #        self.sample_detection_nav_update)
         rospy.Subscriber("/red_puck_imgpoints", geometry_msg.PointStamped,
                 self.sample_detection_man_update)
+        rospy.Subscriber("/sample_distance", std_msg.Float64,
+                self.sample_distance_update)
 
         self.listener = tf.TransformListener()
 
@@ -120,6 +122,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def sample_detection_man_update(self, msg):
         self.current_man_sample = msg
+
+    def sample_distance_update(self, msg):
+        self.precached_sample_distance = msg.data
+        rospy.loginfo("Set sample distance to %f",
+                self.precached_sample_distance)
 
     #----   Publisher Helpers ----
     def announce(self, utterance):
@@ -253,7 +260,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         rospy.loginfo('start pose: %s', start_pose)
         hdr = std_msg.Header(0, rospy.Time(0), '/base_link')
         ahead=geometry_msg.PointStamped(hdr,
-                geometry_msg.Point(1.0, 0, 0))
+                geometry_msg.Point(self.precached_sample_distance, 0, 0))
         desired_pt=self.listener.transformPoint('/map', ahead)
         rospy.loginfo("desired_pt: %s", desired_pt)
         # at desired_pt
