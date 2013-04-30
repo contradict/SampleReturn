@@ -222,7 +222,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def servo_feedback_cb(self, feedback):
         if len(self.proclamations) == 0:
-            self.announce("distance to sample %3.1 meters"%feedback.distance)
+            self.announce("distance to sample %3.1f pixels"%feedback.error)
 
     def get_current_robot_pose(self):
         self.listener.waitForTransform('/map', '/base_link',
