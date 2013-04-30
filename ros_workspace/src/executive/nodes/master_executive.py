@@ -68,7 +68,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         rospy.Subscriber("/red_puck_imgpoints", geometry_msg.PointStamped,
                 self.sample_detection_man_update)
 
-        self.transformer = tf.Transformer(False, rospy.Duration(10.0))
+        self.listener = tf.TransformListener()
 
         # create publishers
         self.navigation_audio=rospy.Publisher("/audio/navigate", SoundRequest)
@@ -217,21 +217,40 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         if len(self.proclamations) == 0:
             self.announce("distance to sample %3.1 meters"%feedback.distance)
 
+    def get_current_robot_pose(self):
+        self.listener.waitForTransform('/map', '/base_link',
+                rospy.Time(0), rospy.Duration(10.0))
+        position, quaternion = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
+        hdr = std_msgs.Header(0, rospy.Time.now(), '/map')
+        pose = geometry_msg.PoseStamped(hdr,
+                geometry_msg.Pose(
+                    geometry_msg.Point(*position),
+                    geometry_msg.Quaternion(*quaternion)))
+        return pose
+
     def retrieve_precached_sample(self):
 
         # set sample to None so we know when the first point arrives
         self.current_man_sample = None
+        # write down sart pose
+        start_pose = self.get_current_robot_pose()
+        rospy.loginfo('start pose: %s', start_pose)
         # switch control to the motion planner and drive to the expected
         # position
+
+        hdr = std_msgs.Header(0, rospy.Time(0), '/base_link')
+        ahead=geometry_msg.PointStamped(hdr,
+                geometry_msg.Point(self.precached_sample_distance, 0, 0))
+        desired_pt=self.listener.transformPoint('/map', ahead)
+        rospy.loginfo("desired_pt: %s", desired_pt)
+
         self.platform_motion_input_select("Planner")
+        hdr = std_msgs.Header(0, rospy.Time(0), '/map')
         expected_position = move_base_msg.MoveBaseGoal()
-        expected_position.target_pose.header.stamp=rospy.Time.now()
-        expected_position.target_pose.header.frame_id='/map'
-        expected_position.target_pose.pose.position.x=self.precached_sample_distance
-        expected_position.target_pose.pose.position.y=0
-        expected_position.target_pose.pose.position.z=0
-        expected_position.target_pose.pose.orientation= \
-          geometry_msg.Quaterion(*tf.transformations.quaternion_from_euler(0,0,0))
+        expected_position.target_pose = \
+            geometry_msg.PoseStamped(hdr, start_pose.pose)
+        expected_position.target_pose.pose.position=desired_pt.point
+        rospy.loginfo('expected postion: %s', expected_position.target_pose)
         self.announce("Moving to expected sample position")
         self.move_base.send_goal(expected_position)
         # wait for the manipulator camera to see the object
@@ -270,10 +289,15 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         spin_goal = move_base_msg.MoveBaseGoal()
         spin_goal.target_pose.header.stamp=rospy.Time.now()
         spin_goal.target_pose.header.frame_id='/map'
-        current_pose = transformer.lookupTransform('/base_link', '/map', rospy.Time(0))
-        spin_goal.target_pose.pose.position = geometry_msg.Pose(*current_pose.origin)
-        spin_goal.target_pose.pose.orientation= \
-          geometry_msg.Quaterion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
+        current_pose = self.get_current_robot_pose()
+        spin_goal.target_pose.pose = current_pose.pose
+        around = tf.transformations.quaternion_from_euler(0,0,math.pi)
+        q1 = (start_pose.pose.orientation.x, start_pose.pose.orientation.y,
+                start_pose.pose.orientation.z, start_pose.pose.orientation.w)
+        spin_goal.target_pose.pose.orientation=\
+                geometry_msg.Quaternion(*tf.transformations.quaternion_multiply(around, q1))
+        rospy.loginfo("spin goal: %s", spin_goal)
+        self.platform_motion_input_select("Planner")
         self.move_base.send_goal(spin_goal)
         while True:
             yield teer_ros.WaitDuration(0.1)
@@ -284,11 +308,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         home_goal = move_base_msg.MoveBaseGoal()
         home_goal.target_pose.header.stamp=rospy.Time.now()
         home_goal.target_pose.header.frame_id='/map'
-        home_goal.target_pose.pose.position.x=0
-        home_goal.target_pose.pose.position.y=0
-        home_goal.target_pose.pose.position.z=0
-        home_goal.target_pose.pose.orientation= \
-          geometry_msg.Quaterion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
+        hdr = std_msgs.Header(0, rospy.Time(0), '/map')
+        home_goal.target_pose=\
+            geometry_msg.PoseStamped(hdr, start_pose.pose)
+        home_goal.target_pose.pose.orientation=\
+            spin_goal.target_pose.pose.orientation
+        rospy.loginfo("home goal: %s", home_goal)
         self.move_base.send_goal(home_goal)
         while True:
             yield teer_ros.WaitDuration(0.1)
