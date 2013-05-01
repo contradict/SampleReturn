@@ -277,7 +277,7 @@ class LineMOD_Detector
     cv::Rect r(m.x,m.y,templates[1].width,templates[1].height);
     cv::Mat r_img = depth(r).clone();
     r_img.convertTo(r_img, CV_32F);
-    cv::imshow("r_img",r_img);
+    //cv::imshow("r_img",r_img);
     char key = (char)cv::waitKey(10);
     int count = cv::countNonZero(r_img);
     if (count > LineMOD_Detector::min_count)
