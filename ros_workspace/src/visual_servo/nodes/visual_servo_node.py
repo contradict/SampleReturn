@@ -175,9 +175,9 @@ class VisualServo:
 				twist.linear.x = pid_controller_output
 				twist.linear.y = 0.0
 				twist.linear.z = 0.0
-			# Else if the object is near the bottom of the image, move backwards
-			elif point.y > self._camera_left_image_height*(1.0-self._safe_region_percentage):
-				error = point.y - self._camera_left_image_height*(1.0-self._safe_region_percentage-0.05)
+			# Else if the object is below the target point, move backwards
+			elif point.y > self._camera_left_target_pixel_y+(self._camera_left_image_height*self._safe_region_percentage):
+				error = point.y - self._camera_left_target_pixel_y+(self._camera_left_image_height*self._safe_region_percentage)
 				pid_controller_output = self.update_pid_controller(error, delta_time)
 				twist.angular.z = 0.0
 				twist.angular.y = 0.0
