@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Test launch for the sample_detection node -->
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+      <node
+        pkg="linemod_detector"
+        type="linemod_detector"
+        name="manipulator_linemod_detector">
+      <remap from="color" to="/manipulator/left/image_rect_color"/>
+      <remap from="disparity" to="/manipulator/stereo/disparity"/>
+      <param name="template_file" type="string" value="$(find linemod_detector)/config/test.yaml"/>
+      <param name="pub_threshold" type="float" value="90.0"/>
+      <param name="min_depth" type="float" value="100.0"/>
+      <param name="max_depth" type="float" value="1000.0"/>
+      <param name="min_count" type="float" value="100.0"/>
+    </node>
+</launch>
