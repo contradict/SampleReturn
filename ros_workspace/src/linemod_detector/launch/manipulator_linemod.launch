@@ -3,6 +3,7 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
       <node
+        machine="search"
         pkg="linemod_detector"
         type="linemod_detector"
         name="manipulator_linemod_detector">
