@@ -7,6 +7,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
+#include "new_modalities.hpp"
 
 static const char WINDOW[] = "image window";
 
@@ -256,6 +257,30 @@ void subtractPlane(const cv::Mat& depth, cv::Mat& mask, std::vector<CvPoint>& ch
   filterPlane(&depth_ipl, tmp, chain, f);
 }
 
+void computeColorMask(const cv::Mat& color, cv::Mat& mask, int l_size, int a_size, int b_size, int win_size)
+{
+  mask = cv::Mat::zeros(color.size(), CV_8U);
+  cv::Mat win_mask = cv::Mat::ones(color.size(), CV_8U)*255;
+  int h_height = color.size().height/2;
+  int h_width = color.size().width/2;
+  cv::Rect r(h_width-win_size,h_height-win_size,2*win_size,2*win_size);
+  cv::Mat roi(win_mask,r);
+  roi = cv::Scalar(0);
+  cv::Vec3b color_pt = color.at<cv::Vec3b>(color.size().height/2, color.size().width/2);
+  std::cout << "Target Color: " << color_pt << std::endl;
+  cv::Vec3b buffer;
+  buffer[0] = l_size;
+  buffer[1] = a_size;
+  buffer[2] = b_size;
+  cv::Vec3b lower = color_pt - buffer;
+  cv::Vec3b upper = color_pt + buffer;
+  cv::inRange(color, lower, upper, mask);
+  mask.setTo(0,win_mask);
+  cv::imshow("win_mask", win_mask);
+  cv::imshow("exp_color_mask", mask);
+}
+
+
 std::vector<CvPoint> maskFromTemplate(const std::vector<cv::linemod::Template>& templates,
                                       int num_modalities, cv::Point offset, cv::Size size,
                                       cv::Mat& mask, cv::Mat& dst)
@@ -399,6 +424,10 @@ class Image_test
   bool learn_online;
   bool got_color;
   int win_size;
+  int l_size;
+  int a_size;
+  int b_size;
+  std::string filename;
 
   public:
   Image_test(): it(nh)
@@ -411,11 +440,16 @@ class Image_test
     matching_threshold = 80;
     got_color = false;
     win_size = 50;
+    l_size = 5;
+    a_size = 10;
+    b_size = 10;
 
     // Initialize LINEMOD data structures
-    std::string filename;
+    Image_test::filename = "pre_cached.yaml";
+    //detector = cv::linemod::getExpandedLINEMOD();
     //detector = cv::linemod::getDefaultLINEMOD();
-    detector = readLinemod("test");
+    detector = cv::linemod::getDefaultLINE();
+    //detector = readLinemod(filename);
     num_modalities = (int)detector->getModalities().size();
     std::cout << num_modalities << std::endl;
   }
@@ -426,8 +460,8 @@ class Image_test
     {
       return;
     }
-    std::string filename;
-    filename = "test";
+    //std::string filename;
+    //filename = "test2";
     cv_bridge::CvImagePtr depth_ptr;
     bool show_match_result = true;
     try
@@ -440,23 +474,25 @@ class Image_test
       return;
     }
     Image_test::sources.push_back(Image_test::color_img);
-    Image_test::sources.push_back(depth_ptr->image);
+    //Image_test::sources.push_back(depth_ptr->image);
+    //Image_test::sources.push_back(Image_test::color_img);
 
       cv::Point pt1((depth_ptr->image.cols/2)-Image_test::win_size,(depth_ptr->image.rows/2)-Image_test::win_size);
       cv::Point pt2((depth_ptr->image.cols/2)+Image_test::win_size,(depth_ptr->image.rows/2)+Image_test::win_size);
       std::vector<CvPoint> chain(4);
-      //std::cout << depth_ptr->image.at<double>(100,100) << std::endl;
       chain[0] = pt1;
       chain[1] = cv::Point(pt2.x, pt1.y);
       chain[2] = pt2;
       chain[3] = cv::Point(pt1.x, pt2.y);
       cv::Mat mask;
+      cv::Mat color_mask;
       double focal_length = 525.0;
       subtractPlane(depth_ptr->image, mask, chain, focal_length);
+      computeColorMask(Image_test::color_img, color_mask, Image_test::l_size, Image_test::a_size, Image_test::b_size, Image_test::win_size);
 
       cv::imshow("mask", mask);
+      cv::imshow("test_color_mask", color_mask);
 
-      cv::imshow("depth", depth_ptr->image);
       char key = (char)cv::waitKey(10);
       if (key == 'q')
       {
@@ -470,7 +506,8 @@ class Image_test
         //int num_classes = 0;
         std::string class_id = cv::format("class%d", Image_test::num_classes);
         cv::Rect bb;
-        int template_id = detector->addTemplate(Image_test::sources, class_id, mask, &bb);
+        //int template_id = detector->addTemplate(Image_test::sources, class_id, mask, &bb);
+        int template_id = detector->addTemplate(Image_test::sources, class_id, color_mask, &bb);
         std::cout << "Template ID: " << template_id << std::endl;
         if (template_id != -1)
         {
@@ -481,8 +518,8 @@ class Image_test
       }
       else if (key == 'w')
       {
-        writeLinemod(detector, filename);
-        printf("Wrote detector and templates to %s\n", filename.c_str());
+        writeLinemod(detector, Image_test::filename);
+        printf("Wrote detector and templates to %s\n", Image_test::filename.c_str());
       }
       else if (key == 'o')
       {
@@ -499,18 +536,48 @@ class Image_test
       else if (key == '[')
       {
         Image_test::win_size += 5;
+        std::cout << "Win size: " << win_size << std::endl;
       }
       else if (key == ']')
       {
         Image_test::win_size -= 5;
+        std::cout << "Win size: " << win_size << std::endl;
+      }
+      else if (key == 'a')
+      {
+        Image_test::a_size -= 2;
+        std::cout << "a size: " << a_size << std::endl;
+      }
+      else if (key == 'A')
+      {
+        Image_test::a_size += 2;
+        std::cout << "a size: " << a_size << std::endl;
+      }
+      else if (key == 'l')
+      {
+        Image_test::l_size -= 2;
+        std::cout << "l size: " << l_size << std::endl;
+      }
+      else if (key == 'L')
+      {
+        Image_test::l_size += 2;
+        std::cout << "l size: " << l_size << std::endl;
+      }
+      else if (key == 'b')
+      {
+        Image_test::b_size -= 2;
+        std::cout << "b size: " << b_size << std::endl;
+      }
+      else if (key == 'B')
+      {
+        Image_test::b_size += 2;
+        std::cout << "b size: " << b_size << std::endl;
       }
 
       // Perform matching
-      //std::cout << "Perform Matching" << std::endl;
       std::vector<cv::linemod::Match> matches;
       std::vector<std::string> class_ids;
       std::vector<cv::Mat> quantized_images;
-      //std::cout << "Detector match" << std::endl;
       Image_test::detector->match(sources, (float)Image_test::matching_threshold, matches, class_ids, quantized_images);
 
       Image_test::num_classes = detector->numClasses();
@@ -520,10 +587,8 @@ class Image_test
       int learning_lower_bound = 90;
       int learning_upper_bound = 95;
 
-      //std::cout << "Entering matching loop" << std::endl;
       for (int i = 0; (i < (int)matches.size()) && (classes_visited < Image_test::num_classes); ++i)
       {
-        //std::cout << "Matching now: " << i << std::endl;
         cv::linemod::Match m = matches[i];
 
         if (visited.insert(m.class_id).second)
@@ -537,12 +602,11 @@ class Image_test
           }
 
           // Draw matching template
-          //std::cout << "Time to draw" << std::endl;
           const std::vector<cv::linemod::Template>& templates = Image_test::detector->getTemplates(m.class_id, m.template_id);
-          //std::cout << "Got dem templates" << std::endl;
-          //std::cout << "Calling num_modalities: " << Image_test::num_modalities << std::endl;
           drawResponse(templates, Image_test::num_modalities, Image_test::display, cv::Point(m.x, m.y), Image_test::detector->getT(0));
-          //std::cout << "Drawing Complete!" << std::endl;
+          //cv::circle(Image_test::display, cv::Point(m.x + templates[m.template_id].width/2, m.y + templates[m.template_id].height/2), 20, CV_RGB(0,255,255));
+          cv::circle(Image_test::display, cv::Point(m.x + templates[1].width/2, m.y + templates[1].height/2), 20, CV_RGB(0,255,255));
+          std::cout << templates[m.template_id].width << std::endl;
 
           if (Image_test::learn_online)
           {
@@ -555,16 +619,17 @@ class Image_test
             std::vector<CvPoint> chain = maskFromTemplate(templates, Image_test::num_modalities,
                                                           cv::Point(m.x, m.y), Image_test::color_img.size(),
                                                           color_mask, Image_test::display);
+            //cv::imshow("color_mask", color_mask);
             subtractPlane(depth_ptr->image, depth_mask, chain, focal_length);
+            computeColorMask(Image_test::color_img, color_mask, Image_test::l_size, Image_test::a_size, Image_test::b_size, Image_test::win_size);
 
             cv::imshow("mask", depth_mask);
 
             // If pretty sure (but not TOO sure), add new template
             if (learning_lower_bound < m.similarity && m.similarity < learning_upper_bound)
             {
-              //extract_timer.start();
-              int template_id = Image_test::detector->addTemplate(sources, m.class_id, depth_mask);
-              //extract_timer.stop();
+              //int template_id = Image_test::detector->addTemplate(sources, m.class_id, depth_mask);
+              int template_id = Image_test::detector->addTemplate(sources, m.class_id, color_mask);
               std::cout << "Online template_id: " << template_id << std::endl;
               if (template_id != -1)
               {
@@ -578,8 +643,8 @@ class Image_test
 
       Image_test::sources.clear();
       cv::imshow("display",display);
-      cv::imshow("color_gradient",quantized_images[0]);
-      cv::imshow("depth_normals",quantized_images[1]);
+      //cv::imshow("color_gradient",quantized_images[0]);
+      //cv::imshow("depth_normals",quantized_images[1]);
   }
 
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -604,10 +669,14 @@ class Image_test
     Image_test::display = color_ptr->image.clone();
     Image_test::color_img = lab_img;
 
+    cv::Mat mask;
+    computeColorMask(lab_img, mask, Image_test::l_size, Image_test::a_size, Image_test::b_size, Image_test::win_size);
+
       cv::Point pt1(Image_test::display.cols/2-Image_test::win_size,Image_test::display.rows/2-Image_test::win_size);
       cv::Point pt2(Image_test::display.cols/2+Image_test::win_size,Image_test::display.rows/2+Image_test::win_size);
       cv::rectangle(Image_test::display, pt1, pt2, CV_RGB(0,0,0), 3);
       cv::rectangle(Image_test::display, pt1, pt2, CV_RGB(255,255,0), 1);
+      cv::circle(Image_test::display, cv::Point(lab_img.size().width/2,lab_img.size().height/2),5,CV_RGB(0,255,255),2);
       cv::imshow("color", color_ptr->image);
   }
 };
