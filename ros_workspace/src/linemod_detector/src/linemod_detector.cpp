@@ -89,11 +89,11 @@ class LineMOD_Detector
     K = cv::Mat(3,3,CV_64FC1);
 
     std::string filename;
-    ros::param::get("template_file", filename);
-    ros::param::get("pub_threshold", pub_threshold);
-    ros::param::get("min_depth", min_depth);
-    ros::param::get("max_depth", max_depth);
-    ros::param::get("min_count", min_count);
+    ros::param::get("~template_file", filename);
+    ros::param::get("~pub_threshold", pub_threshold);
+    ros::param::get("~min_depth", min_depth);
+    ros::param::get("~max_depth", max_depth);
+    ros::param::get("~min_count", min_count);
 
     // Initialize LINEMOD data structures
     detector = readLinemod(filename);
