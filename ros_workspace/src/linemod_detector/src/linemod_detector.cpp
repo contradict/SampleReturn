@@ -110,7 +110,7 @@ class LineMOD_Detector
         LineMOD_Detector::K.at<double>(i,j) = msg.K.at(3*i+j);
       }
     }
-    std::cout << LineMOD_Detector::K << std::endl;
+    //std::cout << LineMOD_Detector::K << std::endl;
   }
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
@@ -227,7 +227,7 @@ class LineMOD_Detector
           // Draw matching template
           const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
-          std::cout << "pub_threshold " << LineMOD_Detector::pub_threshold << std::endl;
+          //std::cout << "pub_threshold " << LineMOD_Detector::pub_threshold << std::endl;
           if (m.similarity > LineMOD_Detector::pub_threshold)
           {
             LineMOD_Detector::publishPoint(templates, m, depth_ptr->image);
