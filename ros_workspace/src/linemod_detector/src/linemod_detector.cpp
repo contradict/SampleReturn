@@ -150,6 +150,7 @@ class LineMOD_Detector
       LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
 
       LineMOD_Detector::num_classes = detector->numClasses();
+      ROS_DEBUG("Num Classes: %u", LineMOD_Detector::num_classes);
       int classes_visited = 0;
       std::set<std::string> visited;
 
