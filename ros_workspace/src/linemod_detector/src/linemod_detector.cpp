@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <ros/console.h>
 #include <stereo_msgs/DisparityImage.h>
 #include <linemod_detector/NamedPoint.h>
 #include <image_transport/image_transport.h>
@@ -90,10 +91,12 @@ class LineMOD_Detector
 
     std::string filename;
     ros::param::get("~template_file", filename);
-    ros::param::get("~pub_threshold", pub_threshold);
-    ros::param::get("~min_depth", min_depth);
-    ros::param::get("~max_depth", max_depth);
-    ros::param::get("~min_count", min_count);
+    ros::param::get("~pub_threshold", LineMOD_Detector::pub_threshold);
+    ros::param::get("~min_depth", LineMOD_Detector::min_depth);
+    ros::param::get("~max_depth", LineMOD_Detector::max_depth);
+    ros::param::get("~min_count", LineMOD_Detector::min_count);
+
+    //ROS_DEBUG(filename);
 
     // Initialize LINEMOD data structures
     detector = readLinemod(filename);
