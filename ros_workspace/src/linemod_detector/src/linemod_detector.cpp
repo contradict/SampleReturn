@@ -154,6 +154,7 @@ class LineMOD_Detector
       int classes_visited = 0;
       std::set<std::string> visited;
 
+      ROS_DEBUG("Matches size: %u", (int)matches.size());
       for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
       {
         cv::linemod::Match m = matches[i];
