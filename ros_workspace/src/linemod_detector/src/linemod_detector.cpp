@@ -157,6 +157,7 @@ class LineMOD_Detector
       for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
       {
         cv::linemod::Match m = matches[i];
+        ROS_DEBUG("Matching count: %u", i);
 
         if (visited.insert(m.class_id).second)
         {
@@ -270,6 +271,7 @@ class LineMOD_Detector
 
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m, cv::Mat& depth)
   {
+    ROS_DEBUG("Publishing POint");
     linemod_detector::NamedPoint img_point_msg;
     linemod_detector::NamedPoint point_msg;
     img_point_msg.name = m.class_id;
@@ -277,6 +279,7 @@ class LineMOD_Detector
     // We only care about the base pyramid level gradient modality
     img_point_msg.point.x = m.x + templates[1].width/2;
     img_point_msg.point.y = m.y + templates[1].height/2;
+    ROS_DEBUG("Point x and y: %f, %f", img_point_msg.point.x, img_point_msg.point.y);
 
     LineMOD_Detector::img_point_pub.publish(img_point_msg);
 
