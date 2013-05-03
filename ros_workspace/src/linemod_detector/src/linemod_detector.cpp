@@ -96,7 +96,7 @@ class LineMOD_Detector
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
 
-    //ROS_DEBUG(filename);
+    ROS_DEBUG("Pub Threshold:%s ", LineMOD_Detector::pub_threshold);
 
     // Initialize LINEMOD data structures
     detector = readLinemod(filename);
@@ -162,6 +162,8 @@ class LineMOD_Detector
 
           if (show_match_result)
           {
+            ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
+                   m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
             printf("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
                    m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
           }
