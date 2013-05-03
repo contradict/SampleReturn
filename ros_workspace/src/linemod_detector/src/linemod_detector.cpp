@@ -96,7 +96,7 @@ class LineMOD_Detector
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
 
-    ROS_DEBUG("Pub Threshold:%s ", LineMOD_Detector::pub_threshold);
+    ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
     // Initialize LINEMOD data structures
     detector = readLinemod(filename);
@@ -118,7 +118,7 @@ class LineMOD_Detector
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
   {
-    ROS_DEBUG("Pub Threshold:%s ", LineMOD_Detector::pub_threshold);
+    ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
     if (!LineMOD_Detector::got_color)
     {
       return;
