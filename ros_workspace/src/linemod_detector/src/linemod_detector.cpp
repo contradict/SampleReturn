@@ -118,6 +118,7 @@ class LineMOD_Detector
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
   {
+    ROS_DEBUG("Pub Threshold:%s ", LineMOD_Detector::pub_threshold);
     if (!LineMOD_Detector::got_color)
     {
       return;
