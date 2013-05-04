@@ -60,6 +60,7 @@ class LineMOD_Detector
   ros::Subscriber cam_info_sub;
   ros::Publisher img_point_pub;
   ros::Publisher point_pub;
+  ros::Publisher debug_img_pub;
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
   cv::Mat display;
@@ -73,6 +74,7 @@ class LineMOD_Detector
   float min_depth;
   float max_depth;
   float min_count;
+  bool _publish_debug_img;
 
   public:
   LineMOD_Detector(): it(nh)
@@ -80,6 +82,7 @@ class LineMOD_Detector
     color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
     cam_info_sub = nh.subscribe("cam_info", 1, &LineMOD_Detector::cameraInfoCallback, this);
     img_point_pub = nh.advertise<linemod_detector::NamedPoint>("img_point", 1);
+    debug_img_pub = nh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
     point_pub = nh.advertise<linemod_detector::NamedPoint>("point", 1);
     matching_threshold = 80;
     got_color = false;
@@ -91,6 +94,7 @@ class LineMOD_Detector
     ros::param::get("~min_depth", LineMOD_Detector::min_depth);
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
+    ros::param::param<bool>("~publish_debug_img", _publish_debug_img, true);
 
     ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
@@ -176,6 +180,12 @@ class LineMOD_Detector
 
       }
     }
+
+   if(_publish_debug_img)
+   {
+       sensor_msgs::ImagePtr debugmsg = cv_bridge::CvImage(color_ptr->header, color_ptr->encoding, display).toImageMsg();
+       debug_img_pub.publish(debugmsg);
+   }
 
     LineMOD_Detector::sources.clear();
   }
