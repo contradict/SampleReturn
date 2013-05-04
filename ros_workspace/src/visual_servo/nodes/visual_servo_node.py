@@ -10,6 +10,7 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo
 from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, TunableConstants
+from linemod_detector.msg  import NamedPoint
 
 # TODO
 # Remap the inputs and outputs in the launch file and create better names for the publish and subscription
@@ -51,10 +52,11 @@ class VisualServo:
 		self._proportional_constant_rotate = rospy.get_param('~proportional_constant_rotate', 0.01)
 		self._integral_constant_rotate = rospy.get_param('~integral_constant_rotate', 0.0)
 		self._derivative_constant_rotate = rospy.get_param('~derivative_constant_rotate', 0.0)
+		self._target_name = rospy.get_param('~target_name', 'red_puck')
 		self.goto_state(VisualServoStates.SAFE_REGION)
 		self.reset()
 
-		rospy.Subscriber('/red_puck_imgpoints', PointStamped, self.object_point_callback, None, 1)
+		rospy.Subscriber('/img_point', NamedPoint, self.object_point_callback, None, 1)
 		rospy.Subscriber('/navigation/left/camera_info', CameraInfo, self.camera_left_info_callback, None, 1)
 		rospy.Subscriber('/navigation/right/camera_info', CameraInfo, self.camera_right_info_callback, None, 1)
 		rospy.Subscriber('/debug/debug_update_constants', TunableConstants, self.debug_update_constants, None, 1)
@@ -119,7 +121,11 @@ class VisualServo:
 
 	def object_point_callback(self, data):
 		# This function receives a centroid location of an object in pixel space
-		if self._camera_left_image_width > 0 and self._camera_left_image_height > 0 and self._camera_right_image_width > 0 and self._camera_right_image_height > 0:
+		if self._camera_left_image_width > 0 and \
+                self._camera_left_image_height > 0 and \
+                self._camera_right_image_width > 0 and \
+                self._camera_right_image_height > 0 and \
+                data.name==self._target_name:
 			rospy.loginfo(rospy.get_name() + ": received point %s" % data.point)
 
 			self._previous_point = data.point
