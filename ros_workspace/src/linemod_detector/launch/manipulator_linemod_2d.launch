@@ -2,15 +2,6 @@
 <!-- Launch for the sample_detection node -->
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <arg name="user" default="robot"/>
-    <arg name="path" default="Desktop"/>
-    <arg name="kind" default="install"/>
-    <include file="$(find samplereturn)/launch/machine_definitions.launch">
-        <arg name="user" value="$(arg user)"/>
-        <arg name="path" value="$(arg path)"/>
-        <arg name="kind" value="$(arg kind)"/>
-    </include>
-
       <node
         machine="search"
         pkg="linemod_detector"
