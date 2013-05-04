@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Launch for the sample_detection node -->
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+      <node
+        pkg="linemod_detector"
+        type="linemod_detector_2d"
+        name="manipulator_linemod_detector_2d">
+      <remap from="color" to="/camera/rgb/image_color"/>
+      <remap from="cam_info" to="/camera/rgb/camera_info"/>
+      <param name="template_file" type="string" value="$(find linemod_detector)/config/manipulator_samples_2d.yaml"/>
+      <param name="pub_threshold" type="double" value="90.0"/>
+      <param name="min_depth" type="double" value="100.0"/>
+      <param name="max_depth" type="double" value="1000.0"/>
+      <param name="min_count" type="double" value="100.0"/>
+    </node>
+</launch>
