@@ -14,8 +14,8 @@
       <node
         machine="search"
         pkg="linemod_detector"
-        type="linemod_detector"
-        name="manipulator_linemod_detector">
+        type="linemod_detector_2d"
+        name="manipulator_linemod_detector_2d">
       <remap from="color" to="/manipulator/left/image_rect_color"/>
       <remap from="cam_info" to="/manipulator/left/camera_info"/>
       <param name="template_file" type="string" value="$(find linemod_detector)/config/manipulator_samples_2d.yaml"/>
