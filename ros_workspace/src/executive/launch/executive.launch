@@ -7,6 +7,8 @@
         pkg="executive"
         type="master_executive.py"
         name="master_executive"
-        output="log"/>
+        output="log">
+        <param name="precached_sample_distance" type="double" value="3.14"/>
+    </node>
 
 </launch>

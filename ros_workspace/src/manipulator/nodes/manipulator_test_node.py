@@ -8,7 +8,7 @@ from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabGoal, Manipula
 
 from sensor_msgs.msg import Joy
 
-buttonGrab = rospy.get_param('button_grab', 5)
+buttonGrab = rospy.get_param('~button_grab', 5)
 
 manipulatorClient = actionlib.SimpleActionClient(
   'manipulator_grab',
