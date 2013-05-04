@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="bagfile"/>
+
+    <param name="use_sim_time" value="true"/>
+    <machine name="navigate"
+        address="localhost"
+        />
+
+    <node
+        machine="navigate"
+        pkg="rosbag"
+        type="play"
+        name="play"
+        ns="/"
+        output="log"
+        args="--clock --topics=navigation/left/camera_info navigation/left/image_raw navigation/right/camera_info navigation/right/image_raw platform_joint_state --bags=$(arg bagfile)"
+        />
+
+    <param name="robot_description"
+        command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+
+    <node
+        machine="navigate"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        name="state_publisher"
+        ns="/"
+        output="log"
+        >
+        <remap from="joint_states" to="platform_joint_state"/>
+        <param name="publish_frequency" type="double" value="10"/>
+    </node>
+
+    <include file="$(find samplereturn)/launch/odometry.launch"/>
+    <include file="$(find samplereturn)/launch/navigation_camera.launch">
+        <arg name="run_cameras" value="false"/>
+    </include>
+
+</launch>
