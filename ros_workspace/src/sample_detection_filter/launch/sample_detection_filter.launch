@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<launch>
+	<node
+		machine="search"
+		name="sample_detection_filter"
+		pkg="sample_detection_filter"
+		type="sample_detection_filter_node.py"
+		output="log">
+		<param name='number_samples' type='int' value='5'/>
+		<param name='weighting_factor' type='double' value='1.0'/>
+		<param name='reset_filter_seconds' type='double' value='10.0'/>
+	</node>
+</launch>
