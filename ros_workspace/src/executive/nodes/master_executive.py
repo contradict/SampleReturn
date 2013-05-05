@@ -60,6 +60,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
         self._target_name = rospy.get_param("~target_name", 'red_puck')
+        self.detection_trigger_distance = rospy.get_param("~detection_trigger_distance", 15)
+        self.detection_trigger_count = rospy.get_param("~detection_trigger_count", 5)
+
+        self.reset_detection_trigger()
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -122,9 +126,33 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def sample_detection_nav_update(self, msg):
         self.current_nav_sample = msg
 
+    def point_distance(self, pt1, pt2):
+        return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
+
     def sample_detection_man_update(self, msg):
-        if msg.name == self._target_name:
-            self.current_man_sample = msg
+        if msg.name != self._target_name:
+            return
+        if self.tmp_man_sample is None:
+            self.tmp_man_sample = msg
+            rospy.logdebug("trigger init")
+            return
+        if self.point_distance(self.tmp_man_sample.point,
+                msg.point)<self.detection_trigger_distance:
+            self.detection_count -= 1
+            rospy.logdebug("trigger, count %d", self.detection_count)
+            if self.detection_count == 0:
+                self.current_man_sample = msg
+                rospy.logdebug("trigger success")
+        else:
+            self.detection_count = self.detection_trigger_count
+            rospy.logdebug("trigger restart")
+        self.tmp_man_sample = msg
+
+    def reset_detection_trigger(self):
+        self.tmp_man_sample = None
+        self.current_man_sample = None
+        self.detection_count = self.detection_trigger_count
+        rospy.logdebug("trigger reset")
 
     def sample_distance_update(self, msg):
         self.precached_sample_distance = msg.data
@@ -311,7 +339,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def retrieve_precached_sample(self):
 
         # set sample to None so we know when the first point arrives
-        self.current_man_sample = None
+        self.reset_detection_trigger()
 
         # write down sart pose
         start_pose = self.get_current_robot_pose()
