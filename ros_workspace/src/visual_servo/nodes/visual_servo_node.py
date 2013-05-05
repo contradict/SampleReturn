@@ -54,7 +54,7 @@ class VisualServo:
 		self.goto_state(VisualServoStates.SAFE_REGION)
 		self.reset()
 
-		rospy.Subscriber('/red_puck_imgpoints', PointStamped, self.object_point_callback, None, 1)
+		rospy.Subscriber('/red_puck_imgpoints_filtered', PointStamped, self.object_point_callback, None, 1)
 		rospy.Subscriber('/navigation/left/camera_info', CameraInfo, self.camera_left_info_callback, None, 1)
 		rospy.Subscriber('/navigation/right/camera_info', CameraInfo, self.camera_right_info_callback, None, 1)
 		rospy.Subscriber('/debug/debug_update_constants', TunableConstants, self.debug_update_constants, None, 1)
