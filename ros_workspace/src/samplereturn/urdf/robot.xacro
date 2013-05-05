@@ -207,7 +207,7 @@
     </joint>
 
     <!-- instantiate manipulator pair -->
-    <xacro:stereo_pair name="manipulator" baseline="0.30" />
+    <xacro:stereo_pair name="manipulator" baseline="0.05" />
     <!-- attach navigation pair -->
     <joint name="manipulator_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
@@ -219,8 +219,7 @@
         <!--
         suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
         -->
-        <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="-0.20 0.0 0.040" rpy="-2.80 0 -1.57"/>
+        <origin xyz="0.067 0.0 0.116" rpy="-2.80 0 -1.57"/>
     </joint>
 
     <link name="search_camera_body">
