@@ -23,7 +23,7 @@
          respawn="true"
          >
 
-        <param name="guid" type="string" value="00b09d0100a85650"/>
+        <param name="guid" type="string" value="00b09d0100bb69fb"/>
         <param name="video_mode" value="640x480_mono8"/>
         <param name="frame_id" value="manipulator_left_camera"/>
         <param name="frame_rate" value="30"/>
@@ -44,7 +44,7 @@
          respawn="true"
          >
 
-        <param name="guid" type="string" value="00b09d0100a85642"/>
+        <param name="guid" type="string" value="00b09d0100bd09ce"/>
         <param name="video_mode" value="640x480_mono8"/>
         <param name="frame_id" value="manipulator_left_camera"/>
         <param name="frame_rate" value="30"/>
