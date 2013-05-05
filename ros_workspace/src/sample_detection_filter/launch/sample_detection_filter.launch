@@ -7,7 +7,7 @@
 		machine="search"
 		name="sample_detection_filter"
 		pkg="sample_detection_filter"
-		type="sample_detection_filter_node.py"
+		type="sample_detection_filter.py"
 		output="log">
 		<param name='number_samples' type='int' value='5'/>
 		<param name='weighting_factor' type='double' value='1.0'/>
