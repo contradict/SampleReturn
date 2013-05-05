@@ -132,8 +132,8 @@ class sample_detection(object):
           mean = self.compute_color_mean(h,self.img,'lab').astype(np.float32)
           cols = self.samples[s]['covariance']['cols']
           rows = self.samples[s]['covariance']['rows']
-          model_covariance = np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols)
-          dist = cv2.Mahalanobis(mean,np.asarray(self.samples[s]['mean'],np.float32),model_covariance)
+          model_inverse_covariance = np.linalg.inv(np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols))
+          dist = cv2.Mahalanobis(mean,np.asarray(self.samples[s]['mean'],np.float32),model_inverse_covariance)
           if dist < detections[s]['min_dist']:
             detections[s]['min_dist'] = dist
             moments = cv2.moments(h)
@@ -148,8 +148,8 @@ class sample_detection(object):
           mean = self.compute_color_mean(h,self.img,'lab').astype(np.float32)
           cols = self.samples[s]['covariance']['cols']
           rows = self.samples[s]['covariance']['rows']
-          model_covariance = np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols)
-          dist = cv2.Mahalanobis(mean,np.asarray(self.samples[s]['mean'],np.float32),model_covariance)
+          model_inverse_covariance = np.linalg.inv(np.asarray(self.samples[s]['covariance']['data'],np.float32).reshape(rows,cols))
+          dist = cv2.Mahalanobis(mean,np.asarray(self.samples[s]['mean'],np.float32),model_inverse_covariance)
           if dist < detections[s]['min_dist']:
             detections[s]['min_dist'] = dist
             moments = cv2.moments(h)
