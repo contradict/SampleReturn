@@ -18,7 +18,10 @@ from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFe
 def enum(**enums):
 	return type('Enum', (), enums)
 
-VisualServoStates = enum(SAFE_REGION=0, ROTATE=1, MOVE_FORWARD=2, STOP_AND_WAIT=3)
+VisualServoStates = enum(SAFE_REGION=VisualServoFeedback.SAFE_REGION,
+                         ROTATE=VisualServoFeedback.ROTATE,
+                         MOVE_FORWARD=VisualServoFeedback.MOVE_FORWARD,
+                         STOP_AND_WAIT=VisualServoFeedback.STOP_AND_WAIT)
 
 class VisualServo:
 	"""A class to position the robot so that it can pick up an object with the manipulator"""
@@ -285,7 +288,7 @@ class VisualServo:
 
 		# Set the action server error feedback to the distance between the centroid and the target location
 		self._visual_servo_feedback.error = math.sqrt((point.x-self._camera_left_target_pixel_x)*(point.x-self._camera_left_target_pixel_x)+(point.y-self._camera_left_target_pixel_y)*(point.y-self._camera_left_target_pixel_y))
-		self._visual_servo_feedback.state = self.get_state_name()
+		self._visual_servo_feedback.state = self._visual_servo_state
 
 	def get_state_name(self):
 		if self._visual_servo_state == VisualServoStates.SAFE_REGION:
