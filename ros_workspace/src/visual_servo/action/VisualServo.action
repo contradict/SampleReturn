@@ -6,3 +6,4 @@ bool success
 ---
 # Feedback
 float32 error
+string state

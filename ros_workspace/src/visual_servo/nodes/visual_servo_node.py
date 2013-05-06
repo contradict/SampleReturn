@@ -158,12 +158,6 @@ class VisualServo:
 			self.goto_state(VisualServoStates.STOP_AND_WAIT)
 			self._stop_wait_timer = 0.0
 
-		# Set the action server error feedback to the distance between the centroid and the target location
-		self._visual_servo_feedback.error = math.sqrt((point.x-self._camera_left_target_pixel_x)*(point.x-self._camera_left_target_pixel_x)+(point.y-self._camera_left_target_pixel_y)*(point.y-self._camera_left_target_pixel_y))
-
-		# Debug output
-		rospy.loginfo(rospy.get_name() + "Current state: %s" % self._visual_servo_state)
-
 		if self._visual_servo_state == VisualServoStates.SAFE_REGION:
 			# If the object is near the top of the image, move forward
 			if point.y < self._camera_left_image_height*self._safe_region_percentage:
@@ -177,7 +171,7 @@ class VisualServo:
 				twist.linear.z = 0.0
 			# Else if the object is below the target point, move backwards
 			elif point.y > self._camera_left_target_pixel_y+(self._camera_left_image_height*self._safe_region_percentage):
-+				error = point.y - self._camera_left_target_pixel_y+(self._camera_left_image_height*self._safe_region_percentage)
+				error = point.y - self._camera_left_target_pixel_y+(self._camera_left_image_height*self._safe_region_percentage)
 				pid_controller_output = self.update_pid_controller(error, delta_time)
 				twist.angular.z = 0.0
 				twist.angular.y = 0.0
@@ -288,6 +282,20 @@ class VisualServo:
 			self._previous_twist = twist
 
 		self._publisher.publish(twist)
+
+		# Set the action server error feedback to the distance between the centroid and the target location
+		self._visual_servo_feedback.error = math.sqrt((point.x-self._camera_left_target_pixel_x)*(point.x-self._camera_left_target_pixel_x)+(point.y-self._camera_left_target_pixel_y)*(point.y-self._camera_left_target_pixel_y))
+		self._visual_servo_feedback.state = self.get_state_name()
+
+	def get_state_name(self):
+		if self._visual_servo_state == VisualServoStates.SAFE_REGION:
+			return "SAFE REGION"
+		elif self._visual_servo_state == VisualServoStates.ROTATE:
+			return "ROTATE"
+		elif self._visual_servo_state == VisualServoStates.MOVE_FORWARD:
+			return "MOVE FORWARD"
+		elif self._visual_servo_state == VisualServoStates.STOP_AND_WAIT:
+			return "STOP AND WAIT"
 
 	def camera_left_info_callback(self, data):
 		self._camera_left_image_width = data.width;
