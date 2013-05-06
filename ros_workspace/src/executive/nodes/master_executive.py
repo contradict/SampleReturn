@@ -237,12 +237,13 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def servo_feedback_cb(self, feedback):
         now = rospy.Time.now()
-        if self.last_servo_feedback is None:
-            self.last_servo_feedback = now
-            self.announce("distance to sample %3.1f pixels"%feedback.error)
-        if len(self.proclamations) == 0 and\
-           now-self.last_servo_feedback>self.servo_feedback_interval:
-            self.announce("distance to sample %3.1f pixels"%feedback.error)
+        if self.last_servo_feedback is None or \
+            (len(self.proclamations) == 0 and\
+              now-self.last_servo_feedback>self.servo_feedback_interval):
+            if feedback.state == feedback.STOP_AND_WAIT:
+                self.announce("lost sample")
+            else:
+                self.announce("range %d"%(10*int(feedback.error/10)))
             self.last_servo_feedback = now
 
     def get_current_robot_pose(self):
