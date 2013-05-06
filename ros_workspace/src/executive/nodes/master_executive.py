@@ -359,7 +359,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitDuration(0.5)
 
         # switch to visual servo control
-        self.announce("sample in manipulator view, switching to servo control")
+        self.announce("Sample detected, servoing")
         self.platform_motion_input_select("Servo")
         self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb
@@ -369,7 +369,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             state = self.servo.get_state()
             if state not in self.working_states:
                 break
-        self.announce("Servo success, triggering manipulator sequence")
+        self.announce("Servo success, triggering manipulator")
 
         # grab the sample
         manip_goal = manipulator_msg.ManipulatorGoal()
