@@ -105,8 +105,7 @@ class ManipulatorJointController(JointControllerMX):
             standoff = req.distance
         self.set_torque_control_mode_enable(True)
         self.set_goal_torque(torque)
-        self.check_for_move = True
-        yield self.block()
+        time.sleep(.5) #allow .5 seconds for dynamixel to move
         self.check_for_stop = True
         yield self.block()
         self.set_torque_control_mode_enable(False)
