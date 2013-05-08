@@ -57,7 +57,7 @@
         
       hand_open_position: 2.7
 
-      wrist_zero_position: 0.36
+      wrist_zero_position: 1.82
     </rosparam>
   </node>
 </launch>

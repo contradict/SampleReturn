@@ -94,7 +94,7 @@ class ManipulatorStateMachine(object):
       
       @smach.cb_interface(input_keys=['wrist_angle'])
       def wrist_angle_cb(userdata, request):
-        return GoToPositionRequest(userdata.wrist_angle)
+        return GoToPositionRequest(self.wrist_zero_position + userdata.wrist_angle)
   
       smach.StateMachine.add('ROTATE_WRIST',
           smach_ros.ServiceState('wrist_joint/go_to_position', GoToPosition,
