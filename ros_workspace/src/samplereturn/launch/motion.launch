@@ -62,6 +62,15 @@
       pkg="samplereturn"
       type="pause_switch.py"
       name="pause_switch"
-      output="log"
-      />
+      output="log">
+  </node>
+
+  <node
+      machine="navigate"
+      pkg="samplereturn"
+      type="lights.py"
+      name="lights"
+      output="log">
+  </node>
+
 </launch>
