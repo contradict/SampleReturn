@@ -22,24 +22,59 @@ class AccelerationLimitsTest : public ::testing::Test
 
 TEST_F( AccelerationLimitsTest, simple )
 {
-    Eigen::Vector2d body_velocity;
-    body_velocity << 1,0;
-    double body_omega=0.0;
+    Eigen::Vector3d body_velocity;
+    body_velocity << 1,0.2,0.0;
 
     double max_steering_accel=1.0;
 
     Eigen::Vector3d bounds;
     bounds = platform_motion::VelocityBounds(
             body_velocity,
-            body_omega,
             stern_position,
             starboard_position,
             port_position,
             max_steering_accel
             );
-    std::cout << bounds << std::endl;
+    std::cout << " bounds: " << bounds << std::endl;
 }
 
+TEST_F( AccelerationLimitsTest, circle )
+{
+    Eigen::Vector3d body_velocity;
+    double max_steering_accel=1.0;
+    for(double theta=-M_PI;theta<=M_PI;theta+=M_PI/8.0)
+    {
+        body_velocity << cos(theta),sin(theta),0.0;
+        Eigen::Vector3d bounds;
+        bounds = platform_motion::VelocityBounds(
+                body_velocity,
+                stern_position,
+                starboard_position,
+                port_position,
+                max_steering_accel
+                );
+        std::cout << "theta: " << theta << " bounds: " << bounds.transpose() << std::endl;
+    }
+}
+
+TEST_F( AccelerationLimitsTest, circleWithOmega )
+{
+    Eigen::Vector3d body_velocity;
+    double max_steering_accel=1.0;
+    for(double theta=-M_PI;theta<=M_PI;theta+=M_PI/8.0)
+    {
+        body_velocity << cos(theta),sin(theta),0.1;
+        Eigen::Vector3d bounds;
+        bounds = platform_motion::VelocityBounds(
+                body_velocity,
+                stern_position,
+                starboard_position,
+                port_position,
+                max_steering_accel
+                );
+        std::cout << "theta: " << theta << " bounds: " << bounds.transpose() << std::endl;
+    }
+}
 
 
 int main(int argc, char **argv)
