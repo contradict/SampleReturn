@@ -122,6 +122,14 @@ target_link_libraries(test_EKF_odometry
     ${catkin_LIBRARIES}
 )
 
+add_executable(velocity_limiter
+    src/velocity_limiter.cpp
+    src/acceleration_limit.cpp
+    )
+target_link_libraries(velocity_limiter
+    ${Boost_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
 
 
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
