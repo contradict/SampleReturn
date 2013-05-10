@@ -39,14 +39,26 @@ class PauseSwitch(object):
         self.pause_pub = rospy.Publisher("pause_state", Bool)
         self.audio_pub = rospy.Publisher("/audio/navigate", SoundRequest)
 
-        self.pause_bit_state = None
-        self.paused = None
+        #pullup on pause input, 1->0 is transition edge
+        self.pause_bit_state = self.button_mask 
+        self.guarded = False #this flag is set to true after a pause
+        self.paused = True
+        self.pause(True) #pause system on startup, no matter what
+
+    def clear_guard(self, event):
+        self.guarded = False
 
     def gpio(self, gpio):
         if gpio.servo_id == self.gpio_servo_id:
-            if self.pause_bit_state is None:
-                self.pause_bit_state = gpio.new_pin_states & self.button_mask
-            self.pause((gpio.new_pin_states & self.button_mask) == self.pause_bit_state)
+            new_bit_state = gpio.new_pin_states & self.button_mask
+            if (self.pause_bit_state == self.button_mask and new_bit_state == 0):
+                new_paused_state = None
+                if self.paused and not self.guarded:
+                    new_paused_state = False #unpause on transition if previously
+                else:                        #paused and guard period over
+                    new_paused_state = True #allow repausing immediately
+                if new_paused_state is not None: self.pause(new_paused_state)
+            self.pause_bit_state = new_bit_state
 
     def status_word(self, status_word):
         if status_word.servo_id == self.carousel_servo_id:
@@ -69,7 +81,10 @@ class PauseSwitch(object):
     def set_pause_state(self, state):
         self.paused = state
         self.pause_pub.publish(Bool(self.paused))
-
+        if self.paused:
+            self.guarded = True
+            rospy.Timer(rospy.Duration(3.0), self.clear_guard, oneshot = True)
+ 
     def check_wheelpod_status(self, status):
         return all([x==status for x in self.wheelpod_servo_status.itervalues()])
 
