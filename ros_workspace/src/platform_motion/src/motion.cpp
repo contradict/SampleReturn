@@ -742,7 +742,7 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
             carousel_setup=true;
         }
         if(!gpio_enabled) {
-            carousel->inputPinPullups(0x0003);
+            carousel->inputPinPullups(0x003f);
             std::vector<uint8_t> parameters;
             /* Calling any of these crahses the amp
             carousel->outputPinFunction(1, CANOpen::Manual, parameters, false);
