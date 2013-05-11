@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- Test launch for the sample_detection node -->
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <machine name="navigate"
+             address="localhost"
+             env-loader="/home/zlizer/src/SampleReturn/ros_workspace/devel/env.sh"
+             user="zlizer"
+    />
+    <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
+
+    <node
+      pkg="sample_detection"
+      type="color_name_sample_detection.py"
+      name="color_name_sample_detection"
+      ns="sample_detection">
+      <param name="samples" type="string" value="$(find sample_detection)/config/samples.yaml"/>
+      <remap from="left_img" to="/navigation/left/image_rect_color"/>
+      <remap from="cam_info" to="/navigation/left/camera_info"/>
+    </node>
+    <node
+      pkg="image_view"
+      type="image_view"
+      name="image_view">
+      <remap from="image" to="/navigation/left/image_rect_color"/>
+    </node>
+</launch>
