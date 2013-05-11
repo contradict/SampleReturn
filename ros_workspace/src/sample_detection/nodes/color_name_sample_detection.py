@@ -12,6 +12,7 @@ from linemod_detector.msg import NamedPoint
 from cv_bridge import CvBridge
 from tf import TransformListener
 import scipy.io
+import scipy.linalg
 
 class color_name_sample_detection(object):
 
@@ -37,6 +38,9 @@ class color_name_sample_detection(object):
     self.color_names = ['black','blue','brown','gray','green','orange','pink','purple','red','white','yellow']
     self.sample_names = [None,None,'wood_block','pre_cached',None,'orange_pipe','pink_ball',None,'red_puck','pre_cached','yellow_rock']
     self.sample_thresh = [None,None,0.3,0.3,None,0.4,0.3,None,0.4,0.3,0.3]
+
+    self.min_disp = 0.0
+    self.max_disp = 128.0
 
   def handle_left_img(self,Image):
     detections = self.find_samples(Image)
@@ -65,12 +69,41 @@ class color_name_sample_detection(object):
         named_img_point.point.y = location[1]
         named_img_point.name = self.sample_names[top_index]
         self.named_img_point_pub.publish(named_img_point)
+        self.publish_xyz_point(h, top_index, Image.header)
+
+  def publish_xyz_point(self, hull, top_index, header):
+    rect = cv2.boundingRect(hull)
+    local_disp = self.disp_img[rect[1]:rect[1]+rect[3],rect[0]:rect[0]+rect[2]]
+    # Trim off extreme disparities
+    local_disp = cv2.threshold(local_disp.astype(np.float32), self.min_disp, 0, cv2.THRESH_TOZERO)[1]
+    local_disp = cv2.threshold(local_disp.astype(np.float32), self.max_disp, 0, cv2.THRESH_TOZERO_INV)[1]
+    # Sort disparities, grab ends, compute mean
+    count = cv2.countNonZero(local_disp)
+    local_disp = local_disp.reshape((rect[2]*rect[3],1))
+    local_disp = np.sort(local_disp)
+    accum_disp = local_disp[:10].sum() + local_disp[count-10:count].sum()
+    ave_disp = accum_disp/20.
+    # Depth in meters
+    ave_depth = self.f*self.T/ave_disp
+    x = rect[0]+rect[2]/2
+    y = rect[1]+rect[3]/2
+    XY = np.dot(self.inv_K,np.array([x,y,1]))
+    XYZ = XY*ave_depth
+    named_point = NamedPoint()
+    named_point.name = self.sample_names[top_index]
+    named_point.header = header
+    named_point.point.x = XYZ[0]
+    named_point.point.y = XYZ[1]
+    named_point.point.z = XYZ[2]
+    self.named_point_pub.publish(named_point)
 
   def handle_disp(self,DisparityImage):
     self.disp_img = np.asarray(self.bridge.imgmsg_to_cv(DisparityImage.image))
     self.disp_header = DisparityImage.header
     self.min_disparity = DisparityImage.min_disparity
     self.max_disparity = DisparityImage.max_disparity
+    self.f = DisparityImage.f
+    self.T = DisparityImage.T
 
   def handle_info(self, CameraInfo):
     # grab camera matrix and distortion model
@@ -81,6 +114,9 @@ class color_name_sample_detection(object):
     self.h = CameraInfo.height
     self.w = CameraInfo.width
     self.frame_id = CameraInfo.header.frame_id
+    self.P = np.asarray(self.P).reshape(3,4)
+    self.K = np.asarray(self.K).reshape(3,3)
+    self.inv_K = scipy.linalg.inv(self.K)
 
   def compute_color_name(self,hull,img):
     img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)

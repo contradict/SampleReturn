@@ -16,6 +16,7 @@
       ns="sample_detection">
       <param name="samples" type="string" value="$(find sample_detection)/config/samples.yaml"/>
       <remap from="left_img" to="/navigation/left/image_rect_color"/>
+      <remap from="disparity" to="/navigation/disparity"/>
       <remap from="cam_info" to="/navigation/left/camera_info"/>
     </node>
     <node
