@@ -18,6 +18,7 @@ class color_name_sample_detection(object):
 
   def __init__(self):
     rospy.init_node('color_name_sample_detection',anonymous=True)
+    self.monocular_img_sub = rospy.Subscriber('monocular_img',Image, queue_size=1,callback=self.handle_monocular_img)
     self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
     self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
     self.disp_sub = rospy.Subscriber('disparity',DisparityImage, queue_size=1,callback=self.handle_disp)
@@ -42,12 +43,18 @@ class color_name_sample_detection(object):
     self.min_disp = 0.0
     self.max_disp = 128.0
 
+    self.disp_img = None
+
   def handle_left_img(self,Image):
     detections = self.find_samples(Image)
     self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
 
   def handle_right_img(self, Image):
     detections = self.find_samples(Image)
+
+  def handle_monocular_img(self, Image):
+    detections = self.find_samples(Image)
+    self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
 
   def find_samples(self, Image):
     self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
@@ -72,30 +79,45 @@ class color_name_sample_detection(object):
         self.publish_xyz_point(h, top_index, Image.header)
 
   def publish_xyz_point(self, hull, top_index, header):
-    rect = cv2.boundingRect(hull)
-    local_disp = self.disp_img[rect[1]:rect[1]+rect[3],rect[0]:rect[0]+rect[2]]
-    # Trim off extreme disparities
-    local_disp = cv2.threshold(local_disp.astype(np.float32), self.min_disp, 0, cv2.THRESH_TOZERO)[1]
-    local_disp = cv2.threshold(local_disp.astype(np.float32), self.max_disp, 0, cv2.THRESH_TOZERO_INV)[1]
-    # Sort disparities, grab ends, compute mean
-    count = cv2.countNonZero(local_disp)
-    local_disp = local_disp.reshape((rect[2]*rect[3],1))
-    local_disp = np.sort(local_disp)
-    accum_disp = local_disp[:10].sum() + local_disp[count-10:count].sum()
-    ave_disp = accum_disp/20.
-    # Depth in meters
-    ave_depth = self.f*self.T/ave_disp
-    x = rect[0]+rect[2]/2
-    y = rect[1]+rect[3]/2
-    XY = np.dot(self.inv_K,np.array([x,y,1]))
-    XYZ = XY*ave_depth
-    named_point = NamedPoint()
-    named_point.name = self.sample_names[top_index]
-    named_point.header = header
-    named_point.point.x = XYZ[0]
-    named_point.point.y = XYZ[1]
-    named_point.point.z = XYZ[2]
-    self.named_point_pub.publish(named_point)
+    if self.disp_img is not None:
+      rect = cv2.boundingRect(hull)
+      local_disp = self.disp_img[rect[1]:rect[1]+rect[3],rect[0]:rect[0]+rect[2]]
+      # Trim off extreme disparities
+      local_disp = cv2.threshold(local_disp.astype(np.float32), self.min_disp, 0, cv2.THRESH_TOZERO)[1]
+      local_disp = cv2.threshold(local_disp.astype(np.float32), self.max_disp, 0, cv2.THRESH_TOZERO_INV)[1]
+      # Sort disparities, grab ends, compute mean
+      count = cv2.countNonZero(local_disp)
+      local_disp = local_disp.reshape((rect[2]*rect[3],1))
+      local_disp = np.sort(local_disp)
+      accum_disp = local_disp[:10].sum() + local_disp[count-10:count].sum()
+      ave_disp = accum_disp/20.
+      # Depth in meters
+      ave_depth = self.f*self.T/ave_disp
+      x = rect[0]+rect[2]/2
+      y = rect[1]+rect[3]/2
+      XY = np.dot(self.inv_K,np.array([x,y,1]))
+      XYZ = XY*ave_depth
+      named_point = NamedPoint()
+      named_point.name = self.sample_names[top_index]
+      named_point.header = header
+      named_point.point.x = XYZ[0]
+      named_point.point.y = XYZ[1]
+      named_point.point.z = XYZ[2]
+      self.named_point_pub.publish(named_point)
+      return
+    else:
+      rect = cv2.boundingRect(hull)
+      x = rect[0]+rect[2]/2
+      y = rect[1]+rect[3]/2
+      XY = np.dot(self.inv_K,np.array([x,y,1]))
+      named_point = NamedPoint()
+      named_point.name = self.sample_names[top_index]
+      named_point.header = header
+      named_point.point.x = XY[0]
+      named_point.point.y = XY[1]
+      named_point.point.z = 0.0
+      self.named_point_pub.publish(named_point)
+
 
   def handle_disp(self,DisparityImage):
     self.disp_img = np.asarray(self.bridge.imgmsg_to_cv(DisparityImage.image))
