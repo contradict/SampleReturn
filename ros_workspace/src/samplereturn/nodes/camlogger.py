@@ -36,11 +36,8 @@ def camlogger():
   pub = rospy.Publisher(topic,Image)
   info_pub = rospy.Publisher(info_topic,CameraInfo)
   calib_file = rospy.get_param('~calib_file', None)
-  if calib_file is not None:
-    cam_info = parse_yaml('')
   rospy.init_node('camlogger',log_level=rospy.DEBUG)
   frame_id = rospy.get_param('~frame_id','/search')
-  cam_info.header.frame_id = frame_id
   seq_id = 0
   rate = rospy.get_param('~rate',1.0)
   r = rospy.Rate(rate)
@@ -54,8 +51,10 @@ def camlogger():
     pub.publish(img)
 
     if calib_file is not None:
+      cam_info = parse_yaml('')
       cam_info.header.stamp = rospy.Time.now()
       cam_info.header.seq = seq_id
+      cam_info.header.frame_id = frame_id
       info_pub.publish(cam_info)
     else:
       cam_info = CameraInfo()
