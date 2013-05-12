@@ -39,10 +39,10 @@ def camlogger():
   if calib_file is not None:
     cam_info = parse_yaml('')
   rospy.init_node('camlogger',log_level=rospy.DEBUG)
-  frame_id = rospy.get_param('~frame_id')
+  frame_id = rospy.get_param('~frame_id','/search')
   cam_info.header.frame_id = frame_id
   seq_id = 0
-  rate = rospy.get_param('~rate')
+  rate = rospy.get_param('~rate',1.0)
   r = rospy.Rate(rate)
   while not rospy.is_shutdown():
     img = capture_image()
