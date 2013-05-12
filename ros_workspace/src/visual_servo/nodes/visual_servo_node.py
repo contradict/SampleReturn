@@ -129,7 +129,7 @@ class VisualServo:
                 self._camera_right_image_width > 0 and \
                 self._camera_right_image_height > 0 and \
                 data.name==self._target_name:
-			rospy.loginfo(rospy.get_name() + ": received point %s" % data.point)
+			rospy.loginfo(rospy.get_name() + ": received point for %s: %s" % (data.name, data.point))
 
 			self._previous_point = data.point
 			self._previous_time = data.header.stamp
