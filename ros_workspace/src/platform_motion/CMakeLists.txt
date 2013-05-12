@@ -142,6 +142,7 @@ install(
       teleop
       least_squares_odometry
       EKF_odometry
+      velocity_limiter
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
