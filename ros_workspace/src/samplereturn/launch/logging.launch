@@ -37,5 +37,5 @@
        type="record"
        name="search_record"
        output="log"
-       args="camimg caminfo manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info"/>
+       args="cam_img cam_info manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info"/>
 </launch>
