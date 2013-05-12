@@ -51,7 +51,7 @@ def camlogger():
     pub.publish(img)
 
     if calib_file is not None:
-      cam_info = parse_yaml('')
+      cam_info = parse_yaml(calib_file)
       cam_info.header.stamp = rospy.Time.now()
       cam_info.header.seq = seq_id
       cam_info.header.frame_id = frame_id
