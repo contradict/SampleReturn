@@ -35,7 +35,9 @@ def camlogger():
   info_topic = 'cam_info'
   pub = rospy.Publisher(topic,Image)
   info_pub = rospy.Publisher(info_topic,CameraInfo)
-  cam_info = parse_yaml('')
+  calib_file = rospy.get_param('~calib_file', None)
+  if calib_file is not None:
+    cam_info = parse_yaml('')
   rospy.init_node('camlogger',log_level=rospy.DEBUG)
   frame_id = rospy.get_param('~frame_id')
   cam_info.header.frame_id = frame_id
@@ -45,13 +47,20 @@ def camlogger():
   while not rospy.is_shutdown():
     img = capture_image()
     rospy.logdebug("img (%d, %d)", img.width, img.height)
+
     img.header.stamp = rospy.Time.now()
-    cam_info.header.stamp = rospy.Time.now()
     img.header.frame_id = frame_id
     img.header.seq = seq_id
-    cam_info.header.seq = seq_id
     pub.publish(img)
-    info_pub.publish(cam_info)
+
+    if calib_file is not None:
+      cam_info.header.stamp = rospy.Time.now()
+      cam_info.header.seq = seq_id
+      info_pub.publish(cam_info)
+    else:
+      cam_info = CameraInfo()
+      info_pub.publish(cam_info)
+
     seq_id += 1
     r.sleep()
 
