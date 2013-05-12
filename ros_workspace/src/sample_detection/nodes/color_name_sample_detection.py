@@ -115,7 +115,7 @@ class color_name_sample_detection(object):
       named_point.header = header
       named_point.point.x = XY[0]
       named_point.point.y = XY[1]
-      named_point.point.z = 0.0
+      named_point.point.z = 1.0
       self.named_point_pub.publish(named_point)
 
 
