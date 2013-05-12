@@ -15,7 +15,18 @@
           <param name="scale_linear" value="2" type="double"/>
           <param name="scale_angular" value="0.25" type="double"/>
 
-          <remap from="twist" to="/joystick_command"/>
+          <remap from="twist" to="/joystick_out"/>
+      </node>
+
+      <node
+          machine="navigate"
+          pkg="platform_motion"
+          type="velocity_limiter"
+          name="velocity_limiter"
+          >
+          <remap from="twist" to="/joystick_out"/>
+          <remap from="limited_twist" to="/joystick_command"/>
+          <remap from="odometry" to="odometry"/>
       </node>
 
 </launch>
