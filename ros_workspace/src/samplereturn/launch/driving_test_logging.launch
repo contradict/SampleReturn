@@ -25,6 +25,13 @@
     <include file="$(find samplereturn)/launch/joystick.launch"/>
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/>
+
+    <include file="$(find executive)/launch/executive.launch"/>
+
+    <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
+
+    <include file="$(find visual_servo)/launch/visual_servo.launch"/>
+
     <include file="$(find samplereturn)/launch/planner.launch"/>
 
   <!-- rosbag record -->

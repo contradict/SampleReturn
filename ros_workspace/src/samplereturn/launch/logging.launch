@@ -1,21 +1,17 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <machine name="search"
-             address="moline"
-             ros-root="/opt/ros/electric/ros"
-             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
-             user="robot"
-    />
-    <machine name="navigate"
-             address="blue18"
-             ros-root="/opt/ros/electric/ros"
-             ros-package-path="/opt/ros/electric/stacks:/home/robot/Desktop/SampleReturn/src/ros"
-             user="robot"
-    />
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+     <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
 
-  <!-- rosbag record -->
-  <!--
+    <!-- rosbag record -->
+    <!--
   -->
   <node machine="navigate"
       pkg="rosbag"
@@ -26,13 +22,20 @@
   </node>
 
   <!-- DSLR Client and Publisher-->
-   <!-- The wait between captures is hard-coded at 3.0 seconds,
+  <!-- The wait between captures is hard-coded at 3.0 seconds,
         I'll make this a param at some point -->
-   <node machine="search" pkg="samplereturn" type="camlogger.py" name="camlogger"/>
+   <node
+       machine="search"
+       pkg="samplereturn"
+       type="camlogger.py"
+       name="camlogger">
+       <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
+       <param name="frame_id" value="search_camera_lens"/>
+   </node>
    <node machine="search"
-      pkg="rosbag"
-      type="record"
-      name="search_record"
-      output="log"
-      args="camimg manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info"/>
+       pkg="rosbag"
+       type="record"
+       name="search_record"
+       output="log"
+       args="cam_img cam_info manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info"/>
 </launch>
