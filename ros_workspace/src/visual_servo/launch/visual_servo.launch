@@ -29,6 +29,8 @@
 		<param name='derivative_constant_drive_forward' type='double' value='0.0'/>
 		<param name='proportional_constant_rotate' type='double' value='0.0017'/>
 		<param name='integral_constant_rotate' type='double' value='0.0'/>
-		<param name='derivative_constant_rotate' type='double' value='0.0'/>
+        <param name='derivative_constant_rotate' type='double' value='0.0'/>
+
+        <remap from="/img_point" to="/namedpoints"/>
 	</node>
 </launch>
