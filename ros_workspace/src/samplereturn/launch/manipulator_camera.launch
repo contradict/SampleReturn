@@ -77,8 +77,6 @@
           ns="/manipulator/left"
           respawn="true"
           >
-          <remap from="image_mono" to="debayer/image_mono"/>
-          <remap from="image_color" to="debayer/image_color"/>
     </node>
     <node
           machine="search"
@@ -89,67 +87,8 @@
           ns="/manipulator/right"
           respawn="true"
           >
-          <remap from="image_mono" to="debayer/image_mono"/>
-          <remap from="image_color" to="debayer/image_color"/>
      </node>
 
-    <!-- Rotate images 90 degrees -->
-    <node
-        machine="search"
-        pkg="nodelet"
-        type="nodelet"
-        name="image_rot90_mono"
-        args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/left"
-        respawn="true"
-        >
-
-        <remap from="rot90/image_raw_in" to="debayer/image_mono"/>
-        <remap from="rot90/image_raw_rot" to="image_mono"/>
-        <param name="rot" type="string" value="pi/2"/>
-    </node>
-    <node
-        machine="search"
-        pkg="nodelet"
-        type="nodelet"
-        name="image_rot90_mono"
-        args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/right"
-        respawn="true"
-        >
-
-        <remap from="rot90/image_raw_in" to="debayer/image_mono"/>
-        <remap from="rot90/image_raw_rot" to="image_mono"/>
-        <param name="rot" type="string" value="pi/2"/>
-    </node>
-    <node
-        machine="search"
-        pkg="nodelet"
-        type="nodelet"
-        name="image_rot90_color"
-        args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/left"
-        respawn="true"
-        >
-
-        <remap from="rot90/image_raw_in" to="debayer/image_color"/>
-        <remap from="rot90/image_raw_rot" to="image_color"/>
-        <param name="rot" type="string" value="pi/2"/>
-    </node>
-    <node
-        machine="search"
-        pkg="nodelet"
-        type="nodelet"
-        name="image_rot90_color"
-        args="load image_rot90/ImageRot90 /manipulator/manager"
-        ns="/manipulator/right"
-        respawn="true"
-        >
-
-        <remap from="rot90/image_raw_in" to="debayer/image_color"/>
-        <remap from="rot90/image_raw_rot" to="image_color"/>
-        <param name="rot" type="string" value="pi/2"/>
-    </node>
 
     <!-- Rectify images -->
     <node
@@ -212,11 +151,15 @@
         output="log"
         respawn="true"
         >
+        <param name="prefilter_size" type="int" value="13"/>
+        <param name="prefilter_cap" type="int" value="15"/>
         <param name="correlation_window_size" type="int" value="17"/>
-        <param name="min_disparity" type="int" value="30"/>
-        <param name="disparity_range" type="int" value="128"/>
+        <param name="min_disparity" type="int" value="17"/>
+        <param name="disparity_range" type="int" value="96"/>
         <param name="uniqueness_ratio" type="int" value="5"/>
         <param name="texture_threshold" type="int" value="1000"/>
+        <param name="speckle_size" type="int" value="50"/>
+        <param name="speckle_range" type="int" value="10"/>
         <param name="approximate_sync" type="bool" value="true"/>
     </node>
 

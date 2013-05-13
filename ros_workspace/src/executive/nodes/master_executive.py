@@ -20,6 +20,7 @@ import manipulator.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
 import visual_servo.msg as visual_servo_msg
+import linemod_detector.msg as linemod_msg
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -58,6 +59,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.servo_feedback_interval =\
             rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
+        self._target_name = rospy.get_param("~target_name", 'red_puck')
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -69,7 +71,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.pause_state_update)
         #rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
         #        self.sample_detection_nav_update)
-        rospy.Subscriber("/red_puck_imgpoints", geometry_msg.PointStamped,
+        rospy.Subscriber("/img_point", linemod_msg.NamedPoint,
                 self.sample_detection_man_update)
         rospy.Subscriber("/sample_distance", std_msg.Float64,
                 self.sample_distance_update)
@@ -121,7 +123,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.current_nav_sample = msg
 
     def sample_detection_man_update(self, msg):
-        self.current_man_sample = msg
+        if msg.name == self._target_name:
+            self.current_man_sample = msg
 
     def sample_distance_update(self, msg):
         self.precached_sample_distance = msg.data
