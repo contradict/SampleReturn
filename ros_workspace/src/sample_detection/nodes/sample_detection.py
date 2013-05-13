@@ -8,6 +8,7 @@ import yaml
 from sensor_msgs.msg import Image,CameraInfo,PointCloud2
 from stereo_msgs.msg import DisparityImage
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
+from linemod_detector.msg import NamedPoint
 from cv_bridge import CvBridge
 from tf import TransformListener
 
@@ -44,6 +45,7 @@ class sample_detection(object):
       self.sample_imgpoints[s] = rospy.Publisher(topic, PointStamped)
       topic = s + '_disparity'
       self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
+    self.namedpoints = rospy.Publisher("/namedpoints", NamedPoint)
 
   def create_point_stamped(self, location):
     msg = PointStamped()
@@ -60,7 +62,13 @@ class sample_detection(object):
         continue
       else:
         location = detections[d]['location']
-        self.sample_imgpoints[d].publish(self.create_point_stamped(location))
+        pt=self.create_point_stamped(location)
+        self.sample_imgpoints[d].publish(pt)
+        named=NamedPoint()
+        named.header=pt.header
+        named.point=pt.point
+        named.name=d
+        self.namedpoints.publish(named)
         # Intersects a camera ray with a flat ground plane
         #self.project_centroid(location)
 
