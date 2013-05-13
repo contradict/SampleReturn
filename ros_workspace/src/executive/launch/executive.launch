@@ -11,6 +11,8 @@
         <param name="precached_sample_distance" type="double" value="3.14"/>
         <param name="detection_trigger_count" type="int" value="4"/>
         <param name="detection_trigger_distance" type="int" value="25"/>
+
+        <remap from="img_point" to="/namedpoints"/>
     </node>
 
 </launch>
