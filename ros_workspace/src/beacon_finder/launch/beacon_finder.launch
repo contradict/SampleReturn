@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<launch>
+	<node
+		machine="search"
+		name="beacon_finder"
+		pkg="beacon_finder"
+		type="beacon_finder.py"
+		output="log">
+	<param name="num_rows" type="double" value="4"/>
+	<param name="num_columns" type="double" value="11"/>
+	<param name="corner_circles_vertical_distance_meters" type="double" value="0.2"/>
+	<param name="camera_image_sensor_width_mmeters" type="double" value="15.6"/>
+	<param name="camera_image_sensor_height_mmeters" type="double" value="23.6"/>
+	</node>
+</launch>
