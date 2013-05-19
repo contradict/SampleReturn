@@ -78,6 +78,7 @@ Eigen::Vector3d bodyVelocityInterpolate(
 }
 
 #define MIN_OMEGA 0.01
+#define MIN_SPEED 0.05
 void bodyVelocityToGeometric(
         const Eigen::Vector3d &body_velocity,
         Eigen::Vector3d &center,
@@ -92,7 +93,13 @@ void bodyVelocityToGeometric(
     Eigen::Vector3d velocity3;
     velocity3.head(2) = body_velocity.head(2);
     velocity3(2) = 0.0;
-    Eigen::Vector3d direction = zhat.cross(velocity3).normalized();
+    std::cerr << "velocity3: " << velocity3.transpose() << std::endl;
+    Eigen::Vector3d direction;
+    if(velocity3.norm()>MIN_SPEED)
+        direction = zhat.cross(velocity3).normalized();
+    else
+        direction << 0,0,0;
+    std::cerr << "direction: " << direction.transpose() << std::endl;
     if(*omega>MIN_OMEGA)
     {
         center = radius*direction;
@@ -115,7 +122,7 @@ double podParamtersToGeometric(
         double stern_angle, double stern_velocity,
         double starboard_angle, double starboard_velocity,
         double port_angle, double port_velocity,
-        Eigen::Vector3d center,
+        Eigen::Vector3d &center,
         double *omega
         )
 {
@@ -127,9 +134,13 @@ double podParamtersToGeometric(
         fabs(starboard_angle-port_angle) < PARALLEL_THRESHOLD )
     {
         double direction = (stern_angle + starboard_angle + port_angle)/3.0;
+        //std::cerr << "direction: " << direction << std::endl;
         error = (fabs(stern_angle - direction) + fabs(starboard_angle-direction) + fabs(port_angle-direction))/3.0;
+        //std::cerr << "error: " << error << std::endl;
         double velocity = (stern_velocity + starboard_velocity + port_velocity)/3.0;
-        center << cos(direction), sin(direction), 0;
+        //std::cerr << "velocity: " << velocity << std::endl;
+        center << -sin(direction), cos(direction), 0;
+        //std::cerr << "center: " << center.transpose() << std::endl;
         *omega = velocity;
     }
     else
@@ -235,17 +246,17 @@ Eigen::Vector3d geometricToBody(
     return body_velocity;
 }
 
-#define MIN_SPEED 0.05
 Eigen::Vector3d geometricInterpolate(
         double a,
-        const Eigen::Vector3d present_body_velocity,
-        const Eigen::Vector3d desired_body_velocity
+        const Eigen::Vector3d desired_body_velocity,
+        const Eigen::Vector3d present_center,
+        const double present_omega
         )
 {
-    double present_omega, desired_omega;
-    Eigen::Vector3d present_center, desired_center;
+    double desired_omega;
+    Eigen::Vector3d desired_center;
     bodyVelocityToGeometric(desired_body_velocity, desired_center, &desired_omega);
-    bodyVelocityToGeometric(present_body_velocity, present_center, &present_omega);
+    std::cerr << "desired center: " << desired_center.transpose() << " omega: " << desired_omega << std::endl;
 
     Eigen::Vector3d body_velocity;
 
@@ -254,20 +265,20 @@ Eigen::Vector3d geometricInterpolate(
     {
         double present_angle = atan2(present_center(1), present_center(0));
         double desired_angle = atan2(desired_center(1), desired_center(0));
-        double interpolated_angle = a*present_angle + (1.0-a)*desired_angle;
-        body_velocity << cos(interpolated_angle), sin(interpolated_angle), 0.0;
+        double interpolated_angle = a*desired_angle + (1.0-a)*present_angle;
+        body_velocity << -sin(interpolated_angle), cos(interpolated_angle), 0.0;
 
-        double present_speed = present_body_velocity.head(2).norm();
+        double present_speed = present_omega;
         double desired_speed = desired_body_velocity.head(2).norm();
-        double interpolated_speed = a*present_speed + (1.0-a)*desired_speed;
+        double interpolated_speed = a*desired_speed + (1.0-a)*present_speed;
         body_velocity *= interpolated_speed;
 
-        body_velocity(2) = a*present_omega + (1.0-a)*desired_omega;
+        body_velocity(2) = 0.0;
     }
     else
     {
-        Eigen::Vector3d interpolated_center = a*present_center + (1.0-a)*desired_center;
-        double interpolated_omega = a*present_omega + (1.0-a)*desired_omega;
+        Eigen::Vector3d interpolated_center = a*desired_center + (1.0-a)*present_center;
+        double interpolated_omega = a*desired_omega + (1.0-a)*present_omega;
         body_velocity = geometricToBody(interpolated_center, interpolated_omega);
     }
     return body_velocity;
@@ -287,7 +298,7 @@ Eigen::Vector3d NumericalLimit(
         const Eigen::Vector3d &desired_body_velocity
         )
 {
-    Eigen::Vector3d present_center, present_body_velocity;
+    Eigen::Vector3d present_center;
     double present_omega;
     double error = podParamtersToGeometric(
         stern_position,
@@ -299,14 +310,10 @@ Eigen::Vector3d NumericalLimit(
         present_center,
         &present_omega
         );
-
-    present_body_velocity = geometricToBody(present_center, present_omega);
-
-    if((present_body_velocity - desired_body_velocity).norm()<0.01)
-        return desired_body_velocity;
+    std::cerr << "present center: " << present_center.transpose() << " omega: " << present_omega << std::endl;
 
     double desired_speed = desired_body_velocity.head(2).norm();
-    if(desired_speed<MIN_SPEED && desired_body_velocity(2)<MIN_OMEGA)
+    if(desired_speed<MIN_SPEED && fabs(desired_body_velocity(2))<MIN_OMEGA)
         return desired_body_velocity;
 
     double desired_stern_angle, desired_starboard_angle, desired_port_angle;
@@ -319,8 +326,10 @@ Eigen::Vector3d NumericalLimit(
     flipVelocity(&starboard_angle, &starboard_velocity);
     flipVelocity(&port_angle, &port_velocity);
 
-    std::cerr << "stern: " << stern_angle << " starboard: " << starboard_angle << " port: " << port_angle << std::endl;
-    std::cerr << "stern: " << desired_stern_angle << " starboard: " << desired_starboard_angle << " port: " << desired_port_angle << std::endl;
+    std::cerr << "present angle stern: " << stern_angle << " starboard: " << starboard_angle << " port: " << port_angle << std::endl;
+    std::cerr << "present velocity stern: " << stern_velocity << " starboard: " << starboard_velocity << " port: " << port_velocity << std::endl;
+    std::cerr << "desired angle stern: " << desired_stern_angle << " starboard: " << desired_starboard_angle << " port: " << desired_port_angle << std::endl;
+    std::cerr << "desired velocity stern: " << desired_stern_speed << " starboard: " << desired_starboard_speed << " port: " << desired_port_speed << std::endl;
 
     double stern_dtheta, starboard_dtheta, port_dtheta;
     stern_dtheta = desired_stern_angle - stern_angle;
@@ -362,8 +371,8 @@ Eigen::Vector3d NumericalLimit(
         }
     double err=fabs(limiting_dtheta) - dtheta;
     double a=1.0;
-    std::cerr << "a: " << a << " err: " << err << std::endl;
-    Eigen::Vector3d achievable_body_velocity=geometricInterpolate(a, desired_body_velocity, present_body_velocity) ;
+    std::cerr << "a: " << a << " err: " << err << " tolerance: " << tolerance << std::endl;
+    Eigen::Vector3d achievable_body_velocity=geometricInterpolate(a, desired_body_velocity, present_center, present_omega) ;
     int its=0;
     while( err>tolerance && a>min_step)
     {
@@ -373,9 +382,7 @@ Eigen::Vector3d NumericalLimit(
         else
             a*=M_SQRT2;
         //std::cerr << "a: " << a << std::endl;
-        //std::cerr << "present: " << present_body_velocity.transpose() << std::endl;
-        //std::cerr << "desired: " << desired_body_velocity.transpose() << std::endl;
-        achievable_body_velocity = geometricInterpolate(a, desired_body_velocity, present_body_velocity);
+        achievable_body_velocity = geometricInterpolate(a, desired_body_velocity, present_center, present_omega);
         //std::cerr << "achievable: " << achievable_body_velocity.transpose() << std::endl;
         computePod(limiting_position, achievable_body_velocity, &limiting_theta, &limiting_speed);
         limiting_dtheta = limiting_theta - limiting_angle;
@@ -384,7 +391,6 @@ Eigen::Vector3d NumericalLimit(
         //std::cerr << "err: " << err << std::endl;
         its++;
     }
-    std::cerr << "present: " << present_body_velocity.transpose() << std::endl;
     std::cerr << "desired: " << desired_body_velocity.transpose() << std::endl;
     std::cerr << "its: " << its << " a: " << a << std::endl;
     std::cerr << "achievable: " << achievable_body_velocity.transpose() << std::endl;
