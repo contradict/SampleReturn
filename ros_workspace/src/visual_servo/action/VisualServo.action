@@ -5,4 +5,9 @@ bool do_align_object_to_manipulator
 bool success
 ---
 # Feedback
+uint8 SAFE_REGION=0
+uint8 ROTATE=1
+uint8 MOVE_FORWARD=2
+uint8 STOP_AND_WAIT=3
 float32 error
+uint8 state

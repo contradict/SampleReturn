@@ -20,6 +20,7 @@ import manipulator.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
 import visual_servo.msg as visual_servo_msg
+import linemod_detector.msg as linemod_msg
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -58,6 +59,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.servo_feedback_interval =\
             rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
+        self._target_name = rospy.get_param("~target_name", 'red_puck')
+        self.detection_trigger_distance = rospy.get_param("~detection_trigger_distance", 15)
+        self.detection_trigger_count = rospy.get_param("~detection_trigger_count", 5)
+
+        self.reset_detection_trigger()
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -69,7 +75,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.pause_state_update)
         #rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
         #        self.sample_detection_nav_update)
-        rospy.Subscriber("/red_puck_imgpoints", geometry_msg.PointStamped,
+        rospy.Subscriber("/img_point", linemod_msg.NamedPoint,
                 self.sample_detection_man_update)
         rospy.Subscriber("/sample_distance", std_msg.Float64,
                 self.sample_distance_update)
@@ -120,8 +126,33 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def sample_detection_nav_update(self, msg):
         self.current_nav_sample = msg
 
+    def point_distance(self, pt1, pt2):
+        return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
+
     def sample_detection_man_update(self, msg):
-        self.current_man_sample = msg
+        if msg.name != self._target_name:
+            return
+        if self.tmp_man_sample is None:
+            self.tmp_man_sample = msg
+            rospy.logdebug("trigger init")
+            return
+        if self.point_distance(self.tmp_man_sample.point,
+                msg.point)<self.detection_trigger_distance:
+            self.detection_count -= 1
+            rospy.logdebug("trigger, count %d", self.detection_count)
+            if self.detection_count == 0:
+                self.current_man_sample = msg
+                rospy.logdebug("trigger success")
+        else:
+            self.detection_count = self.detection_trigger_count
+            rospy.logdebug("trigger restart")
+        self.tmp_man_sample = msg
+
+    def reset_detection_trigger(self):
+        self.tmp_man_sample = None
+        self.current_man_sample = None
+        self.detection_count = self.detection_trigger_count
+        rospy.logdebug("trigger reset")
 
     def sample_distance_update(self, msg):
         self.precached_sample_distance = msg.data
@@ -237,12 +268,13 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def servo_feedback_cb(self, feedback):
         now = rospy.Time.now()
-        if self.last_servo_feedback is None:
-            self.last_servo_feedback = now
-            self.announce("distance to sample %3.1f pixels"%feedback.error)
-        if len(self.proclamations) == 0 and\
-           now-self.last_servo_feedback>self.servo_feedback_interval:
-            self.announce("distance to sample %3.1f pixels"%feedback.error)
+        if self.last_servo_feedback is None or \
+            (len(self.proclamations) == 0 and\
+              now-self.last_servo_feedback>self.servo_feedback_interval):
+            if feedback.state == feedback.STOP_AND_WAIT:
+                self.announce("lost sample")
+            else:
+                self.announce("range %d"%(10*int(feedback.error/10)))
             self.last_servo_feedback = now
 
     def get_current_robot_pose(self):
@@ -307,7 +339,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def retrieve_precached_sample(self):
 
         # set sample to None so we know when the first point arrives
-        self.current_man_sample = None
+        self.reset_detection_trigger()
 
         # write down sart pose
         start_pose = self.get_current_robot_pose()
@@ -327,7 +359,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitDuration(0.5)
 
         # switch to visual servo control
-        self.announce("sample in manipulator view, switching to servo control")
+        self.announce("Sample detected, servoing")
         self.platform_motion_input_select("Servo")
         self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb
@@ -337,7 +369,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             state = self.servo.get_state()
             if state not in self.working_states:
                 break
-        self.announce("Servo success, triggering manipulator sequence")
+        self.announce("Servo success, triggering manipulator")
 
         # grab the sample
         manip_goal = manipulator_msg.ManipulatorGoal()
