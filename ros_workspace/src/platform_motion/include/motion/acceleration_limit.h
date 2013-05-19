@@ -1,6 +1,18 @@
 #include <Eigen/Dense>
 
 namespace platform_motion {
+
+Eigen::Vector3d geometricToBody(
+        const Eigen::Vector3d &center,
+        const double omega
+        );
+
+void bodyVelocityToGeometric(
+        const Eigen::Vector3d &body_velocity,
+        Eigen::Vector3d &center,
+        double *omega
+        );
+
 Eigen::Vector3d NumericalLimit(
         const Eigen::Vector2d &stern_position,
         const Eigen::Vector2d &starboard_position,
