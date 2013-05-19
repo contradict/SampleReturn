@@ -6,15 +6,6 @@ namespace platform_motion {
 
 const double ACCEL_LIMIT_EPS=1e-3;
 
-double flipAngle(double angle)
-{
-    if(angle>M_PI_2)
-        angle -= M_PI;
-    if(angle<=-M_PI_2)
-        angle += M_PI;
-    return angle;
-}
-
 void flipVelocity(double *angle, double *velocity)
 {
     if(*angle>M_PI_2)
