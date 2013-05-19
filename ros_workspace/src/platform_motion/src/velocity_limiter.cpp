@@ -134,7 +134,7 @@ void VelocityLimiter::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
         stern_angle, stern_velocity,
         starboard_angle, starboard_velocity,
         port_angle, port_velocity,
-        body_velocity
+        vel_in
         );
 
     geometry_msgs::Twist lt;
@@ -151,7 +151,7 @@ void VelocityLimiter::handleOdometry(const nav_msgs::Odometry::ConstPtr odo)
     body_velocity << odo->twist.twist.linear.x, odo->twist.twist.linear.y, odo->twist.twist.angular.z;
 }
 
-void lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string jointName, double *angle, double *velocity)
+bool lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string jointName, double *angle, double *velocity)
 {
     for(std::vector<std::string>::const_iterator name=joints->name.begin();
             name<joints->name.end();
@@ -162,30 +162,28 @@ void lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string joi
             int idx = std::distance(joints->name.begin(), name);
             *angle=joints->position[idx];
             *velocity=joints->velocity[idx];
+            return true;
         }
     }
-    *angle=NAN;
-    *velocity=NAN;
+    return false;
 }
 
 void VelocityLimiter::handleJointState(const sensor_msgs::JointState::ConstPtr joints)
 {
     boost::unique_lock<boost::mutex> angle_lock(angle_mutex);
     double angle, velocity;
-    lookupJoint(joints, "starboard_steering_joint", &angle, &velocity);
-    if(!isnan(angle))
+
+    if(lookupJoint(joints, "starboard_steering_joint", &angle, &velocity))
     {
         starboard_angle = angle;
         starboard_velocity = velocity;
     }
-    lookupJoint(joints, "port_steering_joint", &angle, &velocity);
-    if(!isnan(angle))
+    if(lookupJoint(joints, "port_steering_joint", &angle, &velocity))
     {
         port_angle = angle;
         port_velocity = velocity;
     }
-    lookupJoint(joints, "stern_steering_joint", &angle, &velocity);
-    if(!isnan(angle))
+    if(lookupJoint(joints, "stern_steering_joint", &angle, &velocity))
     {
         stern_angle = angle;
         stern_velocity = velocity;
