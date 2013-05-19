@@ -15,12 +15,13 @@ class BeaconFinder:
 		self._image_subscriber = rospy.Subscriber('mono_img', Image, self.image_callback, None, 1)
 		self._camera_info_subscriber = rospy.Subscriber('cam_info', CameraInfo, self.camera_info_callback, None, 1)
 		self._beacon_vector_publisher = rospy.Publisher('/beacon_vector', Vector3)
-		self.cv_bridge = CvBridge()
+		self._beacon_debug_img = rospy.Publisher('/beacon_debug_img', Image)
+		self._cv_bridge = CvBridge()
 
 		# Get params
 		self._num_rows = rospy.get_param("~num_rows", 4)
 		self._num_columns = rospy.get_param("~num_columns", 11)
-		self._corner_circles_vertical_distance_meters = rospy.get_param("~corner_circles_vertical_distance_meters", 0.5)
+		self._corner_circles_vertical_distance_meters = rospy.get_param("~corner_circles_vertical_distance_meters", 0.6895)
 		self._camera_image_sensor_width_mmeters = rospy.get_param("~camera_image_sensor_width_mmeters", 15.6)
 		self._camera_image_sensor_height_mmeters = rospy.get_param("~camera_image_sensor_height_mmeters", 23.6)
 
@@ -36,19 +37,26 @@ class BeaconFinder:
 		# in it, then if successful outputs a vector towards it in the
 		# camera's frame
 		if self._camera_focal_length:
-			image_cv = self.cv_bridge.imgmsg_to_cv(image, 'bgr8')
-			found_beacon, centers, cv2.findCirclesInImage(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID)
+			image_cv = self._cv_bridge.imgmsg_to_cv(image, 'bgr8')
+			found_beacon, centers, cv2.findCirclesGrid(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID)
 
 			if found_beacon:
+				# Publish debug beacon image
+				cv2.drawChessboardCorners(image_cv, (self._num_rows, self._num_columns), centers, found_beacon)
+				image_cv = self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(image_cv, 'bgr8'))
+
 				# Compute the approximate distance to the beacon
-				corner_circles_vector_pixels = centers[0][0] - centers[1][0]
-				corner_circles_vertical_distance_pixels = math.hypot(*corner_circles_vector_pixels)
+				lower_left_circle_index = 0
+				top_left_circle_index = self._num_rows-1
+				corner_circles_vector_pixel_x = centers[lower_left_circle_index][0][0] - centers[top_left_circle_index][0][0]
+				corner_circles_vector_pixel_y = centers[lower_left_circle_index][0][1] - centers[top_left_circle_index][0][1]
+				corner_circles_vertical_distance_pixels = math.hypot(corner_circles_vector_pixel_x, corner_circles_vector_pixel_y)
 				approx_beacon_distance_meters = self._camera_focal_length*self._corner_circles_vertical_distance_meters/(corner_circles_vertical_distance_pixels*self._camera_image_sensor_height_mmeters/self._camera_pixel_height/1000)
 
 				# Generate a vector pointing towards the beacon
-				beacon_center_pixel = centers[2][0]
-				beacon_center_angle_yaw = (beacon_center_pixel.x/self._camera_pixel_width-0.5)*self._camera_hfov
-				beacon_center_angle_pitch = (beacon_center_pixel.y/self._camera_pixel_height-0.5)*self._camera_vfov
+				beacon_center_pixel = centers[self._num_rows*(self._num_columns/2)+self._num_rows/2][0]
+				beacon_center_angle_yaw = (beacon_center_pixel[0]/self._camera_pixel_width-0.5)*self._camera_hfov
+				beacon_center_angle_pitch = -(beacon_center_pixel[1]/self._camera_pixel_height-0.5)*self._camera_vfov
 				beacon_vector = Vector3(1,0,0)
 				beacon_vector.y = math.tan(beacon_center_angle_yaw)
 				beacon_vector.z = math.tan(beacon_center_angle_pitch)
