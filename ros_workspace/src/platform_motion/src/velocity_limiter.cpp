@@ -38,6 +38,7 @@ class VelocityLimiter
 
         boost::mutex angle_mutex;
         double stern_angle, starboard_angle, port_angle;
+        double stern_velocity, starboard_velocity, port_velocity;
 
         std::string body_point_name;
 
@@ -130,11 +131,10 @@ void VelocityLimiter::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
         max_steering_omega*twist_period,
         min_step,
         tolerance,
-        stern_angle,
-        starboard_angle,
-        port_angle,
-        body_velocity,
-        vel_in
+        stern_angle, stern_velocity,
+        starboard_angle, starboard_velocity,
+        port_angle, port_velocity,
+        body_velocity
         );
 
     geometry_msgs::Twist lt;
@@ -151,7 +151,7 @@ void VelocityLimiter::handleOdometry(const nav_msgs::Odometry::ConstPtr odo)
     body_velocity << odo->twist.twist.linear.x, odo->twist.twist.linear.y, odo->twist.twist.angular.z;
 }
 
-double lookupAngle(const sensor_msgs::JointState::ConstPtr joints, std::string jointName)
+void lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string jointName, double *angle, double *velocity)
 {
     for(std::vector<std::string>::const_iterator name=joints->name.begin();
             name<joints->name.end();
@@ -160,22 +160,36 @@ double lookupAngle(const sensor_msgs::JointState::ConstPtr joints, std::string j
         if( *name == jointName )
         {
             int idx = std::distance(joints->name.begin(), name);
-            return joints->position[idx];
+            *angle=joints->position[idx];
+            *velocity=joints->velocity[idx];
         }
     }
-    return NAN;
+    *angle=NAN;
+    *velocity=NAN;
 }
 
 void VelocityLimiter::handleJointState(const sensor_msgs::JointState::ConstPtr joints)
 {
     boost::unique_lock<boost::mutex> angle_lock(angle_mutex);
-    double angle;
-    angle = lookupAngle(joints, "starboard_steering_joint");
-    if(!isnan(angle)) starboard_angle = angle;
-    angle = lookupAngle(joints, "port_steering_joint");
-    if(!isnan(angle)) port_angle = angle;
-    angle = lookupAngle(joints, "stern_steering_joint");
-    if(!isnan(angle)) stern_angle = angle;
+    double angle, velocity;
+    lookupJoint(joints, "starboard_steering_joint", &angle, &velocity);
+    if(!isnan(angle))
+    {
+        starboard_angle = angle;
+        starboard_velocity = velocity;
+    }
+    lookupJoint(joints, "port_steering_joint", &angle, &velocity);
+    if(!isnan(angle))
+    {
+        port_angle = angle;
+        port_velocity = velocity;
+    }
+    lookupJoint(joints, "stern_steering_joint", &angle, &velocity);
+    if(!isnan(angle))
+    {
+        stern_angle = angle;
+        stern_velocity = velocity;
+    }
 }
 
 int main(int argc, char **argv)

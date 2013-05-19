@@ -6,9 +6,32 @@ namespace platform_motion {
 
 const double ACCEL_LIMIT_EPS=1e-3;
 
+double flipAngle(double angle)
+{
+    if(angle>M_PI_2)
+        angle -= M_PI;
+    if(angle<=-M_PI_2)
+        angle += M_PI;
+    return angle;
+}
+
+void flipVelocity(double *angle, double *velocity)
+{
+    if(*angle>M_PI_2)
+    {
+        *angle -= M_PI;
+        *velocity *= -1;
+    }
+    if(*angle<=-M_PI_2)
+    {
+        *angle += M_PI;
+        *velocity *= -1;
+    }
+}
+
 Eigen::Vector2d computePodVelocity(
-        Eigen::Vector3d body_velocity,
-        Eigen::Vector2d position
+        const Eigen::Vector3d &body_velocity,
+        const Eigen::Vector2d &position
         )
 {
     Eigen::Vector2d pod_velocity;
@@ -17,255 +40,293 @@ Eigen::Vector2d computePodVelocity(
     return pod_velocity;
 }
 
-Eigen::Vector3d computeMatrixRow(
-        Eigen::Vector3d body_velocity,
-        Eigen::Vector2d position
-        )
-{
-    Eigen::Vector2d V = computePodVelocity(body_velocity, position);
-    //std::cout << "    " << "V      " << V << std::endl;
-    double r = V.norm();
-    if ( r < ACCEL_LIMIT_EPS )
-    {
-        return (Eigen::Vector3d() << NAN, NAN, NAN).finished();
-    }
-    double sign=1.0;
-    if(V(0)<0) {
-        V *= -1.0;
-        sign = -1.0;
-    }
-    double atan2_ = V(1)/(r + V(0));
-    //std::cout << "    " << "atan2_ " << atan2_ << std::endl;
-    double coeff1 = 2./(1.+pow(atan2_,2.0));
-    //std::cout << "    " << "coeff1 " << coeff1 << std::endl;
-    double A, B, E;
-    A = coeff1*(1./(r + V(0)) - pow(atan2_,2.0)/r);
-    //std::cout << "    " << "A      " << A << std::endl;
-    B = coeff1*-1.0*V(1)/pow(r + V(0), 2.0)*(1.+V(0)/r);
-    //std::cout << "    " << "B      " << B << std::endl;
-    E = A*position(0)-B*position(1);
-    //std::cout << "    " << "E      " << C << std::endl;
-    return (Eigen::Vector3d() << B, A, E).finished()*sign;
-}
-
-Eigen::Vector3d VelocityBounds(
-        Eigen::Vector3d body_velocity,
-        Eigen::Vector2d stern_position,
-        Eigen::Vector2d starboard_position,
-        Eigen::Vector2d port_position,
-        double max_steering_omega
-        )
-{
-    Eigen::Matrix3d m;
-    //std::cout << "stern" << std::endl;
-    m.row(0) = computeMatrixRow(body_velocity, stern_position);
-    //std::cout << "  " << "row " << m.row(0) << std::endl;
-    //std::cout << "starboard" << std::endl;
-    m.row(1) = computeMatrixRow(body_velocity, starboard_position);
-    //std::cout << "  " << "row " << m.row(1) << std::endl;
-    //std::cout << "port" << std::endl;
-    m.row(2) = computeMatrixRow(body_velocity, port_position);
-    //std::cout << "  " << "row " << m.row(2) << std::endl;
-    std::cout <<  "m " << std::endl << m << std::endl;
-
-    Eigen::Vector3d bounds;
-    return m.fullPivLu().solve(Eigen::Vector3d::Constant(max_steering_omega));
-}
-
-Eigen::Vector3d SelectClosestVelocity(
-        Eigen::Vector3d body_velocity,
-        Eigen::Vector2d stern_position,
-        Eigen::Vector2d starboard_position,
-        Eigen::Vector2d port_position,
-        double max_steering_omega,
-        Eigen::Vector3d deltav,
-        Eigen::Vector3d desired_velocity)
-{
-    Eigen::Vector3d bounds = VelocityBounds(
-            body_velocity,
-            stern_position,
-            starboard_position,
-            port_position,
-            max_steering_omega);
-    bounds = bounds.cwiseAbs();
-    bounds = bounds.cwiseMin(deltav);
-    for(int i=0;i<3;i++)
-    {
-        if(isnan(bounds(i)))
-            bounds(i) = deltav(i);
-    }
-
-    Eigen::Vector3d delta=desired_velocity-body_velocity;
-    Eigen::Vector3d abs_delta=delta.cwiseAbs();
-    Eigen::Vector3d bounded_abs_delta=abs_delta.cwiseMin(bounds);
-    Eigen::Vector3d achieved;
-    for(int i=0;i<3;i++)
-    {
-        achieved(i)=copysign(bounded_abs_delta(i), delta(i));
-    }
-    return achieved;
-}
-
-/*
- * number with same sign as a but absolute value equal to minimum of
- * abs(a) and b
- */
-double limit(double a, double b)
-{
-    return copysign(std::min(fabs(a), b), a);
-}
-
-Eigen::Vector3d podLimit(
-        Eigen::Vector2d pod_position,
-        double dtheta,
-        double current_angle,
-        Eigen::Vector3d desired_body_velocity
-        )
-{
-    std::cout << "pod_position: " << pod_position.transpose() << std::endl;
-    Eigen::Vector2d desired_pod_velocity = computePodVelocity(desired_body_velocity, pod_position);
-    std::cout << "desired_pod_velocity: " << desired_pod_velocity.transpose() << std::endl;
-    double desired_pod_speed = desired_pod_velocity.norm();
-    double desired_angle = atan2(desired_pod_velocity(1), desired_pod_velocity(0));
-    if(desired_angle<-M_PI_2)
-        desired_angle += M_PI;
-    if(desired_angle>M_PI_2)
-        desired_angle -= M_PI;
-    if(current_angle<0)
-        current_angle += M_PI;
-    if(current_angle>M_PI_2)
-        current_angle -= M_PI;
-    Eigen::Vector2d desired_pod_direction;
-    desired_pod_direction << cos(desired_angle), sin(desired_angle);
-    double delta_angle = desired_angle-current_angle;
-    double achievable_angle = current_angle + limit(delta_angle, dtheta);
-    std::cout << "desired_angle: " << desired_angle << \
-        " current_angle: " << current_angle << \
-        " achievable_angle: " << achievable_angle << \
-        std::endl;
-    Eigen::Vector2d achievable_pod_direction;
-    achievable_pod_direction << cos(achievable_angle), sin(achievable_angle);
-    Eigen::Vector2d achievable_pod_velocity = achievable_pod_direction*desired_pod_speed;
-    std::cout << "achievable_pod_velocity: " << achievable_pod_velocity.transpose() << std::endl;
-    /*
-       for(int i=0;i<2;i++)
-       {
-       achievable_pod_velocity(i) = limit(desired_pod_velocity(i), fabs(achievable_pod_velocity(i)));
-       }
-       std::cout << "achievable_pod_velocity(limited): " << achievable_pod_velocity.transpose() << std::endl;
-       */
-    Eigen::Vector2d pod_deltav=achievable_pod_velocity - desired_pod_velocity;
-    double pod_deltaspeed=pod_deltav.norm();
-    std::cout << "pod_deltav: " << pod_deltav.transpose() << std::endl;
-
-    Eigen::Vector3d body_deltav;
-    double desired_body_speed=desired_body_velocity.head(2).norm();
-    if(desired_body_speed<1e-4 || pod_deltaspeed<1e-4)
-    {
-        body_deltav(0) = 0.0;
-        body_deltav(1) = 0.0;
-    }
-    else
-    {
-        Eigen::Vector2d desired_body_direction=desired_body_velocity.head(2)/desired_body_speed;
-        body_deltav.head(2) = -pod_deltav.dot(desired_body_direction)*pod_deltav/pod_deltaspeed;
-    }
-
-    Eigen::Vector2d omega_deltav = body_deltav.head(2) - pod_deltav;
-    std::cout << "omega_deltav: " << omega_deltav.transpose() << std::endl;
-    if(fabs(pod_position(0))>1e-4)
-        body_deltav(2) = -omega_deltav(1)/pod_position(0);
-    else
-        body_deltav(2) = omega_deltav(0)/pod_position(1);
-    std::cout << "body_deltav: " << body_deltav.transpose() << std::endl;
-    return body_deltav;
-}
-
-Eigen::Vector3d SimpleLimit(
-        Eigen::Vector2d stern_position,
-        Eigen::Vector2d starboard_position,
-        Eigen::Vector2d port_position,
-        double dtheta,
-        double stern_angle,
-        double starboard_angle,
-        double port_angle,
-        Eigen::Vector3d desired_body_velocity
-        )
-{
-    Eigen::Vector3d stern_deltav, starboard_deltav, port_deltav;
-    stern_deltav = podLimit(stern_position, dtheta, stern_angle, desired_body_velocity);
-    std::cerr << "stern deltav: " << stern_deltav.transpose() << std::endl;
-    starboard_deltav = podLimit(starboard_position, dtheta, starboard_angle, desired_body_velocity);
-    std::cerr << "starboard deltav: " << starboard_deltav.transpose() << std::endl;
-    port_deltav = podLimit(port_position, dtheta, port_angle, desired_body_velocity);
-    std::cerr << "port deltav: " << port_deltav.transpose() << std::endl;
-
-    Eigen::Vector3d deltav;
-    for(int i=0;i<3;i++)
-    {
-        if(fabs(starboard_deltav(i))>fabs(port_deltav(i)))
-            deltav(i) = starboard_deltav(i);
-        else
-            deltav(i) = port_deltav(i);
-        if(fabs(stern_deltav(i))>fabs(deltav(i)))
-            deltav(i) = stern_deltav(i);
-    }
-    std::cerr << "deltav: " << deltav.transpose() << std::endl;
-    std::cerr << "desired: " << desired_body_velocity.transpose() << std::endl;
-    Eigen::Vector3d achievable = desired_body_velocity+deltav;
-    std::cerr << "achievable: " << achievable.transpose() << std::endl;
-
-    return achievable;
-}
-
 void computePod(
-        Eigen::Vector2d pod_position,
-        Eigen::Vector3d desired_body_velocity,
+        const Eigen::Vector2d &pod_position,
+        const Eigen::Vector3d &desired_body_velocity,
         double *pod_angle,
         double *pod_speed)
 {
     Eigen::Vector2d desired_pod_velocity = computePodVelocity(desired_body_velocity, pod_position);
     *pod_angle = atan2(desired_pod_velocity(1), desired_pod_velocity(0));
     *pod_speed = desired_pod_velocity.norm();
+    flipVelocity(pod_angle, pod_speed);
 }
 
-double flipVelocity(double angle)
+
+void computePod(
+        const Eigen::Vector2d &pod_position,
+        const Eigen::Vector3d &center,
+        const double omega,
+        const double velocity,
+        double *angle,
+        double *wheel_velocity)
 {
-    if(angle>M_PI_2)
-        angle -= M_PI;
-    if(angle<-M_PI_2)
-        angle += M_PI;
-    return angle;
+    Eigen::Vector3d zhat;
+    zhat << 0,0,1;
+    Eigen::Vector3d body_velocity;
+    if(center(2) == 0.0)
+    {
+        body_velocity = zhat.cross(center)*velocity;
+        body_velocity(2) = 0.0;
+    }
+    else
+    {
+        body_velocity = -center.cross(zhat*omega);
+        body_velocity(2) = omega;
+    }
+    computePod(pod_position, body_velocity, angle, wheel_velocity);
 }
 
-Eigen::Vector3d NumericalLimit(
-        Eigen::Vector2d stern_position,
-        Eigen::Vector2d starboard_position,
-        Eigen::Vector2d port_position,
-        double dtheta,
-        double min_step,
-        double tolerance,
-        double stern_angle,
-        double starboard_angle,
-        double port_angle,
-        Eigen::Vector3d present_body_velocity,
-        Eigen::Vector3d desired_body_velocity
+
+Eigen::Vector3d bodyVelocityInterpolate(
+        const double a,
+        const Eigen::Vector3d &v1,
+        const Eigen::Vector3d &v2)
+{
+    return a*v1 + (1.0-a)*v2;
+}
+
+#define MIN_OMEGA 0.01
+void bodyVelocityToGeometric(
+        const Eigen::Vector3d &body_velocity,
+        Eigen::Vector3d &center,
+        double *omega
         )
 {
+    *omega = body_velocity(2);
+    double speed = body_velocity.head(2).norm();
+    double radius = speed/fabs(*omega);
+    Eigen::Vector3d zhat;
+    zhat << 0,0,1;
+    Eigen::Vector3d velocity3;
+    velocity3.head(2) = body_velocity.head(2);
+    velocity3(2) = 0.0;
+    Eigen::Vector3d direction = zhat.cross(velocity3).normalized();
+    if(*omega>MIN_OMEGA)
+    {
+        center = radius*direction;
+        center(2) = 1.0;
+    }
+    else
+    {
+        center = direction;
+        center(2) = 0.0;
+        *omega = speed;
+    }
+}
+
+#define PARALLEL_THRESHOLD 0.02
+#define RADIUS_THRESHOLD 0.10
+double podParamtersToGeometric(
+        const Eigen::Vector2d &stern_position,
+        const Eigen::Vector2d &starboard_position,
+        const Eigen::Vector2d &port_position,
+        double stern_angle, double stern_velocity,
+        double starboard_angle, double starboard_velocity,
+        double port_angle, double port_velocity,
+        Eigen::Vector3d center,
+        double *omega
+        )
+{
+    double error=0;
+
+    center << 0,0,0;
+    if( fabs(stern_angle-starboard_angle) < PARALLEL_THRESHOLD &&
+        fabs(stern_angle-port_angle) < PARALLEL_THRESHOLD &&
+        fabs(starboard_angle-port_angle) < PARALLEL_THRESHOLD )
+    {
+        double direction = (stern_angle + starboard_angle + port_angle)/3.0;
+        error = (fabs(stern_angle - direction) + fabs(starboard_angle-direction) + fabs(port_angle-direction))/3.0;
+        double velocity = (stern_velocity + starboard_velocity + port_velocity)/3.0;
+        center << cos(direction), sin(direction), 0;
+        *omega = velocity;
+    }
+    else
+    {
+        Eigen::Vector3d stern_direction, starboard_direction, port_direction;
+        Eigen::Vector3d stern_position_, starboard_position_, port_position_;
+
+        stern_direction << cos(stern_angle), sin(stern_angle), 0;
+        if(stern_velocity<0.0)
+            stern_direction *= -1.0;
+        starboard_direction << cos(starboard_angle), sin(starboard_angle), 0;
+        if(starboard_velocity<0.0)
+            starboard_direction *= -1.0;
+        port_direction << cos(port_angle), sin(port_angle), 0;
+        if(port_velocity<0.0)
+            port_direction *= -1.0;
+
+        stern_position_.head(2) = stern_position; stern_position_(2)=1.0;
+        starboard_position_.head(2) = starboard_position; starboard_position_(2)=1.0;
+        port_position_.head(2) = port_position; port_position_(2)=1.0;
+
+        // line through pod position in direction pod is traveling.
+        stern_direction(2) = -stern_direction.dot(stern_position_);
+        starboard_direction(2) = -starboard_direction.dot(starboard_position_);
+        port_direction(2) = -port_direction.dot(port_position_);
+
+        Eigen::Vector3d i1, i2, i3;
+        i1 = stern_direction.cross(starboard_direction);
+        i2 = stern_direction.cross(port_direction);
+        i3 = starboard_direction.cross(port_direction);
+
+        int cnt=0;
+        if( i1.norm()>PARALLEL_THRESHOLD )
+        {
+            i1 /= i1(2);
+            center += i1;
+            error += (i1-center).norm();
+            cnt++;
+        }
+        if( i2.norm()>PARALLEL_THRESHOLD )
+        {
+            i2 /= i2(2);
+            center += i2;
+            error += (i2-center).norm();
+            cnt++;
+        }
+        if( i3.norm()>PARALLEL_THRESHOLD )
+        {
+            i3 /= i3(2);
+            center += i3;
+            error += (i3-center).norm();
+            cnt++;
+        }
+        center /= cnt;
+        error /= cnt;
+
+        cnt = 0;
+        double stern_radius, starboard_radius, port_radius;
+        stern_radius = (stern_position_ - center).norm();
+        starboard_radius = (starboard_position_ - center).norm();
+        port_radius = (port_position_ - center).norm();
+        if( port_radius > RADIUS_THRESHOLD )
+        {
+            *omega += port_velocity/port_radius;
+            cnt++;
+        }
+        if( starboard_radius > RADIUS_THRESHOLD )
+        {
+            *omega += starboard_velocity/starboard_radius;
+            cnt++;
+        }
+        if( stern_radius > RADIUS_THRESHOLD )
+        {
+            *omega += stern_velocity/stern_radius;
+            cnt++;
+        }
+        *omega /= cnt;
+    }
+
+    return error;
+
+}
+
+Eigen::Vector3d geometricToBody(
+        const Eigen::Vector3d &center,
+        const double omega
+        )
+{
+    Eigen::Vector3d body_velocity;
+    Eigen::Vector3d zhat;
+    zhat << 0,0,1;
+    body_velocity = center.cross(zhat);
+    body_velocity(2) = 0;
+    body_velocity = body_velocity.normalized();
+    if(center(2) == 0.0)
+        body_velocity *= omega;
+    else
+    {
+        double radius=center.head(2).norm();
+        body_velocity *= omega*radius;
+        body_velocity(2) = omega;
+    }
+    return body_velocity;
+}
+
+#define MIN_SPEED 0.05
+Eigen::Vector3d geometricInterpolate(
+        double a,
+        const Eigen::Vector3d present_body_velocity,
+        const Eigen::Vector3d desired_body_velocity
+        )
+{
+    double present_omega, desired_omega;
+    Eigen::Vector3d present_center, desired_center;
+    bodyVelocityToGeometric(desired_body_velocity, desired_center, &desired_omega);
+    bodyVelocityToGeometric(present_body_velocity, present_center, &present_omega);
+
+    Eigen::Vector3d body_velocity;
+
+    if( desired_center(2) == 0.0 ||
+        present_center(2) == 0.0 )
+    {
+        double present_angle = atan2(present_center(1), present_center(0));
+        double desired_angle = atan2(desired_center(1), desired_center(0));
+        double interpolated_angle = a*present_angle + (1.0-a)*desired_angle;
+        body_velocity << cos(interpolated_angle), sin(interpolated_angle), 0.0;
+
+        double present_speed = present_body_velocity.head(2).norm();
+        double desired_speed = desired_body_velocity.head(2).norm();
+        double interpolated_speed = a*present_speed + (1.0-a)*desired_speed;
+        body_velocity *= interpolated_speed;
+
+        body_velocity(2) = a*present_omega + (1.0-a)*desired_omega;
+    }
+    else
+    {
+        Eigen::Vector3d interpolated_center = a*present_center + (1.0-a)*desired_center;
+        double interpolated_omega = a*present_omega + (1.0-a)*desired_omega;
+        body_velocity = geometricToBody(interpolated_center, interpolated_omega);
+    }
+    return body_velocity;
+}
+
+
+Eigen::Vector3d NumericalLimit(
+        const Eigen::Vector2d &stern_position,
+        const Eigen::Vector2d &starboard_position,
+        const Eigen::Vector2d &port_position,
+        const double dtheta,
+        const double min_step,
+        const double tolerance,
+        double stern_angle, double stern_velocity,
+        double starboard_angle, double starboard_velocity,
+        double port_angle, double port_velocity,
+        const Eigen::Vector3d &desired_body_velocity
+        )
+{
+    Eigen::Vector3d present_center, present_body_velocity;
+    double present_omega;
+    double error = podParamtersToGeometric(
+        stern_position,
+        starboard_position,
+        port_position,
+        stern_angle, stern_velocity,
+        starboard_angle, starboard_velocity,
+        port_angle, port_velocity,
+        present_center,
+        &present_omega
+        );
+
+    present_body_velocity = geometricToBody(present_center, present_omega);
+
     if((present_body_velocity - desired_body_velocity).norm()<0.01)
         return desired_body_velocity;
+
+    double desired_speed = desired_body_velocity.head(2).norm();
+    if(desired_speed<MIN_SPEED && desired_body_velocity(2)<MIN_OMEGA)
+        return desired_body_velocity;
+
     double desired_stern_angle, desired_starboard_angle, desired_port_angle;
     double desired_stern_speed, desired_starboard_speed, desired_port_speed;
     computePod(stern_position, desired_body_velocity, &desired_stern_angle, &desired_stern_speed);
     computePod(starboard_position, desired_body_velocity, &desired_starboard_angle, &desired_starboard_speed);
     computePod(port_position, desired_body_velocity, &desired_port_angle, &desired_port_speed);
 
-    stern_angle = flipVelocity(stern_angle);
-    starboard_angle = flipVelocity(starboard_angle);
-    port_angle = flipVelocity(port_angle);
-    desired_stern_angle = flipVelocity(desired_stern_angle);
-    desired_starboard_angle = flipVelocity(desired_starboard_angle);
-    desired_port_angle = flipVelocity(desired_port_angle);
+    flipVelocity(&stern_angle, &stern_velocity);
+    flipVelocity(&starboard_angle, &starboard_velocity);
+    flipVelocity(&port_angle, &port_velocity);
 
     std::cerr << "stern: " << stern_angle << " starboard: " << starboard_angle << " port: " << port_angle << std::endl;
     std::cerr << "stern: " << desired_stern_angle << " starboard: " << desired_starboard_angle << " port: " << desired_port_angle << std::endl;
@@ -308,10 +369,10 @@ Eigen::Vector3d NumericalLimit(
             limiting_dtheta = port_dtheta;
             std::cerr << "port limiting: " << limiting_dtheta << std::endl;
         }
-    Eigen::Vector3d achievable_body_velocity=desired_body_velocity;
     double err=fabs(limiting_dtheta) - dtheta;
     double a=1.0;
     std::cerr << "a: " << a << " err: " << err << std::endl;
+    Eigen::Vector3d achievable_body_velocity=geometricInterpolate(a, desired_body_velocity, present_body_velocity) ;
     int its=0;
     while( err>tolerance && a>min_step)
     {
@@ -323,10 +384,9 @@ Eigen::Vector3d NumericalLimit(
         //std::cerr << "a: " << a << std::endl;
         //std::cerr << "present: " << present_body_velocity.transpose() << std::endl;
         //std::cerr << "desired: " << desired_body_velocity.transpose() << std::endl;
-        achievable_body_velocity = present_body_velocity + a*(desired_body_velocity - present_body_velocity);
+        achievable_body_velocity = geometricInterpolate(a, desired_body_velocity, present_body_velocity);
         //std::cerr << "achievable: " << achievable_body_velocity.transpose() << std::endl;
         computePod(limiting_position, achievable_body_velocity, &limiting_theta, &limiting_speed);
-        limiting_theta = flipVelocity(limiting_theta);
         limiting_dtheta = limiting_theta - limiting_angle;
         //std::cerr << "limiting_theta: " << limiting_theta << " limiting_angle: " << limiting_angle << " limiting_dtheta: " <<limiting_dtheta << std::endl;
         err=fabs(limiting_dtheta) - dtheta;
@@ -339,5 +399,6 @@ Eigen::Vector3d NumericalLimit(
     std::cerr << "achievable: " << achievable_body_velocity.transpose() << std::endl;
     return achievable_body_velocity;
 }
+
 
 }
