@@ -121,7 +121,7 @@ void VelocityLimiter::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
             vel_in
             );
     */
-    boost::unique_lock<boost::mutex> velocity_lock(angle_mutex);
+    boost::unique_lock<boost::mutex> angle_lock(angle_mutex);
     /*
     Eigen::Vector3d vel_out = platform_motion::SelectClosestVelocity(
         body_velocity,
