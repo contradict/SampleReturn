@@ -22,6 +22,7 @@ class VelocityLimiter
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         void handleOdometry(const nav_msgs::Odometry::ConstPtr odo);
         void handleJointState(const sensor_msgs::JointState::ConstPtr odo);
+        bool lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string jointName, double *angle, double *velocity);
 
         ros::NodeHandle nh;
         ros::NodeHandle pnh;
@@ -47,6 +48,7 @@ class VelocityLimiter
         Eigen::Vector3d deltav;
         double tolerance;
         double min_step;
+        double wheel_diameter;
 };
 
 VelocityLimiter::VelocityLimiter() :
@@ -62,9 +64,14 @@ VelocityLimiter::VelocityLimiter() :
     deltav << delta_vx, delta_vy, delta_omega;
     pnh.param<double>("tolerance", tolerance, 0.0001);
     pnh.param<double>("min_step", min_step, 0.005);
+    pnh.param<double>("wheel_diameter", wheel_diameter, 0.314);
     ROS_INFO("max_steering_omega: %f", max_steering_omega);
     ROS_INFO("twist_period: %f", twist_period);
     ROS_INFO("body_point_name: %s", body_point_name.c_str());
+    ROS_INFO_STREAM("deltav: " << deltav.transpose());
+    ROS_INFO("tolerance: %f", tolerance);
+    ROS_INFO("min_step: %f", min_step);
+    ROS_INFO("wheel_diameter: %f", wheel_diameter);
     ROS_INFO("Waiting for tf");
     lookupPodPosition(std::string("port_suspension"), port_position);
     lookupPodPosition(std::string("starboard_suspension"), starboard_position);
@@ -152,19 +159,30 @@ void VelocityLimiter::handleOdometry(const nav_msgs::Odometry::ConstPtr odo)
     body_velocity << odo->twist.twist.linear.x, odo->twist.twist.linear.y, odo->twist.twist.angular.z;
 }
 
-bool lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string jointName, double *angle, double *velocity)
+bool VelocityLimiter::lookupJoint(const sensor_msgs::JointState::ConstPtr joints, std::string jointName, double *angle, double *velocity)
 {
+    std::string steering_joint = jointName+"_steering_joint";
+    std::string wheel_joint = jointName+"_axle";
+    int found=0;
     for(std::vector<std::string>::const_iterator name=joints->name.begin();
             name<joints->name.end();
             name++)
     {
-        if( *name == jointName )
+        if( *name == steering_joint )
         {
             int idx = std::distance(joints->name.begin(), name);
             *angle=joints->position[idx];
-            *velocity=joints->velocity[idx];
-            return true;
+            found += 1;
         }
+        if( *name == wheel_joint )
+        {
+            int idx = std::distance(joints->name.begin(), name);
+            *velocity=joints->velocity[idx];
+            *velocity *= wheel_diameter/2.0;
+            found += 1;
+        }
+        if(found == 2)
+            return true;
     }
     return false;
 }
@@ -174,21 +192,25 @@ void VelocityLimiter::handleJointState(const sensor_msgs::JointState::ConstPtr j
     boost::unique_lock<boost::mutex> angle_lock(angle_mutex);
     double angle, velocity;
 
-    if(lookupJoint(joints, "starboard_steering_joint", &angle, &velocity))
+    if(lookupJoint(joints, "starboard", &angle, &velocity))
     {
         starboard_angle = angle;
         starboard_velocity = velocity;
     }
-    if(lookupJoint(joints, "port_steering_joint", &angle, &velocity))
+    if(lookupJoint(joints, "port", &angle, &velocity))
     {
         port_angle = angle;
         port_velocity = velocity;
     }
-    if(lookupJoint(joints, "stern_steering_joint", &angle, &velocity))
+    if(lookupJoint(joints, "stern", &angle, &velocity))
     {
         stern_angle = angle;
         stern_velocity = velocity;
     }
+
+    ROS_DEBUG_STREAM("angle stern: " << stern_angle << " starboard: " << starboard_angle << " port: " << port_angle);
+    ROS_DEBUG_STREAM("velocity stern: " << stern_velocity << " starboard: " << starboard_velocity << " port: " << port_velocity);
+
 }
 
 int main(int argc, char **argv)
