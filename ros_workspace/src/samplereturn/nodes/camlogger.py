@@ -31,17 +31,21 @@ def parse_yaml(filename):
   return cam_info
 
 def camlogger():
+  rospy.init_node('camlogger',log_level=rospy.DEBUG)
+
   topic = 'cam_img'
   info_topic = 'cam_info'
   pub = rospy.Publisher(topic,Image)
   info_pub = rospy.Publisher(info_topic,CameraInfo)
+
+  cam_info = CameraInfo()
   calib_file = rospy.get_param('~calib_file', None)
   frame_id = rospy.get_param('~frame_id', '/search_camera_lens')
-  cam_info = CameraInfo()
+  rospy.logdebug("calib_file: %s", calib_file)
   if calib_file is not None:
     cam_info = parse_yaml(calib_file)
   cam_info.header.frame_id = frame_id
-  rospy.init_node('camlogger',log_level=rospy.DEBUG)
+
   seq_id = 0
   rate = rospy.get_param('~rate',1.0)
   r = rospy.Rate(rate)
