@@ -28,3 +28,7 @@ add_subdirectory(src)
 
 add_subdirectory(test)
 
+install(DIRECTORY include
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+    USE_SOURCE_PERMISSIONS
+)
