@@ -18,7 +18,7 @@ class VelocityLimiter
         VelocityLimiter();
 
     private:
-        int lookupPodPosition(std::string name, Eigen::Vector2d *pos);
+        int lookupPodPosition(std::string name, Eigen::Vector2d &pos);
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         void handleOdometry(const nav_msgs::Odometry::ConstPtr odo);
         void handleJointState(const sensor_msgs::JointState::ConstPtr odo);
@@ -66,9 +66,10 @@ VelocityLimiter::VelocityLimiter() :
     ROS_INFO("twist_period: %f", twist_period);
     ROS_INFO("body_point_name: %s", body_point_name.c_str());
     ROS_INFO("Waiting for tf");
-    lookupPodPosition(std::string("port_suspension"), &port_position);
-    lookupPodPosition(std::string("starboard_suspension"), &starboard_position);
-    lookupPodPosition(std::string("stern_suspension"), &stern_position);
+    lookupPodPosition(std::string("port_suspension"), port_position);
+    lookupPodPosition(std::string("starboard_suspension"), starboard_position);
+    lookupPodPosition(std::string("stern_suspension"), stern_position);
+    ROS_INFO_STREAM("port: [" << port_position.transpose() << "] starboard: [" << starboard_position.transpose() << "] stern: [" << stern_position.transpose() << "]");
     ROS_INFO("Subscribing");
     st = nh.subscribe("twist", 1, &VelocityLimiter::handleTwist, this);
     so = nh.subscribe("odometry", 1, &VelocityLimiter::handleOdometry, this);
@@ -78,7 +79,7 @@ VelocityLimiter::VelocityLimiter() :
     ROS_INFO("Init done");
 }
 
-int VelocityLimiter::lookupPodPosition(std::string name, Eigen::Vector2d *pos)
+int VelocityLimiter::lookupPodPosition(std::string name, Eigen::Vector2d &pos)
 {
     tf::StampedTransform pod_tf;
     ros::Time current(0);
@@ -91,7 +92,7 @@ int VelocityLimiter::lookupPodPosition(std::string name, Eigen::Vector2d *pos)
         return -1;
     }
     //ROS_DEBUG("%s at (%f, %f)", joint_name, port_tf.getOrigin().x(), port_tf.getOrigin().y());
-    (*pos) << pod_tf.getOrigin().x(), pod_tf.getOrigin().y();
+    pos << pod_tf.getOrigin().x(), pod_tf.getOrigin().y();
     return 0;
 }
 
