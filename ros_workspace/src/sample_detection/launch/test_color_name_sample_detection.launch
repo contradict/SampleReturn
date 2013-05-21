@@ -7,14 +7,16 @@
              env-loader="/home/zlizer/src/SampleReturn/ros_workspace/devel/env.sh"
              user="zlizer"
     />
-    <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
+  <include file="$(find samplereturn)/launch/navigation_camera.launch">
+    <arg name="run_cameras" value="false"/>
+  </include>
 
     <node
       pkg="sample_detection"
       type="color_name_sample_detection.py"
       name="color_name_sample_detection"
       ns="sample_detection">
-      <param name="samples" type="string" value="$(find sample_detection)/config/samples.yaml"/>
+      <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
       <remap from="left_img" to="/navigation/left/image_rect_color"/>
       <remap from="disparity" to="/navigation/disparity"/>
       <remap from="cam_info" to="/navigation/left/camera_info"/>
