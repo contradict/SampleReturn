@@ -17,7 +17,7 @@ import scipy.linalg
 class color_name_sample_detection(object):
 
   def __init__(self):
-    rospy.init_node('color_name_sample_detection',anonymous=True)
+    rospy.init_node('color_name_sample_detection',anonymous=True,log_level=rospy.DEBUG)
     self.monocular_img_sub = rospy.Subscriber('monocular_img',Image, queue_size=1,callback=self.handle_monocular_img)
     self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
     self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
@@ -26,7 +26,14 @@ class color_name_sample_detection(object):
 
     self.bridge = CvBridge()
 
+    maxArea = rospy.get_param('~max_area',800.0)
+    minArea = rospy.get_param('~min_area',100.0)
+    delta = rospy.get_param('~delta',10.0)
+
     self.mser = cv2.MSER()
+    self.mser.setDouble('maxArea', maxArea)
+    self.mser.setDouble('minArea', minArea)
+    self.mser.setDouble('delta', delta)
 
     if rospy.get_param('~enable_debug',True):
       debug_img_topic = 'debug_img'
@@ -35,7 +42,9 @@ class color_name_sample_detection(object):
     self.named_img_point_pub = rospy.Publisher('named_img_point', NamedPoint)
     self.named_point_pub = rospy.Publisher('named_point', NamedPoint)
 
-    self.color_mat = scipy.io.loadmat('/home/zlizer/Downloads/ColorNaming/w2c.mat')
+    color_file = rospy.get_param('~color_file')
+    #self.color_mat = scipy.io.loadmat('w2c.mat')
+    self.color_mat = scipy.io.loadmat(color_file)
     self.color_names = ['black','blue','brown','gray','green','orange','pink','purple','red','white','yellow']
     self.sample_names = [None,None,'wood_block','pre_cached',None,'orange_pipe','pink_ball',None,'red_puck','pre_cached','yellow_rock']
     self.sample_thresh = [None,None,0.3,0.3,None,0.4,0.3,None,0.4,0.3,0.3]
