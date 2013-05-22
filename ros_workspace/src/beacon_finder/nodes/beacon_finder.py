@@ -14,16 +14,16 @@ class BeaconFinder:
 	"""A class to locate the beacon in an image and publish a vector in the camera's frame from the robot to the beacon"""
 	
 	def __init__(self):
-		self._image_subscriber = rospy.Subscriber('cam_img', Image, self.image_callback, None, 1)
-		self._camera_info_subscriber = rospy.Subscriber('cam_info', CameraInfo, self.camera_info_callback, None, 1)
+		self._image_subscriber = rospy.Subscriber('camera_image', Image, self.image_callback, None, 1)
+		self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo, self.camera_info_callback, None, 1)
 		self._beacon_vector_publisher = rospy.Publisher('/beacon_vector', Vector3)
 		self._beacon_debug_image = rospy.Publisher('/beacon_debug_img', Image)
 		self._cv_bridge = CvBridge()
 
 		# Get params
-		self._num_rows = rospy.get_param("~num_rows", 4)
-		self._num_columns = rospy.get_param("~num_columns", 11)
-		self._corner_circles_vertical_distance_meters = rospy.get_param("~corner_circles_vertical_distance_meters", 0.6895)
+		self._num_rows = rospy.get_param("~num_rows", 3)
+		self._num_columns = rospy.get_param("~num_columns", 9)
+		self._corner_circles_vertical_distance_meters = rospy.get_param("~corner_circles_vertical_distance_meters", 0.6096)
 		self._camera_image_sensor_width_mmeters = rospy.get_param("~camera_image_sensor_width_mmeters", 15.6)
 		self._camera_image_sensor_height_mmeters = rospy.get_param("~camera_image_sensor_height_mmeters", 23.6)
 		self._blob_color = rospy.get_param("~blob_color", 0)
@@ -101,16 +101,12 @@ class BeaconFinder:
 					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
 
 	def camera_info_callback(self, camera_info):
-		self._camera_pixel_width = 3696
-		self._camera_pixel_height = 2448
-		self._camera_focal_length = 18
-		self._camera_hfov = 2*math.atan(0.5*self._camera_image_sensor_width_mmeters/18)
-		self._camera_vfov = 2*math.atan(0.5*self._camera_image_sensor_height_mmeters/18)
-		#self._camera_pixel_width = camera_info.width
-		#self._camera_pixel_height = camera_info.height
-		#self._camera_focal_length = camera_info.K[0]
-		#self._camera_hfov = 2*math.atan(0.5*self._camera_image_sensor_width_mmeters/camera_info.K[0])
-		#self._camera_vfov = 2*math.atan(0.5*self._camera_image_sensor_height_mmeters/camera_info.K[4])
+		self._camera_pixel_width = camera_info.width
+		self._camera_pixel_height = camera_info.height
+		self._camera_focal_length = self._camera_image_sensor_width_mmeters/self._camera_pixel_width*camera_info.K[0] # Arbitrary use of the width for focal length
+		
+		self._camera_hfov = 2*math.atan(0.5*self._camera_image_sensor_width_mmeters/self._camera_focal_length)
+		self._camera_vfov = 2*math.atan(0.5*self._camera_image_sensor_height_mmeters/self._camera_focal_length)
 
 if __name__ == '__main__':
 	rospy.init_node('beacon_finder')
