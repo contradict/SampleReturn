@@ -6,9 +6,11 @@
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/JointState.h>
+#include <platform_motion/Centers.h>
 
 #include "motion/acceleration_limit.h"
 
@@ -27,6 +29,7 @@ class VelocityLimiter
         ros::NodeHandle nh;
         ros::NodeHandle pnh;
         ros::Publisher limited_twist;
+        ros::Publisher debug;
         tf::TransformListener listener;
         ros::Subscriber st;
         ros::Subscriber so;
@@ -83,6 +86,7 @@ VelocityLimiter::VelocityLimiter() :
     sj = nh.subscribe("joint_state", 1, &VelocityLimiter::handleJointState, this);
     ROS_INFO("Advertising");
     limited_twist = nh.advertise<geometry_msgs::Twist>("limited_twist", 1);
+    debug = nh.advertise<platform_motion::Centers>("debug", 1);
     ROS_INFO("Init done");
 }
 
@@ -108,30 +112,9 @@ void VelocityLimiter::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     Eigen::Vector3d vel_in;
     vel_in << twist->linear.x, twist->linear.y, twist->angular.z;
 
-    /*
     boost::unique_lock<boost::mutex> angle_lock(angle_mutex);
-    Eigen::Vector3d vel_out = platform_motion::SimpleLimit(
-            stern_position,
-            starboard_position,
-            port_position,
-            max_steering_omega*twist_period,
-            stern_angle,
-            starboard_angle,
-            port_angle,
-            vel_in
-            );
-    */
-    boost::unique_lock<boost::mutex> angle_lock(angle_mutex);
-    /*
-    Eigen::Vector3d vel_out = platform_motion::SelectClosestVelocity(
-        body_velocity,
-        stern_position,
-        starboard_position,
-        port_position,
-        max_steering_omega,
-        deltav,
-        vel_in);
-        */
+    Eigen::Vector3d desired_center, present_center, interpolated_center;
+    double desired_omega, present_omega, interpolated_omega;
     Eigen::Vector3d vel_out = platform_motion::NumericalLimit(
         stern_position,
         starboard_position,
@@ -142,7 +125,10 @@ void VelocityLimiter::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
         stern_angle, stern_velocity,
         starboard_angle, starboard_velocity,
         port_angle, port_velocity,
-        vel_in
+        vel_in,
+        present_center, &present_omega,
+        desired_center, &desired_omega,
+        interpolated_center, &interpolated_omega
         );
 
     geometry_msgs::Twist lt;
@@ -150,6 +136,15 @@ void VelocityLimiter::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     lt.linear.y = vel_out(1);
     lt.angular.z = vel_out(2);
     limited_twist.publish(lt);
+
+    platform_motion::Centers c;
+    tf::pointEigenToMsg(present_center, c.present_center);
+    c.present_omega.data = present_omega;
+    tf::pointEigenToMsg(desired_center, c.desired_center);
+    c.desired_omega.data = desired_omega;
+    tf::pointEigenToMsg(interpolated_center, c.interpolated_center);
+    c.interpolated_omega.data = interpolated_omega;
+    debug.publish(c);
 }
 
 void VelocityLimiter::handleOdometry(const nav_msgs::Odometry::ConstPtr odo)

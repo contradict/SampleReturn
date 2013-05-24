@@ -22,6 +22,7 @@
     <build_depend>dynamic_reconfigure</build_depend>
     <build_depend>canopen</build_depend>
     <build_depend>bfl</build_depend>
+    <build_depend>eigen_conversions</build_depend>
 
     <run_depend>message_runtime</run_depend>
     <run_depend>message_generation</run_depend>

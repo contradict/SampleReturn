@@ -1,0 +1,6 @@
+geometry_msgs/Point present_center
+std_msgs/Float64 present_omega
+geometry_msgs/Point desired_center
+std_msgs/Float64 desired_omega
+geometry_msgs/Point interpolated_center
+std_msgs/Float64 interpolated_omega

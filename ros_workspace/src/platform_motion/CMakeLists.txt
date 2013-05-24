@@ -16,6 +16,7 @@ find_package(catkin REQUIRED
         dynamic_reconfigure
         canopen
         bfl
+        eigen_conversions
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -28,6 +29,7 @@ add_message_files(
     FILES
         GPIO.msg
         ServoStatus.msg
+        Centers.msg
 )
 
 # services
