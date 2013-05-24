@@ -13,6 +13,11 @@ catkin_package(
         rospy
 )
 
+catkin_add_env_hooks(
+    00phidgets
+    SHELLS sh
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/env-hooks)
+
 foreach( d
         launch
         config

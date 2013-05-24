@@ -37,4 +37,5 @@
     <include file="$(find visual_servo)/launch/visual_servo.launch"/>
 
     <include file="$(find samplereturn)/launch/planner.launch"/>
+    <include file="$(find samplereturn)/launch/imu.launch"/>
 </launch>
