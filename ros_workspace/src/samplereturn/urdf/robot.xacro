@@ -246,7 +246,7 @@
     <joint name="search_camera_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="search_camera_body"/>
-        <origin xyz="0.10 0.0 1.0" rpy="-1.77 0 -1.57"/>
+        <origin xyz="0.10 0.0 1.0" rpy="-1.94 0 -1.57"/>
     </joint>
 
     <!--fake laser scanner-->
