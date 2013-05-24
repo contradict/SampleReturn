@@ -9,7 +9,6 @@
     name="dynamixel_manager"
     pkg="dynamixel_controllers"
     type="controller_manager.py"
-    required="true"
     output="log">
     <rosparam>
       namespace: dxl_manager
