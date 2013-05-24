@@ -82,6 +82,7 @@ catkin_package(
 install(PROGRAMS
 		nodes/sample_detection.py
 		nodes/color_name_sample_detection.py
+		nodes/ray_to_points.py
 		DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
