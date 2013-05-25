@@ -122,7 +122,6 @@ class color_name_sample_detection(object):
 
     gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
     self.threaded_mser(gray, Image.header)
-    self.test_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.img),'bgr8'))
     while not self.q_img.empty():
       self.named_img_point_pub.publish(self.q_img.get())
     while not self.q_proj.empty():
@@ -130,7 +129,6 @@ class color_name_sample_detection(object):
 
   def find_samples(self, Image):
     self.img = cv2.resize(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')),(0,0),fx=0.5,fy=0.5)
-    self.test_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.img),'bgr8'))
     self.debug_img = self.img.copy()
 
     if self.static_mask is None:
