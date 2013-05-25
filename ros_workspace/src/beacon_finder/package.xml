@@ -33,6 +33,7 @@
   <run_depend>geometry_msgs</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>rospy</run_depend>
+  <run_depend>cv</run_depend>
   <run_depend>cv2</run_depend>
   <run_depend>numpy</run_depend>
 
