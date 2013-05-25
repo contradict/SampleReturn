@@ -40,4 +40,6 @@
 
     <include file="$(find samplereturn)/launch/planner.launch"/>
     <include file="$(find samplereturn)/launch/imu.launch"/>
+
+    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
 </launch>

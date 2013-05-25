@@ -36,6 +36,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     pause_state = teer_ros.ConditionVariable(None)
     man_sample = teer_ros.ConditionVariable(None)
     search_sample = teer_ros.ConditionVariable(None)
+    beacon_vector = teer_ros.ConditionVariable(None)
 
     proclamations = teer_ros.ConditionVariable([])
 
@@ -56,7 +57,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.servo_feedback_interval =\
             rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
-        self._target_name = rospy.get_param("~target_name", 'pre_cached')
+        self.pursuit_complete_distance = rospy.get_param("~pursuit_complete_distance", 5.0)
+        self.home_pursuit_complete_distance = rospy.get_param("~home_pursuit_complete_distance", 10.0)
+        self.maximum_pursuit_error = rospy.get_param("~maximum_pursuit_error", 1.5)
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -73,6 +76,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.sample_detection_man_update)
         rospy.Subscriber("/sample_distance", std_msg.Float64,
                 self.sample_distance_update)
+        rospy.Subscriber("/beacon_vector", geometry_msgs.Vector3,
+                self.beacon_update)
 
         self.listener = tf.TransformListener()
 
@@ -118,6 +123,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def sample_detection_man_update(self, msg):
         self.man_sample = msg
+
+    def beacon_update(self, msg):
+        self.beacon_vector = msg
 
     def pause_state_update(self, state):
         self.pause_state = state
@@ -256,7 +264,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         return pose
 
     def expected(self, start_pose):
-        rospy.loginfo('start pose: %s', start_pose)
+        rosp y.loginfo('start pose: %s', start_pose)
         hdr = std_msg.Header(0, rospy.Time(0), '/base_link')
         ahead=geometry_msg.PointStamped(hdr,
                 geometry_msg.Point(self.precached_sample_distance, 0, 0))
@@ -293,12 +301,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         hdr = std_msg.Header(0, rospy.Time(0), '/map')
         home_pose = geometry_msg.Pose(start_pose.position,
                         spin_pose.orientation)
-        home_goal = move_base_msg.MoveBaseGoal()
-        home_goal.target_pose=\
+        target_pose=\
             geometry_msg.PoseStamped(hdr, home_pose)
-        rospy.loginfo("home goal: %s", home_goal)
-        self.move_base.send_goal(home_goal)
-        return home_pose
+        rospy.loginfo("home goal: %s", target_pose)
+        return target_pose
 
     def drive_to_point(self, pose_st):
         goal = move_base_msg.MoveBaseGoal()
@@ -354,6 +360,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     pose_st.pose.position=newpt
                     goal.target_pose=pose_st
                     self.move_base.send_goal(goal)
+                self.search_sample = None
 
     def drive_to_sample(self, start_pose):
         # switch control to the motion planner and drive to the expected
@@ -425,13 +432,28 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if state not in self.working_states:
                 break
 
-        # drive back to start pose
-        home_pose = self.home(start_pose.pose, spin_pose)
+        # drive back to beacon
+        home_goal = move_base_msg.MoveBaseGoal()
+        home_goal.target_pose = self.home(start_pose.pose, spin_pose)
+        self.move_base.send_goal(home_goal)
         while True:
-            yield teer_ros.WaitDuration(0.1)
-            state = self.move_base.get_state()
-            if state not in self.working_states:
+            teer_ros.WaitDuration(0.5)
+            move_state = self.move_base.get_state()
+            if move_state not in self.working_states:
                 break
+            robot_pose_st = self.get_current_robot_pose()
+            if self.point_distance(pose_st.pose.position,
+                    robot_pose_st.pose.position)<self.home_pursuit_complete_distance:
+                continue
+            if self.beacon_vector is not None:
+                msg = self.beacon_vector
+                newpt = self.listener.transformPoint('/map', 'search_camera_lens', msg)
+                current_point = pose_st.pose.position
+                if self.point_distance(mappt, newpt) > self.maximum_pursuit_error:
+                    goal.target_pose.pose.position=newpt
+                    self.move_base.send_goal(goal)
+                self.beacon_vector = None
+
 
         self.announce("Complete, waiting for mode change")
         mask = (self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
