@@ -34,8 +34,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     navigation_camera_status = teer_ros.ConditionVariable(None)
     manipulator_camera_status = teer_ros.ConditionVariable(None)
     pause_state = teer_ros.ConditionVariable(None)
-    current_nav_sample = teer_ros.ConditionVariable(None)
-    current_man_sample = teer_ros.ConditionVariable(None)
+    man_sample = teer_ros.ConditionVariable(None)
+    search_sample = teer_ros.ConditionVariable(None)
 
     proclamations = teer_ros.ConditionVariable([])
 
@@ -59,11 +59,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.servo_feedback_interval =\
             rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
-        self._target_name = rospy.get_param("~target_name", 'red_puck')
-        self.detection_trigger_distance = rospy.get_param("~detection_trigger_distance", 15)
-        self.detection_trigger_count = rospy.get_param("~detection_trigger_count", 5)
-
-        self.reset_detection_trigger()
+        self._target_name = rospy.get_param("~target_name", 'pre_cached')
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -73,8 +69,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.manipulator_status_update)
         rospy.Subscriber("/pause_state", std_msg.Bool,
                 self.pause_state_update)
-        #rospy.Subscriber("/navigation/sample_detections", detector_msg.NamedPoint,
-        #        self.sample_detection_nav_update)
+        rospy.Subscriber("/sample_detection/filtered_points",
+                detector_msg.NamedPoint,
+                self.sample_detection_search_update)
         rospy.Subscriber("/img_point", linemod_msg.NamedPoint,
                 self.sample_detection_man_update)
         rospy.Subscriber("/sample_distance", std_msg.Float64,
@@ -119,40 +116,15 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         if self.manipulator_camera_status != status:
             self.manipulator_camera_status = status
 
+    def sample_detection_search_update(self, msg):
+        self.search_sample = msg
+
+    def sample_detection_man_update(self, msg):
+        self.man_sample = msg
+
     def pause_state_update(self, state):
         self.pause_state = state
         rospy.logdebug("Pause state %s", state)
-
-    def sample_detection_nav_update(self, msg):
-        self.current_nav_sample = msg
-
-    def point_distance(self, pt1, pt2):
-        return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
-
-    def sample_detection_man_update(self, msg):
-        if msg.name != self._target_name:
-            return
-        if self.tmp_man_sample is None:
-            self.tmp_man_sample = msg
-            rospy.logdebug("trigger init")
-            return
-        if self.point_distance(self.tmp_man_sample.point,
-                msg.point)<self.detection_trigger_distance:
-            self.detection_count -= 1
-            rospy.logdebug("trigger, count %d", self.detection_count)
-            if self.detection_count == 0:
-                self.current_man_sample = msg
-                rospy.logdebug("trigger success")
-        else:
-            self.detection_count = self.detection_trigger_count
-            rospy.logdebug("trigger restart")
-        self.tmp_man_sample = msg
-
-    def reset_detection_trigger(self):
-        self.tmp_man_sample = None
-        self.current_man_sample = None
-        self.detection_count = self.detection_trigger_count
-        rospy.logdebug("trigger reset")
 
     def sample_distance_update(self, msg):
         self.precached_sample_distance = msg.data
@@ -263,8 +235,6 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     self.kill_task(tid)
                 except:
                     pass
-
-
 
     def servo_feedback_cb(self, feedback):
         now = rospy.Time.now()
