@@ -38,11 +38,12 @@
 	<param name="blob_repeatability" type="int" value="3"/>
 	<param name="do_histogram_equalization" type="bool" value="False"/>
 	<param name="do_publish_debug" type="bool" value="True"/>
-	<remap from="camera_image" to="image_rect"/>
+	<!--<remap from="camera_image" to="image_rect"/>-->
+	<remap from="camera_image" to="cam_img"/>
 	<remap from="camera_info" to="cam_info"/>
 	</node>
 
-	<node
+	<!--<node
 		pkg="nodelet"
 		type="nodelet"
 		name="rect"
@@ -50,5 +51,5 @@
 		output="log">
 	<remap from="image_mono" to="cam_img"/>
 	<remap from="camera_info" to="cam_info"/>
-	</node>
+	</node>-->
 </launch>
