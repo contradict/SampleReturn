@@ -116,7 +116,7 @@ class color_name_sample_detection(object):
 
     if self.static_mask is None:
       self.static_mask = np.zeros((self.img.shape[0],self.img.shape[1],1),np.uint8)
-      self.static_mask[400:,:,:] = 1
+      self.static_mask[600:,:,:] = 1
     if self.height is None:
       self.height = self.img.shape[0]/self.nthreads
 
@@ -239,7 +239,10 @@ class color_name_sample_detection(object):
     ave_vec= np.sum(np.sum(out,axis=0),axis=0)
     top_index = np.argmax(ave_vec)
     similarity = ave_vec[top_index]/cv2.countNonZero(small_mask)
-    if similarity > 0.3:
+    #if similarity > 0.1 and (top_index == 3 or top_index == 9):
+    cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
+    if top_index == 3 or top_index == 9:
+      cv2.polylines(self.debug_img,[hull],1,(255,0,255),3)
       cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
     return top_index,similarity
 
