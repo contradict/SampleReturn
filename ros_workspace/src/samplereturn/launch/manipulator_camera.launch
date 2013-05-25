@@ -171,11 +171,11 @@
         >
         <param name="prefilter_size" type="int" value="13"/>
         <param name="prefilter_cap" type="int" value="15"/>
-        <param name="correlation_window_size" type="int" value="17"/>
+        <param name="correlation_window_size" type="int" value="11"/>
         <param name="min_disparity" type="int" value="17"/>
         <param name="disparity_range" type="int" value="96"/>
         <param name="uniqueness_ratio" type="int" value="5"/>
-        <param name="texture_threshold" type="int" value="1000"/>
+        <param name="texture_threshold" type="int" value="500"/>
         <param name="speckle_size" type="int" value="50"/>
         <param name="speckle_range" type="int" value="10"/>
         <param name="approximate_sync" type="bool" value="true"/>
