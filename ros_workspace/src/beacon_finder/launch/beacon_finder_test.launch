@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<launch>
+	<machine name="search"
+			 address="TheSmooth"
+			 user="brandon"/>
+
+	<node
+		machine="search"
+		pkg="nodelet"
+		type="nodelet"
+		name="manager"
+		args="manager"
+		output="log"
+		respawn="true"
+		/>
+
+	<node
+		machine="search"
+		name="beacon_finder"
+		pkg="beacon_finder"
+		type="beacon_finder.py"
+		output="log">
+	<param name="num_rows" type="int" value="3"/>
+	<param name="num_columns" type="int" value="9"/>
+	<param name="corner_circles_vertical_distance_meters" type="double" value="0.6096"/>
+	<param name="camera_image_sensor_width_mmeters" type="double" value="23.6"/>
+	<param name="camera_image_sensor_height_mmeters" type="double" value="15.6"/>
+	<param name="blob_color" type="double" value="0"/>
+	<param name="blob_min_area" type="double" value="9"/>
+	<param name="blob_max_area" type="double" value="5000"/>
+	<param name="blob_min_threshold" type="double" value="20"/>
+	<param name="blob_max_threshold" type="double" value="220"/>
+	<param name="blob_threshold_step" type="double" value="10"/>
+	<param name="blob_min_distance_between_blobs" type="double" value="3.0"/>
+	<param name="blob_repeatability" type="int" value="3"/>
+	<param name="do_histogram_equalization" type="bool" value="False"/>
+	<param name="do_publish_debug" type="bool" value="True"/>
+	<remap from="camera_image" to="image_rect"/>
+	<remap from="camera_info" to="cam_info"/>
+	</node>
+
+	<node
+		pkg="nodelet"
+		type="nodelet"
+		name="rect"
+		args="load image_proc/rectify /manager"
+		output="log">
+	<remap from="image_mono" to="cam_img"/>
+	<remap from="camera_info" to="cam_info"/>
+	</node>
+</launch>
