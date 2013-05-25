@@ -49,9 +49,6 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         # node parameters
         self.voice = rospy.get_param("~voice", "kal_diphone")
-        self.maximum_desync = rospy.get_param("~maximum_desync", 0.10)
-        self.desync_wait_count = rospy.get_param("~desync_wait_count", 5)
-        self.resync_wait = rospy.get_param("~resync_wait", 10)
         self.speech_delay = rospy.get_param("~speech_delay", 0.8)
         self.speech_rate = rospy.get_param("~speech_rate", 0.07)
         self.precached_sample_distance = rospy.get_param("~precached_sample_distance", 2.0)
@@ -269,13 +266,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # with current orientation
         expected_pose = \
             geometry_msg.Pose(desired_pt.point, start_pose.orientation)
-        hdr = std_msg.Header(0, rospy.Time(0), '/map')
-        expected_position = move_base_msg.MoveBaseGoal()
-        expected_position.target_pose=\
-            geometry_msg.PoseStamped(hdr, expected_pose)
-        rospy.loginfo('expected postion: %s', expected_position.target_pose)
-        self.move_base.send_goal(expected_position)
-        return start_pose
+        hdr =std_msg.Header(0, rospy.Time(0), '/map')
+        pose_st = geometry_msg.PoseStamped(hdr, expected_pose)
+        rospy.loginfo('expected pose: %s', pose_st)
+        return pose_st
 
     def spin(self, current_pose, start_pose):
         # spin in place to point at home
@@ -306,28 +300,94 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.move_base.send_goal(home_goal)
         return home_pose
 
-    def retrieve_precached_sample(self):
+    def drive_to_point(self, pose_st):
+        goal = move_base_msg.MoveBaseGoal()
+        goal.target_pose=pose_st
+        self.move_base.send_goal(goal)
+        while True:
+            teer_ros.WaitDuration(0.1)
+            move_state = self.move_base.get_state()
+            if move_state not in self.working_states:
+                break
 
+    def wait_for_search_sample(self):
         # set sample to None so we know when the first point arrives
-        self.reset_detection_trigger()
+        self.search_sample = None
+        # wait for the search camera to see the object
+        yield teer_ros.WaitCondition(
+                lambda: self.search_sample is not None)
+        self.announce("Sample located")
 
-        # write down sart pose
-        start_pose = self.get_current_robot_pose()
-        rospy.loginfo('start pose: %s', start_pose)
-
-        # switch control to the motion planner and drive to the expected
-        # position
-        self.announce("Moving to expected sample position")
-        self.platform_motion_input_select("Planner")
-        self.expected(start_pose.pose)
-
+    def wait_for_manipulator_sample(self):
+        # set sample to None so we know when the first point arrives
+        self.manipulator_sample = None
         # wait for the manipulator camera to see the object
         yield teer_ros.WaitCondition(
-                lambda: self.current_man_sample is not None)
+                lambda: self.search_sample is not None)
+        self.announce("Sample located")
         # wait to stop
         self.move_base.cancel_goal()
         yield teer_ros.WaitDuration(0.5)
 
+    def point_distance(self, pt1, pt2):
+        return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
+
+    def pursue(self, pose_st):
+        goal = move_base_msg.MoveBaseGoal()
+        goal.target_pose=pose_st
+        self.move_base.send_goal(goal)
+
+        while True:
+            teer_ros.WaitDuration(0.5)
+            move_state = self.move_base.get_state()
+            if move_state not in self.working_states:
+                break
+            robot_pose_st = self.get_current_robot_pose()
+            if self.point_distance(pose_st.pose.position,
+                    robot_pose_st.pose.position)<self.pursuit_complete_distance:
+                continue
+            if self.search_sample is not None:
+                msg = self.search_sample
+                newpt = self.listener.transformPoint('/map', msg.header.frame_id, msg.point)
+                current_point = pose_st.pose.position
+                if self.point_distance(mappt, newpt) > self.maximum_pursuit_error:
+                    pose_st.pose.position=newpt
+                    goal.target_pose=pose_st
+                    self.move_base.send_goal(goal)
+
+    def drive_to_sample(self, start_pose):
+        # switch control to the motion planner and drive to the expected
+        # position
+        self.announce("Moving to expected sample position")
+        self.platform_motion_input_select("Planner")
+        expected_position = self.expected(start_pose)
+        drive=self.new_task(self.drive_to_point(expected_position))
+        find=self.new_task(self.wait_for_search_sample())
+        teer_ros.WaitAnyTask([drive, find])
+        move_state = self.move_base.get_state()
+        if move_state == action_msg.GoalStatus.SUCCEEDED:
+            # arrived at goal position without seeing sample
+            self.announce("Failed to see sample, returning")
+            self.kill_task(find)
+            self.new_task(self.drive_home(start_pose))
+            return
+
+        # see sample in search, update goal and drive close
+        msg = self.search_sample
+        self.listener.waitForTransform('/map', msg.header.frame_id,
+                rospy.Time(0), rospy.Duration(10.0))
+        mappt = self.listener.transformPoint('/map', msg.header.frame_id, msg.point)
+        expected_position.pose.position=mappt
+        pursue = self.new_task(self.pursue(expected_position))
+        see = self.new_task(self.wait_for_manipulator_sample)
+        teer_ros.WaitAnyTask([pursue, see])
+        if self.man_sample is None:
+            self.announce("Failed to acquire sample in manipulator camera")
+            self.new_task(self.drive_home(start_pose))
+            return False
+        return True
+
+    def acquire_sample(self):
         # switch to visual servo control
         self.announce("Sample detected, servoing")
         self.platform_motion_input_select("Servo")
@@ -352,8 +412,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             state = self.manipulator.get_state()
             if state not in self.working_states:
                 break
-        self.announce("Sample retreived, returning to starting point")
+        self.announce("Sample retreived")
 
+    def drive_home(self, start_pose):
         # spin in place to point at home
         self.platform_motion_input_select("Planner")
         capture_pose = self.get_current_robot_pose()
@@ -371,6 +432,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             state = self.move_base.get_state()
             if state not in self.working_states:
                 break
+
         self.announce("Complete, waiting for mode change")
         mask = (self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
         pin_states =\
@@ -379,6 +441,18 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 lambda: self.gpio.new_pin_states&mask != pin_states)
         rospy.loginfo("mode changed")
 
+
+    def retrieve_precached_sample(self):
+        # write down sart pose
+        start_pose = self.get_current_robot_pose()
+        rospy.loginfo('start pose: %s', start_pose)
+
+        if not self.drive_to_sample(start_pose):
+            return
+        if not self.acquire_sample(start_pose):
+            return
+
+        self.drive_home(start_pose)
 
 def start_node():
     rospy.init_node('master_executive')
