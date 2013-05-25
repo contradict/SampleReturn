@@ -39,12 +39,15 @@ class ray_to_points(object):
     point_stamped.header = point_in.header
     point_stamped.point = point_in.point
 
-    base_link_point = self.tf.transformPoint('/base_link', point_stamped)
+    ground_named_point, odom_named_point = self.cast_ray(point_stamped,self.tf,point_in.name)
+    rospy.logdebug("ground_named_point %s",ground_named_point)
+    self.named_point_pub.publish(ground_named_point)
+    rospy.logdebug("odom_named_point %s",odom_named_point)
 
-    t = self.tf.getLatestCommonTime('/base_link', point_in.header.frame_id)
-    pos, quat = self.tf.lookupTransform('/base_link', point_in.header.frame_id, t)
-    rospy.logdebug("pos: %s", pos)
-    rospy.logdebug("quat: %s", quat)
+  def cast_ray(self, point_in, tf, name):
+    base_link_point = tf.transformPoint('/base_link', point_in)
+    t = tf.getLatestCommonTime('/base_link', point_in.header.frame_id)
+    pos, quat = tf.lookupTransform('/base_link', point_in.header.frame_id, t)
     height = pos[2]
 
     x_slope = np.abs((pos[0]-base_link_point.point.x)/(pos[2]-base_link_point.point.z))
@@ -59,9 +62,12 @@ class ray_to_points(object):
     ground_named_point.point.y = ground_point[1]
     ground_named_point.point.z = ground_point[2]
     ground_named_point.header = point_in.header
-    ground_named_point.name = point_in.name
-    rospy.logdebug("ground_named_point %s",ground_named_point)
-    self.named_point_pub.publish(ground_named_point)
+    ground_named_point.header.frame_id = 'base_link'
+    ground_named_point.name = name
+
+    odom_named_point = self.tf.transformPoint('/odom',ground_named_point)
+
+    return ground_named_point, odom_named_point
 
   def make_point_cloud(Point):
     # Take a vector, nominally [x,y,1] and apply some rotation about x (pitch)
