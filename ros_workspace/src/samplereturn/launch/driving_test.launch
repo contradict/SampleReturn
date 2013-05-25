@@ -34,7 +34,7 @@
     -->
     <include file="$(find sample_detection)/launch/sample_detection.launch"/>
 
-    <include file="$(find sample_detection)/launch/search_detection.launch"/>
+    <include file="$(find samplereturn)/launch/search_detection.launch"/>
 
     <include file="$(find visual_servo)/launch/visual_servo.launch"/>
 
