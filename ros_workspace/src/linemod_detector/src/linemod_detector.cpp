@@ -280,7 +280,7 @@ class LineMOD_Detector
     linemod_detector::NamedPoint img_point_msg;
     linemod_detector::NamedPoint point_msg;
     img_point_msg.name = m.class_id;
-    //img_point_msg.header =
+    img_point_msg.header = header;
     // We only care about the base pyramid level gradient modality
     img_point_msg.point.x = m.x + templates[1].width/2;
     img_point_msg.point.y = m.y + templates[1].height/2;
