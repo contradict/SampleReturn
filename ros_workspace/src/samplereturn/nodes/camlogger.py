@@ -40,7 +40,7 @@ def parse_yaml(filename):
   return cam_info
 
 def camlogger():
-  rospy.init_node('camlogger',log_level=rospy.DEBUG)
+  rospy.init_node('camlogger')
 
   topic = 'cam_img'
   info_topic = 'cam_info'
