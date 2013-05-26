@@ -10,7 +10,10 @@
       <remap from="color" to="/manipulator/left/image_rect_color"/>
       <remap from="disparity" to="/manipulator/disparity"/>
       <remap from="cam_info" to="/manipulator/left/camera_info"/>
+      <!--
       <param name="template_file" type="string" value="$(find linemod_detector)/config/manipulator_samples.yaml"/>
+      -->
+      <param name="template_file" type="string" value="$(find linemod_detector)/config/pre_cached.yaml"/>
       <param name="pub_threshold" type="double" value="80.0"/>
       <param name="min_depth" type="double" value="100.0"/>
       <param name="max_depth" type="double" value="1000.0"/>
