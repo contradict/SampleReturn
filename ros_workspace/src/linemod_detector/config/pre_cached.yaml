@@ -15,7 +15,7 @@ modalities:
       extract_threshold: 2
 classes:
    -
-      class_id: class0
+      class_id: pre_cached
       modalities: [ ColorGradient, DepthNormal ]
       pyramid_levels: 2
       template_pyramids:
