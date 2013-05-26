@@ -46,6 +46,7 @@ class BeaconFinder:
 		self._blob_detector_params.minDistBetweenBlobs = self._blob_min_distance_between_blobs
 		self._blob_detector_params.minRepeatability = self._blob_repeatability
 		self._blob_detector = cv2.SimpleBlobDetector(self._blob_detector_params)
+		self._camera_matrix = None
 
 		if self._do_histogram_equalization:
 			self._image_output_encoding = '8UC1'
@@ -87,7 +88,7 @@ class BeaconFinder:
 		# This function receives an image, attempts to locate the beacon
 		# in it, then if successful outputs a vector towards it in the
 		# camera's frame
-		if self._camera_matrix:
+		if self._camera_matrix.any():
 			image_cv = numpy.asarray(self._cv_bridge.imgmsg_to_cv(image, 'bgr8'))
 
 			if self._do_histogram_equalization:
