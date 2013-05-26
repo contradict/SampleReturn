@@ -21,6 +21,7 @@ import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
 import visual_servo.msg as visual_servo_msg
 import linemod_detector.msg as linemod_msg
+import tf_conversions
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -470,6 +471,13 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             rospy.loginfo("inserting transform: %s", tfs)
             self.listener.setTransform(tfs, 'beacon_finder')
             g_pose = self.listener.transformPose('/map', b_pose)
+            q=(g_pose.pose.orientation.x,g_pose.pose.orientation.y,g_pose.pose.orientation.z,g_pose.pose.orientation.w)
+            roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
+            q_upright = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw)
+            g_pose.pose.orientation.x = q_upright[0]
+            g_pose.pose.orientation.y = q_upright[1]
+            g_pose.pose.orientation.z = q_upright[2]
+            g_pose.pose.orientation.w = q_upright[3]
             rospy.loginfo("g: %s", g_pose)
             return g_pose
         return None
