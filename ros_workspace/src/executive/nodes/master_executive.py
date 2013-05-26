@@ -425,12 +425,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def beacon_goal(self, current_beacon_point, new_beacon_pose, robot_pose):
         newpose = self.listener.transformPose('/map', new_beacon_pose)
         rospy.loginfo("newpt: %s", newpose)
-        if self.point_distance(
+        dist = self.point_distance(
                 current_beacon_point.pose.position,
-                newpose.pose.position) > self.maximum_pursuit_error:
-            self.announce("recentering beacon")
-            current_beacon_point.pose = new_beacon_pose.pose
-            current_beacon_point.header = new_beacon_pose.header
+                newpose.pose.position)
+        if dist > self.maximum_pursuit_error:
+            self.announce("re centering beacon")
+            rospy.loginfo("dist: %f", dist)
+            current_beacon_point.pose = newpose.pose
+            current_beacon_point.header = newpose.header
             hdr = std_msg.Header(0, rospy.Time.now(), '/map')
             b_pose = geometry_msg.PoseStamped()
             b_pose.header.stamp = rospy.Time(0)
@@ -444,16 +446,16 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             b_pose.pose.orientation.y = q[1]
             b_pose.pose.orientation.z = q[2]
             b_pose.pose.orientation.w = q[3]
-            tf = geometry_msg.TransformStamped()
-            tf.child_frame_id='beacon'
-            tf.header = new_beacon_pose.header
-            tf.transform.translation = new_beacon_pose.pose.position
-            tf.transform.rotation = new_beacon_pose.pose.orientation
-            rospy.loginfo("inserting transform: %s", tf)
-            self.listener.setTransform(tf, 'beacon_finder')
+            tfs = geometry_msg.TransformStamped()
+            tfs.child_frame_id='beacon'
+            tfs.header = new_beacon_pose.header
+            tfs.transform.translation = new_beacon_pose.pose.position
+            tfs.transform.rotation = new_beacon_pose.pose.orientation
+            rospy.loginfo("inserting transform: %s", tfs)
+            self.listener.setTransform(tfs, 'beacon_finder')
             g_pose = self.listener.transformPose('/map', b_pose)
-            rospy.loginfo("g: %s", g)
-            return g
+            rospy.loginfo("g: %s", g_pose)
+            return g_pose
         return None
 
 
