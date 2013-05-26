@@ -12,8 +12,6 @@
 	<param name="num_rows" type="int" value="3"/>
 	<param name="num_columns" type="int" value="9"/>
 	<param name="corner_circles_vertical_distance_meters" type="double" value="0.6096"/>
-	<param name="camera_image_sensor_width_mmeters" type="double" value="23.6"/>
-	<param name="camera_image_sensor_height_mmeters" type="double" value="15.6"/>
 	<param name="blob_color" type="double" value="0"/>
 	<param name="blob_min_area" type="double" value="9"/>
 	<param name="blob_max_area" type="double" value="5000"/>

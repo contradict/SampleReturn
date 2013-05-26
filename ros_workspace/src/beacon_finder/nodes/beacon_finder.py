@@ -24,9 +24,6 @@ class BeaconFinder:
 		# Get params
 		self._num_rows = rospy.get_param("~num_rows", 3)
 		self._num_columns = rospy.get_param("~num_columns", 9)
-		self._corner_circles_vertical_distance_meters = rospy.get_param("~corner_circles_vertical_distance_meters", 0.6096)
-		self._camera_image_sensor_width_mmeters = rospy.get_param("~camera_image_sensor_width_mmeters", 15.6)
-		self._camera_image_sensor_height_mmeters = rospy.get_param("~camera_image_sensor_height_mmeters", 23.6)
 		self._blob_color = rospy.get_param("~blob_color", 0)
 		self._blob_min_area = rospy.get_param("~blob_min_area", 9)
 		self._blob_max_area = rospy.get_param("~blob_max_area", 5000)
@@ -39,11 +36,6 @@ class BeaconFinder:
 		self._do_publish_debug = rospy.get_param("~do_publish_debug", True)
 
 		# Initialize member variables
-		self._camera_pixel_width = None
-		self._camera_pixel_height = None
-		self._camera_hfov = None
-		self._camera_vfov = None
-		self._camera_focal_length = None
 		self._blob_detector_params = cv2.SimpleBlobDetector_Params()
 		self._blob_detector_params.blobColor = self._blob_color
 		self._blob_detector_params.minArea = self._blob_min_area
@@ -61,78 +53,62 @@ class BeaconFinder:
 			self._image_output_encoding = 'bgr8'
 
 		# Construct a matrix of points representing the circles grid facing the camera
-		self._circles_grid = numpy.array( [      \
-								[-.6096,      0, 0],\
-								[-.6096, -.3048, 0],\
-								[-.6096, -.6096, 0],\
-								[-.4572, -.1524, 0],\
-								[-.4572, -.4572, 0],\
-								[-.4572, -.7620, 0],\
-								[-.3048,      0, 0],\
-								[-.3048, -.3048, 0],\
-								[-.3048, -.6096, 0],\
-								[-.1524, -.1524, 0],\
-								[-.1524, -.4572, 0],\
-								[-.1524, -.7620, 0],\
-								[     0,      0, 0],\
-								[     0, -.3048, 0],\
-								[     0, -.6096, 0],\
-								[ .1524, -.1524, 0],\
-								[ .1524, -.4572, 0],\
-								[ .1524, -.7620, 0],\
-								[ .3048,      0, 0],\
-								[ .3048, -.3048, 0],\
-								[ .3048, -.6096, 0],\
-								[ .4572, -.1524, 0],\
-								[ .4572, -.4572, 0],\
-								[ .4572, -.7620, 0],\
-								[ .6096,      0, 0],\
-								[ .6096, -.3048, 0],\
-								[ .6096, -.6096, 0] ], dtype="float32")
+		d = rospy.get_param("~corner_circles_vertical_distance_meters", 0.6096)
+		self._circles_grid = numpy.array( [             \
+								[-d      ,      0  , 0],\
+								[-d      , -d/2.0  , 0],\
+								[-d      , -d      , 0],\
+								[-3*d/4.0, -d/4.0  , 0],\
+								[-3*d/4.0, -3*d/4.0, 0],\
+								[-3*d/4.0, -5*d/4.0, 0],\
+								[-d/2.0  ,      0  , 0],\
+								[-d/2.0  , -d/2.0  , 0],\
+								[-d/2.0  , -d      , 0],\
+								[-d/4.0  , -d/4.0  , 0],\
+								[-d/4.0  , -3*d/4.0, 0],\
+								[-d/4.0  , -5*d/4.0, 0],\
+								[     0  ,      0  , 0],\
+								[     0  , -d/2.0  , 0],\
+								[     0  , -d      , 0],\
+								[ d/4.0  , -d/4.0  , 0],\
+								[ d/4.0  , -3*d/4.0, 0],\
+								[ d/4.0  , -5*d/4.0, 0],\
+								[ d/2.0  ,      0  , 0],\
+								[ d/2.0  , -d/2.0  , 0],\
+								[ d/2.0  , -d      , 0],\
+								[ 3*d/4.0, -d/4.0  , 0],\
+								[ 3*d/4.0, -3*d/4.0, 0],\
+								[ 3*d/4.0, -5*d/4.0, 0],\
+								[ d      ,      0  , 0],\
+								[ d      , -d/2.0  , 0],\
+								[ d      , -d      , 0]], dtype="float32")
 
 	def image_callback(self, image):
 		# This function receives an image, attempts to locate the beacon
 		# in it, then if successful outputs a vector towards it in the
 		# camera's frame
-		if self._camera_focal_length:
+		if self._camera_matrix:
 			image_cv = numpy.asarray(self._cv_bridge.imgmsg_to_cv(image, 'bgr8'))
+
 			if self._do_histogram_equalization:
 				image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)
 				image_cv = cv2.equalizeHist(image_cv)
+
 			found_beacon, centers = cv2.findCirclesGrid(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID, blobDetector=self._blob_detector)
 
 			if found_beacon:
 				beacon_pose = PoseStamped()
 
-				# Compute the approximate distance to the beacon
-				lower_left_circle_index = 0
-				top_left_circle_index = self._num_rows-1
-				corner_circles_vector_pixel_x = centers[lower_left_circle_index][0][0] - centers[top_left_circle_index][0][0]
-				corner_circles_vector_pixel_y = centers[lower_left_circle_index][0][1] - centers[top_left_circle_index][0][1]
-				corner_circles_vertical_distance_pixels = math.hypot(corner_circles_vector_pixel_x, corner_circles_vector_pixel_y)
-				approx_beacon_distance_meters = self._camera_focal_length*self._corner_circles_vertical_distance_meters/(corner_circles_vertical_distance_pixels*self._camera_image_sensor_height_mmeters/self._camera_pixel_height)
-
-				# Generate a vector pointing towards the beacon
-				beacon_center_pixel = centers[self._num_rows*(self._num_columns/2)+self._num_rows/2][0]
-				beacon_center_angle_yaw = (beacon_center_pixel[0]/self._camera_pixel_width-0.5)*self._camera_hfov
-				beacon_center_angle_pitch = -(beacon_center_pixel[1]/self._camera_pixel_height-0.5)*self._camera_vfov
-				beacon_pose.pose.position.x = math.tan(beacon_center_angle_yaw)
-				beacon_pose.pose.position.y = math.tan(beacon_center_angle_pitch)
-				beacon_pose.pose.position.z = 1
-				beacon_vector_magnitude = math.sqrt(beacon_pose.pose.position.x*beacon_pose.pose.position.x + beacon_pose.pose.position.y*beacon_pose.pose.position.y + 1)
-				beacon_pose.pose.position.x = beacon_pose.pose.position.x*approx_beacon_distance_meters/beacon_vector_magnitude
-				beacon_pose.pose.position.y = beacon_pose.pose.position.y*approx_beacon_distance_meters/beacon_vector_magnitude
-				beacon_pose.pose.position.z = beacon_pose.pose.position.z*approx_beacon_distance_meters/beacon_vector_magnitude
-
-				# Compute the orientation of the beacon
+				# Compute the position and orientation of the beacon
 				rotation_vector, translation_vector, inliers = cv2.solvePnPRansac(self._circles_grid, centers, self._camera_matrix, self._distortion_coefficients)
 				rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
-				forward_vector = numpy.array([0, 0, 1])
-				rotated_vector = numpy.dot(rotation_matrix, forward_vector)
-
 				rotation_matrix = numpy.hstack((rotation_matrix, numpy.array([[0],[0],[0]])))
 				rotation_matrix = numpy.vstack((rotation_matrix, numpy.array([0,0,0,1])))
 				quat = quaternion_from_matrix(rotation_matrix)
+
+				beacon_pose.pose.position.x = translation_vector[0]
+				beacon_pose.pose.position.y = translation_vector[1]
+				beacon_pose.pose.position.z = translation_vector[2]
 				beacon_pose.pose.orientation.x = quat[0]
 				beacon_pose.pose.orientation.y = quat[1]
 				beacon_pose.pose.orientation.z = quat[2]
@@ -149,17 +125,11 @@ class BeaconFinder:
 					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
 
 	def camera_info_callback(self, camera_info):
-		self._camera_pixel_width = camera_info.width
-		self._camera_pixel_height = camera_info.height
-		self._camera_focal_length = self._camera_image_sensor_width_mmeters/self._camera_pixel_width*camera_info.K[0] # Arbitrary use of the width for focal length
 		self._camera_matrix = numpy.array( [ \
 										[camera_info.K[0], 0, camera_info.K[2]], \
 										[0, camera_info.K[4], camera_info.K[5]], \
 										[0, 0, 1]])
 		self._distortion_coefficients = camera_info.D
-		
-		self._camera_hfov = 2*math.atan(0.5*self._camera_image_sensor_width_mmeters/self._camera_focal_length)
-		self._camera_vfov = 2*math.atan(0.5*self._camera_image_sensor_height_mmeters/self._camera_focal_length)
 
 if __name__ == '__main__':
 	rospy.init_node('beacon_finder')
