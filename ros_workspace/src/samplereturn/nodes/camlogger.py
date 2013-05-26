@@ -5,6 +5,15 @@ from sensor_msgs.msg import Image,CameraInfo
 import rospy
 import yaml
 
+import std_msgs.msg as std_msg
+
+paused=True
+
+def pause(msg):
+    global paused
+    paused = msg.data
+    rospy.logdebug("paused: %s", paused)
+
 def capture_image():
   rospy.logdebug("waiting for photo service")
   rospy.wait_for_service('photo_node/capture')
@@ -38,6 +47,8 @@ def camlogger():
   pub = rospy.Publisher(topic,Image)
   info_pub = rospy.Publisher(info_topic,CameraInfo)
 
+  rospy.Subscriber('/pause_state', std_msg.Bool, pause)
+
   cam_info = CameraInfo()
   calib_file = rospy.get_param('~calib_file', None)
   frame_id = rospy.get_param('~frame_id', '/search_camera_lens')
@@ -50,20 +61,23 @@ def camlogger():
   rate = rospy.get_param('~rate',1.0)
   r = rospy.Rate(rate)
   while not rospy.is_shutdown():
-    img = capture_image()
-    rospy.logdebug("img (%d, %d)", img.width, img.height)
+    if not paused:
+      img = capture_image()
+      rospy.logdebug("img (%d, %d)", img.width, img.height)
 
-    now = rospy.Time.now()
-    img.header.stamp = now
-    img.header.frame_id = frame_id
-    img.header.seq = seq_id
-    pub.publish(img)
+      now = rospy.Time.now()
+      img.header.stamp = now
+      img.header.frame_id = frame_id
+      img.header.seq = seq_id
+      pub.publish(img)
 
-    cam_info.header.stamp = now
-    cam_info.header.seq = seq_id
-    info_pub.publish(cam_info)
+      cam_info.header.stamp = now
+      cam_info.header.seq = seq_id
+      info_pub.publish(cam_info)
 
-    seq_id += 1
+      seq_id += 1
+    else:
+        rospy.logdebug("paused")
     r.sleep()
 
 if __name__=="__main__":
