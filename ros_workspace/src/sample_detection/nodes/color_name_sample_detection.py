@@ -13,6 +13,8 @@ from cv_bridge import CvBridge
 from tf import TransformListener
 import scipy.io
 import scipy.linalg
+import threading
+import Queue
 
 class color_name_sample_detection(object):
 
@@ -22,7 +24,7 @@ class color_name_sample_detection(object):
     self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
     self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
     self.disp_sub = rospy.Subscriber('disparity',DisparityImage, queue_size=1,callback=self.handle_disp)
-    self.cam_info_sub = rospy.Subscriber('cam_info',CameraInfo, self.handle_info)
+    self.cam_info_sub = rospy.Subscriber('cam_info',CameraInfo, queue_size=1, callback=self.handle_info)
 
     self.bridge = CvBridge()
 
@@ -43,16 +45,24 @@ class color_name_sample_detection(object):
     self.named_point_pub = rospy.Publisher('named_point', NamedPoint)
 
     color_file = rospy.get_param('~color_file')
-    #self.color_mat = scipy.io.loadmat('w2c.mat')
     self.color_mat = scipy.io.loadmat(color_file)
     self.color_names = ['black','blue','brown','gray','green','orange','pink','purple','red','white','yellow']
-    self.sample_names = [None,None,'wood_block','pre_cached',None,'orange_pipe','pink_ball',None,'red_puck','pre_cached','yellow_rock']
-    self.sample_thresh = [None,None,0.3,0.3,None,0.4,0.3,None,0.4,0.3,0.3]
+    #self.sample_names = [None,None,'wood_block','pre_cached',None,'orange_pipe','pink_ball',None,'red_puck','pre_cached','yellow_rock']
+    self.sample_names = [None,None,None,'pre_cached',None,None,None,None,None,'pre_cached',None]
+    self.sample_thresh = [None,None,0.1,0.1,None,0.1,0.1,None,0.1,0.1,0.1]
 
     self.min_disp = 0.0
     self.max_disp = 128.0
 
     self.disp_img = None
+
+    self.static_mask = None
+
+    self.nthreads = 4
+    self.height = None
+    self.threads = []
+    self.q_img = Queue.Queue()
+    self.q_proj = Queue.Queue()
 
   def handle_left_img(self,Image):
     detections = self.find_samples(Image)
@@ -62,19 +72,30 @@ class color_name_sample_detection(object):
     detections = self.find_samples(Image)
 
   def handle_monocular_img(self, Image):
-    detections = self.find_samples(Image)
+    detections = self.find_samples_threaded(Image)
+    #detections = self.find_samples(Image)
     self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
 
-  def find_samples(self, Image):
-    self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
-    self.debug_img = self.img.copy()
-    lab = cv2.cvtColor(self.img, cv2.COLOR_BGR2LAB)
-    a_regions = self.mser.detect(lab[:,:,1] ,None)
-    a_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in a_regions]
-    b_regions = self.mser.detect(lab[:,:,2] ,None)
-    b_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in b_regions]
-    for h in (a_hulls + b_hulls):
-      top_index, similarity = self.compute_color_name(h,self.img)
+  def threaded_mser(self, img, header):
+    for i in range(self.nthreads):
+      t = threading.Thread(
+          target=self.split_mser_and_color,
+          args=(img[self.height*i:self.height*(i+1),:],self.static_mask[self.height*i:self.height*(i+1),:],
+            i,self.q_img,self.q_proj,header))
+      self.threads.append(t)
+      t.start()
+    for t in self.threads:
+      t.join()
+
+  def split_mser_and_color(self, img, mask, i, q_img, q_proj, header):
+    regions = self.mser.detect(img, mask)
+    for r in regions:
+      r += np.array([0,self.height*i])
+    hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in regions]
+    img = cv2.cvtColor(self.img,cv2.COLOR_BGR2RGB)
+    mask = np.zeros((img.shape[0],img.shape[1]))
+    for h in (hulls):
+      top_index, similarity = self.compute_color_name(h,img,mask)
       if self.sample_names[top_index] is not None and similarity >= self.sample_thresh[top_index]:
         moments = cv2.moments(h)
         # converts to x,y
@@ -84,10 +105,66 @@ class color_name_sample_detection(object):
         named_img_point.point.x = location[0]
         named_img_point.point.y = location[1]
         named_img_point.name = self.sample_names[top_index]
-        self.named_img_point_pub.publish(named_img_point)
-        self.publish_xyz_point(h, top_index, Image.header)
+        q_img.put(named_img_point)
+        named_point = self.project_xyz_point(h, top_index, header)
+        rospy.logdebug("Named_point: %s",named_point)
+        q_proj.put(named_point)
 
-  def publish_xyz_point(self, hull, top_index, header):
+  def find_samples_threaded(self, Image):
+    self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
+    self.debug_img = self.img.copy()
+
+    if self.static_mask is None:
+      self.static_mask = np.zeros((self.img.shape[0],self.img.shape[1],1),np.uint8)
+      self.static_mask[600:,:,:] = 1
+    if self.height is None:
+      self.height = self.img.shape[0]/self.nthreads
+
+    gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
+    self.threaded_mser(gray, Image.header)
+    while not self.q_img.empty():
+      self.named_img_point_pub.publish(self.q_img.get())
+    while not self.q_proj.empty():
+      self.named_point_pub.publish(self.q_proj.get())
+
+  def find_samples(self, Image):
+    self.img = cv2.resize(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')),(0,0),fx=0.5,fy=0.5)
+    self.debug_img = self.img.copy()
+
+    if self.static_mask is None:
+      self.static_mask = np.zeros((self.img.shape[0],self.img.shape[1],1),np.uint8)
+      self.static_mask[400:,:,:] = 1
+
+    lab = cv2.cvtColor(self.img, cv2.COLOR_BGR2LAB)
+    gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
+    #a_regions = self.mser.detect(lab[:,:,1] ,None)
+    #a_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in a_regions]
+    #b_regions = self.mser.detect(lab[:,:,2] ,None)
+    #b_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in b_regions]
+    g_regions = self.mser.detect(gray, self.static_mask)
+    rospy.logdebug("number of regions: %s", len(g_regions))
+    g_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in g_regions]
+    rospy.logdebug("number of hulls: %s", len(g_hulls))
+    img = cv2.cvtColor(self.img,cv2.COLOR_BGR2RGB)
+    mask = np.zeros((img.shape[0],img.shape[1]))
+    #for h in (a_hulls + b_hulls):
+    for h in (g_hulls):
+      top_index, similarity = self.compute_color_name(h,img,mask)
+      if self.sample_names[top_index] is not None and similarity >= self.sample_thresh[top_index]:
+        moments = cv2.moments(h)
+        # converts to x,y
+        location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
+        rospy.logdebug("Publishing Named Point")
+        named_img_point = NamedPoint()
+        named_img_point.header = Image.header
+        named_img_point.point.x = location[0]
+        named_img_point.point.y = location[1]
+        named_img_point.name = self.sample_names[top_index]
+        self.named_img_point_pub.publish(named_img_point)
+        named_point = self.project_xyz_point(h, top_index, Image.header)
+        self.named_point_pub.publish(named_point)
+
+  def project_xyz_point(self, hull, top_index, header):
     if self.disp_img is not None:
       rect = cv2.boundingRect(hull)
       local_disp = self.disp_img[rect[1]:rect[1]+rect[3],rect[0]:rect[0]+rect[2]]
@@ -112,12 +189,12 @@ class color_name_sample_detection(object):
       named_point.point.x = XYZ[0]
       named_point.point.y = XYZ[1]
       named_point.point.z = XYZ[2]
-      self.named_point_pub.publish(named_point)
-      return
+      #self.named_point_pub.publish(named_point)
+      return named_point
     else:
       rect = cv2.boundingRect(hull)
-      x = rect[0]+rect[2]/2
-      y = rect[1]+rect[3]/2
+      x = (rect[0]+rect[2]/2)#*2.
+      y = (rect[1]+rect[3]/2)#*2.
       XY = np.dot(self.inv_K,np.array([x,y,1]))
       named_point = NamedPoint()
       named_point.name = self.sample_names[top_index]
@@ -125,7 +202,8 @@ class color_name_sample_detection(object):
       named_point.point.x = XY[0]
       named_point.point.y = XY[1]
       named_point.point.z = 1.0
-      self.named_point_pub.publish(named_point)
+      return named_point
+      #self.named_point_pub.publish(named_point)
 
 
   def handle_disp(self,DisparityImage):
@@ -149,9 +227,7 @@ class color_name_sample_detection(object):
     self.K = np.asarray(self.K).reshape(3,3)
     self.inv_K = scipy.linalg.inv(self.K)
 
-  def compute_color_name(self,hull,img):
-    img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-    mask = np.zeros((img.shape[0],img.shape[1]))
+  def compute_color_name(self,hull,img,mask):
     rect = cv2.boundingRect(hull)
     cv2.drawContours(mask,[hull],-1,255,-1)
     small_img = img[rect[1]:rect[1]+rect[3],rect[0]:rect[0]+rect[2]]
@@ -163,7 +239,10 @@ class color_name_sample_detection(object):
     ave_vec= np.sum(np.sum(out,axis=0),axis=0)
     top_index = np.argmax(ave_vec)
     similarity = ave_vec[top_index]/cv2.countNonZero(small_mask)
-    if similarity > 0.3:
+    #if similarity > 0.1 and (top_index == 3 or top_index == 9):
+    cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
+    if top_index == 3 or top_index == 9:
+      cv2.polylines(self.debug_img,[hull],1,(255,0,255),3)
       cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
     return top_index,similarity
 
