@@ -66,6 +66,7 @@ class LineMOD_Detector
   cv::Mat color_img;
   cv::Mat display;
   cv::Mat K;
+  cv::Mat inv_K;
   cv::Ptr<cv::linemod::Detector> detector;
   int matching_threshold;
   int num_modalities;
@@ -88,6 +89,7 @@ class LineMOD_Detector
     matching_threshold = 80;
     got_color = false;
     K = cv::Mat(3,3,CV_64FC1);
+    inv_K = cv::Mat(3,3,CV_64FC1);
 
     std::string filename;
     ros::param::get("~template_file", filename);
@@ -111,9 +113,11 @@ class LineMOD_Detector
       for (int j = 0; (j < 3); j++)
       {
         LineMOD_Detector::K.at<double>(i,j) = msg.K.at(3*i+j);
+        cv::invert(LineMOD_Detector::K, LineMOD_Detector::inv_K);
       }
     }
-    //std::cout << LineMOD_Detector::K << std::endl;
+    std::cout << LineMOD_Detector::K << std::endl;
+    std::cout << LineMOD_Detector::inv_K << std::endl;
   }
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
@@ -177,7 +181,7 @@ class LineMOD_Detector
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
           if (m.similarity > LineMOD_Detector::pub_threshold)
           {
-            LineMOD_Detector::publishPoint(templates, m, depth_img);
+            LineMOD_Detector::publishPoint(templates, m, depth_img, msg->header);
           }
 
         }
@@ -239,7 +243,7 @@ class LineMOD_Detector
           //std::cout << "pub_threshold " << LineMOD_Detector::pub_threshold << std::endl;
           if (m.similarity > LineMOD_Detector::pub_threshold)
           {
-            LineMOD_Detector::publishPoint(templates, m, depth_ptr->image);
+            LineMOD_Detector::publishPoint(templates, m, depth_ptr->image, msg->header);
           }
 
         }
@@ -270,7 +274,7 @@ class LineMOD_Detector
 
   }
 
-  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m, cv::Mat& depth)
+  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m, cv::Mat& depth, std_msgs::Header header)
   {
     ROS_DEBUG("Publishing POint");
     linemod_detector::NamedPoint img_point_msg;
@@ -301,10 +305,24 @@ class LineMOD_Detector
       r_img = r_img.reshape(0,1);
       cv::sort(r_img,r_img,CV_SORT_DESCENDING);
       double sum = cv::sum(r_img.colRange(0,10))(0) + cv::sum(r_img.colRange(count-10,count))(0);
-      double ave = sum/20;
       //The average is the average depth in mm
+      double ave = sum/20;
+      //Convert to meters
+      ave /=1000;
       //Now we reproject the center point
-      //std::cout << ave << std::endl;
+      cv::Mat image_point = (cv::Mat_<double>(1,3) << m.x,m.y,1);
+      cv::Mat proj_point = (cv::Mat_<double>(3,1) << 0.,0.,1.);
+      proj_point.row(0) = inv_K.row(0).dot(image_point);
+      proj_point.row(1) = inv_K.row(1).dot(image_point);
+      proj_point.row(2) = inv_K.row(2).dot(image_point);
+      proj_point *= ave;
+      point_msg.point.x = proj_point.at<double>(0,0);
+      point_msg.point.y = proj_point.at<double>(1,0);
+      point_msg.point.z = proj_point.at<double>(2,0);
+      std::cout << "Projected Point: " << proj_point << std::endl;
+      point_msg.name = m.class_id;
+      point_msg.header = header;
+      LineMOD_Detector::point_pub.publish(point_msg);
     }
   }
 };
