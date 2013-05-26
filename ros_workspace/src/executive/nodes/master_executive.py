@@ -323,9 +323,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def look_for_beacon(self):
         pose = self.get_current_robot_pose()
         q=(pose.pose.orientation.x,pose.pose.orientation.y,pose.pose.orientation.z,pose.pose.orientation.w)
-        roll, pitch, yaw = tf_conversions.euler_from_quaternion(q)
+        roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
         for i in range(9):
-            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*pi*float(i)/8.)
+            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*math.pi*float(i)/8.)
             pose.pose.orientation.x = q_goal[0]
             pose.pose.orientation.y = q_goal[1]
             pose.pose.orientation.z = q_goal[2]
