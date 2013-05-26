@@ -83,6 +83,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         # create publishers
         self.navigation_audio=rospy.Publisher("/audio/navigate", SoundRequest)
+        self.joystick_command=rospy.Publisher("/joystick_command", geometry_msg.Twist)
+        self.planner_command=rospy.Publisher("/planner_command", geometry_msg.Twist)
+        self.servo_command=rospy.Publisher("/servo_command", geometry_msg.Twist)
 
         # create serivce proxies
         self.platform_motion_input_select = \
@@ -160,6 +163,18 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitDuration(duration)
             self.proclamations.pop(0)
 
+    def publish_zero_velocity(self):
+        t=geometry_msg.Twist()
+        t.linear.x=0
+        t.linear.y=0
+        t.linear.z=0
+        t.angular.x=0
+        t.angular.y=0
+        t.angular.z=0
+        self.joystick_command.publish(t)
+        self.planner_command.publish(t)
+        self.servo_command.publish(t)
+
     #----   Tasks   ----
     def start_robot(self):
         yield teer_ros.WaitDuration(2.0)
@@ -232,6 +247,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             else:
                 self.announce("Joystick control enabled")
                 self.platform_motion_input_select("Joystick")
+                self.publish_zero_velocity()
             pin_states =\
             self.gpio.new_pin_states&(self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
             yield teer_ros.WaitCondition(
