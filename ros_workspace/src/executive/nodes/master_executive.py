@@ -548,8 +548,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     self.move_base.send_goal(home_goal)
                 else:
                     rospy.loginfo("current goal close enough")
-                self.beacon_vector = None
-
+                self.beacon_pose = None
 
         self.announce("Complete, waiting for mode change")
         mask = (self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
