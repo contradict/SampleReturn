@@ -17,6 +17,7 @@ class VoltageAnnouncer(object):
         rospy.Subscriber("/battery_voltage", Float64, self.voltageCallBack)
         self.voltage = None
         self.audioPub=rospy.Publisher("/audio/navigate", SoundRequest)
+        self.whine_guard = False #flag to keep robot from whining about low voltage constantly
         rospy.spin()
 
     def gpio(self, gpio):
@@ -27,15 +28,20 @@ class VoltageAnnouncer(object):
 
     def voltageCallBack(self, float):
         self.voltage=float.data
-        rospy.logdebug("voltage_announcer received voltage %f", self.voltage)
-        if (self.voltage <= self.lowVoltageLimit):
+        #rospy.logdebug("voltage_announcer received voltage %f", self.voltage)
+        if ((self.voltage <= self.lowVoltageLimit) and not self.whine_guard):
             msg = SoundRequest()
             msg.sound = SoundRequest.SAY
             msg.command = SoundRequest.PLAY_ONCE
             msg.arg2 = 'voice.select "%s"'%self.voice
             msg.arg = "Warning. Battery voltage, %4.1f"%self.voltage
             self.audioPub.publish(msg)
+            self.whine_guard = True
+            rospy.Timer(rospy.Duration(15.0), self.clear_guard, oneshot = True)
 
+    def clear_guard(self, event):
+        self.whine_guard = False
+        
     def sayVoltage(self):
         msg = SoundRequest()
         msg.sound = SoundRequest.SAY
