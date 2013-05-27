@@ -27,6 +27,8 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
         roscore &
     fi
 
+    sleep 1
+
     pidname=`basename ${LAUNCH_FILE} .launch`.pid
     roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
 fi
