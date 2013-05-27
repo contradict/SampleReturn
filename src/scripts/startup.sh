@@ -27,7 +27,8 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
         roscore &
     fi
 
-    /usr/bin/aplay /usr/lib/libreoffice/share/gallery/sounds/romans.wav
     pidname=`basename ${LAUNCH_FILE} .launch`.pid
     roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
 fi
+MACHINE=`hostname`
+/usr/bin/aplay /home/robot/sounds/${MACHINE}start.wav
