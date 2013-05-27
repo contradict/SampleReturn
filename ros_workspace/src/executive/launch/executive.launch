@@ -10,6 +10,7 @@
         output="log">
         <param name="precached_sample_distance" type="double" value="10.0"/>
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
+        <param name="maximum_pursuit_error" type="double" value="0.5"/>
 
         <remap from="img_point" to="/namedpoints"/>
     </node>
