@@ -33,7 +33,6 @@ class BeaconFinder:
 		self._blob_min_distance_between_blobs = rospy.get_param("~blob_min_distance_between_blobs", 3.0)
 		self._blob_repeatability = rospy.get_param("~blob_repeatability", 3L)
 		self._do_histogram_equalization = rospy.get_param("~do_histogram_equalization", False)
-		self._do_publish_debug = rospy.get_param("~do_publish_debug", True)
 
 		# Initialize member variables
 		self._blob_detector_params = cv2.SimpleBlobDetector_Params()
@@ -46,7 +45,7 @@ class BeaconFinder:
 		self._blob_detector_params.minDistBetweenBlobs = self._blob_min_distance_between_blobs
 		self._blob_detector_params.minRepeatability = self._blob_repeatability
 		self._blob_detector = cv2.SimpleBlobDetector(self._blob_detector_params)
-		self._camera_matrix = None
+		self._camera_matrix = numpy.array([0])
 
 		if self._do_histogram_equalization:
 			self._image_output_encoding = '8UC1'
@@ -54,35 +53,21 @@ class BeaconFinder:
 			self._image_output_encoding = 'bgr8'
 
 		# Construct a matrix of points representing the circles grid facing the camera
-		d = rospy.get_param("~corner_circles_vertical_distance_meters", 0.6096)
-		self._circles_grid = numpy.array( [             \
-								[-d      ,      0  , 0],\
-								[-d      , -d/2.0  , 0],\
-								[-d      , -d      , 0],\
-								[-3*d/4.0, -d/4.0  , 0],\
-								[-3*d/4.0, -3*d/4.0, 0],\
-								[-3*d/4.0, -5*d/4.0, 0],\
-								[-d/2.0  ,      0  , 0],\
-								[-d/2.0  , -d/2.0  , 0],\
-								[-d/2.0  , -d      , 0],\
-								[-d/4.0  , -d/4.0  , 0],\
-								[-d/4.0  , -3*d/4.0, 0],\
-								[-d/4.0  , -5*d/4.0, 0],\
-								[     0  ,      0  , 0],\
-								[     0  , -d/2.0  , 0],\
-								[     0  , -d      , 0],\
-								[ d/4.0  , -d/4.0  , 0],\
-								[ d/4.0  , -3*d/4.0, 0],\
-								[ d/4.0  , -5*d/4.0, 0],\
-								[ d/2.0  ,      0  , 0],\
-								[ d/2.0  , -d/2.0  , 0],\
-								[ d/2.0  , -d      , 0],\
-								[ 3*d/4.0, -d/4.0  , 0],\
-								[ 3*d/4.0, -3*d/4.0, 0],\
-								[ 3*d/4.0, -5*d/4.0, 0],\
-								[ d      ,      0  , 0],\
-								[ d      , -d/2.0  , 0],\
-								[ d      , -d      , 0]], dtype="float32")
+		d = rospy.get_param("~vertical_distance_between_circles", 0.3048)
+		if rospy.get_param("~is_first_column_shifted_down", False):
+			offset = -d/2.0
+		else:
+			offset = 0.0
+		self._circles_grid = numpy.array([0,0,0], dtype="float32") # Create a 'dummy' row
+		for column in range(-self._num_columns/2+1, self._num_columns/2+1):
+			for row in range(0, -self._num_rows, -1):
+				self._circles_grid = numpy.vstack((self._circles_grid, numpy.array([column*d/2.0,row*d+offset,0.0])))
+			if offset == 0.0:
+				offset = -d/2.0
+			else:
+				offset = 0.0
+		self._circles_grid = numpy.delete(self._circles_grid, 0, 0) # Delete the 'dummy' row
+		self._circles_grid = numpy.array(self._circles_grid, dtype="float32") # Ensure float32 data type, which shouldn't be necessary at this point, but it is...
 
 	def image_callback(self, image):
 		# This function receives an image, attempts to locate the beacon
@@ -117,12 +102,13 @@ class BeaconFinder:
 				beacon_pose.header = image.header
 				self._beacon_pose_publisher.publish(beacon_pose)
 
-				if self._do_publish_debug:
-					# Publish debug beacon image
+				# Publish debug beacon image with the beacon points circled if there are subscribers
+				if self._beacon_debug_image.get_num_connections() > 0:
 					cv2.drawChessboardCorners(image_cv, (self._num_rows, self._num_columns), centers, found_beacon)
 					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
 			else:
-				if self._do_publish_debug:
+				# Publish debug beacon image if there are subscribers
+				if self._beacon_debug_image.get_num_connections() > 0:
 					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
 
 	def camera_info_callback(self, camera_info):
