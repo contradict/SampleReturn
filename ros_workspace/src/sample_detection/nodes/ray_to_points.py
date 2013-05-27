@@ -18,7 +18,7 @@ class ray_to_points(object):
   # geometrical uncertainty (most notably, pitch)
 
   def __init__(self):
-    rospy.init_node('ray_to_points',anonymous=True,log_level=rospy.DEBUG)
+    rospy.init_node('ray_to_points',log_level=rospy.DEBUG)
 
     self.named_point_sub = rospy.Subscriber('named_point', NamedPoint, self.handle_named_point)
 
