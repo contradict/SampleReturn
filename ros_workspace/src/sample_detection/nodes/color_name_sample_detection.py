@@ -53,8 +53,8 @@ class color_name_sample_detection(object):
     self.color_mat = scipy.io.loadmat(color_file)
     self.color_names = ['black','blue','brown','gray','green','orange','pink','purple','red','white','yellow']
     #self.sample_names = [None,None,'wood_block','pre_cached',None,'orange_pipe','pink_ball',None,'red_puck','pre_cached','yellow_rock']
-    self.sample_names = [None,None,None,'pre_cached',None,None,None,None,None,'pre_cached',None]
-    self.sample_thresh = [None,None,0.1,0.1,None,0.1,0.1,None,0.1,0.1,0.1]
+    self.sample_names = [None,'pre_cached',None,'pre_cached',None,None,None,None,None,'pre_cached',None]
+    self.sample_thresh = [None,0.1,0.1,0.1,None,0.1,0.1,None,0.1,0.1,0.1]
 
     self.min_disp = 0.0
     self.max_disp = 128.0
