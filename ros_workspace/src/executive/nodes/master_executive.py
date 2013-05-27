@@ -369,11 +369,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def wait_for_manipulator_sample(self):
         # set sample to None so we know when the first point arrives
-        self.manipulator_sample = None
+        self.man_sample = None
         # wait for the manipulator camera to see the object
         yield teer_ros.WaitCondition(
-                lambda: self.search_sample is not None)
-        self.announce("Sample located")
+                lambda: self.man_sample is not None)
+        self.announce("Sample in manipulator")
         # wait to stop
         self.move_base.cancel_goal()
         yield teer_ros.WaitDuration(0.5)
@@ -386,6 +386,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         goal.target_pose=pose_st
         self.move_base.send_goal(goal)
 
+        self.search_sample = None
         while True:
             yield teer_ros.WaitDuration(0.5)
             move_state = self.move_base.get_state()
@@ -397,12 +398,13 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 continue
             if self.search_sample is not None:
                 msg = self.search_sample
-                hdr = std_msg.Header(0, rospy.Time(0), 'search_camera_lens')
-                ps = geometry_msg.PointStamped(hdr, msg.pose.position)
-                newpt = self.listener.transformPoint('/map', ps).pose.position
+                rospy.loginfo("msg: %s", msg)
+                newpt = self.listener.transformPoint('/map', msg)
+                rospy.loginfo("newpt: %s", newpt)
                 current_point = pose_st.pose.position
-                if self.point_distance(mappt, newpt) > self.maximum_pursuit_error:
-                    pose_st.pose.position=newpt
+                if self.point_distance(current_point, newpt.point) > self.maximum_pursuit_error:
+                    rospy.loginfo("new pursuit point %s", newpt)
+                    pose_st.pose.position=newpt.point
                     goal.target_pose=pose_st
                     self.move_base.send_goal(goal)
                 self.search_sample = None
@@ -413,6 +415,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.announce("Moving to expected sample position")
         self.platform_motion_input_select("Planner")
         expected_position = self.expected(start_pose)
+        rospy.loginfo("expected: %s", expected_position)
         drive=self.new_task(self.drive_to_point(expected_position))
         find=self.new_task(self.wait_for_search_sample())
         yield teer_ros.WaitAnyTasks([drive, find])
@@ -424,18 +427,21 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             self.new_task(self.drive_home(start_pose))
         elif self.search_sample is not None:
             # see sample in search, update goal and drive close
+            self.kill_task(drive)
             msg = self.search_sample
             self.listener.waitForTransform('/map', msg.header.frame_id,
                     rospy.Time(0), rospy.Duration(10.0))
             mappt = self.listener.transformPoint('/map', msg)
-            expected_position.pose.position=mappt
+            expected_position.pose.position=mappt.point
+            rospy.loginfo("pursue: %s", expected_position)
             pursue = self.new_task(self.pursue(expected_position))
-            see = self.new_task(self.wait_for_manipulator_sample)
+            see = self.new_task(self.wait_for_manipulator_sample())
             yield teer_ros.WaitAnyTasks([pursue, see])
             if self.man_sample is None:
                 self.announce("Failed to acquire sample in manipulator camera")
                 self.new_task(self.drive_home(start_pose))
-            self.drive_succeeded=True
+            else:
+                self.drive_succeeded=True
 
     def acquire_sample(self):
         # switch to visual servo control
@@ -569,7 +575,6 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitCondition(
                 lambda: self.gpio.new_pin_states&mask != pin_states)
         rospy.loginfo("mode changed")
-
 
     def retrieve_precached_sample(self):
         # write down sart pose
