@@ -16,13 +16,11 @@
         name="color_name_sample_detection"
         ns="sample_detection">
         <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
-        <param name="delta" type="double" value="20.0"/>
+        <param name="delta" type="double" value="10.0"/>
         <param name="max_area" type="double" value="40000.0"/>
         <param name="min_area" type="double" value="200.0"/>
         <remap from="monocular_img" to="/cam_img"/>
-        <!--
-      <remap from="cam_info" to="/cam_info"/>
-      -->
+        <remap from="cam_info" to="/cam_info"/>
     </node>
     <node
         machine="search"
@@ -44,6 +42,7 @@
         <remap from="raw_points" to="point"/>
 
         <param name="filter_tolerance" type="double" value="0.50"/>
+        <param name="filter_threshold" type="int" value="3"/>
     </node>
 
 </launch>
