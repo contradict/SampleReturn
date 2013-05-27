@@ -61,7 +61,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.pursuit_complete_distance = rospy.get_param("~pursuit_complete_distance", 5.0)
         self.home_pursuit_complete_distance = rospy.get_param("~home_pursuit_complete_distance", 10.0)
         self.maximum_pursuit_error = rospy.get_param("~maximum_pursuit_error", 1.5)
-        self.beacon_scan_distance = rospy.get_param("~beacon_scan_distance", 10)
+        self.beacon_scan_distance = rospy.get_param("~beacon_scan_distance", 10.0)
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -318,23 +318,24 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def see_beacon(self):
         self.beacon_pose = None
-        teer_ros.WaitCondition(lambda: self.beacon_vector is not None)
+        yield teer_ros.WaitCondition(lambda: self.beacon_pose is not None)
 
     def look_for_beacon(self):
+        self.move_base.cancel_goal()
+        self.publish_zero_velocity()
         pose = self.get_current_robot_pose()
         q=(pose.pose.orientation.x,pose.pose.orientation.y,pose.pose.orientation.z,pose.pose.orientation.w)
         roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
+        sbt = self.new_task(self.see_beacon())
         for i in range(9):
             q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*math.pi*float(i)/8.)
             pose.pose.orientation.x = q_goal[0]
             pose.pose.orientation.y = q_goal[1]
             pose.pose.orientation.z = q_goal[2]
             pose.pose.orientation.w = q_goal[3]
-            rospy.WaitAnyTasks([
+            yield teer_ros.WaitAnyTasks([
                 self.new_task(self.drive_to_point(pose)),
-                self.new_task(self.see_beacon())
-                ]
-                )
+                sbt ])
         self.move_base.cancel_goal()
         self.publish_zero_velocity()
 
@@ -464,13 +465,17 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.announce("Sample retreived")
 
     def beacon_goal(self, current_beacon_point, new_beacon_pose, robot_pose):
-        newpose = self.listener.transformPose('/map', new_beacon_pose)
+        try:
+            newpose = self.listener.transformPose('/map', new_beacon_pose)
+        except Exception, e:
+            self.l.error("failed to transform beacon pose: ", e)
+            return
         rospy.loginfo("newpt: %s", newpose)
         dist = self.point_distance(
                 current_beacon_point.pose.position,
                 newpose.pose.position)
         if dist > self.maximum_pursuit_error:
-            self.announce("re centering beacon")
+            self.announce("aligning beacon")
             rospy.loginfo("dist: %f", dist)
             current_beacon_point.pose = newpose.pose
             current_beacon_point.header = newpose.header
@@ -525,6 +530,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         current_beacon_point = home_goal.target_pose
         self.beacon_pose = None
         self.saw_beacon = False
+        last_beacon_pose = self.get_current_robot_pose()
         while True:
             yield teer_ros.WaitDuration(0.5)
             move_state = self.move_base.get_state()
@@ -536,11 +542,17 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if dist<self.home_pursuit_complete_distance:
                 rospy.loginfo("close enough: %f", dist)
                 continue
-            if not self.saw_beacon and dist<self.beacon_scan_distance:
+            beacon_dist = self.point_distance(last_beacon_pose.pose.position, robot_pose_st.pose.position)
+            if not self.saw_beacon and beacon_dist>self.beacon_scan_distance:
                 rospy.loginfo("looking for beacon")
-                self.announce("No beacon yet, looking")
-                teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
+                self.announce("Searching for beacon")
+                yield teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
+                if self.beacon_pose is None:
+                    self.move_base.send_goal(home_goal)
+                self.saw_beacon = False
+                last_beacon_pose = self.get_current_robot_pose()
             if self.beacon_pose is not None:
+                last_beacon_pose = self.get_current_robot_pose()
                 rospy.loginfo("new beacon")
                 g_p_st = self.beacon_goal(current_beacon_point, self.beacon_pose, robot_pose_st)
                 if g_p_st is not None:
