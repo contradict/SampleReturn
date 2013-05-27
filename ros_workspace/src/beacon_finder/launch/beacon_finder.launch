@@ -11,7 +11,8 @@
 		output="log">
 	<param name="num_rows" type="int" value="3"/>
 	<param name="num_columns" type="int" value="9"/>
-	<param name="corner_circles_vertical_distance_meters" type="double" value="0.6096"/>
+	<param name="vertical_distance_between_circles" type="double" value="0.3048"/>
+	<param name="is_first_column_shifted_down" type="bool" value="False"/>
 	<param name="blob_color" type="double" value="0"/>
 	<param name="blob_min_area" type="double" value="9"/>
 	<param name="blob_max_area" type="double" value="5000"/>
@@ -21,7 +22,6 @@
 	<param name="blob_min_distance_between_blobs" type="double" value="3.0"/>
 	<param name="blob_repeatability" type="int" value="3"/>
 	<param name="do_histogram_equalization" type="bool" value="False"/>
-	<param name="do_publish_debug" type="bool" value="False"/>
 	<remap from="camera_image" to="cam_img"/>
 	<remap from="camera_info" to="cam_info"/>
 	</node>
