@@ -28,7 +28,7 @@
 	<param name="vertical_distance_between_circles" type="double" value="0.3048"/>
 	<param name="is_first_column_shifted_down" type="bool" value="False"/>
 	<param name="blob_color" type="double" value="0"/>
-	<param name="blob_min_area" type="double" value="9"/>
+	<param name="blob_min_area" type="double" value="50"/>
 	<param name="blob_max_area" type="double" value="5000"/>
 	<param name="blob_min_threshold" type="double" value="20"/>
 	<param name="blob_max_threshold" type="double" value="220"/>
