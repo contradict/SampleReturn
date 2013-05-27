@@ -18,8 +18,8 @@ DWAPlannerROS:
     max_trans_vel: 0.45
     # rad/s
     min_rot_vel: 0.0
-    max_rot_vel: 0.75
-    min_in_place_rotational_vel: 0.30
+    max_rot_vel: 0.50
+    min_in_place_rotational_vel: 0.20
 
     publish_cost_grid_pc: true
     # radians per sim step
