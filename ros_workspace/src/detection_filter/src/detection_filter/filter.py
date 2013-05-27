@@ -74,7 +74,7 @@ class Filter(object):
             if h<worst:
                 worst = h
         else:
-            worst.replace(self.hypothesis(position))
+            worst.replace(self.hypothesis(point))
 
     def estimate(self, threshold=None):
         best = self.hypotheses[0]
