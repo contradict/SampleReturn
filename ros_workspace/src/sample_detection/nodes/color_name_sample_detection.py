@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import copy
 import roslib
 import rospy
 import numpy as np
@@ -27,10 +28,14 @@ class color_name_sample_detection(object):
     self.cam_info_sub = rospy.Subscriber('cam_info',CameraInfo, queue_size=1, callback=self.handle_info)
 
     self.bridge = CvBridge()
+    self.tf = TransformListener()
 
     maxArea = rospy.get_param('~max_area',800.0)
     minArea = rospy.get_param('~min_area',100.0)
     delta = rospy.get_param('~delta',10.0)
+
+    self.min_size = rospy.get_param('~min_size',0.08)
+    self.max_size = rospy.get_param('~max_size',0.4)
 
     self.mser = cv2.MSER()
     self.mser.setDouble('maxArea', maxArea)
@@ -105,10 +110,14 @@ class color_name_sample_detection(object):
         named_img_point.point.x = location[0]
         named_img_point.point.y = location[1]
         named_img_point.name = self.sample_names[top_index]
-        q_img.put(named_img_point)
+
         named_point = self.project_xyz_point(h, top_index, header)
-        rospy.logdebug("Named_point: %s",named_point)
-        q_proj.put(named_point)
+        #rospy.logdebug("Named_point: %s",named_point)
+
+        size = self.real_size_check(h,header)
+        if self.min_size < size < self.max_size:
+          q_img.put(named_img_point)
+          q_proj.put(named_point)
 
   def find_samples_threaded(self, Image):
     self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
@@ -122,6 +131,7 @@ class color_name_sample_detection(object):
 
     gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
     self.threaded_mser(gray, Image.header)
+
     while not self.q_img.empty():
       self.named_img_point_pub.publish(self.q_img.get())
     while not self.q_proj.empty():
@@ -246,6 +256,74 @@ class color_name_sample_detection(object):
       cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
     return top_index,similarity
 
+  def cast_ray(self, point_in, tf, name):
+    #rospy.logdebug("Point In: %s", point_in)
+
+    base_link_point = tf.transformPoint('/base_link', point_in)
+    t = tf.getLatestCommonTime('/base_link', point_in.header.frame_id)
+    pos, quat = tf.lookupTransform('/base_link', point_in.header.frame_id, t)
+    height = pos[2]
+    #rospy.logdebug("Pos: %s", pos)
+
+    x_slope = np.abs((pos[0]-base_link_point.point.x)/(pos[2]-base_link_point.point.z))
+    y_slope = np.abs((pos[1]-base_link_point.point.y)/(pos[2]-base_link_point.point.z))
+    #rospy.logdebug("X Slope: %s", x_slope)
+    #rospy.logdebug("Y Slope: %s", y_slope)
+
+    ground_point = np.array([0.,0.,0.])
+    ground_point[0] = x_slope*height
+    ground_point[1] = y_slope*height
+
+    ground_named_point = NamedPoint()
+    ground_named_point.point.x = ground_point[0]
+    ground_named_point.point.y = ground_point[1]
+    ground_named_point.point.z = ground_point[2]
+    ground_named_point.header = point_in.header
+    ground_named_point.header.frame_id = 'base_link'
+    ground_named_point.name = name
+
+    odom_named_point = self.tf.transformPoint('/odom',ground_named_point)
+
+    #rospy.logdebug("Ground Point: %s", ground_named_point)
+    #rospy.logdebug("Odom Point: %s", odom_named_point)
+
+    return ground_named_point, odom_named_point
+
+  def real_size_check(self,hull,header):
+    rect = cv2.boundingRect(hull)
+    top_left = np.array([rect[0],rect[1]])
+    bot_right = np.array([rect[0]+rect[2],rect[1]+rect[3]])
+
+    #rospy.logdebug("Top Left: %s", top_left)
+    #rospy.logdebug("Bot Right: %s", bot_right)
+
+    top_left_point = PointStamped()
+    top_left_point.header = copy.deepcopy(header)
+    top_left_point.point.x = top_left[0]
+    top_left_point.point.y = top_left[1]
+    top_left_point.point.z = 1.0
+    bot_right_point = PointStamped()
+    bot_right_point.header = copy.deepcopy(header)
+    bot_right_point.point.x = bot_right[0]
+    bot_right_point.point.y = bot_right[1]
+    bot_right_point.point.z = 1.0
+
+    #rospy.logdebug("Top Left Point: %s", top_left_point)
+    #rospy.logdebug("Bot Right Point: %s", bot_right_point)
+
+    top_left_ground, top_left_odom = self.cast_ray(top_left_point,self.tf,'top_left')
+    bot_right_ground, bot_right_odom = self.cast_ray(bot_right_point,self.tf,'bot_right')
+
+    #rospy.logdebug("Top Left Ground: %s", top_left_ground)
+    #rospy.logdebug("Bot Right Ground: %s", bot_right_ground)
+
+    diag = np.array([0.,0.])
+    diag[0] = top_left_ground.point.x - bot_right_ground.point.x
+    diag[1] = top_left_ground.point.y - bot_right_ground.point.y
+    rospy.logdebug("Diag: %s", diag)
+    size = scipy.linalg.norm(diag)
+    rospy.logdebug("Size: %s", size)
+    return size
 
 if __name__=="__main__":
   try:
