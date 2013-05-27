@@ -29,10 +29,7 @@
 
     <include file="$(find executive)/launch/executive.launch"/>
 
-    <!--
-    <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
-    -->
-    <include file="$(find sample_detection)/launch/sample_detection.launch"/>
+    <include file="$(find linemod_detector)/launch/manipulator_linemod.launch"/>
 
     <include file="$(find samplereturn)/launch/search_detection.launch"/>
 
