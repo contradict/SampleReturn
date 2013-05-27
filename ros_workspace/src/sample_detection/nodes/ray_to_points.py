@@ -50,8 +50,8 @@ class ray_to_points(object):
     pos, quat = tf.lookupTransform('/base_link', point_in.header.frame_id, t)
     height = pos[2]
 
-    x_slope = np.abs((pos[0]-base_link_point.point.x)/(pos[2]-base_link_point.point.z))
-    y_slope = np.abs((pos[1]-base_link_point.point.y)/(pos[2]-base_link_point.point.z))
+    x_slope = (base_link_point.point.x - pos[0])/(pos[2]-base_link_point.point.z)
+    y_slope = (base_link_point.point.y - pos[1])/(pos[2]-base_link_point.point.z)
 
     ground_point = np.array([0.,0.,0.])
     ground_point[0] = x_slope*height
