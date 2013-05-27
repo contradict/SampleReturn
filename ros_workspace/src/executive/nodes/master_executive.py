@@ -421,7 +421,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             self.announce("Failed to see sample, returning")
             self.kill_task(find)
             self.new_task(self.drive_home(start_pose))
-        else:
+        elif self.search_sample is not None:
             # see sample in search, update goal and drive close
             msg = self.search_sample
             self.listener.waitForTransform('/map', msg.header.frame_id,
