@@ -51,6 +51,9 @@ class Hypothesis(object):
                 unsupported_step=self.unsupported_step)
         return h
 
+    def __str__(self):
+        return "%s: %d"%(self.position, self.support)
+
 class Filter(object):
     def __init__(self, hypothesis, frame="map", hypotheses=3):
         self.frame = frame
@@ -71,14 +74,17 @@ class Filter(object):
         worst=self.hypotheses[0]
         for h in self.hypotheses:
             if h.supports(point):
+                rospy.logdebug("update %s with %s", h, point)
                 h.update(point)
                 break
             else:
+                rospy.logdebug("unsupported %s", h, point)
                 h.unsupported()
             if h<worst:
                 worst = h
         else:
             worst.replace(self.hypothesis(point))
+        rospy.logdebug("hypotheses: %s", self.hypotheses)
 
     def estimate(self, threshold=None):
         best = self.hypotheses[0]
