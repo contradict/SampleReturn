@@ -56,14 +56,14 @@ class Filter(object):
 
         self.listener = tf.TransformListener()
 
-    def update(self, point, frame):
+    def update(self, msg):
         latest = rospy.Time(0)
-        if not self.listener.canTransform(self.frame, frame, latest):
-            rospy.logerr("Can not transform frame %s to %s, ignoring measurement", frame, self.frame)
+        if not self.listener.canTransform(self.frame, msg.header.frame_id, latest):
+            rospy.logerr("Can not transform frame %s to %s, ignoring measurement",
+                    msg.header.frame_id, self.frame)
             return
-        translation, rotation = self.listener.lookupTransform(self.frame, frame,
-                                                             latest)
-        point += np.array(translation)
+        tf_pt = self.listener.transformPoint(self.frame, msg)
+        point = np.array([tf_pt.point.x, tf_pt.point.y, tf_pt.point.z])
         worst=self.hypotheses[0]
         for h in self.hypotheses:
             if h.supports(point):

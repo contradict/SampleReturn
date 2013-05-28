@@ -29,8 +29,7 @@ class SampleDetectionFilter(object):
 
     def handle_point(self, msg):
         if msg.name == self.sample_name:
-            point = np.array([msg.point.x, msg.point.y, msg.point.z])
-            self.filter.update(point, msg.header.frame_id)
+            self.filter.update(msg)
             e = self.filter.estimate(self.filter_threshold)
             if e is not None:
                 fp=NamedPoint()
