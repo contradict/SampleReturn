@@ -9,9 +9,9 @@ class Hypothesis(object):
         self.alpha = alpha
         self.unsupported_step = unsupported_step
         if self.position is not None:
-            self.support = 1
+            self.support = 1.0
         else:
-            self.support = 0
+            self.support = 0.0
 
     def supports(self, position):
         if self.position is None:
@@ -24,16 +24,16 @@ class Hypothesis(object):
     def update(self, position):
         if self.position is None:
             self.position = position
-            self.support = 1
+            self.support = 1.0
         else:
             self.position = (1.0-self.alpha)*self.position + self.alpha*position
-            self.support += 1
+            self.support += 1.0
 
     def unsupported(self):
-        if self.support > 0:
+        if self.support > 0.0:
             self.support -= self.unsupported_step
         if self.support <= 0.0:
-            self.support = 0
+            self.support = 0.0
             self.position = None
 
     def valid(self, threshold):
@@ -47,6 +47,8 @@ class Hypothesis(object):
         return self.support<other.support
 
     def __call__(self, position=None):
+        if position is not None:
+            position = position.copy()
         h=Hypothesis(position=position, tolerance=self.tolerance, alpha=self.alpha,
                 unsupported_step=self.unsupported_step)
         return h
@@ -54,16 +56,19 @@ class Hypothesis(object):
     def __str__(self):
         return "%s: %d"%(self.position, self.support)
 
+    def __repr__(self):
+        return self.__str__()
+
 class Filter(object):
     def __init__(self, hypothesis, frame="map", hypotheses=3):
         self.frame = frame
         self.hypothesis = hypothesis
 
-        self.hypotheses=[self.hypothesis()]*hypotheses
+        self.hypotheses=[self.hypothesis() for x in xrange(hypotheses)]
 
         self.listener = tf.TransformListener()
 
-    def update(self, msg):
+    def update(self, msg, threshold):
         latest = rospy.Time(0)
         if not self.listener.canTransform(self.frame, msg.header.frame_id, latest):
             rospy.logerr("Can not transform frame %s to %s, ignoring measurement",
@@ -72,19 +77,25 @@ class Filter(object):
         tf_pt = self.listener.transformPoint(self.frame, msg)
         point = np.array([tf_pt.point.x, tf_pt.point.y, tf_pt.point.z])
         worst=self.hypotheses[0]
-        for h in self.hypotheses:
+        result = None
+        for i, h in enumerate(self.hypotheses):
             if h.supports(point):
                 rospy.logdebug("update %s with %s", h, point)
                 h.update(point)
+                result = h if h.support>threshold else None
                 break
             else:
-                rospy.logdebug("unsupported %s", h, point)
+                rospy.logdebug("unsupported %s: %s", h, point)
                 h.unsupported()
             if h<worst:
                 worst = h
         else:
             worst.replace(self.hypothesis(point))
-        rospy.logdebug("hypotheses: %s", self.hypotheses)
+        for h in self.hypotheses[i+1:]:
+            rospy.logdebug("unsupported %s: %s", h, point)
+            h.unsupported()
+        rospy.logdebug("hypotheses: %s", ["%s"%x for x in self.hypotheses])
+        return result
 
     def estimate(self, threshold=None):
         best = self.hypotheses[0]

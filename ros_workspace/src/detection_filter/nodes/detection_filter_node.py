@@ -29,8 +29,7 @@ class SampleDetectionFilter(object):
 
     def handle_point(self, msg):
         if msg.name == self.sample_name:
-            self.filter.update(msg)
-            e = self.filter.estimate(self.filter_threshold)
+            e = self.filter.update(msg, self.filter_threshold)
             if e is not None:
                 fp=NamedPoint()
                 fp.header = msg.header
@@ -39,10 +38,11 @@ class SampleDetectionFilter(object):
                 fp.point.y = e.position[1]
                 fp.point.z = e.position[2]
                 fp.name = self.sample_name
+                rospy.logdebug("publish: %s", fp)
                 self.publisher.publish(fp)
 
 def start_node():
-    rospy.init_node('sample_detection_filter')
+    rospy.init_node('sample_detection_filter', log_level=rospy.DEBUG)
     filter = SampleDetectionFilter()
     rospy.spin()
 
