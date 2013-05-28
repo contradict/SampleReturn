@@ -399,7 +399,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if self.search_sample is not None:
                 msg = self.search_sample
                 rospy.loginfo("msg: %s", msg)
-                newpt = self.listener.transformPoint('/map', msg)
+                newpt = self.listener.transformPoint(goal.target_pose.header.frame_id, msg)
                 rospy.loginfo("newpt: %s", newpt)
                 current_point = pose_st.pose.position
                 if self.point_distance(current_point, newpt.point) > self.maximum_pursuit_error:
