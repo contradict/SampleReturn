@@ -30,7 +30,11 @@ class Hypothesis(object):
             self.support += 1
 
     def unsupported(self):
-        self.support -= self.unsupported_step
+        if self.support > 0:
+            self.support -= self.unsupported_step
+        if self.support <= 0.0:
+            self.support = 0
+            self.position = None
 
     def valid(self, threshold):
         return self.support>threshold
