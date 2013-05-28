@@ -34,6 +34,7 @@ class SampleDetectionFilter(object):
             if e is not None:
                 fp=NamedPoint()
                 fp.header = msg.header
+                fp.header.frame_id = self.filter_frame
                 fp.point.x = e.position[0]
                 fp.point.y = e.position[1]
                 fp.point.z = e.position[2]
