@@ -21,17 +21,6 @@
       args="odometry tf platform_joint_state carousel navigation/right/image_raw navigation/left/image_raw navigation/right/camera_info navigation/left/camera_info /phidgets/spatial">
   </node>
 
-  <!-- DSLR Client and Publisher-->
-  <!-- The wait between captures is hard-coded at 3.0 seconds,
-        I'll make this a param at some point -->
-   <node
-       machine="search"
-       pkg="samplereturn"
-       type="camlogger.py"
-       name="camlogger">
-       <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
-       <param name="frame_id" value="search_camera_lens"/>
-   </node>
    <node machine="search"
        pkg="rosbag"
        type="record"
