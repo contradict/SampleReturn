@@ -296,17 +296,18 @@ class color_name_sample_detection(object):
 
   def real_size_check(self,hull,header):
     rect = cv2.boundingRect(hull)
-    top_left = np.array([rect[0],rect[1]])
+    #top_left = np.array([rect[0],rect[1]])
+    bot_left = np.array([rect[0],rect[1]+rect[3]])
     bot_right = np.array([rect[0]+rect[2],rect[1]+rect[3]])
 
     #rospy.logdebug("Top Left: %s", top_left)
     #rospy.logdebug("Bot Right: %s", bot_right)
 
-    top_left_point = PointStamped()
-    top_left_point.header = copy.deepcopy(header)
-    top_left_point.point.x = top_left[0]
-    top_left_point.point.y = top_left[1]
-    top_left_point.point.z = 1.0
+    bot_left_point = PointStamped()
+    bot_left_point.header = copy.deepcopy(header)
+    bot_left_point.point.x = bot_left[0]
+    bot_left_point.point.y = bot_left[1]
+    bot_left_point.point.z = 1.0
     bot_right_point = PointStamped()
     bot_right_point.header = copy.deepcopy(header)
     bot_right_point.point.x = bot_right[0]
@@ -316,17 +317,17 @@ class color_name_sample_detection(object):
     #rospy.logdebug("Top Left Point: %s", top_left_point)
     #rospy.logdebug("Bot Right Point: %s", bot_right_point)
 
-    top_left_ground, top_left_odom = self.cast_ray(top_left_point,self.tf,'top_left')
+    bot_left_ground, bot_left_odom = self.cast_ray(bot_left_point,self.tf,'bot_left')
     bot_right_ground, bot_right_odom = self.cast_ray(bot_right_point,self.tf,'bot_right')
 
     #rospy.logdebug("Top Left Ground: %s", top_left_ground)
     #rospy.logdebug("Bot Right Ground: %s", bot_right_ground)
 
-    diag = np.array([0.,0.])
-    diag[0] = top_left_ground.point.x - bot_right_ground.point.x
-    diag[1] = top_left_ground.point.y - bot_right_ground.point.y
-    rospy.logdebug("Diag: %s", diag)
-    size = scipy.linalg.norm(diag)
+    width = np.array([0.,0.])
+    width[0] = bot_left_ground.point.x - bot_right_ground.point.x
+    width[1] = bot_left_ground.point.y - bot_right_ground.point.y
+    rospy.logdebug("Width: %s", width)
+    size = scipy.linalg.norm(width)
     rospy.logdebug("Size: %s", size)
     return size
 
