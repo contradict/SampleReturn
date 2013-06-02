@@ -130,7 +130,12 @@ class color_name_sample_detection(object):
       self.height = self.img.shape[0]/self.nthreads
 
     gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
-    self.threaded_mser(gray, Image.header)
+    hsv = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
+    flip = 255 - hsv[:,:,1]
+    test = gray.astype(np.float32)*flip.astype(np.float32)
+    test /= np.max(test)
+    test = (test*255).astype(np.uint8)
+    self.threaded_mser(test, Image.header)
 
     while not self.q_img.empty():
       self.named_img_point_pub.publish(self.q_img.get())
@@ -251,7 +256,7 @@ class color_name_sample_detection(object):
     similarity = ave_vec[top_index]/cv2.countNonZero(small_mask)
     #if similarity > 0.1 and (top_index == 3 or top_index == 9):
     cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
-    if top_index == 3 or top_index == 9:
+    if top_index == 3 or top_index == 9 or top_index == 1:
       cv2.polylines(self.debug_img,[hull],1,(255,0,255),3)
       cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
     return top_index,similarity
