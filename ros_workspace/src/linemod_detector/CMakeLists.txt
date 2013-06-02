@@ -83,6 +83,7 @@ include_directories(include
  add_executable(linemod_trainer src/linemod_trainer.cpp)
  add_executable(linemod_detector src/linemod_detector.cpp)
  add_executable(linemod_detector_2d src/linemod_detector_2d.cpp)
+ add_executable(stereo_linemod_trainer src/stereo_linemod_trainer.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -90,6 +91,10 @@ include_directories(include
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(linemod_trainer
+   new_modalities
+   ${catkin_LIBRARIES}
+ )
+ target_link_libraries(stereo_linemod_trainer
    new_modalities
    ${catkin_LIBRARIES}
  )
