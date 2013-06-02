@@ -83,6 +83,7 @@ include_directories(include
  add_executable(linemod_trainer src/linemod_trainer.cpp)
  add_executable(linemod_detector src/linemod_detector.cpp)
  add_executable(linemod_detector_2d src/linemod_detector_2d.cpp)
+ add_executable(stereo_linemod_trainer src/stereo_linemod_trainer.cpp)
 
 add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
 add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
@@ -92,6 +93,10 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(linemod_trainer
+   new_modalities
+   ${catkin_LIBRARIES}
+ )
+ target_link_libraries(stereo_linemod_trainer
    new_modalities
    ${catkin_LIBRARIES}
  )
