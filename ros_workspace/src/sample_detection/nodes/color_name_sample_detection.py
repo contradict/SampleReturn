@@ -78,7 +78,6 @@ class color_name_sample_detection(object):
 
   def handle_monocular_img(self, Image):
     detections = self.find_samples_threaded(Image)
-    #detections = self.find_samples(Image)
     self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
 
   def threaded_mser(self, img, header):
@@ -143,7 +142,7 @@ class color_name_sample_detection(object):
       self.named_point_pub.publish(self.q_proj.get())
 
   def find_samples(self, Image):
-    self.img = cv2.resize(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')),(0,0),fx=0.5,fy=0.5)
+    self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
     self.debug_img = self.img.copy()
 
     if self.static_mask is None:
