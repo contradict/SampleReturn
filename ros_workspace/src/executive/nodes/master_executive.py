@@ -53,8 +53,6 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.voice = rospy.get_param("~voice", "kal_diphone")
         self.speech_delay = rospy.get_param("~speech_delay", 0.8)
         self.speech_rate = rospy.get_param("~speech_rate", 0.07)
-        self.precached_sample_distance = rospy.get_param("~precached_sample_distance", 2.0)
-        rospy.loginfo("distance: %f", self.precached_sample_distance)
         self.servo_feedback_interval =\
             rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
@@ -283,21 +281,37 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     geometry_msg.Quaternion(*quaternion)))
         return pose
 
-    def expected(self, start_pose):
+
+    def forward(self, distance):
+        start_pose = self.get_current_robot_pose()
         rospy.loginfo('start pose: %s', start_pose)
         hdr = std_msg.Header(0, rospy.Time(0), '/base_link')
         ahead=geometry_msg.PointStamped(hdr,
-                geometry_msg.Point(self.precached_sample_distance, 0, 0))
-        desired_pt=self.listener.transformPoint('/map', ahead)
-        rospy.loginfo("desired_pt: %s", desired_pt)
-        # at desired_pt
-        # with current orientation
-        expected_pose = \
-            geometry_msg.Pose(desired_pt.point, start_pose.pose.orientation)
-        hdr =std_msg.Header(0, rospy.Time(0), '/map')
-        pose_st = geometry_msg.PoseStamped(hdr, expected_pose)
-        rospy.loginfo('expected pose: %s', pose_st)
+                geometry_msg.Point(distance, 0, 0))
+        desired_pt = self.listener.transformPoint('/map', ahead)
+        rospy.loginfo('desired point: %s', desired_pt)
+        desired_pose = geometry_msg.Pose(desired_pt.point, start_pose.pose_orientation)
+        hdr = std_msg.Header(0, rospy.Time(0), '/map')
+        pose_st = geometry_msg.PoseStamped(hdr, desired_pose)
+        rospy.loginfo('desired pose: %s', pose_st)
         return pose_st
+
+    def rotate(self, angle):
+        current_pose = self.get_current_robot_pose()
+        rospy.loginfo('current pose: %s', current_pose)
+        hdr = std_msg.Header(0, rospy.Time(0), '/base_link')
+        goal_quat = tf.transformations.quaternion_from_euler(0,0,angle)
+        current_quat = (current_pose.orientation.x, current_pose.orientation.y,
+                    current_pose.orientation.z, current_pose.orientation.w)
+        spin_orientation = \
+            geometry_msg.Quaternion(*tf.transformations.quaternion_multiply(goal_quat, current_quat))
+        spin_pose = geometry_msg.Pose(current_pose.position, spin_orientation)
+        hdr = std_msg.Header(0, rospy.time(0), '/map')
+        spin_goal = move_base_msg.MoveBaseGoal()
+        spin_goal.target_pose = geometry_msg.PoseStamped(hdr, spin_pose)
+        rospy.loginfo('spin goal: %s', spin_goal)
+        self.move_base.send_goal(spin_goal)
+        return spin_pose
 
     def turn_around(self, current_pose, start_pose):
         # spin in place to point at home
@@ -412,20 +426,27 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def drive_to_sample(self, start_pose):
         # switch control to the motion planner and drive to the expected
         # position
-        self.announce("Moving to expected sample position")
+        self.announce("Moving to expected sample location")
         self.platform_motion_input_select("Planner")
-        expected_position = self.expected(start_pose)
-        rospy.loginfo("expected: %s", expected_position)
-        drive=self.new_task(self.drive_to_point(expected_position))
-        find=self.new_task(self.wait_for_search_sample())
+
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(20))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(50))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(-50))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(10))))
+        self.pre_sample_search_pose = self.get_current_robot_pose()
+        drive = self.new_task(self.drive_to_point(self.forward(20)))
+        find = self.new_task(self.wait_for_search_sample())
         yield teer_ros.WaitAnyTasks([drive, find])
+
         move_state = self.move_base.get_state()
         if move_state == action_msg.GoalStatus.SUCCEEDED:
-            # arrived at goal position without seeing sample
-            self.announce("Failed to see sample, returning")
+            # arrived at goal position without seeing sample, try to find it
+            self.announce("Failed to see sample, twirling, twirling, twirling towards freedom")
+            rospy.loginfo("Looking for sample")
+            yield teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
             self.kill_task(find)
-            self.new_task(self.drive_home(start_pose))
-        elif self.search_sample is not None:
+
+        if self.search_sample is not None:
             # see sample in search, update goal and drive close
             self.kill_task(drive)
             msg = self.search_sample
@@ -522,13 +543,18 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # spin in place to point at home
         self.platform_motion_input_select("Planner")
         capture_pose = self.get_current_robot_pose()
-        spin_pose = self.turn_around(capture_pose.pose, start_pose.pose)
+        spin_pose = self.turn_around(capture_pose.pose, self.pre_sample_search_pose)
         while True:
             yield teer_ros.WaitDuration(0.1)
             state = self.move_base.get_state()
             if state not in self.working_states:
                 break
         rospy.loginfo("spin complete")
+
+        # drive back the way we came from
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(30))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(50))))
+
         # drive back to beacon
         home_goal = move_base_msg.MoveBaseGoal()
         home_goal.target_pose = self.home(start_pose.pose, spin_pose)
@@ -577,16 +603,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         rospy.loginfo("mode changed")
 
     def retrieve_precached_sample(self):
-        # write down sart pose
+        # write down start pose
         start_pose = self.get_current_robot_pose()
         rospy.loginfo('start pose: %s', start_pose)
 
         self.drive_succeeded=False
         yield teer_ros.WaitTask(self.new_task(self.drive_to_sample(start_pose)))
-        if not self.drive_succeeded:
-            return
-        yield teer_ros.WaitTask(self.new_task(self.acquire_sample()))
-
+        if self.drive_succeeded:
+            yield teer_ros.WaitTask(self.new_task(self.acquire_sample()))
         yield teer_ros.WaitTask(self.new_task(self.drive_home(start_pose)))
 
 def start_node():
