@@ -74,8 +74,6 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.sample_detection_search_update)
         rospy.Subscriber("/img_point", linemod_msg.NamedPoint,
                 self.sample_detection_man_update)
-        rospy.Subscriber("/sample_distance", std_msg.Float64,
-                self.sample_distance_update)
         rospy.Subscriber("/beacon_pose", geometry_msg.PoseStamped,
                 self.beacon_update)
 
@@ -135,11 +133,6 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def pause_state_update(self, state):
         self.pause_state = state
         rospy.logdebug("Pause state %s", state)
-
-    def sample_distance_update(self, msg):
-        self.precached_sample_distance = msg.data
-        rospy.loginfo("Set sample distance to %f",
-                self.precached_sample_distance)
 
     #----   Publisher Helpers ----
     def announce(self, utterance):
