@@ -4,6 +4,8 @@
     <arg name="user" default="robot"/>
     <arg name="path" default="Desktop"/>
     <arg name="kind" default="install"/>
+    <arg name="replay" default="false"/>
+    <group unless="$(arg replay)">
     <machine name="search"
              address="sr2"
              env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
@@ -14,4 +16,17 @@
              env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
              user="$(arg user)"
              />
+    </group>
+    <group if="$(arg replay)">
+    <machine name="search"
+             address="localhost"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+    />
+    <machine name="navigate"
+             address="localhost"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+    </group>
 </launch>
