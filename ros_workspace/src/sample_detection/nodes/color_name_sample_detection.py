@@ -145,9 +145,9 @@ class color_name_sample_detection(object):
     self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
     self.debug_img = self.img.copy()
 
-    if self.static_mask is None:
-      self.static_mask = np.zeros((self.img.shape[0],self.img.shape[1],1),np.uint8)
-      self.static_mask[400:,:,:] = 1
+    #if self.static_mask is None:
+    #  self.static_mask = np.zeros((self.img.shape[0],self.img.shape[1],1),np.uint8)
+    #  self.static_mask[400:,:,:] = 1
 
     lab = cv2.cvtColor(self.img, cv2.COLOR_BGR2LAB)
     gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
@@ -155,7 +155,11 @@ class color_name_sample_detection(object):
     #a_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in a_regions]
     #b_regions = self.mser.detect(lab[:,:,2] ,None)
     #b_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in b_regions]
-    g_regions = self.mser.detect(gray, self.static_mask)
+    #g_regions = self.mser.detect(gray, self.static_mask)
+    mask = np.ones((self.img.shape[0],self.img.shape[1],1),np.uint8)
+    mask[:,:100] = 0
+    mask[:,-100:] = 0
+    g_regions = self.mser.detect(gray, mask)
     rospy.logdebug("number of regions: %s", len(g_regions))
     g_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in g_regions]
     rospy.logdebug("number of hulls: %s", len(g_hulls))

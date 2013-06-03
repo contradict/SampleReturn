@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Test launch for the sample_detection node -->
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node
+      pkg="sample_detection"
+      type="color_name_sample_detection.py"
+      name="color_name_sample_detection"
+      ns="sample_detection">
+      <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
+      <param name="delta" type="double" value="25.0"/>
+      <param name="max_area" type="double" value="40000.0"/>
+      <param name="min_area" type="double" value="10000.0"/>
+      <remap from="left_img" to="/manipulator/left/image_color"/>
+      <remap from="cam_info" to="/manipulator/left/camera_info"/>
+    </node>
+</launch>
