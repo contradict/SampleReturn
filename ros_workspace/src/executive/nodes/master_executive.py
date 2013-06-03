@@ -422,12 +422,13 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.announce("Moving to expected sample location")
         self.platform_motion_input_select("Planner")
 
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(2))))
         yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(20))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(50))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(5))))
         yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(-50))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(10))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(1))))
         self.pre_sample_search_pose = self.get_current_robot_pose()
-        drive = self.new_task(self.drive_to_point(self.forward(20)))
+        drive = self.new_task(self.drive_to_point(self.forward(2)))
         find = self.new_task(self.wait_for_search_sample())
         yield teer_ros.WaitAnyTasks([drive, find])
 
@@ -545,7 +546,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         rospy.loginfo("spin complete")
 
         # drive back the way we came from
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(30))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(3))))
         yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(50))))
 
         # drive back to beacon
