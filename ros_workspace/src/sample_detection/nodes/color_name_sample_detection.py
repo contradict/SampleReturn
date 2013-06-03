@@ -78,7 +78,6 @@ class color_name_sample_detection(object):
 
   def handle_monocular_img(self, Image):
     detections = self.find_samples_threaded(Image)
-    #detections = self.find_samples(Image)
     self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
 
   def threaded_mser(self, img, header):
@@ -130,7 +129,12 @@ class color_name_sample_detection(object):
       self.height = self.img.shape[0]/self.nthreads
 
     gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
-    self.threaded_mser(gray, Image.header)
+    hsv = cv2.cvtColor(self.img, cv2.COLOR_BGR2HSV)
+    flip = 255 - hsv[:,:,1]
+    test = gray.astype(np.float32)*flip.astype(np.float32)
+    test /= np.max(test)
+    test = (test*255).astype(np.uint8)
+    self.threaded_mser(test, Image.header)
 
     while not self.q_img.empty():
       self.named_img_point_pub.publish(self.q_img.get())
@@ -138,7 +142,7 @@ class color_name_sample_detection(object):
       self.named_point_pub.publish(self.q_proj.get())
 
   def find_samples(self, Image):
-    self.img = cv2.resize(np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8')),(0,0),fx=0.5,fy=0.5)
+    self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
     self.debug_img = self.img.copy()
 
     if self.static_mask is None:
@@ -251,7 +255,7 @@ class color_name_sample_detection(object):
     similarity = ave_vec[top_index]/cv2.countNonZero(small_mask)
     #if similarity > 0.1 and (top_index == 3 or top_index == 9):
     cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
-    if top_index == 3 or top_index == 9:
+    if top_index == 3 or top_index == 9 or top_index == 1:
       cv2.polylines(self.debug_img,[hull],1,(255,0,255),3)
       cv2.putText(self.debug_img,self.color_names[top_index] + str(similarity),(rect[0],rect[1]),cv2.FONT_HERSHEY_PLAIN,2,(255,0,255))
     return top_index,similarity
@@ -291,17 +295,18 @@ class color_name_sample_detection(object):
 
   def real_size_check(self,hull,header):
     rect = cv2.boundingRect(hull)
-    top_left = np.array([rect[0],rect[1]])
+    #top_left = np.array([rect[0],rect[1]])
+    bot_left = np.array([rect[0],rect[1]+rect[3]])
     bot_right = np.array([rect[0]+rect[2],rect[1]+rect[3]])
 
     #rospy.logdebug("Top Left: %s", top_left)
     #rospy.logdebug("Bot Right: %s", bot_right)
 
-    top_left_point = PointStamped()
-    top_left_point.header = copy.deepcopy(header)
-    top_left_point.point.x = top_left[0]
-    top_left_point.point.y = top_left[1]
-    top_left_point.point.z = 1.0
+    bot_left_point = PointStamped()
+    bot_left_point.header = copy.deepcopy(header)
+    bot_left_point.point.x = bot_left[0]
+    bot_left_point.point.y = bot_left[1]
+    bot_left_point.point.z = 1.0
     bot_right_point = PointStamped()
     bot_right_point.header = copy.deepcopy(header)
     bot_right_point.point.x = bot_right[0]
@@ -311,17 +316,17 @@ class color_name_sample_detection(object):
     #rospy.logdebug("Top Left Point: %s", top_left_point)
     #rospy.logdebug("Bot Right Point: %s", bot_right_point)
 
-    top_left_ground, top_left_odom = self.cast_ray(top_left_point,self.tf,'top_left')
+    bot_left_ground, bot_left_odom = self.cast_ray(bot_left_point,self.tf,'bot_left')
     bot_right_ground, bot_right_odom = self.cast_ray(bot_right_point,self.tf,'bot_right')
 
     #rospy.logdebug("Top Left Ground: %s", top_left_ground)
     #rospy.logdebug("Bot Right Ground: %s", bot_right_ground)
 
-    diag = np.array([0.,0.])
-    diag[0] = top_left_ground.point.x - bot_right_ground.point.x
-    diag[1] = top_left_ground.point.y - bot_right_ground.point.y
-    rospy.logdebug("Diag: %s", diag)
-    size = scipy.linalg.norm(diag)
+    width = np.array([0.,0.])
+    width[0] = bot_left_ground.point.x - bot_right_ground.point.x
+    width[1] = bot_left_ground.point.y - bot_right_ground.point.y
+    rospy.logdebug("Width: %s", width)
+    size = scipy.linalg.norm(width)
     rospy.logdebug("Size: %s", size)
     return size
 
