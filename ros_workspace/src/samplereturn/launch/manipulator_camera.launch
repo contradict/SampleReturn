@@ -2,6 +2,7 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <!-- Manipulator Nodelet Host process -->
+    <arg name="run_cameras" default="true"/>
     <node
         machine="search"
         pkg="nodelet"
@@ -13,6 +14,7 @@
         respawn="true"
         >
     </node>
+    <group if="$(arg run_cameras)">
     <node
          machine="search"
          pkg="nodelet"
@@ -73,7 +75,7 @@
                value="file://$(find samplereturn)/calibration/ffmv-manipulator-kowa3.5mm-right.yaml" />
         <remap from="camera" to="right" />
     </node>
-
+    </group>
     <!-- emit synchronization error -->
     <node
         machine="search"
