@@ -261,7 +261,7 @@ void Motion::shutdown(void)
     boost::unique_lock<boost::mutex> carousel_lock(enable_carousel_mutex);
     while( carousel_enabled == true )
         enable_carousel_cond.timed_wait(carousel_lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
-
+    carousel->output(0x0, 0x7);
 }
 
 void Motion::runBus(void)
