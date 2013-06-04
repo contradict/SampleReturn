@@ -105,7 +105,7 @@ class color_name_sample_detection(object):
         # converts to x,y
         location = np.array([moments['m10']/moments['m00'],moments['m01']/moments['m00']])
         named_img_point = NamedPoint()
-        named_img_point.header = Image.header
+        named_img_point.header = copy.deepcopy(header)
         named_img_point.point.x = location[0]
         named_img_point.point.y = location[1]
         named_img_point.name = self.sample_names[top_index]
@@ -203,7 +203,7 @@ class color_name_sample_detection(object):
       XYZ = XY*ave_depth
       named_point = NamedPoint()
       named_point.name = self.sample_names[top_index]
-      named_point.header = header
+      named_point.header = copy.deepcopy(header)
       named_point.point.x = XYZ[0]
       named_point.point.y = XYZ[1]
       named_point.point.z = XYZ[2]
@@ -216,7 +216,7 @@ class color_name_sample_detection(object):
       XY = np.dot(self.inv_K,np.array([x,y,1]))
       named_point = NamedPoint()
       named_point.name = self.sample_names[top_index]
-      named_point.header = header
+      named_point.header = copy.deepcopy(header)
       named_point.point.x = XY[0]
       named_point.point.y = XY[1]
       named_point.point.z = 1.0
@@ -226,7 +226,7 @@ class color_name_sample_detection(object):
 
   def handle_disp(self,DisparityImage):
     self.disp_img = np.asarray(self.bridge.imgmsg_to_cv(DisparityImage.image))
-    self.disp_header = DisparityImage.header
+    self.disp_header = copy.deepcopy(DisparityImage.header)
     self.min_disparity = DisparityImage.min_disparity
     self.max_disparity = DisparityImage.max_disparity
     self.f = DisparityImage.f
@@ -286,7 +286,7 @@ class color_name_sample_detection(object):
     ground_named_point.point.x = ground_point[0]
     ground_named_point.point.y = ground_point[1]
     ground_named_point.point.z = ground_point[2]
-    ground_named_point.header = point_in.header
+    ground_named_point.header = copy.deepcopy(point_in.header)
     ground_named_point.header.frame_id = 'base_link'
     ground_named_point.name = name
 
