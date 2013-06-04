@@ -75,7 +75,6 @@
                value="file://$(find samplereturn)/calibration/ffmv-manipulator-kowa3.5mm-right.yaml" />
         <remap from="camera" to="right" />
     </node>
-    </group>
     <!-- emit synchronization error -->
     <node
         machine="search"
@@ -86,6 +85,7 @@
         <param name="manager_node_name" type="string" value="/manipulator/manager"/>
         <param name="sync_wait" type="double" value="30"/>
     </node>
+    </group>
 
     <!-- Debayer -->
     <node
