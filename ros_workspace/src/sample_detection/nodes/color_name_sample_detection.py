@@ -9,6 +9,7 @@ import yaml
 from sensor_msgs.msg import Image,CameraInfo,PointCloud2
 from stereo_msgs.msg import DisparityImage
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
+from visualization_msgs.msg import Marker
 from linemod_detector.msg import NamedPoint
 from cv_bridge import CvBridge
 from tf import TransformListener
@@ -48,6 +49,7 @@ class color_name_sample_detection(object):
 
     self.named_img_point_pub = rospy.Publisher('named_img_point', NamedPoint)
     self.named_point_pub = rospy.Publisher('named_point', NamedPoint)
+    self.marker_pub = rospy.Publisher('marker', Marker)
 
     color_file = rospy.get_param('~color_file')
     self.color_mat = scipy.io.loadmat(color_file)
@@ -139,7 +141,16 @@ class color_name_sample_detection(object):
     while not self.q_img.empty():
       self.named_img_point_pub.publish(self.q_img.get())
     while not self.q_proj.empty():
-      self.named_point_pub.publish(self.q_proj.get())
+      pt = self.q_proj.get()
+      self.named_point_pub.publish(pt)
+      self.send_marker(pt)
+
+  def send_marker(self, named_pt):
+    m=Marker()
+    m.header = copy.deepcopy(named_pt.header)
+    m.type=Marker.CYLINDER
+    m.pose.position = named_pt.point
+    self.marker_pub.publish(m)
 
   def find_samples(self, Image):
     self.img = np.asarray(self.bridge.imgmsg_to_cv(Image,'bgr8'))
