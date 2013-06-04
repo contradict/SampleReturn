@@ -79,7 +79,12 @@ class image_desync(object):
     def restart_manager(self):
         self.desync_count = 0
         # node must be marked respawn in launch file,
-        rosnode.kill_nodes([self.manager_node_name])
+        #rosnode.kill_nodes([self.manager_node_name])
+        stdin, stdout = os.popen2(['pidof', 'nodelet'])
+        pid_str = stdout.read()
+        pids = [int(x) for s in pid_str.split()]
+        for pid in pids:
+            os.system('kill -9 %d'%pid)
         if self.sync_wait_timer is None:
             self.sync_wait_timer = rospy.Timer(rospy.Duration(self.sync_wait),
                         self.sync_wait_timeout, oneshot=True)
