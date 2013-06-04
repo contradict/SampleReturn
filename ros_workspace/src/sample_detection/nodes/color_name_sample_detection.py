@@ -150,6 +150,18 @@ class color_name_sample_detection(object):
     m.header = copy.deepcopy(named_pt.header)
     m.type=Marker.CYLINDER
     m.pose.position = named_pt.point
+    m.pose.orientation.x=0
+    m.pose.orientation.y=0
+    m.pose.orientation.z=0
+    m.pose.orientation.w=1
+    m.scale.x=0.2
+    m.scale.y=0.2
+    m.scale.z=0.2
+    m.color.r=0.8
+    m.color.g=0.8
+    m.color.b=0.8
+    m.color.a=1.0
+    m.text=named_pt.name
     self.marker_pub.publish(m)
 
   def find_samples(self, Image):
