@@ -334,13 +334,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.beacon_pose = None
         yield teer_ros.WaitCondition(lambda: self.beacon_pose is not None)
 
-    def look_for_beacon(self):
+    def twirl(self, other_task):
         self.move_base.cancel_goal()
         self.publish_zero_velocity()
         pose = self.get_current_robot_pose()
         q=(pose.pose.orientation.x,pose.pose.orientation.y,pose.pose.orientation.z,pose.pose.orientation.w)
         roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
-        sbt = self.new_task(self.see_beacon())
         for i in range(9):
             q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*math.pi*float(i)/8.)
             pose.pose.orientation.x = q_goal[0]
@@ -349,7 +348,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             pose.pose.orientation.w = q_goal[3]
             yield teer_ros.WaitAnyTasks([
                 self.new_task(self.drive_to_point(pose)),
-                sbt ])
+                other_task ])
         self.move_base.cancel_goal()
         self.publish_zero_velocity()
 
@@ -444,12 +443,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitAnyTasks([drive, find])
 
         move_state = self.move_base.get_state()
-        if move_state == action_msg.GoalStatus.SUCCEEDED:
+        if move_state == action_msg.GoalStatus.SUCCEEDED and self.search_sample is None:
             # arrived at goal position without seeing sample, try to find it
             self.announce("Failed to see sample, twirling, twirling, twirling towards freedom")
             rospy.loginfo("Looking for sample")
+            yield teer_ros.WaitTask(self.new_task(self.twirl(find)))
             self.kill_task(find)
-            yield teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
 
         if self.search_sample is not None:
             # see sample in search, update goal and drive close
@@ -470,7 +469,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitAnyTasks([pursue, see])
             if self.man_sample is None:
                 self.announce("Failed to acquire sample in manipulator camera")
-                self.kill_task(see)
+                yield teer_ros.WaitTask(self.new_task(self.twirl(see)))
+                if self.man_sample is None:
+                    self.kill_task(see)
+                else:
+                    self.drive_succeeded=True
             else:
                 self.kill_task(pursue)
                 self.drive_succeeded=True
@@ -590,7 +593,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if not self.saw_beacon and beacon_dist>self.beacon_scan_distance:
                 rospy.loginfo("looking for beacon")
                 self.announce("Searching for beacon")
-                yield teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
+                see_beacon = self.new_task(self.see_beacon())
+                yield teer_ros.WaitTask(self.new_task(self.twirl(see_beacon)))
                 if self.beacon_pose is None:
                     self.move_base.send_goal(home_goal)
                 self.saw_beacon = False
