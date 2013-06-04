@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
+    <arg name="replay" default="false"/>
+    <group unless="$(arg replay)">
     <node
         machine="search"
         pkg="samplereturn"
@@ -9,6 +11,7 @@
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera_lens"/>
     </node>
+    </group>
     <node
         machine="search"
         pkg="sample_detection"
