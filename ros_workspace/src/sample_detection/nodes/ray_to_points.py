@@ -63,6 +63,7 @@ class ray_to_points(object):
     ground_named_point.point.z = ground_point[2]
     ground_named_point.header = point_in.header
     ground_named_point.header.frame_id = 'base_link'
+    ground_named_point.header.stamp = point_in.header.stamp
     ground_named_point.name = name
 
     odom_named_point = self.tf.transformPoint('/odom',ground_named_point)
