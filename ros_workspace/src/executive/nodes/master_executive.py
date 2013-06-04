@@ -454,7 +454,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             self.kill_task(drive)
             msg = self.search_sample
             self.listener.waitForTransform('/map', msg.header.frame_id,
-                    rospy.Time(0), rospy.Duration(10.0))
+                    msg.header.stamp, rospy.Duration(10.0))
             mappt = self.listener.transformPoint('/map', msg)
             expected_position.pose.position=mappt.point
             rospy.loginfo("pursue: %s", expected_position)
