@@ -336,14 +336,15 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.beacon_pose = None
         yield teer_ros.WaitCondition(lambda: self.beacon_pose is not None)
 
-    def twirl(self, other_task):
+    def twirl(self, other_task, do_star_twirl=False):
         self.move_base.cancel_goal()
         self.publish_zero_velocity()
         pose = self.get_current_robot_pose()
         q=(pose.pose.orientation.x,pose.pose.orientation.y,pose.pose.orientation.z,pose.pose.orientation.w)
         roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
         for i in range(9):
-            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*math.pi*float(i)/8.)
+            # rotate a small amount
+            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*math.pi*float(i)/8.0)
             pose.pose.orientation.x = q_goal[0]
             pose.pose.orientation.y = q_goal[1]
             pose.pose.orientation.z = q_goal[2]
@@ -351,6 +352,36 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitAnyTasks([
                 self.new_task(self.drive_to_point(pose)),
                 other_task ])
+
+            # check to see which task finished
+            move_state = self.move_base.get_state()
+            if move_state in self.working_states:
+                # in this case, other_task finished
+                break
+
+            if do_star_twirl:
+                # move backwards a small amount
+                yield teer_ros.WaitAnyTasks([
+                    self.new_task(self.drive_to_point(self.forward(-1))),
+                    other_task ])
+
+                # check to see which task finished
+                move_state = self.move_base.get_state()
+                if move_state in self.working_states:
+                    # in this case, other_task finished
+                    break
+
+                # move forward the same small amount
+                yield teer_ros.WaitAnyTasks([
+                    self.new_task(self.drive_to_point(self.forward(1))),
+                    other_task ])
+
+                # check to see which task finished
+                move_state = self.move_base.get_state()
+                if move_state in self.working_states:
+                    # in this case, other_task finished
+                    break
+
         self.move_base.cancel_goal()
         self.publish_zero_velocity()
 
@@ -471,7 +502,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitAnyTasks([pursue, see])
             if self.man_sample is None:
                 self.announce("Failed to acquire sample in manipulator camera")
-                yield teer_ros.WaitTask(self.new_task(self.twirl(see)))
+                yield teer_ros.WaitTask(self.new_task(self.twirl(see, True)))
                 if self.man_sample is None:
                     self.kill_task(see)
                 else:
