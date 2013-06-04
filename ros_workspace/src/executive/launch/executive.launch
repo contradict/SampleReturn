@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-
+    <arg name="wait_for_cameras" default="true"/>
     <node
         machine="navigate"
         pkg="executive"
@@ -10,6 +10,7 @@
         output="log">
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
+        <param name="wait_for_cameras" value="$(arg wait_for_cameras)"/>
 
         <remap from="manipulator_point" to="/manipulator/filtered_points"/>
         <remap from="search_point" to="/sample_detection/filtered_points"/>

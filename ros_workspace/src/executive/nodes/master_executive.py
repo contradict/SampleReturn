@@ -60,6 +60,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.home_pursuit_complete_distance = rospy.get_param("~home_pursuit_complete_distance", 10.0)
         self.maximum_pursuit_error = rospy.get_param("~maximum_pursuit_error", 1.5)
         self.beacon_scan_distance = rospy.get_param("~beacon_scan_distance", 10.0)
+        self.wait_for_cameras = rospy.get_param("~wait_for_cameras", True)
 
         # subscribe to interesting topics
         rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
@@ -174,13 +175,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     #----   Tasks   ----
     def start_robot(self):
         yield teer_ros.WaitDuration(2.0)
-        camera_ready = lambda: self.navigation_camera_status is not None and \
-                        self.navigation_camera_status.data=="Ready" and \
-                        self.manipulator_camera_status is not None and \
-                        self.manipulator_camera_status.data=="Ready"
-        if not camera_ready():
-            self.announce("Waiting for cameras")
-            yield teer_ros.WaitCondition(camera_ready)
+        if self.wait_for_cameras:
+            camera_ready = lambda: self.navigation_camera_status is not None and \
+                            self.navigation_camera_status.data=="Ready" and \
+                            self.manipulator_camera_status is not None and \
+                            self.manipulator_camera_status.data=="Ready"
+            if not camera_ready():
+                self.announce("Waiting for cameras")
+                yield teer_ros.WaitCondition(camera_ready)
         enabled = lambda: self.pause_state is not None and \
                           not self.pause_state.data
 
