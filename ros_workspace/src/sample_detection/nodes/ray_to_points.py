@@ -64,7 +64,7 @@ class ray_to_points(object):
     m.color.g=0.8
     m.color.b=0.8
     m.color.a=1.0
-    m.text=named_pt.name
+    #m.text=named_pt.name
     self.marker_pub.publish(m)
 
   def cast_ray(self, point_in, tf, name):
