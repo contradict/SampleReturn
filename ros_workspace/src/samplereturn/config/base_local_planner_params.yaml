@@ -2,10 +2,10 @@ controller_frequency: 10.0
 DWAPlannerROS:
     holonomic_robot: false
     # rad/s^2
-    acc_lim_theta: 0.8
+    acc_lim_theta: 0.1
     # m/s^2
-    acc_lim_x: 1.5
-    acc_lim_y: 1.5
+    acc_lim_x: 0.2
+    acc_lim_y: 0.2
     # total translational acceleration limit
     acc_limit_trans: 0.5
 
@@ -37,10 +37,10 @@ DWAPlannerROS:
     max_scaling_factor: 0.2
     # cm per sim step
     sim_granularity: 0.05
-    sim_time: 4.0
+    sim_time: 5.0
     #stop_time_buffer: 0.2
     trans_stopped_vel: 0.01
-    use_dwa: true
+    use_dwa: false
     vth_samples: 11
     vx_samples: 9
     vy_samples: 1
