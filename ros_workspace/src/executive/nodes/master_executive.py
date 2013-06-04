@@ -427,13 +427,15 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.announce("Moving to expected sample location")
         self.platform_motion_input_select("Planner")
 
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(2))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(20))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(5))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(-50))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(1))))
+        # yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(2))))
+        # yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(20))))
+        # yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(5))))
+        # yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(-40))))
+        # yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(1))))
+        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(10))))
         self.pre_sample_search_pose = self.get_current_robot_pose()
-        drive = self.new_task(self.drive_to_point(self.forward(2)))
+        expected_position = self.forward(5)
+        drive = self.new_task(self.drive_to_point(expected_position))
         find = self.new_task(self.wait_for_search_sample())
         yield teer_ros.WaitAnyTasks([drive, find])
 
@@ -552,8 +554,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         rospy.loginfo("spin complete")
 
         # drive back the way we came from
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(3))))
-        yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(50))))
+        #yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(3))))
+        #yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(40))))
 
         # drive back to beacon
         home_goal = move_base_msg.MoveBaseGoal()
