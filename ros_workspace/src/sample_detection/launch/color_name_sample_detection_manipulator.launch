@@ -6,7 +6,7 @@
       pkg="sample_detection"
       type="color_name_sample_detection.py"
       name="color_name_sample_detection"
-      ns="sample_detection">
+      ns="manipulator">
       <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
       <param name="delta" type="double" value="25.0"/>
       <param name="max_area" type="double" value="40000.0"/>
