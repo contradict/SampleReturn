@@ -539,13 +539,14 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 # grab the sample
                 manip_goal = manipulator_msg.ManipulatorGoal()
                 manip_goal.type=manip_goal.GRAB
-                manip_goal.target_bin = 5
+                manip_goal.target_bin = 1
                 manip_goal.grip_torque = 0.7
-                manip_goal.wrist_angle = math.pi
+                manip_goal.wrist_angle = 0.0
                 self.manipulator.send_goal(manip_goal)
                 while True:
                     yield teer_ros.WaitDuration(0.1)
                     state = self.manipulator.get_state()
+                    rospy.loginfo("state: %s", state)
                     if state not in self.working_states:
                         break
                 self.announce("Sample retreived")
@@ -683,9 +684,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitTask(self.new_task(self.drive_to_sample(start_pose)))
         if self.drive_succeeded:
             yield teer_ros.WaitTask(self.new_task(self.acquire_sample(start_pose)))
-        else:
-            self.drive_home_task = self.new_task(self.drive_home(start_pose))
-            yield teer_ros.WaitTask(self.drive_home_task)
+        self.drive_home_task = self.new_task(self.drive_home(start_pose))
+        yield teer_ros.WaitTask(self.drive_home_task)
 
 def start_node():
     rospy.init_node('master_executive')
