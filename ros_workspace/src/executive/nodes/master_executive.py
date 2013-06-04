@@ -69,10 +69,10 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.manipulator_status_update)
         rospy.Subscriber("/pause_state", std_msg.Bool,
                 self.pause_state_update)
-        rospy.Subscriber("/sample_detection/filtered_points",
+        rospy.Subscriber("search_point",
                 linemod_msg.NamedPoint,
                 self.sample_detection_search_update)
-        rospy.Subscriber("/img_point", linemod_msg.NamedPoint,
+        rospy.Subscriber("manipulator_point", linemod_msg.NamedPoint,
                 self.sample_detection_man_update)
         rospy.Subscriber("/beacon_pose", geometry_msg.PoseStamped,
                 self.beacon_update)

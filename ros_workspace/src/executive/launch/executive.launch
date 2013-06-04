@@ -11,6 +11,9 @@
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
 
+        <remap from="manipulator_point" to="/manipulator/filtered_points"/>
+        <remap from="search_point" to="/sample_detection/filtered_points"/>
+
         <!--
         <remap from="img_point" to="filtered_points"/>
         -->
