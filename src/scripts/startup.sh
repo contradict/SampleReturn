@@ -14,7 +14,7 @@ ssh-add ${HOME}/.ssh/robot_rsa
 
 cd ${HOME}/Desktop/SampleReturn
 . /opt/ros/groovy/setup.bash
-. ros_workspace/install/setup.bash
+. ros_workspace/devel/setup.bash
 ROS_PACKAGE_PATH=/opt/ros/phidgets:$ROS_PACKAGE_PATH
 
 export ROSLAUNCH_SSH_UNKNOWN=1
