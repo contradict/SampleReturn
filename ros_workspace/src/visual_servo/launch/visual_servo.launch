@@ -13,8 +13,8 @@
 		<param name='target_window_halfwidth_rotate' type='double' value='3'/>
 		<param name='target_window_halfwidth_move_forward' type='double' value='6'/>
 		<param name='target_window_halfheight_move_forward' type='double' value='8'/>
-		<param name='camera_left_target_pixel_x' type='double' value='325'/>
-		<param name='camera_left_target_pixel_y' type='double' value='256'/>
+		<param name='camera_left_target_pixel_x' type='double' value='340'/>
+		<param name='camera_left_target_pixel_y' type='double' value='195'/>
 		<param name='camera_right_target_pixel_x' type='double' value='150'/>
 		<param name='camera_right_target_pixel_y' type='double' value='256'/>
 		<param name='camera_left_target_forward_vector_x' type='double' value='-16'/>
@@ -30,6 +30,7 @@
 		<param name='proportional_constant_rotate' type='double' value='0.0017'/>
 		<param name='integral_constant_rotate' type='double' value='0.0'/>
         <param name='derivative_constant_rotate' type='double' value='0.0'/>
+        <param name='target_name' type='string' value='pre_cached'/>
 
         <remap from="/img_point" to="/manipulator/named_img_point"/>
 	</node>
