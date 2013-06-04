@@ -428,6 +428,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def drive_to_sample(self, start_pose):
         # switch control to the motion planner and drive to the expected
         # position
+        self.drive_succeeded=False
         self.announce("Moving to expected sample location")
         self.platform_motion_input_select("Planner")
 
@@ -448,12 +449,17 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             # arrived at goal position without seeing sample, try to find it
             self.announce("Failed to see sample, twirling, twirling, twirling towards freedom")
             rospy.loginfo("Looking for sample")
-            yield teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
             self.kill_task(find)
+            yield teer_ros.WaitTask(self.new_task(self.look_for_beacon()))
 
         if self.search_sample is not None:
             # see sample in search, update goal and drive close
             self.kill_task(drive)
+            old_search_sample = self.search_sample
+            self.search_sample = None
+            yield teer_ros.WaitCondition(lambda: self.search_sample is not None)
+            if self.search_sample is None:
+                self.search_sample = old_search_sample
             msg = self.search_sample
             self.listener.waitForTransform('/map', msg.header.frame_id,
                     msg.header.stamp, rospy.Duration(10.0))
@@ -465,9 +471,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitAnyTasks([pursue, see])
             if self.man_sample is None:
                 self.announce("Failed to acquire sample in manipulator camera")
-                self.drive_home_task = self.new_task(self.drive_home(start_pose))
-                yield teer_ros.WaitTask(self.drive_home_task)
+                self.kill_task(see)
             else:
+                self.kill_task(pursue)
                 self.drive_succeeded=True
 
     def acquire_sample(self):
@@ -619,8 +625,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitTask(self.new_task(self.drive_to_sample(start_pose)))
         if self.drive_succeeded:
             yield teer_ros.WaitTask(self.new_task(self.acquire_sample()))
-        self.drive_home_task = self.new_task(self.drive_home(start_pose))
-        yield teer_ros.WaitTask(self.drive_home_task)
+        else:
+            self.drive_home_task = self.new_task(self.drive_home(start_pose))
+            yield teer_ros.WaitTask(self.drive_home_task)
 
 def start_node():
     rospy.init_node('master_executive')
