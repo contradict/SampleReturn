@@ -23,8 +23,10 @@
         machine="search"
         pkg="detection_filter"
         type="detection_filter_node.py"
-        name="manipulator_filter"
+        name="detection_filter"
+        ns="manipulator"
         >
+
         <remap from="raw_points" to="point"/>
 
         <param name="filter_tolerance" type="double" value="0.10"/>
