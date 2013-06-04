@@ -379,8 +379,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # wait for the search camera to see the object
         yield teer_ros.WaitCondition(
                 lambda: self.search_sample is not None)
-        if self.search_sample is not None:
-            self.announce("Sample located")
+        self.announce("Sample located")
 
     def wait_for_manipulator_sample(self):
         # set sample to None so we know when the first point arrives
