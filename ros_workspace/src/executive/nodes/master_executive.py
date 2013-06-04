@@ -103,6 +103,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.servo = actionlib.SimpleActionClient("/visual_servo_action",
                 visual_servo_msg.VisualServoAction)
 
+        self.drive_home_task = None
+
     #----   Subscription Handlers ----
     def gpio_update(self, gpio):
         if gpio.servo_id == self.gpio_servo_id:
@@ -239,6 +241,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.announce("Entering pree cashed sample mode")
                 tid = self.new_task(self.retrieve_precached_sample())
             else:
+                if self.drive_home_task is not None:
+                    self.kill_task(self.drive_home_task)
+                    self.drive_home_task = None
                 self.announce("Joystick control enabled")
                 self.platform_motion_input_select("Joystick")
                 self.publish_zero_velocity()
@@ -454,7 +459,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             yield teer_ros.WaitAnyTasks([pursue, see])
             if self.man_sample is None:
                 self.announce("Failed to acquire sample in manipulator camera")
-                self.new_task(self.drive_home(start_pose))
+                self.drive_home_task = self.new_task(self.drive_home(start_pose))
+                yield teer_ros.WaitTask(self.drive_home_task)
             else:
                 self.drive_succeeded=True
 
@@ -588,6 +594,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     rospy.loginfo("current goal close enough")
                 self.beacon_pose = None
 
+        self.drive_home_task = None
         self.announce("Complete, waiting for mode change")
         mask = (self.GPIO_PIN_MODE_PRECACHED|self.GPIO_PIN_MODE_SEARCH)
         pin_states =\
@@ -605,7 +612,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitTask(self.new_task(self.drive_to_sample(start_pose)))
         if self.drive_succeeded:
             yield teer_ros.WaitTask(self.new_task(self.acquire_sample()))
-        yield teer_ros.WaitTask(self.new_task(self.drive_home(start_pose)))
+        self.drive_home_task = self.new_task(self.drive_home(start_pose))
+        yield teer_ros.WaitTask(drive_home_task)
 
 def start_node():
     rospy.init_node('master_executive')
