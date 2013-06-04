@@ -261,7 +261,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         now = rospy.Time.now()
         if self.last_servo_feedback is None or \
             (len(self.proclamations) == 0 and\
-              now-self.last_servo_feedback>self.servo_feedback_interval):
+              (now-self.last_servo_feedback).to_sec()>self.servo_feedback_interval):
             if feedback.state == feedback.STOP_AND_WAIT:
                 self.announce("lost sample")
             else:
