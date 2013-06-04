@@ -3,6 +3,7 @@ import roslib
 import rospy
 import numpy as np
 import cv2
+import copy
 
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
 from sensor_msgs.msg import PointCloud2
