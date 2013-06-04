@@ -12,8 +12,8 @@
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
         <param name="wait_for_cameras" value="$(arg wait_for_cameras)"/>
 
-        <remap from="manipulator_point" to="/manipulator/filtered_points"/>
-        <remap from="search_point" to="/sample_detection/filtered_points"/>
+        <remap from="manipulator_point" to="/manipulator/named_point"/>
+        <remap from="search_point" to="/sample_detection/point"/>
 
         <!--
         <remap from="img_point" to="filtered_points"/>
