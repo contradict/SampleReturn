@@ -159,7 +159,7 @@ class color_name_sample_detection(object):
     #g_regions = self.mser.detect(gray, self.static_mask)
     mask = np.ones((self.img.shape[0],self.img.shape[1],1),np.uint8)
     mask[:,:100] = 0
-    mask[:,-100:] = 0
+    #mask[:,-100:] = 0
     g_regions = self.mser.detect(gray, mask)
     rospy.logdebug("number of regions: %s", len(g_regions))
     g_hulls = [cv2.convexHull(r.reshape(-1,1,2)) for r in g_regions]
