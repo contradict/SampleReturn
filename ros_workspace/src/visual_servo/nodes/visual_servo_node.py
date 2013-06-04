@@ -324,6 +324,8 @@ class VisualServo:
 				break
 			else:
 				self._action_server.publish_feedback(self._visual_servo_feedback)
+			if self._action_server.is_preempt_requested():
+				break
 			update_rate.sleep()
 
 		# Catch all error handling.  This should not run, but seems good to have
