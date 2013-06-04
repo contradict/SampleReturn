@@ -7,6 +7,8 @@ from linemod_detector.msg import NamedPoint
 
 class SampleDetectionFilter(object):
     def __init__(self):
+        self.current_sequence = None
+
         # node parameters
         self.sample_name = rospy.get_param("~sample_name", "pre_cached")
 
@@ -29,6 +31,11 @@ class SampleDetectionFilter(object):
 
     def handle_point(self, msg):
         if msg.name == self.sample_name:
+            if self.current_sequence is not None:
+                rospy.logdebug("%d %d", self.current_sequence, msg.header.seq)
+            if msg.header.seq != self.current_sequence:
+                self.current_sequence = msg.header.seq
+                self.filter.decay()
             e = self.filter.update(msg, self.filter_threshold)
             if e is not None:
                 fp=NamedPoint()

@@ -54,7 +54,7 @@ class Hypothesis(object):
         return h
 
     def __str__(self):
-        return "%s: %d"%(self.position, self.support)
+        return "%s: %3.1f"%(self.position, self.support)
 
     def __repr__(self):
         return self.__str__()
@@ -68,7 +68,7 @@ class Filter(object):
 
         self.listener = tf.TransformListener()
 
-    def update(self, msg, threshold):
+    def update(self, msg, threshold, unsupport=False):
         latest = rospy.Time(0)
         if not self.listener.canTransform(self.frame, msg.header.frame_id, latest):
             rospy.logerr("Can not transform frame %s to %s, ignoring measurement",
@@ -78,24 +78,30 @@ class Filter(object):
         point = np.array([tf_pt.point.x, tf_pt.point.y, tf_pt.point.z])
         worst=self.hypotheses[0]
         result = None
-        for i, h in enumerate(self.hypotheses):
+        for h in self.hypotheses:
             if h.supports(point):
                 rospy.logdebug("update %s with %s", h, point)
                 h.update(point)
                 result = h if h.support>threshold else None
                 break
-            else:
-                rospy.logdebug("unsupported %s: %s", h, point)
-                h.unsupported()
             if h<worst:
                 worst = h
         else:
             worst.replace(self.hypothesis(point))
-        for h in self.hypotheses[i+1:]:
-            rospy.logdebug("unsupported %s: %s", h, point)
-            h.unsupported()
+        if unsupport:
+            for h in self.hypotheses:
+                if not h.supports(point):
+                    rospy.logdebug("unsupported %s: %s", h, point)
+                    h.unsupported()
+                h.unsupported()
         rospy.logdebug("hypotheses: %s", ["%s"%x for x in self.hypotheses])
         return result
+
+    def decay(self):
+        rospy.logdebug("decay")
+        for h in self.hypotheses:
+            h.unsupported()
+        rospy.logdebug("hypotheses: %s", ["%s"%x for x in self.hypotheses])
 
     def estimate(self, threshold=None):
         best = self.hypotheses[0]
