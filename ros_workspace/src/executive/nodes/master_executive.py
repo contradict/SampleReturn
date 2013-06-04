@@ -272,13 +272,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.listener.waitForTransform('/map', '/base_link',
                 rospy.Time(0), rospy.Duration(10.0))
         position, quaternion = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
-        hdr = std_msg.Header(0, rospy.Time.now(), '/map')
+        hdr = std_msg.Header(0, rospy.Time(0), '/map')
         pose = geometry_msg.PoseStamped(hdr,
                 geometry_msg.Pose(
                     geometry_msg.Point(*position),
                     geometry_msg.Quaternion(*quaternion)))
         return pose
-
 
     def forward(self, distance):
         start_pose = self.get_current_robot_pose()
@@ -506,7 +505,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             rospy.loginfo("dist: %f", dist)
             current_beacon_point.pose = newpose.pose
             current_beacon_point.header = newpose.header
-            hdr = std_msg.Header(0, rospy.Time.now(), '/map')
+            hdr = std_msg.Header(0, rospy.Time(0), '/map')
             b_pose = geometry_msg.PoseStamped()
             b_pose.header.stamp = rospy.Time(0)
             b_pose.header.frame_id = 'beacon'
