@@ -377,7 +377,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # wait for the search camera to see the object
         yield teer_ros.WaitCondition(
                 lambda: self.search_sample is not None)
-        self.announce("Sample located")
+        if self.search_sample is not None:
+            self.announce("Sample located")
 
     def wait_for_manipulator_sample(self):
         # set sample to None so we know when the first point arrives
@@ -385,10 +386,11 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # wait for the manipulator camera to see the object
         yield teer_ros.WaitCondition(
                 lambda: self.man_sample is not None)
-        self.announce("Sample in manipulator")
-        # wait to stop
-        self.move_base.cancel_goal()
-        yield teer_ros.WaitDuration(0.5)
+        if self.man_sample is not None:
+            self.announce("Sample in manipulator")
+            # wait to stop
+            self.move_base.cancel_goal()
+            yield teer_ros.WaitDuration(0.5)
 
     def point_distance(self, pt1, pt2):
         return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
