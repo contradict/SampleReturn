@@ -487,8 +487,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # grab the sample
         manip_goal = manipulator_msg.ManipulatorGoal()
         manip_goal.type=manip_goal.GRAB
-        manip_goal.target_bin = 1
-        manip_goal.grip_torque = 0.5
+        manip_goal.target_bin = 5
+        manip_goal.grip_torque = 0.7
+        manip_goal.wrist_angle = math.pi
         self.manipulator.send_goal(manip_goal)
         while True:
             yield teer_ros.WaitDuration(0.1)
