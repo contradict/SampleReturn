@@ -287,34 +287,33 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 geometry_msg.Point(distance, 0, 0))
         desired_pt = self.listener.transformPoint('/map', ahead)
         rospy.loginfo('desired point: %s', desired_pt)
-        desired_pose = geometry_msg.Pose(desired_pt.point, start_pose.pose_orientation)
+        desired_pose = geometry_msg.Pose(desired_pt.point, start_pose.pose.orientation)
         hdr = std_msg.Header(0, rospy.Time(0), '/map')
         pose_st = geometry_msg.PoseStamped(hdr, desired_pose)
+        rospy.loginfo('forward %f', distance)
         rospy.loginfo('desired pose: %s', pose_st)
         return pose_st
 
     def rotate(self, angle):
         current_pose = self.get_current_robot_pose()
         rospy.loginfo('current pose: %s', current_pose)
-        hdr = std_msg.Header(0, rospy.Time(0), '/base_link')
-        goal_quat = tf.transformations.quaternion_from_euler(0,0,angle)
-        current_quat = (current_pose.orientation.x, current_pose.orientation.y,
-                    current_pose.orientation.z, current_pose.orientation.w)
+        goal_quat = tf.transformations.quaternion_from_euler(0,0,math.radians(angle))
+        current_quat = (current_pose.pose.orientation.x, current_pose.pose.orientation.y,
+                    current_pose.pose.orientation.z, current_pose.pose.orientation.w)
         spin_orientation = \
             geometry_msg.Quaternion(*tf.transformations.quaternion_multiply(goal_quat, current_quat))
-        spin_pose = geometry_msg.Pose(current_pose.position, spin_orientation)
-        hdr = std_msg.Header(0, rospy.time(0), '/map')
-        spin_goal = move_base_msg.MoveBaseGoal()
-        spin_goal.target_pose = geometry_msg.PoseStamped(hdr, spin_pose)
-        rospy.loginfo('spin goal: %s', spin_goal)
-        self.move_base.send_goal(spin_goal)
-        return spin_pose
+        spin_pose = geometry_msg.Pose(current_pose.pose.position, spin_orientation)
+        hdr = std_msg.Header(0, rospy.Time(0), '/map')
+        spin_pose_st = geometry_msg.PoseStamped(hdr, spin_pose)
+        rospy.loginfo('rotate %f', angle)
+        rospy.loginfo('desired pose: %s', spin_pose_st)
+        return spin_pose_st
 
     def turn_around(self, current_pose, start_pose):
         # spin in place to point at home
         around = tf.transformations.quaternion_from_euler(0,0,math.pi)
-        q1 = (start_pose.orientation.x, start_pose.orientation.y,
-                start_pose.orientation.z, start_pose.orientation.w)
+        q1 = (start_pose.pose.orientation.x, start_pose.pose.orientation.y,
+                start_pose.pose.orientation.z, start_pose.pose.orientation.w)
         spin_orientation = \
                 geometry_msg.Quaternion(*tf.transformations.quaternion_multiply(around, q1))
         spin_pose = geometry_msg.Pose(current_pose.position,
