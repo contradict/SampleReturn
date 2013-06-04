@@ -23,7 +23,7 @@
         <param name="max_area" type="double" value="80000.0"/>
         <param name="min_area" type="double" value="100.0"/>
         <param name="max_size" type="double" value="0.4"/>
-        <param name="min_size" type="double" value="0.03"/>
+        <param name="min_size" type="double" value="0.05"/>
         <remap from="monocular_img" to="/cam_img"/>
         <remap from="cam_info" to="/cam_info"/>
     </node>
