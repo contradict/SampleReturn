@@ -7,6 +7,7 @@ import cv2
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
 from sensor_msgs.msg import PointCloud2
 from linemod_detector.msg import NamedPoint
+from visualization_msgs.msg import Marker
 from cv_bridge import CvBridge
 from tf import TransformListener
 
@@ -24,6 +25,7 @@ class ray_to_points(object):
 
     self.points_pub = rospy.Publisher('points', PointCloud2)
     self.named_point_pub = rospy.Publisher('point', NamedPoint)
+    self.marker_pub = rospy.Publisher('marker', Marker)
 
     self.tf = TransformListener()
 
@@ -43,6 +45,26 @@ class ray_to_points(object):
     rospy.logdebug("ground_named_point %s",ground_named_point)
     self.named_point_pub.publish(ground_named_point)
     rospy.logdebug("odom_named_point %s",odom_named_point)
+    self.send_marker(odom_named_point)
+
+  def send_marker(self, named_pt):
+    m=Marker()
+    m.header = copy.deepcopy(named_pt.header)
+    m.type=Marker.CYLINDER
+    m.pose.position = named_pt.point
+    m.pose.orientation.x=0.707
+    m.pose.orientation.y=0.0
+    m.pose.orientation.z=0.0
+    m.pose.orientation.w=0.707
+    m.scale.x=0.2
+    m.scale.y=0.2
+    m.scale.z=0.2
+    m.color.r=0.8
+    m.color.g=0.8
+    m.color.b=0.8
+    m.color.a=1.0
+    m.text=named_pt.name
+    self.marker_pub.publish(m)
 
   def cast_ray(self, point_in, tf, name):
     base_link_point = tf.transformPoint('/base_link', point_in)
