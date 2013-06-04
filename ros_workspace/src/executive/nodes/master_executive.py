@@ -48,6 +48,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         # ordinary variables
         self.last_servo_feedback = None
+        self.lost_sample = None
 
         # node parameters
         self.voice = rospy.get_param("~voice", "kal_diphone")
@@ -271,6 +272,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             else:
                 self.announce("range %d"%(10*int(feedback.error/10)))
             self.last_servo_feedback = now
+            self.lost_sample = (feedback.state == feedback.STOP_AND_WAIT)
 
     def get_current_robot_pose(self):
         self.listener.waitForTransform('/map', '/base_link',
@@ -478,33 +480,46 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 self.kill_task(pursue)
                 self.drive_succeeded=True
 
-    def acquire_sample(self):
+    def acquire_sample(self, start_pose):
         # switch to visual servo control
         self.announce("Sample detected, servoing")
         self.platform_motion_input_select("Servo")
         self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb
                             )
+        lost_count = 0
+        success = False
         while True:
             yield teer_ros.WaitDuration(0.1)
             state = self.servo.get_state()
             if state not in self.working_states:
+                success=True
                 break
-        self.announce("Servo success, triggering manipulator")
+            if self.lost_sample:
+                lost_count += 1
+            else:
+                lost_count = 0
+            if lost_count >= 200:
+                break
+        if success:
+            self.announce("Servo success, triggering manipulator")
 
-        # grab the sample
-        manip_goal = manipulator_msg.ManipulatorGoal()
-        manip_goal.type=manip_goal.GRAB
-        manip_goal.target_bin = 5
-        manip_goal.grip_torque = 0.7
-        manip_goal.wrist_angle = math.pi
-        self.manipulator.send_goal(manip_goal)
-        while True:
-            yield teer_ros.WaitDuration(0.1)
-            state = self.manipulator.get_state()
-            if state not in self.working_states:
-                break
-        self.announce("Sample retreived")
+            # grab the sample
+            manip_goal = manipulator_msg.ManipulatorGoal()
+            manip_goal.type=manip_goal.GRAB
+            manip_goal.target_bin = 5
+            manip_goal.grip_torque = 0.7
+            manip_goal.wrist_angle = math.pi
+            self.manipulator.send_goal(manip_goal)
+            while True:
+                yield teer_ros.WaitDuration(0.1)
+                state = self.manipulator.get_state()
+                if state not in self.working_states:
+                    break
+            self.announce("Sample retreived")
+        else:
+            self.drive_home_task = self.new_task(self.drive_home(start_pose))
+            yield teer_ros.WaitTask(self.drive_home_task)
 
     def beacon_goal(self, current_beacon_point, new_beacon_pose, robot_pose):
         try:
@@ -627,7 +642,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.drive_succeeded=False
         yield teer_ros.WaitTask(self.new_task(self.drive_to_sample(start_pose)))
         if self.drive_succeeded:
-            yield teer_ros.WaitTask(self.new_task(self.acquire_sample()))
+            yield teer_ros.WaitTask(self.new_task(self.acquire_sample(start_pose)))
         else:
             self.drive_home_task = self.new_task(self.drive_home(start_pose))
             yield teer_ros.WaitTask(self.drive_home_task)
