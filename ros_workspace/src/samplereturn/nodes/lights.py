@@ -14,7 +14,7 @@ class LightController(object):
     def __init__(self):
         rospy.Subscriber("/pause_state", Bool, self.pause_state_update)
         self.pub = rospy.Publisher('gpio_write', GPIO)
-        self.blink = False
+        self.blink = True
         self.light_state = self._all_on
         self.cycle = rospy.Timer(rospy.Duration(1.0), self.set_lights)
 
@@ -27,7 +27,7 @@ class LightController(object):
         self.pub.publish(GPIO(servo_id=1, pin_mask=7, new_pin_states=self.light_state))
         
     def pause_state_update(self, pause_state_msg):
-        self.blink = pause_state_msg.data
+        self.blink = not pause_state_msg.data
         
 def main():
     rospy.init_node('lights')
