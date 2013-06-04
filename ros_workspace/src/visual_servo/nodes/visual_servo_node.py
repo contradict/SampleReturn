@@ -269,7 +269,7 @@ class VisualServo:
 
 		# Clamp the twist to very small velocities so the wheels have time
 		# to steer in the right direction
-		if self._new_state_wait_timer > 0:
+		if self._new_state_wait_timer > 0.0:
 			twist.angular.z = numpy.clip(twist.angular.z, -0.001, 0.001)
 			twist.angular.y = numpy.clip(twist.angular.y, -0.001, 0.001)
 			twist.angular.x = numpy.clip(twist.angular.x, -0.001, 0.001)
