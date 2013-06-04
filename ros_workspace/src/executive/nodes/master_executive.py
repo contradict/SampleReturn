@@ -617,7 +617,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         if self.drive_succeeded:
             yield teer_ros.WaitTask(self.new_task(self.acquire_sample()))
         self.drive_home_task = self.new_task(self.drive_home(start_pose))
-        yield teer_ros.WaitTask(drive_home_task)
+        yield teer_ros.WaitTask(self.drive_home_task)
 
 def start_node():
     rospy.init_node('master_executive')
