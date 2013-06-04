@@ -261,7 +261,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def servo_feedback_cb(self, feedback):
         now = rospy.Time.now()
-        if self.ast_servo_feedback is None:
+        if self.last_servo_feedback is None:
             self.last_servo_feedback = now
             return
         dt = (now-self.last_servo_feedback)
