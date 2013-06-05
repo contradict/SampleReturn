@@ -281,8 +281,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def get_current_robot_pose(self):
         self.listener.waitForTransform('/map', '/base_link',
                 rospy.Time(0), rospy.Duration(20.0))
+        t = self.listener.getLatestCommonTime('/map', '/base_link')
         position, quaternion = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
-        hdr = std_msg.Header(0, rospy.Time(0), '/map')
+        hdr = std_msg.Header(0, t, '/map')
         pose = geometry_msg.PoseStamped(hdr,
                 geometry_msg.Pose(
                     geometry_msg.Point(*position),
@@ -349,7 +350,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
         for i in range(9):
             # rotate a small amount
-            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, (yaw+2*math.pi*float(i)/8.0)%2*math.pi)
+            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, (yaw+2*math.pi*float(i)/8.0))
             pose.pose.orientation.x = q_goal[0]
             pose.pose.orientation.y = q_goal[1]
             pose.pose.orientation.z = q_goal[2]
