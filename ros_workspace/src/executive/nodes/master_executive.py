@@ -280,7 +280,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def get_current_robot_pose(self):
         self.listener.waitForTransform('/map', '/base_link',
-                rospy.Time(0), rospy.Duration(10.0))
+                rospy.Time(0), rospy.Duration(20.0))
         position, quaternion = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
         hdr = std_msg.Header(0, rospy.Time(0), '/map')
         pose = geometry_msg.PoseStamped(hdr,
