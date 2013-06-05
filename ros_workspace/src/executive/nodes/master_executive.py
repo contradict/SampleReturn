@@ -329,6 +329,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         spin_goal.target_pose = \
                 geometry_msg.PoseStamped(hdr, spin_pose)
         rospy.loginfo("spin goal: %s", spin_goal)
+        self.platform_motion_input_select("Planner")
         self.move_base.send_goal(spin_goal)
         return spin_pose
 
@@ -337,8 +338,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitCondition(lambda: self.beacon_pose is not None)
 
     def twirl(self, other_task, do_star_twirl=False):
+        self.platform_motion_input_select("None")
         self.move_base.cancel_goal()
-        self.publish_zero_velocity()
         pose = self.get_current_robot_pose()
         q=(pose.pose.orientation.x,pose.pose.orientation.y,pose.pose.orientation.z,pose.pose.orientation.w)
         roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
@@ -382,8 +383,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     # in this case, other_task finished
                     break
 
+        self.platform_motion_input_select("None")
         self.move_base.cancel_goal()
-        self.publish_zero_velocity()
 
     def home(self, start_pose, spin_pose):
         # drive back to (0,0,0)
@@ -398,6 +399,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def drive_to_point(self, pose_st):
         goal = move_base_msg.MoveBaseGoal()
         goal.target_pose=pose_st
+        self.platform_motion_input_select("Planner")
         self.move_base.send_goal(goal)
         while True:
             yield teer_ros.WaitDuration(0.1)
@@ -421,6 +423,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 lambda: self.man_sample is not None)
         if self.man_sample is not None:
             self.announce("Sample in manipulator")
+            self.platform_motion_input_select("None")
             # wait to stop
             self.move_base.cancel_goal()
             yield teer_ros.WaitDuration(0.5)
@@ -431,6 +434,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     def pursue(self, pose_st):
         goal = move_base_msg.MoveBaseGoal()
         goal.target_pose=pose_st
+        self.platform_motion_input_select("Planner")
         self.move_base.send_goal(goal)
 
         self.search_sample = None
@@ -453,6 +457,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     rospy.loginfo("new pursuit point %s", newpt)
                     pose_st.pose.position=newpt.point
                     goal.target_pose=pose_st
+                    self.platform_motion_input_select("Planner")
                     self.move_base.send_goal(goal)
                 self.search_sample = None
 
@@ -551,6 +556,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                         break
                 self.announce("Sample retreived")
             else:
+                self.platform_motion_input_select("None")
                 self.servo.cancel_goal()
                 see = self.new_task(self.wait_for_manipulator_sample())
                 yield self.new_task(self.twirl(see, True))
@@ -629,6 +635,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         # drive back to beacon
         home_goal = move_base_msg.MoveBaseGoal()
         home_goal.target_pose = self.home(start_pose.pose, spin_pose)
+        self.platform_motion_input_select("Planner")
         self.move_base.send_goal(home_goal)
         current_beacon_point = home_goal.target_pose
         self.beacon_pose = None
@@ -652,6 +659,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 see_beacon = self.new_task(self.see_beacon())
                 yield teer_ros.WaitTask(self.new_task(self.twirl(see_beacon)))
                 if self.beacon_pose is None:
+                    self.platform_motion_input_select("Planner")
                     self.move_base.send_goal(home_goal)
                 self.saw_beacon = False
                 last_beacon_pose = self.get_current_robot_pose()
@@ -661,6 +669,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 g_p_st = self.beacon_goal(current_beacon_point, self.beacon_pose, robot_pose_st)
                 if g_p_st is not None:
                     home_goal.target_pose=g_p_st
+                    self.platform_motion_input_select("Planner")
                     self.move_base.send_goal(home_goal)
                 else:
                     rospy.loginfo("current goal close enough")
