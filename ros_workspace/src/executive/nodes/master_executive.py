@@ -344,7 +344,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         roll, pitch, yaw = tf_conversions.transformations.euler_from_quaternion(q)
         for i in range(9):
             # rotate a small amount
-            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw+2*math.pi*float(i)/8.0)
+            q_goal = tf_conversions.transformations.quaternion_from_euler(0, 0, (yaw+2*math.pi*float(i)/8.0)%2*math.pi)
             pose.pose.orientation.x = q_goal[0]
             pose.pose.orientation.y = q_goal[1]
             pose.pose.orientation.z = q_goal[2]
@@ -371,9 +371,20 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                     # in this case, other_task finished
                     break
 
-                # move forward the same small amount
+                # move forward double the small amount
                 yield teer_ros.WaitAnyTasks([
-                    self.new_task(self.drive_to_point(self.forward(1))),
+                    self.new_task(self.drive_to_point(self.forward(2))),
+                    other_task ])
+
+                # check to see which task finished
+                move_state = self.move_base.get_state()
+                if move_state in self.working_states:
+                    # in this case, other_task finished
+                    break
+
+                # move backwards a small amount again
+                yield teer_ros.WaitAnyTasks([
+                    self.new_task(self.drive_to_point(self.forward(-1))),
                     other_task ])
 
                 # check to see which task finished
