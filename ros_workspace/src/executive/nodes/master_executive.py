@@ -322,6 +322,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def turn_around(self, current_pose, start_pose):
         # spin in place to point at home
+        rospy.loginfo("turn around:\n%s\n%s", current_pose, start_pose)
         around = tf.transformations.quaternion_from_euler(0,0,math.pi)
         q1 = (start_pose.pose.orientation.x, start_pose.pose.orientation.y,
                 start_pose.pose.orientation.z, start_pose.pose.orientation.w)
@@ -579,6 +580,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                         break
                 self.announce("Sample retreived")
             else:
+                self.announce("Local search")
                 self.platform_motion_input_select("None")
                 self.servo.cancel_goal()
                 see = self.new_task(self.wait_for_manipulator_sample())
