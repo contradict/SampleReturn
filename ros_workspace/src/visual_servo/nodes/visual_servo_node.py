@@ -93,9 +93,10 @@ class VisualServo:
 
 
 	def goto_state(self, new_state):
-		self._visual_servo_state = new_state
-		self._new_state_wait_timer = self._new_state_wait_time
-		self.reset_pid_controller()
+		if self._new_state_wait_timer <= 0.0:
+			self._visual_servo_state = new_state
+			self._new_state_wait_timer = self._new_state_wait_time
+			self.reset_pid_controller()
 
 	def get_target_forward_line_pixel_x(self, pixel_y):
 		return (pixel_y - self._camera_left_target_pixel_y)*self._camera_left_target_forward_vector_x/self._camera_left_target_forward_vector_y + self._camera_left_target_pixel_x
@@ -162,10 +163,11 @@ class VisualServo:
 			self.reset_pid_controller()
 			self._new_state_wait_timer = self._new_state_wait_timer - delta_time
 
-		self._stop_wait_timer = self._stop_wait_timer + delta_time
-		if self._stop_wait_timer > self._no_input_stop_wait_time:
-			self.goto_state(VisualServoStates.STOP_AND_WAIT)
-			self._stop_wait_timer = 0.0
+		if self._new_state_wait_timer <= 0.0:
+			self._stop_wait_timer = self._stop_wait_timer + delta_time
+			if self._stop_wait_timer > self._no_input_stop_wait_time:
+				self.goto_state(VisualServoStates.STOP_AND_WAIT)
+				self._stop_wait_timer = 0.0
 
 		if self._visual_servo_state == VisualServoStates.SAFE_REGION:
 			# If the object is near the top of the image, move forward
