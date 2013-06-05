@@ -9,7 +9,7 @@
 		pkg="visual_servo"
 		type="visual_servo_node.py"
 		output="log">
-		<param name='safe_region_percentage' type='double' value='0.15'/>
+		<param name='safe_region_percentage' type='double' value='0.20'/>
 		<param name='target_window_halfwidth_rotate' type='double' value='6'/>
 		<param name='target_window_halfwidth_move_forward' type='double' value='6'/>
 		<param name='target_window_halfheight_move_forward' type='double' value='8'/>
