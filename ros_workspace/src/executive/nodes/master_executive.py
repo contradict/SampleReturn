@@ -34,7 +34,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     gpio = teer_ros.ConditionVariable(None)
     navigation_camera_status = teer_ros.ConditionVariable(None)
     manipulator_camera_status = teer_ros.ConditionVariable(None)
-    pause_state = teer_ros.ConditionVariable(None)
+    pause_state = teer_ros.ConditionVariable(std_msg.Bool(False))
     man_sample = teer_ros.ConditionVariable(None)
     search_sample = teer_ros.ConditionVariable(None)
     beacon_pose = teer_ros.ConditionVariable(None)

@@ -7,7 +7,7 @@ import yaml
 
 import std_msgs.msg as std_msg
 
-paused=True
+paused=False
 
 def pause(msg):
     global paused

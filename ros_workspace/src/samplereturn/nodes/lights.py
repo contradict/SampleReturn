@@ -14,7 +14,7 @@ class LightController(object):
     def __init__(self):
         rospy.Subscriber("/pause_state", Bool, self.pause_state_update)
         self.pub = rospy.Publisher('gpio_write', GPIO)
-        self.blink = True
+        self.blink = False
         self.light_state = self._all_on
         self.cycle = rospy.Timer(rospy.Duration(1.0), self.set_lights)
 

@@ -36,14 +36,18 @@ class PauseSwitch(object):
         rospy.Subscriber("/gpio_read", GPIO, self.gpio)
         rospy.Subscriber("/status_word", ServoStatus, self.status_word)
 
-        self.pause_pub = rospy.Publisher("pause_state", Bool)
+        self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True)
         self.audio_pub = rospy.Publisher("/audio/search", SoundRequest)
 
         #pullup on pause input, 1->0 is transition edge
         self.pause_bit_state = self.button_mask 
         self.guarded = False #this flag is set to true after a pause
-        self.paused = True
-        self.pause(True) #pause system on startup, no matter what
+        ##### CAUTION ####
+        # Changed at NASA request, machine should start un paused.
+        # Yikes
+        self.paused = False
+        self.pause(False)
+        #################
 
     def clear_guard(self, event):
         self.guarded = False
