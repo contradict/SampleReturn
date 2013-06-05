@@ -13,16 +13,16 @@
 		<param name='target_window_halfwidth_rotate' type='double' value='6'/>
 		<param name='target_window_halfwidth_move_forward' type='double' value='6'/>
 		<param name='target_window_halfheight_move_forward' type='double' value='8'/>
-		<param name='camera_left_target_pixel_x' type='double' value='340'/>
+		<param name='camera_left_target_pixel_x' type='double' value='360'/>
 		<param name='camera_left_target_pixel_y' type='double' value='195'/>
-		<param name='camera_right_target_pixel_x' type='double' value='150'/>
+		<param name='camera_right_target_pixel_x' type='double' value='170'/>
 		<param name='camera_right_target_pixel_y' type='double' value='256'/>
 		<param name='camera_left_target_forward_vector_x' type='double' value='-16'/>
 		<param name='camera_left_target_forward_vector_y' type='double' value='-255'/>
 		<param name='camera_right_target_forward_vector_x' type='double' value='16'/>
 		<param name='camera_right_target_forward_vector_y' type='double' value='255'/>
 		<param name='loop_frequency' type='double' value='10.0'/>
-		<param name='new_state_wait_time' type='double' value='1.0'/>
+		<param name='new_state_wait_time' type='double' value='2.0'/>
 		<param name='no_input_stop_wait_time' type='double' value='0.5'/>
 		<param name='proportional_constant_drive_forward' type='double' value='0.0009'/>
 		<param name='integral_constant_drive_forward' type='double' value='0.0'/>

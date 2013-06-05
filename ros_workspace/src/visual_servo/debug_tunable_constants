@@ -7,7 +7,7 @@ derivative_angular_constant: 0.0
 target_window_halfwidth_rotate: 3
 target_window_halfwidth_move_forward: 3
 target_window_halfheight_move_forward: 6
-camera_left_target_pixel_x: 340
+camera_left_target_pixel_x: 360
 camera_left_target_pixel_y: 195
-camera_right_target_pixel_x: 150
+camera_right_target_pixel_x: 155
 camera_right_target_pixel_y: 256
