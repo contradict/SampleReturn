@@ -55,6 +55,8 @@ class VisualServo:
 		self._proportional_constant_rotate = rospy.get_param('~proportional_constant_rotate', 0.01)
 		self._integral_constant_rotate = rospy.get_param('~integral_constant_rotate', 0.0)
 		self._derivative_constant_rotate = rospy.get_param('~derivative_constant_rotate', 0.0)
+		self._max_linear_velocity = rospy.get_param('~max_linear_velocity', 0.10)
+		self._max_angular_velocity = rospy.get_param('~max_angular_velocity', 0.25)
 		self._target_name = rospy.get_param('~target_name', 'red_puck')
 		self.goto_state(VisualServoStates.SAFE_REGION)
 		self.reset()
@@ -280,12 +282,16 @@ class VisualServo:
 			twist.linear.z = numpy.clip(twist.linear.z, -0.001, 0.001)
 		else:
 			# Clamp the twist values so we don't... kill... anyone....
-			twist.angular.z = numpy.clip(twist.angular.z, -0.250, 0.250)
-			twist.angular.y = numpy.clip(twist.angular.y, -0.250, 0.250)
-			twist.angular.x = numpy.clip(twist.angular.x, -0.250, 0.250)
-			twist.linear.x = numpy.clip(twist.linear.x, -0.5, 0.5)
-			twist.linear.y = numpy.clip(twist.linear.y, -0.5, 0.5)
-			twist.linear.z = numpy.clip(twist.linear.z, -0.5, 0.5)
+			twist.angular.z = numpy.clip(twist.angular.z,
+				-self._max_angular_velocity, self._max_angular_velocity)
+			twist.angular.y = 0
+			twist.angular.x = 0
+			twist.linear.x = numpy.clip(twist.linear.x,
+				-self._max_linear_velocity, self._max_linear_velocity)
+			twist.linear.y = numpy.clip(twist.linear.y,
+				-self._max_linear_velocity, self._max_linear_velocity)
+			twist.linear.z = numpy.clip(twist.linear.z,
+				-self._max_linear_velocity, self._max_linear_velocity)
 
 		# Do not update the previous twist if we are stopping and waiting
 		# so we can ramp the twist down slowly to a stop
