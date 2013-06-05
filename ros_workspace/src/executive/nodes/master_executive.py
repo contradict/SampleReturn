@@ -572,7 +572,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         try:
             newpose = self.listener.transformPose('/map', new_beacon_pose)
         except Exception, e:
-            rospy.logerr("failed to transform beacon pose: ", e)
+            rospy.logerr("failed to transform beacon pose: %s", e)
             return
         rospy.loginfo("newpt: %s", newpose)
         dist = self.point_distance(
