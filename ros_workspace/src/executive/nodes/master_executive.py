@@ -22,6 +22,8 @@ import move_base_msgs.msg as move_base_msg
 import visual_servo.msg as visual_servo_msg
 import linemod_detector.msg as linemod_msg
 import tf_conversions
+import dynamic_reconfigure.srv as dynsrv
+import dynamic_reconfigure.msg as dynmsg
 
 class SampleReturnScheduler(teer_ros.Scheduler):
     GPIO_PIN_PAUSE=0x02
@@ -91,6 +93,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.platform_motion_input_select = \
                 rospy.ServiceProxy("/select_command_source",
                         platform_srv.SelectCommandSource)
+
+        self.set_planner_parameters=rospy.ServiceProxy('/planner/mover/DWAPlannerROS/set_parameters', dynsrv.Reconfigure)
 
         # action clients
         self.home_wheelpods = actionlib.SimpleActionClient("/home_wheelpods",
@@ -443,6 +447,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
 
     def pursue(self, pose_st):
+        cfg=dynmsg.Config()
+        self.saved_planner_parameters = self.set_planner_parameters(cfg).config
+        cfg.doubles.append(dynmsg.DoubleParameter('max_vel_x', 0.2))
+        cfg.doubles.append(dynmsg.DoubleParameter('min_vel_x', -0.2))
+        self.set_planner_parameters(cfg)
+
         goal = move_base_msg.MoveBaseGoal()
         goal.target_pose=pose_st
         self.platform_motion_input_select("Planner")
@@ -629,6 +639,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
     def drive_home(self, start_pose):
         # spin in place to point at home
+        self.set_planner_parameters(self.saved_planner_parameters)
+
         self.platform_motion_input_select("Planner")
         capture_pose = self.get_current_robot_pose()
         spin_pose = self.turn_around(capture_pose.pose, self.pre_sample_search_pose)
