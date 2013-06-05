@@ -297,9 +297,9 @@ Visualization Manager:
       Decay Time: 1
       Enabled: true
       Max Color: 255; 255; 255
-      Max Intensity: 73.5
+      Max Intensity: 27.6
       Min Color: 0; 0; 0
-      Min Intensity: 11.5
+      Min Intensity: 9.5
       Name: trajectory_cloud
       Position Transformer: XYZ
       Queue Size: 1
@@ -321,10 +321,10 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: visualization_marker
+      Marker Topic: /sample_detection/marker
       Name: Sample
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -359,7 +359,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 22.1385
+      Distance: 7.68107
       Focal Point:
         X: 0
         Y: 0
