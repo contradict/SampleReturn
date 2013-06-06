@@ -496,6 +496,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(56))))
         yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.rotate(83.6))))
         yield teer_ros.WaitTask(self.new_task(self.drive_to_point(self.forward(17.5))))
+        self.announce("Beginning search")
         self.pre_sample_search_pose = self.get_current_robot_pose()
         expected_position = self.forward(17.5)
         drive = self.new_task(self.drive_to_point(expected_position))
