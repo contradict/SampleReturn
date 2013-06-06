@@ -242,8 +242,32 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             tid=None
             rospy.logdebug("pins: %s", hex(self.gpio.new_pin_states))
             if self.gpio.new_pin_states&self.GPIO_PIN_MODE_SEARCH == 0:
-                self.announce("Entering search mode")
+                cfg=dynmsg.Config()
+                self.saved_planner_parameters = self.set_planner_parameters(cfg).config
+                self.announce("Returning to beacon")
                 self.platform_motion_input_select("Planner")
+                hdr = std_msg.Header(0, 0, '/map')
+                pre_pose = geometry_msg.Pose()
+                pre_pose.position.x=0
+                pre_pose.position.y=0
+                pre_pose.position.z=0
+                pre_pose.orientation.x=0
+                pre_pose.orientation.y=0
+                pre_pose.orientation.z=0
+                pre_pose.orientation.w=1
+                self.pre_sample_search_pose = geometry_msg.PoseStamped(hdr,  pre_pose)
+                home_pose = geometry_msg.Pose()
+                home_pose.position.x=-10
+                home_pose.position.y=0
+                home_pose.position.z=0
+                home_pose.orientation.x=0
+                home_pose.orientation.y=0
+                home_pose.orientation.z=0
+                home_pose.orientation.w=1
+                hdr = std_msg.Header(0, 0, '/map')
+                home_pose_stamped = geometry_msg.PoseStamped(hdr, home_pose)
+                self.drive_home_task = self.new_task(self.drive_home(home_pose_stamped))
+                yield teer_ros.WaitTask(self.drive_home_task)
             elif self.gpio.new_pin_states&self.GPIO_PIN_MODE_PRECACHED == 0:
                 self.announce("Entering pree cashed sample mode")
                 tid = self.new_task(self.retrieve_precached_sample())
