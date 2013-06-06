@@ -62,10 +62,11 @@ def camlogger():
   r = rospy.Rate(rate)
   while not rospy.is_shutdown():
     if not paused:
+      now = rospy.Time.now()
+
       img = capture_image()
       rospy.logdebug("img (%d, %d)", img.width, img.height)
 
-      now = rospy.Time.now()
       img.header.stamp = now
       img.header.frame_id = frame_id
       img.header.seq = seq_id
