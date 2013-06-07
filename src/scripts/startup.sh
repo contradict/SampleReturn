@@ -30,7 +30,8 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
     sleep 1
 
     pidname=`basename ${LAUNCH_FILE} .launch`.pid
-    roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
+    roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} kind:=devel &
+    roslaunch --pid=${HOME}/.ros/logging.pid samplereturn logging.launch &
 fi
 MACHINE=`hostname`
 /usr/bin/aplay /home/robot/sounds/${MACHINE}start.wav
