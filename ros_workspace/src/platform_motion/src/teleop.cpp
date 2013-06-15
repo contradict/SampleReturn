@@ -5,7 +5,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <platform_motion/HomeAction.h>
 #include <platform_motion/Enable.h>
-
+#include <manipulator/ManipulatorAction.h>
 
 class Teleop
 {
@@ -16,6 +16,7 @@ private:
   double scale_joystick(double scale, double exponent, double value);
   void joyCallback(const sensor_msgs::Joy::ConstPtr& joy);
   void doHoming(void);
+  void doGrab(void);
   void timerCallback(const ros::TimerEvent &);
   
   ros::NodeHandle nh_;
@@ -23,13 +24,14 @@ private:
   ros::Timer pub_timer;
 
   int linear_x, linear_y, angular_z;
-  int button_homing;
+  int button_homing, button_grab;
   double l_scale_, l_exp_;
   double a_scale_, a_exp_;
   ros::Publisher twist_pub_;
   ros::Subscriber joy_sub_;
   bool homing, homed;
   actionlib::SimpleActionClient<platform_motion::HomeAction> home_pods;
+  actionlib::SimpleActionClient<manipulator::ManipulatorAction> manipulate;
 
   double vel_x, vel_y, vel_theta;
 };
@@ -39,7 +41,8 @@ Teleop::Teleop():
   linear_x(1),
   linear_y(0),
   angular_z(2),
-  button_homing(1),
+  button_homing(2),
+  button_grab(4),
   l_scale_(2),
   l_exp_(2),
   a_scale_(M_PI),
@@ -47,6 +50,7 @@ Teleop::Teleop():
   homing(false),
   homed(false),
   home_pods("home_wheelpods"),
+  manipulate("/manipulator/manipulator_action"),
   vel_x(0),
   vel_y(0),
   vel_theta(0)
@@ -90,6 +94,25 @@ void Teleop::doHoming(void)
     homing=false;
 }
 
+void Teleop::doGrab(void)
+{
+    ROS_INFO("Waiting for manipulator server");
+    if(!manipulate.waitForServer(ros::Duration(5.0))) {
+        ROS_ERROR("Timeout waiting for manipulator server");
+        return;
+    }
+    ROS_INFO("Send manipulator goal");
+    manipulator::ManipulatorGoal grab;
+    grab.type = grab.GRAB;
+    grab.grip_torque=0.7;
+    manipulate.sendGoal(grab);
+    if(!manipulate.waitForResult(ros::Duration(60.0))) {
+        ROS_ERROR("Timeout waiting for grab");
+    } else {
+        ROS_INFO("Grab complete");
+    }
+}
+
 double Teleop::scale_joystick(double scale, double exponent, double value)
 {
     return copysign(scale*pow(fabs(value), exponent), value);
@@ -100,6 +123,11 @@ void Teleop::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
     if(joy->buttons[button_homing] && !homing)
     {
         boost::thread(boost::bind(&Teleop::doHoming, this));
+    }
+    if(joy->buttons[button_grab])
+    {
+        boost::thread(boost::bind(&Teleop::doGrab, this));
+
     }
     vel_theta=scale_joystick(a_scale_, a_exp_, joy->axes[angular_z]);
     vel_x=scale_joystick(l_scale_, l_exp_, joy->axes[linear_x]);
