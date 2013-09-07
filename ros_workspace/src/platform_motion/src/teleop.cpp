@@ -5,6 +5,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <platform_motion/HomeAction.h>
 #include <platform_motion/Enable.h>
+#include <platform_motion/SelectCommandSource.h>
 #include <manipulator/ManipulatorAction.h>
 
 class Teleop
@@ -76,22 +77,33 @@ void Teleop::doHoming(void)
 {
     homing=true;
     homed=false;
+    platform_motion::SelectCommandSource sel;
+    sel.request.source="test";
+    ros::service::call("/select_command_source", sel);
+    std::string savedsource(sel.response.source);
+    sel.request.source="None";
+    ros::service::call("/select_command_source", sel);
+    sel.request.source=savedsource;
     ROS_INFO("Waiting for homing server");
     if(!home_pods.waitForServer(ros::Duration(5.0))) {
         ROS_ERROR("Timeout waiting for homing server");
         homing=false;
+        ros::service::call("/select_command_source", sel);
         return;
     }
     ROS_INFO("Send home goal");
     platform_motion::HomeGoal g;
+    g.home_count = 3;
     home_pods.sendGoal(g);
     if(!home_pods.waitForResult(ros::Duration(60.0))) {
         ROS_ERROR("Timeout waiting for homing");
+        home_pods.cancelGoal();
     } else {
         homed=true;
         ROS_INFO("Homing complete");
     }
     homing=false;
+    ros::service::call("/select_command_source", sel);
 }
 
 void Teleop::doGrab(void)
