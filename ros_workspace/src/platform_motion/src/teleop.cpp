@@ -42,7 +42,7 @@ Teleop::Teleop():
   linear_y(0),
   angular_z(2),
   button_homing(2),
-  button_grab(4),
+  button_grab(3),
   l_scale_(2),
   l_exp_(2),
   a_scale_(M_PI),
@@ -105,6 +105,7 @@ void Teleop::doGrab(void)
     manipulator::ManipulatorGoal grab;
     grab.type = grab.GRAB;
     grab.grip_torque=0.7;
+    grab.target_bin=2;
     manipulate.sendGoal(grab);
     if(!manipulate.waitForResult(ros::Duration(60.0))) {
         ROS_ERROR("Timeout waiting for grab");
