@@ -142,7 +142,7 @@ void Teleop::doServo(void)
     sel.request.source="test";
     ros::service::call("/select_command_source", sel);
     std::string savedsource(sel.response.source);
-    sel.request.source="None";
+    sel.request.source="Servo";
     ros::service::call("/select_command_source", sel);
     sel.request.source=savedsource;
     ROS_INFO("Waiting for servo server");
