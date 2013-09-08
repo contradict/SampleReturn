@@ -48,10 +48,7 @@ class CarouselIndexer(object):
                 rospy.logwarn( "server active, joystick ignored" )
                 return
             if self.joy_goal is None:
-               self.joy_goal = self.current_index 
-            if self.current_index != self.joy_goal:
-                rospy.loginfo( "waiting to arrive at joy goal %d: %d", self.joy_goal, self.current_index)
-                return
+               self.joy_goal = self.current_index
             if(joy_msg.axes[4]<0):
                 rospy.loginfo( "increment" )
                 index = self.joy_goal + 1
@@ -64,21 +61,23 @@ class CarouselIndexer(object):
                 index %= len(self.carousel_bin_angles)
                 self.joy_goal = index
                 self.send_carousel_position(index)
-        if(joy_msg.buttons[0]):
+        if(joy_msg.axes[5] > 0):
             rospy.loginfo( "enable" )
             try:
                 self.enable_service(True)
+                self.joy_goal = self.current_index
             except rospy.ServiceException, e:
                 rospy.logerr("Unable to enable carousel: %s", e)
-        elif(joy_msg.buttons[3]):
+        elif(joy_msg.axes[5] < 0):
             rospy.loginfo( "disable" )
             try:
                 self.enable_service(False)
             except rospy.ServiceException, e:
                 rospy.logerr("Unable to disable carousel: %s", e)
-        elif(joy_msg.buttons[4]):
+        elif(joy_msg.buttons[8]):
             rospy.loginfo( "home" )
             self.home_client.send_goal(HomeGoal())
+            self.joy_goal = 0
 
     def jointStateCallback(self, joint_msg):
         if self.carousel_position is None:

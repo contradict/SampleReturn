@@ -20,7 +20,7 @@ import Queue
 class color_name_sample_detection(object):
 
   def __init__(self):
-    rospy.init_node('color_name_sample_detection',log_level=rospy.DEBUG)
+    rospy.init_node('color_name_sample_detection',log_level=rospy.INFO)
     self.monocular_img_sub = rospy.Subscriber('monocular_img',Image, queue_size=1,callback=self.handle_monocular_img, buff_size=60000000)
     self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
     self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
@@ -53,7 +53,7 @@ class color_name_sample_detection(object):
     self.color_mat = scipy.io.loadmat(color_file)
     self.color_names = ['black','blue','brown','gray','green','orange','pink','purple','red','white','yellow']
     #self.sample_names = [None,None,'wood_block','pre_cached',None,'orange_pipe','pink_ball',None,'red_puck','pre_cached','yellow_rock']
-    self.sample_names = [None,'pre_cached',None,'pre_cached',None,None,None,None,None,'pre_cached',None]
+    self.sample_names = [None,'pre_cached',None,'pre_cached',None,None,None,None,None,'pre_cached','pre_cached']
     self.sample_thresh = [None,0.1,0.1,0.1,None,0.1,0.1,None,0.1,0.1,0.1]
 
     self.min_disp = 0.0

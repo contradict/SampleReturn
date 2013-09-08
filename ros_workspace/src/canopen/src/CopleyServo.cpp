@@ -548,8 +548,8 @@ bool CopleyServo::enabled(void)
 void CopleyServo::home(DS301CallbackObject callback)
 {
     home_callback = callback;
-    modeControl(0, CONTROL_NEW_SETPOINT, Homing); 
-    control( CONTROL_NEW_SETPOINT| CONTROL_CHANGE_SET_IMMEDIATE, 0);
+    modeControl(0, CONTROL_NEW_SETPOINT, Homing);
+    control( CONTROL_NEW_SETPOINT, 0);
 }
 
 void CopleyServo::setVelocity(int32_t v)
