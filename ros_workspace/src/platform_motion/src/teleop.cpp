@@ -84,6 +84,7 @@ void Teleop::doHoming(void)
     sel.request.source="None";
     ros::service::call("/select_command_source", sel);
     sel.request.source=savedsource;
+    ros::Duration(0.25).sleep();
     ROS_INFO("Waiting for homing server");
     if(!home_pods.waitForServer(ros::Duration(5.0))) {
         ROS_ERROR("Timeout waiting for homing server");
