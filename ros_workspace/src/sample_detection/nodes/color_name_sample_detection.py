@@ -20,7 +20,7 @@ import Queue
 class color_name_sample_detection(object):
 
   def __init__(self):
-    rospy.init_node('color_name_sample_detection',log_level=rospy.DEBUG)
+    rospy.init_node('color_name_sample_detection',log_level=rospy.INFO)
     self.monocular_img_sub = rospy.Subscriber('monocular_img',Image, queue_size=1,callback=self.handle_monocular_img, buff_size=60000000)
     self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
     self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
