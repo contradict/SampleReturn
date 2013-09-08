@@ -74,7 +74,7 @@ class CarouselIndexer(object):
                 self.enable_service(False)
             except rospy.ServiceException, e:
                 rospy.logerr("Unable to disable carousel: %s", e)
-        elif(joy_msg.buttons[0]):
+        elif(joy_msg.buttons[8]):
             rospy.loginfo( "home" )
             self.home_client.send_goal(HomeGoal())
             self.joy_goal = 0
