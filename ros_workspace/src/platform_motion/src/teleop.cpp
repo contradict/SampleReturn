@@ -42,7 +42,7 @@ Teleop::Teleop():
   linear_x(1),
   linear_y(0),
   angular_z(2),
-  button_homing(2),
+  button_homing(9),
   button_grab(3),
   l_scale_(2),
   l_exp_(2),
