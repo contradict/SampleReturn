@@ -14,7 +14,7 @@ ssh-add ${HOME}/.ssh/robot_rsa
 
 cd ${HOME}/Desktop/SampleReturn
 . /opt/ros/groovy/setup.bash
-. ros_workspace/devel/setup.bash
+. ros_workspace/install/setup.bash
 ROS_PACKAGE_PATH=/opt/ros/phidgets:$ROS_PACKAGE_PATH
 
 export ROSLAUNCH_SSH_UNKNOWN=1
@@ -30,7 +30,7 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
     sleep 1
 
     pidname=`basename ${LAUNCH_FILE} .launch`.pid
-    roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} kind:=devel &
+    roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
     roslaunch --pid=${HOME}/.ros/logging.pid samplereturn logging.launch &
 fi
 MACHINE=`hostname`
