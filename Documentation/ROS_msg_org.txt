@@ -1,0 +1,38 @@
+/cameras
+  /nav_left
+    /left/...
+    /rigt/...
+  /nav_right
+    /left/...
+    /right/...
+  /manipulator
+    /left/...
+    /right/...
+  /search
+
+/motion
+  /manipulator/...
+  /carousel
+    /select_bin/...
+    /home
+  /wheel_pods
+    /home
+    /servo_command
+    /servo_word
+
+/io
+  /gpio_read
+  /gpio_write
+  /joy
+  /audio/...
+  /pause_state
+  /battery_voltage
+  /imu_data
+
+/processes
+  /odometry
+  /visual_odometry
+  /wheel_odometry
+  /planner_command
+
+/tf
