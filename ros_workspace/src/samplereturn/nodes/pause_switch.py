@@ -24,20 +24,19 @@ class PauseSwitch(object):
         self.carousel_servo_status = None
 
         rospy.loginfo('Pause_switch waiting for servo controller enable service...')
-        rospy.wait_for_service('/enable_wheel_pods')
-        rospy.wait_for_service('/enable_carousel')
-        self.enable_wheelpods = rospy.ServiceProxy('/enable_wheel_pods', Enable)
-        self.enable_carousel = rospy.ServiceProxy('/enable_carousel', Enable)
+        rospy.wait_for_service('enable_wheel_pods')
+        rospy.wait_for_service('enable_carousel')
+        self.enable_wheelpods = rospy.ServiceProxy('enable_wheel_pods', Enable)
+        self.enable_carousel = rospy.ServiceProxy('enable_carousel', Enable)
 
-        rospy.loginfo('Pause_switch waiting for manipulator/pause service...')
-        rospy.wait_for_service('/manipulator/pause')
-        self.manipulator_pause_service = rospy.ServiceProxy('/manipulator/pause', Enable)
-
-        rospy.Subscriber("/gpio_read", GPIO, self.gpio)
-        rospy.Subscriber("/status_word", ServoStatus, self.status_word)
+        rospy.loginfo('Pause_switch waiting for manipulator pause service...')
+        rospy.wait_for_service('manipulator_pause')
+        self.manipulator_pause_service = rospy.ServiceProxy('manipulator_pause', Enable)
+        rospy.Subscriber("gpio_read", GPIO, self.gpio)
+        rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
 
         self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True)
-        self.audio_pub = rospy.Publisher("/audio/search", SoundRequest)
+        self.audio_pub = rospy.Publisher("audio_search", SoundRequest)
 
         #pullup on pause input, 1->0 is transition edge
         self.pause_bit_state = self.button_mask 
@@ -45,10 +44,13 @@ class PauseSwitch(object):
         ##### CAUTION ####
         # Changed at NASA request, machine should start un paused.
         # Yikes
-        self.paused = False
-        self.pause(False)
+        #self.paused = False
+        #self.pause(False)
         #################
-
+        # For testing, we will use the start on pause, as below
+        self.paused = True
+        self.pause(True)
+        
     def clear_guard(self, event):
         self.guarded = False
 
