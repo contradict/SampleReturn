@@ -56,9 +56,9 @@ Teleop::Teleop():
   a_exp_(2),
   homing(false),
   homed(false),
-  home_pods("home_wheelpods"),
-  manipulate("/manipulator/manipulator_action"),
-  servo("/visual_servo_action"),
+  home_pods("wheel_pods/home"),
+  manipulate("manipulator/grab_action"),
+  servo("visual_servo_action"),
   servo_active(false),
   vel_x(0),
   vel_y(0),
@@ -87,17 +87,17 @@ void Teleop::doHoming(void)
     homed=false;
     platform_motion::SelectCommandSource sel;
     sel.request.source="test";
-    ros::service::call("/select_command_source", sel);
+    ros::service::call("CAN_select_command_source", sel);
     std::string savedsource(sel.response.source);
     sel.request.source="None";
-    ros::service::call("/select_command_source", sel);
+    ros::service::call("CAN_select_command_source", sel);
     sel.request.source=savedsource;
     ros::Duration(0.25).sleep();
     ROS_INFO("Waiting for homing server");
     if(!home_pods.waitForServer(ros::Duration(5.0))) {
         ROS_ERROR("Timeout waiting for homing server");
         homing=false;
-        ros::service::call("/select_command_source", sel);
+        ros::service::call("CAN_select_command_source", sel);
         return;
     }
     ROS_INFO("Send home goal");
@@ -112,7 +112,7 @@ void Teleop::doHoming(void)
         ROS_INFO("Homing complete");
     }
     homing=false;
-    ros::service::call("/select_command_source", sel);
+    ros::service::call("CAN_select_command_source", sel);
 }
 
 void Teleop::doGrab(void)
@@ -140,15 +140,15 @@ void Teleop::doServo(void)
 {
     platform_motion::SelectCommandSource sel;
     sel.request.source="test";
-    ros::service::call("/select_command_source", sel);
+    ros::service::call("CAN_select_command_source", sel);
     std::string savedsource(sel.response.source);
     sel.request.source="Servo";
-    ros::service::call("/select_command_source", sel);
+    ros::service::call("CAN_select_command_source", sel);
     sel.request.source=savedsource;
     ROS_INFO("Waiting for servo server");
     if(!manipulate.waitForServer(ros::Duration(5.0))) {
         ROS_ERROR("Timeout waiting for servo server");
-        ros::service::call("/select_command_source", sel);
+        ros::service::call("CAN_select_command_source", sel);
         return;
     }
     ROS_INFO("Send servo goal");
@@ -170,7 +170,7 @@ void Teleop::doServo(void)
             break;
         }
     }
-    ros::service::call("/select_command_source", sel);
+    ros::service::call("CAN_select_command_source", sel);
 }
 
 

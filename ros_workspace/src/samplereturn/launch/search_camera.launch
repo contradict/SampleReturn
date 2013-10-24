@@ -2,5 +2,12 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <!-- DSLR Camera Service Server --> 
-    <node machine="search" pkg="photo" type="photo_node" name="photo_node"/>
+    <node machine="search" 
+          pkg="photo" 
+          type="photo_node" 
+          name="photo_node"
+          ns="/cameras/search">
+        <remap from="cam_img" to="image"/>
+        <remap from="cam_info" to="info"/>
+    </node>
 </launch>

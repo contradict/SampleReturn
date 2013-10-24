@@ -12,7 +12,7 @@ class LightController(object):
     _all_off = 7 #bit states for all lights off
      
     def __init__(self):
-        rospy.Subscriber("/pause_state", Bool, self.pause_state_update)
+        rospy.Subscriber("pause_state", Bool, self.pause_state_update)
         self.pub = rospy.Publisher('gpio_write', GPIO)
         self.blink = False
         self.light_state = self._all_on

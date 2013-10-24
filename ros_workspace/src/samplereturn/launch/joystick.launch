@@ -2,20 +2,32 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
       <!-- joy node -->
-      <node machine="navigate" respawn="true" pkg="joy"
-          type="joy_node" name="joy_node" output="screen">
+      <node machine="navigate"
+            respawn="true" 
+            pkg="joy"
+            type="joy_node" 
+            name="joy_node" 
+            output="screen"
+            ns="/io">
           <param name="dev" type="string" value="/dev/input/js0" />
           <param name="deadzone" value="0.05" />
       </node>
 
-      <node machine="navigate" pkg="platform_motion" type="teleop" name="teleop">
+      <node machine="navigate" 
+            pkg="platform_motion" 
+            type="teleop" 
+            name="teleop"
+            ns="/motion">
           <!-- Axes -->
           <param name="axis_linear" value="1" type="int"/>
           <param name="axis_angular" value="0" type="int"/>
           <param name="scale_linear" value="2" type="double"/>
           <param name="scale_angular" value="0.5" type="double"/>
-
-          <remap from="twist" to="/joystick_command"/>
+          <!-- Remaps -->
+          <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
+          <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
+          <remap from="twist" to="joystick_command"/>
+          <remap from="joy" to="/io/joy"/> 
       </node>
 
 </launch>

@@ -12,10 +12,6 @@ from sensor_msgs.msg import CameraInfo
 from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, TunableConstants
 from linemod_detector.msg  import NamedPoint
 
-# TODO
-# Remap the inputs and outputs in the launch file and create better names for the publish and subscription
-# strings here.
-
 def enum(**enums):
 	return type('Enum', (), enums)
 
@@ -61,15 +57,15 @@ class VisualServo:
 		self.goto_state(VisualServoStates.SAFE_REGION)
 		self.reset()
 
-		rospy.Subscriber('/img_point', NamedPoint, self.object_point_callback, None, 1)
-		rospy.Subscriber('/manipulator/left/camera_info', CameraInfo, self.camera_left_info_callback, None, 1)
-		rospy.Subscriber('/manipulator/right/camera_info', CameraInfo, self.camera_right_info_callback, None, 1)
-		rospy.Subscriber('/debug/debug_update_constants', TunableConstants, self.debug_update_constants, None, 1)
-		self._publisher = rospy.Publisher('/servo_command', Twist)
+		rospy.Subscriber('image_point', NamedPoint, self.object_point_callback, None, 1)
+		rospy.Subscriber('left_camera_info', CameraInfo, self.camera_left_info_callback, None, 1)
+		rospy.Subscriber('right_camera_info', CameraInfo, self.camera_right_info_callback, None, 1)
+		rospy.Subscriber('debug_update_constants', TunableConstants, self.debug_update_constants, None, 1)
+		self._publisher = rospy.Publisher('servo_command', Twist)
 
 		self._visual_servo_result = VisualServoResult()
 		self._visual_servo_feedback = VisualServoFeedback()
-		self._action_server = actionlib.SimpleActionServer('visual_servo_action', VisualServoAction, self.run_visual_servo_action, False)
+		self._action_server = actionlib.SimpleActionServer('servo_action', VisualServoAction, self.run_visual_servo_action, False)
 		self._action_server.start()
 
 	def reset(self):

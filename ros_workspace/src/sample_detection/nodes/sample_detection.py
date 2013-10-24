@@ -16,7 +16,7 @@ class sample_detection(object):
 
   def __init__(self):
     rospy.init_node('sample_detection',anonymous=True)
-    self.mono_img_sub = rospy.Subscriber('mono_img',Image, queue_size=1,callback=self.handle_mono_img)
+    self.monocular_img_sub = rospy.Subscriber('monocular_img',Image, queue_size=1,callback=self.handle_monocular_img)
     self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
     self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
     self.disp_sub = rospy.Subscriber('disp',DisparityImage, queue_size=1,callback=self.handle_disp)
@@ -45,7 +45,7 @@ class sample_detection(object):
       self.sample_imgpoints[s] = rospy.Publisher(topic, PointStamped)
       topic = s + '_disparity'
       self.sample_disparity[s] = rospy.Publisher(topic, DisparityImage)
-    self.namedpoints = rospy.Publisher("/namedpoints", NamedPoint)
+    self.namedpoints = rospy.Publisher("named_points", NamedPoint)
 
   def create_point_stamped(self, location):
     msg = PointStamped()
@@ -54,7 +54,7 @@ class sample_detection(object):
     msg.point.y=location[1]
     return msg
 
-  def handle_mono_img(self, Image):
+  def handle_monocular_img(self, Image):
     detections = self.find_samples(Image)
     self.debug_img_pub.publish(self.bridge.cv_to_imgmsg(cv2.cv.fromarray(self.debug_img),'bgr8'))
     for d in detections:

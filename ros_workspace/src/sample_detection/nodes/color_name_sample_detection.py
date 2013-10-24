@@ -22,10 +22,11 @@ class color_name_sample_detection(object):
   def __init__(self):
     rospy.init_node('color_name_sample_detection',log_level=rospy.INFO)
     self.monocular_img_sub = rospy.Subscriber('monocular_img',Image, queue_size=1,callback=self.handle_monocular_img, buff_size=60000000)
-    self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
-    self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
-    self.disp_sub = rospy.Subscriber('disparity',DisparityImage, queue_size=1,callback=self.handle_disp)
     self.cam_info_sub = rospy.Subscriber('cam_info',CameraInfo, queue_size=1, callback=self.handle_info)
+    #I think this node only uses the search camera - JL
+    #self.left_img_sub = rospy.Subscriber('left_img',Image, queue_size=1,callback=self.handle_left_img)
+    #self.right_img_sub = rospy.Subscriber('right_img',Image, queue_size=1,callback=self.handle_right_img)
+    #self.disp_sub = rospy.Subscriber('disp',DisparityImage, queue_size=1,callback=self.handle_disp)
 
     self.bridge = CvBridge()
     self.tf = TransformListener()

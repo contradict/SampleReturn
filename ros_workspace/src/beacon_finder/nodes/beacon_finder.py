@@ -17,8 +17,8 @@ class BeaconFinder:
 	def __init__(self):
 		self._image_subscriber = rospy.Subscriber('camera_image', Image, self.image_callback, None, 8)
 		self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo, self.camera_info_callback, None, 8)
-		self._beacon_pose_publisher = rospy.Publisher('/beacon_pose', PoseStamped)
-		self._beacon_debug_image = rospy.Publisher('/beacon_debug_img', Image)
+		self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseStamped)
+		self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
 		self._cv_bridge = CvBridge()
 
 		# Get params

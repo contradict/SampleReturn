@@ -5,14 +5,19 @@
     <node
       pkg="sample_detection"
       type="color_name_sample_detection.py"
-      name="color_name_sample_detection"
+      name="color_name_sample_detection_manipulator"
       machine="search"
-      ns="manipulator">
+      ns="/processes/sample_detection/manipulator">
       <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
       <param name="delta" type="double" value="25.0"/>
       <param name="max_area" type="double" value="40000.0"/>
       <param name="min_area" type="double" value="10000.0"/>
-      <remap from="left_img" to="/manipulator/left/image_color"/>
-      <remap from="cam_info" to="/manipulator/left/camera_info"/>
-    </node>
+      <remap from="left_img" to="/cameras/manipulator/left/image_color"/>
+      <remap from="cam_info" to="/cameras/manipulator/left/camera_info"/>
+      <!--
+      <remap from="right_img" to="/cameras/manipulator/right/image_color"/>
+      <remap from="monocular_img" to="/cameras/manipulator/left/image_rect_color"/>
+      <remap from="disp" to="/cameras/manipulator/disparity"/>
+      -->
+   </node>
 </launch>

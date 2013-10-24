@@ -11,14 +11,27 @@
   /search
 
 /motion
-  /manipulator/...
+  /manipulator
+    /diagnostics
+    /motor_states/ttyUSB0
+    /arm_joint/...
+    /wrist_joint/...
+    /hand_joint/...
+    /manipulator_action/...
+  /CAN
+    /status_word
+    /select_command_source
   /carousel
     /select_bin/...
     /home
+    /enable
+    /angle
   /wheel_pods
     /home
+    /enable
     /servo_command
     /servo_word
+  /platform_joint_state
 
 /io
   /gpio_read
@@ -28,11 +41,22 @@
   /pause_state
   /battery_voltage
   /imu_data
+  /pause_state
 
 /processes
   /odometry
   /visual_odometry
   /wheel_odometry
   /planner_command
+  /sample_detection
+  /planner
+    /command
+    /move_base
+  /beacon_finder
+    /beacon_pose
+
+/debug
+  /visual_servo
+    /update_constants
 
 /tf

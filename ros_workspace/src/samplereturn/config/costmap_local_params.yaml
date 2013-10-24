@@ -9,7 +9,7 @@ local_costmap:
     observation_sources: point_cloud_sensor
     point_cloud_sensor: {
         data_type: PointCloud2,
-        topic: /navigation/points2,
+        topic: /cameras/navigation/points2,
         observation_persistence: 0.0,
         expected_update_rate: 0.1,
         marking: true, clearing: true,

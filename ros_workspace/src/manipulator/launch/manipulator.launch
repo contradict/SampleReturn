@@ -3,60 +3,66 @@
 <!-- -*- mode: XML -*- -->
 
 <launch>
-  <!-- load up the manager. this thing gets the actual serial port -->
-  <node
-    machine="search"
-    name="dynamixel_manager"
-    pkg="dynamixel_controllers"
-    type="controller_manager.py"
-    output="log">
-    <rosparam>
-      namespace: dxl_manager
-      serial_ports:
-        manipulator_port:
-          port_name: "/dev/ttyUSB0"
-          baud_rate: 200000
-          min_motor_id: 10
-          max_motor_id: 12
-          update_rate: 10
-    </rosparam>
-  </node>
+    <!-- Remaps - apply to all nodes in this launch -->  
+    <remap from="select_carousel_bin" to="/motion/carousel/select_bin"/>
+  
+    <!-- load up the manager. this thing gets the actual serial port -->
+    <node name="dynamixel_manager"
+          machine="search"
+          pkg="dynamixel_controllers"
+          ns="/motion/manipulator"
+          type="controller_manager.py"
+          output="log">
+        <rosparam>
+            namespace: dynamixel_manager  
+            serial_ports:
+                ttyUSB0:
+                    port_name: "/dev/ttyUSB0"
+                    baud_rate: 200000
+                    min_motor_id: 10
+                    max_motor_id: 12
+                    update_rate: 10
+        </rosparam>
+    </node>
 
-  <!-- load the yaml file that defines which motor is which and what kind
-       of controller they each get -->
-  <rosparam file="$(find manipulator)/config/manipulator.yaml" command="load"/>
+    <!-- load yaml file that defines motor type and controller -->
+    <rosparam file="$(find manipulator)/config/manipulator.yaml" 
+              ns="/motion/manipulator"
+              command="load"
+    />
 
-  <!-- start up the joint controllers! -->
-  <node
-    machine="search"
-    name="dynamixel_controller_spawner"
-    pkg="dynamixel_controllers"
-    type="controller_spawner.py"
-    args="--manager=dxl_manager --port=manipulator_port --type=simple manipulator/arm_joint manipulator/wrist_joint manipulator/hand_joint"
-    output="log"
-  />
+    <!-- start up the joint controllers! -->
+    <node name="dynamixel_controller_spawner"
+          machine="search"
+          pkg="dynamixel_controllers"
+          ns="/motion/manipulator"
+          type="controller_spawner.py"
+          args="--manager=dynamixel_manager --port=ttyUSB0 --type=simple arm_joint wrist_joint hand_joint"
+          output="log">
+    </node>
 
-  <!-- now the scary part, the manipulator node! -->
-  <node
-    machine="search"
-    name="manipulator"
-    pkg="manipulator"
-    ns="manipulator"
-    type="manipulator_node.py"
-    output="log"
-  >
-    <rosparam>
-      arm_down_velocity: -1.0  
-      arm_down_torque: 0.4
-      arm_down_standoff: 0.05
+    <!-- now the scary part, the manipulator node! -->
+    <node name="manipulator"
+          machine="search"
+          pkg="manipulator"
+          ns="/motion/manipulator"
+          type="manipulator_node.py"
+          output="log">
+        <rosparam>
+            arm_down_velocity: -1.0  
+            arm_down_torque: 0.4
+            arm_down_standoff: 0.05
 
-      arm_up_velocity: 1.0
-      arm_up_torque: 0.6
-      arm_up_standoff: 0.02
+            arm_up_velocity: 1.0
+            arm_up_torque: 0.6
+            arm_up_standoff: 0.02
         
-      hand_open_position: 2.7
+            hand_open_position: 2.7
 
-      wrist_zero_position: 1.82
-    </rosparam>
-  </node>
+            wrist_zero_position: 1.82
+        </rosparam>
+    
+        <remap from="select_carousel_bin" to="/motion/carousel/select_bin"/>
+    
+    </node>
 </launch>

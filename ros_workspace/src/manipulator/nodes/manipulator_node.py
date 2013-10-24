@@ -58,7 +58,7 @@ class ManipulatorStateMachine(object):
     rospy.loginfo('Waiting for manipulator/hand_joint services...')
     rospy.wait_for_service('hand_joint/go_to_position')
   
-    self.carousel_client = actionlib.SimpleActionClient('/carousel/select_carousel_bin', SelectCarouselBinAction)    
+    self.carousel_client = actionlib.SimpleActionClient('select_carousel_bin', SelectCarouselBinAction)    
     
     # make service proxies important services
     
@@ -69,7 +69,8 @@ class ManipulatorStateMachine(object):
     self.wrist_pause = rospy.ServiceProxy('wrist_joint/pause', Enable)
     self.hand_pause = rospy.ServiceProxy('hand_joint/pause', Enable)
             
-    #actions and services will be started after state machine declaration
+    #IMPORTANT - actions and services (including pause) will be
+    #started after state machine declaration
     
     #create the state machine!
     self.sm = smach.StateMachine(
@@ -155,7 +156,7 @@ class ManipulatorStateMachine(object):
         
       #carousel bin is acquired from datastore via callback method
       smach.StateMachine.add('GET_BIN',
-          smach_ros.SimpleActionState('/carousel/select_carousel_bin',
+          smach_ros.SimpleActionState('select_carousel_bin',
           SelectCarouselBinAction,
           goal_cb=get_carousel_bin_cb,
           input_keys = ['target_bin']),
@@ -178,7 +179,7 @@ class ManipulatorStateMachine(object):
       carousel_clear_bin = SelectCarouselBinGoal()
       carousel_clear_bin.bin_index = 0
       smach.StateMachine.add('CLEAR_CAROUSEL',
-          smach_ros.SimpleActionState('/carousel/select_carousel_bin',
+          smach_ros.SimpleActionState('select_carousel_bin',
           SelectCarouselBinAction,
           goal=carousel_clear_bin,
           output_keys=['action_result']),
@@ -229,7 +230,7 @@ class ManipulatorStateMachine(object):
 
     #now that the state machine is fully defined, make the action server wrapper
     manipulator_action_server = smach_ros.ActionServerWrapper(
-        'manipulator_action', ManipulatorAction,
+        'grab_action', ManipulatorAction,
         wrapped_container = self.sm,
         succeeded_outcomes = ['success'],
         aborted_outcomes = ['aborted'],
