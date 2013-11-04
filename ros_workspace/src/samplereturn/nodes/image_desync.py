@@ -4,6 +4,58 @@ from std_msgs.msg import Float64, String
 from sensor_msgs.msg import CameraInfo
 import rospy
 import rosnode
+import os
+
+def get_argv(pid):
+    try:
+        cmdl = open("/proc/%d/cmdline"%pid).read()
+    except Exception,e:
+        return []
+    return cmdl.split("\x00")
+
+def get_envvar(pid, name):
+    try:
+        env = open("/proc/%d/environ"%pid).read()
+    except:
+        return None
+    for envvar in env.split("\x00"):
+        var,val = envvar.split("=")
+        if var == name:
+            return val
+    return None
+
+def get_rosparam(argv, pname):
+    for arg in argv:
+        if ":=" in arg:
+            var,val = arg.split(":=")
+            if var == pname:
+                return val
+    return None
+
+def kill_nodelet_manager(managername):
+    stdin, stdout = os.popen2(['pidof', 'nodelet'])
+    pid_str = stdout.read()
+    pids = [int(s) for s in pid_str.split()]
+    for pid in pids:
+        print pid
+        argv = get_argv(pid)
+        if len(argv)<2:
+            continue
+        if argv[1] != "manager":
+            continue
+        name=get_rosparam(argv[2:], "__name")
+        if name is None:
+            continue
+        ns=get_envvar(pid, "ROS_NAMESPACE")
+        if ns is None:
+            testname="/%s"%name
+        else:
+            testname="%s/%s"%(ns,name)
+        if testname==managername:
+            os.system('kill -9 %d'%pid)
+            return True
+    return False
+
 
 class image_desync(object):
     def __init__(self):
@@ -79,12 +131,8 @@ class image_desync(object):
     def restart_manager(self):
         self.desync_count = 0
         # node must be marked respawn in launch file,
-        #rosnode.kill_nodes([self.manager_node_name])
-        stdin, stdout = os.popen2(['pidof', 'nodelet'])
-        pid_str = stdout.read()
-        pids = [int(x) for s in pid_str.split()]
-        for pid in pids:
-            os.system('kill -9 %d'%pid)
+        if not kill_nodelet_manager(self.manager_node_name):
+            rospy.logerr("Unable to kill manager %s", self.manager_node_name)
         if self.sync_wait_timer is None:
             self.sync_wait_timer = rospy.Timer(rospy.Duration(self.sync_wait),
                         self.sync_wait_timeout, oneshot=True)

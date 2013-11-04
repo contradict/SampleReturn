@@ -78,7 +78,7 @@
               pkg="samplereturn"
               type="image_desync.py"
               ns="/cameras/manipulator">
-            <param name="manager_node_name" type="string" value="manager"/>
+            <param name="manager_node_name" type="string" value="/cameras/manipulator/manager"/>
             <param name="sync_wait" type="double" value="30"/>
         </node>
     </group>
