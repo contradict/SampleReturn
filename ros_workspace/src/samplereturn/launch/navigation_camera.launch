@@ -3,174 +3,154 @@
 <launch>
     <!-- Navigation Nodelet Host process -->
     <arg name="run_cameras" default="true"/>
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="manager"
-        args="manager"
-        ns="/navigation"
-        output="log"
-        respawn="true"
-        />
+    
+    <node name="manager"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="manager"
+          ns="/cameras/navigation"
+          output="log"
+          respawn="true">
+    </node>
     <!-- IEEE1394 camera driver -->
     <group if="$(arg run_cameras)">
-    <node
-         machine="navigate"
-         pkg="nodelet"
-         type="nodelet"
-         name="left"
-         args="load camera1394/driver manager"
-         ns="/navigation"
-         respawn="true"
-         >
+        <node name="left"
+              machine="navigate"
+              pkg="nodelet"
+              type="nodelet"
+              args="load camera1394/driver manager"
+              ns="/cameras/navigation"
+              respawn="true">
+            <param name="guid" type="string" value="00b09d0100bb69f3"/>
+            <param name="video_mode" value="640x480_mono8"/>
+            <param name="frame_id" value="navigation_left_camera"/>
+            <param name="frame_rate" value="30"/>
+            <param name="bayer_pattern" value="rggb"/>
+            <param name="auto_exposure" type="int" value="2"/>
+            <!--
+            <param name="auto_gain" type="int" value="2"/>
+            <param name="auto_shutter" type="int" value="3"/>
+            <param name="shutter" type="double" value="6.0"/>
+            <param name="gain" type="double" value="17.0"/>
+            <param name="brightness" type="double" value="176.0"/>
+            <param name="white_balance_BU" type="double" value="520.0"/>
+            <param name="white_balance_RV" type="double" value="512.0"/>
+            -->
+            <param name="camera_info_url"
+                   type="string"
+                   value="file://$(find samplereturn)/calibration/ffmv-left.yaml" />
+            <remap from="camera" to="left" />
+        </node>
+        <node name="right"
+              machine="navigate"
+              pkg="nodelet"
+              type="nodelet"
+              args="load camera1394/driver manager"
+              ns="/cameras/navigation"
+              respawn="true">
 
-        <param name="guid" type="string" value="00b09d0100bb69f3"/>
-        <param name="video_mode" value="640x480_mono8"/>
-        <param name="frame_id" value="navigation_left_camera"/>
-        <param name="frame_rate" value="30"/>
-        <param name="bayer_pattern" value="rggb"/>
-        <param name="auto_exposure" type="int" value="2"/>
-        <!--
-        <param name="auto_gain" type="int" value="2"/>
-        <param name="auto_shutter" type="int" value="3"/>
-        <param name="shutter" type="double" value="6.0"/>
-        <param name="gain" type="double" value="17.0"/>
-        <param name="brightness" type="double" value="176.0"/>
-        <param name="white_balance_BU" type="double" value="520.0"/>
-        <param name="white_balance_RV" type="double" value="512.0"/>
-        -->
-        <param name="camera_info_url"
-               type="string"
-               value="file://$(find samplereturn)/calibration/ffmv-left.yaml" />
-        <remap from="camera" to="left" />
-    </node>
-    <node
-         machine="navigate"
-         pkg="nodelet"
-         type="nodelet"
-         name="right"
-         args="load camera1394/driver manager"
-         ns="/navigation"
-         respawn="true"
-         >
+            <param name="guid" type="string" value="00b09d0100a85719"/>
+            <param name="video_mode" value="640x480_mono8"/>
+            <param name="frame_id" value="navigation_left_camera"/>
+            <param name="frame_rate" value="30"/>
+            <param name="bayer_pattern" value="rggb"/>
+            <param name="auto_exposure" type="int" value="2"/>
+            <!--
+            <param name="auto_gain" type="int" value="3"/>
+            <param name="auto_shutter" type="int" value="3"/>
+            <param name="shutter" type="double" value="6.0"/>
+            <param name="gain" type="double" value="17.0"/>
+            <param name="brightness" type="double" value="176.0"/>
+            <param name="white_balance_BU" type="double" value="520.0"/>
+            <param name="white_balance_RV" type="double" value="512.0"/>
+            -->
+            <param name="camera_info_url"
+                   type="string"
+                   value="file://$(find samplereturn)/calibration/ffmv-right.yaml" />
+            <remap from="camera" to="right" />
+        </node>
 
-        <param name="guid" type="string" value="00b09d0100a85719"/>
-        <param name="video_mode" value="640x480_mono8"/>
-        <param name="frame_id" value="navigation_left_camera"/>
-        <param name="frame_rate" value="30"/>
-        <param name="bayer_pattern" value="rggb"/>
-        <param name="auto_exposure" type="int" value="2"/>
-        <!--
-        <param name="auto_gain" type="int" value="3"/>
-        <param name="auto_shutter" type="int" value="3"/>
-        <param name="shutter" type="double" value="6.0"/>
-        <param name="gain" type="double" value="17.0"/>
-        <param name="brightness" type="double" value="176.0"/>
-        <param name="white_balance_BU" type="double" value="520.0"/>
-        <param name="white_balance_RV" type="double" value="512.0"/>
-        -->
-        <param name="camera_info_url"
-               type="string"
-               value="file://$(find samplereturn)/calibration/ffmv-right.yaml" />
-        <remap from="camera" to="right" />
-    </node>
-
-    <!-- emit synchronization error -->
-    <node
-        machine="navigate"
-        pkg="samplereturn"
-        type="image_desync.py"
-        name="image_desync"
-        ns="/navigation">
-        <param name="manager_node_name" type="string" value="/navigation/manager"/>
-        <param name="sync_wait" type="double" value="30"/>
-    </node>
+        <!-- emit synchronization error -->
+        <node name="image_desync"
+              machine="navigate"
+              pkg="samplereturn"
+              type="image_desync.py"
+              ns="/cameras/navigation">
+            <param name="manager_node_name" type="string" value="manager"/>
+            <param name="sync_wait" type="double" value="30"/>
+        </node>
     </group>
 
     <!-- Debayer -->
-    <node
+    <node name="debayer"
           machine="navigate"
           pkg="nodelet"
           type="nodelet"
-          name="debayer"
-          args="load image_proc/debayer /navigation/manager"
-          ns="/navigation/left"
-          respawn="true"
-          >
+          args="load image_proc/debayer /cameras/navigation/manager"
+          ns="/cameras/navigation/left"
+          respawn="true">
     </node>
-    <node
+    <node name="debayer"
           machine="navigate"
           pkg="nodelet"
           type="nodelet"
-          name="debayer"
-          args="load image_proc/debayer /navigation/manager"
-          ns="/navigation/right"
-          respawn="true"
-          >
-      </node>
+          args="load image_proc/debayer /cameras/navigation/manager"
+          ns="/cameras/navigation/right"
+          respawn="true">
+    </node>
 
     <!-- Rectify images -->
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="rect"
-        args="load image_proc/rectify /navigation/manager"
-        ns="/navigation/left"
-        output="log"
-        respawn="true"
-        >
+    <node name="rect"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load image_proc/rectify /cameras/navigation/manager"
+          ns="/cameras/navigation/left"
+          output="log"
+          respawn="true">
     </node>
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="rect_color"
-        args="load image_proc/rectify /navigation/manager"
-        ns="/navigation/left"
-        output="log"
-        respawn="true"
-        >
+    <node name="rect_color"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load image_proc/rectify /cameras/navigation/manager"
+          ns="/cameras/navigation/left"
+          output="log"
+          respawn="true">
         <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
     </node>
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="rect"
-        args="load image_proc/rectify /navigation/manager"
-        ns="/navigation/right"
-        output="log"
-        respawn="true"
-        >
+    <node name="rect"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load image_proc/rectify /cameras/navigation/manager"
+          ns="/cameras/navigation/right"
+          output="log"
+          respawn="true">
     </node>
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="rect_color"
-        args="load image_proc/rectify /navigation/manager"
-        ns="/navigation/right"
-        output="log"
-        respawn="true"
-        >
+    <node name="rect_color"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load image_proc/rectify /cameras/navigation/manager"
+          ns="/cameras/navigation/right"
+          output="log"
+          respawn="true">
         <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
     </node>
  
     <!-- Compute Stereo -->
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="stereo_image_disparity"
-        args="load stereo_image_proc/disparity manager"
-        ns="/navigation"
-        output="log"
-        respawn="true"
-        >
+    <node name="stereo_image_disparity"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load stereo_image_proc/disparity manager"
+          ns="/cameras/navigation"
+          output="log"
+          respawn="true">
         <param name="correlation_window_size" type="int" value="17"/>
         <param name="min_disparity" type="int" value="0"/>
         <param name="disparity_range" type="int" value="128"/>
@@ -180,16 +160,14 @@
     </node>
 
     <!-- Compute Stereo Point Cloud -->
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="stereo_image_points"
-        args="load stereo_image_proc/point_cloud2 /navigation/manager"
-        ns="/navigation"
-        output="log"
-        respawn="true"
-        >
+    <node name="stereo_image_points"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load stereo_image_proc/point_cloud2 manager"
+          ns="/cameras/navigation"
+          output="log"
+          respawn="true">
         <param name="approximate_sync" type="bool" value="true"/>
     </node>
 

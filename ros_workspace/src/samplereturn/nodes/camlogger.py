@@ -47,7 +47,7 @@ def camlogger():
   pub = rospy.Publisher(topic,Image)
   info_pub = rospy.Publisher(info_topic,CameraInfo)
 
-  rospy.Subscriber('/pause_state', std_msg.Bool, pause)
+  rospy.Subscriber('pause_state', std_msg.Bool, pause)
 
   cam_info = CameraInfo()
   calib_file = rospy.get_param('~calib_file', None)

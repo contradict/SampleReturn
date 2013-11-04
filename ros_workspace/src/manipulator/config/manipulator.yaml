@@ -1,4 +1,4 @@
-manipulator/arm_joint:
+arm_joint:
   controller:
     package: manipulator  
     module: manipulator_joint_controller
@@ -11,7 +11,7 @@ manipulator/arm_joint:
     cw_limit: 0
     ccw_limit: 6.28165
 
-manipulator/wrist_joint:
+wrist_joint:
   controller:
     package: manipulator
     module: manipulator_joint_controller
@@ -24,7 +24,7 @@ manipulator/wrist_joint:
     cw_limit: 0.2
     ccw_limit: 3.44
 
-manipulator/hand_joint:
+hand_joint:
   controller:
     package: manipulator
     module: manipulator_joint_controller

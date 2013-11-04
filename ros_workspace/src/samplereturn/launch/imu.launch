@@ -2,22 +2,22 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <env name="ROSCONSOLE_CONFIG_FILE" 
-        value="$(find samplereturn)/config/custom_rosconsole.conf"/>
-    <node
-        machine="navigate"
-        respawn="true"
-        pkg="phidgets"
-        type="manager"
-        name="phidget_manager"
-        output="log"
-        >
+         value="$(find samplereturn)/config/custom_rosconsole.conf"/>
+     
+    <node name="phidget_manager"
+          machine="navigate"
+          respawn="true"
+          pkg="phidgets"
+          type="manager"
+          output="log"
+          ns="/io">
     </node>
 
-    <node
-        machine="navigate"
-        pkg="phidgets"
-        type="spatial"
-        name="raw_imu">
+    <node name="raw_imu"
+          machine="navigate"
+          pkg="phidgets"
+          type="spatial"
+          ns="/io">
     </node>
 
 </launch>

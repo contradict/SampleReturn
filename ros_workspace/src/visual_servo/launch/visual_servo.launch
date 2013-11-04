@@ -8,7 +8,8 @@
 		name="visual_servo"
 		pkg="visual_servo"
 		type="visual_servo_node.py"
-		output="log">
+        output="log"
+        ns="/processes/visual_servo">
 		<param name='safe_region_percentage' type='double' value='0.20'/>
 		<param name='target_window_halfwidth_rotate' type='double' value='6'/>
 		<param name='target_window_halfwidth_move_forward' type='double' value='6'/>
@@ -34,6 +35,11 @@
         <param name='max_angular_velocity' type='double' value='0.25'/>
         <param name='target_name' type='string' value='pre_cached'/>
 
-        <remap from="/img_point" to="/manipulator/named_img_point"/>
-	</node>
+        <remap from="image_point" to="processes/sample_detection/manipulator/named_point"/>
+        <remap from="left_camera_info" to="/cameras/manipulator/left/camera_info"/>
+        <remap from="right_camera_info" to="/cameras/manipulator/right/camera_info"/>
+
+        <remap from="debug_update_constants" to="/debug/visual_servo/update_constants"/>
+  
+  </node>
 </launch>

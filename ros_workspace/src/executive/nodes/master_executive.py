@@ -36,7 +36,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
     gpio = teer_ros.ConditionVariable(None)
     navigation_camera_status = teer_ros.ConditionVariable(None)
     manipulator_camera_status = teer_ros.ConditionVariable(None)
-    pause_state = teer_ros.ConditionVariable(std_msg.Bool(False))
+    pause_state = teer_ros.ConditionVariable(None)
+    #CAUTION - line below for competition, starts unpaused
+    #pause_state = teer_ros.ConditionVariable(std_msg.Bool(False))
     man_sample = teer_ros.ConditionVariable(None)
     search_sample = teer_ros.ConditionVariable(None)
     beacon_pose = teer_ros.ConditionVariable(None)
@@ -66,47 +68,55 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         self.wait_for_cameras = rospy.get_param("~wait_for_cameras", True)
 
         # subscribe to interesting topics
-        rospy.Subscriber("/gpio_read", platform_msg.GPIO, self.gpio_update)
-        rospy.Subscriber("/navigation/camera_status", std_msg.String,
+        rospy.Subscriber("gpio_read", platform_msg.GPIO, self.gpio_update)
+        rospy.Subscriber("navigation_camera_status", std_msg.String,
                 self.navigation_status_update)
-        rospy.Subscriber("/manipulator/camera_status", std_msg.String,
+        rospy.Subscriber("manipulator_camera_status", std_msg.String,
                 self.manipulator_status_update)
-        rospy.Subscriber("/pause_state", std_msg.Bool,
+        rospy.Subscriber("pause_state", std_msg.Bool,
                 self.pause_state_update)
         rospy.Subscriber("search_point",
                 linemod_msg.NamedPoint,
                 self.sample_detection_search_update)
-        rospy.Subscriber("manipulator_point", linemod_msg.NamedPoint,
+        rospy.Subscriber("manipulator_detection_point", linemod_msg.NamedPoint,
                 self.sample_detection_man_update)
-        rospy.Subscriber("/beacon_pose", geometry_msg.PoseStamped,
+        rospy.Subscriber("beacon_pose", geometry_msg.PoseStamped,
                 self.beacon_update)
 
         self.listener = tf.TransformListener()
 
         # create publishers
-        self.navigation_audio=rospy.Publisher("/audio/navigate", SoundRequest)
-        self.joystick_command=rospy.Publisher("/joystick_command", geometry_msg.Twist)
-        self.planner_command=rospy.Publisher("/planner_command", geometry_msg.Twist)
-        self.servo_command=rospy.Publisher("/servo_command", geometry_msg.Twist)
+        self.navigation_audio=rospy.Publisher("audio_navigate", SoundRequest)
+        self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
+        self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
+        self.servo_command=rospy.Publisher("CAN_servo_command", geometry_msg.Twist)
 
-        # create serivce proxies
+        # create service proxies
         self.platform_motion_input_select = \
-                rospy.ServiceProxy("/select_command_source",
-                        platform_srv.SelectCommandSource)
+                rospy.ServiceProxy("CAN_select_command_source",
+                platform_srv.SelectCommandSource)
 
-        self.set_planner_parameters=rospy.ServiceProxy('/planner/mover/DWAPlannerROS/set_parameters', dynsrv.Reconfigure)
+        self.set_planner_parameters = \
+                rospy.ServiceProxy('DWAPlanner_set_parameters',
+                dynsrv.Reconfigure)
 
         # action clients
-        self.home_wheelpods = actionlib.SimpleActionClient("/home_wheelpods",
-                                                           platform_msg.HomeAction)
-        self.home_carousel = actionlib.SimpleActionClient("/home_carousel",
-                                                          platform_msg.HomeAction)
-        self.manipulator = actionlib.SimpleActionClient('/manipulator/manipulator_action',
-                                                        manipulator_msg.ManipulatorAction)
+        self.home_wheelpods = \
+                actionlib.SimpleActionClient("home_wheel_pods",
+                platform_msg.HomeAction)
+        
+        self.home_carousel = \
+                actionlib.SimpleActionClient("home_carousel",
+                platform_msg.HomeAction)
+   
+        self.manipulator = \
+                actionlib.SimpleActionClient('manipulator_action',
+                manipulator_msg.ManipulatorAction)
 
-        self.move_base = actionlib.SimpleActionClient("/planner/move_base",
+        self.move_base = actionlib.SimpleActionClient("planner_move_base",
                 move_base_msg.MoveBaseAction)
-        self.servo = actionlib.SimpleActionClient("/visual_servo_action",
+        
+        self.servo = actionlib.SimpleActionClient("visual_servo_action",
                 visual_servo_msg.VisualServoAction)
 
         self.drive_home_task = None
@@ -120,10 +130,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             self.gpio = gpio
 
     def navigation_status_update(self, status):
+        #rospy.loginfo("Executive received nav camera status")
         if self.navigation_camera_status != status:
             self.navigation_camera_status = status
 
     def manipulator_status_update(self, status):
+        #rospy.loginfo("Executive received man camera status")
         if self.manipulator_camera_status != status:
             self.manipulator_camera_status = status
 
@@ -188,10 +200,15 @@ class SampleReturnScheduler(teer_ros.Scheduler):
             if not camera_ready():
                 self.announce("Waiting for cameras")
                 yield teer_ros.WaitCondition(camera_ready)
+        
         enabled = lambda: self.pause_state is not None and \
                           not self.pause_state.data
-
+        
+        service_down_warn = 0    
         while True:
+            service_down_warn += 1
+            if ((service_down_warn % 80) == 0):
+                self.announce("Homing services not started")
             if self.home_wheelpods.wait_for_server(rospy.Duration(1e-6))\
             and self.home_carousel.wait_for_server(rospy.Duration(1e-6))\
             and self.manipulator.wait_for_server(rospy.Duration(1e-6)):

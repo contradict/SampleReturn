@@ -38,7 +38,7 @@ namespace platform_motion {
 
 Motion::Motion() :
     param_nh("~"),
-    home_pods_action_server(nh_, "home_wheelpods", false),
+    home_pods_action_server(nh_, "home_wheel_pods", false),
     home_carousel_action_server(nh_, "home_carousel", false),
     command_source(COMMAND_SOURCE_NONE),
     CAN_fd(-1),
@@ -72,13 +72,13 @@ Motion::Motion() :
     enable_carousel_server = nh_.advertiseService("enable_carousel",
             &Motion::enableCarouselCallback, this);
 
-    select_command_server = nh_.advertiseService("select_command_source",
+    select_command_server = nh_.advertiseService("CAN_select_command_source",
             &Motion::selectCommandSourceCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
     joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
-    servo_sub = nh_.subscribe("servo_command", 2, &Motion::servoTwistCallback, this);
+    servo_sub = nh_.subscribe("CAN_servo_command", 2, &Motion::servoTwistCallback, this);
 
-    carousel_sub = nh_.subscribe("carousel", 2, &Motion::carouselCallback,
+    carousel_sub = nh_.subscribe("carousel_angle", 2, &Motion::carouselCallback,
             this);
 
     gpio_sub = nh_.subscribe("gpio_write", 2, &Motion::gpioSubscriptionCallback,
@@ -90,7 +90,7 @@ Motion::Motion() :
 
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
 
-    status_pub = nh_.advertise<ServoStatus>("status_word", 10);
+    status_pub = nh_.advertise<ServoStatus>("CAN_status_word", 10);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));

@@ -10,6 +10,7 @@
         name="camlogger">
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera_lens"/>
+        <remap from="pause_state" to="/io/pause_state"/>
     </node>
     </group>
     <node
@@ -17,35 +18,30 @@
         pkg="sample_detection"
         type="color_name_sample_detection.py"
         name="color_name_sample_detection"
-        ns="sample_detection">
+        ns="/processes/sample_detection">
         <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
         <param name="delta" type="double" value="15.0"/>
         <param name="max_area" type="double" value="80000.0"/>
         <param name="min_area" type="double" value="100.0"/>
         <param name="max_size" type="double" value="0.4"/>
         <param name="min_size" type="double" value="0.05"/>
-        <remap from="monocular_img" to="/cam_img"/>
-        <remap from="cam_info" to="/cam_info"/>
+        <remap from="monocular_img" to="/cameras/search/image"/>
+        <remap from="cam_info" to="/cameras/search/info"/>
     </node>
     <node
         machine="search"
         pkg="sample_detection"
         type="ray_to_points.py"
         name="search_ray_to_points"
-        ns="sample_detection">
-        <!--
-        <remap from="named_point" to="named_point"/>
-        -->
+        ns="/processes/sample_detection">
     </node>
     <node
         machine="search"
         pkg="detection_filter"
         type="detection_filter_node.py"
         name="search_filter"
-        ns="sample_detection"
-        >
+        ns="/processes/sample_detection">
         <remap from="raw_points" to="point"/>
-
         <param name="filter_tolerance" type="double" value="0.50"/>
         <param name="filter_threshold" type="int" value="3"/>
     </node>

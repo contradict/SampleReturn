@@ -2,75 +2,97 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
-  <!-- platform node -->
-  <node
-      machine="navigate"
-      pkg="platform_motion"
-      type="motion_node"
-      name="motion"
-      output="log"
-      >
-      <!--launch-prefix="xterm -e gdb -ex run - -args"-->
-      <param name="port_steering_offset" type="double" value="0.138"/>
-      <param name="starboard_steering_offset" type="double" value="-0.176"/>
-      <param name="stern_steering_offset" type="double" value="0.068"/>
+    <!-- Remaps - apply to all nodes in this launch file -->
+    <remap from="platform_joint_state" to="/motion/platform_joint_state"/>`
+    <remap from="enable_wheel_pods" to="/motion/wheel_pods/enable"/>
+    <remap from="home_wheel_pods" to="/motion/wheel_pods/home"/>
+    <remap from="enable_carousel" to="/motion/carousel/enable"/>
+    <remap from="home_carousel" to="/motion/carousel/home"/>
+    <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
+    <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
+    <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
+    <remap from="manipulator_pause" to="/motion/manipulator/pause"/>
+    <remap from="carousel_angle" to="/motion/carousel/angle"/>
+    <remap from="select_carousel_bin" to="/motion/carousel/select_bin"/>
 
-      <param name="carousel_id" type="int" value="1"/>
-      <param name="starboard_steering_id" type="int" value="2"/>
-      <param name="starboard_wheel_id" type="int" value="3"/>
-      <param name="stern_steering_id" type="int" value="5"/>
-      <param name="stern_wheel_id" type="int" value="4"/>
-      <param name="port_steering_id" type="int" value="6"/>
-      <param name="port_wheel_id" type="int" value="7"/>
+    <remap from="gpio_read" to="/io/gpio_read"/>
+    <remap from="gpio_write" to="/io/gpio_write"/>
+    <remap from="joy" to="/io/joy"/>
+    <remap from="battery_voltage" to="/io/battery_voltage"/>
+    <remap from="audio_search" to="/io/audio/search"/>
 
-      <param name="wheel_diameter" type="double" value="0.314"/>
+    <remap from="planner_command" to="/processes/planner/command"/>
 
-      <param name="status_publish_interval" type="double" value="1.0"/>
-  </node>
+    <!-- platform node -->
+    <node name="motion"
+          machine="navigate"
+          pkg="platform_motion"
+          type="motion_node"
+          output="log"
+          ns="/motion">
+        <!--launch-prefix="xterm -e gdb -ex run - -args"-->
+        <param name="port_steering_offset" type="double" value="0.138"/>
+        <param name="starboard_steering_offset" type="double" value="-0.176"/>
+        <param name="stern_steering_offset" type="double" value="0.068"/>
 
-  <node
-      machine="navigate"
-      pkg="platform_motion"
-      type="EKF_odometry"
-      name="odometry"
-      output="log">
-      <param name="wheel_diameter" type="double" value="0.314"/>
-      <param name="odom_frame_id" type="string" value="/odom"/>
-  </node>
+        <param name="carousel_id" type="int" value="1"/>
+        <param name="starboard_steering_id" type="int" value="2"/>
+        <param name="starboard_wheel_id" type="int" value="3"/>
+        <param name="stern_steering_id" type="int" value="5"/>
+        <param name="stern_wheel_id" type="int" value="4"/>
+        <param name="port_steering_id" type="int" value="6"/>
+        <param name="port_wheel_id" type="int" value="7"/>
 
-  <node 
-      machine="navigate" 
-      pkg="platform_motion" 
-      type="carousel_indexer.py" 
-      name="carousel_indexer"
-      output="log"
-      ns="carousel">
-  </node>
+        <param name="wheel_diameter" type="double" value="0.314"/>
 
+        <param name="status_publish_interval" type="double" value="1.0"/>
+    </node>
 
-  <param name="robot_description"
-      command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+    <node name="odometry"
+          machine="navigate"
+          pkg="platform_motion"
+          type="EKF_odometry"
+          output="log"
+          ns="/motion">
+        <param name="wheel_diameter" type="double" value="0.314"/>
+        <param name="odom_frame_id" type="string" value="/odom"/>
+    </node>
 
-  <node machine="navigate" pkg="robot_state_publisher" type="robot_state_publisher"
-      name="state_publisher" output="log">
-      <remap from="joint_states" to="platform_joint_state"/>
-      <param name="publish_frequency" type="double" value="10"/>
-  </node>
+    <node name="carousel_indexer"
+          machine="navigate" 
+          pkg="platform_motion" 
+          type="carousel_indexer.py" 
+          output="log"
+          ns="/motion/carousel">
+    </node>
 
-  <node
-      machine="navigate"
-      pkg="samplereturn"
-      type="pause_switch.py"
-      name="pause_switch"
-      output="log">
-  </node>
+    <param name="robot_description"
+           command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
 
-  <node
-      machine="navigate"
-      pkg="samplereturn"
-      type="lights.py"
-      name="lights"
-      output="log">
-  </node>
+    <node name="state_publisher"
+          machine="navigate" 
+          pkg="robot_state_publisher" 
+          type="robot_state_publisher"
+          output="log"
+          ns="/motion">
+        <remap from="joint_states" to="platform_joint_state"/>
+        <param name="publish_frequency" type="double" value="10"/>
+    </node>
+
+    <node name="pause_switch"
+          machine="navigate"
+          pkg="samplereturn"
+          type="pause_switch.py"
+          output="log"
+          ns="/io">
+    </node>
+
+    <node name="lights" 
+          machine="navigate"
+          pkg="samplereturn"
+          type="lights.py"
+          output="log"
+          ns="/io">
+    </node>
 
 </launch>

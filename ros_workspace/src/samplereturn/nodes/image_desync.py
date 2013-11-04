@@ -14,7 +14,7 @@ class image_desync(object):
         rospy.Subscriber('right/camera_info', CameraInfo,
                 lambda info, name='right': self.info_callback(name, info))
 
-        self.status_pub = rospy.Publisher('camera_status', String)
+        self.status_pub = rospy.Publisher('status', String)
 
         self.check_interval    = rospy.get_param("~check_interval",     1.0)
         self.max_desync        = rospy.get_param("~max_desync",         0.10)

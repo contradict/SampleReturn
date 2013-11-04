@@ -7,16 +7,43 @@
         pkg="executive"
         type="master_executive.py"
         name="master_executive"
-        output="log">
+        output="log"
+        ns="/processes/executive">
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
         <param name="wait_for_cameras" value="$(arg wait_for_cameras)"/>
 
-        <remap from="manipulator_point" to="/manipulator/named_point"/>
-        <remap from="search_point" to="/sample_detection/point"/>
+        <remap from="navigation_camera_status" to="/cameras/navigation/status"/>
+        <remap from="manipulator_camera_status" to="/cameras/manipulator/status"/>
+        
+        <remap from="home_wheel_pods" to="/motion/wheel_pods/home"/>
+        <remap from="home_carousel" to="/motion/carousel/home"/>
+        <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
+
+        <remap from="manipulator_detection_point" 
+               to="processes/sample_detection/manipulator/named_point"/>
+        <remap from="search_point" to="/processes/sample_detection/point"/>
+        <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
+
+        <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
+        <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
+        <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
+        <remap from="joystick_command" to="/motion/joystick_command"/>
+
+        <remap from="audio_search" to="/io/audio/search"/>
+        <remap from="audio_navigate" to="/io/audio/navigate"/>
+        <remap from="gpio_read" to="/io/gpio_read"/>
+        <remap from="pause_state" to="/io/pause_state"/>
+        
+        <remap from="DWAPlanner_set_parameters"
+               to="/planner/mover/DWAPlannerROS/set_parameters"/>
+        <remap from="planner_command" to="/processes/planner/command"/>        
+        <remap from="planner_move_base" to="/processes/planner/move_base"/>        
+
+        <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
 
         <!--
-        <remap from="img_point" to="filtered_points"/>
+        <remap from="img_point" to="filtered_points"/
         -->
     </node>
 

@@ -13,10 +13,10 @@ class VoltageAnnouncer(object):
         self.servo_id = rospy.get_param("servo_id", 1)
         self.button_mask = rospy.get_param("button_mask", 4)
         self.lowVoltageLimit = rospy.get_param("lowVoltageLimit", 49)
-        rospy.Subscriber("/gpio_read", GPIO, self.gpio)
-        rospy.Subscriber("/battery_voltage", Float64, self.voltageCallBack)
+        rospy.Subscriber("gpio_read", GPIO, self.gpio)
+        rospy.Subscriber("battery_voltage", Float64, self.voltageCallBack)
         self.voltage = None
-        self.audioPub=rospy.Publisher("/audio/navigate", SoundRequest)
+        self.audioPub=rospy.Publisher("audio_navigate", SoundRequest)
         self.whine_guard = False #flag to keep robot from whining about low voltage constantly
         rospy.spin()
 

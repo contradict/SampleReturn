@@ -23,9 +23,9 @@ class CarouselIndexer(object):
         self.carousel_position = None
         self.current_index = None
         self.joy_goal = None
-        self.angle_pub = rospy.Publisher('/carousel', Float64)
-        self.joy_sub = rospy.Subscriber('/joy', Joy, self.joyCallback)
-        self.joint_sub = rospy.Subscriber('/platform_joint_state', JointState,
+        self.angle_pub = rospy.Publisher('carousel_angle', Float64)
+        self.joy_sub = rospy.Subscriber('joy', Joy, self.joyCallback)
+        self.joint_sub = rospy.Subscriber('platform_joint_state', JointState,
                 self.jointStateCallback)
         self.goal_index = None
         self.server = actionlib.SimpleActionServer('select_carousel_bin',
@@ -34,9 +34,9 @@ class CarouselIndexer(object):
         self.server.register_preempt_callback(self.preempt)
         self.server.start()
         rospy.loginfo( "Waiting for carousel enable service" )
-        rospy.wait_for_service("/enable_carousel")
-        self.enable_service = rospy.ServiceProxy('/enable_carousel', Enable)
-        self.home_client = actionlib.SimpleActionClient('/home_carousel',
+        rospy.wait_for_service("enable_carousel")
+        self.enable_service = rospy.ServiceProxy('enable_carousel', Enable)
+        self.home_client = actionlib.SimpleActionClient('home_carousel',
                 HomeAction)
         rospy.loginfo( "Waiting for home server" )
         self.home_client.wait_for_server()
