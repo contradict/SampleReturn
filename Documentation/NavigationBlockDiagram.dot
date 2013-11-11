@@ -1,0 +1,18 @@
+digraph NavigationSystem {
+    EX [label="System Executive"];
+    SP [label="Search Planner"];
+    PP [label="Pursuit Planner"];
+    //WS [label="Waypoint Sequence"];
+    VM [label="Valid Maneuver Planner"];
+    CD [label="CAN Driver"];
+    WP [label="Wheel Pods"];
+
+    EX->SP;
+    EX->PP;
+    //SP->WS;
+    //PP->WS;
+    SP->VM [label="Waypoint Sequence"];
+    PP->VM [label="Waypoint Sequence"];
+    VM->CD [label="Maneuver"];
+    CD->WP [label="Wheel Commands"];
+}
