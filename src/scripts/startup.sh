@@ -13,7 +13,7 @@ eval `ssh-agent`
 ssh-add ${HOME}/.ssh/robot_rsa
 
 cd ${HOME}/Desktop/SampleReturn
-. /opt/ros/groovy/setup.bash
+. /opt/ros/hydro/setup.bash
 . ros_workspace/install/setup.bash
 ROS_PACKAGE_PATH=/opt/ros/phidgets:$ROS_PACKAGE_PATH
 
