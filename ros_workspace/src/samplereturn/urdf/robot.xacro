@@ -190,11 +190,13 @@
 
 
     <!-- instantiate navigation pair -->
-    <xacro:stereo_pair name="navigation" baseline="0.30" />
+    <xacro:stereo_pair name="navigation_port" baseline="0.10" />
+    <xacro:stereo_pair name="navigation_bow" baseline="0.10" />
+    <xacro:stereo_pair name="navigation_starboard" baseline="0.10" />
     <!-- attach navigation pair -->
-    <joint name="navigation_stereo_pair_joint" type="fixed">
+    <joint name="navigation_port_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
-        <child link="navigation_baseline_bar"/>
+        <child link="navigation_port_baseline_bar"/>
         <!-- macro defines camera with lenses facing along +z -->
         <!-- rpy is pi/2 + 16.5 degree down tilt -->
         <!-- height of bottom of deck (origin) is -->
@@ -203,8 +205,35 @@
         suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
         -->
         <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="0.015 0.0 0.990" rpy="-2.00 0 -1.57"/>
+        <origin xyz="0.125 0.160 0.810" rpy="-1.919 0 -0.522"/>
     </joint>
+    <joint name="navigation_bow_stereo_pair_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="navigation_bow_baseline_bar"/>
+        <!-- macro defines camera with lenses facing along +z -->
+        <!-- rpy is pi/2 + 16.5 degree down tilt -->
+        <!-- height of bottom of deck (origin) is -->
+        <!-- suspension_height + yoke_height - yoke_offset + wheel_radius -->
+        <!--
+        suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
+        -->
+        <!-- so camera should be at 1.4 - deck -->
+        <origin xyz="0.190 0.0 0.810" rpy="-1.919 0 -1.57"/>
+    </joint>
+    <joint name="navigation_starboard_stereo_pair_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="navigation_starboard_baseline_bar"/>
+        <!-- macro defines camera with lenses facing along +z -->
+        <!-- rpy is pi/2 + 16.5 degree down tilt -->
+        <!-- height of bottom of deck (origin) is -->
+        <!-- suspension_height + yoke_height - yoke_offset + wheel_radius -->
+        <!--
+        suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
+        -->
+        <!-- so camera should be at 1.4 - deck -->
+        <origin xyz="0.125 -0.160 0.810" rpy="-1.919 0 -2.617"/>
+    </joint>
+
 
     <!-- instantiate manipulator pair -->
     <xacro:stereo_pair name="manipulator" baseline="0.05" />

@@ -40,7 +40,7 @@
                  1508 - 30.5
             -->
             <param name="format7_packet_size" value="752"/>
-            <param name="frame_id" value="navigation_left_camera"/>
+            <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="2"/>
             <param name="camera_info_url"
@@ -71,7 +71,7 @@
                  1508 - 30.5
             -->
             <param name="format7_packet_size" value="752"/>
-            <param name="frame_id" value="navigation_left_camera"/>
+            <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="2"/>
             <param name="camera_info_url"
