@@ -3,12 +3,12 @@
 <launch>
     <!-- Calibration tool -->
 
-    <arg name="cameras" default="navigation"/>
+    <arg name="cameras" default="navigation/port"/>
     <node
         pkg="camera_calibration"
         type="cameracalibrator.py"
         name="calibrator"
-        args="--size 9x6 --square 0.058 -p chessboard --approximate=0.005"
+        args="--size 8x6 --square 0.1 -p chessboard --approximate=0.05"
         output="screen"
         >
         <remap from="right" to="/cameras/$(arg cameras)/right/image_mono"/>
