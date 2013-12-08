@@ -191,7 +191,7 @@
 
     <!-- instantiate navigation pair -->
     <xacro:stereo_pair name="navigation_port" baseline="0.10" />
-    <xacro:stereo_pair name="navigation_bow" baseline="0.10" />
+    <xacro:stereo_pair name="navigation_center" baseline="0.10" />
     <xacro:stereo_pair name="navigation_starboard" baseline="0.10" />
     <!-- attach navigation pair -->
     <joint name="navigation_port_stereo_pair_joint" type="fixed">
@@ -207,9 +207,9 @@
         <!-- so camera should be at 1.4 - deck -->
         <origin xyz="0.125 0.160 0.810" rpy="-1.919 0 -0.522"/>
     </joint>
-    <joint name="navigation_bow_stereo_pair_joint" type="fixed">
+    <joint name="navigation_center_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
-        <child link="navigation_bow_baseline_bar"/>
+        <child link="navigation_center_baseline_bar"/>
         <!-- macro defines camera with lenses facing along +z -->
         <!-- rpy is pi/2 + 16.5 degree down tilt -->
         <!-- height of bottom of deck (origin) is -->

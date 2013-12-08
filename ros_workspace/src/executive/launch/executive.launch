@@ -14,7 +14,7 @@
         <param name="wait_for_cameras" value="$(arg wait_for_cameras)"/>
 
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
-        <remap from="navigation_bow_camera_status" to="/cameras/navigation/bow/status"/>
+        <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
         <remap from="navigation_starboard_camera_status" to="/cameras/navigation/starboard/status"/>
         <remap from="manipulator_camera_status" to="/cameras/manipulator/status"/>
         

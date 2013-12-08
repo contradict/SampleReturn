@@ -71,8 +71,8 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         rospy.Subscriber("gpio_read", platform_msg.GPIO, self.gpio_update)
         rospy.Subscriber("navigation_port_camera_status", std_msg.String,
                 lambda msg,camera="port":self.navigation_status_update(camera,msg))
-        rospy.Subscriber("navigation_bow_camera_status", std_msg.String,
-                lambda msg,camera="bow":self.navigation_status_update(camera,msg))
+        rospy.Subscriber("navigation_center_camera_status", std_msg.String,
+                lambda msg,camera="center":self.navigation_status_update(camera,msg))
         rospy.Subscriber("navigation_starboard_camera_status", std_msg.String,
                 lambda msg,camera="starboard":self.navigation_status_update(camera,msg))
         rospy.Subscriber("manipulator_camera_status", std_msg.String,
@@ -201,7 +201,7 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         if self.wait_for_cameras:
             camera_ready = lambda: self.navigation_camera_status is not None and \
                             self.navigation_camera_status["port"]=="Ready" and \
-                            self.navigation_camera_status["bow"]=="Ready" and \
+                            self.navigation_camera_status["center"]=="Ready" and \
                             self.navigation_camera_status["starboard"]=="Ready" and \
                             self.manipulator_camera_status is not None and \
                             self.manipulator_camera_status.data=="Ready"
