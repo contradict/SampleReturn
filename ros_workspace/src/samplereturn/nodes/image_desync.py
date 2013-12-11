@@ -57,6 +57,26 @@ def kill_nodelet_manager(managername):
             return True
     return False
 
+def masacre_nodelets_in_namespace(namespace):
+    stdin, stdout = os.popen2(['pidof', 'nodelet'])
+    pid_str = stdout.read()
+    pids = [int(s) for s in pid_str.split()]
+    killed_some=False
+    for pid in pids:
+        argv = get_argv(pid)
+        if len(argv)<2:
+            continue
+        name=get_rosparam(argv[2:], "__name")
+        if name is None:
+            continue
+        ns=get_envvar(pid, "ROS_NAMESPACE")
+        if ns==namespace:
+            os.system('kill -9 %d'%pid)
+            killed_some=True
+            rospy.loginfo("Killing pid %d, %s/%s", pid, ns, name)
+    return killed_some
+
+
 
 class image_desync(object):
     def __init__(self):
@@ -71,6 +91,7 @@ class image_desync(object):
         self.max_missing_count = rospy.get_param("~max_missing_count", 10)
         self.sync_wait         = rospy.get_param("~sync_wait",          5.0)
         self.manager_node_name = rospy.get_param("~manager_node_name")
+        self.namespace = get_envvar(os.getpid(), "ROS_NAMESPACE")
 
         self.timer = rospy.Timer(rospy.Duration(self.check_interval),
                 self.check_for_data)
@@ -133,8 +154,11 @@ class image_desync(object):
     def restart_manager(self):
         self.desync_count = 0
         # node must be marked respawn in launch file,
-        if not kill_nodelet_manager(self.manager_node_name):
-            rospy.logerr("Unable to kill manager %s", self.manager_node_name)
+        #if not kill_nodelet_manager(self.manager_node_name):
+        #    rospy.logerr("Unable to kill manager %s", self.manager_node_name)
+        if not masacre_nodelets_in_namespace(self.namespace):
+            rospy.logerr("Unable to kill any nodes in this namespace: %s",
+                    self.namespace)
         if self.sync_wait_timer is None:
             self.sync_wait_timer = rospy.Timer(rospy.Duration(self.sync_wait),
                         self.sync_wait_timeout, oneshot=True)
