@@ -62,10 +62,6 @@ class image_desync(object):
     def __init__(self):
         self.timestamps={'left':[], 'right':[]}
         self.pub = rospy.Publisher('desync', Float64)
-        rospy.Subscriber('left/camera_info', CameraInfo,
-                lambda info, name='left': self.info_callback(name, info))
-        rospy.Subscriber('right/camera_info', CameraInfo,
-                lambda info, name='right': self.info_callback(name, info))
 
         self.status_pub = rospy.Publisher('status', String)
 
@@ -89,6 +85,11 @@ class image_desync(object):
                             'right':0
                             }
         self.sync_wait_timer = None
+
+        rospy.Subscriber('left/camera_info', CameraInfo,
+                lambda info, name='left': self.info_callback(name, info))
+        rospy.Subscriber('right/camera_info', CameraInfo,
+                lambda info, name='right': self.info_callback(name, info))
 
     def info_callback(self, name, info):
         self.got_info[name] = True
