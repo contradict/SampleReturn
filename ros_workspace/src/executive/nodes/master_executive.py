@@ -200,9 +200,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitDuration(2.0)
         if self.wait_for_cameras:
             camera_ready = lambda: self.navigation_camera_status is not None and \
-                            self.navigation_camera_status["port"]=="Ready" and \
-                            self.navigation_camera_status["center"]=="Ready" and \
-                            self.navigation_camera_status["starboard"]=="Ready" and \
+                            self.navigation_camera_status.get("port")=="Ready" and \
+                            self.navigation_camera_status.get("center")=="Ready" and \
+                            self.navigation_camera_status.get("starboard")=="Ready" and \
                             self.manipulator_camera_status is not None and \
                             self.manipulator_camera_status.data=="Ready"
             if not camera_ready():
