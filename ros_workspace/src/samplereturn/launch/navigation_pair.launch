@@ -81,7 +81,6 @@
         </node>
 
         <!-- emit synchronization error -->
-        <!--
         <node name="image_desync"
               machine="navigate"
               pkg="samplereturn"
@@ -91,7 +90,6 @@
             <param name="sync_wait" type="double" value="30"/>
             <param name="max_desync" type="double" value="0.01"/>
         </node>
-        -->
     </group>
 
     <!-- Debayer -->
