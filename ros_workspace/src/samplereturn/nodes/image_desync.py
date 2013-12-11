@@ -19,7 +19,9 @@ def get_envvar(pid, name):
     except:
         return None
     for envvar in env.split("\x00"):
-        var,val = envvar.split("=")
+        if not '=' in envvar:
+            continue
+        var,val = envvar.split("=")[:2]
         if var == name:
             return val
     return None
@@ -37,7 +39,6 @@ def kill_nodelet_manager(managername):
     pid_str = stdout.read()
     pids = [int(s) for s in pid_str.split()]
     for pid in pids:
-        print pid
         argv = get_argv(pid)
         if len(argv)<2:
             continue
