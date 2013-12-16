@@ -84,6 +84,8 @@ include_directories(include
  add_executable(linemod_detector src/linemod_detector.cpp)
  add_executable(linemod_detector_2d src/linemod_detector_2d.cpp)
 
+add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
+add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(cv_test_node cv_test_generate_messages_cpp)
