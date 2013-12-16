@@ -8,13 +8,12 @@ find_package(catkin REQUIRED
         rospy
         rosconsole
         message_generation
-        actionlib_msgs
         actionlib
-        geometry_msgs
-        std_msgs
         tf
         dynamic_reconfigure
         canopen
+	platform_motion_msgs
+	visual_servo_msgs
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -31,37 +30,6 @@ message("BFL include dirs:" ${BFL_INCLUDE_DIRS})
 message("BFL library dirs:" ${BFL_LIBRARY_DIRS})
 link_directories(${BFL_LIBRARY_DIRS})
 
-
-# messages
-add_message_files(
-    DIRECTORY msg
-    FILES
-        GPIO.msg
-        ServoStatus.msg
-)
-
-# services
-add_service_files(
-    DIRECTORY srv
-    FILES
-        Enable.srv
-        SelectCommandSource.srv
-)
-
-# actions
-add_action_files(
-    DIRECTORY action
-    FILES
-        Home.action
-        SelectCarouselBin.action
-)
-
-generate_messages(
-    DEPENDENCIES
-        actionlib_msgs
-        std_msgs
-        geometry_msgs
-)
 
 # dynamic reconfigure
 generate_dynamic_reconfigure_options(
@@ -86,14 +54,13 @@ include_directories(
 
 #common commands for building c++ executables and libraries
 add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencpp)
+
 add_executable(motion_node src/motion_node.cpp)
 target_link_libraries(motion_node
     ${PROJECT_NAME}
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencpp)
 
 add_executable(teleop src/teleop.cpp)
 target_link_libraries(teleop

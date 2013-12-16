@@ -3,11 +3,11 @@
 #include <sensor_msgs/Joy.h>
 
 #include <actionlib/client/simple_action_client.h>
-#include <platform_motion/HomeAction.h>
-#include <platform_motion/Enable.h>
-#include <platform_motion/SelectCommandSource.h>
+#include <platform_motion_msgs/HomeAction.h>
+#include <platform_motion_msgs/Enable.h>
+#include <platform_motion_msgs/SelectCommandSource.h>
 #include <manipulator/ManipulatorAction.h>
-#include <visual_servo/VisualServoAction.h>
+#include <visual_servo_msgs/VisualServoAction.h>
 
 class Teleop
 {
@@ -33,9 +33,9 @@ private:
   ros::Publisher twist_pub_;
   ros::Subscriber joy_sub_;
   bool homing, homed;
-  actionlib::SimpleActionClient<platform_motion::HomeAction> home_pods;
+  actionlib::SimpleActionClient<platform_motion_msgs::HomeAction> home_pods;
   actionlib::SimpleActionClient<manipulator::ManipulatorAction> manipulate;
-  actionlib::SimpleActionClient<visual_servo::VisualServoAction> servo;
+  actionlib::SimpleActionClient<visual_servo_msgs::VisualServoAction> servo;
   bool servo_active;
 
   double vel_x, vel_y, vel_theta;
@@ -85,7 +85,7 @@ void Teleop::doHoming(void)
 {
     homing=true;
     homed=false;
-    platform_motion::SelectCommandSource sel;
+    platform_motion_msgs::SelectCommandSource sel;
     sel.request.source="test";
     ros::service::call("CAN_select_command_source", sel);
     std::string savedsource(sel.response.source);
@@ -101,7 +101,7 @@ void Teleop::doHoming(void)
         return;
     }
     ROS_INFO("Send home goal");
-    platform_motion::HomeGoal g;
+    platform_motion_msgs::HomeGoal g;
     g.home_count = 3;
     home_pods.sendGoal(g);
     if(!home_pods.waitForResult(ros::Duration(60.0))) {
@@ -138,7 +138,7 @@ void Teleop::doGrab(void)
 
 void Teleop::doServo(void)
 {
-    platform_motion::SelectCommandSource sel;
+    platform_motion_msgs::SelectCommandSource sel;
     sel.request.source="test";
     ros::service::call("CAN_select_command_source", sel);
     std::string savedsource(sel.response.source);
@@ -152,7 +152,7 @@ void Teleop::doServo(void)
         return;
     }
     ROS_INFO("Send servo goal");
-    visual_servo::VisualServoGoal s;
+    visual_servo_msgs::VisualServoGoal s;
     s.do_align_object_to_manipulator = true;
     servo.sendGoal(s);
     servo_active = true;

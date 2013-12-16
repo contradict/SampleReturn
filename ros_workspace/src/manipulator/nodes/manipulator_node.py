@@ -17,8 +17,8 @@ from dynamixel_controllers.srv import *
 
 from manipulator.msg import ManipulatorAction, ManipulatorFeedback, ManipulatorResult
 
-from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
-from platform_motion.srv import Enable, EnableRequest
+from platform_motion_msgs.msg import SelectCarouselBinGoal, SelectCarouselBinAction
+from platform_motion_msgs.srv import Enable, EnableRequest
 
 from manipulator import manipulator_states
 

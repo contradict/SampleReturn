@@ -3,8 +3,8 @@ import rospy
 import sys
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 from sound_play.msg import SoundRequest
-from platform_motion.msg import GPIO, ServoStatus
-from platform_motion.srv import Enable
+from platform_motion_msgs.msg import GPIO, ServoStatus
+from platform_motion_msgs.srv import Enable
 from std_msgs.msg import Bool
 
 class PauseSwitch(object):

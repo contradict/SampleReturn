@@ -15,7 +15,7 @@ from dynamixel_controllers.joint_controller_mx import JointControllerMX
 from std_msgs.msg import Float64
 from dynamixel_msgs.msg import JointState
 
-from platform_motion.srv import Enable, EnableRequest
+from platform_motion_msgs.srv import Enable, EnableRequest
 
 from manipulator.srv import VelocityStandoff
 from manipulator.srv import TorqueStandoff
