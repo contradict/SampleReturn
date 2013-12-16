@@ -15,12 +15,22 @@ find_package(catkin REQUIRED
         tf
         dynamic_reconfigure
         canopen
-        bfl
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
 
 find_package(Eigen REQUIRED)
+
+# bfl (Bayesian Filtering Library) is a third party package that uses pkg-config
+find_package(PkgConfig)
+pkg_check_modules(BFL REQUIRED orocos-bfl)
+
+include_directories(${BFL_INCLUDE_DIRS})
+
+message("BFL include dirs:" ${BFL_INCLUDE_DIRS})
+message("BFL library dirs:" ${BFL_LIBRARY_DIRS})
+link_directories(${BFL_LIBRARY_DIRS})
+
 
 # messages
 add_message_files(
@@ -109,6 +119,7 @@ add_executable(EKF_odometry
     )
 target_link_libraries(EKF_odometry
     ${Boost_LIBRARIES}
+    ${BFL_LIBRARIES}
     ${catkin_LIBRARIES}
 )
 
@@ -119,6 +130,7 @@ add_executable(test_EKF_odometry
     )
 target_link_libraries(test_EKF_odometry
     ${Boost_LIBRARIES}
+    ${BFL_LIBRARIES}
     ${catkin_LIBRARIES}
 )
 
