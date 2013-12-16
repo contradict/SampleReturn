@@ -9,7 +9,7 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo
-from visual_servo.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, TunableConstants
+from visual_servo_msgs.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, TunableConstants
 from linemod_detector.msg  import NamedPoint
 
 def enum(**enums):
