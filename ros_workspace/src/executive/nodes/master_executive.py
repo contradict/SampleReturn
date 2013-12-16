@@ -16,7 +16,7 @@ from sound_play.msg import SoundRequest
 import sensor_msgs.msg as sensor_msgs
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
-import manipulator.msg as manipulator_msg
+import manipulator_msgs.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
 import visual_servo_msgs.msg as visual_servo_msg

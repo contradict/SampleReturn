@@ -14,6 +14,7 @@ find_package(catkin REQUIRED
         canopen
 	platform_motion_msgs
 	visual_servo_msgs
+	manipulator_msgs
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)

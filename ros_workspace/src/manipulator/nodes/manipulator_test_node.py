@@ -4,7 +4,7 @@ import roslib; roslib.load_manifest("manipulator")
 import rospy
 import actionlib
 
-from manipulator.msg import ManipulatorGrabAction, ManipulatorGrabGoal, ManipulatorGrabFeedback, ManipulatorGrabResult
+from manipulator_msgs.msg import ManipulatorGrabAction, ManipulatorGrabGoal, ManipulatorGrabFeedback, ManipulatorGrabResult
 
 from sensor_msgs.msg import Joy
 

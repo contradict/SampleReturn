@@ -6,7 +6,7 @@
 #include <platform_motion_msgs/HomeAction.h>
 #include <platform_motion_msgs/Enable.h>
 #include <platform_motion_msgs/SelectCommandSource.h>
-#include <manipulator/ManipulatorAction.h>
+#include <manipulator_msgs/ManipulatorAction.h>
 #include <visual_servo_msgs/VisualServoAction.h>
 
 class Teleop
@@ -34,7 +34,7 @@ private:
   ros::Subscriber joy_sub_;
   bool homing, homed;
   actionlib::SimpleActionClient<platform_motion_msgs::HomeAction> home_pods;
-  actionlib::SimpleActionClient<manipulator::ManipulatorAction> manipulate;
+  actionlib::SimpleActionClient<manipulator_msgs::ManipulatorAction> manipulate;
   actionlib::SimpleActionClient<visual_servo_msgs::VisualServoAction> servo;
   bool servo_active;
 
@@ -123,7 +123,7 @@ void Teleop::doGrab(void)
         return;
     }
     ROS_INFO("Send manipulator goal");
-    manipulator::ManipulatorGoal grab;
+    manipulator_msgs::ManipulatorGoal grab;
     grab.type = grab.GRAB;
     grab.grip_torque=0.7;
     grab.target_bin=2;

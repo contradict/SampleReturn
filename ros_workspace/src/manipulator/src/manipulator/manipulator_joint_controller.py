@@ -17,10 +17,10 @@ from dynamixel_msgs.msg import JointState
 
 from platform_motion_msgs.srv import Enable, EnableRequest
 
-from manipulator.srv import VelocityStandoff
-from manipulator.srv import TorqueStandoff
-from manipulator.srv import TorqueHold
-from manipulator.srv import GoToPosition
+from manipulator_msgs.srv import VelocityStandoff
+from manipulator_msgs.srv import TorqueStandoff
+from manipulator_msgs.srv import TorqueHold
+from manipulator_msgs.srv import GoToPosition
 
 # Decorator for services that should exit when this
 # controller has received a pause request.
