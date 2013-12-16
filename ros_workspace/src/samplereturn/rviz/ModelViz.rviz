@@ -1,0 +1,439 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Status1
+        - /TF1
+        - /TF1/Frames1
+        - /TF1/Tree1
+        - /TF1/Tree1/base_link1
+        - /TF1/Tree1/base_link1/body_triangle1
+      Splitter Ratio: 0.858351
+    Tree Height: 565
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Tool Properties
+    Expanded:
+      - /2D Pose Estimate1
+      - /2D Nav Goal1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.588679
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: ""
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Class: rviz/RobotModel
+      Collision Enabled: false
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        body_triangle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        carousel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        fake_laser:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        manipulator_baseline_bar:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        manipulator_left_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        manipulator_left_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        manipulator_right_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        manipulator_right_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_center_baseline_bar:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_center_left_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_center_left_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_center_right_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_center_right_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_port_baseline_bar:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_port_left_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_port_left_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_port_right_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_port_right_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_starboard_baseline_bar:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_starboard_left_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_starboard_left_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_starboard_right_camera:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        navigation_starboard_right_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        port_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        port_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        port_yoke:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        search_camera_body:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        search_camera_lens:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        starboard_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        starboard_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        starboard_yoke:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        stern_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        stern_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        stern_yoke:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        top_triangle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Name: RobotModel
+      Robot Description: robot_description
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        base_link:
+          Value: true
+        body_triangle:
+          Value: false
+        carousel:
+          Value: true
+        fake_laser:
+          Value: false
+        manipulator_baseline_bar:
+          Value: false
+        manipulator_left_camera:
+          Value: true
+        manipulator_left_camera_lens:
+          Value: false
+        manipulator_right_camera:
+          Value: false
+        manipulator_right_camera_lens:
+          Value: false
+        navigation_center_baseline_bar:
+          Value: false
+        navigation_center_left_camera:
+          Value: true
+        navigation_center_left_camera_lens:
+          Value: false
+        navigation_center_right_camera:
+          Value: false
+        navigation_center_right_camera_lens:
+          Value: false
+        navigation_port_baseline_bar:
+          Value: false
+        navigation_port_left_camera:
+          Value: true
+        navigation_port_left_camera_lens:
+          Value: false
+        navigation_port_right_camera:
+          Value: false
+        navigation_port_right_camera_lens:
+          Value: false
+        navigation_starboard_baseline_bar:
+          Value: false
+        navigation_starboard_left_camera:
+          Value: true
+        navigation_starboard_left_camera_lens:
+          Value: false
+        navigation_starboard_right_camera:
+          Value: false
+        navigation_starboard_right_camera_lens:
+          Value: false
+        port_suspension:
+          Value: true
+        port_wheel:
+          Value: true
+        port_yoke:
+          Value: false
+        search_camera_body:
+          Value: true
+        search_camera_lens:
+          Value: false
+        starboard_suspension:
+          Value: true
+        starboard_wheel:
+          Value: true
+        starboard_yoke:
+          Value: false
+        stern_suspension:
+          Value: true
+        stern_wheel:
+          Value: true
+        stern_yoke:
+          Value: false
+        top_triangle:
+          Value: false
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        base_link:
+          body_triangle:
+            carousel:
+              {}
+            fake_laser:
+              {}
+            manipulator_baseline_bar:
+              manipulator_left_camera:
+                manipulator_left_camera_lens:
+                  {}
+              manipulator_right_camera:
+                manipulator_right_camera_lens:
+                  {}
+            navigation_center_baseline_bar:
+              navigation_center_left_camera:
+                navigation_center_left_camera_lens:
+                  {}
+              navigation_center_right_camera:
+                navigation_center_right_camera_lens:
+                  {}
+            navigation_port_baseline_bar:
+              navigation_port_left_camera:
+                navigation_port_left_camera_lens:
+                  {}
+              navigation_port_right_camera:
+                navigation_port_right_camera_lens:
+                  {}
+            navigation_starboard_baseline_bar:
+              navigation_starboard_left_camera:
+                navigation_starboard_left_camera_lens:
+                  {}
+              navigation_starboard_right_camera:
+                navigation_starboard_right_camera_lens:
+                  {}
+            port_suspension:
+              port_yoke:
+                port_wheel:
+                  {}
+            search_camera_body:
+              search_camera_lens:
+                {}
+            starboard_suspension:
+              starboard_yoke:
+                starboard_wheel:
+                  {}
+            stern_suspension:
+              stern_yoke:
+                stern_wheel:
+                  {}
+            top_triangle:
+              {}
+      Update Interval: 0
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+      Topic: /initialpose
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 2.78014
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.600398
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+      Yaw: 1.68541
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 846
+  Hide Left Dock: false
+  Hide Right Dock: true
+  QMainWindow State: 000000ff00000000fd0000000400000000000001eb000002c4fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000002c4000000dd00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f000002c4fc0200000003fb0000000a005600690065007700730000000028000002c4000000b000fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004b00000003efc0100000002fb0000000800540069006d00650100000000000004b0000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000002bf000002c400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Selection:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: true
+  Width: 1200
+  X: 91
+  Y: 65
