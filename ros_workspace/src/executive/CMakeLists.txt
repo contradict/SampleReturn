@@ -22,6 +22,6 @@ endforeach()
 
 install(
     PROGRAMS
-       nodes/master_executive.py
+       nodes/executive_master_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
