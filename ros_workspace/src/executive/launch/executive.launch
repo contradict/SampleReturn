@@ -5,8 +5,8 @@
     <node
         machine="navigate"
         pkg="executive"
-        type="master_executive.py"
-        name="master_executive"
+        type="executive_master_node.py"
+        name="executive_master"
         output="log"
         ns="/processes/executive">
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
@@ -42,6 +42,9 @@
 
         <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
 
+        <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
+        <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
+        
         <!--
         <remap from="img_point" to="filtered_points"/
         -->
@@ -60,4 +63,5 @@
         <param name="filter_tolerance" type="double" value="0.10"/>
     </node>
 
+       
 </launch>
