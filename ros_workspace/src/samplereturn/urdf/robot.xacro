@@ -77,7 +77,7 @@
             <visual>
                 <geometry>
                     <!-- numbers measured from first prototype article -->
-                    <box size="${baseline-0.054} 0.0254 0.0381"/>
+                    <box size="${baseline+.076} 0.055 0.055"/>
                 </geometry>
                 <material name="sensor"/>
             </visual>
@@ -145,12 +145,12 @@
     </xacro:macro>
 
     <!-- define suspension properties -->
-    <xacro:property name="wheel_diameter" value="0.33"/>
-    <xacro:property name="wheel_width" value="0.09"/>
+    <xacro:property name="wheel_diameter" value="0.3239"/>
+    <xacro:property name="wheel_width" value="0.12"/>
     <xacro:property name="yoke_height" value="0.3"/>
-    <xacro:property name="axle_offset" value="0.25"/>
-    <xacro:property name="suspension_length" value="0.35"/>
-    <xacro:property name="suspension_mounting_height" value="0.26"/>
+    <xacro:property name="axle_offset" value="0.255"/>
+    <xacro:property name="suspension_length" value="0.354"/>
+    <xacro:property name="suspension_mounting_height" value="0.276"/>
     <!-- instantiate 3 modules -->
     <xacro:wheel_module name="stern" position="-1.126 0 ${suspension_mounting_height}"/>
     <xacro:wheel_module name="port" position="0.0 0.650 ${suspension_mounting_height}"/>
@@ -190,21 +190,41 @@
 
 
     <!-- instantiate navigation pair -->
-    <xacro:stereo_pair name="navigation" baseline="0.30" />
+    <xacro:stereo_pair name="navigation_port" baseline="0.10" />
+    <xacro:stereo_pair name="navigation_center" baseline="0.10" />
+    <xacro:stereo_pair name="navigation_starboard" baseline="0.10" />
     <!-- attach navigation pair -->
-    <joint name="navigation_stereo_pair_joint" type="fixed">
+    <joint name="navigation_port_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
-        <child link="navigation_baseline_bar"/>
+        <child link="navigation_port_baseline_bar"/>
         <!-- macro defines camera with lenses facing along +z -->
-        <!-- rpy is pi/2 + 16.5 degree down tilt -->
-        <!-- height of bottom of deck (origin) is -->
-        <!-- suspension_height + yoke_height - yoke_offset + wheel_radius -->
-        <!--
-        suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
-        -->
-        <!-- so camera should be at 1.4 - deck -->
-        <origin xyz="0.015 0.0 0.990" rpy="-2.00 0 -1.57"/>
+        <!-- rpy is pi/2 + T degrees down tilt -->
+        <!-- year 3 triple nav setup is tilted down 20 degrees -->
+        <!-- in plane of camera centers, baselines point 60 deg apart -->
+        <!-- all nav cameras are 1.303m off dirt by Inventor model (no settling)-->
+        <origin xyz="0.0956 0.1553 0.8085" rpy="-1.919 0 -0.523"/>
     </joint>
+    <joint name="navigation_center_stereo_pair_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="navigation_center_baseline_bar"/>
+        <!-- macro defines camera with lenses facing along +z -->
+        <!-- rpy is pi/2 + T degrees down tilt -->
+        <!-- year 3 triple nav setup is tilted down 20 degrees -->
+        <!-- in plane of camera centers, baselines point 60 deg apart -->
+        <!-- all nav cameras are 1.303m off dirt by Inventor model (no settling)-->
+        <origin xyz="0.1788 0.0 0.8085" rpy="-1.919 0 -1.57"/>
+    </joint>
+    <joint name="navigation_starboard_stereo_pair_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="navigation_starboard_baseline_bar"/>
+        <!-- macro defines camera with lenses facing along +z -->
+        <!-- rpy is pi/2 + T degrees down tilt -->
+        <!-- year 3 triple nav setup is tilted down 20 degrees -->
+        <!-- in plane of camera centers, baselines point 60 deg apart -->
+        <!-- all nav cameras are 1.303m off dirt by Inventor model (no settling)-->
+         <origin xyz="0.0956 -0.1553 0.8085" rpy="-1.919 0 -2.618"/>
+    </joint>
+
 
     <!-- instantiate manipulator pair -->
     <xacro:stereo_pair name="manipulator" baseline="0.05" />
@@ -213,13 +233,10 @@
         <parent link="body_triangle"/>
         <child link="manipulator_baseline_bar"/>
         <!-- macro defines camera with lenses facing along +z -->
-        <!-- rpy is pi/2 + 16.5 degree down tilt -->
-        <!-- height of bottom of deck (origin) is -->
-        <!-- suspension_height + yoke_height - yoke_offset + wheel_radius -->
-        <!--
-        suspension_height+wheel_diameter*1.25/2-wheel_diameter*0.125/2+wheel_diameter/2
-        -->
-        <origin xyz="0.067 0.0 0.116" rpy="-2.80 0 -1.57"/>
+        <!-- rpy is pi/2 + T degrees down tilt -->
+        <!-- note: year 3 manipulator is tilted down 70 degrees -->
+        <!-- manipulators are .555m off dirt by Inventor model (no settling)-->
+        <origin xyz="-0.1147 0.0 0.0605" rpy="-2.79 0 -1.57"/>
     </joint>
 
     <link name="search_camera_body">
@@ -246,7 +263,8 @@
     <joint name="search_camera_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="search_camera_body"/>
-        <origin xyz="0.10 0.0 1.0" rpy="-1.94 0 -1.57"/>
+        <!-- still considering 3 search camera angles: 20, 25, 40 degrees -->
+        <origin xyz="0.1763 0.0 0.9203" rpy="-2.01 0 -1.57"/>
     </joint>
 
     <!--fake laser scanner-->

@@ -14,12 +14,12 @@ import std_msgs.msg as std_msg
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 from sound_play.msg import SoundRequest
 import sensor_msgs.msg as sensor_msgs
-import platform_motion.msg as platform_msg
-import platform_motion.srv as platform_srv
-import manipulator.msg as manipulator_msg
+import platform_motion_msgs.msg as platform_msg
+import platform_motion_msgs.srv as platform_srv
+import manipulator_msgs.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
-import visual_servo.msg as visual_servo_msg
+import visual_servo_msgs.msg as visual_servo_msg
 import linemod_detector.msg as linemod_msg
 import tf_conversions
 import dynamic_reconfigure.srv as dynsrv
@@ -69,8 +69,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
 
         # subscribe to interesting topics
         rospy.Subscriber("gpio_read", platform_msg.GPIO, self.gpio_update)
-        rospy.Subscriber("navigation_camera_status", std_msg.String,
-                self.navigation_status_update)
+        rospy.Subscriber("navigation_port_camera_status", std_msg.String,
+                lambda msg,camera="port":self.navigation_status_update(camera,msg))
+        rospy.Subscriber("navigation_center_camera_status", std_msg.String,
+                lambda msg,camera="center":self.navigation_status_update(camera,msg))
+        rospy.Subscriber("navigation_starboard_camera_status", std_msg.String,
+                lambda msg,camera="starboard":self.navigation_status_update(camera,msg))
         rospy.Subscriber("manipulator_camera_status", std_msg.String,
                 self.manipulator_status_update)
         rospy.Subscriber("pause_state", std_msg.Bool,
@@ -129,10 +133,12 @@ class SampleReturnScheduler(teer_ros.Scheduler):
                 rospy.loginfo("gpio: %s", gpio)
             self.gpio = gpio
 
-    def navigation_status_update(self, status):
+    def navigation_status_update(self, camera, status):
         #rospy.loginfo("Executive received nav camera status")
-        if self.navigation_camera_status != status:
-            self.navigation_camera_status = status
+        if self.navigation_camera_status is None:
+            self.navigation_camera_status = {camera: status.data}
+        if self.navigation_camera_status.get(camera) != status.data:
+            self.navigation_camera_status[camera] = status.data
 
     def manipulator_status_update(self, status):
         #rospy.loginfo("Executive received man camera status")
@@ -194,7 +200,9 @@ class SampleReturnScheduler(teer_ros.Scheduler):
         yield teer_ros.WaitDuration(2.0)
         if self.wait_for_cameras:
             camera_ready = lambda: self.navigation_camera_status is not None and \
-                            self.navigation_camera_status.data=="Ready" and \
+                            self.navigation_camera_status.get("port")=="Ready" and \
+                            self.navigation_camera_status.get("center")=="Ready" and \
+                            self.navigation_camera_status.get("starboard")=="Ready" and \
                             self.manipulator_camera_status is not None and \
                             self.manipulator_camera_status.data=="Ready"
             if not camera_ready():

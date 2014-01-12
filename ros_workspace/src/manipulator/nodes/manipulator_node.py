@@ -15,17 +15,17 @@ from std_msgs.msg import Bool
 from dynamixel_msgs.msg import JointState
 from dynamixel_controllers.srv import *
 
-from manipulator.msg import ManipulatorAction, ManipulatorFeedback, ManipulatorResult
+from manipulator_msgs.msg import ManipulatorAction, ManipulatorFeedback, ManipulatorResult
 
-from platform_motion.msg import SelectCarouselBinGoal, SelectCarouselBinAction
-from platform_motion.srv import Enable, EnableRequest
+from platform_motion_msgs.msg import SelectCarouselBinGoal, SelectCarouselBinAction
+from platform_motion_msgs.srv import Enable, EnableRequest
 
 from manipulator import manipulator_states
 
-from manipulator.srv import VelocityStandoff, VelocityStandoffRequest
-from manipulator.srv import TorqueStandoff, TorqueStandoffRequest
-from manipulator.srv import TorqueHold, TorqueHoldRequest
-from manipulator.srv import GoToPosition, GoToPositionRequest
+from manipulator_msgs.srv import VelocityStandoff, VelocityStandoffRequest
+from manipulator_msgs.srv import TorqueStandoff, TorqueStandoffRequest
+from manipulator_msgs.srv import TorqueHold, TorqueHoldRequest
+from manipulator_msgs.srv import GoToPosition, GoToPositionRequest
 
 class ManipulatorStateMachine(object):
   

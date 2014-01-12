@@ -1,14 +1,34 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <param name="robot_description"
-       command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+    <arg name="gui" default="true" />
 
-	<arg name="gui" default="False" />
     <param name="use_gui" value="$(arg gui)"/>
 
-	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" ></node>
-	<node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
-    <node name="rviz" pkg="rviz" type="rviz"
-        args="-d $(find samplereturn)/config/model_display.vcg" />
+    <param
+        name="robot_description"
+        command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'"
+    />
+
+
+    <node
+         name="joint_state_publisher"
+         pkg="joint_state_publisher"
+         type="joint_state_publisher"
+         output="screen"
+    />
+
+    <node
+         name="robot_state_publisher"
+         pkg="robot_state_publisher"
+         type="robot_state_publisher"
+         output="screen"
+    />
+    <node
+         name="rviz"
+         pkg="rviz"
+         type="rviz"
+         args="-d $(find samplereturn)/rviz/ModelViz.rviz"
+         output="screen"
+    />
 </launch>

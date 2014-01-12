@@ -29,17 +29,17 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
                 const char *joint_name, double *steering, double *speed);
         void carouselCallback(const std_msgs::Float64::ConstPtr fmsg);
-        void gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio);
+        void gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr gpio);
         void doHomePods(void);
         void doHomeCarousel(void);
         void homePodsComplete(CANOpen::DS301 &node);
         void homeCarouselComplete(CANOpen::DS301 &node);
-        bool selectCommandSourceCallback(platform_motion::SelectCommandSource::Request &req,
-                                     platform_motion::SelectCommandSource::Response &resp);
-        bool enableWheelPodsCallback(platform_motion::Enable::Request &req,
-                                     platform_motion::Enable::Response &resp);
-        bool enableCarouselCallback(platform_motion::Enable::Request &req,
-                                    platform_motion::Enable::Response &resp);
+        bool selectCommandSourceCallback(platform_motion_msgs::SelectCommandSource::Request &req,
+                                     platform_motion_msgs::SelectCommandSource::Response &resp);
+        bool enableWheelPodsCallback(platform_motion_msgs::Enable::Request &req,
+                                     platform_motion_msgs::Enable::Response &resp);
+        bool enableCarouselCallback(platform_motion_msgs::Enable::Request &req,
+                                    platform_motion_msgs::Enable::Response &resp);
         void podEnableStateChange(CANOpen::DS301 &node);
         void carouselEnableStateChange(CANOpen::DS301 &node);
         void pvCallback(CANOpen::DS301 &node);
@@ -72,14 +72,14 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         dynamic_reconfigure::Server<PlatformParametersConfig>
             reconfigure_server;
 
-        actionlib::SimpleActionServer<HomeAction> home_pods_action_server;
-        HomeFeedback home_pods_feedback;
-        HomeResult home_pods_result;
+        actionlib::SimpleActionServer<platform_motion_msgs::HomeAction> home_pods_action_server;
+        platform_motion_msgs::HomeFeedback home_pods_feedback;
+        platform_motion_msgs::HomeResult home_pods_result;
         int home_pods_count;
 
-        actionlib::SimpleActionServer<HomeAction> home_carousel_action_server;
-        HomeFeedback home_carousel_feedback;
-        HomeResult home_carousel_result;
+        actionlib::SimpleActionServer<platform_motion_msgs::HomeAction> home_carousel_action_server;
+        platform_motion_msgs::HomeFeedback home_carousel_feedback;
+        platform_motion_msgs::HomeResult home_carousel_result;
 
         ros::ServiceServer enable_pods_server;
         int enable_pods_count;

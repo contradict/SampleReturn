@@ -7,10 +7,13 @@
         machine="search"
         pkg="samplereturn"
         type="camlogger.py"
-        name="camlogger">
+        name="camlogger"
+        ns="/cameras/search">
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera_lens"/>
         <remap from="pause_state" to="/io/pause_state"/>
+        <remap from="cam_img" to="image"/>
+        <remap from="cam_info" to="info"/>
     </node>
     </group>
     <node

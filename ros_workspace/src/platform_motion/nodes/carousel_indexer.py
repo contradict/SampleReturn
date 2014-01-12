@@ -10,9 +10,9 @@ import actionlib
 from std_msgs.msg import Float64
 from sensor_msgs.msg import Joy, JointState
 
-from platform_motion.msg import SelectCarouselBinAction, SelectCarouselBinFeedback, SelectCarouselBinResult
-from platform_motion.srv import Enable
-from platform_motion.msg import HomeAction, HomeGoal
+from platform_motion_msgs.msg import SelectCarouselBinAction, SelectCarouselBinFeedback, SelectCarouselBinResult
+from platform_motion_msgs.srv import Enable
+from platform_motion_msgs.msg import HomeAction, HomeGoal
 
 class CarouselIndexer(object):
     _selectBinFeedback = SelectCarouselBinFeedback()

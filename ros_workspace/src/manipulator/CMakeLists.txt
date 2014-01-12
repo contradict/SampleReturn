@@ -7,44 +7,19 @@ find_package(catkin REQUIRED
         rospy
         message_generation
         message_runtime
-        actionlib_msgs
         actionlib
         dynamixel_controllers
-        std_msgs
-        dynamixel_msgs
         smach
         smach_ros
+	manipulator_msgs
         )
 
 catkin_python_setup()
-
-add_service_files(
-    DIRECTORY srv
-    FILES
-        VelocityStandoff.srv
-        TorqueStandoff.srv
-        TorqueHold.srv
-        GoToPosition.srv
-)
-
-# actions
-add_action_files(
-    DIRECTORY action
-    FILES
-        Manipulator.action
-)
-
-generate_messages(
-    DEPENDENCIES
-        actionlib_msgs
-        std_msgs
-)
 
 catkin_package(
     CATKIN_DEPENDS
         rospy
         message_runtime
-        actionlib_msgs
         actionlib
 )
 
