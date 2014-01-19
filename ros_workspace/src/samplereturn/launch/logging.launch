@@ -18,7 +18,8 @@
       type="record"
       name="navigate_record"
       output="log"
-      args="odometry tf platform_joint_state carousel navigation/right/image_raw navigation/left/image_raw navigation/right/camera_info navigation/left/camera_info /phidgets/spatial">
+      args="tf tf_static /cameras/navigation/port/right/image_raw /cameras/navigation/port/right/camera_info /cameras/navigation/port/left/image_raw /cameras/navigation/port/left/camera_info /cameras/navigation/center/right/image_raw /cameras/navigation/center/right/camera_info /cameras/navigation/center/left/image_raw /cameras/navigation/center/left/camera_info /cameras/navigation/starboard/right/image_raw /cameras/navigation/starboard/right/camera_info /cameras/navigation/starboard/left/image_raw /cameras/navigation/starboard/left/camera_info /io/battery_voltage /io/gpio_read /io/gpio_write /io/joy /io/phidgets/spatial /motion/odometry /motion/platform_joint_state /motion/carousel/angle /motion/CAN/status_word /process/planner/move_base/goal /process/planner/mover/current_goal"
+      >
   </node>
 
    <node machine="search"
@@ -26,5 +27,7 @@
        type="record"
        name="search_record"
        output="log"
-       args="cam_img cam_info manipulator/left/image_raw manipulator/right/image_raw manipulator/left/camera_info manipulator/right/camera_info tf"/>
+       args="tf tf_static /cameras/search/image /cameras/search/info /cameras/manipulator/left/image_raw /cameras/manipulator/right/image_raw /cameras/manipulator/left/camera_info /cameras/manipulator/right/camera_info /process/beacon_finder/beacon_pose /process/sample_detection/named_point /process/sample_detection/manipulator/named_point "
+       >
+   </node>
 </launch>

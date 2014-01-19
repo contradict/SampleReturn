@@ -8,50 +8,29 @@ find_package(catkin REQUIRED
         rospy
         rosconsole
         message_generation
-        actionlib_msgs
         actionlib
-        geometry_msgs
-        std_msgs
         tf
         dynamic_reconfigure
         canopen
-        bfl
+	platform_motion_msgs
+	visual_servo_msgs
+	manipulator_msgs
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
 
 find_package(Eigen REQUIRED)
 
-# messages
-add_message_files(
-    DIRECTORY msg
-    FILES
-        GPIO.msg
-        ServoStatus.msg
-)
+# bfl (Bayesian Filtering Library) is a third party package that uses pkg-config
+find_package(PkgConfig)
+pkg_check_modules(BFL REQUIRED orocos-bfl)
 
-# services
-add_service_files(
-    DIRECTORY srv
-    FILES
-        Enable.srv
-        SelectCommandSource.srv
-)
+include_directories(${BFL_INCLUDE_DIRS})
 
-# actions
-add_action_files(
-    DIRECTORY action
-    FILES
-        Home.action
-        SelectCarouselBin.action
-)
+message("BFL include dirs:" ${BFL_INCLUDE_DIRS})
+message("BFL library dirs:" ${BFL_LIBRARY_DIRS})
+link_directories(${BFL_LIBRARY_DIRS})
 
-generate_messages(
-    DEPENDENCIES
-        actionlib_msgs
-        std_msgs
-        geometry_msgs
-)
 
 # dynamic reconfigure
 generate_dynamic_reconfigure_options(
@@ -76,14 +55,13 @@ include_directories(
 
 #common commands for building c++ executables and libraries
 add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencpp)
+
 add_executable(motion_node src/motion_node.cpp)
 target_link_libraries(motion_node
     ${PROJECT_NAME}
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencpp)
 
 add_executable(teleop src/teleop.cpp)
 target_link_libraries(teleop
@@ -109,6 +87,7 @@ add_executable(EKF_odometry
     )
 target_link_libraries(EKF_odometry
     ${Boost_LIBRARIES}
+    ${BFL_LIBRARIES}
     ${catkin_LIBRARIES}
 )
 
@@ -119,6 +98,7 @@ add_executable(test_EKF_odometry
     )
 target_link_libraries(test_EKF_odometry
     ${Boost_LIBRARIES}
+    ${BFL_LIBRARIES}
     ${catkin_LIBRARIES}
 )
 

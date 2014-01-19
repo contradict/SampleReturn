@@ -14,7 +14,9 @@
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
         <param name="wait_for_cameras" value="$(arg wait_for_cameras)"/>
 
-        <remap from="navigation_camera_status" to="/cameras/navigation/status"/>
+        <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
+        <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
+        <remap from="navigation_starboard_camera_status" to="/cameras/navigation/starboard/status"/>
         <remap from="manipulator_camera_status" to="/cameras/manipulator/status"/>
         
         <remap from="home_wheel_pods" to="/motion/wheel_pods/home"/>

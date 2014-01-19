@@ -22,12 +22,12 @@
 #include <KvaserInterface.h>
 
 #include <actionlib/server/simple_action_server.h>
-#include <platform_motion/HomeAction.h>
-#include <platform_motion/Enable.h>
-#include <platform_motion/SelectCommandSource.h>
+#include <platform_motion_msgs/HomeAction.h>
+#include <platform_motion_msgs/Enable.h>
+#include <platform_motion_msgs/SelectCommandSource.h>
 #include <platform_motion/PlatformParametersConfig.h>
-#include <platform_motion/GPIO.h>
-#include <platform_motion/ServoStatus.h>
+#include <platform_motion_msgs/GPIO.h>
+#include <platform_motion_msgs/ServoStatus.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -86,11 +86,11 @@ Motion::Motion() :
 
     joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
 
-    gpio_pub = nh_.advertise<platform_motion::GPIO>("gpio_read", 1);
+    gpio_pub = nh_.advertise<platform_motion_msgs::GPIO>("gpio_read", 1);
 
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
 
-    status_pub = nh_.advertise<ServoStatus>("CAN_status_word", 10);
+    status_pub = nh_.advertise<platform_motion_msgs::ServoStatus>("CAN_status_word", 10);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -346,8 +346,8 @@ void Motion::servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
         handleTwist(twist);
 }
 
-bool Motion::selectCommandSourceCallback(platform_motion::SelectCommandSource::Request &req,
-                                          platform_motion::SelectCommandSource::Response &resp)
+bool Motion::selectCommandSourceCallback(platform_motion_msgs::SelectCommandSource::Request &req,
+                                          platform_motion_msgs::SelectCommandSource::Response &resp)
 {
     resp.valid=true;
     resp.source=req.source;
@@ -528,8 +528,8 @@ bool Motion::ready(void)
     return port->ready() && starboard->ready() && stern->ready() && carousel->ready();
 }
 
-bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
-                                     platform_motion::Enable::Response &resp)
+bool Motion::enableWheelPodsCallback(platform_motion_msgs::Enable::Request &req,
+                                     platform_motion_msgs::Enable::Response &resp)
 {
     bool notified=false;
     if(req.state==pods_enabled){
@@ -561,8 +561,8 @@ bool Motion::enableWheelPodsCallback(platform_motion::Enable::Request &req,
     return notified;
 }
 
-bool Motion::enableCarouselCallback(platform_motion::Enable::Request &req,
-                                    platform_motion::Enable::Response &resp)
+bool Motion::enableCarouselCallback(platform_motion_msgs::Enable::Request &req,
+                                    platform_motion_msgs::Enable::Response &resp)
 {
     bool notified=false;
     if(req.state==carousel_enabled){
@@ -704,7 +704,7 @@ void Motion::pvCallback(CANOpen::DS301 &node)
 
 void Motion::gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t new_pins)
 {
-    platform_motion::GPIO gpio;
+    platform_motion_msgs::GPIO gpio;
 
     gpio.servo_id = svo.node_id;
     gpio.previous_pin_states = old_pins;
@@ -713,7 +713,7 @@ void Motion::gpioCallback(CANOpen::CopleyServo &svo, uint16_t old_pins, uint16_t
     gpio_pub.publish(gpio);
 }
 
-void Motion::gpioSubscriptionCallback(const platform_motion::GPIO::ConstPtr gpio)
+void Motion::gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr gpio)
 {
     if((unsigned long)gpio->servo_id == carousel->node_id) {
         boost::unique_lock<boost::mutex> lock(CAN_mutex);
@@ -784,7 +784,7 @@ void Motion::carouselCallback(const std_msgs::Float64::ConstPtr fmsg)
 void Motion::statusPublishCallback(const ros::TimerEvent& event)
 {
     if(carousel_setup) {
-        platform_motion::GPIO gpio;
+        platform_motion_msgs::GPIO gpio;
         gpio.servo_id = carousel->node_id;
         gpio.previous_pin_states = carousel->getInputPins();
         gpio.new_pin_states = gpio.previous_pin_states;
@@ -796,7 +796,7 @@ void Motion::statusPublishCallback(const ros::TimerEvent& event)
         battery_voltage_pub.publish(voltage);
     }
 
-    ServoStatus status;
+    platform_motion_msgs::ServoStatus status;
     std::stringstream status_stream;
     std::stringstream mode_stream;
 
@@ -865,7 +865,7 @@ void Motion::statusPublishCallback(const ros::TimerEvent& event)
 void Motion::statusCallback(CANOpen::DS301 &node)
 {
     CANOpen::CopleyServo *svo = static_cast<CANOpen::CopleyServo*>(&node);
-    ServoStatus status;
+    platform_motion_msgs::ServoStatus status;
     std::stringstream status_stream;
     std::stringstream mode_stream;
 

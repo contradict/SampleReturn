@@ -1,7 +1,7 @@
 # this is where all the states for the manipulator will be defined.
 
 import smach
-from manipulator.msg import ManipulatorFeedback, ManipulatorResult, ManipulatorGoal
+from manipulator_msgs.msg import ManipulatorFeedback, ManipulatorResult, ManipulatorGoal
 
 
 class ProcessGoal(smach.State):
