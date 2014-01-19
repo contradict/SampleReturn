@@ -4,8 +4,14 @@ project(executive)
 find_package(catkin REQUIRED
         COMPONENTS
             rospy
+            actionlib_msgs
+            actionlib
+            smach
+            smach_ros
         )
 
+catkin_python_setup()
+    
 catkin_package(
     CATKIN_DEPENDS
         rospy
