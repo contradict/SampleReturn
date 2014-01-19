@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # the actual ros node for the manipulator code
 
-import roslib; roslib.load_manifest("manipulator")
 import rospy
 import actionlib
 import smach
