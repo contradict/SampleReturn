@@ -2,8 +2,9 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <arg name="wait_for_cameras" default="true"/>
+    
+    <!-- machine="navigate" -->
     <node
-        machine="navigate"
         pkg="executive"
         type="executive_master_node.py"
         name="executive_master"
@@ -50,6 +51,7 @@
         -->
     </node>
 
+    <!--
     <node
         machine="search"
         pkg="detection_filter"
@@ -62,6 +64,7 @@
 
         <param name="filter_tolerance" type="double" value="0.10"/>
     </node>
+    -->
 
        
 </launch>
