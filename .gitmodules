@@ -7,3 +7,9 @@
 [submodule "ros_workspace/src/navigation"]
 	path = ros_workspace/src/navigation
 	url = git://github.com/contradict/ros-navigation
+[submodule "ros_workspace/src/smach_viewer"]
+	path = ros_workspace/src/smach_viewer
+	url = https://github.com/ros-visualization/executive_smach_visualization.git
+[submodule "ros_workspace/src/executive_smach"]
+	path = ros_workspace/src/executive_smach
+	url = https://github.com/ros/executive_smach.git
