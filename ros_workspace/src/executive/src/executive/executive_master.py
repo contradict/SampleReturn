@@ -9,7 +9,9 @@ import actionlib
 import actionlib_msgs.msg as action_msg
 import tf
 
-from executive import executive_states
+from executive import executive_manual
+from executive import executive_level_one
+from executive import executive_level_two
 
 class ExecutiveMaster(object):
     
@@ -89,9 +91,9 @@ class ExecutiveMaster(object):
         '''
         
         self.top_state_machine = smach.StateMachine(
-            outcomes=['success', 'preempted', 'aborted'],
-            input_keys = ['action_goal'],
-            output_keys = ['action_result']
+            outcomes=['shutdown', 'aborted'],
+            input_keys = [],
+            output_keys = []
         )
         
         
@@ -99,9 +101,9 @@ class ExecutiveMaster(object):
         #In this machine, "preempted" will indicate a normal command
         #from another process or node, requesting the state machine to pause
         #and handle some input.  This will probably be primarily for handling
-        #mode changes.
-        #"aborted" will indicate an internal failure in a state that prevents
-        #the state from executing properly
+        #mode changes. "aborted" will indicate an internal failure in a state 
+        #that prevents the state from executing properly.
+        #The "next" outcome will be used for states that have only one possible transition.
         with self.top_state_machine: 
             
             smach.StateMachine.add(
@@ -110,14 +112,13 @@ class ExecutiveMaster(object):
                 transitions = { 'check_cameras':'WAIT_FOR_CAMERAS',
                                 'skip_cameras':'HOME_PLATFORM',
                                 'preempted':'TOP_PREEMPTED',
-                                'aborted':'TOP_ABORTED'}
-            )
+                                'aborted':'TOP_ABORTED'})
             
-            cam_dict = {'NAV_CENTER' : 'started',
-                        'NAV_PORT' : 'started',
-                        'NAV_STARBOARD' : 'started',
-                        'MANIPULATOR' : 'started',
-                        'SEARCH' : 'started'}
+            cam_dict = {'NAV_CENTER' : 'camera_started',
+                        'NAV_PORT' : 'camera_started',
+                        'NAV_STARBOARD' : 'camera_started',
+                        'MANIPULATOR' : 'camera_started',
+                        'SEARCH' : 'camera_started'}
             
             #concurrency container to allow waiting for cameras in parallel
             wait_for_cams = smach.Concurrence(outcomes = ['all_started',
@@ -127,48 +128,84 @@ class ExecutiveMaster(object):
                                               default_outcome = 'timeout',
                                               input_keys = [],
                                               output_keys = [],
-                                              outcome_map = { 'succeeded' : cam_dict}
-            )
+                                              outcome_map = { 'all_started' : cam_dict})
             
             with wait_for_cams:
                 
                 smach.Concurrence.add('NAV_CENTER',
-                                      WaitForCamera('nav_center_topic'),
-                                      )
+                                      WaitForCamera('nav_center_topic'))
                                 
                 smach.Concurrence.add('NAV_PORT',
-                                      WaitForCamera('nav_port_topic'),
-                                      )
+                                      WaitForCamera('nav_port_topic'))
                 
                 smach.Concurrence.add('NAV_STARBOARD',
-                                      WaitForCamera('nav_starboard_topic')
-                                     )
+                                      WaitForCamera('nav_starboard_topic'))
                 
                 smach.Concurrence.add('MANIPULATOR',
-                                      WaitForCamera('manipulator_topic')
-                                     )
+                                      WaitForCamera('manipulator_topic'))
                 
                 smach.Concurrence.add('SEARCH',
-                                      WaitForCamera('search_topic')
-                                     )
+                                      WaitForCamera('search_topic'))
                 
             smach.StateMachine.add('WAIT_FOR_CAMERAS',
                                    wait_for_cams,
-                                   transitions = {'succeeded':'HOME_PLATFORM',
+                                   transitions = {'all_started':'HOME_PLATFORM',
                                                   'timeout':'CAMERA_FAILURE',
                                                   'preempted':'TOP_PREEMPTED',
-                                                  'aborted' : 'TOP_ABORTED'}
-                                  )
+                                                  'aborted' : 'TOP_ABORTED'})
             
+            smach.StateMachine.add('CAMERA_FAILURE',
+                                   CameraFailure(),
+                                   transitions = {'next':'HOME_PLATFORM'})
             
             smach.StateMachine.add('HOME_PLATFORM',
                                    HomePlatform(),
-                                   transitions = {'homed':'MODE_CHECK',
-                                                  'timeout':'TOP_ABORTED',
+                                   transitions = {'homed':'CHECK_MODE',
                                                   'preempted':'TOP_PREEMPTED',
-                                                  'aborted':'TOP_ABORTED'}
-                                   )
+                                                  'aborted':'TOP_ABORTED'})
+     
+            smach.StateMachine.add('CHECK_MODE',
+                                   CheckMode(),
+                                   transitions = {'manual':'MANUAL_MODE',
+                                                  'level_one':'LEVEL_ONE_MODE',
+                                                  'level_two':'LEVEL_TWO_MODE',
+                                                  'preempted':'TOP_PREEMPTED',
+                                                  'aborted':'TOP_ABORTED'})                       
+
+            #create the mode state machines, and pass them to the
+            #function which adds their states
+            level_one = smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
+            executive_level_one.AddStates(level_one)
+            smach.StateMachine.add('LEVEL_ONE_MODE',
+                                   level_one,
+                                   transitions = {'complete':'CHECK_MODE',
+                                                  'preempted':'CHECK_MODE',
+                                                  'aborted':'TOP_ABORTED'})
+
+            level_two = smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
+            executive_level_two.AddStates(level_two)
+            smach.StateMachine.add('LEVEL_TWO_MODE',
+                                   level_two,
+                                   transitions = {'complete':'CHECK_MODE',
+                                                  'preempted':'CHECK_MODE',
+                                                  'aborted':'TOP_ABORTED'})
+
+            manual =  smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
+            executive_manual.AddStates(manual)
+            smach.StateMachine.add('MANUAL_MODE',
+                                   manual,
+                                   transitions = {'complete':'CHECK_MODE',
+                                                  'preempted':'CHECK_MODE',
+                                                  'aborted':'TOP_ABORTED'})                        
+
+            smach.StateMachine.add('TOP_PREEMPTED',
+                                   TopPreempted(),
+                                   transitions = {})
             
+            smach.StateMachine.add('TOP_ABORTED',
+                                   TopAborted(),
+                                   transitions = {'recover':'CHECK_MODE',
+                                                  'fail':'aborted'})
             
         sls = smach_ros.IntrospectionServer('top_introspection', self.top_state_machine, '/START')
         sls.start()
@@ -208,8 +245,8 @@ class WaitForCamera(smach.State):
 class HomePlatform(smach.State):
     def __init__(self):
         smach.State.__init__(self,
-                            input_keys=['mode'],
-                            outcomes=['homed','aborted','preempted']
+                            input_keys=['camera_status'],
+                            outcomes=['homed', 'aborted','preempted']
         )   
     
     def execute(self, userdata):
@@ -220,11 +257,20 @@ class HomePlatform(smach.State):
     
 class CheckMode(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=[])
+        smach.State.__init__(self,
+                             input_keys=['camera_status'],
+                             outcomes=['manual', 'level_one', 'level_two', 'preempted', 'aborted'])
         
     def execute(self):
         
         return 'succeeded'
+    
+class CameraFailure(smach.State):
+    def __init__(self):
+        smach.State.__init__(self,
+                             output_keys=['camera_status'],
+                             outcomes=['next']
+                             )
     
 class TopPreempted(smach.State):
     def __init__(self):
@@ -236,11 +282,11 @@ class TopPreempted(smach.State):
 
 class TopAborted(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=[])
+        smach.State.__init__(self, outcomes=['recover','fail'])
         
     def execute(self):
         
-        return 'succeeded'
+        return 'fail'
     
 
 
