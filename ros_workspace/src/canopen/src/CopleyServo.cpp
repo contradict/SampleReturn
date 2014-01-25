@@ -852,7 +852,7 @@ void CopleyServo::addPvtSegment(int32_t position, int32_t velocity, uint8_t dura
     }
 }
 
-void CopletServo::startPvtMove()
+void CopleyServo::startPvtMove()
 {
     // flip bit 4 in the control word to 0 so we can cause a 0 to 1
     // transition. this causes the servo to start a pvt segment
@@ -860,7 +860,7 @@ void CopletServo::startPvtMove()
     control( CONTROL_NEW_SETPOINT, 0);
 }
 
-void CopleyServo::stopPvtMove(uint8_t duration, bool emergency=false)
+void CopleyServo::stopPvtMove(uint8_t duration, bool emergency)
 {
     // clear the pvt buffer.
     clearPvtBuffer();
