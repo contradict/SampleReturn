@@ -817,6 +817,11 @@ void CopleyServo::handlePvtSegmentConsumed()
 
 void CopleyServo::addPvtSegment(int32_t position, int32_t velocity, uint8_t duration, bool lastInSequence)
 {
+    // ensure that we're in InterpolatedPosition mode.
+    // note that this doesn't cause the control word bit flip. you'll
+    // need to do that yourself as needed.
+    modeControl(0, 0, InterpolatedPosition);
+
     // make a PvtSegment struct instance for this new segment
     PvtSegment segment;
     segment.id = m_currentSegmentId;
@@ -844,6 +849,43 @@ void CopleyServo::addPvtSegment(int32_t position, int32_t velocity, uint8_t dura
     if(lastInSequence)
     {
         addPvtSegment(position, velocity, duration, false);
+    }
+}
+
+void CopletServo::startPvtMove()
+{
+    // flip bit 4 in the control word to 0 so we can cause a 0 to 1
+    // transition. this causes the servo to start a pvt segment
+    modeControl(0, CONTROL_NEW_SETPOINT, InterpolatedPosition);
+    control( CONTROL_NEW_SETPOINT, 0);
+}
+
+void CopleyServo::stopPvtMove(uint8_t duration, bool emergency=false)
+{
+    // clear the pvt buffer.
+    clearPvtBuffer();
+
+    // if this is an emergency, just disable pvt mode by flipping
+    // the control bit.
+    if(emergency)
+    {
+        modeControl(0, CONTROL_NEW_SETPOINT, InterpolatedPosition);
+    }
+    else
+    {
+        // add a pvt segment that takes duration time and is at 0
+        // velocity. leave position in place if we're absolute
+        if(m_isAbsolute)
+        {
+            // in absolute mode, set position to whatever it is now
+            // and set velocity to zero
+            addPvtSegment(this->position, 0, true);
+        }
+        else
+        {
+            // set position and velocity to 0 in relative mode
+            addPvtSegment(0, 0, duration, true);
+        }
     }
 }
 

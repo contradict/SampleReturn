@@ -136,6 +136,11 @@ class CopleyServo : public DS301 {
         // sequence. this will cause an extra zero duration sequence to be
         // created to ensure you actually get to the last position
         void addPvtSegment(int32_t position, int32_t velocity, uint8_t duration, bool lastInSequence=false);
+        void startPvtMove(); // flips the control bit to start a pvt move
+        // stops a pvt move in duration milliseconds.
+        // if emergency is true, it flips the control word bit that disables
+        // pvt mode until you call startPvtMove again
+        void stopPvtMove(uint8_t duration, bool emergency=false);
 
         enum OperationMode operationMode(uint8_t m);
         static enum OperationMode operationMode(std::string m);
