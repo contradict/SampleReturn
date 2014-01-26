@@ -25,6 +25,9 @@ find_package(Eigen REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(BFL REQUIRED orocos-bfl)
 
+# use c++0x
+set( CMAKE_CXX_FLAGS -std=c++0x)
+
 include_directories(${BFL_INCLUDE_DIRS})
 
 message("BFL include dirs:" ${BFL_INCLUDE_DIRS})
