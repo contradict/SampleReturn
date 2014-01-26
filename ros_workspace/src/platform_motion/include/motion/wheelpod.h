@@ -6,6 +6,23 @@ enum PodMode {
     PodPosition
 };
 
+struct PodSegment
+{
+    double steeringAngle; // absolute in radians
+    double steeringVelocity; // radians per second
+    double wheelDistance; // signed relative distance in meters
+    double wheelVelocity; // signed velocity in meters per second
+    double duration; // segment length in seconds
+
+    PodSegment():
+        steeringAngle(0.0),
+        steeringVelocity(0.0),
+        wheelDistance(0.0),
+        wheelVelocity(0.0),
+        duration(0.0)
+    {}
+};
+
 class WheelPod : public CANOpen::TransferCallbackReceiver {
     public:
         WheelPod(
@@ -39,7 +56,7 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         void initialize(void);
 
         void drive(double angle, double omega);
-        void move(Eigen::Vector2d distance, double rotation);
+        void move(std::vector<PodSegment> &segments);
         void home(CANOpen::DS301CallbackObject cb);
         void enable(bool state, CANOpen::DS301CallbackObject cb);
         bool enabled(void);
@@ -56,6 +73,17 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         void _setMode(enum PodMode m);
         void _positionAcchieved(CANOpen::DS301 &node);
 
+        void computeSteeringAndVelocity(
+                double steeringAngle,
+                double steeringVelocity,
+                double wheelDistance,
+                double wheelVelocity,
+                int &steeringPosition,
+                int &steeringVelocityCounts,
+                int &wheelDistanceCounts,
+                int &wheelVelocityCounts
+            );
+
         double steering_min, steering_max, steering_offset;
         long int steering_encoder_counts, wheel_encoder_counts;
         long int large_steering_move;
@@ -66,6 +94,7 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
 
         enum PodMode currentMode;
 
+        PodSegment m_lastSegment;
 };
 
 }
