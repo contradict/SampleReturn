@@ -17,7 +17,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
                  double steering_offset,
                  long int steering_encoder_counts,
                  long int wheel_encoder_counts,
-                 long int large_steering_move
+                 long int large_steering_move,
+                 double wheel_diameter
                  ):
             steering(CANOpen::CopleyServo(steering_id, pbus)),
             wheel(CANOpen::CopleyServo(wheel_id, pbus)),
@@ -27,6 +28,7 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
             steering_encoder_counts(steering_encoder_counts),
             wheel_encoder_counts(wheel_encoder_counts),
             large_steering_move(large_steering_move),
+            wheelDiameter(wheel_diameter),
             currentMode(PodUninitialized)
             {};
 
@@ -59,6 +61,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         long int large_steering_move;
 
         double desired_steering_position, desired_omega;
+
+        double wheelDiameter;
 
         enum PodMode currentMode;
 

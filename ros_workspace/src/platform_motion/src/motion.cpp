@@ -175,7 +175,8 @@ void Motion::createServos()
                  port_steering_offset,
                  steering_encoder_counts,
                  wheel_encoder_counts,
-                 large_steering_move
+                 large_steering_move,
+                 wheel_diameter
                 ));
     port->setCallbacks(pvcb, pvcb, gpiocb);
     port->steering.setStatusCallback(stcb);
@@ -195,7 +196,8 @@ void Motion::createServos()
                  starboard_steering_offset,
                  steering_encoder_counts,
                  wheel_encoder_counts,
-                 large_steering_move
+                 large_steering_move,
+                 wheel_diameter
                 ));
     starboard->setCallbacks(pvcb, pvcb, gpiocb);
     starboard->steering.setStatusCallback(stcb);
@@ -216,7 +218,8 @@ void Motion::createServos()
                  stern_steering_offset,
                  steering_encoder_counts,
                  wheel_encoder_counts,
-                 large_steering_move
+                 large_steering_move,
+                 wheel_diameter
                 ));
     stern->setCallbacks(pvcb, pvcb, gpiocb);
     stern->steering.setStatusCallback(stcb);
