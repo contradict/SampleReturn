@@ -9,13 +9,19 @@
 namespace platform_motion {
 
 void WheelPod::setCallbacks(CANOpen::DS301CallbackObject wheelcb,
-        CANOpen::DS301CallbackObject steeringcb,
-        CANOpen::CopleyServo::InputChangeCallback gpiocb)
+      CANOpen::DS301CallbackObject steeringcb,
+      CANOpen::CopleyServo::InputChangeCallback gpiocb,
+      CANOpen::DS301CallbackObject wheelBufferCallback,
+      CANOpen::DS301CallbackObject steeringBufferCallback
+    )
 {
     wheel.setPVCallback(wheelcb);
     wheel.setInputCallback(gpiocb);
     steering.setPVCallback(steeringcb);
     steering.setInputCallback(gpiocb);
+
+    wheel.setMoreDataNeededCallback(wheelBufferCallback);
+    steering.setMoreDataNeededCallback(steeringBufferCallback);
 }
 
 void WheelPod::drive(double angle, double omega)
@@ -291,6 +297,11 @@ void WheelPod::setSteeringOffset(double offset)
                 CANOpen::DS301CallbackObject(static_cast<CANOpen::TransferCallbackReceiver *>(this),
                     static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&WheelPod::_positionAcchieved)));
     }
+}
+
+int WheelPod::getMinBufferDepth()
+{
+    return std::min(wheel.getPvtBufferDepth(), steering.getPvtBufferDepth());
 }
 
 }

@@ -51,7 +51,10 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
 
         void setCallbacks(CANOpen::DS301CallbackObject wheelcb,
                           CANOpen::DS301CallbackObject steeringcb,
-                          CANOpen::CopleyServo::InputChangeCallback gpiocb);
+                          CANOpen::CopleyServo::InputChangeCallback gpiocb,
+                          CANOpen::DS301CallbackObject wheelBufferCallback,
+                          CANOpen::DS301CallbackObject steeringBufferCallback
+            );
 
         void initialize(void);
 
@@ -66,6 +69,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         void getStatusWord(uint16_t *steering_status, uint16_t *wheel_status);
 
         void setSteeringOffset(double offset);
+
+        int getMinBufferDepth();
 
         CANOpen::CopleyServo steering, wheel;
 
