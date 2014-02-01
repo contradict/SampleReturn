@@ -50,6 +50,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         void statusPublishCallback(const ros::TimerEvent& event);
 
+        // pvt mode
+        void moreDataNeededCallback(CANOpen::DS301 &node);
+        void errorCallback(CANOpen::DS301 &node);
+
+        void sendPvtSegment(); // send next pvt segment to all wheelpods
+
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;
 
@@ -125,6 +131,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         Eigen::Vector2d body_pt;
         int pv_counter;
         int joint_seq;
+
+        // pvt mode members
+        bool moreDataSent; // send more data once per sync.
 };
 
 }

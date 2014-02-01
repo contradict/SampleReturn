@@ -157,6 +157,21 @@ void Motion::createServos()
     CANOpen::DS301CallbackObject stcb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
             static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(&Motion::statusCallback));
 
+    CANOpen::DS301CallbackObject moreDataCb(
+            static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(
+                &Motion::moreDataNeededCallback)
+            );
+
+    // set the more data sent flag to the correct value (no data yet sent)
+    this->moreDataSent = false;
+
+    CANOpen::DS301CallbackObject errorCb(
+            static_cast<CANOpen::TransferCallbackReceiver *>(this),
+            static_cast<CANOpen::DS301CallbackObject::CallbackFunction>(
+                &Motion::errorCallback)
+            );
+
     param_nh.param("steering_encoder_counts", steering_encoder_counts, 4*2500);
     param_nh.param("wheel_encoder_counts", wheel_encoder_counts, 4*2500);
     param_nh.param("large_steering_move", large_steering_move, 30);
@@ -178,9 +193,11 @@ void Motion::createServos()
                  large_steering_move,
                  wheel_diameter
                 ));
-    port->setCallbacks(pvcb, pvcb, gpiocb);
+    port->setCallbacks(pvcb, pvcb, gpiocb, moreDataCb, moreDataCb);
     port->steering.setStatusCallback(stcb);
     port->wheel.setStatusCallback(stcb);
+    port->steering.setErrorCallback(errorCb);
+    port->wheel.setErrorCallback(errorCb);
 
     param_nh.getParam("starboard_steering_id", starboard_steering_id);
     param_nh.getParam("starboard_wheel_id", starboard_wheel_id);
@@ -199,9 +216,11 @@ void Motion::createServos()
                  large_steering_move,
                  wheel_diameter
                 ));
-    starboard->setCallbacks(pvcb, pvcb, gpiocb);
+    starboard->setCallbacks(pvcb, pvcb, gpiocb, moreDataCb, moreDataCb);
     starboard->steering.setStatusCallback(stcb);
     starboard->wheel.setStatusCallback(stcb);
+    starboard->steering.setErrorCallback(errorCb);
+    starboard->wheel.setErrorCallback(errorCb);
 
 
     param_nh.getParam("stern_steering_id", stern_steering_id);
@@ -221,9 +240,11 @@ void Motion::createServos()
                  large_steering_move,
                  wheel_diameter
                 ));
-    stern->setCallbacks(pvcb, pvcb, gpiocb);
+    stern->setCallbacks(pvcb, pvcb, gpiocb, moreDataCb, moreDataCb);
     stern->steering.setStatusCallback(stcb);
     stern->wheel.setStatusCallback(stcb);
+    stern->steering.setErrorCallback(errorCb);
+    stern->wheel.setErrorCallback(errorCb);
 
     param_nh.getParam("carousel_id", carousel_id);
     param_nh.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
@@ -732,7 +753,12 @@ void Motion::gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
+    // reset the pv_counter to wait for all the servos to report status
     pv_counter=7;
+
+    // reset the more data sent flag so we can send more data when needed
+    this->moreDataSent = false;
+
     /*
     if(carousel_enabled)
         pv_counter += 1;
@@ -878,6 +904,32 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status.status = status_stream.str();
     status.mode = mode_stream.str();
     status_pub.publish(status);
+}
+
+void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
+{
+    // only send more data once per sync pulse. this way we send data to
+    // all the servos as soon as one says it needs more
+    if(!this->moreDataSent)
+    {
+        // set the flag so we don't send data for every callback call this
+        // sync fame
+        this->moreDataSent = true;
+
+        sendPvtSegment();
+    }
+}
+
+void Motion::errorCallback(CANOpen::DS301 &node)
+{
+    // handle a pvt related error here!
+    // XXX TODO: at least print the error...
+}
+
+void Motion::sendPvtSegment()
+{
+    // send the next pvt segment to all the wheelpods.
+    // XXX TODO: actually make this work!
 }
 
 }
