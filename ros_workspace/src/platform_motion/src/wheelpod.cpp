@@ -65,6 +65,11 @@ void WheelPod::move(std::vector<PodSegment> &segments)
     // we're going to use pvt mode here
     _setMode(PodPosition);
 
+    // save the current buffer depths so we know to tell the servo to start
+    // going if we've just transitioned from a buffer underflow.
+    int steeringBufferDepth = steering.getPvtBufferDepth();
+    int wheelBufferDepth = wheel.getPvtBufferDepth();
+
     // variables for the loop:
     int steeringPosition, steeringVelocityCounts;
     int wheelDistanceCounts, wheelVelocityCounts;
@@ -165,6 +170,16 @@ void WheelPod::move(std::vector<PodSegment> &segments)
 
         // save the last segment. it may be useful.
         m_lastSegment = segment;
+    }
+
+    // start the servos moving as soon as they've got enough data.
+    if((steeringBufferDepth < 2) && (steering.getPvtBufferDepth() >= 2))
+    {
+        steering.startPvtMove();
+    }
+    if((wheelBufferDepth < 2) && (wheel.getPvtBufferDepth() >= 2))
+    {
+        wheel.startPvtMove();
     }
 }
 
