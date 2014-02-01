@@ -104,6 +104,13 @@ enum OutputPinFunction {
 #define PVT_HEADER_RESET_SEGMENT_ID 0x83
 #define PVT_HEADER_SEQUENCE_MASK 0x0007
 
+// the more data needed callback will fire if the number of buffer segments
+// is less than or equal to this
+#define PVT_MINIMUM_SEGMENTS 3
+
+// from the documentation:
+#define PVT_NUM_BUFFER_SLOTS 32
+
 class CopleyServo : public DS301 {
     public:
         CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus);
@@ -141,6 +148,7 @@ class CopleyServo : public DS301 {
         // if emergency is true, it flips the control word bit that disables
         // pvt mode until you call startPvtMove again
         void stopPvtMove(uint8_t duration, bool emergency=false);
+        int getPvtBufferDepth(); // how many things are in the pvt buffer?
 
         enum OperationMode operationMode(uint8_t m);
         static enum OperationMode operationMode(std::string m);
@@ -188,6 +196,8 @@ class CopleyServo : public DS301 {
         void setPVCallback(DS301CallbackObject cb);
         void setEMCYCallback(DS301CallbackObject cb);
         void setStatusCallback(DS301CallbackObject cb);
+        void setErrorCallback(DS301CallbackObject cb);
+        void setMoreDataNeededCallback(DS301CallbackObject cb);
 
         uint16_t getInputPins(void){return input_pins;};
         uint16_t getOutputPins(void){return output_pins;};
@@ -256,6 +266,7 @@ class CopleyServo : public DS301 {
         DS301CallbackObject status_callback;
         DS301CallbackObject emcy_callback;
         DS301CallbackObject error_callback;
+        DS301CallbackObject more_data_needed_callback;;
         InputChangeCallback input_callback;
 
         bool syncProducer;

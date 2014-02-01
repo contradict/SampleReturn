@@ -489,6 +489,16 @@ void CopleyServo::setStatusCallback(DS301CallbackObject cb)
     status_callback = cb;
 }
 
+void CopleyServo::setErrorCallback(DS301CallbackObject cb)
+{
+    error_callback = cb;
+}
+
+void CopleyServo::setMoreDataNeededCallback(DS301CallbackObject cb)
+{
+    more_data_needed_callback = cb;
+}
+
 
 bool CopleyServo::ready(void)
 {
@@ -775,6 +785,9 @@ void CopleyServo::handlePvtError(uint8_t statusByte)
                 slots--;
             }
         }
+
+        // fire the more data needed callback
+        more_data_needed_callback(*this);
     }
 
     if(statusByte&PVT_BUFFER_OVERFLOW)
@@ -787,6 +800,9 @@ void CopleyServo::handlePvtError(uint8_t statusByte)
     {
         // we ran out of things to do!
         m_lastErrorMessage += "buffer empty!\n";
+
+        // fire the more data needed callback
+        more_data_needed_callback(*this);
     }
 
     // call the error callback
@@ -812,6 +828,12 @@ void CopleyServo::handlePvtSegmentConsumed()
     {
         // send this segment.
         sendPvtSegment(m_activeSegments.front());
+    }
+
+    // if we're low on segments, fire the callback to ask for more.
+    if(m_freeBufferSlots <= PVT_MINIMUM_SEGMENTS)
+    {
+        more_data_needed_callback(*this);
     }
 }
 
@@ -936,6 +958,12 @@ bool CopleyServo::sendPvtSegment(PvtSegment &segment)
 
     pvt_pdo->send(data);
     return true;
+}
+
+int CopleyServo::getPvtBufferDepth()
+{
+    // return the number of pvt segments currently in the buffer.
+    return PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots;
 }
 
 }
