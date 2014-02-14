@@ -13,6 +13,8 @@
 #include <ros/ros.h>
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/Path.h>
 #include <sensor_msgs/JointState.h>
 #include <dynamic_reconfigure/server.h>
 #include <tf/transform_listener.h>
@@ -84,6 +86,8 @@ Motion::Motion() :
     gpio_sub = nh_.subscribe("gpio_write", 2, &Motion::gpioSubscriptionCallback,
             this);
 
+    nh_.subscribe("planned_path", 1, &Motion::plannedPathCallback, this);
+
     joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
 
     gpio_pub = nh_.advertise<platform_motion_msgs::GPIO>("gpio_read", 1);
@@ -91,6 +95,7 @@ Motion::Motion() :
     battery_voltage_pub = nh_.advertise<std_msgs::Float64>("battery_voltage", 1);
 
     status_pub = nh_.advertise<platform_motion_msgs::ServoStatus>("CAN_status_word", 10);
+
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -904,6 +909,44 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status.status = status_stream.str();
     status.mode = mode_stream.str();
     status_pub.publish(status);
+}
+
+void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
+{
+    // take the new path and insert it into the plannedPath
+    // list in the right spot.
+    // first, remove everything in the list that is now made obsolete
+    // by the new planned path.
+    ros::Time startTime = path->poses[0].header.stamp;
+    plannedPath.remove_if(
+            [startTime](geometry_msgs::PoseStamped p)
+            {
+                return p.header.stamp >= startTime;
+            }
+    );
+
+    // now copy all the path segments to the end of the list.
+    for(auto pose : path->poses)
+    {
+        plannedPath.push_back(pose);
+    }
+
+    // add a "safety" segment to the very end that will stop the robot
+    // one second after the end of the path. this seems like a good thing
+    geometry_msgs::PoseStamped lastPose = plannedPath.back();
+    lastPose.header.stamp += ros::Duration(1.0);
+    plannedPath.push_back(lastPose);
+
+    // check to see if the wheel pods are out of data. if they are,
+    // send a couple of segments to get things moving.
+    if((port->getMinBufferDepth() < 3) ||
+            (starboard->getMinBufferDepth() < 3) ||
+            (stern->getMinBufferDepth() < 3))
+    {
+        // just send one to get the ball rolling. they should ask for more
+        // right away (I think?)
+        sendPvtSegment();
+    }
 }
 
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)

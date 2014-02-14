@@ -1,3 +1,5 @@
+#include <nav_msgs/Path.h>
+
 namespace platform_motion{
 
 enum MotionCommandSource {
@@ -25,6 +27,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void plannedPathCallback(const nav_msgs::Path::ConstPtr path);
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
                 const char *joint_name, double *steering, double *speed);
@@ -134,6 +137,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         // pvt mode members
         bool moreDataSent; // send more data once per sync.
+        std::list<geometry_msgs::PoseStamped> plannedPath;
 };
 
 }
