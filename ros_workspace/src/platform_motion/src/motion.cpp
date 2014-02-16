@@ -14,7 +14,6 @@
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <nav_msgs/Path.h>
 #include <sensor_msgs/JointState.h>
 #include <dynamic_reconfigure/server.h>
 #include <tf/transform_listener.h>
