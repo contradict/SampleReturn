@@ -173,6 +173,9 @@ void WheelPod::move(std::vector<PodSegment> &segments)
     }
 
     // start the servos moving as soon as they've got enough data.
+    // the mode change already flips this bit, so it may be redundant to do
+    // it here. if things are starnge and jittery, consider removing these
+    // calls to startPvtMove.
     if((steeringBufferDepth < 2) && (steering.getPvtBufferDepth() >= 2))
     {
         steering.startPvtMove();
@@ -231,7 +234,7 @@ void WheelPod::_setMode(enum PodMode m)
             steering.setPvtAbsolute();
             wheel.mode(CANOpen::InterpolatedPosition);
             wheel.setPvtRelative();
-            // flip the bit that will pvt segments to start when they're added
+            // flip the bit that will cause pvt segments to start when they're added
             steering.startPvtMove();
             wheel.startPvtMove();
             currentMode = m;
