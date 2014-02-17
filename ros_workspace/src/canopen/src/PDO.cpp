@@ -152,8 +152,8 @@ void RPDO::send(std::vector<uint8_t> &data, PDOCallbackObject callback)
     m.id = COBID();
     m.RTR = false;
     m.EXTENDED = false;
-    m.dlc=8;
     int tocopy=std::min((int)data.size(), 8);
+    m.dlc=tocopy;
     std::copy(data.begin(), data.begin()+tocopy, &m.data[0]);
 
     to_send.push_back( m );
