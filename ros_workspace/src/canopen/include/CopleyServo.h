@@ -207,6 +207,7 @@ class CopleyServo : public DS301 {
         void writeStatus(std::ostream &out);
 
         std::string getLastError() {return m_lastErrorMessage;}
+        void resetLastError() {m_lastErrorMessage = "";}
 
         int32_t position;
         int32_t velocity;

@@ -59,7 +59,10 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
     syncProducer(false),
     allReady(false),
     gotPV(false),
-    mapsCreated(false)
+    mapsCreated(false),
+    m_lastErrorMessage(""),
+    m_freeBufferSlots(32),
+    m_currentSegmentId(0)
 {
     bus->add(sync);
     bus->add(emcy);
@@ -79,7 +82,10 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
     syncInterval(sync_interval),
     allReady(false),
     gotPV(false),
-    mapsCreated(false)
+    mapsCreated(false),
+    m_lastErrorMessage(""),
+    m_freeBufferSlots(32),
+    m_currentSegmentId(0)
 {
     bus->add(sync);
     bus->add(emcy);
@@ -229,8 +235,8 @@ void CopleyServo::_mapPDOs(void)
     map.subindex = 0x0;
     map.bits = 64;
     maps.push_back(map);
-    // Commit on sync
-    pvt_pdo = mapRPDO("Target Position, Velocity, & Time", 4, maps, 0);
+    // Immediate action
+    pvt_pdo = mapRPDO("Target Position, Velocity, & Time", 4, maps, 0xFF);
     bus->add(pvt_pdo);
 
     mapsCreated = true;
