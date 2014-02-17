@@ -60,9 +60,11 @@ void WheelPod::home(CANOpen::DS301CallbackObject cb)
     steering.home(cb);
 }
 
-void WheelPod::move(std::vector<PodSegment> &segments)
+void WheelPod::move(PodSegment &segment)
 {
     // we're going to use pvt mode here
+    // _setMode won't do anything if the mode is already PodPosition,
+    // so there's not much harm in callign it repeatedly
     _setMode(PodPosition);
 
     // save the current buffer depths so we know to tell the servo to start
@@ -70,19 +72,69 @@ void WheelPod::move(std::vector<PodSegment> &segments)
     int steeringBufferDepth = steering.getPvtBufferDepth();
     int wheelBufferDepth = wheel.getPvtBufferDepth();
 
-    // variables for the loop:
+    // variables for the unit conversions:
     int steeringPosition, steeringVelocityCounts;
     int wheelDistanceCounts, wheelVelocityCounts;
 
-    // loop over the segments, convert each one into servo units and
-    // send them to the servos
-    for(auto segment : segments)
+    // check the segment duration. the servos can only handle 8-bit
+    // time in milliseconds per segment
+    if(segment.duration <= 0.255)
     {
-        // check the segment duration. the servos can only handle 8-bit
-        // time in milliseconds per segment
-        if(segment.duration <= 0.255)
+        int time = round(segment.duration*1000.0);
+        // handle potential rounding problems.
+        if(time > 255)
         {
-            int time = round(segment.duration*1000.0);
+            time = 255;
+        }
+        // convert units to counts with the helper.
+        computeSteeringAndVelocity(
+                segment.steeringAngle,
+                segment.steeringVelocity,
+                segment.wheelDistance,
+                segment.wheelVelocity,
+                steeringPosition,
+                steeringVelocityCounts,
+                wheelDistanceCounts,
+                wheelVelocityCounts
+        );
+
+        // send the segment to the servos
+        wheel.addPvtSegment(
+                wheelDistanceCounts,
+                wheelVelocityCounts,
+                time
+        );
+        steering.addPvtSegment(
+                steeringPosition,
+                steeringVelocityCounts,
+                time
+        );
+    }
+    else
+    {
+        // you probably don't want to be here.
+        // linearly interpolate the segment so the time works out.
+        // this is likely wrong most of the time, but is better
+        // than telling the servo to do something totally crazy.
+        int numSubsegments = (int)ceil(segment.duration/0.255);
+
+        double subsegmentDuration = segment.duration/numSubsegments;
+
+        // compute deltas between this state and the last.
+        double steeringAngleDelta = 
+            (segment.steeringAngle - m_lastSegment.steeringAngle)/
+            numSubsegments;
+        double steeringVelocityDelta = 
+            (segment.steeringVelocity - m_lastSegment.steeringVelocity)/
+            numSubsegments;
+        double wheelVelocityDelta = 
+            (segment.wheelVelocity - m_lastSegment.wheelVelocity)/
+            numSubsegments;
+
+        // add the subsegments
+        for(int i = 1; i <= numSubsegments; i++)
+        {
+            int time = round(subsegmentDuration*1000.0);
             // handle potential rounding problems.
             if(time > 255)
             {
@@ -90,14 +142,14 @@ void WheelPod::move(std::vector<PodSegment> &segments)
             }
             // convert units to counts with the helper.
             computeSteeringAndVelocity(
-                    segment.steeringAngle,
-                    segment.steeringVelocity,
-                    segment.wheelDistance,
-                    segment.wheelVelocity,
-                    steeringPosition,
-                    steeringVelocityCounts,
-                    wheelDistanceCounts,
-                    wheelVelocityCounts
+                m_lastSegment.steeringAngle + i*steeringAngleDelta,
+                m_lastSegment.steeringVelocity + i*steeringVelocityDelta,
+                segment.wheelDistance/numSubsegments,
+                m_lastSegment.wheelVelocity + i*wheelVelocityDelta,
+                steeringPosition,
+                steeringVelocityCounts,
+                wheelDistanceCounts,
+                wheelVelocityCounts
             );
 
             // send the segment to the servos
@@ -112,65 +164,10 @@ void WheelPod::move(std::vector<PodSegment> &segments)
                     time
             );
         }
-        else
-        {
-            // you probably don't want to be here.
-            // linearly interpolate the segment so the time works out.
-            // this is likely wrong most of the time, but is better
-            // than telling the servo to do something totally crazy.
-            int numSubsegments = (int)ceil(segment.duration/0.255);
-
-            double subsegmentDuration = segment.duration/numSubsegments;
-
-            // compute deltas between this state and the last.
-            double steeringAngleDelta = 
-                (segment.steeringAngle - m_lastSegment.steeringAngle)/
-                numSubsegments;
-            double steeringVelocityDelta = 
-                (segment.steeringVelocity - m_lastSegment.steeringVelocity)/
-                numSubsegments;
-            double wheelVelocityDelta = 
-                (segment.wheelVelocity - m_lastSegment.wheelVelocity)/
-                numSubsegments;
-
-            // add the subsegments
-            for(int i = 1; i <= numSubsegments; i++)
-            {
-                int time = round(subsegmentDuration*1000.0);
-                // handle potential rounding problems.
-                if(time > 255)
-                {
-                    time = 255;
-                }
-                // convert units to counts with the helper.
-                computeSteeringAndVelocity(
-                    m_lastSegment.steeringAngle + i*steeringAngleDelta,
-                    m_lastSegment.steeringVelocity + i*steeringVelocityDelta,
-                    segment.wheelDistance/numSubsegments,
-                    m_lastSegment.wheelVelocity + i*wheelVelocityDelta,
-                    steeringPosition,
-                    steeringVelocityCounts,
-                    wheelDistanceCounts,
-                    wheelVelocityCounts
-                );
-
-                // send the segment to the servos
-                wheel.addPvtSegment(
-                        wheelDistanceCounts,
-                        wheelVelocityCounts,
-                        time
-                );
-                steering.addPvtSegment(
-                        steeringPosition,
-                        steeringVelocityCounts,
-                        time
-                );
-            }
-        }
-
-        // save the last segment. it may be useful.
-        m_lastSegment = segment;
     }
+
+    // save the last segment. it may be useful.
+    m_lastSegment = segment;
 
     // start the servos moving as soon as they've got enough data.
     // the mode change already flips this bit, so it may be redundant to do
@@ -183,6 +180,16 @@ void WheelPod::move(std::vector<PodSegment> &segments)
     if((wheelBufferDepth < 2) && (wheel.getPvtBufferDepth() >= 2))
     {
         wheel.startPvtMove();
+    }
+}
+
+void WheelPod::move(std::vector<PodSegment> &segments)
+{
+    // loop over the segments and use the one segment move method to
+    // digest all the given segments
+    for(auto segment : segments)
+    {
+        move(segment);
     }
 }
 
