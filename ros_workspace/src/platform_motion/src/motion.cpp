@@ -971,7 +971,29 @@ void Motion::errorCallback(CANOpen::DS301 &node)
 void Motion::sendPvtSegment()
 {
     // send the next pvt segment to all the wheelpods.
-    // XXX TODO: actually make this work!
+    if(plannedPath.size() > 0)
+    {
+        // if we've got some path to follow, follow it.
+        // XXX TODO: actually make this work!
+    }
+    else
+    {
+        // if there is no path to follow, keep the buffers full of zeros
+        // this means we're constantly actually filling the buffer and
+        // don't have to worry about it being empty. that seems like
+        // a good thing.
+        // we'll just give all the wheel pods the same segment.
+        PodSegment segment;
+        segment.steeringAngle = 0.0;
+        segment.steeringVelocity = 0.0;
+        segment.wheelDistance = 0.0;
+        segment.wheelVelocity = 0.0;
+        segment.duration = .25;
+
+        port->move(segment);
+        starboard->move(segment);
+        stern->move(segment);
+    }
 }
 
 }
