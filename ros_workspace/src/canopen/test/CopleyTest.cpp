@@ -201,6 +201,13 @@ int main(int argc, char * argv[])
                 }
             }
         }
+
+        if(servo.getLastError() != "")
+        {
+            std::cout << servo.getLastError() << std::endl << servo.getPvtBufferDepth() << std::endl;
+            servo.resetLastError();
+        }
+
         if(servo.ready() && !opdone ) {
             switch(op){
                 case Monitor:
@@ -240,24 +247,42 @@ int main(int argc, char * argv[])
                     break;
                 case PvtMode:
                     // currently hard coded for wheels! do not run on steering!
+                    std::cout << "enabling servo" << std::endl;
                     servo.mode(InterpolatedPosition);
+                    servo.enable();
                     servo.setPvtRelative();
-                    servo.addPvtSegment(0, 0, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 50000, 250);
-                    servo.addPvtSegment(1250, 0, 250);
-                    servo.addPvtSegment(0, 0, 250);
-                    servo.addPvtSegment(-2500, -100000, 250);
-                    servo.addPvtSegment(-2500, -100000, 250);
-                    servo.addPvtSegment(-2500, -100000, 250);
-                    servo.addPvtSegment(-2500, 0, 250);
-                    servo.addPvtSegment(0, 0, 250);
+                    std::cout << "starting pvt move" << std::endl;
                     servo.startPvtMove();
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(0, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(0, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, -100000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, -100000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, -100000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(0, 0, 250);
                     break;
             }
             opdone=true;
