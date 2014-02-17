@@ -912,6 +912,11 @@ void Motion::statusCallback(CANOpen::DS301 &node)
 
 void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
 {
+    if(command_source != COMMAND_SOURCE_PLANNER)
+    {
+        // if the planner hasn't been put in charge, don't listen to it
+        return;
+    }
     // take the new path and insert it into the plannedPath
     // list in the right spot.
     // first, remove everything in the list that is now made obsolete
@@ -970,29 +975,38 @@ void Motion::errorCallback(CANOpen::DS301 &node)
 
 void Motion::sendPvtSegment()
 {
-    // send the next pvt segment to all the wheelpods.
-    if(plannedPath.size() > 0)
+    // for now, only the planner should be sending pvt segments.
+    // if the planner isn't in charge, don't send segments, including
+    // the stop segments. this will keep the zero velocity segments from
+    // stomping all over other commands from other sources.
+    // if the joystick and visual servo ever use pvt mode, this will
+    // have to change.
+    if(command_source == COMMAND_SOURCE_PLANNER)
     {
-        // if we've got some path to follow, follow it.
-        // XXX TODO: actually make this work!
-    }
-    else
-    {
-        // if there is no path to follow, keep the buffers full of zeros
-        // this means we're constantly actually filling the buffer and
-        // don't have to worry about it being empty. that seems like
-        // a good thing.
-        // we'll just give all the wheel pods the same segment.
-        PodSegment segment;
-        segment.steeringAngle = 0.0;
-        segment.steeringVelocity = 0.0;
-        segment.wheelDistance = 0.0;
-        segment.wheelVelocity = 0.0;
-        segment.duration = .25;
+        // send the next pvt segment to all the wheelpods.
+        if(plannedPath.size() > 0)
+        {
+            // if we've got some path to follow, follow it.
+            // XXX TODO: actually make this work!
+        }
+        else
+        {
+            // if there is no path to follow, keep the buffers full of zeros
+            // this means we're constantly actually filling the buffer and
+            // don't have to worry about it being empty. that seems like
+            // a good thing.
+            // we'll just give all the wheel pods the same segment.
+            PodSegment segment;
+            segment.steeringAngle = 0.0;
+            segment.steeringVelocity = 0.0;
+            segment.wheelDistance = 0.0;
+            segment.wheelVelocity = 0.0;
+            segment.duration = .25;
 
-        port->move(segment);
-        starboard->move(segment);
-        stern->move(segment);
+            port->move(segment);
+            starboard->move(segment);
+            stern->move(segment);
+        }
     }
 }
 
