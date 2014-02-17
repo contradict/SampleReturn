@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="smooth"/>
+    <arg name="path" default="AppliedMinds"/>
+    <arg name="kind" default="install"/>
+    <machine name="search"
+             address="localhost"
+             env-loader="/home/$(arg user)/$(arg path)/AppliedMinds/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+    <machine name="navigate"
+             address="localhost"
+             env-loader="/home/$(arg user)/$(arg path)/AppliedMinds/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+
+    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
+        <remap from="base_pose_ground_truth" to="odometry"/>
+    </node>
+
+    <node pkg="tf" type="static_transform_publisher" name="map_base_link_broadcaster" args="0 0 0 0 0 0 map base_link 100" />
+
+    <include file="$(find samplereturn)/launch/planner_test.launch"/>
+</launch>

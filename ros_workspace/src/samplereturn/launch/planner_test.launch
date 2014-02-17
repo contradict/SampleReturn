@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node
+        machine="navigate"
+        name="mover"
+        pkg="move_base"
+        type="move_base"
+        ns="/processes/planner"
+        output="log"
+	launch-prefix="xterm -e gdb --args"
+        >
+        <!--
+        launch-prefix="screen -d -m gdb - -args"
+        -->
+        <remap from="odom" to="odometry"/>
+        <remap from="cmd_vel" to="command"/>
+
+
+        <rosparam file="$(find samplereturn)/config/test/costmap_common_params.yaml" command="load" ns="local_costmap" />
+        <rosparam file="$(find samplereturn)/config/test/costmap_local_params.yaml" command="load"/>
+        <rosparam file="$(find samplereturn)/config/test/costmap_common_params.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(find samplereturn)/config/test/costmap_global_params.yaml" command="load"/>
+
+	<rosparam file="$(find samplereturn)/config/test/sbpl_common_params.yaml" command="load"/>
+
+	<param name="SBPLLatticePlanner/primitive_filename" type="string" value="$(find samplereturn)/config/test/motion_primitives.mprim"/>
+        <param name="planner_frequency" type="double" value="0.5"/>
+        <!--<param name="base_global_planner" type="string" value="carrot_planner/CarrotPlanner"/>-->
+        <param name="base_global_planner" type="string" value="SBPLLatticePlanner"/>
+        <!--<param name="base_local_planner" type="string" value="dwa_local_planner/DWAPlannerROS"/>-->
+        <!--<rosparam file="$(find samplereturn)/config/test/base_local_planner_params.yaml" command="load"/>-->
+    </node>
+
+    <node
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_cloud"
+        name="voxel_visualizer_cloud"
+        ns="/processes/planner/mover/local_costmap">
+    </node>
+
+
+    <node
+        machine="navigate"
+        name="map_server"
+        pkg="map_server"
+        type="map_server"
+        ns="/processes/planner"
+        output="log"
+        args="$(find samplereturn)/config/test/map_server.yaml"
+        >
+    </node>
+
+</launch>
