@@ -970,7 +970,10 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 void Motion::errorCallback(CANOpen::DS301 &node)
 {
     // handle a pvt related error here!
-    // XXX TODO: at least print the error...
+    // for now, just print out the error...
+    ROS_ERROR("Servo with id %lu had the following error:%s",
+            node.node_id,
+            static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
 }
 
 void Motion::sendPvtSegment()
