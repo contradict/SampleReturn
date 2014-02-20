@@ -50,7 +50,8 @@ Motion::Motion() :
     carousel_enabled(false),
     desired_carousel_state(false),
     pv_counter(0),
-    joint_seq(0)
+    joint_seq(0),
+    scaryTestModeEnabled(false)
 {
 
     ROS_INFO("Started in namespace %s", nh_.getNamespace().c_str());
@@ -86,6 +87,14 @@ Motion::Motion() :
             this);
 
     nh_.subscribe("planned_path", 1, &Motion::plannedPathCallback, this);
+
+    carousel_sub = nh_.subscribe(
+            "scary_test_mode",
+            2,
+            &Motion::scaryTestModeCallback,
+            this
+    );
+
 
     joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
 
@@ -394,6 +403,10 @@ bool Motion::selectCommandSourceCallback(platform_motion_msgs::SelectCommandSour
         twist->angular.z=0;
         handleTwist(geometry_msgs::Twist::ConstPtr(twist));
     }
+    else if(req.source == std::string("ScaryTestMode"))
+    {
+        command_source = COMMAND_SOURCE_SCARY_TEST_MODE;
+    }
     else
     {
         ROS_ERROR("Unrecognized command source %s", req.source.c_str());
@@ -410,6 +423,9 @@ bool Motion::selectCommandSourceCallback(platform_motion_msgs::SelectCommandSour
                 break;
             case COMMAND_SOURCE_NONE:
                 resp.source="None";
+                break;
+            case COMMAND_SOURCE_SCARY_TEST_MODE:
+                resp.source = "ScaryTestMode";
                 break;
         }
         resp.valid=false;
@@ -953,6 +969,22 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
     }
 }
 
+void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
+{
+    if(command_source != COMMAND_SOURCE_SCARY_TEST_MODE)
+    {
+        return;
+    }
+
+    scaryTestModeEnabled = enable->data;
+
+    // keep track of when we started.
+    scaryTestModeStartTime = ros::Time::now();
+
+    // send a pvt segment to kick things off
+    sendPvtSegment();
+}
+
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 {
     // only send more data once per sync pulse. this way we send data to
@@ -999,6 +1031,42 @@ void Motion::sendPvtSegment()
             // don't have to worry about it being empty. that seems like
             // a good thing.
             // we'll just give all the wheel pods the same segment.
+            PodSegment segment;
+            segment.steeringAngle = 0.0;
+            segment.steeringVelocity = 0.0;
+            segment.wheelDistance = 0.0;
+            segment.wheelVelocity = 0.0;
+            segment.duration = .25;
+
+            port->move(segment);
+            starboard->move(segment);
+            stern->move(segment);
+        }
+    }
+    else if(command_source == COMMAND_SOURCE_SCARY_TEST_MODE)
+    {
+        if(scaryTestModeEnabled)
+        {
+            double theta =
+                (ros::Time::now() - scaryTestModeStartTime).toSec() * M_PI;
+
+            // we'll just give all the wheel pods the same segment.
+            // also, no steering for now, just wheels moving
+            PodSegment segment;
+            segment.steeringAngle = 0.0;
+            segment.steeringVelocity = 0.0;
+            segment.wheelDistance = sin(theta);
+            segment.wheelVelocity = cos(theta);
+            segment.duration = .25;
+
+            port->move(segment);
+            starboard->move(segment);
+            stern->move(segment);
+        }
+        else
+        {
+            // if we're disabled for the moment, send zeros to get things
+            // to stop moving. this seems like it might be handy...
             PodSegment segment;
             segment.steeringAngle = 0.0;
             segment.steeringVelocity = 0.0;

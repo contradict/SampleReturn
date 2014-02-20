@@ -1,4 +1,5 @@
 #include <nav_msgs/Path.h>
+#include <std_msgs/Bool.h>
 
 namespace platform_motion{
 
@@ -6,6 +7,7 @@ enum MotionCommandSource {
     COMMAND_SOURCE_PLANNER,
     COMMAND_SOURCE_JOYSTICK,
     COMMAND_SOURCE_SERVO,
+    COMMAND_SOURCE_SCARY_TEST_MODE,
     COMMAND_SOURCE_NONE
 };
 
@@ -52,6 +54,11 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void reconfigureCallback(PlatformParametersConfig &config, uint32_t level);
 
         void statusPublishCallback(const ros::TimerEvent& event);
+
+        // scary pvt test mode enable. only do this on blocks!!!
+        void scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable);
+        bool scaryTestModeEnabled;
+        ros::Time scaryTestModeStartTime;
 
         // pvt mode
         void moreDataNeededCallback(CANOpen::DS301 &node);
