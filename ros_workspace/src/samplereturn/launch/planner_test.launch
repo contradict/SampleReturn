@@ -28,7 +28,7 @@
         <param name="planner_frequency" type="double" value="0.5"/>
         <!--<param name="base_global_planner" type="string" value="carrot_planner/CarrotPlanner"/>-->
         <param name="base_global_planner" type="string" value="SBPLLatticePlanner"/>
-        <!--<param name="base_local_planner" type="string" value="dwa_local_planner/DWAPlannerROS"/>-->
+        <param name="base_local_planner" type="string" value="TheSmoothPlanner"/>
         <!--<rosparam file="$(find samplereturn)/config/test/base_local_planner_params.yaml" command="load"/>-->
     </node>
 
