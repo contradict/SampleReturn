@@ -242,8 +242,8 @@ void WheelPod::_setMode(enum PodMode m)
             wheel.mode(CANOpen::InterpolatedPosition);
             wheel.setPvtRelative();
             // flip the bit that will cause pvt segments to start when they're added
-            steering.startPvtMove();
-            wheel.startPvtMove();
+            //steering.startPvtMove();
+            //wheel.startPvtMove();
             currentMode = m;
             break;
         case PodDrive:
