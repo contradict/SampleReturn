@@ -77,6 +77,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber joystick_sub;
         ros::Subscriber servo_sub;
         ros::Subscriber carousel_sub;
+        ros::Subscriber scary_test_mode_sub;
         ros::Subscriber gpio_sub;
         ros::Publisher gpio_pub;
         ros::Publisher joint_state_pub;

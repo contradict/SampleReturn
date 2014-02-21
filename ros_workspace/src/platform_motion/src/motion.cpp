@@ -88,7 +88,7 @@ Motion::Motion() :
 
     nh_.subscribe("planned_path", 1, &Motion::plannedPathCallback, this);
 
-    carousel_sub = nh_.subscribe(
+    scary_test_mode_sub = nh_.subscribe(
             "scary_test_mode",
             2,
             &Motion::scaryTestModeCallback,
@@ -1048,15 +1048,15 @@ void Motion::sendPvtSegment()
         if(scaryTestModeEnabled)
         {
             double theta =
-                (ros::Time::now() - scaryTestModeStartTime).toSec() * M_PI;
+                ((ros::Time::now() - scaryTestModeStartTime).toSec() / 4.0) * M_PI;
 
             // we'll just give all the wheel pods the same segment.
             // also, no steering for now, just wheels moving
             PodSegment segment;
             segment.steeringAngle = 0.0;
             segment.steeringVelocity = 0.0;
-            segment.wheelDistance = sin(theta);
-            segment.wheelVelocity = cos(theta);
+            segment.wheelDistance = 1.0 - cos(theta);
+            segment.wheelVelocity = (M_PI / 4.0) * sin(theta);
             segment.duration = .25;
 
             port->move(segment);
