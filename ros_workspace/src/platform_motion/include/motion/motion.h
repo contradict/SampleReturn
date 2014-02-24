@@ -66,6 +66,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         void sendPvtSegment(ros::Time time); // send next pvt segment to all wheelpods
 
+        // debug print statement variable. probably shouldn't be committed
+        int m_debugPrintCounter;
+
+        // another not great solution to a problem. we should probably
+        // not really have this
+        int m_dumbSyncCounter;
 
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;
