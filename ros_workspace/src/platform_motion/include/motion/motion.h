@@ -64,7 +64,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 
-        void sendPvtSegment(); // send next pvt segment to all wheelpods
+        void sendPvtSegment(ros::Time time); // send next pvt segment to all wheelpods
+
 
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;

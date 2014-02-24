@@ -965,7 +965,7 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
     {
         // just send one to get the ball rolling. they should ask for more
         // right away (I think?)
-        sendPvtSegment();
+        sendPvtSegment(ros::Time::now());
     }
 }
 
@@ -982,7 +982,9 @@ void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
     scaryTestModeStartTime = ros::Time::now();
 
     // send a pvt segment to kick things off
-    sendPvtSegment();
+    sendPvtSegment(scaryTestModeStartTime);
+    sendPvtSegment(scaryTestModeStartTime + ros::Duration(0.25));
+    sendPvtSegment(scaryTestModeStartTime + ros::Duration(0.5));
 }
 
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
@@ -995,7 +997,7 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         // sync fame
         this->moreDataSent = true;
 
-        sendPvtSegment();
+        sendPvtSegment(ros::Time::now());
     }
 }
 
@@ -1008,7 +1010,18 @@ void Motion::errorCallback(CANOpen::DS301 &node)
             static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
 }
 
-void Motion::sendPvtSegment()
+// function definition interlude!
+double x(double t, double omega)
+{
+    return (1.0 - cos(omega * t)) / 2.0;
+}
+
+double xPrime(double t, double omega)
+{
+    return omega * sin(omega * t) / 2.0;
+}
+
+void Motion::sendPvtSegment(ros::Time time)
 {
     // for now, only the planner should be sending pvt segments.
     // if the planner isn't in charge, don't send segments, including
@@ -1045,22 +1058,47 @@ void Motion::sendPvtSegment()
     }
     else if(command_source == COMMAND_SOURCE_SCARY_TEST_MODE)
     {
+        // get the steering angles (and a bunch of other crud) so we can
+        // tell the steering not to move for each pod. this seems like a good
+        // thing.
+        double port_steering, starboard_steering, stern_steering;
+        double port_steering_velocity, starboard_steering_velocity,
+               stern_steering_velocity;
+        double port_wheel, starboard_wheel, stern_wheel;
+        double port_wheel_velocity, starboard_wheel_velocity,
+               stern_wheel_velocity;
+
+        port->getPosition(&port_steering, &port_steering_velocity,
+                &port_wheel, &port_wheel_velocity);
+        starboard->getPosition(&starboard_steering, &starboard_steering_velocity,
+                &starboard_wheel, &starboard_wheel_velocity);
+        stern->getPosition(&stern_steering, &stern_steering_velocity,
+                &stern_wheel, &stern_wheel_velocity);
+
         if(scaryTestModeEnabled)
         {
-            double theta =
-                ((ros::Time::now() - scaryTestModeStartTime).toSec() / 4.0) * M_PI;
+            double t = (time - scaryTestModeStartTime).toSec();
+            double omega = M_PI / 4.0;
+            double dt = 0.25;
 
             // we'll just give all the wheel pods the same segment.
             // also, no steering for now, just wheels moving
             PodSegment segment;
             segment.steeringAngle = 0.0;
             segment.steeringVelocity = 0.0;
-            segment.wheelDistance = 1.0 - cos(theta);
-            segment.wheelVelocity = (M_PI / 4.0) * sin(theta);
-            segment.duration = .25;
+            segment.wheelDistance = 1.5 * (x(t + dt, omega) - x(t, omega));
+            segment.wheelVelocity = 1.5 * (xPrime(t+dt, omega));
+            segment.duration = dt;
 
+            // reset the steering angle for each pod so we don't move the
+            // steering.
+            segment.steeringAngle = port_steering;
             port->move(segment);
+            segment.wheelVelocity *= -1.0;
+            segment.wheelDistance *= -1.0;
+            segment.steeringAngle = starboard_steering;
             starboard->move(segment);
+            segment.steeringAngle = stern_steering;
             stern->move(segment);
         }
         else
@@ -1074,8 +1112,13 @@ void Motion::sendPvtSegment()
             segment.wheelVelocity = 0.0;
             segment.duration = .25;
 
+            // reset the steering angle for each pod so we don't move the
+            // steering.
+            segment.steeringAngle = port_steering;
             port->move(segment);
+            segment.steeringAngle = starboard_steering;
             starboard->move(segment);
+            segment.steeringAngle = stern_steering;
             stern->move(segment);
         }
     }
