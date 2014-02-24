@@ -168,19 +168,6 @@ void WheelPod::move(PodSegment &segment)
 
     // save the last segment. it may be useful.
     m_lastSegment = segment;
-
-    // start the servos moving as soon as they've got enough data.
-    // the mode change already flips this bit, so it may be redundant to do
-    // it here. if things are starnge and jittery, consider removing these
-    // calls to startPvtMove.
-    if((steeringBufferDepth < 2) && (steering.getPvtBufferDepth() >= 2))
-    {
-        steering.startPvtMove();
-    }
-    if((wheelBufferDepth < 2) && (wheel.getPvtBufferDepth() >= 2))
-    {
-        wheel.startPvtMove();
-    }
 }
 
 void WheelPod::move(std::vector<PodSegment> &segments)
@@ -191,6 +178,19 @@ void WheelPod::move(std::vector<PodSegment> &segments)
     {
         move(segment);
     }
+}
+
+bool WheelPod::getNeedsToStart()
+{
+    // if both servos need to start, this wheel pod is ready to start.
+    return steering.getNeedsToStart() && wheel.getNeedsToStart();
+}
+
+void WheelPod::startMoving()
+{
+    // tell both steering and wheel to start pvt segments.
+    steering.startPvtMove();
+    wheel.startPvtMove();
 }
 
 void WheelPod::computeSteeringAndVelocity(
@@ -237,13 +237,12 @@ void WheelPod::_setMode(enum PodMode m)
     if(currentMode == m) return;
     switch(m) {
         case PodPosition:
-            steering.mode(CANOpen::InterpolatedPosition);
             steering.setPvtAbsolute();
-            wheel.mode(CANOpen::InterpolatedPosition);
+            steering.mode(CANOpen::InterpolatedPosition);
+
             wheel.setPvtRelative();
-            // flip the bit that will cause pvt segments to start when they're added
-            //steering.startPvtMove();
-            //wheel.startPvtMove();
+            wheel.mode(CANOpen::InterpolatedPosition);
+
             currentMode = m;
             break;
         case PodDrive:

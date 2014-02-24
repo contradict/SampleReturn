@@ -66,6 +66,11 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         bool enabled(void);
         bool ready(void);
 
+        // for pvt mode we need to coordinate our starting. do we need to
+        // start?
+        bool getNeedsToStart();
+        void startMoving(); // actually start pvt moves.
+
         void getPosition(double *steering_pos, double *steering_vel, double *wheel_pos, double *wheel_vel);
         void getStatusWord(uint16_t *steering_status, uint16_t *wheel_status);
 
