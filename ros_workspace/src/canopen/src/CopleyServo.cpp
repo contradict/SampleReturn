@@ -62,6 +62,8 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
     mapsCreated(false),
     m_lastErrorMessage(""),
     m_freeBufferSlots(32),
+    m_expectedFreeBufferSlots(32),
+    m_needsToStart(false),
     m_currentSegmentId(0)
 {
     bus->add(sync);
@@ -85,6 +87,8 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
     mapsCreated(false),
     m_lastErrorMessage(""),
     m_freeBufferSlots(32),
+    m_expectedFreeBufferSlots(32),
+    m_needsToStart(false),
     m_currentSegmentId(0)
 {
     bus->add(sync);
@@ -280,9 +284,32 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
 
     // if there are now more free slots than we had before, we've consumed one
     bool segmentConsumed = (m_freeBufferSlots < freeBufferSlots);
+
+    // if we just got enough segments to start, we're ready to be told to go
+    if(
+        ((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) < 2) &&
+        ((PVT_NUM_BUFFER_SLOTS - freeBufferSlots) >= 2))
+    {
+        m_needsToStart = true;
+    }
+    else if(
+        ((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) >= 2) &&
+        ((PVT_NUM_BUFFER_SLOTS - freeBufferSlots) < 2))
+
+    {
+        // if we just crossed from having enough thing in the buffer to having
+        // too few, we shouldn't be told to start
+        m_needsToStart = false;
+    }
     
     m_expectedSegmentId = nextSegmentExpected;
     m_freeBufferSlots = freeBufferSlots;
+    // expected free buffer slots decrements between status callbacks
+    // this is so we don't accidentally send too many segments too quickly.
+    // we need to keep the concept of how many are actually free though because
+    // we need to tell the servo to go only when it actually has enough
+    // segments!
+    m_expectedFreeBufferSlots = freeBufferSlots;
 
     uint8_t risingPvtStatus = (~m_pvtStatusByte) & statusByte;
     m_pvtStatusByte = statusByte;
@@ -307,13 +334,26 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
         case InterpolatedPosition:
             if(risingPvtStatus&PVT_GOT_ERROR)
             {
+                std::cerr << "Got pvt error" << std::endl;
                 handlePvtError(risingPvtStatus);
             }
             if(segmentConsumed)
             {
+                std::cerr << "pvt segment consumed" << std::endl;
                 // if we've consumed a segment, check to see if there
                 // are any more segments waiting
                 handlePvtSegmentConsumed();
+            }
+            else if((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) < PVT_MINIMUM_SEGMENTS)
+            {
+                std::cerr << "more pvt data needed" << std::endl;
+                // if we still don't think we have enough segments,
+                // ask for more!
+                more_data_needed_callback(*this);
+            }
+            else
+            {
+                std::cerr << "no pvt action taken. free buffer slots: " << m_freeBufferSlots << " expected free buffer slots: " << m_expectedFreeBufferSlots << std::endl;
             }
             break;
         case CyclicSynchonousPosition:
@@ -829,15 +869,15 @@ void CopleyServo::handlePvtSegmentConsumed()
     // send one new segment if we happen to have the next one the
     // servo expects to get
     if((m_activeSegments.size() > 0) &&
-       (m_freeBufferSlots > 0) &&
+       (m_expectedFreeBufferSlots > 0) &&
        (m_activeSegments.front().id == m_expectedSegmentId))
     {
         // send this segment.
-        sendPvtSegment(m_activeSegments.front());
+        //sendPvtSegment(m_activeSegments.front());
     }
 
     // if we're low on segments, fire the callback to ask for more.
-    if(m_freeBufferSlots <= PVT_MINIMUM_SEGMENTS)
+    if((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) <= PVT_MINIMUM_SEGMENTS)
     {
         more_data_needed_callback(*this);
     }
@@ -862,14 +902,14 @@ void CopleyServo::addPvtSegment(int32_t position, int32_t velocity, uint8_t dura
     m_activeSegments.push_back(segment);
 
     // send this if we think we can.
-    if(m_freeBufferSlots > 0)
+    if(m_expectedFreeBufferSlots > 0)
     {
         sendPvtSegment(segment);
 
         // decrement the free buffer slots between status updates
         // this keeps us from overflowing when we have a ton of adds between
         // status pdos. this seems unlikely, but possible.
-        m_freeBufferSlots--;
+        m_expectedFreeBufferSlots--;
     }
 
     // if this is the last segment in a sequence, add a special extra
@@ -886,6 +926,9 @@ void CopleyServo::startPvtMove()
     // transition. this causes the servo to start a pvt segment
     modeControl(0, CONTROL_NEW_SETPOINT, InterpolatedPosition);
     control( CONTROL_NEW_SETPOINT, 0);
+
+    // we don't need to start anymore
+    m_needsToStart = false;
 }
 
 void CopleyServo::stopPvtMove(uint8_t duration, bool emergency)
@@ -920,11 +963,6 @@ void CopleyServo::stopPvtMove(uint8_t duration, bool emergency)
 bool CopleyServo::sendPvtSegment(PvtSegment &segment)
 {
     // send this segment to the servo, return true if it actually happened
-    if(m_freeBufferSlots <= 0)
-    {
-        // we don't have any buffer slots here, don't send it
-        return false;
-    }
     std::vector<uint8_t> data;
     // ensure that data is 8 bytes long
     data.assign(8, 0);

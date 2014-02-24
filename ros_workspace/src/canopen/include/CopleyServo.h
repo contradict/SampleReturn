@@ -209,6 +209,8 @@ class CopleyServo : public DS301 {
         std::string getLastError() {return m_lastErrorMessage;}
         void resetLastError() {m_lastErrorMessage = "";}
 
+        bool getNeedsToStart() {return m_needsToStart;}
+
         int32_t position;
         int32_t velocity;
         double bus_voltage;
@@ -286,9 +288,11 @@ class CopleyServo : public DS301 {
         uint16_t m_currentSegmentId; // a counter
         uint16_t m_expectedSegmentId; // given by buffer status pdo
         uint8_t m_freeBufferSlots; // as reported by status pdo
+        int  m_expectedFreeBufferSlots; // predict how many will be free next pdo
         uint8_t m_pvtStatusByte;    // given by buffer statud pdo
         std::string m_lastErrorMessage; // for logging the last error
         std::list<PvtSegment> m_activeSegments; // segments recently sent/to be sent
+        bool m_needsToStart; // have we just crossed over to having enough data to go?
 
 };
 
