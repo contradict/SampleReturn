@@ -270,6 +270,7 @@ void CopleyServo::_initialOutputPins(SDO &sdo)
 
 void CopleyServo::statusModePDOCallback(PDO &pdo)
 {
+    std::cerr << "top of status mode pdo callback!" << std::endl;
     uint16_t new_status_word = pdo.data[0] | (pdo.data[1]<<8);
     enum OperationMode new_mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
 
@@ -793,7 +794,7 @@ void CopleyServo::handlePvtError(uint8_t statusByte)
             {
                 // we have the segment the controller is looking for!
                 bool found = true;
-                sendPvtSegment(segment);
+                //sendPvtSegment(segment);
                 break;
             }
         }
@@ -827,7 +828,7 @@ void CopleyServo::handlePvtError(uint8_t statusByte)
             if(segment.id >= m_expectedSegmentId)
             {
                 // if this segment is the expected one or higher, add it
-                sendPvtSegment(segment);
+                //sendPvtSegment(segment);
                 slots--;
             }
         }
