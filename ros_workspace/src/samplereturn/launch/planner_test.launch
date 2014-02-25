@@ -16,6 +16,7 @@
         <remap from="odom" to="odometry"/>
         <remap from="cmd_vel" to="command"/>
 
+        <!--<remap from="plan" to="~/SBPLLatticePlanner/plan"/>-->
 
         <rosparam file="$(find samplereturn)/config/test/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find samplereturn)/config/test/costmap_local_params.yaml" command="load"/>
@@ -23,6 +24,7 @@
         <rosparam file="$(find samplereturn)/config/test/costmap_global_params.yaml" command="load"/>
 
 	<rosparam file="$(find samplereturn)/config/test/sbpl_common_params.yaml" command="load"/>
+	<rosparam file="$(find samplereturn)/config/test/the_smooth_params.yaml" command="load"/>
 
 	<param name="SBPLLatticePlanner/primitive_filename" type="string" value="$(find samplereturn)/config/test/motion_primitives.mprim"/>
         <param name="planner_frequency" type="double" value="0.5"/>

@@ -3,16 +3,12 @@
 #include <iostream>
 #include <vector>
 
-using namespace std;
-
 /** ROS **/
 #include <ros/ros.h>
-
-// Costmap used for the map representation
 #include <costmap_2d/costmap_2d_ros.h>
-
-//local representation
 #include <nav_core/base_local_planner.h>
+#include <nav_msgs/Path.h>
+
 
 namespace the_smooth_planner
 {
@@ -31,9 +27,12 @@ public:
 	virtual bool isGoalReached();
 
 	virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
+
+	void setPath(const nav_msgs::Path& path);
   
 private:
-	ros::Publisher posePublisher;
+	ros::Publisher pose_publisher;
+	ros::Subscriber pose_subscriber;
 	double maximum_velocity;
 	double acceleration;
 	std::vector<geometry_msgs::PoseStamped> plan;
