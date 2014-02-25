@@ -209,7 +209,7 @@ class CopleyServo : public DS301 {
         std::string getLastError() {return m_lastErrorMessage;}
         void resetLastError() {m_lastErrorMessage = "";}
 
-        bool getNeedsToStart() {return m_needsToStart;}
+        bool getNeedsToStart() {return ((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) >= PVT_MINIMUM_SEGMENTS) && !m_pvtModeActive;}
 
         int32_t position;
         int32_t velocity;
@@ -292,8 +292,7 @@ class CopleyServo : public DS301 {
         uint8_t m_pvtStatusByte;    // given by buffer statud pdo
         std::string m_lastErrorMessage; // for logging the last error
         std::list<PvtSegment> m_activeSegments; // segments recently sent/to be sent
-        bool m_needsToStart; // have we just crossed over to having enough data to go?
-
+        bool m_pvtModeActive; // are we in pvt mode?
 };
 
 }

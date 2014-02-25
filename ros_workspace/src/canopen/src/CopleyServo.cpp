@@ -63,7 +63,7 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
     m_lastErrorMessage(""),
     m_freeBufferSlots(32),
     m_expectedFreeBufferSlots(32),
-    m_needsToStart(false),
+    m_pvtModeActive(false),
     m_currentSegmentId(0)
 {
     bus->add(sync);
@@ -88,7 +88,7 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
     m_lastErrorMessage(""),
     m_freeBufferSlots(32),
     m_expectedFreeBufferSlots(32),
-    m_needsToStart(false),
+    m_pvtModeActive(false),
     m_currentSegmentId(0)
 {
     bus->add(sync);
@@ -270,7 +270,6 @@ void CopleyServo::_initialOutputPins(SDO &sdo)
 
 void CopleyServo::statusModePDOCallback(PDO &pdo)
 {
-    std::cerr << "top of status mode pdo callback!" << std::endl;
     uint16_t new_status_word = pdo.data[0] | (pdo.data[1]<<8);
     enum OperationMode new_mode_of_operation = CopleyServo::operationMode(pdo.data[2]);
 
@@ -286,31 +285,23 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
     // if there are now more free slots than we had before, we've consumed one
     bool segmentConsumed = (m_freeBufferSlots < freeBufferSlots);
 
-    // if we just got enough segments to start, we're ready to be told to go
-    if(
-        ((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) < 2) &&
-        ((PVT_NUM_BUFFER_SLOTS - freeBufferSlots) >= 2))
-    {
-        m_needsToStart = true;
-    }
-    else if(
-        ((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) >= 2) &&
-        ((PVT_NUM_BUFFER_SLOTS - freeBufferSlots) < 2))
-
-    {
-        // if we just crossed from having enough thing in the buffer to having
-        // too few, we shouldn't be told to start
-        m_needsToStart = false;
-    }
-    
     m_expectedSegmentId = nextSegmentExpected;
     m_freeBufferSlots = freeBufferSlots;
     // expected free buffer slots decrements between status callbacks
     // this is so we don't accidentally send too many segments too quickly.
     // we need to keep the concept of how many are actually free though because
     // we need to tell the servo to go only when it actually has enough
-    // segments!
-    m_expectedFreeBufferSlots = freeBufferSlots;
+    // segments! since the servo says the buffer is empty when pvt mode
+    // isn't enabled, don't reset expectedFreeBufferSlots!
+    if(status_word & STATUS_INTERPOLATED_POSITION)
+    {
+        m_expectedFreeBufferSlots = freeBufferSlots;
+        m_pvtModeActive = true;
+    }
+    else
+    {
+        m_pvtModeActive = false;
+    }
 
     uint8_t risingPvtStatus = (~m_pvtStatusByte) & statusByte;
     m_pvtStatusByte = statusByte;
@@ -335,26 +326,19 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
         case InterpolatedPosition:
             if(risingPvtStatus&PVT_GOT_ERROR)
             {
-                std::cerr << "Got pvt error" << std::endl;
                 handlePvtError(risingPvtStatus);
             }
             if(segmentConsumed)
             {
-                std::cerr << "pvt segment consumed" << std::endl;
                 // if we've consumed a segment, check to see if there
                 // are any more segments waiting
                 handlePvtSegmentConsumed();
             }
             else if((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) < PVT_MINIMUM_SEGMENTS)
             {
-                std::cerr << "more pvt data needed" << std::endl;
                 // if we still don't think we have enough segments,
                 // ask for more!
                 more_data_needed_callback(*this);
-            }
-            else
-            {
-                std::cerr << "no pvt action taken. free buffer slots: " << m_freeBufferSlots << " expected free buffer slots: " << m_expectedFreeBufferSlots << std::endl;
             }
             break;
         case CyclicSynchonousPosition:
@@ -928,8 +912,9 @@ void CopleyServo::startPvtMove()
     modeControl(0, CONTROL_NEW_SETPOINT, InterpolatedPosition);
     control( CONTROL_NEW_SETPOINT, 0);
 
-    // we don't need to start anymore
-    m_needsToStart = false;
+    // to prevent a race, assume pvt mode is active for now
+    // the flag will get set next status update anyways
+    m_pvtModeActive = true;
 }
 
 void CopleyServo::stopPvtMove(uint8_t duration, bool emergency)
@@ -1002,6 +987,7 @@ bool CopleyServo::sendPvtSegment(PvtSegment &segment)
     data[7] = ((uint8_t *)&segment.velocity)[2];
 
     pvt_pdo->send(data);
+
     return true;
 }
 
