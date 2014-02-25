@@ -16,7 +16,7 @@
         <remap from="odom" to="odometry"/>
         <remap from="cmd_vel" to="command"/>
 
-        <!--<remap from="plan" to="~/SBPLLatticePlanner/plan"/>-->
+        <remap from="plan" to="~/SBPLLatticePlanner/plan"/>
 
         <rosparam file="$(find samplereturn)/config/test/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find samplereturn)/config/test/costmap_local_params.yaml" command="load"/>

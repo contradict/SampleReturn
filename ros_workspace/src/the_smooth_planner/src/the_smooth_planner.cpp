@@ -31,7 +31,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	localNodeHandle.param("maximum_velocity", maximum_velocity, 1.0);
 	localNodeHandle.param("acceleration", acceleration, 1.0);
 
-	pose_subscriber = parentNodeHandle.subscribe("SBPLLatticePlanner/plan", 1, &TheSmoothPlanner::setPath, this);
+	pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
 
 	pose_publisher = localNodeHandle.advertise<nav_msgs::Path>("smooth_plan", 1);
 }
