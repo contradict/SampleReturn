@@ -52,8 +52,7 @@ Motion::Motion() :
     pv_counter(0),
     joint_seq(0),
     scaryTestModeEnabled(false),
-    m_debugPrintCounter(0),
-    m_dumbSyncCounter(0)
+    m_debugPrintCounter(0)
 {
 
     ROS_INFO("Started in namespace %s", nh_.getNamespace().c_str());
@@ -793,38 +792,11 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
            starboard->getNeedsToStart() &&
            stern->getNeedsToStart())
         {
-            ROS_ERROR("All servos ready to start. starting!");
             // if all the wheel pods are ready to go, tell them to start
             // moving. this means they should all start at the same time!
             port->startMoving();
             starboard->startMoving();
             stern->startMoving();
-        }
-        else if(m_dumbSyncCounter > 0)
-        {
-            m_dumbSyncCounter--;
-            if(m_dumbSyncCounter == 0)
-            {
-                ROS_ERROR("starting servos because of dumb sync counter!");
-                port->startMoving();
-                starboard->startMoving();
-                stern->startMoving();
-            }
-        }
-        else if(port->getNeedsToStart() ||
-           starboard->getNeedsToStart() ||
-           stern->getNeedsToStart())
-        {
-            ROS_ERROR("Some servos are ready to start, others aren't");
-        }
-        else if(true || (m_debugPrintCounter % 100) == 0)
-        {
-            ROS_ERROR("port steering buffer depth: %d", port->steering.getPvtBufferDepth());
-            ROS_ERROR("port wheel buffer depth: %d", port->wheel.getPvtBufferDepth());
-            ROS_ERROR("starboard steering buffer depth: %d", starboard->steering.getPvtBufferDepth());
-            ROS_ERROR("starboard wheel buffer depth: %d", starboard->wheel.getPvtBufferDepth());
-            ROS_ERROR("stern steering buffer depth: %d", stern->steering.getPvtBufferDepth());
-            ROS_ERROR("stern wheel buffer depth: %d", stern->wheel.getPvtBufferDepth());
         }
     }
 
@@ -1030,12 +1002,6 @@ void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
     // keep track of when we started.
     scaryTestModeStartTime = ros::Time::now();
 
-    // it appears we don't get callbacks from the pvt mode until we're
-    // actually going, but it is hard to figure out when the pvt segments
-    // actually got sent, so count sync messages for now. this is less
-    // than ideal.
-    m_dumbSyncCounter = 10;
-
     // send a pvt segment to kick things off
     sendPvtSegment(scaryTestModeStartTime);
     sendPvtSegment(scaryTestModeStartTime + ros::Duration(0.25));
@@ -1044,7 +1010,6 @@ void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
 
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 {
-    ROS_ERROR("More data callback fired!");
     // only send more data once per sync pulse. this way we send data to
     // all the servos as soon as one says it needs more
     if(!this->moreDataSent)
@@ -1053,7 +1018,6 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         // sync fame
         this->moreDataSent = true;
 
-        ROS_ERROR("attempting to send more data.");
         sendPvtSegment(ros::Time::now());
     }
 }
@@ -1080,7 +1044,6 @@ double xPrime(double t, double omega)
 
 void Motion::sendPvtSegment(ros::Time time)
 {
-    ROS_ERROR("sending pvt segment...");
     // for now, only the planner should be sending pvt segments.
     // if the planner isn't in charge, don't send segments, including
     // the stop segments. this will keep the zero velocity segments from
@@ -1152,14 +1115,14 @@ void Motion::sendPvtSegment(ros::Time time)
             // steering.
             segment.steeringAngle = port_steering;
             port->move(segment);
+
             segment.wheelVelocity *= -1.0;
             segment.wheelDistance *= -1.0;
             segment.steeringAngle = starboard_steering;
             starboard->move(segment);
+
             segment.steeringAngle = stern_steering;
             stern->move(segment);
-
-            ROS_ERROR("Scary test mode segments sent!");
         }
         else
         {
@@ -1180,8 +1143,6 @@ void Motion::sendPvtSegment(ros::Time time)
             starboard->move(segment);
             segment.steeringAngle = stern_steering;
             stern->move(segment);
-
-            ROS_ERROR("zero speed segments sent");
         }
     }
 }
