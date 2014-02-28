@@ -27,8 +27,8 @@ def AddStates(state_machine):
                                                   'aborted':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('MANUAL_PREEMPTED',
-                                  ManualPreempted(),
-                                   transitions = {'complete':'preempted',
+                                    ManualPreempted(),
+                                    transitions = {'complete':'preempted',
                                                   'fail':'aborted'})
             
             smach.StateMachine.add('MANUAL_ABORTED',

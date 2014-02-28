@@ -8,10 +8,30 @@ import smach_ros
 import actionlib
 import actionlib_msgs.msg as action_msg
 import tf
+import threading
+
+sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
+
+from samplereturn_msgs.msg import VoiceAnnouncement
+
+import std_msgs.msg as std_msg
+import sensor_msgs.msg as sensor_msgs
+import platform_motion_msgs.msg as platform_msg
+import platform_motion_srv.srv as platform_srv
+import manipulator_msgs.msg as manipulator_msg
+import geometry_msgs.msg as geometry_msg
+import move_base_msgs.msg as move_base_msg
+import visual_servo_msgs.msg as visual_servo_msg
+import linemod_detector.msg as linemod_msg
+import dynamic_reconfigure.srv as dynsrv
+import dynamic_reconfigure.msg as dynmsg
+import tf_conversions
 
 from executive import executive_manual
 from executive import executive_level_one
 from executive import executive_level_two
+
+from executive.monitor_topic_state import MonitorTopicState
 
 class ExecutiveMaster(object):
     
@@ -20,45 +40,52 @@ class ExecutiveMaster(object):
         # ordinary variables
         self.last_servo_feedback = None
         self.lost_sample = None
-
-        '''
+        self.gpio = None
+        self.search_sample = None
+        self.manip_sample = None
+        
+        self.last_detected_mode = None
+        self.last_selected_mode = None
+        self.selected_mode = None
+        self.preempt_modes = ('LEVEL_ONE_MODE', 'LEVEL_TWO_MODE', 'MANUAL_MODE')
+        self.preemptCV = threading.Condition()
+ 
         # node parameters
-        self.voice = rospy.get_param("~voice", "kal_diphone")
-        self.speech_delay = rospy.get_param("~speech_delay", 0.8)
-        self.speech_rate = rospy.get_param("~speech_rate", 0.07)
-        self.servo_feedback_interval =\
-            rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
+        self.wait_for_cameras = rospy.get_param("~wait_for_cameras", True)
+        self.servo_feedback_interval = rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
         self.pursuit_complete_distance = rospy.get_param("~pursuit_complete_distance", 5.0)
         self.home_pursuit_complete_distance = rospy.get_param("~home_pursuit_complete_distance", 10.0)
         self.maximum_pursuit_error = rospy.get_param("~maximum_pursuit_error", 1.5)
         self.beacon_scan_distance = rospy.get_param("~beacon_scan_distance", 10.0)
-        self.wait_for_cameras = rospy.get_param("~wait_for_cameras", True)
-
-        # subscribe to interesting topics
+            #get pin assignments, they are strings in hex format, convert to ints
+        self.GPIO_PIN_LEVEL_ONE = int(rospy.get_param("~GPIO_PIN_LEVEL_ONE", '0x20'), 16)
+        self.GPIO_PIN_LEVEL_TWO = int(rospy.get_param("~GPIO_PIN_LEVEL_TWO", '0x08'), 16)
+        
+        # subscribe to topics
         rospy.Subscriber("gpio_read", platform_msg.GPIO, self.gpio_update)
-        rospy.Subscriber("navigation_camera_status", std_msg.String,
-                self.navigation_status_update)
-        rospy.Subscriber("manipulator_camera_status", std_msg.String,
-                self.manipulator_status_update)
-        rospy.Subscriber("pause_state", std_msg.Bool,
-                self.pause_state_update)
+        rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         rospy.Subscriber("search_point",
-                linemod_msg.NamedPoint,
-                self.sample_detection_search_update)
-        rospy.Subscriber("manipulator_detection_point", linemod_msg.NamedPoint,
-                self.sample_detection_man_update)
-        rospy.Subscriber("beacon_pose", geometry_msg.PoseStamped,
-                self.beacon_update)
+                         linemod_msg.NamedPoint,
+                         self.sample_detection_search_update)
+        rospy.Subscriber("manipulator_detection_point",
+                         linemod_msg.NamedPoint,
+                         self.sample_detection_manip_update)
+        rospy.Subscriber("beacon_pose",
+                          geometry_msg.PoseStamped,
+                          self.beacon_update)
 
         self.listener = tf.TransformListener()
-
+        
+        
         # create publishers
-        self.navigation_audio=rospy.Publisher("audio_navigate", SoundRequest)
+        self.navigation_audio=rospy.Publisher("audio_navigate", platform.msg_VoiceAnnouncement)
+        
         self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
         self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
         self.servo_command=rospy.Publisher("CAN_servo_command", geometry_msg.Twist)
 
+        '''
         # create service proxies
         self.platform_motion_input_select = \
                 rospy.ServiceProxy("CAN_select_command_source",
@@ -90,11 +117,9 @@ class ExecutiveMaster(object):
         self.drive_home_task = None
         '''
         
-        self.top_state_machine = smach.StateMachine(
-            outcomes=['shutdown', 'aborted'],
-            input_keys = [],
-            output_keys = []
-        )
+        self.top_state_machine = smach.StateMachine(outcomes=['shutdown', 'aborted'],
+                                                    input_keys = [],
+                                                    output_keys = [])
         
         
         #Beginning of top level state machine declaration.
@@ -106,14 +131,13 @@ class ExecutiveMaster(object):
         #The "next" outcome will be used for states that have only one possible transition.
         with self.top_state_machine: 
             
-            smach.StateMachine.add(
-                'START',
-                StartState(),
-                transitions = { 'check_cameras':'WAIT_FOR_CAMERAS',
-                                'skip_cameras':'HOME_PLATFORM',
-                                'preempted':'TOP_PREEMPTED',
-                                'aborted':'TOP_ABORTED'})
-            
+            smach.StateMachine.add('START',
+                                    StartState(self.wait_for_cameras),
+                                    transitions = { 'check_cameras':'WAIT_FOR_CAMERAS',
+                                                    'skip_cameras':'HOME_PLATFORM',
+                                                    'preempted':'TOP_PREEMPTED',
+                                                    'aborted':'TOP_ABORTED'})
+                        
             cam_dict = {'NAV_CENTER' : 'camera_started',
                         'NAV_PORT' : 'camera_started',
                         'NAV_STARBOARD' : 'camera_started',
@@ -123,8 +147,7 @@ class ExecutiveMaster(object):
             #concurrency container to allow waiting for cameras in parallel
             wait_for_cams = smach.Concurrence(outcomes = ['all_started',
                                                           'timeout',
-                                                          'preempted',
-                                                          'aborted'],
+                                                          'preempted'],
                                               default_outcome = 'timeout',
                                               input_keys = [],
                                               output_keys = [],
@@ -132,27 +155,48 @@ class ExecutiveMaster(object):
             
             with wait_for_cams:
                 
+                camera_wait_outcomes = [ ('Ready', 'camera_started', 1 ) ]
+                
                 smach.Concurrence.add('NAV_CENTER',
-                                      WaitForCamera('nav_center_topic'))
+                                      MonitorTopicState('navigation_center_camera_status',
+                                                        'data',
+                                                        std_msg.String,
+                                                        camera_wait_outcomes,
+                                                        timeout = 10.0))
                                 
                 smach.Concurrence.add('NAV_PORT',
-                                      WaitForCamera('nav_port_topic'))
+                                      MonitorTopicState('navigation_port_camera_status',
+                                                        'data',
+                                                        std_msg.String,
+                                                        camera_wait_outcomes,
+                                                        timeout = 10.0))
                 
                 smach.Concurrence.add('NAV_STARBOARD',
-                                      WaitForCamera('nav_starboard_topic'))
+                                      MonitorTopicState('navigation_starboard_camera_status',
+                                                        'data',
+                                                        std_msg.String,
+                                                        camera_wait_outcomes,
+                                                        timeout = 10.0))
                 
                 smach.Concurrence.add('MANIPULATOR',
-                                      WaitForCamera('manipulator_topic'))
+                                      MonitorTopicState('manipulator_camera_status',
+                                                        'data',
+                                                        std_msg.String,
+                                                        camera_wait_outcomes,
+                                                        timeout = 10.0))
                 
                 smach.Concurrence.add('SEARCH',
-                                      WaitForCamera('search_topic'))
+                                      MonitorTopicState('search_camera_status',
+                                                        'data',
+                                                        std_msg.String,
+                                                        camera_wait_outcomes,
+                                                        timeout = 10.0))
                 
             smach.StateMachine.add('WAIT_FOR_CAMERAS',
                                    wait_for_cams,
                                    transitions = {'all_started':'HOME_PLATFORM',
                                                   'timeout':'CAMERA_FAILURE',
-                                                  'preempted':'TOP_PREEMPTED',
-                                                  'aborted' : 'TOP_ABORTED'})
+                                                  'preempted':'TOP_PREEMPTED'})
             
             smach.StateMachine.add('CAMERA_FAILURE',
                                    CameraFailure(),
@@ -200,7 +244,7 @@ class ExecutiveMaster(object):
 
             smach.StateMachine.add('TOP_PREEMPTED',
                                    TopPreempted(),
-                                   transitions = {})
+                                   transitions = {'next':'CHECK_MODE'})
             
             smach.StateMachine.add('TOP_ABORTED',
                                    TopAborted(),
@@ -209,51 +253,85 @@ class ExecutiveMaster(object):
             
         sls = smach_ros.IntrospectionServer('top_introspection', self.top_state_machine, '/START')
         sls.start()
-
-    def start(self):
+        
         self.top_state_machine.execute()
+
+    #topic handlers
+
+    def gpio_update(self, gpio):
+        if gpio.servo_id == self.gpio_servo_id:
+            #store the new gpio value, and pass it to any functions that should react
+            self.gpio = gpio
+            self.handle_mode_switch(gpio.new_pin_states)
+                
+    def sample_detection_search_update(self, msg):
+        self.search_sample = msg
+
+    def sample_detection_manip_update(self, msg):
+        self.manip_sample = msg
         
+    #other methods
+
+    def handle_mode_switch(self, pin_states):
+        if pin_states&self.GPIO_PIN_LEVEL_ONE == 0:
+            detected_mode == "LEVEL_ONE_MODE"
+        elif pin_states&self.GPIO_PIN_LEVEL_TWO == 0:
+            detected_mode == "LEVEL_TWO_MODE"
+        else:
+            detected_mode == "MANUAL_MODE"
         
+        #it requires two matches to change mode
+        detect_match = detected_mode == self.last_detected_mode
+        self.last_detected_mode = detected_mode
+                                
+        if (detected_mode != self.selected_mode) & detect_match:
+            self.selected_mode = detected_mode
+            active_state = self.top_state_machine.get_active_states()[0]
+            if active_state in self.preempt_modes:
+                #if we are in one of the sub state machines, preempt
+                self.top_state_machine.request_preempt()
+                self.preemptCV.acquire()
+                #wait until state machine succesfully preempts the current mode
+                self.preemptCV.wait()
+                self.preemptCV.release    
+                self.top_state_machine.service_preempt()
+
+    def announce(self, utterance):
+        msg = SoundRequest()
+        msg.sound = SoundRequest.SAY
+        msg.command = SoundRequest.PLAY_ONCE
+        msg.arg = utterance
+        msg.arg2 = 'voice.select "%s"'%self.voice
+        self.navigation_audio.publish(msg)
+                
 #state classes for the top level machine
 
 #first state in top level executive, wait for other nodes to come up here
 #no need to start the state machine if other services are not available, etc.
 class StartState(smach.State):
-    def __init__(self):
+    def __init__(self, wait_for_cameras):
         smach.State.__init__(self,
-                             input_keys=['wait_for_cameras'],
-                             outcomes=['check_cameras', 'skip_cameras', 'preempted', 'aborted']
-        )
-        
+                             outcomes=['check_cameras', 'skip_cameras', 'preempted', 'aborted'])
+        self.wait_for_cameras = wait_for_cameras
+                
     def execute(self, userdata):
-        if userdata.wait_for_cameras:
+        if self.wait_for_cameras:
             return 'check_cameras'
         else:
             return 'skip_cameras'
-
-#this state waits for a camera (or pair) to properly start        
-class WaitForCamera(smach.State):
-    def __init__(self, camera_topic):
-        smach.State.__init__(self, outcomes=['camera_started', 'timeout'])
-        self.camera_topic = camera_topic
-                    
-    def execute(self, userdata):
-
-        return 'camera_started'
 
 #this state homes all mechanisms on the robot platform
 class HomePlatform(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                             input_keys=['camera_status'],
-                            outcomes=['homed', 'aborted','preempted']
-        )   
+                            outcomes=['homed', 'aborted','preempted'])   
     
     def execute(self, userdata):
         
         #home servos            
                
-        return 'homed'
+        return 'aborted'
     
 class CheckMode(smach.State):
     def __init__(self):
@@ -261,7 +339,7 @@ class CheckMode(smach.State):
                              input_keys=['camera_status'],
                              outcomes=['manual', 'level_one', 'level_two', 'preempted', 'aborted'])
         
-    def execute(self):
+    def execute(self, userdata):
         
         return 'succeeded'
     
@@ -269,22 +347,33 @@ class CameraFailure(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                              output_keys=['camera_status'],
-                             outcomes=['next']
-                             )
+                             outcomes=['next'])
+        
+    def execute(self, userdata):
+        
+        userdata.camera_status = 'error'
+                
+        return 'next'
     
 class TopPreempted(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=[])
+    def __init__(self, preemptCV):
+        smach.State.__init__(self, outcomes=['next'])
         
-    def execute(self):
+        self.preemptCV = preemptCV
         
-        return 'succeeded'
+    def execute(self, userdata):
+        
+        self.preemptCV.acquire()
+        self.preemptCV.notifyAll()
+        self.preemptCV.release()
+        
+        return 'next'
 
 class TopAborted(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['recover','fail'])
         
-    def execute(self):
+    def execute(self, userdata):
         
         return 'fail'
     
