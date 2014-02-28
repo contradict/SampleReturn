@@ -11,6 +11,7 @@
     <buildtool_depend>catkin</buildtool_depend>
 
     <build_depend>rospy</build_depend>
+    <build_depend>executive_smach</build_depend>
 
     <run_depend>rospy</run_depend>
     <run_depend>executive_smach</run_depend>
