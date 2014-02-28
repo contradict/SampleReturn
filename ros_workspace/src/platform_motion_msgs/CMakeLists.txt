@@ -5,8 +5,11 @@ project(platform_motion_msgs)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
   actionlib_msgs
   geometry_msgs
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -112,7 +115,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES platform_motion_msgs
-  CATKIN_DEPENDS actionlib_msgs geometry_msgs
+  CATKIN_DEPENDS message_runtime actionlib_msgs geometry_msgs
 #  DEPENDS system_lib
 )
 
