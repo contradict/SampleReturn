@@ -2,14 +2,13 @@
 import rospy
 import sys
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
-from sound_play.msg import SoundRequest
+from samplereturn_msgs.msg import VoiceAnnouncement
 from platform_motion_msgs.msg import GPIO, ServoStatus
 from platform_motion_msgs.srv import Enable
 from std_msgs.msg import Bool
 
 class PauseSwitch(object):
     def __init__(self):
-        self.voice = rospy.get_param("voice", "kal_diphone")
         self.gpio_servo_id = rospy.get_param("gpio_servo_id", 1)
         self.button_mask = rospy.get_param("button_mask", 2)
         self.carousel_servo_id = rospy.get_param("carousel_servo_id", 1)
@@ -77,11 +76,9 @@ class PauseSwitch(object):
                 self.wheelpod_servo_status)
     
     def say(self, utterance):
-        msg = SoundRequest()
-        msg.sound = SoundRequest.SAY
-        msg.command = SoundRequest.PLAY_ONCE
-        msg.arg = utterance
-        msg.arg2 = 'voice.select "%s"'%self.voice
+        msg = VoiceAnnouncement()
+        msg.priority = VoiceAnnouncement.OVERRIDE
+        msg.words = utterance
         self.audio_pub.publish(msg)
 
     def set_pause_state(self, state):
