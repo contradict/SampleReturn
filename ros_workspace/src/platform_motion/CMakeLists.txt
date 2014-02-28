@@ -43,7 +43,6 @@ catkin_package(
         roscpp
         rospy
         canopen
-        message_generation
 )
 
 include_directories(
@@ -55,6 +54,7 @@ include_directories(
 
 #common commands for building c++ executables and libraries
 add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 add_executable(motion_node src/motion_node.cpp)
 target_link_libraries(motion_node
@@ -68,6 +68,7 @@ target_link_libraries(teleop
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
+add_dependencies(teleop ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 add_executable(least_squares_odometry
     src/odometry_node.cpp
