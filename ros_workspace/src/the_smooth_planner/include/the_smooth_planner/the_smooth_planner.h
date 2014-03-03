@@ -29,12 +29,15 @@ public:
 	virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
 
 	void setPath(const nav_msgs::Path& path);
+	void setOdometry(const nav_msgs::Odometry& odometry);
   
 private:
 	ros::Publisher pose_publisher;
 	ros::Subscriber pose_subscriber;
+	ros::Subscriber odom_subscriber;
 	double maximum_velocity;
 	double acceleration;
-	std::vector<geometry_msgs::PoseStamped> plan;
+	std::vector<nav_msgs::Path> path;
+	nav_msgs::Odometry odometry;
 };
 };

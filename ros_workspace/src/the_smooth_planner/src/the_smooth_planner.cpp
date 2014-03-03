@@ -1,12 +1,10 @@
 #include <the_smooth_planner/the_smooth_planner.h>
 #include <pluginlib/class_list_macros.h>
 #include <the_smooth_planner/TheSmoothPlannerStats.h>
-
 #include <costmap_2d/inflation_layer.h>
 
 using namespace std;
 using namespace ros;
-
 
 PLUGINLIB_DECLARE_CLASS(the_smooth_planner, TheSmoothPlanner, the_smooth_planner::TheSmoothPlanner, nav_core::BaseLocalPlanner);
 
@@ -27,11 +25,13 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 {
 	ros::NodeHandle localNodeHandle("~/" + name);
 	ros::NodeHandle parentNodeHandle("~/");
+	ros::NodeHandle rootNodeHandle("/");
 
 	localNodeHandle.param("maximum_velocity", maximum_velocity, 1.0);
 	localNodeHandle.param("acceleration", acceleration, 1.0);
 
-	pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
+	pose_subscriber = parentNodeHandle.subscribe("SBPLLatticePlanner/plan", 1, &TheSmoothPlanner::setPath, this);
+	odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
 
 	pose_publisher = localNodeHandle.advertise<nav_msgs::Path>("smooth_plan", 1);
 }
@@ -39,7 +39,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
 	ROS_INFO("COMPUTE VELOCITY COMMANDS");
-	return false;
+	return true;
 }
 
 bool TheSmoothPlanner::isGoalReached()
@@ -47,7 +47,7 @@ bool TheSmoothPlanner::isGoalReached()
 	// TODO - return true when the goal pose specified by the global planner
 	//        has been reached
 	ROS_INFO("IS GOAL REACHED");
-	return false;
+	return true;
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
@@ -60,7 +60,27 @@ bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& pl
 
 void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
+	ROS_INFO("RECEIVED PATH");
+
+	// Compute and assign a time stamp to each point in the path
+	// corresponding to when the robot should be there.  The times
+	// are assigned so the robot will accelerate linearly and/or
+	// angularly at a constant rate
+
+	// First, assuming the robot is holonomic and behaves like a
+	// point-mass, compute the time needed to reach the next point
+	// ignoring heading
+	
+
+	this->path = path;
 	pose_publisher.publish(path);
+	return;
+}
+
+void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
+{
+	ROS_INFO("RECEIVED ODOMETRY");
+	this->odometry = odometry;
 	return;
 }
 
