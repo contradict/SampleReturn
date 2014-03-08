@@ -1044,6 +1044,23 @@ double xPrime(double t, double omega)
 
 void Motion::sendPvtSegment(ros::Time time)
 {
+    // get the steering angles (and a bunch of other crud) so we can
+    // tell the steering not to move for each pod, if needed.
+    // this seems like a good thing.
+    double port_steering, starboard_steering, stern_steering;
+    double port_steering_velocity, starboard_steering_velocity,
+           stern_steering_velocity;
+    double port_wheel, starboard_wheel, stern_wheel;
+    double port_wheel_velocity, starboard_wheel_velocity,
+           stern_wheel_velocity;
+
+    port->getPosition(&port_steering, &port_steering_velocity,
+            &port_wheel, &port_wheel_velocity);
+    starboard->getPosition(&starboard_steering, &starboard_steering_velocity,
+            &starboard_wheel, &starboard_wheel_velocity);
+    stern->getPosition(&stern_steering, &stern_steering_velocity,
+            &stern_wheel, &stern_wheel_velocity);
+
     // for now, only the planner should be sending pvt segments.
     // if the planner isn't in charge, don't send segments, including
     // the stop segments. this will keep the zero velocity segments from
@@ -1065,6 +1082,7 @@ void Motion::sendPvtSegment(ros::Time time)
             // don't have to worry about it being empty. that seems like
             // a good thing.
             // we'll just give all the wheel pods the same segment.
+
             PodSegment segment;
             segment.steeringAngle = 0.0;
             segment.steeringVelocity = 0.0;
@@ -1072,30 +1090,18 @@ void Motion::sendPvtSegment(ros::Time time)
             segment.wheelVelocity = 0.0;
             segment.duration = .25;
 
+            // reset the steering angle for each pod so we don't move the
+            // steering.
+            segment.steeringAngle = port_steering;
             port->move(segment);
+            segment.steeringAngle = starboard_steering;
             starboard->move(segment);
+            segment.steeringAngle = stern_steering;
             stern->move(segment);
         }
     }
     else if(command_source == COMMAND_SOURCE_SCARY_TEST_MODE)
     {
-        // get the steering angles (and a bunch of other crud) so we can
-        // tell the steering not to move for each pod. this seems like a good
-        // thing.
-        double port_steering, starboard_steering, stern_steering;
-        double port_steering_velocity, starboard_steering_velocity,
-               stern_steering_velocity;
-        double port_wheel, starboard_wheel, stern_wheel;
-        double port_wheel_velocity, starboard_wheel_velocity,
-               stern_wheel_velocity;
-
-        port->getPosition(&port_steering, &port_steering_velocity,
-                &port_wheel, &port_wheel_velocity);
-        starboard->getPosition(&starboard_steering, &starboard_steering_velocity,
-                &starboard_wheel, &starboard_wheel_velocity);
-        stern->getPosition(&stern_steering, &stern_steering_velocity,
-                &stern_wheel, &stern_wheel_velocity);
-
         if(scaryTestModeEnabled)
         {
             double t = (time - scaryTestModeStartTime).toSec();
