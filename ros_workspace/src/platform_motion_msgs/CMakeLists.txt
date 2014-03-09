@@ -93,6 +93,7 @@ add_action_files(
     FILES
         Home.action
         SelectCarouselBin.action
+        ManualControl.action
 )
 
 generate_messages(

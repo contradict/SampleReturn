@@ -1,0 +1,12 @@
+# Goal
+uint8 FULL_CONTROL
+uint8 DRIVING_ONLY
+uint8 MANIPULATOR_ONLY
+
+uint8 mode
+---
+# Result
+string result
+---
+# Feedback
+string state
