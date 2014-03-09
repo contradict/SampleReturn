@@ -222,6 +222,12 @@ void WheelPod::computeSteeringAndVelocity(
         wheelDistance *= -1.0;
     }
 
+    // is this wheel pod backwards? if so, negate the wheel velocity!
+    if(m_isBackwards)
+    {
+        wheelVelocity *= -1;
+    }
+
     steeringPosition = round(steering_encoder_counts*steeringAngle/2.0/M_PI);
     steeringVelocityCounts =
         round(steering_encoder_counts*10.0*steeringVelocity/2.0/M_PI);

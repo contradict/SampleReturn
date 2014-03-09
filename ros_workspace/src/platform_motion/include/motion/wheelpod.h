@@ -46,8 +46,12 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
             wheel_encoder_counts(wheel_encoder_counts),
             large_steering_move(large_steering_move),
             wheelDiameter(wheel_diameter),
-            currentMode(PodUninitialized)
+            currentMode(PodUninitialized),
+            m_isBackwards(false)
             {};
+
+        // some wheel pods are mounted  backwards. set a flag to let them know!
+        void setIsBackwards(bool isBackwards) {m_isBackwards = isBackwards;}
 
         void setCallbacks(CANOpen::DS301CallbackObject wheelcb,
                           CANOpen::DS301CallbackObject steeringcb,
@@ -106,6 +110,8 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         enum PodMode currentMode;
 
         PodSegment m_lastSegment;
+
+        bool m_isBackwards;
 };
 
 }
