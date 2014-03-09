@@ -2,7 +2,7 @@ import numpy as np
 from numpy import arctan2, sin, cos, sqrt, pi, diff, allclose, abs
 import pylab
 
-def makePath(N=100, A=1, omega=1):
+def makePath(N=100, A=3, omega=0.2):
     t=linspace(0,2*pi/omega,N)
     x=2*A*sin(omega*t)
     xdot=2*A*omega*cos(omega*t)
