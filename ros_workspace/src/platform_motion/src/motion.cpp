@@ -54,6 +54,22 @@ Motion::Motion() :
     scaryTestModeEnabled(false),
     m_debugPrintCounter(0)
 {
+    lastSegmentSent.port.steeringAngle = 0.0;
+    lastSegmentSent.port.steeringVelocity = 0.0;
+    lastSegmentSent.port.wheelDistance = 0.0;
+    lastSegmentSent.port.wheelVelocity = 0.0;
+    lastSegmentSent.port.duration = 0.25;
+    lastSegmentSent.starboard.steeringAngle = 0.0;
+    lastSegmentSent.starboard.steeringVelocity = 0.0;
+    lastSegmentSent.starboard.wheelDistance = 0.0;
+    lastSegmentSent.starboard.wheelVelocity = 0.0;
+    lastSegmentSent.starboard.duration = 0.25;
+    lastSegmentSent.stern.steeringAngle = 0.0;
+    lastSegmentSent.stern.steeringVelocity = 0.0;
+    lastSegmentSent.stern.wheelDistance = 0.0;
+    lastSegmentSent.stern.wheelVelocity = 0.0;
+    lastSegmentSent.stern.duration = 0.25;
+    lastSegmentSent.time = ros::Time::now();
 
     ROS_INFO("Started in namespace %s", nh_.getNamespace().c_str());
 
@@ -236,6 +252,8 @@ void Motion::createServos()
     starboard->steering.setErrorCallback(errorCb);
     starboard->wheel.setErrorCallback(errorCb);
 
+    // starboard is mounted backwards on the robot relative to the normal wheel velocity.
+    starboard->setIsBackwards(true);
 
     param_nh.getParam("stern_steering_id", stern_steering_id);
     param_nh.getParam("stern_wheel_id", stern_wheel_id);
@@ -259,6 +277,9 @@ void Motion::createServos()
     stern->wheel.setStatusCallback(stcb);
     stern->steering.setErrorCallback(errorCb);
     stern->wheel.setErrorCallback(errorCb);
+
+    // stern is mounted backwards on the robot relative to the normal wheel velocity.
+    stern->setIsBackwards(true);
 
     param_nh.getParam("carousel_id", carousel_id);
     param_nh.param("carousel_encoder_counts", carousel_encoder_counts, 4*2500);
@@ -958,6 +979,15 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
     // list in the right spot.
     // first, remove everything in the list that is now made obsolete
     // by the new planned path.
+    /*
+     * NOTE: This is currently commented out because it isn't right!
+     * plannedPath used to be a list of PosedStamped, but it isn't
+     * any longer because PosedStamped doesn't contain sufficient information
+     * to be useful. Once the data type of the path message is changed, it
+     * should be pretty easy to figure out how to translate the contents of
+     * that message into PathSegments. in the mean time, I'm developing the
+     * scaryTestModeCallback below, so refer to it for the latest code that
+     * is actually likely to work...
     ros::Time startTime = path->poses[0].header.stamp;
     plannedPath.remove_if(
             [startTime](geometry_msgs::PoseStamped p)
@@ -988,6 +1018,7 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
         // right away (I think?)
         sendPvtSegment(ros::Time::now());
     }
+    */
 }
 
 void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
@@ -999,8 +1030,38 @@ void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
 
     scaryTestModeEnabled = enable->data;
 
+    // clear the planned path.
+    plannedPath.clear();
+
     // keep track of when we started.
     scaryTestModeStartTime = ros::Time::now();
+
+    lastSegmentSent.port.steeringAngle = 0.0;
+    lastSegmentSent.port.steeringVelocity = 0.0;
+    lastSegmentSent.port.wheelDistance = 0.0;
+    lastSegmentSent.port.wheelVelocity = 0.0;
+    lastSegmentSent.port.duration = 0.25;
+    lastSegmentSent.starboard.steeringAngle = 0.0;
+    lastSegmentSent.starboard.steeringVelocity = 0.0;
+    lastSegmentSent.starboard.wheelDistance = 0.0;
+    lastSegmentSent.starboard.wheelVelocity = 0.0;
+    lastSegmentSent.starboard.duration = 0.25;
+    lastSegmentSent.stern.steeringAngle = 0.0;
+    lastSegmentSent.stern.steeringVelocity = 0.0;
+    lastSegmentSent.stern.wheelDistance = 0.0;
+    lastSegmentSent.stern.wheelVelocity = 0.0;
+    lastSegmentSent.stern.duration = 0.25;
+    lastSegmentSent.time = ros::Time::now() - ros::Duration(0.25);
+
+    if(scaryTestModeEnabled)
+    {
+        // if we're supposed to be going, make a new scary test mode path
+        std::list<PathSegment> path = computeScaryPath(scaryTestModeStartTime, 250, 3.0, 0.1);
+        // debugging stuff! don't check this in!
+        //auto temp = pathToBody(path);
+
+        plannedPath = pathToBody(path);
+    }
 
     // send a pvt segment to kick things off
     sendPvtSegment(scaryTestModeStartTime);
@@ -1018,7 +1079,9 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         // sync fame
         this->moreDataSent = true;
 
-        sendPvtSegment(ros::Time::now());
+        // send the next segment we expect, ie: the last segment's time plus the duration
+        // of that segment. this is very likely in the future, but that's good!
+        sendPvtSegment(lastSegmentSent.time + ros::Duration(lastSegmentSent.port.duration));
     }
 }
 
@@ -1031,15 +1094,252 @@ void Motion::errorCallback(CANOpen::DS301 &node)
             static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
 }
 
-// function definition interlude!
-double x(double t, double omega)
+std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numPoints, double amplitude, double omega)
 {
-    return (1.0 - cos(omega * t)) / 2.0;
+    // compute the time step between each point
+    ros::Duration timeStep = ros::Duration((2.0*M_PI/omega)/((double)numPoints));
+
+    std::list<PathSegment> retval;
+
+    // this is based on the math in path2local.py. sorry the contradict-style variable names
+    // declare lambdas for the loop.
+    auto f = [] (double x) {return 2.0 * atan(x);};
+    auto fprime = [] (double x) {return 2.0/(1.0 + pow(x, 2));};
+    auto g = [] (double x, double y) {return (sqrt(pow(x, 2) + pow(y, 2)) - x) / y;};
+    auto gprime = [] (double x, double y, double xdot, double ydot)
+        {return (pow((pow(x, 2) + pow(y, 2)), -0.5) * (x * xdot + y * ydot) - xdot) / y -
+            (sqrt(pow(x, 2) + pow(y,2)) -x) / pow(y, 2) * ydot;};
+
+    // compute the first point so that we have a nice ramp up to the start of the
+    // figure 8. start by computing the first point of the figure 8.
+    double xDot0 = 2.0 * amplitude * omega;
+    double yDot0 = 2.0 * amplitude * omega;
+    double theta0 = f(g(xDot0, yDot0));
+    double acceleration = 0.1; // acceleration in meters per second. should be parameter
+    double startDistance = 0.5 * (pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
+    double startDuration = sqrt(pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
+    PathSegment start;
+    start.time = time;
+    start.xDot = 0.0;
+    start.yDot = 0.0;
+    start.thetaDot = 0.0;
+    start.x = startDistance * cos(theta0 + M_PI);
+    start.y = startDistance * sin(theta0 + M_PI);
+    start.theta = theta0;
+
+    retval.push_back(start);
+
+    // account for the start up ramp by adding some to the actual start time
+    ros::Time actualStartTime = time + ros::Duration(startDuration);
+
+    // build the figure 8 part of the path
+    for(int i = 0; i < numPoints; i++)
+    {
+        double t = (timeStep * i).toSec();
+        PathSegment segment;
+        segment.time = actualStartTime + timeStep * i;
+        segment.x = 2.0 * amplitude * sin(omega * t);
+        segment.xDot = 2.0 * amplitude * omega * cos(omega * t);
+        double xdDot = -2.0 * amplitude * omega * omega * sin(omega * t);
+        segment.y = amplitude * sin(2.0 * omega * t);
+        segment.yDot = 2.0 * amplitude * omega * cos(2.0 * omega * t);
+        double ydDot = -4.0 * amplitude * omega * omega * sin(2.0 * omega * t);
+        segment.theta = f(g(segment.xDot, segment.yDot));
+        segment.thetaDot = fprime(g(segment.xDot, segment.yDot)) *
+            gprime(segment.xDot, segment.yDot, xdDot, ydDot);
+
+        retval.push_back(segment);
+    }
+
+    // now add a ramp down to zero at the end.
+    PathSegment end;
+    double endDistance = 0.5 * (pow(retval.back().xDot, 2.0) + pow(retval.back().yDot, 2.0))
+        / acceleration;
+    double endDuration = sqrt(pow(retval.back().xDot, 2.0) + pow(retval.back().yDot, 2.0)) /
+        acceleration;
+
+    end.time = retval.back().time + ros::Duration(endDuration);
+    end.xDot = 0.0;
+    end.yDot = 0.0;
+    end.thetaDot = 0.0;
+    end.x = endDistance + cos(retval.back().theta) + retval.back().x;
+    end.y = endDistance + sin(retval.back().theta) + retval.back().y;
+    end.theta = retval.back().theta;
+
+    retval.push_back(end);
+
+    // debugging. should not be pushed commented in!
+    //for(auto i : retval)
+    //{
+    //    ROS_ERROR("time: %d, x: %d, y: %d, theta: %d, xDot: %d, yDot: %d, thetaDot: %d",
+    //            i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
+    //    );
+    }
+
+    return retval;
+
 }
 
-double xPrime(double t, double omega)
+std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
 {
-    return omega * sin(omega * t) / 2.0;
+    // store the current steering angles as a way to initialize last valid steering
+    // angle
+    double portLastValidAngle, starboardLastValidAngle, sternLastValidAngle;
+    port->getPosition(&portLastValidAngle, nullptr, nullptr, nullptr);
+    starboard->getPosition(&starboardLastValidAngle, nullptr, nullptr, nullptr);
+    stern->getPosition(&sternLastValidAngle, nullptr, nullptr, nullptr);
+
+    // make sure that the last thing in the path is a segment with zero velocity
+    PathSegment last = path.back();
+    last.xDot = 0;
+    last.yDot = 0;
+    last.thetaDot = 0;
+    last.time += ros::Duration(0.25);
+    path.push_back(last);
+
+    std::list<BodySegment> retval;
+
+    // iterate over the path. this is slightly tricky because we want two consecutive
+    // elements at a time
+    for(auto current = path.begin(), next = ++path.begin();
+            next != path.end();
+            current++, next++)
+    {
+        BodySegment segment;
+        segment.time = (*current).time;
+        segment.port = pathToPod(*current, *next, "port_suspension", portLastValidAngle);
+        segment.starboard = pathToPod(*current, *next, "starboard_suspension", starboardLastValidAngle);
+        segment.stern = pathToPod(*current, *next, "stern_suspension", sternLastValidAngle);
+
+        retval.push_back(segment);
+    }
+
+    return retval;
+}
+
+// helper function needed only for pathToPod below
+double unwrap(double theta)
+{
+    if(theta < -M_PI)
+        theta += 2*M_PI;
+    if(theta > M_PI)
+        theta -= 2*M_PI;
+    return theta;
+}
+
+PodSegment Motion::pathToPod(PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle)
+{
+    // this is a helper that does the actual math for each pod segment.
+    // this math comes from contradict's path2local.py and I'm using those vairable names
+    // for the most part. sorry about that.
+    // compute the differentials
+    double dx = next.x - current.x;
+    double dy = next.y - current.y;
+    double dtheta = next.theta - current.theta;
+    double dt = (next.time - current.time).toSec();
+
+    PodSegment retval;
+    retval.duration = dt;
+
+    // look up the transform
+    tf::StampedTransform pod_tf;
+    // asking for time 0 asks for the most recent transform
+    ros::Time zero(0);
+    try {
+        listener.lookupTransform(child_frame_id, jointName, zero, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", jointName, ex.what());
+        // set the steering angle to the last valid and zero out everything else
+        // this is all we can do here...
+        retval.steeringAngle = lastValidSteeringAngle;
+        retval.steeringVelocity = 0.0;
+        retval.wheelDistance = 0.0;
+        retval.wheelVelocity = 0.0;
+        return retval;
+    }
+
+    Eigen::Vector2d pod_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+
+    // I am not really a fan of Eigen's matrix initializers
+    Eigen::Matrix2d rot;
+    rot << cos(current.theta), sin(current.theta),
+           -sin(current.theta), cos(current.theta);
+
+    Eigen::Matrix2d drot;
+    drot << 1.0-cos(dtheta), sin(dtheta),
+           -sin(dtheta), 1.0-cos(dtheta);
+
+    Eigen::Vector2d rdx = drot * rot * pod_pos;
+
+    dx += rdx(0);
+    dy += rdx(1);
+
+    double Vx = (-current.thetaDot * pod_pos(1)) + current.xDot;
+    double Vy = (current.thetaDot * pod_pos(0)) + current.yDot;
+
+    double ksidot = sqrt(pow(Vx, 2) + pow(Vy, 2));
+
+    if(ksidot < 0.001)
+    {
+        // if ksidot is nearly zero, steering angle and velocity will be wrong!
+        // set steering velocity to 0 and steering angle to the last valid and
+        // return early. that's all we can do for now.
+        retval.steeringAngle = lastValidSteeringAngle;
+        retval.steeringVelocity = 0.0;
+        retval.wheelDistance = 0.0;
+        retval.wheelVelocity = 0.0;
+        return retval;
+    }
+
+    double phi = unwrap(atan2(Vy, Vx) - current.theta);
+
+    // we determined .001 by looking at the limit. it might want to be a parameter or
+    // a constant...
+    double dksi;
+    if(dtheta < 0.001)
+    {
+        dksi = sqrt(pow(dx, 2) + pow(dy, 2));
+    }
+    else
+    {
+        dksi = abs(dtheta) * sqrt(pow(dx, 2) + pow(dy, 2)) / sqrt(2 * (1.0 - cos(dtheta)));
+    }
+
+    double alpha = unwrap(phi + current.theta);
+
+    double Vdotx = Vx/dt;
+    double Vdoty = Vy/dt;
+
+    double phidot = (Vdotx * cos(-alpha - M_PI/2.0) - Vdoty * sin(-alpha - M_PI/2.0)) /
+        ksidot - current.thetaDot;
+
+    // we've actually computed everything now! stick the results into retval!
+    retval.steeringAngle = phi;
+    retval.steeringVelocity = phidot;
+    retval.wheelDistance = dksi;
+    retval.wheelVelocity = ksidot;
+
+    // update last valid steering angle in case we hit another zero velocity path.
+    lastValidSteeringAngle = phi;
+
+    return retval;
+}
+
+// function definition interlude!
+PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double amount, double duration)
+{
+    // a helper for sendPvtSegment. this should probably be declared in the header...
+    PodSegment retval;
+    retval.steeringAngle = first.steeringAngle +
+        amount*(second.steeringAngle - first.steeringAngle);
+    retval.steeringVelocity = first.steeringVelocity +
+        amount*(second.steeringVelocity - first.steeringVelocity);
+    retval.wheelDistance = first.wheelDistance +
+        amount*(second.wheelDistance - first.wheelDistance);
+    retval.wheelVelocity = first.wheelVelocity +
+        amount*(second.wheelVelocity - first.wheelVelocity);
+    retval.duration = duration;
+    return retval;
 }
 
 void Motion::sendPvtSegment(ros::Time time)
@@ -1067,13 +1367,80 @@ void Motion::sendPvtSegment(ros::Time time)
     // stomping all over other commands from other sources.
     // if the joystick and visual servo ever use pvt mode, this will
     // have to change.
-    if(command_source == COMMAND_SOURCE_PLANNER)
+    if((command_source == COMMAND_SOURCE_PLANNER) ||
+       (command_source == COMMAND_SOURCE_SCARY_TEST_MODE))
     {
+        BodySegment newSegment;
+
         // send the next pvt segment to all the wheelpods.
         if(plannedPath.size() > 0)
         {
+            // delete all the segments that are as old or older than the last segment
+            // sent.
+            plannedPath.remove_if(
+                    [lastSegmentSent](BodySegment p)
+                    {
+                        return p.time <= lastSegmentSent.time;
+                    }
+            );
+
             // if we've got some path to follow, follow it.
-            // XXX TODO: actually make this work!
+            if(plannedPath.front().time <= time)
+            {
+                // if the next segment is between the time we really want and now or
+                // happens to be exactly at the time we want, just send it.
+                newSegment = plannedPath.front();
+
+                // make sure the durations are all less than or equal to .255!!
+                if((newSegment.port.duration > 0.255) ||
+                   (newSegment.starboard.duration > 0.255) ||
+                   (newSegment.stern.duration > 0.255))
+                {
+                    newSegment.port.duration = 0.250;
+                    newSegment.starboard.duration = 0.250;
+                    newSegment.stern.duration = 0.250;
+                }
+            }
+            else
+            {
+                // in this case, linearly interpolate between last segment sent and
+                // the next one in the list
+                // the duration is the time between now and when the next segment is for
+                double duration = (plannedPath.front().time - time).toSec();
+                if(duration > 0.255)
+                {
+                    // if the next segment is a long ways off, set duration to .25
+                    // that means we'll interpolate twice, which isn't so bad.
+                    duration = 0.25;
+                }
+
+                double interpolationAmount = (time - lastSegmentSent.time).toSec() /
+                    (plannedPath.front().time - lastSegmentSent.time).toSec();
+
+                // use the helper function to linearly interpolate each segment
+                newSegment.port = interpolatePodSegments(
+                        lastSegmentSent.port,
+                        plannedPath.front().port,
+                        interpolationAmount,
+                        duration
+                );
+
+                newSegment.starboard = interpolatePodSegments(
+                        lastSegmentSent.starboard,
+                        plannedPath.front().starboard,
+                        interpolationAmount,
+                        duration
+                );
+
+                newSegment.stern = interpolatePodSegments(
+                        lastSegmentSent.stern,
+                        plannedPath.front().stern,
+                        interpolationAmount,
+                        duration
+                );
+
+                newSegment.time = time;
+            }
         }
         else
         {
@@ -1093,63 +1460,25 @@ void Motion::sendPvtSegment(ros::Time time)
             // reset the steering angle for each pod so we don't move the
             // steering.
             segment.steeringAngle = port_steering;
-            port->move(segment);
+            newSegment.port = segment;
             segment.steeringAngle = starboard_steering;
-            starboard->move(segment);
+            newSegment.starboard = segment;
             segment.steeringAngle = stern_steering;
-            stern->move(segment);
+            newSegment.stern = segment;
+            newSegment.time = time;
         }
-    }
-    else if(command_source == COMMAND_SOURCE_SCARY_TEST_MODE)
-    {
-        if(scaryTestModeEnabled)
-        {
-            double t = (time - scaryTestModeStartTime).toSec();
-            double omega = M_PI / 4.0;
-            double dt = 0.25;
 
-            // we'll just give all the wheel pods the same segment.
-            // also, no steering for now, just wheels moving
-            PodSegment segment;
-            segment.steeringAngle = 0.0;
-            segment.steeringVelocity = 0.0;
-            segment.wheelDistance = 1.5 * (x(t + dt, omega) - x(t, omega));
-            segment.wheelVelocity = 1.5 * (xPrime(t+dt, omega));
-            segment.duration = dt;
+        // some debug printing. probably shouldn't check this in
+        //ROS_ERROR("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
+        //ROS_ERROR("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
+        //ROS_ERROR("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
 
-            // reset the steering angle for each pod so we don't move the
-            // steering.
-            segment.steeringAngle = port_steering;
-            port->move(segment);
+        // now just send the new segment, whatever it was.
+        port->move(newSegment.port);
+        starboard->move(newSegment.starboard);
+        stern->move(newSegment.stern);
 
-            segment.wheelVelocity *= -1.0;
-            segment.wheelDistance *= -1.0;
-            segment.steeringAngle = starboard_steering;
-            starboard->move(segment);
-
-            segment.steeringAngle = stern_steering;
-            stern->move(segment);
-        }
-        else
-        {
-            // if we're disabled for the moment, send zeros to get things
-            // to stop moving. this seems like it might be handy...
-            PodSegment segment;
-            segment.steeringAngle = 0.0;
-            segment.steeringVelocity = 0.0;
-            segment.wheelDistance = 0.0;
-            segment.wheelVelocity = 0.0;
-            segment.duration = .25;
-
-            // reset the steering angle for each pod so we don't move the
-            // steering.
-            segment.steeringAngle = port_steering;
-            port->move(segment);
-            segment.steeringAngle = starboard_steering;
-            starboard->move(segment);
-            segment.steeringAngle = stern_steering;
-            stern->move(segment);
-        }
+        lastSegmentSent = newSegment;
     }
 }
 

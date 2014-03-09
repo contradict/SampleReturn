@@ -23,6 +23,40 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void enable_carousel(bool state = true);
 
     private:
+        // structs for pvt segment operation.
+        struct PathSegment
+        {
+            // path segment in the odometry frame.
+            double x;
+            double y;
+            double theta;
+            double xDot;
+            double yDot;
+            double thetaDot;
+            ros::Time time;
+
+            PathSegment():
+                x(0.0),
+                y(0.0),
+                theta(0.0),
+                xDot(0.0),
+                yDot(0.0),
+                thetaDot(0.0),
+                time()
+            {
+            }
+        };
+
+        struct BodySegment
+        {
+            // when a PathSegment has been transformed into wheel pod local coordinates,
+            // it becomes a BodySegment
+            PodSegment port;
+            PodSegment starboard;
+            PodSegment stern;
+            ros::Time time;
+        };
+
         bool openBus(void);
         void createServos(void);
 
@@ -58,9 +92,13 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         // scary pvt test mode enable. only do this on blocks!!!
         void scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable);
         bool scaryTestModeEnabled;
+        std::list<PathSegment> computeScaryPath(ros::Time time, int numPoints, double amplitude, double omega);
         ros::Time scaryTestModeStartTime;
 
         // pvt mode
+        // pathToBody transforms odometry frame PathSegments to body local BodySegments
+        std::list<BodySegment> pathToBody(std::list<PathSegment>& path);
+        PodSegment pathToPod(PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle);
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 
@@ -148,7 +186,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         // pvt mode members
         bool moreDataSent; // send more data once per sync.
-        std::list<geometry_msgs::PoseStamped> plannedPath;
+        std::list<BodySegment> plannedPath;
+        BodySegment lastSegmentSent; // the last segment we actually gave the wheelpods
 };
 
 }
