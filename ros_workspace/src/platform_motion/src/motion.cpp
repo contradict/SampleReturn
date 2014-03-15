@@ -1173,7 +1173,7 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     //    ROS_ERROR("time: %d, x: %d, y: %d, theta: %d, xDot: %d, yDot: %d, thetaDot: %d",
     //            i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
     //    );
-    }
+    //}
 
     return retval;
 
