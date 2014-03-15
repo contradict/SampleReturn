@@ -2,7 +2,7 @@ import numpy as np
 from numpy import arctan2, sin, cos, sqrt, pi, diff, allclose, abs
 import pylab
 
-def makePath(N=100, A=3, omega=0.2):
+def makePath(N=100, A=3, omega=0.2, a=0.1):
     t=linspace(0,2*pi/omega,N)
     x=2*A*sin(omega*t)
     xdot=2*A*omega*cos(omega*t)
@@ -18,7 +18,19 @@ def makePath(N=100, A=3, omega=0.2):
     gprime = lambda x,y,xdot,ydot : ((x**2+y**2)**(-1./2.)*(x*xdot+y*ydot)-xdot)/y - (sqrt(x**2+y**2)-x)/y**2*ydot
     theta = f(g(xdot, ydot))
     thetadot=fprime(g(xdot,ydot))*gprime(xdot, ydot, xddot, yddot)
-    return np.c_[x,y,theta,xdot,ydot,thetadot,t]
+    path=np.c_[x,y,theta,xdot,ydot,thetadot,t]
+    v0=sqrt(xdot[0]**2 + ydot[0]**2)
+    d0=1./2.*v0**2/a
+    P0 = path[0:1,0:2]+[[d0*cos(theta[0]+pi), d0*sin(theta[0]+pi)]]
+    t0=-v0/a
+    path = np.r_[np.c_[ P0, theta[0], 0, 0, 0, t0], path]
+    ve=sqrt(xdot[-1]**2 + ydot[-1]**2)
+    de=1./2.*ve**2/a
+    Pe = path[-1:,0:2]+[[de*cos(theta[-1]), de*sin(theta[-1])]]
+    te = t[-1]+ve/a
+    path = np.r_[path, np.c_[ Pe, theta[-1], 0, 0, 0, te]]
+    path[:,-1] -= path[0,-1]
+    return path
 
 def drawPath(p,N=1):
     base=p[::N,:2]
@@ -51,7 +63,7 @@ def unwrap(theta):
     theta = np.where(theta>pi, theta-2*pi, theta)
     return theta
 
-def path2local(p, R, small=1e-3):
+def path2local(p, R, initialphi=0, small=1e-3):
     x = p[:,0:1]
     y = p[:,1:2]
     theta = p[:,2:3]
@@ -78,6 +90,12 @@ def path2local(p, R, small=1e-3):
     ksidot = sqrt(Vx**2+Vy**2)
     # phi = arg(V)-theta
     phi = unwrap(arctan2(Vy, Vx) - theta)
+    last_good_phi=initialphi
+    for i in xrange(phi.shape[0]):
+        if ksidot[i]<small:
+            phi[i]=last_good_phi
+        else:
+            last_good_phi = phi[i]
     dksi = np.where(abs(dtheta)<small, sqrt(dx**2+dy**2),
                                   abs(dtheta)*sqrt(dx**2+dy**2)/sqrt(2*(1.-cos(dtheta))))
     # V = ksidot exp(i(phi+theta))
@@ -93,11 +111,13 @@ def path2local(p, R, small=1e-3):
     # (Vdot exp(-i (alpha+pi/2)) + i ksiddot)/(ksidot) - thetadot = phidot
     # ([Vdotx cos(-alpha-pi/2) - Vdoty sin(-alpha-pi/2),
     #   Vdoty cos(-alpha-pi/2) + Vdotx sin(-alpha-pi/2)+ksiddot])/(ksidot) - thetadot = phidot
-    phidot = (Vdotx*cos(-alpha-pi/2) - Vdoty*sin(-alpha-pi/2))/ksidot - thetadot
+    phidot = np.where(ksidot>small, (Vdotx*cos(-alpha-pi/2) -
+        Vdoty*sin(-alpha-pi/2))/ksidot - thetadot, 0)
     # this should be very small (analytically, it should be zero) everywhere
-    imphidot = (Vdoty*cos(-alpha-pi/2) + Vdotx*sin(-alpha-pi/2)+ksiddot)/ksidot
+    imphidot = np.where(ksidot>small, (Vdoty*cos(-alpha-pi/2) +
+        Vdotx*sin(-alpha-pi/2)+ksiddot)/ksidot, 0)
     assert(allclose(imphidot, 0))
-    return np.c_[phi, phidot, dksi, ksidot, t], alpha
+    return np.c_[phi, phidot, dksi, ksidot, t]
 
 def plotlocal(l):
     f=pylab.figure(2)
