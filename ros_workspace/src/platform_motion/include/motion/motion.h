@@ -102,7 +102,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 
-        void sendPvtSegment(ros::Time time); // send next pvt segment to all wheelpods
+        void sendPvtSegment(); // send next pvt segment to all wheelpods
 
         // debug print statement variable. probably shouldn't be committed
         int m_debugPrintCounter;

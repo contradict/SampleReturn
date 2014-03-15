@@ -1064,9 +1064,9 @@ void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
     }
 
     // send a pvt segment to kick things off
-    sendPvtSegment(scaryTestModeStartTime);
-    sendPvtSegment(scaryTestModeStartTime + ros::Duration(0.25));
-    sendPvtSegment(scaryTestModeStartTime + ros::Duration(0.5));
+    sendPvtSegment();
+    sendPvtSegment();
+    sendPvtSegment();
 }
 
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
@@ -1079,9 +1079,8 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         // sync fame
         this->moreDataSent = true;
 
-        // send the next segment we expect, ie: the last segment's time plus the duration
-        // of that segment. this is very likely in the future, but that's good!
-        sendPvtSegment(lastSegmentSent.time + ros::Duration(lastSegmentSent.port.duration));
+        // send the next segment
+        sendPvtSegment();
     }
 }
 
@@ -1318,7 +1317,6 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
     double Vy_prev = (previous.thetaDot * pod_pos(0)) + previous.yDot;
     double Vx_next = (-next.thetaDot * pod_pos(1)) + next.xDot;
     double Vy_next = (next.thetaDot * pod_pos(0)) + next.yDot;
-
     double Vdotx = ((Vx-Vx_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
     double Vdoty = ((Vy-Vy_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
 
@@ -1338,23 +1336,22 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
 }
 
 // function definition interlude!
-PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double amount, double duration)
+PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double interpolationAmount, double distanceScalar, double duration)
 {
     // a helper for sendPvtSegment. this should probably be declared in the header...
     PodSegment retval;
     retval.steeringAngle = first.steeringAngle +
-        amount*(second.steeringAngle - first.steeringAngle);
+        interpolationAmount*(second.steeringAngle - first.steeringAngle);
     retval.steeringVelocity = first.steeringVelocity +
-        amount*(second.steeringVelocity - first.steeringVelocity);
-    retval.wheelDistance = first.wheelDistance +
-        amount*(second.wheelDistance - first.wheelDistance);
+        interpolationAmount*(second.steeringVelocity - first.steeringVelocity);
+    retval.wheelDistance = distanceScalar * second.wheelDistance;
     retval.wheelVelocity = first.wheelVelocity +
-        amount*(second.wheelVelocity - first.wheelVelocity);
+        interpolationAmount*(second.wheelVelocity - first.wheelVelocity);
     retval.duration = duration;
     return retval;
 }
 
-void Motion::sendPvtSegment(ros::Time time)
+void Motion::sendPvtSegment()
 {
     // get the steering angles (and a bunch of other crud) so we can
     // tell the steering not to move for each pod, if needed.
@@ -1384,24 +1381,26 @@ void Motion::sendPvtSegment(ros::Time time)
     {
         BodySegment newSegment;
 
+        // make sure the planned path has 2 or more segments in it. if it only has one
+        // segment, just clear it.
+        if(plannedPath.size() == 1)
+        {
+            plannedPath.clear();
+        }
+
         // send the next pvt segment to all the wheelpods.
         if(plannedPath.size() > 0)
         {
-            // delete all the segments that are as old or older than the last segment
-            // sent.
-            plannedPath.remove_if(
-                    [this](BodySegment p)
-                    {
-                        return p.time <= lastSegmentSent.time;
-                    }
-            );
-
             // if we've got some path to follow, follow it.
-            if(plannedPath.front().time <= time)
+            // get the next two path segments out of the path
+            BodySegment first = plannedPath.front();
+            BodySegment second = *(++plannedPath.begin());
+
+            if(lastSegmentSent.time < first.time)
             {
-                // if the next segment is between the time we really want and now or
-                // happens to be exactly at the time we want, just send it.
-                newSegment = plannedPath.front();
+                // if the last segment we sent was before this path, just send
+                // the first segment. that's all we can really do.
+                newSegment = first;
 
                 // make sure the durations are all less than or equal to .255!!
                 if((newSegment.port.duration > 0.255) ||
@@ -1413,45 +1412,85 @@ void Motion::sendPvtSegment(ros::Time time)
                     newSegment.stern.duration = 0.250;
                 }
             }
+            else if((lastSegmentSent.time == first.time) &&
+                    ((second.time - first.time).toSec() < 0.255))
+            {
+                // if we sent the first segment and the distance between the
+                // first and second segments is close enough, send the second
+                // segment.
+                newSegment = second;
+
+                // now that we're all the way past first, remove it from the list.
+                plannedPath.pop_front();
+            }
             else
             {
-                // in this case, linearly interpolate between last segment sent and
-                // the next one in the list
-                // the duration is the time between now and when the next segment is for
-                double duration = (plannedPath.front().time - time).toSec();
-                if(duration > 0.255)
+                // we're going to have to interpolate here.
+                if((second.time - lastSegmentSent.time).toSec() < 0.255)
                 {
-                    // if the next segment is a long ways off, set duration to .25
-                    // that means we'll interpolate twice, which isn't so bad.
-                    duration = 0.25;
+                    // send second pretty much as is, but fix the distance and duration
+                    double duration = (second.time - lastSegmentSent.time).toSec();
+                    newSegment = second;
+                    
+                    newSegment.port.duration = duration;
+                    newSegment.starboard.duration = duration;
+                    newSegment.stern.duration = duration;
+
+                    // compute the distance scalar.
+                    double distanceScalar = duration / (second.time - first.time).toSec();
+                    newSegment.port.wheelDistance *= distanceScalar;
+                    newSegment.starboard.wheelDistance *= distanceScalar;
+                    newSegment.stern.wheelDistance *= distanceScalar;
+
+                    // we're also well past the first segment, so remove it from the
+                    // path.
+                    plannedPath.pop_front();
                 }
+                else
+                {
+                    // interpolate between first and second with a fixed time step
+                    // this prevents us from having a strange tiny duration at the end
+                    double numSteps = ceil((second.time - first.time).toSec() / 0.255);
+                    double step = (second.time - first.time).toSec() / numSteps;
 
-                double interpolationAmount = (time - lastSegmentSent.time).toSec() /
-                    (plannedPath.front().time - lastSegmentSent.time).toSec();
+                    // the next segment is step away from the last one in time.
+                    newSegment = lastSegmentSent;
+                    newSegment.time += ros::Duration(step);
 
-                // use the helper function to linearly interpolate each segment
-                newSegment.port = interpolatePodSegments(
-                        lastSegmentSent.port,
-                        plannedPath.front().port,
-                        interpolationAmount,
-                        duration
-                );
+                    // the distance this segment goes is just a scalar on the distance
+                    // second wants to go
+                    double distanceScalar = step / (second.time - first.time).toSec();
 
-                newSegment.starboard = interpolatePodSegments(
-                        lastSegmentSent.starboard,
-                        plannedPath.front().starboard,
-                        interpolationAmount,
-                        duration
-                );
+                    // all the rest of the parameters in the new segment are just
+                    // linear interpolations between first and second
+                    double interpolationAmount =
+                        (newSegment.time - first.time).toSec() /
+                        (second.time - first.time).toSec();
 
-                newSegment.stern = interpolatePodSegments(
-                        lastSegmentSent.stern,
-                        plannedPath.front().stern,
-                        interpolationAmount,
-                        duration
-                );
+                    newSegment.port = interpolatePodSegments(
+                            first.port,
+                            second.port,
+                            interpolationAmount,
+                            distanceScalar,
+                            step
+                    );
 
-                newSegment.time = time;
+                    newSegment.starboard = interpolatePodSegments(
+                            first.starboard,
+                            second.starboard,
+                            interpolationAmount,
+                            distanceScalar,
+                            step
+                    );
+
+                    newSegment.stern = interpolatePodSegments(
+                            first.stern,
+                            second.stern,
+                            interpolationAmount,
+                            distanceScalar,
+                            step
+                    );
+                }
             }
         }
         else
@@ -1477,7 +1516,7 @@ void Motion::sendPvtSegment(ros::Time time)
             newSegment.starboard = segment;
             segment.steeringAngle = stern_steering;
             newSegment.stern = segment;
-            newSegment.time = time;
+            newSegment.time = lastSegmentSent.time + ros::Duration(0.250);
         }
 
         // some debug printing. probably shouldn't check this in
