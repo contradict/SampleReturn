@@ -98,7 +98,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         // pvt mode
         // pathToBody transforms odometry frame PathSegments to body local BodySegments
         std::list<BodySegment> pathToBody(std::list<PathSegment>& path);
-        PodSegment pathToPod(PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle);
+        PodSegment pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle);
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 

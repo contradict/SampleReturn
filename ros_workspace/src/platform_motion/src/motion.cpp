@@ -1201,17 +1201,23 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
 
     // iterate over the path. this is slightly tricky because we want two consecutive
     // elements at a time
+    PathSegment previous;
+    previous.xDot = 0;
+    previous.yDot = 0;
+    previous.thetaDot = 0;
+    previous.time = path.begin()->time-ros::Duration(0.250);
     for(auto current = path.begin(), next = ++path.begin();
             next != path.end();
             current++, next++)
     {
         BodySegment segment;
         segment.time = (*current).time;
-        segment.port = pathToPod(*current, *next, "port_suspension", portLastValidAngle);
-        segment.starboard = pathToPod(*current, *next, "starboard_suspension", starboardLastValidAngle);
-        segment.stern = pathToPod(*current, *next, "stern_suspension", sternLastValidAngle);
+        segment.port = pathToPod(previous, *current, *next, "port_suspension", portLastValidAngle);
+        segment.starboard = pathToPod(previous, *current, *next, "starboard_suspension", starboardLastValidAngle);
+        segment.stern = pathToPod(previous, *current, *next, "stern_suspension", sternLastValidAngle);
 
         retval.push_back(segment);
+        previous = *current;
     }
 
     return retval;
@@ -1227,19 +1233,20 @@ double unwrap(double theta)
     return theta;
 }
 
-PodSegment Motion::pathToPod(PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle)
+PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle)
 {
     // this is a helper that does the actual math for each pod segment.
     // this math comes from contradict's path2local.py and I'm using those vairable names
     // for the most part. sorry about that.
     // compute the differentials
-    double dx = next.x - current.x;
-    double dy = next.y - current.y;
-    double dtheta = next.theta - current.theta;
-    double dt = (next.time - current.time).toSec();
+    double dx = current.x - previous.x;
+    double dy = current.y - previous.y;
+    double dtheta = current.theta - previous.theta;
+    double dt_prev = (current.time - previous.time).toSec();
+    double dt_next = (next.time - current.time).toSec();
 
     PodSegment retval;
-    retval.duration = dt;
+    retval.duration = dt_next;
 
     // look up the transform
     tf::StampedTransform pod_tf;
@@ -1307,8 +1314,13 @@ PodSegment Motion::pathToPod(PathSegment &current, PathSegment &next, const char
 
     double alpha = unwrap(phi + current.theta);
 
-    double Vdotx = Vx/dt;
-    double Vdoty = Vy/dt;
+    double Vx_prev = (-previous.thetaDot * pod_pos(1)) + previous.xDot;
+    double Vy_prev = (previous.thetaDot * pod_pos(0)) + previous.yDot;
+    double Vx_next = (-next.thetaDot * pod_pos(1)) + next.xDot;
+    double Vy_next = (next.thetaDot * pod_pos(0)) + next.yDot;
+
+    double Vdotx = ((Vx-Vx_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
+    double Vdoty = ((Vy-Vy_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
 
     double phidot = (Vdotx * cos(-alpha - M_PI/2.0) - Vdoty * sin(-alpha - M_PI/2.0)) /
         ksidot - current.thetaDot;
@@ -1378,7 +1390,7 @@ void Motion::sendPvtSegment(ros::Time time)
             // delete all the segments that are as old or older than the last segment
             // sent.
             plannedPath.remove_if(
-                    [lastSegmentSent](BodySegment p)
+                    [this](BodySegment p)
                     {
                         return p.time <= lastSegmentSent.time;
                     }
