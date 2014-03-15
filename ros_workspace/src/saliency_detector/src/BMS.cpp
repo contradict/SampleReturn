@@ -31,8 +31,12 @@ using namespace cv;
 using namespace std;
 
 
-BMS::BMS(const Mat& src, const int dw1, const int ow, const bool nm, const bool hb)
+BMS::BMS(const int dw1, const int ow, const bool nm, const bool hb)
 	:_rng(),_dilation_width_1(dw1),_opening_width(ow),_normalize(nm),_handle_border(hb)
+{
+}
+
+void BMS::computeSaliency(const Mat& src, float step)
 {
 	_src=src.clone();
 	Mat lab;
@@ -61,10 +65,7 @@ BMS::BMS(const Mat& src, const int dw1, const int ow, const bool nm, const bool 
     }
 	}
 	_sm=Mat::zeros(src.size(),CV_64FC1);
-}
 
-void BMS::computeSaliency(float step)
-{
 	for (int i=0;i<_feature_maps.size();++i)
 	{
 		double max_,min_;
