@@ -1161,19 +1161,21 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     end.xDot = 0.0;
     end.yDot = 0.0;
     end.thetaDot = 0.0;
-    end.x = endDistance + cos(retval.back().theta) + retval.back().x;
-    end.y = endDistance + sin(retval.back().theta) + retval.back().y;
+    end.x = endDistance * cos(retval.back().theta) + retval.back().x;
+    end.y = endDistance * sin(retval.back().theta) + retval.back().y;
     end.theta = retval.back().theta;
 
     retval.push_back(end);
 
     // debugging. should not be pushed commented in!
-    //for(auto i : retval)
-    //{
-    //    ROS_ERROR("time: %d, x: %d, y: %d, theta: %d, xDot: %d, yDot: %d, thetaDot: %d",
-    //            i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
-    //    );
-    //}
+    int j = 0;
+    for(auto i : retval)
+    {
+        ROS_ERROR("%d: time: %f, x: %f, y: %f, theta: %f, xDot: %f, yDot: %f, thetaDot: %f",
+                j, i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
+        );
+        j++;
+    }
 
     return retval;
 
@@ -1205,6 +1207,10 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
     previous.yDot = 0;
     previous.thetaDot = 0;
     previous.time = path.begin()->time-ros::Duration(0.250);
+
+    // debug counter!
+    int j = 0;
+
     for(auto current = path.begin(), next = ++path.begin();
             next != path.end();
             current++, next++)
@@ -1217,6 +1223,9 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
 
         retval.push_back(segment);
         previous = *current;
+
+        ROS_ERROR("%d: stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", j, segment.stern.steeringAngle, segment.stern.steeringVelocity, segment.stern.wheelDistance, segment.stern.wheelVelocity, segment.stern.duration);
+        j++;
     }
 
     return retval;
@@ -1240,7 +1249,7 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
     // compute the differentials
     double dx = current.x - previous.x;
     double dy = current.y - previous.y;
-    double dtheta = current.theta - previous.theta;
+    double dtheta = unwrap(current.theta - previous.theta);
     double dt_prev = (current.time - previous.time).toSec();
     double dt_next = (next.time - current.time).toSec();
 
@@ -1302,13 +1311,13 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
     // we determined .001 by looking at the limit. it might want to be a parameter or
     // a constant...
     double dksi;
-    if(dtheta < 0.001)
+    if(fabs(dtheta) < 0.001)
     {
         dksi = sqrt(pow(dx, 2) + pow(dy, 2));
     }
     else
     {
-        dksi = abs(dtheta) * sqrt(pow(dx, 2) + pow(dy, 2)) / sqrt(2 * (1.0 - cos(dtheta)));
+        dksi = fabs(dtheta) * sqrt(pow(dx, 2) + pow(dy, 2)) / sqrt(2 * (1.0 - cos(dtheta)));
     }
 
     double alpha = unwrap(phi + current.theta);
@@ -1336,15 +1345,39 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
 }
 
 // function definition interlude!
-PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double interpolationAmount, double distanceScalar, double duration)
+double cubicInterpolate(double x0, double xDot0, double x1, double xDot1, double alpha)
+{
+    // this comes from something we worked out on the board. it could be
+    // a little easier to read..
+    double c = -6.0 * (x1 - 0.5 * xDot1 - x0 - 0.5 * xDot0);
+    double b = xDot1 - xDot0 - c;
+
+    return x0 + xDot0 * alpha + 0.5 * b * pow(alpha, 2.0) + (1.0/3.0) * c * pow(alpha, 3.0);
+}
+
+PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double interpolationAmount, double previousInterpolationAmount, double duration)
 {
     // a helper for sendPvtSegment. this should probably be declared in the header...
     PodSegment retval;
-    retval.steeringAngle = first.steeringAngle +
-        interpolationAmount*(second.steeringAngle - first.steeringAngle);
+    retval.steeringAngle = cubicInterpolate(
+            first.steeringAngle, first.steeringVelocity,
+            second.steeringAngle, second.steeringVelocity,
+            interpolationAmount
+    );
     retval.steeringVelocity = first.steeringVelocity +
         interpolationAmount*(second.steeringVelocity - first.steeringVelocity);
-    retval.wheelDistance = distanceScalar * second.wheelDistance;
+
+    retval.wheelDistance =
+        cubicInterpolate(
+            first.wheelDistance, first.wheelVelocity,
+            second.wheelDistance, second.wheelVelocity,
+            interpolationAmount) -
+        cubicInterpolate(
+            first.wheelDistance, first.wheelVelocity,
+            second.wheelDistance, second.wheelVelocity,
+            previousInterpolationAmount
+        );
+
     retval.wheelVelocity = first.wheelVelocity +
         interpolationAmount*(second.wheelVelocity - first.wheelVelocity);
     retval.duration = duration;
@@ -1398,6 +1431,8 @@ void Motion::sendPvtSegment()
 
             if(lastSegmentSent.time < first.time)
             {
+                ROS_ERROR("last segment too old, sending first blindly");
+
                 // if the last segment we sent was before this path, just send
                 // the first segment. that's all we can really do.
                 newSegment = first;
@@ -1415,6 +1450,8 @@ void Motion::sendPvtSegment()
             else if((lastSegmentSent.time == first.time) &&
                     ((second.time - first.time).toSec() < 0.255))
             {
+                ROS_ERROR("last = first and second close enough, sending second");
+
                 // if we sent the first segment and the distance between the
                 // first and second segments is close enough, send the second
                 // segment.
@@ -1428,6 +1465,8 @@ void Motion::sendPvtSegment()
                 // we're going to have to interpolate here.
                 if((second.time - lastSegmentSent.time).toSec() < 0.255)
                 {
+                    ROS_ERROR("interpolated close enough to second, sending second");
+
                     // send second pretty much as is, but fix the distance and duration
                     double duration = (second.time - lastSegmentSent.time).toSec();
                     newSegment = second;
@@ -1436,11 +1475,25 @@ void Motion::sendPvtSegment()
                     newSegment.starboard.duration = duration;
                     newSegment.stern.duration = duration;
 
-                    // compute the distance scalar.
-                    double distanceScalar = duration / (second.time - first.time).toSec();
-                    newSegment.port.wheelDistance *= distanceScalar;
-                    newSegment.starboard.wheelDistance *= distanceScalar;
-                    newSegment.stern.wheelDistance *= distanceScalar;
+                    // compute the distance with the fancy cubic interpolation thing.
+                    newSegment.port.wheelDistance = second.port.wheelDistance - 
+                        cubicInterpolate(
+                            first.port.wheelDistance, first.port.wheelVelocity,
+                            second.port.wheelDistance, second.port.wheelVelocity,
+                            1.0 - duration / (second.time - first.time).toSec()
+                        );
+                    newSegment.starboard.wheelDistance = second.starboard.wheelDistance - 
+                        cubicInterpolate(
+                            first.starboard.wheelDistance, first.starboard.wheelVelocity,
+                            second.starboard.wheelDistance, second.starboard.wheelVelocity,
+                            1.0 - duration / (second.time - first.time).toSec()
+                        );
+                    newSegment.stern.wheelDistance = second.stern.wheelDistance - 
+                        cubicInterpolate(
+                            first.stern.wheelDistance, first.stern.wheelVelocity,
+                            second.stern.wheelDistance, second.stern.wheelVelocity,
+                            1.0 - duration / (second.time - first.time).toSec()
+                        );
 
                     // we're also well past the first segment, so remove it from the
                     // path.
@@ -1448,6 +1501,8 @@ void Motion::sendPvtSegment()
                 }
                 else
                 {
+                    ROS_ERROR("interpolating between first and second");
+
                     // interpolate between first and second with a fixed time step
                     // this prevents us from having a strange tiny duration at the end
                     double numSteps = ceil((second.time - first.time).toSec() / 0.255);
@@ -1457,21 +1512,21 @@ void Motion::sendPvtSegment()
                     newSegment = lastSegmentSent;
                     newSegment.time += ros::Duration(step);
 
-                    // the distance this segment goes is just a scalar on the distance
-                    // second wants to go
-                    double distanceScalar = step / (second.time - first.time).toSec();
-
                     // all the rest of the parameters in the new segment are just
                     // linear interpolations between first and second
                     double interpolationAmount =
                         (newSegment.time - first.time).toSec() /
                         (second.time - first.time).toSec();
 
+                    double previousInterpolationAmount =
+                        std::max((lastSegmentSent.time - first.time).toSec() /
+                        (second.time - first.time).toSec(), 0.0);
+
                     newSegment.port = interpolatePodSegments(
                             first.port,
                             second.port,
                             interpolationAmount,
-                            distanceScalar,
+                            previousInterpolationAmount,
                             step
                     );
 
@@ -1479,7 +1534,7 @@ void Motion::sendPvtSegment()
                             first.starboard,
                             second.starboard,
                             interpolationAmount,
-                            distanceScalar,
+                            previousInterpolationAmount,
                             step
                     );
 
@@ -1487,7 +1542,7 @@ void Motion::sendPvtSegment()
                             first.stern,
                             second.stern,
                             interpolationAmount,
-                            distanceScalar,
+                            previousInterpolationAmount,
                             step
                     );
                 }
@@ -1495,6 +1550,8 @@ void Motion::sendPvtSegment()
         }
         else
         {
+            ROS_ERROR("out of path segments, sending zeros");
+
             // if there is no path to follow, keep the buffers full of zeros
             // this means we're constantly actually filling the buffer and
             // don't have to worry about it being empty. that seems like
@@ -1520,9 +1577,9 @@ void Motion::sendPvtSegment()
         }
 
         // some debug printing. probably shouldn't check this in
-        //ROS_ERROR("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
-        //ROS_ERROR("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
-        //ROS_ERROR("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
+        ROS_ERROR("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
+        ROS_ERROR("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
+        ROS_ERROR("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
 
         // now just send the new segment, whatever it was.
         port->move(newSegment.port);
