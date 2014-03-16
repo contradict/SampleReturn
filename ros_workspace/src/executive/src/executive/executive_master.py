@@ -9,15 +9,15 @@ import actionlib
 import actionlib_msgs.msg as action_msg
 import tf
 import threading
-
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 
 from samplereturn_msgs.msg import VoiceAnnouncement
+import samplereturn.util as util
 
 import std_msgs.msg as std_msg
 import sensor_msgs.msg as sensor_msgs
 import platform_motion_msgs.msg as platform_msg
-import platform_motion_srv.srv as platform_srv
+import platform_motion_msgs.srv as platform_srv
 import manipulator_msgs.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
@@ -27,7 +27,6 @@ import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
 import tf_conversions
 
-from executive import executive_manual
 from executive import executive_level_one
 from executive import executive_level_two
 
@@ -49,9 +48,12 @@ class ExecutiveMaster(object):
         self.selected_mode = None
         self.preempt_modes = ('LEVEL_ONE_MODE', 'LEVEL_TWO_MODE', 'MANUAL_MODE')
         self.preemptCV = threading.Condition()
- 
+
+        self.node_params = util.get_node_params()
+        
+        rospy.loginfo("INIT LOGGING -----------------")
+   
         # node parameters
-        self.wait_for_cameras = rospy.get_param("~wait_for_cameras", True)
         self.servo_feedback_interval = rospy.Duration(rospy.get_param("~servo_feedback_interval", 5.0))
         self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
         self.pursuit_complete_distance = rospy.get_param("~pursuit_complete_distance", 5.0)
@@ -71,15 +73,11 @@ class ExecutiveMaster(object):
         rospy.Subscriber("manipulator_detection_point",
                          linemod_msg.NamedPoint,
                          self.sample_detection_manip_update)
-        rospy.Subscriber("beacon_pose",
-                          geometry_msg.PoseStamped,
-                          self.beacon_update)
-
+ 
         self.listener = tf.TransformListener()
         
-        
         # create publishers
-        self.navigation_audio=rospy.Publisher("audio_navigate", platform.msg_VoiceAnnouncement)
+        self.navigation_audio=rospy.Publisher("audio_navigate", VoiceAnnouncement)
         
         self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
         self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
@@ -104,9 +102,7 @@ class ExecutiveMaster(object):
                 actionlib.SimpleActionClient("home_carousel",
                 platform_msg.HomeAction)
    
-        self.manipulator = \
-                actionlib.SimpleActionClient('manipulator_action',
-                manipulator_msg.ManipulatorAction)
+
 
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                 move_base_msg.MoveBaseAction)
@@ -132,7 +128,7 @@ class ExecutiveMaster(object):
         with self.top_state_machine: 
             
             smach.StateMachine.add('START',
-                                    StartState(self.wait_for_cameras),
+                                    StartState(self.node_params.wait_for_cameras),
                                     transitions = { 'check_cameras':'WAIT_FOR_CAMERAS',
                                                     'skip_cameras':'HOME_PLATFORM',
                                                     'preempted':'TOP_PREEMPTED',
@@ -234,16 +230,19 @@ class ExecutiveMaster(object):
                                                   'preempted':'CHECK_MODE',
                                                   'aborted':'TOP_ABORTED'})
 
-            manual =  smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
-            executive_manual.AddStates(manual)
+            
+            mcg = platform_msg.ManualControlGoal()
+            mcg.mode = mcg.FULL_CONTROL
             smach.StateMachine.add('MANUAL_MODE',
-                                   manual,
-                                   transitions = {'complete':'CHECK_MODE',
+                                   smach_ros.SimpleActionState('manual_control',
+                                   platform_msg.ManualControlAction,
+                                   goal = mcg),
+                                   transitions = {'succeeded':'CHECK_MODE',
                                                   'preempted':'CHECK_MODE',
-                                                  'aborted':'TOP_ABORTED'})                        
+                                                  'aborted':'TOP_ABORTED'})    
 
             smach.StateMachine.add('TOP_PREEMPTED',
-                                   TopPreempted(),
+                                   TopPreempted(self.preemptCV),
                                    transitions = {'next':'CHECK_MODE'})
             
             smach.StateMachine.add('TOP_ABORTED',
@@ -253,7 +252,8 @@ class ExecutiveMaster(object):
             
         sls = smach_ros.IntrospectionServer('top_introspection', self.top_state_machine, '/START')
         sls.start()
-        
+    
+    def start_state_machine(self):
         self.top_state_machine.execute()
 
     #topic handlers
@@ -269,6 +269,10 @@ class ExecutiveMaster(object):
 
     def sample_detection_manip_update(self, msg):
         self.manip_sample = msg
+        
+    def pause_state_update(self, state):
+        self.pause_state = state
+        #rospy.logdebug("Pause state %s", state)
         
     #other methods
 
