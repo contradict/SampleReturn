@@ -2,6 +2,7 @@ import smach
 import smach_ros
 import rospy
 import actionlib
+import collections
 
 import manipulator_msgs.msg as manipulator_msg
 import platform_motion_msgs.msg as platform_msg
@@ -17,6 +18,11 @@ import sensor_msgs.msg as sensor_msgs
 class ManualController(object):
     
     def __init__(self):
+        
+        #stuff namedtuple with joystick parameters
+        node_params_dict = rospy.get_param(rospy.get_name())
+        ParamTuple =  namedtuple('ParamTuple', node_params_dict.keys())
+        self.node_params = ParamTuple(**node_params_dict)
         
         CAN_source_select = \
                 rospy.ServiceProxy("CAN_select_command_source",
@@ -36,7 +42,7 @@ class ManualController(object):
                                                  'invalid_goal':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
-                                   JoystickListen(CAN_source_select),
+                                   JoystickListen(CAN_source_select, self.node_params),
                                    transitions = {'visual_servo_requested':'VISUAL_SERVO',
                                                   'manipulator_grab_requested':'MANIPULATOR_GRAB',
                                                   'preempted':'MANUAL_PREEMPTED',
@@ -118,7 +124,7 @@ class ProcessGoal(smach.State):
 
 
 class JoystickListen(smach.State):
-    def __init__(self, CAN_source_select):
+    def __init__(self, CAN_source_select, node_params):
         smach.State.__init__(self,
                              outcomes=['visual_servo_requested',
                                        'manipulator_grab_requested',
@@ -128,6 +134,7 @@ class JoystickListen(smach.State):
                              output_keys=['action_feedback'])
         
         self.CAN_source_select = CAN_source_select
+        self.joy_params = node_params
         
     def execute(self, userdata):
         
@@ -148,6 +155,13 @@ class JoystickListen(smach.State):
     
     def joy_callback(self, joy_msg):
         
+        if self.allow_manipulator:
+            if joy_msg.buttons[0]:
+                #start visual servo
+            if joy_msg.buttons[0]:
+                #start grab acton
+        
+        if self.allow_driving:
         
 
 #drive to detected sample location        
