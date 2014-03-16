@@ -10,6 +10,7 @@ import platform_motion_msgs.srv as platform_srv
 import visual_servo_msgs.msg as visual_servo_msg
 import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msgs
+import samplereturn.util as util
 
 
 #the top level executive passes the level one state machine object to this
@@ -20,9 +21,7 @@ class ManualController(object):
     def __init__(self):
         
         #stuff namedtuple with joystick parameters
-        node_params_dict = rospy.get_param(rospy.get_name())
-        ParamTuple =  namedtuple('ParamTuple', node_params_dict.keys())
-        self.node_params = ParamTuple(**node_params_dict)
+        self.node_params = util.get_node_params()
         
         CAN_source_select = \
                 rospy.ServiceProxy("CAN_select_command_source",
