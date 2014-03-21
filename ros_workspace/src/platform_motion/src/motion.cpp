@@ -1367,11 +1367,11 @@ PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double 
 
     retval.wheelDistance =
         cubicInterpolate(
-            first.wheelDistance, first.wheelVelocity,
+            0, first.wheelVelocity,
             second.wheelDistance, second.wheelVelocity,
             interpolationAmount) -
         cubicInterpolate(
-            first.wheelDistance, first.wheelVelocity,
+            0, first.wheelVelocity,
             second.wheelDistance, second.wheelVelocity,
             previousInterpolationAmount
         );
