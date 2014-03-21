@@ -1168,14 +1168,12 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     retval.push_back(end);
 
     // debugging. should not be pushed commented in!
-    int j = 0;
-    for(auto i : retval)
-    {
-        ROS_ERROR("%d: time: %f, x: %f, y: %f, theta: %f, xDot: %f, yDot: %f, thetaDot: %f",
-                j, i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
-        );
-        j++;
-    }
+    //for(auto i : retval)
+    //{
+    //    ROS_ERROR("time: %d, x: %d, y: %d, theta: %d, xDot: %d, yDot: %d, thetaDot: %d",
+    //            i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
+    //    );
+    //}
 
     return retval;
 
@@ -1355,7 +1353,7 @@ double cubicInterpolate(double x0, double xDot0, double x1, double xDot1, double
     return x0 + xDot0 * alpha + 0.5 * b * pow(alpha, 2.0) + (1.0/3.0) * c * pow(alpha, 3.0);
 }
 
-PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double interpolationAmount, double previousInterpolationAmount, double duration)
+PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double interpolationAmount, double previousInterpolationAmount)
 {
     // a helper for sendPvtSegment. this should probably be declared in the header...
     PodSegment retval;
@@ -1380,7 +1378,6 @@ PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double 
 
     retval.wheelVelocity = first.wheelVelocity +
         interpolationAmount*(second.wheelVelocity - first.wheelVelocity);
-    retval.duration = duration;
     return retval;
 }
 
@@ -1428,8 +1425,10 @@ void Motion::sendPvtSegment()
             // get the next two path segments out of the path
             BodySegment first = plannedPath.front();
             BodySegment second = *(++plannedPath.begin());
+            ros::Time now=lastSegmentSent.time+ros::Duration(lastSegmentSent.port.duration);
+            newSegment.time = now;
 
-            if(lastSegmentSent.time < first.time)
+            if(now < first.time)
             {
                 ROS_ERROR("last segment too old, sending first blindly");
 
@@ -1437,114 +1436,69 @@ void Motion::sendPvtSegment()
                 // the first segment. that's all we can really do.
                 newSegment = first;
 
-                // make sure the durations are all less than or equal to .255!!
-                if((newSegment.port.duration > 0.255) ||
-                   (newSegment.starboard.duration > 0.255) ||
-                   (newSegment.stern.duration > 0.255))
-                {
-                    newSegment.port.duration = 0.250;
-                    newSegment.starboard.duration = 0.250;
-                    newSegment.stern.duration = 0.250;
-                }
             }
-            else if((lastSegmentSent.time == first.time) &&
-                    ((second.time - first.time).toSec() < 0.255))
+            else if(now>second.time)
             {
-                ROS_ERROR("last = first and second close enough, sending second");
-
-                // if we sent the first segment and the distance between the
-                // first and second segments is close enough, send the second
-                // segment.
-                newSegment = second;
-
-                // now that we're all the way past first, remove it from the list.
-                plannedPath.pop_front();
+                ROS_ERROR("past second");
+                return;
             }
             else
             {
-                // we're going to have to interpolate here.
-                if((second.time - lastSegmentSent.time).toSec() < 0.255)
-                {
-                    ROS_ERROR("interpolated close enough to second, sending second");
-
-                    // send second pretty much as is, but fix the distance and duration
-                    double duration = (second.time - lastSegmentSent.time).toSec();
+                double alphaLast = (lastSegmentSent.time - first.time).toSec()/(second.time-first.time).toSec();
+                double alphaNow = (now - first.time).toSec()/(second.time-first.time).toSec();
+                if(alphaLast == 0. && alphaNow == 1) {
                     newSegment = second;
-                    
+                } else {
+                    // compute the distance with the fancy cubic interpolation thing.
+                    newSegment.port = interpolatePodSegments(
+                            first.port,
+                            second.port,
+                            alphaNow,
+                            alphaLast
+                            );
+
+                    newSegment.starboard = interpolatePodSegments(
+                            first.starboard,
+                            second.starboard,
+                            alphaNow,
+                            alphaLast
+                            );
+
+                    newSegment.stern = interpolatePodSegments(
+                            first.stern,
+                            second.stern,
+                            alphaNow,
+                            alphaLast
+                            );
+                }
+                if((second.time - now).toSec() < 0.255)
+                {
+                    ROS_ERROR("interpolated close enough, duration to second");
+
+                    double duration = (second.time - now).toSec();
+
                     newSegment.port.duration = duration;
                     newSegment.starboard.duration = duration;
                     newSegment.stern.duration = duration;
 
-                    // compute the distance with the fancy cubic interpolation thing.
-                    newSegment.port.wheelDistance = second.port.wheelDistance - 
-                        cubicInterpolate(
-                            first.port.wheelDistance, first.port.wheelVelocity,
-                            second.port.wheelDistance, second.port.wheelVelocity,
-                            1.0 - duration / (second.time - first.time).toSec()
-                        );
-                    newSegment.starboard.wheelDistance = second.starboard.wheelDistance - 
-                        cubicInterpolate(
-                            first.starboard.wheelDistance, first.starboard.wheelVelocity,
-                            second.starboard.wheelDistance, second.starboard.wheelVelocity,
-                            1.0 - duration / (second.time - first.time).toSec()
-                        );
-                    newSegment.stern.wheelDistance = second.stern.wheelDistance - 
-                        cubicInterpolate(
-                            first.stern.wheelDistance, first.stern.wheelVelocity,
-                            second.stern.wheelDistance, second.stern.wheelVelocity,
-                            1.0 - duration / (second.time - first.time).toSec()
-                        );
-
-                    // we're also well past the first segment, so remove it from the
+                    // we're also past the first segment, so remove it from the
                     // path.
                     plannedPath.pop_front();
                 }
                 else
                 {
-                    ROS_ERROR("interpolating between first and second");
+                    ROS_ERROR("computing partial duration");
 
-                    // interpolate between first and second with a fixed time step
+                    // send a fixed time step
                     // this prevents us from having a strange tiny duration at the end
                     double numSteps = ceil((second.time - first.time).toSec() / 0.255);
                     double step = (second.time - first.time).toSec() / numSteps;
 
                     // the next segment is step away from the last one in time.
-                    newSegment = lastSegmentSent;
-                    newSegment.time += ros::Duration(step);
+                    newSegment.port.duration = step;
+                    newSegment.starboard.duration = step;
+                    newSegment.stern.duration = step;
 
-                    // all the rest of the parameters in the new segment are just
-                    // linear interpolations between first and second
-                    double interpolationAmount =
-                        (newSegment.time - first.time).toSec() /
-                        (second.time - first.time).toSec();
-
-                    double previousInterpolationAmount =
-                        std::max((lastSegmentSent.time - first.time).toSec() /
-                        (second.time - first.time).toSec(), 0.0);
-
-                    newSegment.port = interpolatePodSegments(
-                            first.port,
-                            second.port,
-                            interpolationAmount,
-                            previousInterpolationAmount,
-                            step
-                    );
-
-                    newSegment.starboard = interpolatePodSegments(
-                            first.starboard,
-                            second.starboard,
-                            interpolationAmount,
-                            previousInterpolationAmount,
-                            step
-                    );
-
-                    newSegment.stern = interpolatePodSegments(
-                            first.stern,
-                            second.stern,
-                            interpolationAmount,
-                            previousInterpolationAmount,
-                            step
-                    );
                 }
             }
         }
@@ -1574,6 +1528,23 @@ void Motion::sendPvtSegment()
             segment.steeringAngle = stern_steering;
             newSegment.stern = segment;
             newSegment.time = lastSegmentSent.time + ros::Duration(0.250);
+        }
+
+        // make sure the durations are all less than or equal to .255!!
+        double minDuration =
+            std::min( 0.250,
+                 std::min(newSegment.port.duration,
+                     std::min(newSegment.starboard.duration, newSegment.stern.duration)));
+
+        double maxDuration =
+                 std::max(newSegment.port.duration,
+                     std::max(newSegment.starboard.duration, newSegment.stern.duration));
+        if( maxDuration > 0.255 )
+        {
+            ROS_ERROR("Clipping duration");
+            newSegment.port.duration = minDuration;
+            newSegment.starboard.duration = minDuration;
+            newSegment.stern.duration = minDuration;
         }
 
         // some debug printing. probably shouldn't check this in
