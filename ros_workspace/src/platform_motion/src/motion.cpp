@@ -1095,11 +1095,56 @@ void Motion::errorCallback(CANOpen::DS301 &node)
 
 std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numPoints, double amplitude, double omega)
 {
-    // compute the time step between each point
-    ros::Duration timeStep = ros::Duration((2.0*M_PI/omega)/((double)numPoints));
 
     std::list<PathSegment> retval;
 
+    ros::Duration step = ros::Duration(0.5);
+
+    double a=0.1;
+    PathSegment seg;
+    seg.time = time;
+    seg.x=0;
+    seg.xDot=0;
+    seg.y=0;
+    seg.yDot=0;
+    seg.theta=0;
+    seg.thetaDot=0;
+    while(seg.xDot<1.0)
+    {
+        retval.push_back(seg);
+        seg.time += step;
+        double t = (seg.time-time).toSec();
+        seg.xDot = a*t;
+        seg.x    = 0.5*a*t*t;
+    }
+    seg = retval.back();
+    seg.xDot = 1.0;
+    for(int i=0;i<10;i++) {
+        seg.time += step;
+        seg.x += seg.xDot*0.5;
+        retval.push_back(seg);
+    }
+    ros::Time tdecel=seg.time;
+    double xdecel=seg.x;
+    while(seg.xDot>0)
+    {
+        seg.x += seg.xDot*0.5;
+        seg.time += step;
+        double t = (seg.time - tdecel).toSec();
+        seg.xDot = 1.0 - a*t;
+        seg.x    = xdecel + (1.0*t - 0.5*a*t*t);
+        if(seg.xDot>0) retval.push_back(seg);
+    }
+    seg = retval.back();
+    double decelrest=seg.xDot/a;
+    seg.time += ros::Duration(decelrest);
+    seg.x    += 0.5*a*decelrest*decelrest;
+    seg.xDot  = 0;
+    retval.push_back(seg);
+
+     /*
+    // compute the time step between each point
+    ros::Duration timeStep = ros::Duration((2.0*M_PI/omega)/((double)numPoints));
     // this is based on the math in path2local.py. sorry the contradict-style variable names
     // declare lambdas for the loop.
     auto f = [] (double x) {return 2.0 * atan(x);};
@@ -1174,7 +1219,7 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     //            i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
     //    );
     //}
-
+*/
     return retval;
 
 }
