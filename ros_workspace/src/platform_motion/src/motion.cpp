@@ -1343,41 +1343,52 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
 }
 
 // function definition interlude!
-double cubicInterpolate(double x0, double xDot0, double x1, double xDot1, double alpha)
+void cubicInterpolate(double x0, double xDot0, double x1, double xDot1, double alpha, double *x, double *v)
 {
     // this comes from something we worked out on the board. it could be
     // a little easier to read..
     double c = -6.0 * (x1 - 0.5 * xDot1 - x0 - 0.5 * xDot0);
     double b = xDot1 - xDot0 - c;
 
-    return x0 + xDot0 * alpha + 0.5 * b * pow(alpha, 2.0) + (1.0/3.0) * c * pow(alpha, 3.0);
+    *x = x0 + xDot0 * alpha + 0.5 * b * pow(alpha, 2.0) + (1.0/3.0) * c * pow(alpha, 3.0);
+    *v = xDot0 + b * alpha +  c * pow(alpha, 2.0);
 }
 
-PodSegment interpolatePodSegments(PodSegment &first, PodSegment &second, double interpolationAmount, double previousInterpolationAmount)
+PodSegment interpolatePodSegment(const PodSegment &first, const PodSegment &second, const PodSegment &last, double dadt, double alphaNow)
+{
+    PodSegment retval;
+    cubicInterpolate(
+            first.steeringAngle, first.steeringVelocity / dadt,
+            second.steeringAngle, second.steeringVelocity / dadt,
+            alphaNow,
+            &retval.steeringAngle,
+            &retval.steeringVelocity
+    );
+
+    cubicInterpolate(
+            0, first.wheelVelocity / dadt,
+            second.wheelDistance, second.wheelVelocity / dadt,
+            alphaNow,
+            &retval.wheelDistance,
+            &retval.wheelVelocity
+            );
+    retval.wheelDistance -= last.wheelDistance;
+    return retval;
+}
+
+Motion::BodySegment Motion::interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now)
 {
     // a helper for sendPvtSegment. this should probably be declared in the header...
-    PodSegment retval;
-    retval.steeringAngle = cubicInterpolate(
-            first.steeringAngle, first.steeringVelocity,
-            second.steeringAngle, second.steeringVelocity,
-            interpolationAmount
-    );
-    retval.steeringVelocity = first.steeringVelocity +
-        interpolationAmount*(second.steeringVelocity - first.steeringVelocity);
 
-    retval.wheelDistance =
-        cubicInterpolate(
-            0, first.wheelVelocity,
-            second.wheelDistance, second.wheelVelocity,
-            interpolationAmount) -
-        cubicInterpolate(
-            0, first.wheelVelocity,
-            second.wheelDistance, second.wheelVelocity,
-            previousInterpolationAmount
-        );
+    double dadt=1./(second.time-first.time).toSec();
+    double alphaLast = (last.time - first.time).toSec()*dadt;
+    double alphaNow = (now - first.time).toSec()*dadt;
 
-    retval.wheelVelocity = first.wheelVelocity +
-        interpolationAmount*(second.wheelVelocity - first.wheelVelocity);
+    BodySegment retval;
+    retval.port = interpolatePodSegment( first.port, second.port, last.port, dadt, alphaNow);
+    retval.starboard = interpolatePodSegment( first.starboard, second.starboard, last.starboard, dadt, alphaNow);
+    retval.stern = interpolatePodSegment( first.stern, second.stern, last.stern, dadt, alphaNow);
+
     return retval;
 }
 
@@ -1444,32 +1455,11 @@ void Motion::sendPvtSegment()
             }
             else
             {
-                double alphaLast = (lastSegmentSent.time - first.time).toSec()/(second.time-first.time).toSec();
-                double alphaNow = (now - first.time).toSec()/(second.time-first.time).toSec();
-                if(alphaLast == 0. && alphaNow == 1) {
+                if(lastSegmentSent.time == first.time && now == second.time) {
                     newSegment = second;
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
-                    newSegment.port = interpolatePodSegments(
-                            first.port,
-                            second.port,
-                            alphaNow,
-                            alphaLast
-                            );
-
-                    newSegment.starboard = interpolatePodSegments(
-                            first.starboard,
-                            second.starboard,
-                            alphaNow,
-                            alphaLast
-                            );
-
-                    newSegment.stern = interpolatePodSegments(
-                            first.stern,
-                            second.stern,
-                            alphaNow,
-                            alphaLast
-                            );
+                    newSegment = interpolatePodSegments(first, second, lastSegmentSent, now);
                 }
                 if((second.time - now).toSec() < 0.255)
                 {
