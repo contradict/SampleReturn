@@ -1364,6 +1364,7 @@ PodSegment interpolatePodSegment(const PodSegment &first, const PodSegment &seco
             &retval.steeringAngle,
             &retval.steeringVelocity
     );
+    retval.steeringVelocity *= dadt;
 
     cubicInterpolate(
             0, first.wheelVelocity / dadt,
@@ -1373,15 +1374,13 @@ PodSegment interpolatePodSegment(const PodSegment &first, const PodSegment &seco
             &retval.wheelVelocity
             );
     retval.wheelDistance -= last.wheelDistance;
+    retval.wheelVelocity *= dadt;
     return retval;
 }
 
 Motion::BodySegment Motion::interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now)
 {
-    // a helper for sendPvtSegment. this should probably be declared in the header...
-
     double dadt=1./(second.time-first.time).toSec();
-    double alphaLast = (last.time - first.time).toSec()*dadt;
     double alphaNow = (now - first.time).toSec()*dadt;
 
     BodySegment retval;
