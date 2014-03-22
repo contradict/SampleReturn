@@ -1382,7 +1382,7 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
     double Vx_next = (-next.thetaDot * pod_pos(1)) + next.xDot;
     double Vy_next = (next.thetaDot * pod_pos(0)) + next.yDot;
     double Vdotx = ((Vx-Vx_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
-    double Vdoty = ((Vy-Vy_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
+    double Vdoty = ((Vy-Vy_prev)/dt_prev + (Vy_next-Vy)/dt_next)/2.;
 
     double phidot = (Vdotx * cos(-alpha - M_PI/2.0) - Vdoty * sin(-alpha - M_PI/2.0)) /
         ksidot - current.thetaDot;
