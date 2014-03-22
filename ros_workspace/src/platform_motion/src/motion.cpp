@@ -1437,7 +1437,6 @@ void Motion::sendPvtSegment()
             BodySegment first = plannedPath.front();
             BodySegment second = *(++plannedPath.begin());
             ros::Time now=lastSegmentSent.time+ros::Duration(lastSegmentSent.port.duration);
-            newSegment.time = now;
 
             ROS_ERROR_STREAM("first: " << first.time << " second: " << second.time << " now: " << now << " new: " << newSegment.time);
 
@@ -1496,6 +1495,10 @@ void Motion::sendPvtSegment()
 
                 }
             }
+
+            newSegment.time = now;
+
+        // some debug printing. probably shouldn't check this in
         }
         else
         {
@@ -1522,6 +1525,7 @@ void Motion::sendPvtSegment()
             newSegment.starboard = segment;
             segment.steeringAngle = stern_steering;
             newSegment.stern = segment;
+            newSegment.time = lastSegmentSent.time + ros::Duration(lastSegmentSent.port.duration);
         }
 
         // make sure the durations are all less than or equal to .255!!
@@ -1541,7 +1545,6 @@ void Motion::sendPvtSegment()
             newSegment.stern.duration = minDuration;
         }
 
-        // some debug printing. probably shouldn't check this in
         ROS_ERROR_STREAM("newSegment.time: " << newSegment.time );
         ROS_ERROR("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
         ROS_ERROR("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
