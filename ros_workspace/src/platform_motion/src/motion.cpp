@@ -1354,7 +1354,7 @@ void cubicInterpolate(double x0, double xDot0, double x1, double xDot1, double a
     *v = xDot0 + b * alpha +  c * pow(alpha, 2.0);
 }
 
-PodSegment interpolatePodSegment(const PodSegment &first, const PodSegment &second, const PodSegment &last, double dadt, double alphaNow)
+PodSegment interpolatePodSegment(const PodSegment &first, const PodSegment &second, const PodSegment &last, double dadt, double alphaNow, double alphaLast)
 {
     PodSegment retval;
     cubicInterpolate(
@@ -1373,7 +1373,15 @@ PodSegment interpolatePodSegment(const PodSegment &first, const PodSegment &seco
             &retval.wheelDistance,
             &retval.wheelVelocity
             );
-    retval.wheelDistance -= last.wheelDistance;
+    double lastWheelDistance, lastWheelVelocity;
+    cubicInterpolate(
+            0, first.wheelVelocity / dadt,
+            second.wheelDistance, second.wheelVelocity / dadt,
+            alphaLast,
+            &lastWheelDistance,
+            &lastWheelVelocity
+            );
+    retval.wheelDistance -= lastWheelDistance;
     retval.wheelVelocity *= dadt;
     return retval;
 }
@@ -1382,11 +1390,12 @@ Motion::BodySegment Motion::interpolatePodSegments(const BodySegment &first, con
 {
     double dadt=1./(second.time-first.time).toSec();
     double alphaNow = (now - first.time).toSec()*dadt;
+    double alphaLast = (last.time - first.time).toSec()*dadt;
 
     BodySegment retval;
-    retval.port = interpolatePodSegment( first.port, second.port, last.port, dadt, alphaNow);
-    retval.starboard = interpolatePodSegment( first.starboard, second.starboard, last.starboard, dadt, alphaNow);
-    retval.stern = interpolatePodSegment( first.stern, second.stern, last.stern, dadt, alphaNow);
+    retval.port = interpolatePodSegment( first.port, second.port, last.port, dadt, alphaNow, alphaLast);
+    retval.starboard = interpolatePodSegment( first.starboard, second.starboard, last.starboard, dadt, alphaNow, alphaLast);
+    retval.stern = interpolatePodSegment( first.stern, second.stern, last.stern, dadt, alphaNow, alphaLast);
 
     return retval;
 }
