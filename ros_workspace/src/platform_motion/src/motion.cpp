@@ -1211,15 +1211,17 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     end.theta = retval.back().theta;
 
     retval.push_back(end);
+*/
 
     // debugging. should not be pushed commented in!
-    //for(auto i : retval)
-    //{
-    //    ROS_ERROR("time: %d, x: %d, y: %d, theta: %d, xDot: %d, yDot: %d, thetaDot: %d",
-    //            i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
-    //    );
-    //}
-*/
+    int count=0;
+    for(auto i : retval)
+    {
+        ROS_ERROR("count: %d, time: %f, x: %f, y: %f, theta: %f, xDot: %f, yDot: %f, thetaDot: %f",
+               count, i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
+        );
+        count++;
+    }
     return retval;
 
 }
