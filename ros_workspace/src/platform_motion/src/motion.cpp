@@ -1439,6 +1439,8 @@ void Motion::sendPvtSegment()
             ros::Time now=lastSegmentSent.time+ros::Duration(lastSegmentSent.port.duration);
             newSegment.time = now;
 
+            ROS_ERROR_STREAM("first: " << first.time << " second: " << second.time << " now: " << now << " new: " << newSegment.time);
+
             if(now < first.time)
             {
                 ROS_ERROR("last segment too old, sending first blindly");
@@ -1456,9 +1458,12 @@ void Motion::sendPvtSegment()
             else
             {
                 if(lastSegmentSent.time == first.time && now == second.time) {
+                    ROS_ERROR("No interpolation needed");
                     newSegment = second;
+                    plannedPath.pop_front();
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
+                    ROS_ERROR("interpolating to now");
                     newSegment = interpolatePodSegments(first, second, lastSegmentSent, now);
                 }
                 if((second.time - now).toSec() < 0.255)
@@ -1517,7 +1522,6 @@ void Motion::sendPvtSegment()
             newSegment.starboard = segment;
             segment.steeringAngle = stern_steering;
             newSegment.stern = segment;
-            newSegment.time = lastSegmentSent.time + ros::Duration(0.250);
         }
 
         // make sure the durations are all less than or equal to .255!!
@@ -1538,6 +1542,7 @@ void Motion::sendPvtSegment()
         }
 
         // some debug printing. probably shouldn't check this in
+        ROS_ERROR_STREAM("newSegment.time: " << newSegment.time );
         ROS_ERROR("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
         ROS_ERROR("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
         ROS_ERROR("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
