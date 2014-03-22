@@ -99,7 +99,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         // pathToBody transforms odometry frame PathSegments to body local BodySegments
         std::list<BodySegment> pathToBody(std::list<PathSegment>& path);
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
-        PodSegment pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle);
+        PodSegment pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, Eigen::Vector2d pod_pos, double &lastValidSteeringAngle);
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 

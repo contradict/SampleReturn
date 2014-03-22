@@ -1228,12 +1228,42 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
 
 std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
 {
+    std::list<BodySegment> retval;
+
     // store the current steering angles as a way to initialize last valid steering
     // angle
     double portLastValidAngle, starboardLastValidAngle, sternLastValidAngle;
     port->getPosition(&portLastValidAngle, nullptr, nullptr, nullptr);
     starboard->getPosition(&starboardLastValidAngle, nullptr, nullptr, nullptr);
     stern->getPosition(&sternLastValidAngle, nullptr, nullptr, nullptr);
+
+    // look up the transforms
+    tf::StampedTransform pod_tf;
+    // asking for time 0 asks for the most recent transform
+    ros::Time zero(0);
+    try {
+        listener.lookupTransform(child_frame_id, "port_suspension", zero, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", "port_suspension", ex.what());
+        return retval;
+    }
+    Eigen::Vector2d port_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+    try {
+        listener.lookupTransform(child_frame_id, "starboard_suspension", zero, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", "starboard_suspension", ex.what());
+        return retval;
+    }
+    Eigen::Vector2d starboard_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+    try {
+        listener.lookupTransform(child_frame_id, "stern_suspension", zero, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", "stern_suspension", ex.what());
+        return retval;
+    }
+    Eigen::Vector2d stern_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+
+
 
     // make sure that the last thing in the path is a segment with zero velocity
     PathSegment last = path.back();
@@ -1243,7 +1273,6 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
     last.time += ros::Duration(0.25);
     path.push_back(last);
 
-    std::list<BodySegment> retval;
 
     // iterate over the path. this is slightly tricky because we want two consecutive
     // elements at a time
@@ -1262,9 +1291,9 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
     {
         BodySegment segment;
         segment.time = (*current).time;
-        segment.port = pathToPod(previous, *current, *next, "port_suspension", portLastValidAngle);
-        segment.starboard = pathToPod(previous, *current, *next, "starboard_suspension", starboardLastValidAngle);
-        segment.stern = pathToPod(previous, *current, *next, "stern_suspension", sternLastValidAngle);
+        segment.port = pathToPod(previous, *current, *next, port_pos, portLastValidAngle);
+        segment.starboard = pathToPod(previous, *current, *next, starboard_pos, starboardLastValidAngle);
+        segment.stern = pathToPod(previous, *current, *next, stern_pos, sternLastValidAngle);
 
         retval.push_back(segment);
         previous = *current;
@@ -1286,7 +1315,7 @@ double unwrap(double theta)
     return theta;
 }
 
-PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, const char *jointName, double &lastValidSteeringAngle)
+PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, Eigen::Vector2d pod_pos, double &lastValidSteeringAngle)
 {
     // this is a helper that does the actual math for each pod segment.
     // this math comes from contradict's path2local.py and I'm using those vairable names
@@ -1300,25 +1329,6 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
 
     PodSegment retval;
     retval.duration = dt_next;
-
-    // look up the transform
-    tf::StampedTransform pod_tf;
-    // asking for time 0 asks for the most recent transform
-    ros::Time zero(0);
-    try {
-        listener.lookupTransform(child_frame_id, jointName, zero, pod_tf );
-    } catch( tf::TransformException ex) {
-        ROS_ERROR("Error looking up %s: %s", jointName, ex.what());
-        // set the steering angle to the last valid and zero out everything else
-        // this is all we can do here...
-        retval.steeringAngle = lastValidSteeringAngle;
-        retval.steeringVelocity = 0.0;
-        retval.wheelDistance = 0.0;
-        retval.wheelVelocity = 0.0;
-        return retval;
-    }
-
-    Eigen::Vector2d pod_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
 
     // I am not really a fan of Eigen's matrix initializers
     Eigen::Matrix2d rot;
