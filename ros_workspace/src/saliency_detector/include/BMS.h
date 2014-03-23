@@ -1,8 +1,8 @@
 /*****************************************************************************
 *	Implemetation of the saliency detction method described in paper
-*	"Saliency Detection: A Boolean Map Approach", Jianming Zhang, 
+*	"Saliency Detection: A Boolean Map Approach", Jianming Zhang,
 *	Stan Sclaroff, ICCV, 2013
-*	
+*
 *	Copyright (C) 2013 Jianming Zhang
 *
 *	This program is free software: you can redistribute it and/or modify
@@ -33,6 +33,7 @@ using namespace cv;
 class BMS
 {
 public:
+  BMS ();
   BMS (const int dw1, const int ow, const bool nm, const bool hb);
   Mat getSaliencyMap();
   void computeSaliency(const Mat& src, float step);
