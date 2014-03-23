@@ -74,6 +74,7 @@ add_message_files(
     FILES
         GPIO.msg
         ServoStatus.msg
+        ScaryTestMode.msg
 )
 
 # services

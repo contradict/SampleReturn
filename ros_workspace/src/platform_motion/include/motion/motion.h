@@ -1,5 +1,6 @@
 #include <nav_msgs/Path.h>
 #include <std_msgs/Bool.h>
+#include <platform_motion_msgs/ScaryTestMode.h>
 
 namespace platform_motion{
 
@@ -90,9 +91,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void statusPublishCallback(const ros::TimerEvent& event);
 
         // scary pvt test mode enable. only do this on blocks!!!
-        void scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable);
+        void scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::ConstPtr msg);
         bool scaryTestModeEnabled;
-        std::list<PathSegment> computeScaryPath(ros::Time time, int numPoints, double amplitude, double omega);
+        std::list<Motion::PathSegment> computeCirclePath(ros::Time time, double dt, double R, double a, double vmax);
+        std::list<Motion::PathSegment> computeStraightPath(ros::Time time, double dt, double tconst, double a, double vmax);
+        std::list<Motion::PathSegment> computeFigureEight(ros::Time time, int numPoints, double amplitude, double omega, double acceleration);
+        std::list<PathSegment> computeScaryPath(ros::Time time, int which);
         ros::Time scaryTestModeStartTime;
 
         // pvt mode

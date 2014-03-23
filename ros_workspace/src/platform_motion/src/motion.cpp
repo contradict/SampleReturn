@@ -1021,14 +1021,14 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
     */
 }
 
-void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
+void Motion::scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::ConstPtr msg)
 {
     if(command_source != COMMAND_SOURCE_SCARY_TEST_MODE)
     {
         return;
     }
 
-    scaryTestModeEnabled = enable->data;
+    scaryTestModeEnabled = msg->enable;
 
     // clear the planned path.
     plannedPath.clear();
@@ -1056,7 +1056,7 @@ void Motion::scaryTestModeCallback(const std_msgs::Bool::ConstPtr enable)
     if(scaryTestModeEnabled)
     {
         // if we're supposed to be going, make a new scary test mode path
-        std::list<PathSegment> path = computeScaryPath(scaryTestModeStartTime, 250, 3.0, 0.1);
+        std::list<PathSegment> path = computeScaryPath(scaryTestModeStartTime, msg->which);
         // debugging stuff! don't check this in!
         //auto temp = pathToBody(path);
 
@@ -1093,15 +1093,11 @@ void Motion::errorCallback(CANOpen::DS301 &node)
             static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
 }
 
-std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numPoints, double amplitude, double omega)
+std::list<Motion::PathSegment> Motion::computeCirclePath(ros::Time time, double dt, double R, double a, double vmax)
 {
-
     std::list<PathSegment> retval;
 
-    double dt=0.5;
     ros::Duration step = ros::Duration(dt);
-    double a=0.1;
-    double vmax=1.0;
 
     PathSegment seg;
     seg.time = time;
@@ -1111,43 +1107,7 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     seg.yDot=0;
     seg.theta=0;
     seg.thetaDot=0;
-    /*
-    while(seg.xDot<vmax)
-    {
-        retval.push_back(seg);
-        seg.time += step;
-        double t = (seg.time-time).toSec();
-        seg.xDot = a*t;
-        seg.x    = dt*a*t*t;
-    }
-    seg = retval.back();
-    seg.xDot = vmax;
-    for(int i=0;i<10;i++) {
-        seg.time += step;
-        seg.x += seg.xDot*dt;
-        retval.push_back(seg);
-    }
-    ros::Time tdecel=seg.time;
-    double xdecel=seg.x;
-    while(seg.xDot>0)
-    {
-        seg.x += seg.xDot*dt;
-        seg.time += step;
-        double t = (seg.time - tdecel).toSec();
-        seg.xDot = vmax - a*t;
-        seg.x    = xdecel + (vmax*t - dt*a*t*t);
-        if(seg.xDot>0) retval.push_back(seg);
-    }
-    seg = retval.back();
-    double decelrest=seg.xDot/a;
-    seg.time += ros::Duration(decelrest);
-    seg.x    += dt*a*decelrest*decelrest;
-    seg.xDot  = 0;
-    retval.push_back(seg);
-
-    */
-
-    double s=0, R=3.0, v=0;
+    double s=0, v=0;
     retval.push_back(seg);
     while(v<vmax)
     {
@@ -1192,7 +1152,63 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
         seg.yDot = v*sin(seg.theta);
         retval.push_back(seg);
     }
-    /*
+    return retval;
+}
+
+std::list<Motion::PathSegment> Motion::computeStraightPath(ros::Time time, double dt, double tconst, double a, double vmax)
+{
+    std::list<PathSegment> retval;
+
+    ros::Duration step = ros::Duration(dt);
+
+    PathSegment seg;
+    seg.time = time;
+    seg.x=0;
+    seg.xDot=0;
+    seg.y=0;
+    seg.yDot=0;
+    seg.theta=0;
+    seg.thetaDot=0;
+
+    while(seg.xDot<vmax)
+    {
+        retval.push_back(seg);
+        seg.time += step;
+        double t = (seg.time-time).toSec();
+        seg.xDot = a*t;
+        seg.x    = dt*a*t*t;
+    }
+    seg = retval.back();
+    seg.xDot = vmax;
+    for(double t=0;t<tconst;t+=dt) {
+        seg.time += step;
+        seg.x += seg.xDot*dt;
+        retval.push_back(seg);
+    }
+    ros::Time tdecel=seg.time;
+    double xdecel=seg.x;
+    while(seg.xDot>0)
+    {
+        seg.x += seg.xDot*dt;
+        seg.time += step;
+        double t = (seg.time - tdecel).toSec();
+        seg.xDot = vmax - a*t;
+        seg.x    = xdecel + (vmax*t - dt*a*t*t);
+        if(seg.xDot>0) retval.push_back(seg);
+    }
+    seg = retval.back();
+    double decelrest=seg.xDot/a;
+    seg.time += ros::Duration(decelrest);
+    seg.x    += dt*a*decelrest*decelrest;
+    seg.xDot  = 0;
+    retval.push_back(seg);
+
+    return retval;
+}
+
+std::list<Motion::PathSegment> Motion::computeFigureEight(ros::Time time, int numPoints, double amplitude, double omega, double acceleration)
+{
+    std::list<PathSegment> retval;
     // compute the time step between each point
     ros::Duration timeStep = ros::Duration((2.0*M_PI/omega)/((double)numPoints));
     // this is based on the math in path2local.py. sorry the contradict-style variable names
@@ -1209,7 +1225,6 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     double xDot0 = 2.0 * amplitude * omega;
     double yDot0 = 2.0 * amplitude * omega;
     double theta0 = f(g(xDot0, yDot0));
-    double acceleration = 0.1; // acceleration in meters per second. should be parameter
     double startDistance = 0.5 * (pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
     double startDuration = sqrt(pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
     PathSegment start;
@@ -1261,7 +1276,37 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     end.theta = retval.back().theta;
 
     retval.push_back(end);
-*/
+
+    return retval;
+}
+
+std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int which)
+{
+    std::list<Motion::PathSegment> retval;
+
+    double dt=0.5;
+    double R=3.0;
+    double a=0.1;
+    double vmax=1.0;
+    double tconst=5.0;
+    int numPoints=250;
+    double amplitude=3.0;
+    double omega=0.1;
+
+    switch(which) {
+        case platform_motion_msgs::ScaryTestMode::Circle:
+            retval=computeCirclePath(time, dt, R,  a, vmax);
+            break;
+        case platform_motion_msgs::ScaryTestMode::Straight:
+            retval=computeStraightPath(time, dt, tconst, a, vmax);
+            break;
+        case platform_motion_msgs::ScaryTestMode::FigureEight:
+            retval=computeFigureEight(time, numPoints, amplitude, omega, a);
+            break;
+        default:
+            ROS_ERROR("Unknown path %d", which);
+            return retval;
+    }
 
     // debugging. should not be pushed commented in!
     int count=0;
