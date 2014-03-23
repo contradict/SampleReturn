@@ -1098,9 +1098,11 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
 
     std::list<PathSegment> retval;
 
-    ros::Duration step = ros::Duration(0.5);
-
+    double dt=0.5;
+    ros::Duration step = ros::Duration(dt);
     double a=0.1;
+    double vmax=1.0;
+
     PathSegment seg;
     seg.time = time;
     seg.x=0;
@@ -1109,40 +1111,88 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int numP
     seg.yDot=0;
     seg.theta=0;
     seg.thetaDot=0;
-    while(seg.xDot<1.0)
+    /*
+    while(seg.xDot<vmax)
     {
         retval.push_back(seg);
         seg.time += step;
         double t = (seg.time-time).toSec();
         seg.xDot = a*t;
-        seg.x    = 0.5*a*t*t;
+        seg.x    = dt*a*t*t;
     }
     seg = retval.back();
-    seg.xDot = 1.0;
+    seg.xDot = vmax;
     for(int i=0;i<10;i++) {
         seg.time += step;
-        seg.x += seg.xDot*0.5;
+        seg.x += seg.xDot*dt;
         retval.push_back(seg);
     }
     ros::Time tdecel=seg.time;
     double xdecel=seg.x;
     while(seg.xDot>0)
     {
-        seg.x += seg.xDot*0.5;
+        seg.x += seg.xDot*dt;
         seg.time += step;
         double t = (seg.time - tdecel).toSec();
-        seg.xDot = 1.0 - a*t;
-        seg.x    = xdecel + (1.0*t - 0.5*a*t*t);
+        seg.xDot = vmax - a*t;
+        seg.x    = xdecel + (vmax*t - dt*a*t*t);
         if(seg.xDot>0) retval.push_back(seg);
     }
     seg = retval.back();
     double decelrest=seg.xDot/a;
     seg.time += ros::Duration(decelrest);
-    seg.x    += 0.5*a*decelrest*decelrest;
+    seg.x    += dt*a*decelrest*decelrest;
     seg.xDot  = 0;
     retval.push_back(seg);
 
-     /*
+    */
+
+    double s=0, R=3.0, v=0;
+    retval.push_back(seg);
+    while(v<vmax)
+    {
+        seg.time += step;
+        double t = (seg.time-time).toSec();
+        v = a*t;
+        s = dt*a*t*t;
+        seg.theta = s/R;
+        seg.thetaDot = v/R;
+        seg.x = R*sin(seg.theta);
+        seg.xDot = v*cos(seg.theta);
+        seg.y = R*(1-cos(seg.theta));
+        seg.yDot = v*sin(seg.theta);
+        retval.push_back(seg);
+    }
+    double acceltheta=seg.theta;
+    while(seg.theta<(2*M_PI-acceltheta))
+    {
+        seg.time += step;
+        s += v*dt;
+        seg.theta = s/R;
+        seg.thetaDot = v/R;
+        seg.x = R*sin(seg.theta);
+        seg.xDot = v*cos(seg.theta);
+        seg.y = R*(1-cos(seg.theta));
+        seg.yDot = v*sin(seg.theta);
+        retval.push_back(seg);
+    }
+    ros::Time tdecel=seg.time;
+    double vdecel=v, sdecel=s;
+    while(v>0)
+    {
+        seg.time += step;
+        double t=(seg.time - tdecel).toSec();
+        v  = vdecel-a*t;
+        s  = sdecel+vdecel*t-dt*a*t*t;
+        seg.theta = s/R;
+        seg.thetaDot = v/R;
+        seg.x = R*sin(seg.theta);
+        seg.xDot = v*cos(seg.theta);
+        seg.y = R*(1-cos(seg.theta));
+        seg.yDot = v*sin(seg.theta);
+        retval.push_back(seg);
+    }
+    /*
     // compute the time step between each point
     ros::Duration timeStep = ros::Duration((2.0*M_PI/omega)/((double)numPoints));
     // this is based on the math in path2local.py. sorry the contradict-style variable names
