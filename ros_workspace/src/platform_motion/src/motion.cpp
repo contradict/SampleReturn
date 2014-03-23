@@ -1309,15 +1309,15 @@ std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int whic
     }
 
     // debugging. should not be pushed commented in!
-    int count=0;
-    for(auto i : retval)
-    {
-        ROS_ERROR("count: %d, time: %f, x: %f, y: %f, theta: %f, xDot: %f, yDot: %f, thetaDot: %f",
-               count, i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
-        );
-        count++;
-    }
-    return retval;
+    //int count=0;
+    //for(auto i : retval)
+    //{
+    //    ROS_DEBUG("count: %d, time: %f, x: %f, y: %f, theta: %f, xDot: %f, yDot: %f, thetaDot: %f",
+    //           count, i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
+    //    );
+    //    count++;
+    //}
+    //return retval;
 
 }
 
@@ -1393,7 +1393,7 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
         retval.push_back(segment);
         previous = *current;
 
-        ROS_ERROR("%d: stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", j, segment.stern.steeringAngle, segment.stern.steeringVelocity, segment.stern.wheelDistance, segment.stern.wheelVelocity, segment.stern.duration);
+        ROS_DEBUG("%d: stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", j, segment.stern.steeringAngle, segment.stern.steeringVelocity, segment.stern.wheelDistance, segment.stern.wheelVelocity, segment.stern.duration);
         j++;
     }
 
@@ -1609,11 +1609,11 @@ void Motion::sendPvtSegment()
             BodySegment second = *(++plannedPath.begin());
             ros::Time now=lastSegmentSent.time+ros::Duration(lastSegmentSent.port.duration);
 
-            ROS_ERROR_STREAM("first: " << first.time << " second: " << second.time << " now: " << now << " new: " << newSegment.time);
+            ROS_DEBUG_STREAM("first: " << first.time << " second: " << second.time << " now: " << now << " new: " << newSegment.time);
 
             if(now < first.time)
             {
-                ROS_ERROR("last segment too old, sending first blindly");
+                ROS_DEBUG("last segment too old, sending first blindly");
 
                 // if the last segment we sent was before this path, just send
                 // the first segment. that's all we can really do.
@@ -1628,17 +1628,17 @@ void Motion::sendPvtSegment()
             else
             {
                 if(lastSegmentSent.time == first.time && now == second.time) {
-                    ROS_ERROR("No interpolation needed");
+                    ROS_DEBUG("No interpolation needed");
                     newSegment = second;
                     plannedPath.pop_front();
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
-                    ROS_ERROR("interpolating to now");
+                    ROS_DEBUG("interpolating to now");
                     newSegment = interpolatePodSegments(first, second, lastSegmentSent, now);
                 }
                 if((second.time - now).toSec() < 0.255)
                 {
-                    ROS_ERROR("interpolated close enough, duration to second");
+                    ROS_DEBUG("interpolated close enough, duration to second");
 
                     double duration = (second.time - now).toSec();
 
@@ -1652,7 +1652,7 @@ void Motion::sendPvtSegment()
                 }
                 else
                 {
-                    ROS_ERROR("computing partial duration");
+                    ROS_DEBUG("computing partial duration");
 
                     // send a fixed time step
                     // this prevents us from having a strange tiny duration at the end
@@ -1673,7 +1673,7 @@ void Motion::sendPvtSegment()
         }
         else
         {
-            ROS_ERROR("out of path segments, sending zeros");
+            ROS_DEBUG("out of path segments, sending zeros");
 
             // if there is no path to follow, keep the buffers full of zeros
             // this means we're constantly actually filling the buffer and
@@ -1710,16 +1710,16 @@ void Motion::sendPvtSegment()
                      std::max(newSegment.starboard.duration, newSegment.stern.duration));
         if( maxDuration > 0.255 )
         {
-            ROS_ERROR("Clipping duration");
+            ROS_DEBUG("Clipping duration");
             newSegment.port.duration = minDuration;
             newSegment.starboard.duration = minDuration;
             newSegment.stern.duration = minDuration;
         }
 
-        ROS_ERROR_STREAM("newSegment.time: " << newSegment.time );
-        ROS_ERROR("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
-        ROS_ERROR("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
-        ROS_ERROR("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
+        ROS_DEBUG_STREAM("newSegment.time: " << newSegment.time );
+        ROS_DEBUG("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
+        ROS_DEBUG("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
+        ROS_DEBUG("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
 
         // now just send the new segment, whatever it was.
         port->move(newSegment.port);
