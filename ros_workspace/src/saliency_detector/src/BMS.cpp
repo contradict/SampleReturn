@@ -30,6 +30,7 @@
 using namespace cv;
 using namespace std;
 
+BMS::BMS() {};
 
 BMS::BMS(const int dw1, const int ow, const bool nm, const bool hb)
 	:_rng(),_dilation_width_1(dw1),_opening_width(ow),_normalize(nm),_handle_border(hb)

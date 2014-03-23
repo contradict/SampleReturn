@@ -4,7 +4,11 @@ project(saliency_detector)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  sensor_msgs
+  cv_bridge
+  dynamic_reconfigure)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -66,6 +70,8 @@ find_package(catkin REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
+generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
+
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -76,10 +82,9 @@ find_package(catkin REQUIRED)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES saliency_detector
-#  CATKIN_DEPENDS other_catkin_pkg
-#  DEPENDS system_lib
+  LIBRARIES ${PROJECT_NAME}
+  CATKIN_DEPENDS roscpp roslib
+  DEPENDS opencv2
 )
 
 ###########
@@ -88,24 +93,33 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+ include_directories(include
+   ${catkin_INCLUDE_DIRS}
+)
 
 ## Declare a cpp library
-# add_library(saliency_detector
-#   src/${PROJECT_NAME}/saliency_detector.cpp
-# )
+add_library(BMS
+  src/BMS.cpp
+ )
+
+add_library(saliency_detector_core
+  src/saliency_detector_core.cpp
+ )
 
 ## Declare a cpp executable
-# add_executable(saliency_detector_node src/saliency_detector_node.cpp)
+ add_executable(saliency_detector_node src/saliency_detector.cpp)
+ # add_executable(BMS_standalone src/BMS.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(saliency_detector_node saliency_detector_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(saliency_detector_node
-#   ${catkin_LIBRARIES}
-# )
+ target_link_libraries(saliency_detector_node
+   saliency_detector_core
+   BMS
+   ${catkin_LIBRARIES}
+ )
 
 #############
 ## Install ##
