@@ -1365,6 +1365,22 @@ double unwrap(double theta)
     return theta;
 }
 
+Eigen::Vector2d Motion::podVelocity(const PathSegment &current, Eigen::Vector2d pod_pos)
+{
+    Eigen::Matrix2d rot;
+    rot << cos(current.theta), -sin(current.theta),
+           sin(current.theta), cos(current.theta);
+
+    Eigen::Matrix2d omegacross;
+    omegacross << 0, -current.thetaDot,
+                  current.thetaDot, 0;
+
+    Eigen::Vector2d Vbody;
+    Vbody << current.xDot, current.yDot;
+
+    return omegacross * rot * pod_pos + Vbody;
+}
+
 PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, Eigen::Vector2d pod_pos, double &lastValidSteeringAngle)
 {
     // this is a helper that does the actual math for each pod segment.
@@ -1380,24 +1396,9 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
     PodSegment retval;
     retval.duration = dt_next;
 
-    // I am not really a fan of Eigen's matrix initializers
-    Eigen::Matrix2d rot;
-    rot << cos(current.theta), sin(current.theta),
-           -sin(current.theta), cos(current.theta);
+    Eigen::Vector2d Vpod = podVelocity(current, pod_pos);
 
-    Eigen::Matrix2d drot;
-    drot << 1.0-cos(dtheta), sin(dtheta),
-           -sin(dtheta), 1.0-cos(dtheta);
-
-    Eigen::Vector2d rdx = drot * rot * pod_pos;
-
-    dx += rdx(0);
-    dy += rdx(1);
-
-    double Vx = (-current.thetaDot * pod_pos(1)) + current.xDot;
-    double Vy = (current.thetaDot * pod_pos(0)) + current.yDot;
-
-    double ksidot = sqrt(pow(Vx, 2) + pow(Vy, 2));
+    double ksidot = Vpod.norm();
 
     if(ksidot < 0.001)
     {
@@ -1411,8 +1412,21 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
         return retval;
     }
 
-    double phi = unwrap(atan2(Vy, Vx) - current.theta);
+    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - current.theta);
 
+    // add motion due to rotation about body axis of pod
+    Eigen::Matrix2d rot;
+    rot << cos(current.theta), -sin(current.theta),
+           sin(current.theta), cos(current.theta);
+
+    Eigen::Matrix2d drot;
+    drot << cos(dtheta)-1, -sin(dtheta),
+            sin(dtheta), cos(dtheta)-1;
+
+    Eigen::Vector2d rdx = drot * rot * pod_pos;
+
+    dx += rdx(0);
+    dy += rdx(1);
     // we determined .001 by looking at the limit. it might want to be a parameter or
     // a constant...
     double dksi;
@@ -1427,14 +1441,11 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
 
     double alpha = unwrap(phi + current.theta);
 
-    double Vx_prev = (-previous.thetaDot * pod_pos(1)) + previous.xDot;
-    double Vy_prev = (previous.thetaDot * pod_pos(0)) + previous.yDot;
-    double Vx_next = (-next.thetaDot * pod_pos(1)) + next.xDot;
-    double Vy_next = (next.thetaDot * pod_pos(0)) + next.yDot;
-    double Vdotx = ((Vx-Vx_prev)/dt_prev + (Vx_next-Vx)/dt_next)/2.;
-    double Vdoty = ((Vy-Vy_prev)/dt_prev + (Vy_next-Vy)/dt_next)/2.;
+    Eigen::Vector2d Vpod_prev = podVelocity(previous, pod_pos);
+    Eigen::Vector2d Vpod_next = podVelocity(next, pod_pos);
+    Eigen::Vector2d Vdot = ((Vpod-Vpod_prev)/dt_prev + (Vpod_next-Vpod)/dt_next)/2.;
 
-    double phidot = (Vdotx * cos(-alpha - M_PI/2.0) - Vdoty * sin(-alpha - M_PI/2.0)) /
+    double phidot = (Vdot[0] * cos(-alpha - M_PI/2.0) - Vdot[1] * sin(-alpha - M_PI/2.0)) /
         ksidot - current.thetaDot;
 
     // we've actually computed everything now! stick the results into retval!

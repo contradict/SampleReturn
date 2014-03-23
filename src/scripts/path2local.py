@@ -2,7 +2,69 @@ import numpy as np
 from numpy import arctan2, sin, cos, sqrt, pi, diff, allclose, abs
 import pylab
 
-def makePath(N=100, A=3, omega=0.2, a=0.1):
+def makeCircle(R=5.0, N=100, a=0.1, vmax=1.0):
+    Taccel = vmax/a
+    Saccel = 0.5*a*Taccel*Taccel
+    Tconst = (2*pi*R-2*Saccel)/vmax
+    if Tconst<0:
+        Taccel = sqrt(2*pi*R/a)
+        Tconst = 0
+    T=2*Taccel+Tconst
+    t=linspace(0,T,N)[:,None]
+    @np.vectorize
+    def velocity(t):
+        if t<Taccel:
+            return a*t
+        elif t>Taccel+Tconst:
+            return vmax-a*(t-Taccel-Tconst)
+        else:
+            return vmax
+    @np.vectorize
+    def distance(t):
+        if(t<Taccel):
+            return 0.5*a*t*t
+        elif(t<Taccel+Tconst):
+            return 0.5*a*Taccel*Taccel + vmax*(t-Taccel)
+        else:
+            tau=(t-Taccel-Tconst)
+            return 0.5*a*Taccel*Taccel + vmax*Tconst + vmax*tau - 0.5*a*tau*tau
+    v=velocity(t)
+    s=distance(t)
+    theta=s/R
+    omega=v/R
+    x=R*sin(theta)
+    y=R*(1-cos(theta))
+    xdot=v*cos(theta)
+    ydot=v*sin(theta)
+    return np.c_[x, y, theta, xdot, ydot, omega, t]
+
+
+def makeLine(N=100, a=0.1, vmax=1.0, Tconst=2.0):
+    Taccel = vmax/a
+    T=2*Taccel+Tconst
+    t=linspace(0,T,N)[:,None]
+    @np.vectorize
+    def velocity(t):
+        if t<Taccel:
+            return a*t
+        elif t>Taccel+Tconst:
+            return vmax-a*(t-Taccel-Tconst)
+        else:
+            return vmax
+    @np.vectorize
+    def distance(t):
+        if(t<Taccel):
+            return 0.5*a*t*t
+        elif(t<Taccel+Tconst):
+            return 0.5*a*Taccel*Taccel + vmax*(t-Taccel)
+        else:
+            tau=(t-Taccel-Tconst)
+            return 0.5*a*Taccel*Taccel + vmax*Tconst + vmax*tau - 0.5*a*tau*tau
+
+    z=np.zeros((N,1))
+    return np.c_[distance(t), z, z, velocity(t), z, z, t]
+
+def makeFigureEight(N=100, A=3, omega=0.2, a=0.1):
     t=linspace(0,2*pi/omega,N)
     x=2*A*sin(omega*t)
     xdot=2*A*omega*cos(omega*t)
@@ -71,19 +133,23 @@ def path2local(p, R, initialphi=0, small=1e-3):
     ydot = p[:,4:5]
     thetadot = p[:,5:6]
     t=p[:,6:7]
-    ct = cos(theta)[...,None]
-    st = sin(theta)[...,None]
+    ct = cos(-theta)[...,None]
+    st = sin(-theta)[...,None]
     rot = np.append(np.c_[ct, st], np.c_[-st, ct], axis=1)
     dtheta = unwrap(np.r_[diff(theta, axis=0), [[0]]])
     ct = cos(dtheta)[...,None]
     st = sin(dtheta)[...,None]
-    drot = np.append(np.c_[1-ct, st], np.c_[-st, 1-ct], axis=1)
+    drot = np.append(np.c_[ct-1, st], np.c_[-st, ct-1], axis=1)
     rdx=np.einsum("...ij,...jk,...kl", drot, rot, R.reshape((1,2,1)))
     # appending zero here is equivalent to assuming all paths end stopped
     dx = np.r_[diff(x, axis=0), [[0]]]+rdx[:,0]
     dy = np.r_[diff(y, axis=0), [[0]]]+rdx[:,1]
     # V = (thetadot Zhat) x R + v
-    V = np.c_[-thetadot*R[1], thetadot*R[0]] + np.c_[xdot, ydot]
+    td = thetadot[...,None]
+    z = np.zeros_like(td)
+    omegacross = np.append(np.c_[z, -td], np.c_[td, z], axis=1)
+    V = np.einsum("...ij,...jk,...kl", omegacross, rot, R.reshape((1,2,1)))[...,0] + np.c_[xdot, ydot]
+    #V = np.c_[-thetadot*R[1], thetadot*R[0]] + np.c_[xdot, ydot]
     Vx = V[:,0:1]
     Vy = V[:,1:2]
     # ksidot = ||V||
@@ -120,7 +186,7 @@ def path2local(p, R, initialphi=0, small=1e-3):
     return np.c_[phi, phidot, dksi, ksidot, t]
 
 def plotlocal(l):
-    f=pylab.figure(2)
+    f=pylab.figure(2) 
     f.clear()
     ax4=f.add_subplot(414)
     ax1=f.add_subplot(411, sharex=ax4)
@@ -138,4 +204,41 @@ def plotlocal(l):
     ax4.set_title("ksidot")
     ax4.plot(l[:,4], l[:,3])
     f.canvas.draw()
+
+def rot(theta, v):
+    ct = cos(theta)[...,None]
+    st = sin(theta)[...,None]
+    rot = np.append(np.c_[ct, -st], np.c_[st, ct], axis=1)
+    rotv=np.einsum("...ij,...jk", rot, v.reshape((1,2,1)))
+    return rotv[...,0]
+
+def drawlocal(path, Rport, Rstarboard, Rstern, N=1):
+    base=path[::N,:2]
+    heading=np.c_[cos(path[::N,2]), sin(path[::N,2])]
+
+    lport = path2local(path, Rport)
+    lstarboard = path2local(path, Rstarboard)
+    lstern = path2local(path, Rstern)
+
+    fig=pylab.figure(3)
+    fig.clear()
+    ax=fig.add_subplot(111)
+    ax.set_aspect(1)
+    ax.quiver(base[:,0], base[:,1], heading[:,0], heading[:,1])
+
+    portbase = base+rot(path[::N,2:3],Rport)
+    portsteer = rot(path[::N,2:3]+lport[::N,0:1], np.r_[1.0, 0.0])
+    ax.quiver(portbase[:,0], portbase[:,1], portsteer[:,0], portsteer[:,1],
+            color="r")
+    starboardbase = base+rot(path[::N,2:3],Rstarboard)
+    starboardsteer = rot(path[::N,2:3]+lstarboard[::N,0:1], np.r_[1.0, 0.0])
+    ax.quiver(starboardbase[:,0], starboardbase[:,1], starboardsteer[:,0],
+            starboardsteer[:,1],
+            color="g")
+    sternbase = base+rot(path[::N,2:3],Rstern)
+    sternsteer = rot(path[::N,2:3] + lstern[::N,0:1], np.r_[1.0, 0.0])
+    ax.quiver(sternbase[:,0], sternbase[:,1], sternsteer[:,0], sternsteer[:,1],
+            color="b")
+
+    fig.canvas.draw()
 
