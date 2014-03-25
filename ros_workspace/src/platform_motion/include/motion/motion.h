@@ -1,6 +1,6 @@
 #include <nav_msgs/Path.h>
 #include <std_msgs/Bool.h>
-#include <platform_motion_msgs/ScaryTestMode.h>
+#include <platform_motion_msgs/Path.h>
 
 namespace platform_motion{
 
@@ -8,7 +8,6 @@ enum MotionCommandSource {
     COMMAND_SOURCE_PLANNER,
     COMMAND_SOURCE_JOYSTICK,
     COMMAND_SOURCE_SERVO,
-    COMMAND_SOURCE_SCARY_TEST_MODE,
     COMMAND_SOURCE_NONE
 };
 
@@ -24,33 +23,10 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void enable_carousel(bool state = true);
 
     private:
-        // structs for pvt segment operation.
-        struct PathSegment
-        {
-            // path segment in the odometry frame.
-            double x;
-            double y;
-            double theta;
-            double xDot;
-            double yDot;
-            double thetaDot;
-            ros::Time time;
-
-            PathSegment():
-                x(0.0),
-                y(0.0),
-                theta(0.0),
-                xDot(0.0),
-                yDot(0.0),
-                thetaDot(0.0),
-                time()
-            {
-            }
-        };
 
         struct BodySegment
         {
-            // when a PathSegment has been transformed into wheel pod local coordinates,
+            // when a Knot has been transformed into wheel pod local coordinates,
             // it becomes a BodySegment
             PodSegment port;
             PodSegment starboard;
@@ -64,7 +40,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
-        void plannedPathCallback(const nav_msgs::Path::ConstPtr path);
+        void plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path);
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
                 const char *joint_name, double *steering, double *speed);
@@ -90,21 +66,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         void statusPublishCallback(const ros::TimerEvent& event);
 
-        // scary pvt test mode enable. only do this on blocks!!!
-        void scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::ConstPtr msg);
-        bool scaryTestModeEnabled;
-        std::list<Motion::PathSegment> computeCirclePath(ros::Time time, double dt, double R, double a, double vmax);
-        std::list<Motion::PathSegment> computeStraightPath(ros::Time time, double dt, double tconst, double a, double vmax);
-        std::list<Motion::PathSegment> computeFigureEight(ros::Time time, int numPoints, double amplitude, double omega, double acceleration);
-        std::list<PathSegment> computeScaryPath(ros::Time time, int which);
-        ros::Time scaryTestModeStartTime;
-
         // pvt mode
-        // pathToBody transforms odometry frame PathSegments to body local BodySegments
-        std::list<BodySegment> pathToBody(std::list<PathSegment>& path);
+        // pathToBody transforms odometry frame Knots to body local BodySegments
+        std::list<BodySegment> pathToBody(std::list<platform_motion_msgs::Knot>& path);
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
-        Eigen::Vector2d podVelocity(const PathSegment &current, Eigen::Vector2d pod_pos);
-        PodSegment pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, Eigen::Vector2d pod_pos, double &lastValidSteeringAngle);
+        Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
+        PodSegment pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle);
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 
@@ -124,7 +91,6 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber joystick_sub;
         ros::Subscriber servo_sub;
         ros::Subscriber carousel_sub;
-        ros::Subscriber scary_test_mode_sub;
         ros::Subscriber gpio_sub;
         ros::Publisher gpio_pub;
         ros::Publisher joint_state_pub;
@@ -192,7 +158,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         // pvt mode members
         bool moreDataSent; // send more data once per sync.
-        std::list<BodySegment> plannedPath;
+        std::list<platform_motion_msgs::Knot> plannedPath;
+        std::list<BodySegment> runningPath;
         BodySegment lastSegmentSent; // the last segment we actually gave the wheelpods
 };
 

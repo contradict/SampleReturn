@@ -7,6 +7,7 @@ project(platform_motion_msgs)
 find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   geometry_msgs
+  std_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -75,6 +76,8 @@ add_message_files(
         GPIO.msg
         ServoStatus.msg
         ScaryTestMode.msg
+        Knot.msg
+        Path.msg
 )
 
 # services

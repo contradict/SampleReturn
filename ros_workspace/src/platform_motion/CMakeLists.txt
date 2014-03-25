@@ -10,6 +10,8 @@ find_package(catkin REQUIRED
         message_generation
         actionlib
         tf
+        tf_conversions
+        eigen_conversions
         dynamic_reconfigure
         canopen
 	platform_motion_msgs
@@ -106,6 +108,12 @@ target_link_libraries(test_EKF_odometry
     ${catkin_LIBRARIES}
 )
 
+add_executable(test_path
+    src/scarytestpath.cpp
+    )
+target_link_libraries(test_path
+    ${catkin_LIBRARIES}
+    )
 
 
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
@@ -118,6 +126,8 @@ install(
       teleop
       least_squares_odometry
       EKF_odometry
+      test_path
+
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

@@ -17,6 +17,8 @@
 #include <sensor_msgs/JointState.h>
 #include <dynamic_reconfigure/server.h>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 #include <canlib.h>
 #include <CANOpen.h>
@@ -29,6 +31,7 @@
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion_msgs/GPIO.h>
 #include <platform_motion_msgs/ServoStatus.h>
+#include <platform_motion_msgs/Path.h>
 #include <motion/wheelpod.h>
 
 #include <motion/motion.h>
@@ -51,7 +54,6 @@ Motion::Motion() :
     desired_carousel_state(false),
     pv_counter(0),
     joint_seq(0),
-    scaryTestModeEnabled(false),
     m_debugPrintCounter(0)
 {
     lastSegmentSent.port.steeringAngle = 0.0;
@@ -104,14 +106,6 @@ Motion::Motion() :
             this);
 
     nh_.subscribe("planned_path", 1, &Motion::plannedPathCallback, this);
-
-    scary_test_mode_sub = nh_.subscribe(
-            "scary_test_mode",
-            2,
-            &Motion::scaryTestModeCallback,
-            this
-    );
-
 
     joint_state_pub = nh_.advertise<sensor_msgs::JointState>("platform_joint_state", 1);
 
@@ -425,10 +419,6 @@ bool Motion::selectCommandSourceCallback(platform_motion_msgs::SelectCommandSour
         twist->angular.z=0;
         handleTwist(geometry_msgs::Twist::ConstPtr(twist));
     }
-    else if(req.source == std::string("ScaryTestMode"))
-    {
-        command_source = COMMAND_SOURCE_SCARY_TEST_MODE;
-    }
     else
     {
         ROS_ERROR("Unrecognized command source %s", req.source.c_str());
@@ -445,9 +435,6 @@ bool Motion::selectCommandSourceCallback(platform_motion_msgs::SelectCommandSour
                 break;
             case COMMAND_SOURCE_NONE:
                 resp.source="None";
-                break;
-            case COMMAND_SOURCE_SCARY_TEST_MODE:
-                resp.source = "ScaryTestMode";
                 break;
         }
         resp.valid=false;
@@ -806,8 +793,7 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 
     // check to see if we're ready to start a coordinated pvt move
     // assuming we're in a mode that uses pvt moves..
-    if((command_source == COMMAND_SOURCE_SCARY_TEST_MODE) ||
-        (command_source == COMMAND_SOURCE_PLANNER))
+    if( command_source == COMMAND_SOURCE_PLANNER )
     {
         if(port->getNeedsToStart() &&
            starboard->getNeedsToStart() &&
@@ -968,7 +954,7 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status_pub.publish(status);
 }
 
-void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
+void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path)
 {
     if(command_source != COMMAND_SOURCE_PLANNER)
     {
@@ -979,33 +965,27 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
     // list in the right spot.
     // first, remove everything in the list that is now made obsolete
     // by the new planned path.
-    /*
-     * NOTE: This is currently commented out because it isn't right!
-     * plannedPath used to be a list of PosedStamped, but it isn't
-     * any longer because PosedStamped doesn't contain sufficient information
-     * to be useful. Once the data type of the path message is changed, it
-     * should be pretty easy to figure out how to translate the contents of
-     * that message into PathSegments. in the mean time, I'm developing the
-     * scaryTestModeCallback below, so refer to it for the latest code that
-     * is actually likely to work...
-    ros::Time startTime = path->poses[0].header.stamp;
+    ros::Time startTime = path->header.stamp;
     plannedPath.remove_if(
-            [startTime](geometry_msgs::PoseStamped p)
+            [startTime](platform_motion_msgs::Knot p)
             {
                 return p.header.stamp >= startTime;
             }
     );
 
     // now copy all the path segments to the end of the list.
-    for(auto pose : path->poses)
-    {
-        plannedPath.push_back(pose);
-    }
+    plannedPath.insert(plannedPath.end(), path->knots.begin(), path->knots.end());
 
     // add a "safety" segment to the very end that will stop the robot
     // one second after the end of the path. this seems like a good thing
-    geometry_msgs::PoseStamped lastPose = plannedPath.back();
+    platform_motion_msgs::Knot lastPose = plannedPath.back();
     lastPose.header.stamp += ros::Duration(1.0);
+    lastPose.twist.linear.x = 0;
+    lastPose.twist.linear.y = 0;
+    lastPose.twist.linear.z = 0;
+    lastPose.twist.angular.x = 0;
+    lastPose.twist.angular.y = 0;
+    lastPose.twist.angular.z = 0;
     plannedPath.push_back(lastPose);
 
     // check to see if the wheel pods are out of data. if they are,
@@ -1016,57 +996,9 @@ void Motion::plannedPathCallback(const nav_msgs::Path::ConstPtr path)
     {
         // just send one to get the ball rolling. they should ask for more
         // right away (I think?)
-        sendPvtSegment(ros::Time::now());
-    }
-    */
-}
-
-void Motion::scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::ConstPtr msg)
-{
-    if(command_source != COMMAND_SOURCE_SCARY_TEST_MODE)
-    {
-        return;
+        sendPvtSegment();
     }
 
-    scaryTestModeEnabled = msg->enable;
-
-    // clear the planned path.
-    plannedPath.clear();
-
-    // keep track of when we started.
-    scaryTestModeStartTime = ros::Time::now();
-
-    lastSegmentSent.port.steeringAngle = 0.0;
-    lastSegmentSent.port.steeringVelocity = 0.0;
-    lastSegmentSent.port.wheelDistance = 0.0;
-    lastSegmentSent.port.wheelVelocity = 0.0;
-    lastSegmentSent.port.duration = 0.25;
-    lastSegmentSent.starboard.steeringAngle = 0.0;
-    lastSegmentSent.starboard.steeringVelocity = 0.0;
-    lastSegmentSent.starboard.wheelDistance = 0.0;
-    lastSegmentSent.starboard.wheelVelocity = 0.0;
-    lastSegmentSent.starboard.duration = 0.25;
-    lastSegmentSent.stern.steeringAngle = 0.0;
-    lastSegmentSent.stern.steeringVelocity = 0.0;
-    lastSegmentSent.stern.wheelDistance = 0.0;
-    lastSegmentSent.stern.wheelVelocity = 0.0;
-    lastSegmentSent.stern.duration = 0.25;
-    lastSegmentSent.time = ros::Time::now() - ros::Duration(0.25);
-
-    if(scaryTestModeEnabled)
-    {
-        // if we're supposed to be going, make a new scary test mode path
-        std::list<PathSegment> path = computeScaryPath(scaryTestModeStartTime, msg->which);
-        // debugging stuff! don't check this in!
-        //auto temp = pathToBody(path);
-
-        plannedPath = pathToBody(path);
-    }
-
-    // send a pvt segment to kick things off
-    sendPvtSegment();
-    sendPvtSegment();
-    sendPvtSegment();
 }
 
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
@@ -1093,235 +1025,7 @@ void Motion::errorCallback(CANOpen::DS301 &node)
             static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
 }
 
-std::list<Motion::PathSegment> Motion::computeCirclePath(ros::Time time, double dt, double R, double a, double vmax)
-{
-    std::list<PathSegment> retval;
-
-    ros::Duration step = ros::Duration(dt);
-
-    PathSegment seg;
-    seg.time = time;
-    seg.x=0;
-    seg.xDot=0;
-    seg.y=0;
-    seg.yDot=0;
-    seg.theta=0;
-    seg.thetaDot=0;
-    double s=0, v=0;
-    retval.push_back(seg);
-    while(v<vmax)
-    {
-        seg.time += step;
-        double t = (seg.time-time).toSec();
-        v = a*t;
-        s = dt*a*t*t;
-        seg.theta = s/R;
-        seg.thetaDot = v/R;
-        seg.x = R*sin(seg.theta);
-        seg.xDot = v*cos(seg.theta);
-        seg.y = R*(1-cos(seg.theta));
-        seg.yDot = v*sin(seg.theta);
-        retval.push_back(seg);
-    }
-    double acceltheta=seg.theta;
-    while(seg.theta<(2*M_PI-acceltheta))
-    {
-        seg.time += step;
-        s += v*dt;
-        seg.theta = s/R;
-        seg.thetaDot = v/R;
-        seg.x = R*sin(seg.theta);
-        seg.xDot = v*cos(seg.theta);
-        seg.y = R*(1-cos(seg.theta));
-        seg.yDot = v*sin(seg.theta);
-        retval.push_back(seg);
-    }
-    ros::Time tdecel=seg.time;
-    double vdecel=v, sdecel=s;
-    while(v>0)
-    {
-        seg.time += step;
-        double t=(seg.time - tdecel).toSec();
-        v  = vdecel-a*t;
-        s  = sdecel+vdecel*t-dt*a*t*t;
-        seg.theta = s/R;
-        seg.thetaDot = v/R;
-        seg.x = R*sin(seg.theta);
-        seg.xDot = v*cos(seg.theta);
-        seg.y = R*(1-cos(seg.theta));
-        seg.yDot = v*sin(seg.theta);
-        retval.push_back(seg);
-    }
-    return retval;
-}
-
-std::list<Motion::PathSegment> Motion::computeStraightPath(ros::Time time, double dt, double tconst, double a, double vmax)
-{
-    std::list<PathSegment> retval;
-
-    ros::Duration step = ros::Duration(dt);
-
-    PathSegment seg;
-    seg.time = time;
-    seg.x=0;
-    seg.xDot=0;
-    seg.y=0;
-    seg.yDot=0;
-    seg.theta=0;
-    seg.thetaDot=0;
-
-    while(seg.xDot<vmax)
-    {
-        retval.push_back(seg);
-        seg.time += step;
-        double t = (seg.time-time).toSec();
-        seg.xDot = a*t;
-        seg.x    = dt*a*t*t;
-    }
-    seg = retval.back();
-    seg.xDot = vmax;
-    for(double t=0;t<tconst;t+=dt) {
-        seg.time += step;
-        seg.x += seg.xDot*dt;
-        retval.push_back(seg);
-    }
-    ros::Time tdecel=seg.time;
-    double xdecel=seg.x;
-    while(seg.xDot>0)
-    {
-        seg.x += seg.xDot*dt;
-        seg.time += step;
-        double t = (seg.time - tdecel).toSec();
-        seg.xDot = vmax - a*t;
-        seg.x    = xdecel + (vmax*t - dt*a*t*t);
-        if(seg.xDot>0) retval.push_back(seg);
-    }
-    seg = retval.back();
-    double decelrest=seg.xDot/a;
-    seg.time += ros::Duration(decelrest);
-    seg.x    += dt*a*decelrest*decelrest;
-    seg.xDot  = 0;
-    retval.push_back(seg);
-
-    return retval;
-}
-
-std::list<Motion::PathSegment> Motion::computeFigureEight(ros::Time time, int numPoints, double amplitude, double omega, double acceleration)
-{
-    std::list<PathSegment> retval;
-    // compute the time step between each point
-    ros::Duration timeStep = ros::Duration((2.0*M_PI/omega)/((double)numPoints));
-    // this is based on the math in path2local.py. sorry the contradict-style variable names
-    // declare lambdas for the loop.
-    auto f = [] (double x) {return 2.0 * atan(x);};
-    auto fprime = [] (double x) {return 2.0/(1.0 + pow(x, 2));};
-    auto g = [] (double x, double y) {return (sqrt(pow(x, 2) + pow(y, 2)) - x) / y;};
-    auto gprime = [] (double x, double y, double xdot, double ydot)
-        {return (pow((pow(x, 2) + pow(y, 2)), -0.5) * (x * xdot + y * ydot) - xdot) / y -
-            (sqrt(pow(x, 2) + pow(y,2)) -x) / pow(y, 2) * ydot;};
-
-    // compute the first point so that we have a nice ramp up to the start of the
-    // figure 8. start by computing the first point of the figure 8.
-    double xDot0 = 2.0 * amplitude * omega;
-    double yDot0 = 2.0 * amplitude * omega;
-    double theta0 = f(g(xDot0, yDot0));
-    double startDistance = 0.5 * (pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
-    double startDuration = sqrt(pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
-    PathSegment start;
-    start.time = time;
-    start.xDot = 0.0;
-    start.yDot = 0.0;
-    start.thetaDot = 0.0;
-    start.x = startDistance * cos(theta0 + M_PI);
-    start.y = startDistance * sin(theta0 + M_PI);
-    start.theta = theta0;
-
-    retval.push_back(start);
-
-    // account for the start up ramp by adding some to the actual start time
-    ros::Time actualStartTime = time + ros::Duration(startDuration);
-
-    // build the figure 8 part of the path
-    for(int i = 0; i < numPoints; i++)
-    {
-        double t = (timeStep * i).toSec();
-        PathSegment segment;
-        segment.time = actualStartTime + timeStep * i;
-        segment.x = 2.0 * amplitude * sin(omega * t);
-        segment.xDot = 2.0 * amplitude * omega * cos(omega * t);
-        double xdDot = -2.0 * amplitude * omega * omega * sin(omega * t);
-        segment.y = amplitude * sin(2.0 * omega * t);
-        segment.yDot = 2.0 * amplitude * omega * cos(2.0 * omega * t);
-        double ydDot = -4.0 * amplitude * omega * omega * sin(2.0 * omega * t);
-        segment.theta = f(g(segment.xDot, segment.yDot));
-        segment.thetaDot = fprime(g(segment.xDot, segment.yDot)) *
-            gprime(segment.xDot, segment.yDot, xdDot, ydDot);
-
-        retval.push_back(segment);
-    }
-
-    // now add a ramp down to zero at the end.
-    PathSegment end;
-    double endDistance = 0.5 * (pow(retval.back().xDot, 2.0) + pow(retval.back().yDot, 2.0))
-        / acceleration;
-    double endDuration = sqrt(pow(retval.back().xDot, 2.0) + pow(retval.back().yDot, 2.0)) /
-        acceleration;
-
-    end.time = retval.back().time + ros::Duration(endDuration);
-    end.xDot = 0.0;
-    end.yDot = 0.0;
-    end.thetaDot = 0.0;
-    end.x = endDistance * cos(retval.back().theta) + retval.back().x;
-    end.y = endDistance * sin(retval.back().theta) + retval.back().y;
-    end.theta = retval.back().theta;
-
-    retval.push_back(end);
-
-    return retval;
-}
-
-std::list<Motion::PathSegment> Motion::computeScaryPath(ros::Time time, int which)
-{
-    std::list<Motion::PathSegment> retval;
-
-    double dt=0.5;
-    double R=3.0;
-    double a=0.1;
-    double vmax=1.0;
-    double tconst=5.0;
-    int numPoints=250;
-    double amplitude=3.0;
-    double omega=0.1;
-
-    switch(which) {
-        case platform_motion_msgs::ScaryTestMode::Circle:
-            retval=computeCirclePath(time, dt, R,  a, vmax);
-            break;
-        case platform_motion_msgs::ScaryTestMode::Straight:
-            retval=computeStraightPath(time, dt, tconst, a, vmax);
-            break;
-        case platform_motion_msgs::ScaryTestMode::FigureEight:
-            retval=computeFigureEight(time, numPoints, amplitude, omega, a);
-            break;
-        default:
-            ROS_ERROR("Unknown path %d", which);
-            return retval;
-    }
-
-    // debugging. should not be pushed commented in!
-    //int count=0;
-    //for(auto i : retval)
-    //{
-    //    ROS_DEBUG("count: %d, time: %f, x: %f, y: %f, theta: %f, xDot: %f, yDot: %f, thetaDot: %f",
-    //           count, i.time.toSec(), i.x, i.y, i.theta, i.xDot, i.yDot, i.thetaDot
-    //    );
-    //    count++;
-    //}
-    //return retval;
-
-}
-
-std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
+std::list<Motion::BodySegment> Motion::pathToBody(std::list<platform_motion_msgs::Knot> &path)
 {
     std::list<BodySegment> retval;
 
@@ -1342,40 +1046,41 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
         ROS_ERROR("Error looking up %s: %s", "port_suspension", ex.what());
         return retval;
     }
-    Eigen::Vector2d port_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+    Eigen::Vector3d port_pos;
+    tf::vectorTFToEigen( pod_tf.getOrigin(), port_pos);
     try {
         listener.lookupTransform(child_frame_id, "starboard_suspension", zero, pod_tf );
     } catch( tf::TransformException ex) {
         ROS_ERROR("Error looking up %s: %s", "starboard_suspension", ex.what());
         return retval;
     }
-    Eigen::Vector2d starboard_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
+    Eigen::Vector3d starboard_pos;
+    tf::vectorTFToEigen( pod_tf.getOrigin(), starboard_pos);
     try {
         listener.lookupTransform(child_frame_id, "stern_suspension", zero, pod_tf );
     } catch( tf::TransformException ex) {
         ROS_ERROR("Error looking up %s: %s", "stern_suspension", ex.what());
         return retval;
     }
-    Eigen::Vector2d stern_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
-
-
+    Eigen::Vector3d stern_pos;
+    tf::vectorTFToEigen( pod_tf.getOrigin(), stern_pos);
 
     // make sure that the last thing in the path is a segment with zero velocity
-    PathSegment last = path.back();
-    last.xDot = 0;
-    last.yDot = 0;
-    last.thetaDot = 0;
-    last.time += ros::Duration(0.25);
+    platform_motion_msgs::Knot last = path.back();
+    last.twist.linear.x = 0;
+    last.twist.linear.y = 0;
+    last.twist.angular.z = 0;
+    last.header.stamp += ros::Duration(0.25);
     path.push_back(last);
 
 
     // iterate over the path. this is slightly tricky because we want two consecutive
     // elements at a time
-    PathSegment previous;
-    previous.xDot = 0;
-    previous.yDot = 0;
-    previous.thetaDot = 0;
-    previous.time = path.begin()->time-ros::Duration(0.250);
+    platform_motion_msgs::Knot previous;
+    previous.twist.linear.x = 0;
+    previous.twist.linear.y = 0;
+    previous.twist.angular.z = 0;
+    previous.header.stamp = path.begin()->header.stamp-ros::Duration(0.250);
 
     // debug counter!
     int j = 0;
@@ -1385,7 +1090,7 @@ std::list<Motion::BodySegment> Motion::pathToBody(std::list<PathSegment> &path)
             current++, next++)
     {
         BodySegment segment;
-        segment.time = (*current).time;
+        segment.time = (*current).header.stamp;
         segment.port = pathToPod(previous, *current, *next, port_pos, portLastValidAngle);
         segment.starboard = pathToPod(previous, *current, *next, starboard_pos, starboardLastValidAngle);
         segment.stern = pathToPod(previous, *current, *next, stern_pos, sternLastValidAngle);
@@ -1410,33 +1115,37 @@ double unwrap(double theta)
     return theta;
 }
 
-Eigen::Vector2d Motion::podVelocity(const PathSegment &current, Eigen::Vector2d pod_pos)
+Eigen::Vector2d Motion::podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos)
 {
-    Eigen::Matrix2d rot;
-    rot << cos(current.theta), -sin(current.theta),
-           sin(current.theta), cos(current.theta);
+    Eigen::Quaterniond rot;
+    tf::quaternionMsgToEigen( current.pose.orientation, rot );
 
-    Eigen::Matrix2d omegacross;
-    omegacross << 0, -current.thetaDot,
-                  current.thetaDot, 0;
+    Eigen::Matrix3d omegacross;
+    omegacross << 0, -current.twist.angular.z, 0,
+                  current.twist.angular.z, 0, 0,
+                  0, 0, 1;
 
-    Eigen::Vector2d Vbody;
-    Vbody << current.xDot, current.yDot;
+    Eigen::Vector3d Vbody;
+    tf::vectorMsgToEigen( current.twist.linear, Vbody );
 
-    return omegacross * rot * pod_pos + Vbody;
+    return (omegacross * (rot * pod_pos) + Vbody).head(2);
 }
 
-PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSegment &next, Eigen::Vector2d pod_pos, double &lastValidSteeringAngle)
+PodSegment Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle)
 {
     // this is a helper that does the actual math for each pod segment.
     // this math comes from contradict's path2local.py and I'm using those vairable names
     // for the most part. sorry about that.
     // compute the differentials
-    double dx = current.x - previous.x;
-    double dy = current.y - previous.y;
-    double dtheta = unwrap(current.theta - previous.theta);
-    double dt_prev = (current.time - previous.time).toSec();
-    double dt_next = (next.time - current.time).toSec();
+    double dx = current.pose.position.x - previous.pose.position.x;
+    double dy = current.pose.position.y - previous.pose.position.y;
+    Eigen::Quaterniond q;
+    double previousTheta = tf::getYaw( previous.pose.orientation );
+    double currentTheta = tf::getYaw( current.pose.orientation );
+    double nextTheta = tf::getYaw( next.pose.orientation );
+    double dtheta = unwrap(currentTheta - previousTheta);
+    double dt_prev = (current.header.stamp - previous.header.stamp).toSec();
+    double dt_next = (next.header.stamp - current.header.stamp).toSec();
 
     PodSegment retval;
     retval.duration = dt_next;
@@ -1457,18 +1166,18 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
         return retval;
     }
 
-    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - current.theta);
+    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - currentTheta);
 
     // add motion due to rotation about body axis of pod
     Eigen::Matrix2d rot;
-    rot << cos(current.theta), -sin(current.theta),
-           sin(current.theta), cos(current.theta);
+    rot << cos(currentTheta), -sin(currentTheta),
+           sin(currentTheta), cos(currentTheta);
 
     Eigen::Matrix2d drot;
     drot << cos(dtheta)-1, -sin(dtheta),
             sin(dtheta), cos(dtheta)-1;
 
-    Eigen::Vector2d rdx = drot * rot * pod_pos;
+    Eigen::Vector2d rdx = drot * rot * pod_pos.head(2);
 
     dx += rdx(0);
     dy += rdx(1);
@@ -1484,14 +1193,14 @@ PodSegment Motion::pathToPod(PathSegment &previous, PathSegment &current, PathSe
         dksi = fabs(dtheta) * sqrt(pow(dx, 2) + pow(dy, 2)) / sqrt(2 * (1.0 - cos(dtheta)));
     }
 
-    double alpha = unwrap(phi + current.theta);
+    double alpha = unwrap(phi + currentTheta);
 
     Eigen::Vector2d Vpod_prev = podVelocity(previous, pod_pos);
     Eigen::Vector2d Vpod_next = podVelocity(next, pod_pos);
     Eigen::Vector2d Vdot = ((Vpod-Vpod_prev)/dt_prev + (Vpod_next-Vpod)/dt_next)/2.;
 
     double phidot = (Vdot[0] * cos(-alpha - M_PI/2.0) - Vdot[1] * sin(-alpha - M_PI/2.0)) /
-        ksidot - current.thetaDot;
+        ksidot - current.twist.angular.z;
 
     // we've actually computed everything now! stick the results into retval!
     retval.steeringAngle = phi;
@@ -1588,25 +1297,24 @@ void Motion::sendPvtSegment()
     // stomping all over other commands from other sources.
     // if the joystick and visual servo ever use pvt mode, this will
     // have to change.
-    if((command_source == COMMAND_SOURCE_PLANNER) ||
-       (command_source == COMMAND_SOURCE_SCARY_TEST_MODE))
+    if( command_source == COMMAND_SOURCE_PLANNER )
     {
         BodySegment newSegment;
 
         // make sure the planned path has 2 or more segments in it. if it only has one
         // segment, just clear it.
-        if(plannedPath.size() == 1)
+        if(runningPath.size() == 1)
         {
-            plannedPath.clear();
+            runningPath.clear();
         }
 
         // send the next pvt segment to all the wheelpods.
-        if(plannedPath.size() > 0)
+        if(runningPath.size() > 0)
         {
             // if we've got some path to follow, follow it.
             // get the next two path segments out of the path
-            BodySegment first = plannedPath.front();
-            BodySegment second = *(++plannedPath.begin());
+            BodySegment first = runningPath.front();
+            BodySegment second = *(++runningPath.begin());
             ros::Time now=lastSegmentSent.time+ros::Duration(lastSegmentSent.port.duration);
 
             ROS_DEBUG_STREAM("first: " << first.time << " second: " << second.time << " now: " << now << " new: " << newSegment.time);
@@ -1630,7 +1338,7 @@ void Motion::sendPvtSegment()
                 if(lastSegmentSent.time == first.time && now == second.time) {
                     ROS_DEBUG("No interpolation needed");
                     newSegment = second;
-                    plannedPath.pop_front();
+                    runningPath.pop_front();
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
                     ROS_DEBUG("interpolating to now");
@@ -1648,7 +1356,7 @@ void Motion::sendPvtSegment()
 
                     // we're also past the first segment, so remove it from the
                     // path.
-                    plannedPath.pop_front();
+                    runningPath.pop_front();
                 }
                 else
                 {
