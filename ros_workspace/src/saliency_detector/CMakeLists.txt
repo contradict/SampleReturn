@@ -115,10 +115,14 @@ add_library(saliency_detector_core
 # add_dependencies(saliency_detector_node saliency_detector_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
+ target_link_libraries(saliency_detector_core
+   ${catkin_LIBRARIES}
+   )
+
  target_link_libraries(saliency_detector_node
    saliency_detector_core
-   BMS
    ${catkin_LIBRARIES}
+   BMS
  )
 
 #############
