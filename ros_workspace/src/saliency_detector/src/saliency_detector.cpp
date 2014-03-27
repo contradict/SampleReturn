@@ -24,6 +24,8 @@ class SaliencyDetectorNode
   BMS bms_;
   int bms_sample_step_;
   double bms_blur_std_;
+  int bms_thresh_;
+  double bms_top_trim_;
 
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
 
@@ -57,11 +59,16 @@ class SaliencyDetectorNode
     catch (cv_bridge::Exception& e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
     }
+
     cv::Mat small;
-    cv::resize(cv_ptr->image,small,cv::Size(600.0,cv_ptr->image.rows*(600.0/cv_ptr->image.cols)),0.0,0.0,cv::INTER_AREA);
+    cv::resize(cv_ptr->image.rowRange(bms_top_trim_,cv_ptr->image.rows),
+        small,cv::Size(600.0,(cv_ptr->image.rows-bms_top_trim_)*(600.0/cv_ptr->image.cols)),
+        0.0,0.0,cv::INTER_AREA);
 
     bms_.computeSaliency(small, bms_sample_step_);
     debug_bms_img_ = bms_.getSaliencyMap().clone();
+
+    cv::threshold(debug_bms_img_, debug_bms_img_, bms_thresh_, 255, cv::THRESH_BINARY);
 
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"mono8",debug_bms_img_).toImageMsg();
@@ -80,6 +87,8 @@ class SaliencyDetectorNode
 
     bms_sample_step_ = config.bms_sample_step;
     bms_blur_std_ = config.bms_blur_std;
+    bms_thresh_ = config.bms_thresh;
+    bms_top_trim_ = config.bms_top_trim;
   }
 };
 
