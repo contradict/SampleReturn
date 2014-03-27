@@ -25,10 +25,12 @@ class SaliencyDetectorNode
   int bms_sample_step_;
   double bms_blur_std_;
 
+  dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
+
   public:
   SaliencyDetectorNode() {
 
-    dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
+    //dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
     dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig>::CallbackType cb;
 
     cb = boost::bind(&SaliencyDetectorNode::configCallback, this,  _1, _2);
