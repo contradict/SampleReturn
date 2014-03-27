@@ -83,7 +83,7 @@ generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp roslib
+  CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
   DEPENDS opencv2
 )
 
@@ -112,7 +112,7 @@ add_library(saliency_detector_core
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(saliency_detector_node saliency_detector_generate_messages_cpp)
+ add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
