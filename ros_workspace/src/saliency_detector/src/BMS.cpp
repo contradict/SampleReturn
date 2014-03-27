@@ -79,6 +79,7 @@ void BMS::computeSaliency(const Mat& src, float step)
 			registerPosition(bm);
 		}
 	}
+  _feature_maps.clear();
 }
 
 Mat BMS::registerPosition(const Mat& bm)
