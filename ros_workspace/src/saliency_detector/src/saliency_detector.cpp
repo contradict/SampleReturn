@@ -22,9 +22,12 @@ class SaliencyDetectorNode
 
   cv::Mat debug_bms_img_;
   BMS bms_;
+  cv::SimpleBlobDetector blob_;
+  bool blobDetect_on_;
   int bms_sample_step_;
   double bms_blur_std_;
   int bms_thresh_;
+  bool bms_thresh_on_;
   double bms_top_trim_;
 
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
@@ -68,7 +71,24 @@ class SaliencyDetectorNode
     bms_.computeSaliency(small, bms_sample_step_);
     debug_bms_img_ = bms_.getSaliencyMap().clone();
 
-    cv::threshold(debug_bms_img_, debug_bms_img_, bms_thresh_, 255, cv::THRESH_BINARY);
+    if (bms_thresh_on_) {
+      ROS_INFO("Thresholding");
+      cv::threshold(debug_bms_img_, debug_bms_img_, bms_thresh_, 255, cv::THRESH_BINARY);
+    }
+
+    //ROS_INFO("Image depth: %d", debug_bms_img_.depth());
+
+    if (blobDetect_on_) {
+      vector<cv::KeyPoint> keypoints;
+      cv::Mat blob_copy;
+      blob_copy = debug_bms_img_.clone();
+      blob_.detect(blob_copy, keypoints);
+      ROS_INFO("Keypoints Detected: %lu", keypoints.size());
+      for (size_t i=0; i < keypoints.size(); i++)
+      {
+        cv::circle(debug_bms_img_, keypoints[i].pt, keypoints[i].size, CV_RGB(255,0,0));
+      }
+    }
 
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"mono8",debug_bms_img_).toImageMsg();
@@ -88,7 +108,26 @@ class SaliencyDetectorNode
     bms_sample_step_ = config.bms_sample_step;
     bms_blur_std_ = config.bms_blur_std;
     bms_thresh_ = config.bms_thresh;
+    bms_thresh_on_ = config.bms_thresh_on;
     bms_top_trim_ = config.bms_top_trim;
+
+    blobDetect_on_ = config.blobDetect_on;
+
+    //Construct BlobDetector/MSER
+    cv::SimpleBlobDetector::Params BlobParams;
+
+    //BlobParams.filterByColor = config.filterByColor;
+    BlobParams.filterByColor = true;
+    BlobParams.filterByArea = config.filterByArea;
+    BlobParams.filterByConvexity = config.filterByConvexity;
+    BlobParams.filterByCircularity = config.filterByCircularity;
+    BlobParams.filterByInertia = config.filterByInertia;
+
+    //BlobParams.blobColor = config.blobColor;
+    BlobParams.blobColor = 255;
+    BlobParams.maxThreshold = config.maxThreshold;
+    BlobParams.minThreshold = config.minThreshold;
+    blob_ = cv::SimpleBlobDetector(BlobParams);
   }
 };
 
