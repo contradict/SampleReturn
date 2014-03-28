@@ -22,7 +22,7 @@ link_directories(${catkin_LIBRARY_DIRS} ${THE_SMOOTH_LIBRARY_DIRS})
 # Generate messages
 ##############################################################################
 
-add_message_files(FILES TheSmoothPlannerStats.msg)
+add_message_files(FILES TheSmoothPlannerMsg.msg)
 generate_messages(DEPENDENCIES geometry_msgs)
 
 ##############################################################################
