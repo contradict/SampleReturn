@@ -43,7 +43,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path);
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
-                const char *joint_name, double *steering, double *speed);
+                Eigen::Vector2d pod_pos, double *steering, double *speed);
         void carouselCallback(const std_msgs::Float64::ConstPtr fmsg);
         void gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr gpio);
         void doHomePods(void);
@@ -125,6 +125,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
+
+        Eigen::Vector3d port_pos_, starboard_pos_, stern_pos_;
 
         double wheel_diameter;
 

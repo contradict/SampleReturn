@@ -379,6 +379,28 @@ void Motion::start(void)
         ROS_INFO("Still Waiting for transforms");
     if( ros::ok() )
         ROS_INFO("Got all transforms");
+    // asking for time 0 asks for the most recent transform
+    ros::Time most_recent(0);
+    // look up the transforms
+    tf::StampedTransform pod_tf;
+    try {
+        listener.lookupTransform(child_frame_id, "port_suspension", most_recent, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", "port_suspension", ex.what());
+    }
+    tf::vectorTFToEigen( pod_tf.getOrigin(), port_pos_);
+    try {
+        listener.lookupTransform(child_frame_id, "starboard_suspension", most_recent, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", "starboard_suspension", ex.what());
+    }
+    tf::vectorTFToEigen( pod_tf.getOrigin(), starboard_pos_);
+    try {
+        listener.lookupTransform(child_frame_id, "stern_suspension", most_recent, pod_tf );
+    } catch( tf::TransformException ex) {
+        ROS_ERROR("Error looking up %s: %s", "stern_suspension", ex.what());
+    }
+    tf::vectorTFToEigen( pod_tf.getOrigin(), stern_pos_);
 }
 
 void Motion::plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
@@ -452,19 +474,19 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
 
 
     stern->getPosition(&stern_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, "stern_suspension",
+    if(0>computePod(body_vel, body_omega, body_pt, stern_pos_.head(2),
                 &stern_steering_angle, &stern_wheel_speed)) {
         return;
     }
 
     port->getPosition(&port_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, "port_suspension",
+    if(0>computePod(body_vel, body_omega, body_pt, port_pos_.head(2),
                 &port_steering_angle, &port_wheel_speed)) {
         return;
     }
 
     starboard->getPosition(&starboard_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, "starboard_suspension",
+    if(0>computePod(body_vel, body_omega, body_pt, starboard_pos_.head(2),
                 &starboard_steering_angle, &starboard_wheel_speed)){
         return;
     }
@@ -476,18 +498,9 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
 }
 
 int Motion::computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
-        const char *joint_name, double *steering, double *speed)
+        Eigen::Vector2d pod_pos, double *steering, double *speed)
 {
     tf::StampedTransform pod_tf;
-    ros::Time current(0);
-    try {
-        listener.lookupTransform(child_frame_id, joint_name, current, pod_tf );
-    } catch( tf::TransformException ex) {
-        ROS_ERROR("Error looking up %s: %s", joint_name, ex.what());
-        return -1;
-    }
-    //ROS_DEBUG("%s at (%f, %f)", joint_name, port_tf.getOrigin().x(), port_tf.getOrigin().y());
-    Eigen::Vector2d pod_pos( pod_tf.getOrigin().x(), pod_tf.getOrigin().y());
     Eigen::Vector2d pod_vect = pod_pos - body_pt;
     Eigen::Vector2d pod_perp(-pod_vect(1), pod_vect(0));
     Eigen::Vector2d pod_vel = body_vel + pod_perp*body_omega;
