@@ -62,6 +62,7 @@ std::list<platform_motion_msgs::Knot> TestPath::computeStraightPath(double dt, d
     std::list<platform_motion_msgs::Knot> retval;
 
     platform_motion_msgs::Knot knot;
+    knot.pose.orientation.w=1.0;
 
     ros::Duration step = ros::Duration(dt);
 

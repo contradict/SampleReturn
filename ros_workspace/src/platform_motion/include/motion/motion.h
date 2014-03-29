@@ -67,8 +67,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void statusPublishCallback(const ros::TimerEvent& event);
 
         // pvt mode
-        // pathToBody transforms odometry frame Knots to body local BodySegments
-        std::list<BodySegment> pathToBody(std::list<platform_motion_msgs::Knot>& path);
+        void pathToBody( void );
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
         Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
         PodSegment pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle);
@@ -92,10 +91,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber servo_sub;
         ros::Subscriber carousel_sub;
         ros::Subscriber gpio_sub;
+        ros::Subscriber planned_path_sub;
         ros::Publisher gpio_pub;
         ros::Publisher joint_state_pub;
         ros::Publisher battery_voltage_pub;
         ros::Publisher status_pub;
+        ros::Publisher stitchedPath_pub_;
 
         ros::Timer status_publish_timer;
 
@@ -160,9 +161,10 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         // pvt mode members
         bool moreDataSent; // send more data once per sync.
+        bool restartPvt; // need to send 3 segments
+        bool newPathReady;
         std::list<platform_motion_msgs::Knot> plannedPath;
-        std::list<BodySegment> runningPath;
-        BodySegment lastSegmentSent; // the last segment we actually gave the wheelpods
+        BodySegment firstSegment_, secondSegment_, lastSegmentSent_; // the last segment we actually gave the wheelpods
 };
 
 }
