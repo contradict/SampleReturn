@@ -41,6 +41,7 @@
 namespace platform_motion {
 
 Motion::Motion() :
+    m_debugPrintCounter(0),
     param_nh("~"),
     home_pods_action_server(nh_, "home_wheel_pods", false),
     home_carousel_action_server(nh_, "home_carousel", false),
@@ -585,6 +586,7 @@ void Motion::homePodsComplete(CANOpen::DS301 &node)
 
 void Motion::homeCarouselComplete(CANOpen::DS301 &node)
 {
+    (void) node;
     ROS_INFO("homed carousel");
     home_carousel_action_server.setSucceeded(home_carousel_result);  
 }
@@ -707,6 +709,7 @@ void Motion::enable_carousel(bool state)
 
 void Motion::pvCallback(CANOpen::DS301 &node)
 {
+    (void) node;
     if(pv_counter>0 && --pv_counter==0) {
         ros::Time current_time = ros::Time::now();
 
@@ -795,6 +798,7 @@ void Motion::gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
+    (void) sync;
     // reset the pv_counter to wait for all the servos to report status
     pv_counter=7;
 
@@ -846,6 +850,8 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 
 void Motion::reconfigureCallback(PlatformParametersConfig &config, uint32_t level)
 {
+    (void) level;
+
     wheel_diameter = config.wheel_diameter;
 
     if( CAN_fd>0 ) {
@@ -873,6 +879,8 @@ void Motion::carouselCallback(const std_msgs::Float64::ConstPtr fmsg)
 
 void Motion::statusPublishCallback(const ros::TimerEvent& event)
 {
+    (void) event;
+
     if(carousel_setup) {
         platform_motion_msgs::GPIO gpio;
         gpio.servo_id = carousel->node_id;
@@ -1016,6 +1024,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
 
 void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 {
+    (void) node;
     // only send more data once per sync pulse. this way we send data to
     // all the servos as soon as one says it needs more
     if(!this->moreDataSent)
