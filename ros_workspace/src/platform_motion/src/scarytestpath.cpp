@@ -109,6 +109,7 @@ std::list<platform_motion_msgs::Knot> TestPath::computeCirclePath(double dt, dou
     std::list<platform_motion_msgs::Knot> retval;
 
     platform_motion_msgs::Knot knot;
+    knot.pose.orientation.w=1.0;
 
     ros::Duration step = ros::Duration(dt);
 
@@ -189,6 +190,7 @@ std::list<platform_motion_msgs::Knot> TestPath::computeFigureEight(int numPoints
     double startDistance = 0.5 * (pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
     double startDuration = sqrt(pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
     platform_motion_msgs::Knot start;
+    start.pose.orientation.w=1.0;
     start.pose.position.x = startDistance * cos(theta0 + M_PI);
     start.pose.position.y = startDistance * sin(theta0 + M_PI);
     tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0,0,theta0), start.pose.orientation);
