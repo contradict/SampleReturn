@@ -1060,6 +1060,8 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         ros::Duration dt=startTime - ros::Time(0);
         for( auto k : path->knots )
         {
+            if(plannedPath.size()>0 && k.header.stamp == ros::Time(0))
+                continue;
             k = transformKnot( rotation, translation, omega, velocity, "odom", k);
             k.header.stamp += dt;
             plannedPath.push_back(k);
