@@ -24,7 +24,7 @@ class TestPath {
         std::list<platform_motion_msgs::Knot> computeCirclePath(double dt, double R, double a, double vmax);
         std::list<platform_motion_msgs::Knot> computeStraightPath(double dt, double tconst, double a, double vmax);
         std::list<platform_motion_msgs::Knot> computeFigureEight(int numPoints, double amplitude, double omega, double acceleration);
-        std::list<platform_motion_msgs::Knot> computeScaryPath(ros::Time time, int which);
+        std::list<platform_motion_msgs::Knot> computeScaryPath(int which);
 
 };
 
@@ -51,7 +51,7 @@ void TestPath::scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::
     path.header.stamp = ros::Time(0);
     path.header.frame_id = "map";
 
-    std::list<platform_motion_msgs::Knot> knots = computeScaryPath(path.header.stamp, msg->which);
+    std::list<platform_motion_msgs::Knot> knots = computeScaryPath(msg->which);
     path.knots.insert(path.knots.begin(), knots.begin(), knots.end() );
 
     path_pub_.publish(path);
@@ -242,27 +242,21 @@ std::list<platform_motion_msgs::Knot> TestPath::computeFigureEight(int numPoints
 
     retval.push_back(end);
 
+    double xoff, yoff;
+    xoff = retval.front().pose.position.x;
+    yoff = retval.front().pose.position.y;
+    for( auto k : retval )
+    {
+        k.pose.position.x -= xoff;
+        k.pose.position.y -= yoff;
+    }
+
     return retval;
 }
 
-std::list<platform_motion_msgs::Knot> TestPath::computeScaryPath(ros::Time time, int which)
+std::list<platform_motion_msgs::Knot> TestPath::computeScaryPath(int which)
 {
     std::list<platform_motion_msgs::Knot> retval;
-
-    platform_motion_msgs::Knot knot;
-    knot.header.stamp = time;
-    knot.header.seq = 0;
-    knot.header.frame_id = "map";
-    knot.pose.position.x=0;
-    knot.pose.position.y=0;
-    knot.pose.position.z=0;
-    tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0,0,0), knot.pose.orientation);
-    knot.twist.linear.x=0;
-    knot.twist.linear.y=0;
-    knot.twist.linear.z=0;
-    knot.twist.angular.x=0;
-    knot.twist.angular.y=0;
-    knot.twist.angular.z=0;
 
     double dt=0.5;
     double R=3.0;
