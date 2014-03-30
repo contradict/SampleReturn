@@ -3,16 +3,19 @@
 <launch>
     <arg name="wait_for_cameras" default="true"/>
     
-    <!-- machine="navigate" -->
     <node
         pkg="executive"
         type="executive_master_node.py"
         name="executive_master"
+        machine="navigate"
         output="log"
         ns="/processes/executive">
+
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
-        <param name="wait_for_cameras" value="$(arg wait_for_cameras)"/>
+        <param name="gpio_servo_id" value="1"/>
+        <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
+        <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
 
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
         <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
@@ -23,7 +26,8 @@
         <remap from="home_wheel_pods" to="/motion/wheel_pods/home"/>
         <remap from="home_carousel" to="/motion/carousel/home"/>
         <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
-
+        <remap from="manual_control" to="/motion/manual_control"/>
+        
         <remap from="manipulator_detection_point" 
                to="processes/sample_detection/manipulator/named_point"/>
         <remap from="search_point" to="/processes/sample_detection/point"/>
@@ -46,29 +50,10 @@
         <remap from="planner_move_base" to="/processes/planner/move_base"/>        
 
         <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
-
-        <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
-        <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
         
         <!--
         <remap from="img_point" to="filtered_points"/
         -->
     </node>
 
-    <!--
-    <node
-        machine="search"
-        pkg="detection_filter"
-        type="detection_filter_node.py"
-        name="detection_filter"
-        ns="manipulator"
-        >
-
-        <remap from="raw_points" to="point"/>
-
-        <param name="filter_tolerance" type="double" value="0.10"/>
-    </node>
-    -->
-
-       
 </launch>
