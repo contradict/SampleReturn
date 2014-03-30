@@ -35,7 +35,7 @@ class PauseSwitch(object):
         rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
 
         self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True)
-        self.audio_pub = rospy.Publisher("audio_search", SoundRequest)
+        self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement)
 
         #pullup on pause input, 1->0 is transition edge
         self.pause_bit_state = self.button_mask 
