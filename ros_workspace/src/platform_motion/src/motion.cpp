@@ -1425,7 +1425,7 @@ void Motion::sendPvtSegment()
             // get the next two path segments out of the path
             ros::Time now=lastSegmentSent_.time+ros::Duration(lastSegmentSent_.port.duration);
 
-            ROS_DEBUG_STREAM("first: " << firstSegment_.time << " second: " << secondSegment_.time << " now: " << now << " new: " << newSegment.time);
+            ROS_DEBUG_STREAM("first: " << firstSegment_.time << " second: " << secondSegment_.time << " now: ");
 
             if(now < firstSegment_.time)
             {
