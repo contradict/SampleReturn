@@ -979,19 +979,31 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status_pub.publish(status);
 }
 
-platform_motion_msgs::Knot transformKnot( tf::StampedTransform t, std::string newframe, platform_motion_msgs::Knot k)
+platform_motion_msgs::Knot
+transformKnot( Eigen::Quaterniond rotation,
+               Eigen::Vector3d translation,
+               Eigen::Vector3d omega,
+               Eigen::Vector3d velocity,
+               std::string newframe,
+               platform_motion_msgs::Knot k)
 {
-    tf::Quaternion orientation;
-    tf::Vector3 position;
-    tf::pointMsgToTF( k.pose.position, position );
-    tf::quaternionMsgToTF( k.pose.orientation, orientation );
-    tf::Transform tf_in = tf::Transform( orientation, position );
-    tf::Transform tf_out= t*tf_in;
-    tf::quaternionTFToMsg( tf_out.getRotation(), k.pose.orientation );
-    tf::pointTFToMsg( tf_out.getOrigin( ), k.pose.position );
-    tf::Vector3 velocity;
-    tf::vector3MsgToTF( k.twist.linear, velocity );
-    tf::vector3TFToMsg( tf::quatRotate(orientation, velocity) , k.twist.linear );
+    Eigen::Quaterniond orientation;
+    Eigen::Vector3d position, kvelocity, komega;
+
+    tf::quaternionMsgToEigen( k.pose.orientation, orientation );
+    tf::pointMsgToEigen(k.pose.position, position );
+    tf::vectorMsgToEigen( k.twist.linear, kvelocity );
+    tf::vectorMsgToEigen( k.twist.angular, komega );
+
+    orientation = rotation*orientation;
+    position = translation + rotation*position;
+    kvelocity = velocity + rotation*kvelocity + omega.cross( position );
+    komega = omega + rotation*komega;
+
+    tf::quaternionEigenToMsg( orientation, k.pose.orientation );
+    tf::pointEigenToMsg( position, k.pose.position );
+    tf::vectorEigenToMsg( kvelocity, k.twist.linear );
+    tf::vectorEigenToMsg( komega, k.twist.angular );
     k.header.frame_id = newframe;
     return k;
 }
@@ -1011,18 +1023,24 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     if(path->header.stamp == ros::Time(0))
     {
         // 0 means append after whatever is going on as a relative path
-        tf::StampedTransform initial;
         ros::Time startTime;
+        Eigen::Quaterniond rotation;
+        Eigen::Vector3d translation, velocity, omega;
         if(plannedPath.size() == 0 )
         {
             // No existing path, start at present position
             ROS_DEBUG("Start at present position");
+            tf::StampedTransform initial;
             try {
                 listener.lookupTransform("odom", "base_link", most_recent, initial );
             } catch( tf::TransformException ex) {
                 ROS_ERROR("Error looking up %s: %s", "current robot pose", ex.what());
                 return;
             }
+            tf::quaternionTFToEigen( initial.getRotation(), rotation );
+            tf::vectorTFToEigen( initial.getOrigin(), translation );
+            velocity.setZero();
+            omega.setZero();
             startTime = ros::Time::now();
         }
         else if(plannedPath.size() > 0)
@@ -1033,15 +1051,16 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             if(plannedPath.size() > 1 )
                 plannedPath.pop_back();
             platform_motion_msgs::Knot k = plannedPath.back();
-            tf::Pose p;
-            tf::poseMsgToTF(k.pose, p);
-            initial = tf::StampedTransform( tf::Transform(p.getRotation(), p.getOrigin()), k.header.stamp, k.header.frame_id, "last_point");
+            tf::quaternionMsgToEigen( k.pose.orientation, rotation );
+            tf::pointMsgToEigen( k.pose.position, translation );
+            tf::vectorMsgToEigen( k.twist.linear, velocity );
+            tf::vectorMsgToEigen( k.twist.angular, omega );
             startTime = k.header.stamp;
         }
         ros::Duration dt=startTime - ros::Time(0);
         for( auto k : path->knots )
         {
-            k=transformKnot( initial, "odom", k );
+            k = transformKnot( rotation, translation, omega, velocity, "odom", k);
             k.header.stamp += dt;
             plannedPath.push_back(k);
         }
@@ -1062,6 +1081,8 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
                 }
                 );
 
+        Eigen::Quaterniond rotation;
+        Eigen::Vector3d translation, velocity, omega;
         tf::StampedTransform T;
         try {
             listener.lookupTransform(path->header.frame_id, "odom", most_recent, T );
@@ -1069,12 +1090,16 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             ROS_ERROR("Error looking up %s: %s", "base_link", ex.what());
             return;
         }
+        tf::quaternionTFToEigen( T.getRotation(), rotation );
+        tf::vectorTFToEigen( T.getOrigin(), translation );
+        velocity.setZero();
+        omega.setZero();
 
         ros::Duration dt = startTime - ros::Time(0);
 
         for( auto k : path->knots )
         {
-            k = transformKnot( T, "odom", k);
+            k = transformKnot( rotation, translation, omega, velocity, "odom", k);
             k.header.stamp += dt;
             plannedPath.push_back( k );
         }
