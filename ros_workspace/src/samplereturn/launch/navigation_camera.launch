@@ -8,6 +8,7 @@
         <arg name="namespace" value="port"/>
         <arg name="left_guid" value="00b09d0100a85719"/>
         <arg name="right_guid" value="00b09d0100bb69f3"/>
+        <arg name="strobe" value="true"/>
     </include>
 
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
@@ -15,6 +16,7 @@
         <arg name="namespace" value="center"/>
         <arg name="left_guid" value="00b09d0100bb69fb"/>
         <arg name="right_guid" value="00b09d0100bd09ce"/>
+        <arg name="strobe" value="false"/>
     </include>
 
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
@@ -22,6 +24,7 @@
         <arg name="namespace" value="starboard"/>
         <arg name="left_guid" value="00b09d0100ca7fdb"/>
         <arg name="right_guid" value="00b09d0100ca7fd5"/>
+        <arg name="strobe" value="false"/>
     </include>
 
 </launch>

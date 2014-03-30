@@ -5,6 +5,7 @@
     <arg name="namespace" default="port"/>
     <arg name="left_guid" default="00b09d0100bb69f3"/>
     <arg name="right_guid" default="00b09d0100a85719"/>
+    <arg name="strobe" default="false"/>
 
     <!-- Navigation Nodelet Host process -->
     <node name="manager"
@@ -27,7 +28,12 @@
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
 
-            <param name="strobe" type="bool" value="true"/>
+            <group if="(arg strobe)">
+                <param name="strobe" type="bool" value="true"/>
+            </group>
+            <group unless="(arg strobe)">
+                <param name="external_trigger" type="bool" value="true"/>
+            </group>
             <param name="isMaster" type="bool" value="true"/>
 
             <param name="reset_on_open" type="bool" value="true"/>
