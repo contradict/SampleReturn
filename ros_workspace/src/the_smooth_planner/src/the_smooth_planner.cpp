@@ -37,6 +37,8 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
 	localNodeHandle.param("angular_acceleration", angular_acceleration, 1.0);
 
+	this->odometry = nav_msgs::Odometry();
+
 	pose_subscriber = parentNodeHandle.subscribe("SBPLLatticePlanner/plan", 1, &TheSmoothPlanner::setPath, this);
 	odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
 
@@ -79,19 +81,21 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	the_smooth_planner_msg.poses.resize(path.poses.size());
 	the_smooth_planner_msg.twists.resize(path.poses.size());
 	the_smooth_planner_msg.header.stamp = timestamp;
+	the_smooth_planner_msg.header.seq = 0;
 
 	visualization_msgs::MarkerArray visualizationMarkerArray;
-	//visualizationMarkerArray.markers.resize(path.poses.size()+1);
-	visualizationMarkerArray.markers.resize(1);
+	visualizationMarkerArray.markers.resize(path.poses.size()+1);
 	visualizationMarkerArray.markers[0].points.resize(path.poses.size());
 
 	if (path.poses.size() > 0)
 	{
 		// Populate the first entry with the current kinematic data.
 		the_smooth_planner_msg.poses[0].header.stamp = timestamp;
+		the_smooth_planner_msg.poses[0].header.seq = 0;
 		the_smooth_planner_msg.poses[0].pose = path.poses[0].pose;
 		the_smooth_planner_msg.twists[0] = odometry.twist.twist;
 
+		visualizationMarkerArray.markers[0].header.seq = 0;
 		visualizationMarkerArray.markers[0].header.frame_id = "map";
 		visualizationMarkerArray.markers[0].header.stamp = timestamp;
 		visualizationMarkerArray.markers[0].ns = "SmoothPlannerVisualization";
@@ -109,10 +113,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
 		// 1) Fit a cubic spline to each pair of points, given P and V direction
-		Array<double> times;
-		Array<double> positions_x;
-		Array<double> positions_y;
-		Array<double> angles;
+		Array<double> times(2);
+		Array<double> positions_x(2);
+		Array<double> positions_y(2);
+		Array<double> angles(2);
 		double linear_velocity_xf;
 		double linear_velocity_yf;
 
@@ -158,16 +162,40 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		timestamp.sec += static_cast<int>(delta_time_seconds);
 		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
 
+		the_smooth_planner_msg.poses[i+1].header.seq = i+1;
 		the_smooth_planner_msg.poses[i+1].header.stamp = timestamp;
 		the_smooth_planner_msg.poses[i+1].pose = path.poses[i+1].pose;
 		the_smooth_planner_msg.twists[i+1].linear.x = finalLinearVelocity(0);
 		the_smooth_planner_msg.twists[i+1].linear.y = finalLinearVelocity(1);
-		the_smooth_planner_msg.twists[i+1].linear.z = finalLinearVelocity(2);
+		the_smooth_planner_msg.twists[i+1].linear.z = 0.0;
 		the_smooth_planner_msg.twists[i+1].angular.x = 0.0;
 		the_smooth_planner_msg.twists[i+1].angular.y = 0.0;
 		the_smooth_planner_msg.twists[i+1].angular.z = 0.0;
 
+		// Store the position for the line strip
 		visualizationMarkerArray.markers[0].points[i+1] = path.poses[i+1].pose.position;
+
+		// Store the velocity at this path point
+		visualizationMarkerArray.markers[i+1].header.seq = i+1;
+		visualizationMarkerArray.markers[i+1].header.frame_id = "map";
+		visualizationMarkerArray.markers[i+1].header.stamp = timestamp;
+		visualizationMarkerArray.markers[i+1].ns = "SmoothPlannerVisualization";
+		visualizationMarkerArray.markers[i+1].id = i+1;
+		visualizationMarkerArray.markers[i+1].type = visualization_msgs::Marker::ARROW;
+		visualizationMarkerArray.markers[i+1].action = visualization_msgs::Marker::ADD;
+		visualizationMarkerArray.markers[i+1].scale.x = 0.1;
+		visualizationMarkerArray.markers[i+1].scale.y = 0.1;
+		visualizationMarkerArray.markers[i+1].scale.z = finalLinearVelocityMagnitude;
+		visualizationMarkerArray.markers[i+1].color.r = 1.0;
+		visualizationMarkerArray.markers[i+1].color.g = 0.0;
+		visualizationMarkerArray.markers[i+1].color.b = 0.0;
+		visualizationMarkerArray.markers[i+1].color.a = 1.0;
+		visualizationMarkerArray.markers[i+1].pose.position = path.poses[i+1].pose.position;
+		visualizationMarkerArray.markers[i+1].pose.orientation = path.poses[i+1].pose.orientation;
+		//visualizationMarkerArray.markers[i+1].pose.orientation.x = 0.0;
+		//visualizationMarkerArray.markers[i+1].pose.orientation.y = 0.0;
+		//visualizationMarkerArray.markers[i+1].pose.orientation.z = 1.0;
+		//visualizationMarkerArray.markers[i+1].pose.orientation.w = 0.0;
 	}
 
 	// 5) Publish the_smooth_path and visualization messages

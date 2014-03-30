@@ -7,7 +7,7 @@ project(the_smooth_planner)
 
 set(CMAKE_BUILD_TYPE Debug)
 set(THIS_PACKAGE_ROS_DEPS roscpp costmap_2d nav_core pluginlib 
-  geometry_msgs nav_msgs)
+  geometry_msgs nav_msgs ecl_geometry visualization_msgs tf)
 find_package(catkin REQUIRED COMPONENTS
   ${THIS_PACKAGE_ROS_DEPS} message_generation)
 
