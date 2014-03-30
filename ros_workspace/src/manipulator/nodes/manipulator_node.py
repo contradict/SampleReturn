@@ -80,7 +80,7 @@ class ManipulatorStateMachine(object):
   
     with self.sm:
            
-      smach.StateMachine.add('START',
+      smach.StateMachine.add('START_MANIPULATOR',
           manipulator_states.ProcessGoal(),
           transitions = {'grab': 'ROTATE_WRIST',
                          'home': 'HOME_ARM',
@@ -238,7 +238,9 @@ class ManipulatorStateMachine(object):
         result_key = 'action_result'
     )
   
-    sls = smach_ros.IntrospectionServer('smach_grab_introspection', self.sm, '/START')
+    sls = smach_ros.IntrospectionServer('smach_grab_introspection',
+                                        self.sm,
+                                        '/START_MANIPULATOR')
     sls.start()
   
     #start action servers and services

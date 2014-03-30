@@ -20,7 +20,7 @@ class ProcessGoal(smach.State):
   def execute(self, userdata):
     # set the feedback key
     fb = ManipulatorFeedback()
-    fb.current_state = "START"
+    fb.current_state = "START_MANIPULATOR"
     userdata.action_feedback = fb
 
     mgr = ManipulatorResult()      
