@@ -26,22 +26,17 @@
     <include file="$(find samplereturn)/launch/joystick.launch"/>
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/>
-
+    <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
+    <include file="$(find samplereturn)/launch/search_detection.launch"/>
+    <include file="$(find visual_servo)/launch/visual_servo.launch"/>
+    <include file="$(find samplereturn)/launch/planner.launch"/>
+    <!--
+    <include file="$(find samplereturn)/launch/imu.launch"/>
+    -->
+    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
     <include file="$(find executive)/launch/executive.launch"/>
 
-    <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
-
-    <include file="$(find samplereturn)/launch/search_detection.launch"/>
-
-    <include file="$(find visual_servo)/launch/visual_servo.launch"/>
-
-    <include file="$(find samplereturn)/launch/planner.launch"/>
-    <include file="$(find samplereturn)/launch/imu.launch"/>
-
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
-
-    <!-- Nodes -->  
-       
+<!-- Nodes -->  
     <node machine="navigate" 
           pkg="fake_localization" 
           type="fake_localization" 

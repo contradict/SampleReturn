@@ -4,8 +4,14 @@ project(executive)
 find_package(catkin REQUIRED
         COMPONENTS
             rospy
+            actionlib_msgs
+            actionlib
+            smach
+            smach_ros
         )
 
+catkin_python_setup()
+    
 catkin_package(
     CATKIN_DEPENDS
         rospy
@@ -22,6 +28,6 @@ endforeach()
 
 install(
     PROGRAMS
-       nodes/master_executive.py
+       nodes/executive_master_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

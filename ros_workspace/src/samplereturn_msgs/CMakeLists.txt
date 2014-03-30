@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(platform_motion_msgs)
+project(samplereturn_msgs)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -7,8 +7,6 @@ project(platform_motion_msgs)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
-  actionlib_msgs
-  geometry_msgs
   std_msgs
   message_generation
 )
@@ -70,41 +68,33 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   actionlib_msgs#   geometry_msgs
+#   actionlib_msgs#   std_msgs
 # )
-# messages
+
+## Generate messages in the 'msg' folder
 add_message_files(
-    DIRECTORY msg
-    FILES
-        GPIO.msg
-        ServoStatus.msg
-        ScaryTestMode.msg
-        Knot.msg
-        Path.msg
+  FILES
+  VoiceAnnouncement.msg
 )
 
-# services
-add_service_files(
-    DIRECTORY srv
-    FILES
-        Enable.srv
-        SelectCommandSource.srv
-)
+## Generate services in the 'srv' folder
+# add_service_files(
+#   FILES
+#   Service1.srv
+#   Service2.srv
+# )
 
-# actions
-add_action_files(
-    DIRECTORY action
-    FILES
-        Home.action
-        SelectCarouselBin.action
-        ManualControl.action
-)
+## Generate actions 
+#add_action_files(
+#	DIRECTORY action
+#	FILES
+#	VisualServo.action
+#)
 
+## Generate added messages and services with any dependencies listed here
 generate_messages(
     DEPENDENCIES
-        actionlib_msgs
         std_msgs
-        geometry_msgs
 )
 
 
@@ -119,8 +109,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES platform_motion_msgs
-  CATKIN_DEPENDS message_runtime actionlib_msgs geometry_msgs
+#  LIBRARIES visual_servo_msgs
+  CATKIN_DEPENDS message_runtime std_msgs
 #  DEPENDS system_lib
 )
 
@@ -136,19 +126,19 @@ include_directories(
 )
 
 ## Declare a cpp library
-# add_library(platform_motion_msgs
-#   src/${PROJECT_NAME}/platform_motion_msgs.cpp
+# add_library(visual_servo_msgs
+#   src/${PROJECT_NAME}/visual_servo_msgs.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(platform_motion_msgs_node src/platform_motion_msgs_node.cpp)
+# add_executable(visual_servo_msgs_node src/visual_servo_msgs_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(platform_motion_msgs_node platform_motion_msgs_generate_messages_cpp)
+# add_dependencies(visual_servo_msgs_node visual_servo_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(platform_motion_msgs_node
+# target_link_libraries(visual_servo_msgs_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -167,7 +157,7 @@ include_directories(
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS platform_motion_msgs platform_motion_msgs_node
+# install(TARGETS visual_servo_msgs visual_servo_msgs_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -192,7 +182,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_platform_motion_msgs.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_visual_servo_msgs.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

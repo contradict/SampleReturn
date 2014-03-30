@@ -23,6 +23,7 @@
     <run_depend>image_proc</run_depend>
     <run_depend>camera_calibration</run_depend>
     <run_depend>sensor_msgs</run_depend>
+    <run_depend>samplereturn_msgs</run_depend>
     <run_depend>platform_motion</run_depend>
     <run_depend>robot_setup_tf</run_depend>
     <run_depend>sync_images</run_depend>

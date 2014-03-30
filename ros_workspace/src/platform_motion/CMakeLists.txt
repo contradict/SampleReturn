@@ -14,9 +14,11 @@ find_package(catkin REQUIRED
         eigen_conversions
         dynamic_reconfigure
         canopen
-	platform_motion_msgs
-	visual_servo_msgs
-	manipulator_msgs
+	    smach
+        smach_ros
+        platform_motion_msgs
+	    visual_servo_msgs
+	    manipulator_msgs
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -115,7 +117,6 @@ target_link_libraries(test_path
     ${catkin_LIBRARIES}
     )
 
-
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
     src/acceleration_limit.cpp)
 
@@ -136,5 +137,6 @@ install(
 install(
     PROGRAMS
         nodes/carousel_indexer.py
+        nodes/manual_control_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

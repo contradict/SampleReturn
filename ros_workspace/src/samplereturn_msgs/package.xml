@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <package>
-  <name>visual_servo_msgs</name>
+  <name>samplereturn_msgs</name>
   <version>0.0.0</version>
-  <description>Messages and actions for visual_servo</description>
+  <description>General messages and actions for sample return project</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
-  <maintainer email="darkspy5@gmail.com">Brandon</maintainer>
+  <maintainer email="jtlittle@gmail.com">Jascha</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
@@ -40,11 +40,10 @@
   <!-- Use test_depend for packages you need only for testing: -->
   <!--   <test_depend>gtest</test_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>actionlib_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
-  <run_depend>actionlib_msgs</run_depend>
+  <build_depend>message_generation</build_depend>
   <run_depend>std_msgs</run_depend>
-
+  <run_depend>message_runtime</run_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
