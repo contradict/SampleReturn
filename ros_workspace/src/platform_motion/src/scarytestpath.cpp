@@ -48,7 +48,7 @@ void TestPath::scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::
 {
     platform_motion_msgs::Path path;
     // keep track of when we started.
-    path.header.stamp = ros::Time::now();
+    path.header.stamp = ros::Time(0);
     path.header.frame_id = "map";
 
     std::list<platform_motion_msgs::Knot> knots = computeScaryPath(path.header.stamp, msg->which);
