@@ -12,20 +12,23 @@ class Announcer(object):
     
     def __init__(self):
         rospy.init_node("announcer", anonymous=True)
-        
+               
         self.voice = rospy.get_param("~voice", "kal_diphone")
         self.speech_delay = rospy.get_param("~speech_delay", 0.8)
         self.speech_rate = rospy.get_param("~speech_rate", 0.07)        
-    
-        self.audio_sub=rospy.Subscriber("audio_in",
-                                        platform_msg.VoiceAnnouncement,
-                                        self.handle_announcement)
         
         self.audio_pub=rospy.Publisher("audio_out", SoundRequest)
+
+        while self.audio_pub.get_num_connections == 0:
+            rospy.sleep(0.1)
+        #once we connect to the sound node, subscribe to any announcer_interfaces
+        
+        self.audio_sub=rospy.Subscriber("audio_in",
+                                        VoiceAnnouncement,
+                                        self.handle_announcement)    
         
         self.announcements = []
         self.announceCV = threading.Condition()
-                
         self.announcement_worker()
                 
         rospy.spin()
@@ -44,22 +47,21 @@ class Announcer(object):
 
     
     def announcement_worker(self):
-        while True:
+        while not rospy.is_shutdown():
             self.announceCV.acquire()
             if len(self.announcements) > 0:
                 msg = SoundRequest()
                 msg.sound = SoundRequest.SAY
                 msg.command = SoundRequest.PLAY_ONCE
-                msg.arg = self.announcements[0].words
+                msg.arg = self.announcements.pop(0)
                 msg.arg2 = 'voice.select "%s"'%self.voice
-                self.audio_pub(msg)
-                self.announcements.pop[0]
+                self.audio_pub.publish(msg)
                 duration = self.speech_delay + self.speech_rate*len(msg.arg)
                 self.announceCV.wait(timeout=duration)
-            else:
-                self.announceCV.wait()
                 self.announceCV.release()
-        
-    
+            else:
+                self.announceCV.wait(timeout=0.1)
+                self.announceCV.release()
+            
 if __name__=="__main__":
     Announcer()

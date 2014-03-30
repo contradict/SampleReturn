@@ -12,6 +12,7 @@ d = generate_distutils_setup(
                'nodes/lights.py',
                'nodes/announce_voltage.py',
                'nodes/pause_switch.py',
+               'nodes/announcer.py'
                ],
           )
 
