@@ -75,7 +75,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	// What direction is the robot going and what is the linear/angular vel?
 	Time timestamp = Time::now();
 	Eigen::Vector3d linearVelocity(odometry.twist.twist.linear.x, odometry.twist.twist.linear.y, odometry.twist.twist.linear.z);
-	double linearVelocityMagnitude = linearVelocity.norm();
+	double currentVelocityMagnitude = linearVelocity.norm();
+	double pathVelocityMagnitude = currentVelocityMagnitude;
 
 	the_smooth_planner::TheSmoothPlannerMsg the_smooth_planner_msg;
 	the_smooth_planner_msg.poses.resize(path.poses.size());
@@ -84,12 +85,17 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	the_smooth_planner_msg.header.seq = 0;
 
 	visualization_msgs::MarkerArray visualizationMarkerArray;
-	visualizationMarkerArray.markers.resize(path.poses.size()+1);
+	visualizationMarkerArray.markers.resize(1); // Just a single marker for now
 	visualizationMarkerArray.markers[0].points.resize(path.poses.size());
+	visualizationMarkerArray.markers[0].colors.resize(path.poses.size());
 
+	// Compute the distance we should travel before we stop accelerating
+	double stopAcceleratingDistance = (maximum_linear_velocity*maximum_linear_velocity - currentVelocityMagnitude*currentVelocityMagnitude)/(2.0*linear_acceleration);
+	double distanceTraveled = 0.0;
+
+	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
 	{
-		// Populate the first entry with the current kinematic data.
 		the_smooth_planner_msg.poses[0].header.stamp = timestamp;
 		the_smooth_planner_msg.poses[0].header.seq = 0;
 		the_smooth_planner_msg.poses[0].pose = path.poses[0].pose;
@@ -103,11 +109,13 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		visualizationMarkerArray.markers[0].type = visualization_msgs::Marker::LINE_STRIP;
 		visualizationMarkerArray.markers[0].action = visualization_msgs::Marker::ADD;
 		visualizationMarkerArray.markers[0].scale.x = 0.1;
-		visualizationMarkerArray.markers[0].color.r = 0.0;
-		visualizationMarkerArray.markers[0].color.g = 1.0;
-		visualizationMarkerArray.markers[0].color.b = 0.0;
-		visualizationMarkerArray.markers[0].color.a = 1.0;
+		visualizationMarkerArray.markers[0].scale.y = 1.0; // Not used
+		visualizationMarkerArray.markers[0].scale.z = 1.0; // Not used
 		visualizationMarkerArray.markers[0].points[0] = path.poses[0].pose.position;
+		visualizationMarkerArray.markers[0].colors[0].r = 1.0 - pathVelocityMagnitude/maximum_linear_velocity;
+		visualizationMarkerArray.markers[0].colors[0].g = pathVelocityMagnitude/maximum_linear_velocity;
+		visualizationMarkerArray.markers[0].colors[0].b = 0.0;
+		visualizationMarkerArray.markers[0].colors[0].a = 1.0;
 	}
 
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
@@ -117,48 +125,53 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		Array<double> positions_x(2);
 		Array<double> positions_y(2);
 		Array<double> angles(2);
-		double linear_velocity_xf;
-		double linear_velocity_yf;
+		double linear_direction_xf;
+		double linear_direction_yf;
 
 		times << 0.00, 1.00;
 		positions_x << path.poses[i].pose.position.x, path.poses[i+1].pose.position.x;
 		positions_y << path.poses[i].pose.position.y, path.poses[i+1].pose.position.y;
 		tf::Quaternion initialOrientationQuat(path.poses[i].pose.orientation.x,
-                                            path.poses[i].pose.orientation.y,
-                                            path.poses[i].pose.orientation.z,
-                                            path.poses[i].pose.orientation.w);
+                                              path.poses[i].pose.orientation.y,
+                                              path.poses[i].pose.orientation.z,
+                                              path.poses[i].pose.orientation.w);
 		tf::Quaternion finalOrientationQuat(path.poses[i+1].pose.orientation.x,
-                                          path.poses[i+1].pose.orientation.y,
-                                          path.poses[i+1].pose.orientation.z,
-                                          path.poses[i+1].pose.orientation.w);
+                                            path.poses[i+1].pose.orientation.y,
+                                            path.poses[i+1].pose.orientation.z,
+                                            path.poses[i+1].pose.orientation.w);
 		double roll_0, pitch_0, yaw_0;
 		double roll_f, pitch_f, yaw_f;
 		tf::Matrix3x3(initialOrientationQuat).getRPY(roll_0, pitch_0, yaw_0);
 		tf::Matrix3x3(finalOrientationQuat).getRPY(roll_f, pitch_f, yaw_f);
 		angles << yaw_0, yaw_f;
-		linear_velocity_xf = cos(yaw_f);
-		linear_velocity_yf = sin(yaw_f);
-		CubicSpline positionXSpline = CubicSpline::ContinuousDerivatives(times, positions_x, linearVelocity(0), linear_velocity_xf);
-		CubicSpline positionYSpline = CubicSpline::ContinuousDerivatives(times, positions_y, linearVelocity(1), linear_velocity_yf);
+		linear_direction_xf = cos(yaw_f);
+		linear_direction_yf = sin(yaw_f);
+		// TODO - Control the curvature of the spline by normalizing linearVelocity?
+		CubicSpline positionXSpline = CubicSpline::ContinuousDerivatives(times, positions_x, linearVelocity(0), linear_direction_xf);
+		CubicSpline positionYSpline = CubicSpline::ContinuousDerivatives(times, positions_y, linearVelocity(1), linear_direction_yf);
 
 		// 2) Based on input V magnitude, compute the output V magnitude
 		// 3) Based on input theta_dot, compute the output theta_dot
-		double linear_distance = 0; // Compute the spline length
-		double finalLinearVelocityMagnitude = linearVelocityMagnitude;
-		bool isAccelerating = linearVelocityMagnitude < maximum_linear_velocity;
+		double deltaX = (path.poses[i+1].pose.position.x - path.poses[i].pose.position.x);
+		double deltaY = (path.poses[i+1].pose.position.y - path.poses[i].pose.position.y);
+		double linear_distance = sqrt(deltaX*deltaX + deltaY*deltaY); // TODO - Better spline length computation?
+		distanceTraveled += linear_distance;
+
+		double finalLinearVelocityMagnitude = maximum_linear_velocity;
+		bool isAccelerating = (distanceTraveled < stopAcceleratingDistance);
 		if (isAccelerating)
 		{
-			finalLinearVelocityMagnitude = sqrt(linearVelocity.squaredNorm() + 2*linear_acceleration*linear_distance);
+			finalLinearVelocityMagnitude = (maximum_linear_velocity-currentVelocityMagnitude)*(distanceTraveled/stopAcceleratingDistance) + currentVelocityMagnitude;
+			//finalLinearVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.0*linear_acceleration*distanceTraveled);
 			finalLinearVelocityMagnitude = min(finalLinearVelocityMagnitude, maximum_linear_velocity);
 		}
 
 		// 4) Store the data in a new message format containing PVT for linear
 		//    and angular metrics
-		Eigen::Vector2d finalLinearVelocity(linear_velocity_xf, linear_velocity_yf);
-		finalLinearVelocity.normalize();
+		Eigen::Vector2d finalLinearVelocity(linear_direction_xf, linear_direction_yf);
 		finalLinearVelocity *= finalLinearVelocityMagnitude;
 
-		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+linearVelocityMagnitude);
+		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+pathVelocityMagnitude);
 		timestamp.sec += static_cast<int>(delta_time_seconds);
 		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
 
@@ -174,31 +187,39 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 		// Store the position for the line strip
 		visualizationMarkerArray.markers[0].points[i+1] = path.poses[i+1].pose.position;
+		visualizationMarkerArray.markers[0].colors[i+1].r = 1.0 - finalLinearVelocityMagnitude/maximum_linear_velocity;
+		visualizationMarkerArray.markers[0].colors[i+1].g = finalLinearVelocityMagnitude/maximum_linear_velocity;
+		visualizationMarkerArray.markers[0].colors[i+1].b = 0.0;
+		visualizationMarkerArray.markers[0].colors[i+1].a = 1.0;
 
-		// Store the velocity at this path point
-		visualizationMarkerArray.markers[i+1].header.seq = i+1;
-		visualizationMarkerArray.markers[i+1].header.frame_id = "map";
-		visualizationMarkerArray.markers[i+1].header.stamp = timestamp;
-		visualizationMarkerArray.markers[i+1].ns = "SmoothPlannerVisualization";
-		visualizationMarkerArray.markers[i+1].id = i+1;
-		visualizationMarkerArray.markers[i+1].type = visualization_msgs::Marker::ARROW;
-		visualizationMarkerArray.markers[i+1].action = visualization_msgs::Marker::ADD;
-		visualizationMarkerArray.markers[i+1].scale.x = 0.1;
-		visualizationMarkerArray.markers[i+1].scale.y = 0.1;
-		visualizationMarkerArray.markers[i+1].scale.z = finalLinearVelocityMagnitude;
-		visualizationMarkerArray.markers[i+1].color.r = 1.0;
-		visualizationMarkerArray.markers[i+1].color.g = 0.0;
-		visualizationMarkerArray.markers[i+1].color.b = 0.0;
-		visualizationMarkerArray.markers[i+1].color.a = 1.0;
-		visualizationMarkerArray.markers[i+1].pose.position = path.poses[i+1].pose.position;
-		visualizationMarkerArray.markers[i+1].pose.orientation = path.poses[i+1].pose.orientation;
-		//visualizationMarkerArray.markers[i+1].pose.orientation.x = 0.0;
-		//visualizationMarkerArray.markers[i+1].pose.orientation.y = 0.0;
-		//visualizationMarkerArray.markers[i+1].pose.orientation.z = 1.0;
-		//visualizationMarkerArray.markers[i+1].pose.orientation.w = 0.0;
+		pathVelocityMagnitude = finalLinearVelocityMagnitude;
 	}
 
-	// 5) Publish the_smooth_path and visualization messages
+	// 5) Handle deceleration
+	double targetDecelerationVelocity = 0.0;
+	for (unsigned int i = path.poses.size() - 1; i > 0; --i)
+	{
+		double velocitySquared = (the_smooth_planner_msg.twists[i].linear.x*the_smooth_planner_msg.twists[i].linear.x +
+                                 the_smooth_planner_msg.twists[i].linear.y*the_smooth_planner_msg.twists[i].linear.y);
+
+		if (targetDecelerationVelocity*targetDecelerationVelocity >= velocitySquared)
+		{
+			break;
+		}
+
+		// Update the velocity for this path point
+		the_smooth_planner_msg.twists[i].linear.x *= targetDecelerationVelocity;
+		the_smooth_planner_msg.twists[i].linear.y *= targetDecelerationVelocity;
+		visualizationMarkerArray.markers[0].colors[i].r = 1.0 - targetDecelerationVelocity/maximum_linear_velocity;
+		visualizationMarkerArray.markers[0].colors[i].g = targetDecelerationVelocity/maximum_linear_velocity;
+
+		double delta_time_seconds = (the_smooth_planner_msg.poses[i].header.stamp.sec-the_smooth_planner_msg.poses[i-1].header.stamp.sec) +
+                                    (the_smooth_planner_msg.poses[i].header.stamp.nsec-the_smooth_planner_msg.poses[i-1].header.stamp.nsec)/1000000000.0;
+
+		targetDecelerationVelocity += linear_acceleration*delta_time_seconds;
+	}
+
+	// 6) Publish the_smooth_path and visualization messages
 	smooth_path_publisher.publish(the_smooth_planner_msg);
 	visualization_publisher.publish(visualizationMarkerArray);
 	return;
