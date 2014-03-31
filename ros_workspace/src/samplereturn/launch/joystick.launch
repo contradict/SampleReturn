@@ -38,7 +38,7 @@
     <!-- Remaps -->
     <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
-    <remap from="grab_action" to="/manipulator/grab_action"/>
+    <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
     <remap from="twist" to="joystick_command"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="joy" to="/io/joy"/>
