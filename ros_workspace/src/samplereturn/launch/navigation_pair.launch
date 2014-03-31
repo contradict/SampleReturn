@@ -45,7 +45,8 @@
                  1128 - 22.8
                  1504 - 30.5
             -->
-            <param name="format7_packet_size" value="752"/>
+            <param name="format7_packet_size" value="752" if="$(arg strobe)"/>
+            <param name="format7_packet_size" value="1504" unless="$(arg strobe)"/>
             <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="2"/>
