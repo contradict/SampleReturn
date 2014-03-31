@@ -11,7 +11,6 @@ import tf
 import threading
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 
-from samplereturn_msgs.msg import VoiceAnnouncement
 import samplereturn.util as util
 
 import std_msgs.msg as std_msg
@@ -64,7 +63,6 @@ class ExecutiveMaster(object):
                                                     output_keys = [])
         
         #create initial userdata states in this state machine
-        self.state_machine.userdata.wait_for_cameras = self.node_params.wait_for_cameras
         self.state_machine.userdata.paused = None
         self.state_machine.userdata.selected_mode = None
         
@@ -178,11 +176,11 @@ class ExecutiveMaster(object):
             #create the mode state machines, and pass them to the
             #function which adds their states
             level_one = smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
-            executive_level_one.AddStates(level_one)
+            executive_level_one.AddStates(level_one, self.announcer)
             smach.StateMachine.add('LEVEL_ONE_MODE',
                                    level_one,
                                    transitions = {'complete':'CHECK_MODE',
-                                                  'preempted':'CHECK_MODE',
+                                                  'preempted':'TOP_PREEMPTED',
                                                   'aborted':'TOP_ABORTED'})
 
             level_two = smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
@@ -190,7 +188,7 @@ class ExecutiveMaster(object):
             smach.StateMachine.add('LEVEL_TWO_MODE',
                                    level_two,
                                    transitions = {'complete':'CHECK_MODE',
-                                                  'preempted':'CHECK_MODE',
+                                                  'preempted':'TOP_PREEMPTED',
                                                   'aborted':'TOP_ABORTED'})
 
             
@@ -201,7 +199,7 @@ class ExecutiveMaster(object):
                                    platform_msg.ManualControlAction,
                                    goal = mcg),
                                    transitions = {'succeeded':'CHECK_MODE',
-                                                  'preempted':'START_MASTER_EXECUTIVE',
+                                                  'preempted':'TOP_PREEMPTED',
                                                   'aborted':'TOP_ABORTED'})    
 
             smach.StateMachine.add('TOP_PREEMPTED',
@@ -262,6 +260,7 @@ class ExecutiveMaster(object):
             active_state = self.state_machine.get_active_states()[0]
             if active_state in self.preempt_modes:
                 #if we are in one of the sub state machines, preempt
+                rospy.loginfo("MASTER EXECUTIVE requesting preempt on: " + active_state)
                 self.state_machine.request_preempt()
                 self.preemptCV.acquire()
                 #wait until state machine succesfully preempts the current mode
@@ -403,13 +402,16 @@ class CheckMode(smach.State):
     def __init__(self, announcer):
         smach.State.__init__(self,
                              input_keys=['selected_mode', 'camera_status'],
+                             output_keys=['camera_status'],
                              outcomes=['manual', 'level_one', 'level_two', 'check_cameras', 'preempted', 'aborted'])
 
         self.announcer = announcer
                
     def execute(self, userdata):
         
-        if userdata.selected_mode == 'manual': return 'manual'
+        if userdata.selected_mode == 'manual':
+            userdata.camera_status = 'unknown'
+            return 'manual'
         
         if userdata.camera_status == 'error':
             words = 'Camera failure, manual mode only'
@@ -421,7 +423,7 @@ class CheckMode(smach.State):
         
         if userdata.selected_mode in ['level_one', 'level_two']:
             if userdata.camera_status in ['unknown', 'error']:
-                self.announcer.say("Checking camera status")
+                self.announcer.say("Check ing camera status")
                 return 'check_cameras'
             elif userdata.camera_status == 'good':                
                 return userdata.selected_mode
