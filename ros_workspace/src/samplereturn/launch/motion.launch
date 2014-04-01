@@ -31,8 +31,8 @@
           output="log"
           ns="/motion">
         <!--launch-prefix="xterm -e gdb -ex run - -args"-->
-        <param name="port_steering_offset" type="double" value="0.138"/>
-        <param name="starboard_steering_offset" type="double" value="-0.176"/>
+        <param name="port_steering_offset" type="double" value="0.10"/>
+        <param name="starboard_steering_offset" type="double" value="0.0"/>
         <param name="stern_steering_offset" type="double" value="0.068"/>
 
         <param name="carousel_id" type="int" value="1"/>
