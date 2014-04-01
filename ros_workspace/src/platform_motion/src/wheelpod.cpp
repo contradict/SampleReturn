@@ -60,6 +60,11 @@ void WheelPod::home(CANOpen::DS301CallbackObject cb)
     steering.home(cb);
 }
 
+void WheelPod::cancelHome()
+{
+    steering.cancelHome();
+}
+
 void WheelPod::move(PodSegment &segment)
 {
     // we're going to use pvt mode here
