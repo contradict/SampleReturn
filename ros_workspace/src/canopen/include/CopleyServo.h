@@ -128,6 +128,7 @@ class CopleyServo : public DS301 {
         bool enabled(void);
 
         void home(DS301CallbackObject callback=DS301CallbackObject());
+        void cancelHome();
 
         void setVelocity(int32_t v);
         void setPosition(int32_t p, DS301CallbackObject

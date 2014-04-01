@@ -641,6 +641,12 @@ void CopleyServo::home(DS301CallbackObject callback)
     control( CONTROL_NEW_SETPOINT, 0);
 }
 
+void CopleyServo::cancelHome()
+{
+    modeControl(0, CONTROL_NEW_SETPOINT, ProfilePosition);
+    control( CONTROL_NEW_SETPOINT, 0);
+}
+
 void CopleyServo::setVelocity(int32_t v)
 {
     modeControl(0, 0, ProfileVelocity);
