@@ -70,13 +70,6 @@ target_link_libraries(motion_node
     ${catkin_LIBRARIES}
 )
 
-add_executable(teleop src/teleop.cpp)
-target_link_libraries(teleop
-    ${Boost_LIBRARIES}
-    ${catkin_LIBRARIES}
-)
-add_dependencies(teleop ${${PROJECT_NAME}_EXPORTED_TARGETS})
-
 add_executable(least_squares_odometry
     src/odometry_node.cpp
     src/least_squares_odometry_node.cpp
@@ -124,7 +117,6 @@ install(
     TARGETS
       ${PROJECT_NAME}
       motion_node
-      teleop
       least_squares_odometry
       EKF_odometry
       test_path
