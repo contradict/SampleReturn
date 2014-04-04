@@ -4,8 +4,10 @@ import sys
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 from samplereturn_msgs.msg import VoiceAnnouncement
 from platform_motion_msgs.msg import GPIO, ServoStatus
+from platform_motion_msgs.srv import SelectMotionMode, SelectMotionModeRequest
 from platform_motion_msgs.srv import Enable
 from std_msgs.msg import Bool
+from samplereturn.util import wait_for_rosout
 
 class PauseSwitch(object):
     def __init__(self):
@@ -23,10 +25,11 @@ class PauseSwitch(object):
         self.carousel_servo_status = None
 
         rospy.loginfo('Pause_switch waiting for servo controller enable service...')
-        rospy.wait_for_service('enable_wheel_pods')
         rospy.wait_for_service('enable_carousel')
-        self.enable_wheelpods = rospy.ServiceProxy('enable_wheel_pods', Enable)
-        self.enable_carousel = rospy.ServiceProxy('enable_carousel', Enable)
+        self.enable_carousel_service = rospy.ServiceProxy('enable_carousel', Enable)
+        rospy.wait_for_service('CAN_select_motion_mode')
+        self.select_motion_mode = rospy.ServiceProxy( 'CAN_select_motion_mode',
+                SelectMotionMode )
 
         rospy.loginfo('Pause_switch waiting for manipulator pause service...')
         rospy.wait_for_service('manipulator_pause')
@@ -37,8 +40,11 @@ class PauseSwitch(object):
         self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True)
         self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement)
 
+        # retrieve initial motion mode
+        self.motion_mode = None
+
         #pullup on pause input, 1->0 is transition edge
-        self.pause_bit_state = self.button_mask 
+        self.pause_bit_state = self.button_mask
         self.guarded = False #this flag is set to true after a pause
         ##### CAUTION ####
         # Changed at NASA request, machine should start un paused.
@@ -49,7 +55,7 @@ class PauseSwitch(object):
         # For testing, we will use the start on pause, as below
         self.paused = True
         self.pause(True)
-        
+
     def clear_guard(self, event):
         self.guarded = False
 
@@ -74,7 +80,7 @@ class PauseSwitch(object):
                 ("Switch On Disabled" not in status_word.status)
         rospy.logdebug("carousel: %s, wheelpods: %s", self.carousel_servo_status,
                 self.wheelpod_servo_status)
-    
+
     def say(self, utterance):
         msg = VoiceAnnouncement()
         msg.priority = VoiceAnnouncement.OVERRIDE
@@ -97,40 +103,88 @@ class PauseSwitch(object):
         else:
             self.say("System active")
 
-    def enable(self, name, service, state, check):
+    def enable_carousel(self, state):
         enabled = None
         for x in xrange(2):
             try:
-                rospy.loginfo("Enabling %s %s", name, state)
-                srv_resp=service(state)
+                rospy.loginfo("Enabling carousel %s", state)
+                srv_resp=self.enable_carousel_service(state)
                 enabled=srv_resp.state
                 break
             except rospy.ServiceException, e:
-                rospy.logerr("Unable to use %s enable service: %s", name, e)
-                if check(state):
+                rospy.logerr("Unable to use carousel enable service: %s", e)
+                if self.carousel_servo_status == state:
                     enabled = state
                     break
                 else:
                     try:
-                        service(False)
+                        self.enable_carousel_service(False)
                     except rospy.ServiceException, e:
                         pass
         return enabled
 
+    def enable_wheelpods(self, state):
+        enabled = None
+        retries = 2;
+        rospy.loginfo("Enabling %s", state)
+        while retries>0:
+            # exit conditions
+            if state and (
+                    self.motion_mode != SelectMotionModeRequest.MODE_LOCK and
+                    self.motion_mode != SelectMotionModeRequest.MODE_DISABLE and
+                    self.motion_mode != SelectMotionModeRequest.MODE_ENABLE and
+                    self.motion_mode != SelectMotionModeRequest.MODE_PAUSE ):
+                break
+            if state and (
+                    self.motion_mode == SelectMotionModeRequest.MODE_ENABLE and
+                    self.check_wheelpod_status(True) ):
+                break
+            if not state and (
+                    self.motion_mode == SelectMotionModeRequest.MODE_PAUSE):
+                break
+            # pump state machine as needed to get to PAUSE or some not-pause
+            # state
+            if self.motion_mode == None:
+                rospy.logdebug("Querying current mode")
+                new_mode = SelectMotionModeRequest.MODE_QUERY
+            elif self.motion_mode == SelectMotionModeRequest.MODE_DISABLE:
+                rospy.logdebug("DISABLED, requesting ENABLE")
+                new_mode = SelectMotionModeRequest.MODE_ENABLE
+            elif self.motion_mode == SelectMotionModeRequest.MODE_LOCK:
+                rospy.logdebug("LOCKED, requesting UNLOCK")
+                new_mode = SelectMotionModeRequest.MODE_UNLOCK
+            elif (self.motion_mode == SelectMotionModeRequest.MODE_ENABLE and
+                  not self.check_wheelpod_status(True) ):
+                rospy.logdebug("ENABLED, but servos not all ready, retrying")
+                new_mode = SelectMotionModeRequest.MODE_DISABLE
+            else:
+                if state:
+                    rospy.logdebug("Resuming previous state")
+                    new_mode = SelectMotionModeRequest.MODE_RESUME
+                else:
+                    rospy.logdebug("Requesting PAUSE state")
+                    new_mode = SelectMotionModeRequest.MODE_PAUSE
+            rospy.logdebug("Requesting state transition %s->%s",
+                    self.motion_mode, new_mode)
+            try:
+                self.motion_mode=self.select_motion_mode(new_mode).mode
+            except rospy.ServiceException, e:
+                rospy.logerr("Unable to select motion mode: %s", e)
+                if self.check_wheelpod_status(state):
+                    enabled = state
+                    break
+                retries -= 1
+        return not (self.motion_mode == SelectMotionModeRequest.MODE_PAUSE)
+
     def pause(self, state):
         rospy.logdebug("pause %s", state)
-        if self.check_wheelpod_status(not state) and \
-                self.carousel_servo_status == (not state):
+        self.motion_mode = self.select_motion_mode( SelectMotionModeRequest.MODE_QUERY ).mode
+        if ((state and self.motion_mode == SelectMotionModeRequest.MODE_PAUSE) and
+            (self.carousel_servo_status == (not state))):
             self.set_pause_state(state)
             return
-        wheelpods_toggled = not state == self.enable("wheelpods",
-                                                     self.enable_wheelpods,
-                                                     not state,
-                                                     self.check_wheelpod_status)
-        carousel_toggled = not state == self.enable("carousel",
-                                                    self.enable_carousel,
-                                                    not state,
-                                                    lambda x:x==self.carousel_servo_status)
+        carousel_toggled = not state == self.enable_carousel(not state)
+        wheelpods_toggled = not state == self.enable_wheelpods(not state)
         manipulator_toggled = self.manipulator_pause_service(state).state == state
         if wheelpods_toggled and carousel_toggled and manipulator_toggled:
             self.set_pause_state(state)
@@ -145,5 +199,6 @@ class PauseSwitch(object):
 
 if __name__=="__main__":
     rospy.init_node('pause_switch')
+    wait_for_rosout()
     p=PauseSwitch()
     rospy.spin()

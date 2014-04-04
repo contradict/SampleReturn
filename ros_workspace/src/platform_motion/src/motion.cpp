@@ -524,7 +524,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
         default:
             ROS_FATAL("In unknown mode, serious error: %d", motion_mode);
     }
-    bool podsResult, carouselResult;
+    bool podsResult;
     // Enter new state if possible
     switch(req.mode)
     {
@@ -593,9 +593,9 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE ||
                 motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE)
             {
-                if( !(handleEnablePods(true, &podsResult)&&handleEnableCarousel(true, &carouselResult)) )
+                if( !handleEnablePods(true, &podsResult) )
                     return false;
-                if(podsResult && carouselResult)
+                if( podsResult )
                     motion_mode = req.mode;
             }
             else
@@ -606,9 +606,9 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE:
             // can DISABLE from anywhere
-            if( !(handleEnablePods(false, &podsResult)&&handleEnableCarousel(false, &carouselResult)) )
+            if( !handleEnablePods(false, &podsResult) )
                 return false;
-            if( !(podsResult||carouselResult) )
+            if( !podsResult )
                 motion_mode = req.mode;
             break;
         default:
