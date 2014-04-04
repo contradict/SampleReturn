@@ -1,0 +1,35 @@
+# request the current mode in the response
+# no change to the mode is made
+int8 MODE_QUERY=0
+# Allow homing to proceed. A separate request to the homing
+# server triggers homing.
+int8 MODE_HOME=1
+# Listen to twists from the joystick input
+int8 MODE_JOYSTICK=2
+# Listen to twists from the planner input
+int8 MODE_PLANNER_TWIST=3
+# Listen to twists from visual servo
+int8 MODE_SERVO=4
+# Listen to paths from the planner and track them with
+# PVT mode
+int8 MODE_PLANNER_PVT=5
+# decelrate to zero velocity at 2m/s^2
+# and hold position
+int8 MODE_PAUSE=6
+# Can only be used to exit PAUSE
+# returns to the mode which was executing before PAUSE
+int8 MODE_RESUME=7
+# Can only be entered from PAUSE
+# Point the wheels so the vehicle cannot move
+int8 MODE_LOCK=8
+# The only way out of LOCK.
+# Send UNLOCK to return to PAUSE
+int8 MODE_UNLOCK=9
+# Enable power to the servos. The only way out of DISABLE.
+int8 MODE_ENABLE=10
+# Disable power to the servos allowing them to free-wheel.
+# this is the starup mode.
+int8 MODE_DISABLE=11
+int8 mode
+---
+int8 mode

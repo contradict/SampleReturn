@@ -88,7 +88,7 @@ add_service_files(
     DIRECTORY srv
     FILES
         Enable.srv
-        SelectCommandSource.srv
+        SelectMotionMode.srv
 )
 
 # actions
