@@ -47,19 +47,21 @@ class ManualController(object):
                                                  'invalid_goal':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('SELECT_JOYSTICK',
-                                   SelectCommandSource(self.CAN_interface, 'Joystick'),
+                                   SelectMotionMode(self.CAN_interface,
+                                       platform_srv.SelectMotionModeRequest.MODE_JOYSTICK),
                                    transitions = {'next':'JOYSTICK_LISTEN',
                                                  'aborted':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'SELECT_SERVO',
-                                                  'manipulator_grab_requested':'SELECT_NONE',
+                                                  'manipulator_grab_requested':'SELECT_PAUSE',
                                                   'preempted':'MANUAL_PREEMPTED',
                                                   'aborted':'MANUAL_ABORTED'})           
             
             smach.StateMachine.add('SELECT_SERVO',
-                                   SelectCommandSource(self.CAN_interface, 'Servo'),
+                                   SelectMotionMode(self.CAN_interface,
+                                       platform_srv.SelectMotionModeRequest.MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED'})
              
@@ -69,8 +71,9 @@ class ManualController(object):
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
             
-            smach.StateMachine.add('SELECT_NONE',
-                                   SelectCommandSource(self.CAN_interface, 'None'),
+            smach.StateMachine.add('SELECT_PAUSE',
+                                   SelectMotionMode(self.CAN_interface,
+                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
                                                   'aborted':'MANUAL_ABORTED'})
              
@@ -153,14 +156,14 @@ class ProcessGoal(smach.State):
                         
         return 'valid_goal'
 
-class SelectCommandSource(smach.State):
-    def __init__(self, CAN_interface, source):
+class SelectMotionMode(smach.State):
+    def __init__(self, CAN_interface, motion_mode):
         smach.State.__init__(self, outcomes = ['next', 'aborted'])
         self.CAN_interface = CAN_interface
-        self.command_source = source
+        self.motion_mode = motion_mode
                       
     def execute(self, userdata):
-        self.CAN_interface.select_source(self.command_source)
+        self.CAN_interface.select_mode(self.motion_mode)
         self.CAN_interface.publish_zero()
         return 'next'
                 
@@ -182,7 +185,7 @@ class JoystickListen(smach.State):
     
         self.allow_driving = userdata.allow_driving
         self.allow_manipulator = userdata.allow_manipulator
-        self.callback_outcome = None
+        self.button_outcome = None
  
         #publish the joystick defined twist every 50ms    
         driving_timer = rospy.Timer(rospy.Duration(.05), self.driving_callback)
@@ -194,7 +197,7 @@ class JoystickListen(smach.State):
         
         driving_timer.shutdown()       
                 
-        return self.callback_outcome
+        return self.button_outcome
     
     def driving_callback(self, event):
         
@@ -286,8 +289,9 @@ class ManualPreempted(smach.State):
     def execute(self):
         
         #we are preempted by the top state machine
-        #set command source to None and exit
-        self.CAN_interface.select_source('None')
+        #set motion mode to None and exit
+        self.CAN_interface.select_mode(
+                platform_srv.SelectMotionModeRequest.MODE_PAUSE )
         self.CAN_interface.publish_zero()
         
         return 'complete'
@@ -342,18 +346,18 @@ class JoyState(object):
                                           self.msg.axes[self.joy_params.ANGULAR_Z])
         
         return twist
- 
+
 class CANInterface(object):
     def __init__(self):
-        self.CAN_source_select = \
-                rospy.ServiceProxy("CAN_select_command_source",
-                platform_srv.SelectCommandSource)        
+        self.CAN_select_motion_mode = \
+                rospy.ServiceProxy("CAN_select_motion_mode",
+                platform_srv.SelectMotionMode)
         self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
         self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
         self.servo_command=rospy.Publisher("CAN_servo_command", geometry_msg.Twist)
-    
-    def select_source(self, source):
-        self.CAN_source_select(source)
+
+    def select_mode(self, motion_mode):
+        self.CAN_select_motion_mode(motion_mode)
         
     def publish_joy_state(self, joy_state):
         self.joystick_command.publish(joy_state.get_twist())
