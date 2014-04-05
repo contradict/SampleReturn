@@ -75,6 +75,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   VoiceAnnouncement.msg
+  CameraParams.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -84,7 +85,7 @@ add_message_files(
 #   Service2.srv
 # )
 
-## Generate actions 
+## Generate actions
 #add_action_files(
 #	DIRECTORY action
 #	FILES
