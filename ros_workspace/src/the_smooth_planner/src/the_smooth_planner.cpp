@@ -2,7 +2,6 @@
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
 #include <ecl/geometry/cubic_spline.hpp>
-#include <the_smooth_planner/TheSmoothPlannerMsg.h>
 #include <platform_motion_msgs/Path.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <tf/LinearMath/Quaternion.h>
