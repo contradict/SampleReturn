@@ -3,6 +3,7 @@
 #include <costmap_2d/inflation_layer.h>
 #include <ecl/geometry/cubic_spline.hpp>
 #include <the_smooth_planner/TheSmoothPlannerMsg.h>
+#include <platform_motion_msgs/Path.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
@@ -42,7 +43,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	pose_subscriber = parentNodeHandle.subscribe("SBPLLatticePlanner/plan", 1, &TheSmoothPlanner::setPath, this);
 	odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
 
-	smooth_path_publisher = localNodeHandle.advertise<the_smooth_planner::TheSmoothPlannerMsg>("smooth_path", 1);
+	smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
 	visualization_publisher = localNodeHandle.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 0);
 }
 
@@ -78,11 +79,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	double currentVelocityMagnitude = linearVelocity.norm();
 	double pathVelocityMagnitude = currentVelocityMagnitude;
 
-	the_smooth_planner::TheSmoothPlannerMsg the_smooth_planner_msg;
-	the_smooth_planner_msg.poses.resize(path.poses.size());
-	the_smooth_planner_msg.twists.resize(path.poses.size());
-	the_smooth_planner_msg.header.stamp = timestamp;
-	the_smooth_planner_msg.header.seq = 0;
+	platform_motion_msgs::Path path_msg;
+	path_msg.knots.resize(path.poses.size());
+	path_msg.header.stamp = timestamp;
+	path_msg.header.seq = 0;
 
 	visualization_msgs::MarkerArray visualizationMarkerArray;
 	visualizationMarkerArray.markers.resize(1); // Just a single marker for now
@@ -96,10 +96,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
 	{
-		the_smooth_planner_msg.poses[0].header.stamp = timestamp;
-		the_smooth_planner_msg.poses[0].header.seq = 0;
-		the_smooth_planner_msg.poses[0].pose = path.poses[0].pose;
-		the_smooth_planner_msg.twists[0] = odometry.twist.twist;
+		path_msg.knots[0].header.stamp = timestamp;
+		path_msg.knots[0].header.seq = 0;
+		path_msg.knots[0].pose = path.poses[0].pose;
+		path_msg.knots[0].twist = odometry.twist.twist;
 
 		visualizationMarkerArray.markers[0].header.seq = 0;
 		visualizationMarkerArray.markers[0].header.frame_id = "map";
@@ -175,15 +175,15 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		timestamp.sec += static_cast<int>(delta_time_seconds);
 		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
 
-		the_smooth_planner_msg.poses[i+1].header.seq = i+1;
-		the_smooth_planner_msg.poses[i+1].header.stamp = timestamp;
-		the_smooth_planner_msg.poses[i+1].pose = path.poses[i+1].pose;
-		the_smooth_planner_msg.twists[i+1].linear.x = finalLinearVelocity(0);
-		the_smooth_planner_msg.twists[i+1].linear.y = finalLinearVelocity(1);
-		the_smooth_planner_msg.twists[i+1].linear.z = 0.0;
-		the_smooth_planner_msg.twists[i+1].angular.x = 0.0;
-		the_smooth_planner_msg.twists[i+1].angular.y = 0.0;
-		the_smooth_planner_msg.twists[i+1].angular.z = 0.0;
+		path_msg.knots[i+1].header.seq = i+1;
+		path_msg.knots[i+1].header.stamp = timestamp;
+		path_msg.knots[i+1].pose = path.poses[i+1].pose;
+		path_msg.knots[i+1].twist.linear.x = finalLinearVelocity(0);
+		path_msg.knots[i+1].twist.linear.y = finalLinearVelocity(1);
+		path_msg.knots[i+1].twist.linear.z = 0.0;
+		path_msg.knots[i+1].twist.angular.x = 0.0;
+		path_msg.knots[i+1].twist.angular.y = 0.0;
+		path_msg.knots[i+1].twist.angular.z = 0.0;
 
 		// Store the position for the line strip
 		visualizationMarkerArray.markers[0].points[i+1] = path.poses[i+1].pose.position;
@@ -199,8 +199,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	double targetDecelerationVelocity = 0.0;
 	for (unsigned int i = path.poses.size() - 1; i > 0; --i)
 	{
-		double velocitySquared = (the_smooth_planner_msg.twists[i].linear.x*the_smooth_planner_msg.twists[i].linear.x +
-                                 the_smooth_planner_msg.twists[i].linear.y*the_smooth_planner_msg.twists[i].linear.y);
+		double velocitySquared = (path_msg.knots[i].twist.linear.x*path_msg.knots[i].twist.linear.x +
+                                 path_msg.knots[i].twist.linear.y*path_msg.knots[i].twist.linear.y);
 
 		if (targetDecelerationVelocity*targetDecelerationVelocity >= velocitySquared)
 		{
@@ -208,19 +208,19 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		}
 
 		// Update the velocity for this path point
-		the_smooth_planner_msg.twists[i].linear.x *= targetDecelerationVelocity;
-		the_smooth_planner_msg.twists[i].linear.y *= targetDecelerationVelocity;
+		path_msg.knots[i].twist.linear.x *= targetDecelerationVelocity;
+		path_msg.knots[i].twist.linear.y *= targetDecelerationVelocity;
 		visualizationMarkerArray.markers[0].colors[i].r = 1.0 - targetDecelerationVelocity/maximum_linear_velocity;
 		visualizationMarkerArray.markers[0].colors[i].g = targetDecelerationVelocity/maximum_linear_velocity;
 
-		double delta_time_seconds = (the_smooth_planner_msg.poses[i].header.stamp.sec-the_smooth_planner_msg.poses[i-1].header.stamp.sec) +
-                                    (the_smooth_planner_msg.poses[i].header.stamp.nsec-the_smooth_planner_msg.poses[i-1].header.stamp.nsec)/1000000000.0;
+		double delta_time_seconds = (path_msg.knots[i].header.stamp.sec-path_msg.knots[i-1].header.stamp.sec) +
+                                    (path_msg.knots[i].header.stamp.nsec-path_msg.knots[i-1].header.stamp.nsec)/1000000000.0;
 
 		targetDecelerationVelocity += linear_acceleration*delta_time_seconds;
 	}
 
 	// 6) Publish the_smooth_path and visualization messages
-	smooth_path_publisher.publish(the_smooth_planner_msg);
+	smooth_path_publisher.publish(path_msg);
 	visualization_publisher.publish(visualizationMarkerArray);
 	return;
 }
