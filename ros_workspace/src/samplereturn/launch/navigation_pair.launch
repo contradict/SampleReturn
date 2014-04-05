@@ -6,10 +6,11 @@
     <arg name="left_guid" default="00b09d0100bb69f3"/>
     <arg name="right_guid" default="00b09d0100a85719"/>
     <arg name="strobe" default="false"/>
+    <arg name="machine" default="navigate"/>
 
     <!-- Navigation Nodelet Host process -->
     <node name="manager"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="manager"
@@ -20,7 +21,7 @@
     <!-- IEEE1394 camera driver -->
     <group if="$(arg run_cameras)">
         <node name="left"
-              machine="navigate"
+              machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
               args="load camera1394/driver manager"
@@ -57,7 +58,7 @@
             <remap from="left/camera_params" to="right/camera_params" />
         </node>
         <node name="right"
-              machine="navigate"
+              machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
               args="load camera1394/driver manager"
@@ -98,21 +99,19 @@
         </node>
 
         <!-- emit synchronization error -->
-        <!--
         <node name="image_desync"
-              machine="navigate"
+              machine="$(arg machine)"
               pkg="samplereturn"
               type="image_desync.py"
               ns="/cameras/navigation/$(arg namespace)">
             <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/manager"/>
             <param name="max_desync" type="double" value="0.02"/>
         </node>
-        -->
     </group>
 
     <!-- Debayer -->
     <node name="debayer"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load image_proc/debayer /cameras/navigation/$(arg namespace)/manager"
@@ -120,7 +119,7 @@
           respawn="true">
     </node>
     <node name="debayer"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load image_proc/debayer /cameras/navigation/$(arg namespace)/manager"
@@ -130,7 +129,7 @@
 
     <!-- Rectify images -->
     <node name="rect"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load image_proc/rectify /cameras/navigation/$(arg namespace)/manager"
@@ -139,7 +138,7 @@
           respawn="true">
     </node>
     <node name="rect_color"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load image_proc/rectify /cameras/navigation/$(arg namespace)/manager"
@@ -150,7 +149,7 @@
         <remap from="image_rect" to="image_rect_color"/>
     </node>
     <node name="rect"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load image_proc/rectify /cameras/navigation/$(arg namespace)/manager"
@@ -159,7 +158,7 @@
           respawn="true">
     </node>
     <node name="rect_color"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load image_proc/rectify /cameras/navigation/$(arg namespace)/manager"
@@ -172,7 +171,7 @@
 
     <!-- Compute Stereo -->
     <node name="stereo_image_disparity"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load stereo_image_proc/disparity manager"
@@ -189,7 +188,7 @@
 
     <!-- Compute Stereo Point Cloud -->
     <node name="stereo_image_points"
-          machine="navigate"
+          machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="load stereo_image_proc/point_cloud2 manager"

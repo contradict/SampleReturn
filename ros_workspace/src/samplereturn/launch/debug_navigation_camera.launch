@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="zlizer"/>
+    <arg name="path" default="src"/>
+    <arg name="kind" default="devel"/>
+    <arg name="replay" default="false"/>
+    <arg name="run_cameras" default="true"/>
+
+    <machine name="navigate"
+             address="sr1"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+
+    <machine name="search"
+             address="sr2"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+
+    <include file="$(find samplereturn)/launch/navigation_pair.launch">
+        <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="namespace" value="port"/>
+        <arg name="left_guid" value="00b09d0100a85719"/>
+        <arg name="right_guid" value="00b09d0100bb69f3"/>
+        <arg name="strobe" value="true"/>
+        <arg name="machine" value="search"/>
+    </include>
+
+    <include file="$(find samplereturn)/launch/navigation_pair.launch">
+        <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="namespace" value="center"/>
+        <arg name="left_guid" value="00b09d0100bb69fb"/>
+        <arg name="right_guid" value="00b09d0100bd09ce"/>
+        <arg name="strobe" value="true"/>
+        <arg name="machine" value="navigate"/>
+    </include>
+
+    <include file="$(find samplereturn)/launch/navigation_pair.launch">
+        <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="namespace" value="starboard"/>
+        <arg name="left_guid" value="00b09d0100ca7fdb"/>
+        <arg name="right_guid" value="00b09d0100ca7fd5"/>
+        <arg name="strobe" value="true"/>
+        <arg name="machine" value="navigate"/>
+    </include>
+
+</launch>
