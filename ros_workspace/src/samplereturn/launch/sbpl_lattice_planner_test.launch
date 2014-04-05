@@ -35,7 +35,6 @@
 -->
 
     <include file="$(find samplereturn)/launch/planner_test.launch"/>
-	<include file="$(find samplereturn)/launch/motion.launch"/>
     <include file="$(find samplereturn)/launch/motion.launch"/>
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
 </launch>
