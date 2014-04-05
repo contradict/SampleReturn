@@ -3,8 +3,7 @@
 <launch>
 
 <!-- joy node -->
-<node machine="navigate"
-      respawn="true" 
+<node respawn="true" 
       pkg="joy"
       type="joy_node" 
       name="joy_node"
@@ -14,8 +13,7 @@
     <param name="deadzone" value="0.05" />
 </node>
 
-<node machine="navigate"
-      pkg="platform_motion" 
+<node pkg="platform_motion" 
       type="manual_control_node.py" 
       name="manual_control_node"
       ns="/motion">
@@ -34,13 +32,14 @@
     <param name="LINEAR_EXP" value="2" type="double"/>
     <param name="ANGULAR_SCALE" value="3.14" type="double"/>
     <param name="ANGULAR_EXP" value="2" type="double"/>
+    <!-- Other -->
+    <param name="JOY_TIMEOUT" value="0.5" type="double"/>
 
     <!-- Remaps -->
     <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="grab_action" to="/manipulator/grab_action"/>
     <remap from="twist" to="joystick_command"/>
-    <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="joy" to="/io/joy"/>
 
 </node>

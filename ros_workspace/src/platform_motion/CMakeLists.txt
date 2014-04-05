@@ -10,11 +10,15 @@ find_package(catkin REQUIRED
         message_generation
         actionlib
         tf
+        tf_conversions
+        eigen_conversions
         dynamic_reconfigure
         canopen
-	platform_motion_msgs
-	visual_servo_msgs
-	manipulator_msgs
+	    smach
+        smach_ros
+        platform_motion_msgs
+	    visual_servo_msgs
+	    manipulator_msgs
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -24,6 +28,9 @@ find_package(Eigen REQUIRED)
 # bfl (Bayesian Filtering Library) is a third party package that uses pkg-config
 find_package(PkgConfig)
 pkg_check_modules(BFL REQUIRED orocos-bfl)
+
+# use c++0x
+set( CMAKE_CXX_FLAGS -std=c++0x)
 
 include_directories(${BFL_INCLUDE_DIRS})
 
@@ -103,7 +110,12 @@ target_link_libraries(test_EKF_odometry
     ${catkin_LIBRARIES}
 )
 
-
+add_executable(test_path
+    src/scarytestpath.cpp
+    )
+target_link_libraries(test_path
+    ${catkin_LIBRARIES}
+    )
 
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
     src/acceleration_limit.cpp)
@@ -115,6 +127,8 @@ install(
       teleop
       least_squares_odometry
       EKF_odometry
+      test_path
+
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -123,5 +137,6 @@ install(
 install(
     PROGRAMS
         nodes/carousel_indexer.py
+        nodes/manual_control_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

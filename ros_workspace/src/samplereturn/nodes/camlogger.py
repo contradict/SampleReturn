@@ -9,21 +9,26 @@ import std_msgs.msg as std_msg
 
 paused=False
 
+#This node interfaces with the photo_node.cpp.   It requests images at a specified
+#rate, then publishes the image, image info, and status.
+
 def pause(msg):
     global paused
     paused = msg.data
     rospy.logdebug("paused: %s", paused)
 
-def capture_image():
+def capture_image(s_pub):
   rospy.logdebug("waiting for photo service")
   rospy.wait_for_service('photo_node/capture')
   try:
     rospy.logdebug("requesting photo")
     capture = rospy.ServiceProxy('photo_node/capture', Capture, persistent=True)
     img = capture()
+    s_pub.publish(std_msg.String("Ready"))
     rospy.logdebug("received photo")
     return img.image
   except rospy.ServiceException, e:
+    s_pub.publish(std_msg.String("Error"))
     print "Service Call Failed: %s"%e
 
 def parse_yaml(filename):
@@ -42,10 +47,10 @@ def parse_yaml(filename):
 def camlogger():
   rospy.init_node('camlogger')
 
-  topic = 'cam_img'
-  info_topic = 'cam_info'
-  pub = rospy.Publisher(topic,Image)
-  info_pub = rospy.Publisher(info_topic,CameraInfo)
+  #camera publishers, topic names should be remapped in launch file
+  pub = rospy.Publisher('cam_img',Image)
+  info_pub = rospy.Publisher('cam_info',CameraInfo)
+  status_pub = rospy.Publisher('cam_status',std_msg.String)
 
   rospy.Subscriber('pause_state', std_msg.Bool, pause)
 
@@ -58,13 +63,13 @@ def camlogger():
   cam_info.header.frame_id = frame_id
 
   seq_id = 0
-  rate = rospy.get_param('~rate',1.0)
+  rate = rospy.get_param('~rate', 1.0)
   r = rospy.Rate(rate)
   while not rospy.is_shutdown():
     if not paused:
       now = rospy.Time.now()
 
-      img = capture_image()
+      img = capture_image(status_pub)
       rospy.logdebug("img (%d, %d)", img.width, img.height)
 
       img.header.stamp = now
@@ -77,8 +82,7 @@ def camlogger():
       info_pub.publish(cam_info)
 
       seq_id += 1
-    else:
-        rospy.logdebug("paused")
+    
     r.sleep()
 
 if __name__=="__main__":

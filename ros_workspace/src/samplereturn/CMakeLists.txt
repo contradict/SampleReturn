@@ -37,5 +37,6 @@ install(
        nodes/lights.py
        nodes/announce_voltage.py
        nodes/pause_switch.py
+       nodes/announcer.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

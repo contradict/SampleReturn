@@ -1,3 +1,7 @@
+#include <nav_msgs/Path.h>
+#include <std_msgs/Bool.h>
+#include <platform_motion_msgs/Path.h>
+
 namespace platform_motion{
 
 enum MotionCommandSource {
@@ -19,15 +23,27 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void enable_carousel(bool state = true);
 
     private:
+
+        struct BodySegment
+        {
+            // when a Knot has been transformed into wheel pod local coordinates,
+            // it becomes a BodySegment
+            PodSegment port;
+            PodSegment starboard;
+            PodSegment stern;
+            ros::Time time;
+        };
+
         bool openBus(void);
         void createServos(void);
 
         void plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path);
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
-                const char *joint_name, double *steering, double *speed);
+                Eigen::Vector2d pod_pos, double *steering, double *speed);
         void carouselCallback(const std_msgs::Float64::ConstPtr fmsg);
         void gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr gpio);
         void doHomePods(void);
@@ -50,6 +66,19 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         void statusPublishCallback(const ros::TimerEvent& event);
 
+        // pvt mode
+        void pathToBody( void );
+        BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
+        Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
+        PodSegment pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle);
+        void moreDataNeededCallback(CANOpen::DS301 &node);
+        void errorCallback(CANOpen::DS301 &node);
+
+        void sendPvtSegment(); // send next pvt segment to all wheelpods
+
+        // debug print statement variable. probably shouldn't be committed
+        int m_debugPrintCounter;
+
         ros::NodeHandle nh_;
         ros::NodeHandle param_nh;
 
@@ -62,10 +91,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Subscriber servo_sub;
         ros::Subscriber carousel_sub;
         ros::Subscriber gpio_sub;
+        ros::Subscriber planned_path_sub;
         ros::Publisher gpio_pub;
         ros::Publisher joint_state_pub;
         ros::Publisher battery_voltage_pub;
         ros::Publisher status_pub;
+        ros::Publisher stitchedPath_pub_;
 
         ros::Timer status_publish_timer;
 
@@ -96,6 +127,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
 
+        Eigen::Vector3d port_pos_, starboard_pos_, stern_pos_;
+
         double wheel_diameter;
 
         double center_pt_x, center_pt_y;
@@ -125,6 +158,13 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         Eigen::Vector2d body_pt;
         int pv_counter;
         int joint_seq;
+
+        // pvt mode members
+        bool moreDataSent; // send more data once per sync.
+        bool restartPvt; // need to send 3 segments
+        bool newPathReady;
+        std::list<platform_motion_msgs::Knot> plannedPath;
+        BodySegment firstSegment_, secondSegment_, lastSegmentSent_; // the last segment we actually gave the wheelpods
 };
 
 }

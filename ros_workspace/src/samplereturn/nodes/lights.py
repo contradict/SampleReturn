@@ -3,7 +3,7 @@
 import roslib; roslib.load_manifest('samplereturn')
 import rospy
 
-from platform_motion.msg import GPIO
+from platform_motion_msgs.msg import GPIO
 from std_msgs.msg import Bool
 
 class LightController(object):
