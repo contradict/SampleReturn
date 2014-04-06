@@ -51,6 +51,7 @@ class ManualController(object):
             
             smach.StateMachine.add('SELECT_JOYSTICK',
                                    SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
                                        platform_srv.SelectMotionModeRequest.MODE_JOYSTICK),
                                    transitions = {'next':'JOYSTICK_LISTEN',
                                                  'aborted':'MANUAL_ABORTED'})
@@ -59,11 +60,14 @@ class ManualController(object):
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'SELECT_SERVO',
                                                   'manipulator_grab_requested':'SELECT_PAUSE',
+                                                  'home_wheelpods_requested':'SELECT_HOME',
+                                                  'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
                                                   'aborted':'MANUAL_ABORTED'})           
             
             smach.StateMachine.add('SELECT_SERVO',
                                    SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
                                        platform_srv.SelectMotionModeRequest.MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED'})
@@ -104,6 +108,7 @@ class ManualController(object):
             
             smach.StateMachine.add('SELECT_PAUSE',
                                    SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
                                        platform_srv.SelectMotionModeRequest.MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
                                                   'aborted':'MANUAL_ABORTED'})
@@ -144,8 +149,74 @@ class ManualController(object):
                                     ManualAborted(self.CAN_interface),
                                     transitions = {'recover':'SELECT_JOYSTICK',
                                                    'fail':'aborted'})
-            
-            #end with state_machine     
+
+            smach.StateMachine.add('SELECT_HOME',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_HOME),
+                                   transitions = {'next':'PERFORM_HOME',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            home_goal = platform_msg.HomeGoal()
+            home_goal.home_count = 3
+            smach.StateMachine.add('PERFORM_HOME',
+                                   InterruptibleActionClientState(
+                                       'wheel_pods/home',
+                                       platform_msg.HomeAction,
+                                       home_goal,
+                                       None,
+                                       self.announcer,
+                                       "Home ing unavailable",
+                                       "Home ing",
+                                       30.0,
+                                       "Home ing timed out"),
+                                    transitions = {'complete':'SELECT_JOYSTICK',
+                                                   'canceled':'SELECT_JOYSTICK',
+                                                   'preempted':'MANUAL_PREEMPTED',
+                                                   'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('SELECT_PAUSE_FOR_LOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE),
+                                   transitions = {'next':'SELECT_LOCK',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('SELECT_LOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_LOCK),
+                                   transitions = {'next':'WAIT_FOR_UNLOCK',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('WAIT_FOR_UNLOCK',
+                                    WaitForJoystickButton(
+                                        self.joy_state,
+                                        'BUTTON_LOCK',
+                                        self.announcer,
+                                        ),
+                                    transitions = {'pressed':'SELECT_UNLOCK',
+                                                   'timeout':'SELECT_LOCK',
+                                                   'preempted':'MANUAL_PREEMPTED',
+                                                   }
+                                    )
+
+            smach.StateMachine.add('SELECT_UNLOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_UNLOCK),
+                                   transitions = {'next':'RESUME_FROM_LOCK',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('RESUME_FROM_LOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_RESUME),
+                                   transitions = {'next':'JOYSTICK_LISTEN',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+
+             #end with state_machine
   
         #action server wrapper    
         manual_control_server = smach_ros.ActionServerWrapper(
@@ -209,14 +280,17 @@ class ProcessGoal(smach.State):
         return 'valid_goal'
 
 class SelectMotionMode(smach.State):
-    def __init__(self, CAN_interface, motion_mode):
+    def __init__(self, CAN_interface, announcer, motion_mode):
         smach.State.__init__(self, outcomes = ['next', 'aborted'])
         self.CAN_interface = CAN_interface
+        self.announcer = announcer
         self.motion_mode = motion_mode
                       
     def execute(self, userdata):
         self.CAN_interface.select_mode(self.motion_mode)
         self.CAN_interface.publish_zero()
+        if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_LOCK:
+            self.announcer.say("Wheel lock selected")
         return 'next'
                 
 class JoystickListen(smach.State):
@@ -224,6 +298,8 @@ class JoystickListen(smach.State):
         smach.State.__init__(self,
                              outcomes=['visual_servo_requested',
                                        'manipulator_grab_requested',
+                                       'home_wheelpods_requested',
+                                       'lock_wheelpods_requested',
                                        'preempted',
                                        'aborted'],
                              input_keys=['action_goal', 'allow_driving', 'allow_manipulator'],
@@ -283,6 +359,62 @@ class JoystickListen(smach.State):
                 self.set_outcome( 'lock_wheelpods_requested' )
                 return
             self.CAN_interface.publish_joy_state(self.joy_state)
+
+class WaitForJoystickButton(smach.State):
+    def __init__(self, joy_state, button, announcer, timeout=None):
+        smach.State.__init__(self,
+                             outcomes=['pressed',
+                                       'timeout',
+                                       'preempted',
+                                       ],
+                             )
+
+        self.joy_state = joy_state
+
+        self.button = button
+
+        self.announcer = announcer
+
+        self.timeout = timeout
+
+    def execute(self, userdata):
+        button_state = self.joy_state.button( self.button )
+
+        debounce_count = 5
+
+        debounce = debounce_count
+
+        outcome = None
+
+        timeout = self.timeout
+
+        dt = 0.1
+
+        rate = rospy.Rate( 1./dt )
+        while outcome == None:
+            rate.sleep()
+            new_button_state =  self.joy_state.button( self.button )
+            if new_button_state and not button_state:
+                debounce -= 1
+                if debounce == 0:
+                    outcome = 'pressed'
+            else:
+                debounce = debounce_count
+                button_state = new_button_state
+            if self.preempt_requested():
+                self.outcome = 'preempted'
+            if timeout is not None:
+                timeout -= dt
+                if timeout <= 0:
+                    outcome = 'timeout'
+
+        self.announcer.say( "Release to unlock." )
+
+        while self.joy_state.button(self.button):
+            rate.sleep()
+
+        return outcome
+
 
 class InterruptibleActionClientState(smach.State):
     def __init__(self, actionname, actionspec, goal,
@@ -427,7 +559,7 @@ class JoyState(object):
         if button_index >= len(self.msg.buttons):
             return False #always return false if the requested button is not in the list
         else:
-            return self.msg.buttons[button_index]
+            return bool(self.msg.buttons[button_index])
     
     def scale_axis(self, scale, exponent, value):
         return math.copysign( scale*(abs(value)**exponent), value)
