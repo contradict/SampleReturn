@@ -553,8 +553,8 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
                 // remember where you were for resume and
                 saved_mode = motion_mode;
                 // take care of slowing down
-                handlePause();
                 motion_mode = req.mode;
+                handlePause();
             }
             else
             {
@@ -646,7 +646,7 @@ void Motion::cancelHome( void )
 
 void Motion::handlePause( void )
 {
-    switch(motion_mode)
+    switch(saved_mode)
     {
         case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
             cancelHome();
@@ -657,7 +657,7 @@ void Motion::handlePause( void )
             planToZeroTwist();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
-            // nothing to do, handled by PVT machine
+            primePVT();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             // nothing to do, already here
