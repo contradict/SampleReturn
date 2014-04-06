@@ -1956,10 +1956,10 @@ bool Motion::setSteering( PodSegment &pod, double goal, double dt)
     {
         vprime = std::min( steeringMaxV_, copysign( fabs(pod.steeringVelocity) + dt*steeringAccel_, error ) );
     }
-    double thetaprime = pod.steeringAngle + dt*(pod.steeringVelocity + vprime)/2.;
-    if( fabs(goal - thetaprime) < fabs( error ) )
+    double dtheta = dt*(pod.steeringVelocity + vprime)/2.;
+    if( fabs(dtheta)<error )
     {
-        pod.steeringAngle = thetaprime;
+        pod.steeringAngle += dtheta;
         pod.steeringVelocity = vprime;
     }
     else
