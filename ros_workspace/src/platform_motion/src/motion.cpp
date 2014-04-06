@@ -130,6 +130,7 @@ Motion::Motion() :
 
     stitchedPath_pub_ = nh_.advertise<platform_motion_msgs::Path>("stitched_path", 1);
 
+    motionMode_pub_ = nh_.advertise<platform_motion_msgs::SelectMotionModeResponse>("current_motion_mode", 1, true);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -617,6 +618,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
     }
     ROS_INFO("Selected motion mode %s", motion_mode_string(motion_mode).c_str());
     resp.mode=motion_mode;
+    motionMode_pub_.publish( resp );
     return true;
 }
 

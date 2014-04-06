@@ -100,6 +100,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Publisher battery_voltage_pub;
         ros::Publisher status_pub;
         ros::Publisher stitchedPath_pub_;
+        ros::Publisher motionMode_pub_;
 
         ros::Timer status_publish_timer;
 
