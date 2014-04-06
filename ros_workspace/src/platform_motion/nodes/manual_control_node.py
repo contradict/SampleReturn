@@ -339,12 +339,13 @@ class ManualPreempted(smach.State):
 
 class ManualAborted(smach.State):
     def __init__(self, CAN_interface):
-        smach.State.__init__(self, outcomes=['recover','fail'])
+        smach.State.__init__(self, outcomes=['recover','fail'],
+                output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
         
     def execute(self, userdata):
-        
+        action_result='fail'
         return 'fail'
 
 #classes to handle joystick and CAN interfacing
