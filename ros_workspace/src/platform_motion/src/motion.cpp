@@ -543,12 +543,24 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             motion_mode = req.mode;
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
-            // Can pause from anywhere,
-            // remember where you were for resume and
-            saved_mode = motion_mode;
-            // take care of slowing down
-            handlePause();
-            motion_mode = req.mode;
+            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_HOME ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE)
+            {
+                // remember where you were for resume and
+                saved_mode = motion_mode;
+                // take care of slowing down
+                handlePause();
+                motion_mode = req.mode;
+            }
+            else
+            {
+                ROS_ERROR( "Cannot PAUSE from %s", motion_mode_string(motion_mode).c_str() );
+                return false;
+            }
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME:
             // Can only enter RESUME if we were in PAUSE
