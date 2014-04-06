@@ -248,6 +248,14 @@ void WheelPod::computeSteeringAndVelocity(
 void WheelPod::_setMode(enum PodMode m)
 {
     if(currentMode == m) return;
+
+    if(currentMode == PodPosition)
+    {
+        // if we're leaving pvt mode, clear the pvt buffer on the servo
+        steering.clearPvtBuffer();
+        wheel.clearPvtBuffer();
+    }
+
     switch(m) {
         case PodPosition:
             steering.setPvtAbsolute();
