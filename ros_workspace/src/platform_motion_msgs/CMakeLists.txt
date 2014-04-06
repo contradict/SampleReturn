@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   actionlib_msgs
   geometry_msgs
+  std_msgs
   message_generation
 )
 
@@ -77,6 +78,9 @@ add_message_files(
     FILES
         GPIO.msg
         ServoStatus.msg
+        ScaryTestMode.msg
+        Knot.msg
+        Path.msg
 )
 
 # services
@@ -84,7 +88,7 @@ add_service_files(
     DIRECTORY srv
     FILES
         Enable.srv
-        SelectCommandSource.srv
+        SelectMotionMode.srv
 )
 
 # actions
@@ -93,6 +97,7 @@ add_action_files(
     FILES
         Home.action
         SelectCarouselBin.action
+        ManualControl.action
 )
 
 generate_messages(

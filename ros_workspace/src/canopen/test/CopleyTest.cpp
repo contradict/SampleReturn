@@ -39,7 +39,8 @@ enum ToolOperation {
     SetVelocity,
     SetPosition,
     GPIOMode,
-    GPIOValue
+    GPIOValue,
+    PvtMode
 };
 
 
@@ -60,7 +61,7 @@ int main(int argc, char * argv[])
         po::options_description operation("Operation Options");
         operation.add_options()
             ("operation,o", po::value<std::string>()->default_value("monitor"),
-             "monitor|home|sync|nosync|enable|velocity|postion")
+             "monitor|home|sync|nosync|enable|velocity|postion|pvt")
             ("sync-interval,s", po::value<float>()->default_value(0.0),
              "floating-point seconds")
             ("velocity,v", po::value<int32_t>()->default_value(0),
@@ -127,6 +128,8 @@ int main(int argc, char * argv[])
         op = GPIOMode;
     } else if(opstr.compare("gpiovalue") == 0){
         op = GPIOValue;
+    } else if(opstr.compare("pvt") == 0){
+        op = PvtMode;
     } else {
         std::cout << "Unknown operation: " << opstr << std::endl;
         return 1;
@@ -169,7 +172,7 @@ int main(int argc, char * argv[])
     pfd[0].events = POLLIN | POLLOUT;
     pfd[1].fd = STDIN_FILENO;
     pfd[1].events = POLLIN;
-    int ret;
+    int ret = 0;
     bool keepgoing=true;
     bool opdone=false;
     int32_t velocity, position;
@@ -198,6 +201,13 @@ int main(int argc, char * argv[])
                 }
             }
         }
+
+        if(servo.getLastError() != "")
+        {
+            std::cout << servo.getLastError() << std::endl << servo.getPvtBufferDepth() << std::endl;
+            servo.resetLastError();
+        }
+
         if(servo.ready() && !opdone ) {
             switch(op){
                 case Monitor:
@@ -234,6 +244,45 @@ int main(int argc, char * argv[])
                     servo.outputPinFunction(3, Manual,
                                             std::vector<uint8_t>(), false);
                     servo.output(pin_value&0x03, (~pin_value)&0x03);
+                    break;
+                case PvtMode:
+                    // currently hard coded for wheels! do not run on steering!
+                    std::cout << "enabling servo" << std::endl;
+                    servo.mode(InterpolatedPosition);
+                    servo.enable();
+                    servo.setPvtRelative();
+                    std::cout << "starting pvt move" << std::endl;
+                    servo.startPvtMove();
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(0, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 50000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(1250, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(0, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, -100000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, -100000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, -100000, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(-2500, 0, 250);
+                    std::cout << "sending pvt segment" << std::endl;
+                    servo.addPvtSegment(0, 0, 250);
                     break;
             }
             opdone=true;

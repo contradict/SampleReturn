@@ -14,7 +14,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion_msgs/HomeAction.h>
 #include <platform_motion_msgs/Enable.h>
-#include <platform_motion_msgs/SelectCommandSource.h>
+#include <platform_motion_msgs/SelectMotionMode.h>
 #include <platform_motion_msgs/GPIO.h>
 
 #include <canlib.h>

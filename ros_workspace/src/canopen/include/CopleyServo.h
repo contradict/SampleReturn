@@ -90,7 +90,27 @@ enum OutputPinFunction {
 #define STATUS_RESERVED_IP13     0x2000
 #define STATUS_PERFORMING_MOVE   0x4000
 #define STATUS_RESERVED_15       0x8000
- 
+
+#define PVT_SEQUENCE_ERROR       0x01
+#define PVT_BUFFER_UNDERFLOW     0x02
+#define PVT_BUFFER_OVERFLOW      0x04
+#define PVT_BUFFER_EMPTY         0x80
+#define PVT_GOT_ERROR            0x8f // was there any kind of error?
+
+// pvt control headers. the segment header needs to be computed
+#define PVT_HEADER_CLEAR_BUFFER  0x80
+#define PVT_HEADER_POP_BUFFER    0x81
+#define PVT_HEADER_CLEAR_ERRORS  0x82
+#define PVT_HEADER_RESET_SEGMENT_ID 0x83
+#define PVT_HEADER_SEQUENCE_MASK 0x0007
+
+// the more data needed callback will fire if the number of buffer segments
+// is less than or equal to this
+#define PVT_MINIMUM_SEGMENTS 3
+
+// from the documentation:
+#define PVT_NUM_BUFFER_SLOTS 32
+
 class CopleyServo : public DS301 {
     public:
         CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus);
@@ -108,10 +128,28 @@ class CopleyServo : public DS301 {
         bool enabled(void);
 
         void home(DS301CallbackObject callback=DS301CallbackObject());
+        void cancelHome();
 
         void setVelocity(int32_t v);
         void setPosition(int32_t p, DS301CallbackObject
                 callback=DS301CallbackObject() );
+
+        // pvt mode methods
+        void clearPvtBuffer(); // when starting a new maneuver.
+        // absolute or relative positioning for pvt mode?
+        void setPvtAbsolute() {m_isAbsolute = true;}
+        void setPvtRelative() {m_isAbsolute = false;}
+        // addPvtSegment will add the segment to the buffer
+        // set lastInSequence to true if this is the last segment in a
+        // sequence. this will cause an extra zero duration sequence to be
+        // created to ensure you actually get to the last position
+        void addPvtSegment(int32_t position, int32_t velocity, uint8_t duration, bool lastInSequence=false);
+        void startPvtMove(); // flips the control bit to start a pvt move
+        // stops a pvt move in duration milliseconds.
+        // if emergency is true, it flips the control word bit that disables
+        // pvt mode until you call startPvtMove again
+        void stopPvtMove(uint8_t duration, bool emergency=false);
+        int getPvtBufferDepth(); // how many things are in the pvt buffer?
 
         enum OperationMode operationMode(uint8_t m);
         static enum OperationMode operationMode(std::string m);
@@ -159,6 +197,8 @@ class CopleyServo : public DS301 {
         void setPVCallback(DS301CallbackObject cb);
         void setEMCYCallback(DS301CallbackObject cb);
         void setStatusCallback(DS301CallbackObject cb);
+        void setErrorCallback(DS301CallbackObject cb);
+        void setMoreDataNeededCallback(DS301CallbackObject cb);
 
         uint16_t getInputPins(void){return input_pins;};
         uint16_t getOutputPins(void){return output_pins;};
@@ -166,6 +206,11 @@ class CopleyServo : public DS301 {
 
         void writeMode(std::ostream &out);
         void writeStatus(std::ostream &out);
+
+        std::string getLastError() {return m_lastErrorMessage;}
+        void resetLastError() {m_lastErrorMessage = "";}
+
+        bool getNeedsToStart() {return ((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) >= PVT_MINIMUM_SEGMENTS) && !m_pvtModeActive;}
 
         int32_t position;
         int32_t velocity;
@@ -189,6 +234,23 @@ class CopleyServo : public DS301 {
         void _setPositionValue(PDO &pdo);
         void _positionGo(PDO &pdo);
 
+        // a struct for keeping track of pvt segments.
+        struct PvtSegment
+        {
+            uint16_t id;
+            int32_t position;
+            int32_t velocity;
+            uint8_t time;
+        };
+
+        // internal pvt methods
+        void handlePvtError(uint8_t statusByte);
+        void handlePvtSegmentConsumed(); // if we have waiting segments, add them
+        void clearPvtError(uint8_t errorFlags);
+        void popPvtBuffer(uint8_t numToPop);
+        void resetSegmentId();
+        bool sendPvtSegment(PvtSegment &segment); // send the segment
+
         std::tr1::shared_ptr<SYNC> sync;
         std::tr1::shared_ptr<EMCY> emcy;
 
@@ -199,6 +261,7 @@ class CopleyServo : public DS301 {
         std::tr1::shared_ptr<RPDO> control_mode_pdo;
         std::tr1::shared_ptr<RPDO> position_pdo;
         std::tr1::shared_ptr<RPDO> velocity_pdo;
+        std::tr1::shared_ptr<RPDO> pvt_pdo;
 
         DS301CallbackObject home_callback;
         DS301CallbackObject position_callback;
@@ -206,6 +269,8 @@ class CopleyServo : public DS301 {
         DS301CallbackObject enable_callback;
         DS301CallbackObject status_callback;
         DS301CallbackObject emcy_callback;
+        DS301CallbackObject error_callback;
+        DS301CallbackObject more_data_needed_callback;;
         InputChangeCallback input_callback;
 
         bool syncProducer;
@@ -219,6 +284,16 @@ class CopleyServo : public DS301 {
         uint16_t control_word;
         enum OperationMode mode_of_operation;
 
+        // members for PVT mode
+        bool m_isAbsolute; // are positions absolute or relative?
+        uint16_t m_currentSegmentId; // a counter
+        uint16_t m_expectedSegmentId; // given by buffer status pdo
+        uint8_t m_freeBufferSlots; // as reported by status pdo
+        int  m_expectedFreeBufferSlots; // predict how many will be free next pdo
+        uint8_t m_pvtStatusByte;    // given by buffer statud pdo
+        std::string m_lastErrorMessage; // for logging the last error
+        std::list<PvtSegment> m_activeSegments; // segments recently sent/to be sent
+        bool m_pvtModeActive; // are we in pvt mode?
 };
 
 }

@@ -7,9 +7,8 @@
         machine="navigate"
         pkg="sound_play"
         type="soundplay_node.py"
-        ns="/io/audio"
-        >
-        <remap from="robotsound" to="navigate"/>
+        ns="/io/audio">
+        <remap from="robotsound" to="navigate_soundplay"/>
     </node>
 
     <node
@@ -17,9 +16,31 @@
         machine="search"
         pkg="sound_play"
         type="soundplay_node.py"
-        ns="/io/audio"
-        >
-        <remap from="robotsound" to="search"/>
+        ns="/io/audio">
+        <remap from="robotsound" to="search_soundplay"/>
+    </node>
+
+    <!--The nodes below queue and handle announcements from other
+        nodes.  They send the announcements to the nodes above-->
+
+    <node
+        name="navigate_announcer"
+        machine="navigate"
+        pkg="samplereturn"
+        type="announcer.py"
+        ns="/io/audio">
+        <remap from="audio_in" to="navigate"/>
+        <remap from="audio_out" to="navigate_soundplay"/>
+    </node>
+
+    <node
+        name="search_announcer"
+        machine="search"
+        pkg="samplereturn"
+        type="announcer.py"
+        ns="/io/audio">
+        <remap from="audio_in" to="search"/>
+        <remap from="audio_out" to="search_soundplay"/>
     </node>
 
     <node
@@ -28,10 +49,7 @@
         pkg="samplereturn"
         type="announce_voltage.py"
         ns="/io">
-        <param name="voice" type="string" value="kal_diphone"/>
         <param name="lowVoltageLimit" type="double" value="49"/>
-
         <remap from="audio_navigate" to="audio/navigate"/>
-              
     </node>
 </launch>
