@@ -1457,6 +1457,7 @@ void Motion::primePVT(void)
             (starboard->getMinBufferDepth() < 3) ||
             (stern->getMinBufferDepth() < 3))
     {
+        ROS_ERROR( "Restart needed" );
         restartPvt = true;
         sendPvtSegment();
     }
@@ -1476,8 +1477,10 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 
         // send the next segment
         sendPvtSegment();
+        ROS_ERROR( "Send one" );
         if(restartPvt)
         {
+            ROS_ERROR( "Send two more" );
             sendPvtSegment();
             sendPvtSegment();
             restartPvt = false;
@@ -1883,6 +1886,10 @@ void Motion::sendPvtSegment()
     {
         pvtToUnlock();
     }
+    else
+    {
+        ROS_ERROR( "Not sending PVT from mode %s", motion_mode_string( motion_mode ).c_str() );
+    }
 }
 
 double decelWheel( double xdot, double a, double dt, double *dx )
@@ -1905,6 +1912,7 @@ double decelSteering( double thetadot, double a, double dt, double *theta )
 
 void Motion::pvtToZero( void )
 {
+    ROS_ERROR( "Zeroing" );
     lastSegmentSent_.time += ros::Duration(0.250);
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
@@ -1913,6 +1921,7 @@ void Motion::pvtToZero( void )
         lastSegmentSent_.starboard.wheelVelocity > 0 ||
         lastSegmentSent_.stern.wheelVelocity > 0 )
     {
+        ROS_ERROR( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
         lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
         lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
         lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
@@ -1960,6 +1969,7 @@ bool Motion::setSteering( PodSegment &pod, double goal, double dt)
 
 void Motion::pvtToLock( void )
 {
+    ROS_ERROR( "Locking" );
     lastSegmentSent_.time += ros::Duration(0.250);
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
@@ -1974,6 +1984,7 @@ void Motion::pvtToLock( void )
 
 void Motion::pvtToUnlock( void )
 {
+    ROS_ERROR( "Unlocking" );
     lastSegmentSent_.time += ros::Duration(0.250);
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
