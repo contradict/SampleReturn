@@ -87,6 +87,7 @@ class image_desync(object):
 
         self.check_interval    = rospy.get_param("~check_interval",     1.0)
         self.max_desync        = rospy.get_param("~max_desync",         0.10)
+        self.desync_offset     = rospy.get_param("~desync_offset", -0.030)
         self.max_desync_count  = rospy.get_param("~max_desync_count",  10)
         self.max_missing_count = rospy.get_param("~max_missing_count", 10)
         self.startup_delay     = rospy.get_param("~startup_delay", 60)
@@ -121,9 +122,9 @@ class image_desync(object):
            self.timestamps[name].pop(0)
         if name=='left' and all([len(x)==2 for x in self.timestamps.itervalues()]):
             delta1 = (self.timestamps['left'][0] -
-                    self.timestamps['right'][1]).to_sec()
+                    self.timestamps['right'][1]).to_sec() + self.desync_offset
             delta2 = (self.timestamps['left'][1] -
-                self.timestamps['right'][1]).to_sec()
+                self.timestamps['right'][1]).to_sec() + self.desync_offset
             if abs(delta1)<abs(delta2):
                 delta = delta1
             else:
