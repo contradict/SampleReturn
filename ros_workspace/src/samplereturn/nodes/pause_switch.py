@@ -4,7 +4,7 @@ import sys
 sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 from samplereturn_msgs.msg import VoiceAnnouncement
 from platform_motion_msgs.msg import GPIO, ServoStatus
-from platform_motion_msgs.srv import SelectMotionMode, SelectMotionModeRequest
+from platform_motion_msgs.srv import SelectMotionMode, SelectMotionModeRequest, SelectMotionModeResponse
 from platform_motion_msgs.srv import Enable
 from std_msgs.msg import Bool
 from samplereturn.util import wait_for_rosout
@@ -36,6 +36,7 @@ class PauseSwitch(object):
         self.manipulator_pause_service = rospy.ServiceProxy('manipulator_pause', Enable)
         rospy.Subscriber("gpio_read", GPIO, self.gpio)
         rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
+        rospy.Subscriber("current_motion_mode", SelectMotionModeResponse, self.motion_mode_update)
 
         self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True)
         self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement)
@@ -80,6 +81,12 @@ class PauseSwitch(object):
                 ("Switch On Disabled" not in status_word.status)
         rospy.logdebug("carousel: %s, wheelpods: %s", self.carousel_servo_status,
                 self.wheelpod_servo_status)
+
+    def motion_mode_update(self, moderesponse):
+        newmode = moderesponse.mode
+        if not self.paused and newmode == SelectMotionModeRequest.MODE_PAUSE:
+            self.set_pause_state( True )
+            self.announce_pause_state()
 
     def say(self, utterance):
         msg = VoiceAnnouncement()
