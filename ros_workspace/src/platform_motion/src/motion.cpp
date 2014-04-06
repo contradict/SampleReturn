@@ -537,10 +537,13 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
         case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
         case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
-        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
             // These states can be entered from anywhere you can get out of
             // and need to take no immediate action
             motion_mode = req.mode;
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            motion_mode = req.mode;
+            primePVT();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_HOME ||
