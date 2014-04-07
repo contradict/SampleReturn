@@ -747,6 +747,7 @@ void CopleyServo::clearPvtBuffer()
     m_activeSegments.clear();
     // we now expect that all the buffer slots will be free.
     m_expectedFreeBufferSlots = 32;
+    m_freeBufferSlots = 32;
 }
 
 void CopleyServo::resetSegmentId()
