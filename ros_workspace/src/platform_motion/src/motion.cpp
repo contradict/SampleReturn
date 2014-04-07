@@ -761,20 +761,26 @@ void Motion::handleUnlock( void )
 
 void Motion::driveToLock( void )
 {
-    port->drive( portSteeringLock_, 0.0 );
-    starboard->drive( starboardSteeringLock_, 0.0 );
-    stern->drive( sternSteeringLock_, 0.0 );
-    while( !targetReached_ && ros::ok())
+    do
+    {
+        port->drive( portSteeringLock_, 0.0 );
+        starboard->drive( starboardSteeringLock_, 0.0 );
+        stern->drive( sternSteeringLock_, 0.0 );
         ros::Duration(0.1).sleep();
+    }
+    while( !targetReached_ && ros::ok());
 }
 
 void Motion::driveToUnLock( void )
 {
-    port->drive( 0.0, 0.0 );
-    starboard->drive( 0.0, 0.0 );
-    stern->drive( 0.0, 0.0 );
-    while( !targetReached_ && ros::ok())
+    do
+    {
+        port->drive( 0.0, 0.0 );
+        starboard->drive( 0.0, 0.0 );
+        stern->drive( 0.0, 0.0 );
         ros::Duration(0.1).sleep();
+    }
+    while( !targetReached_ && ros::ok());
     // Move back to PAUSE
     motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE;
 }
@@ -1284,11 +1290,12 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status_pub.publish(status);
 
     bool this_reached = ( (svo->getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED );
-    if( svo->node_id == 2 )
+    if( svo->node_id == stern->steering.node_id )
     {
         targetReached_ = this_reached;
     }
-    else if( svo->node_id > 2 )
+    else if( svo->node_id == starboard->steering.node_id ||
+             svo->node_id == port->steering.node_id )
     {
         targetReached_ &= this_reached;
     }
