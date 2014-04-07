@@ -95,8 +95,8 @@ Motion::Motion() :
     param_nh.param("plan_to_zero_decel", planToZeroDecel_, 2.0);
     param_nh.param("plan_to_zero_period", planToZeroPeriod_, 0.050);
 
-    param_nh.param("port_steering_lock", portSteeringLock_, -2.*M_PI/3.);
-    param_nh.param("starboard_steering_lock", starboardSteeringLock_, 2.*M_PI/3.);
+    param_nh.param("port_steering_lock", portSteeringLock_, M_PI/3.);
+    param_nh.param("starboard_steering_lock", starboardSteeringLock_, -M_PI/3.);
     param_nh.param("stern_steering_lock", sternSteeringLock_, 0.0);
 
     param_nh.param("steering_tolerance", steeringTolerance_, 0.01);
