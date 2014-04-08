@@ -1922,7 +1922,6 @@ double decelSteering( double thetadot, double a, double dt, double *theta )
 
 void Motion::pvtToZero( void )
 {
-    ROS_ERROR( "Zeroing" );
     lastSegmentSent_.time += ros::Duration(0.250);
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
@@ -1942,6 +1941,11 @@ void Motion::pvtToZero( void )
     port->move(lastSegmentSent_.port);
     starboard->move(lastSegmentSent_.starboard);
     stern->move(lastSegmentSent_.stern);
+    ROS_DEBUG( "Zeroing: %f %f %f %f %f %f",
+            lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
+            lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
+            lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
 }
 
 bool Motion::setSteering( PodSegment &pod, double goal, double dt)
@@ -1979,7 +1983,6 @@ bool Motion::setSteering( PodSegment &pod, double goal, double dt)
 
 void Motion::pvtToLock( void )
 {
-    ROS_ERROR( "Locking" );
     lastSegmentSent_.time += ros::Duration(0.250);
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
@@ -1990,11 +1993,15 @@ void Motion::pvtToLock( void )
     port->move(lastSegmentSent_.port);
     starboard->move(lastSegmentSent_.starboard);
     stern->move(lastSegmentSent_.stern);
+    ROS_DEBUG( "Locking: %f %f %f %f %f %f",
+            lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
+            lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
+            lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
 }
 
 void Motion::pvtToUnlock( void )
 {
-    ROS_ERROR( "Unlocking" );
     lastSegmentSent_.time += ros::Duration(0.250);
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
@@ -2011,6 +2018,11 @@ void Motion::pvtToUnlock( void )
     port->move(lastSegmentSent_.port);
     starboard->move(lastSegmentSent_.starboard);
     stern->move(lastSegmentSent_.stern);
+    ROS_DEBUG( "Unlocking: %f %f %f %f %f %f",
+            lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
+            lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
+            lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
 }
 
 }
