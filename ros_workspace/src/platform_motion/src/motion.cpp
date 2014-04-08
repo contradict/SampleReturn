@@ -1479,7 +1479,7 @@ void Motion::primePVT(void)
             (starboard->getMinBufferDepth() < 3) ||
             (stern->getMinBufferDepth() < 3))
     {
-        ROS_ERROR( "Restart needed" );
+        ROS_DEBUG( "Restart needed" );
         restartPvt = true;
         sendPvtSegment();
     }
@@ -1499,10 +1499,8 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 
         // send the next segment
         sendPvtSegment();
-        ROS_ERROR( "Send one" );
         if(restartPvt)
         {
-            ROS_ERROR( "Send two more" );
             sendPvtSegment();
             sendPvtSegment();
             restartPvt = false;
@@ -1942,7 +1940,7 @@ void Motion::pvtToZero( void )
         lastSegmentSent_.starboard.wheelVelocity > 0 ||
         lastSegmentSent_.stern.wheelVelocity > 0 )
     {
-        ROS_ERROR( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
+        ROS_DEBUG( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
         lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
         lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
         lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
