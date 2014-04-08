@@ -55,10 +55,11 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void planToZeroTwist( void );
         void driveToLock( void );
         void handleLock( void );
+        void waitForLockCond( void );
         void pvtToZero( void );
         void pvtToLock( void );
         void pvtToUnlock( void );
-        void setSteering( PodSegment &pod, double goal, double dt);
+        bool setSteering( PodSegment &pod, double goal, double dt);
         void podEnableStateChange(CANOpen::DS301 &node);
         void carouselEnableStateChange(CANOpen::DS301 &node);
         void pvCallback(CANOpen::DS301 &node);
@@ -78,6 +79,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void errorCallback(CANOpen::DS301 &node);
 
         void sendPvtSegment(); // send next pvt segment to all wheelpods
+        void primePVT(void);
 
         // debug print statement variable. probably shouldn't be committed
         int m_debugPrintCounter;
@@ -128,6 +130,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::ServiceServer motion_mode_server;
         int motion_mode, saved_mode;
 
+        boost::mutex lock_state_mutex_;
+        boost::condition_variable lock_state_cond_;
+
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
 
@@ -163,6 +168,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool desired_pod_state;
         bool carousel_enabled;
         bool desired_carousel_state;
+        bool targetReached_;
 
         Eigen::Vector2d body_pt;
         int pv_counter;
