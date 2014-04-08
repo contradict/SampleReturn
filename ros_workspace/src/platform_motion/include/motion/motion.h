@@ -55,6 +55,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void planToZeroTwist( void );
         void driveToLock( void );
         void handleLock( void );
+        void waitForLockCond( void );
         void pvtToZero( void );
         void pvtToLock( void );
         void pvtToUnlock( void );
@@ -128,6 +129,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         ros::ServiceServer motion_mode_server;
         int motion_mode, saved_mode;
+
+        boost::mutex lock_state_mutex_;
+        boost::condition_variable lock_state_cond_;
 
         std::tr1::shared_ptr<WheelPod> port, starboard, stern;
         std::tr1::shared_ptr<CANOpen::CopleyServo> carousel;
