@@ -10,7 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   cv_bridge
-  dynamic_reconfigure)
+  dynamic_reconfigure
+  Eigen)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -107,6 +108,10 @@ add_library(BMS
 add_library(saliency_detector_core
   src/saliency_detector_core.cpp
  )
+
+add_library(color_naming
+  src/color_naming.cpp
+)
 
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
