@@ -1497,7 +1497,6 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         {
             ROS_DEBUG("Send priming segment");
             sendPvtSegment();
-            sendPvtSegment();
             restartPvt = false;
         }
     }
@@ -1864,6 +1863,7 @@ void Motion::sendPvtSegment()
     {
         if( plannedPath.size() > 0 )
         {
+            ROS_INFO( "Clearing path in pause" );
             plannedPath.clear();
         }
         pvtToZero();
