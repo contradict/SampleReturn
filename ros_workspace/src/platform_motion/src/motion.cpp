@@ -1145,13 +1145,19 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
         {
             // if all the wheel pods are ready to go, tell them to start
             // moving. this means they should all start at the same time!
-            ROS_DEBUG("Start moving %d %d %d %d %d %d",
+            ROS_DEBUG("Start moving %d %d %d %d %d %d %d %d %d %d %d %d",
                     port->wheel.getPvtBufferDepth(),
+                    port->wheel.getPvtActive(),
                     port->steering.getPvtBufferDepth(),
+                    port->steering.getPvtActive(),
                     starboard->wheel.getPvtBufferDepth(),
+                    starboard->wheel.getPvtActive(),
                     starboard->steering.getPvtBufferDepth(),
+                    starboard->steering.getPvtActive(),
                     stern->wheel.getPvtBufferDepth(),
-                    stern->steering.getPvtBufferDepth()
+                    stern->wheel.getPvtActive(),
+                    stern->steering.getPvtBufferDepth(),
+                    stern->steering.getPvtActive()
                     );
             port->startMoving();
             starboard->startMoving();
