@@ -1380,10 +1380,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         else if(plannedPath.size() > 0)
         {
             // append at end of present path
-            // if there are more segments than just the safety, drop the safety segment
             ROS_DEBUG("Append to existing path");
-            if(plannedPath.size() > 1 )
-                plannedPath.pop_back();
             platform_motion_msgs::Knot k = plannedPath.back();
             tf::quaternionMsgToEigen( k.pose.orientation, rotation );
             tf::pointMsgToEigen( k.pose.position, translation );
@@ -1440,18 +1437,6 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             plannedPath.push_back( k );
         }
     }
-
-    // add a "safety" segment to the very end that will stop the robot
-    // one second after the end of the path. this seems like a good thing
-    platform_motion_msgs::Knot lastPose = plannedPath.back();
-    lastPose.header.stamp += ros::Duration(1.0);
-    lastPose.twist.linear.x = 0;
-    lastPose.twist.linear.y = 0;
-    lastPose.twist.linear.z = 0;
-    lastPose.twist.angular.x = 0;
-    lastPose.twist.angular.y = 0;
-    lastPose.twist.angular.z = 0;
-    plannedPath.push_back(lastPose);
 
     // publish stitched path for visualization
     if( stitchedPath_pub_.getNumSubscribers() > 0 )
@@ -1732,8 +1717,6 @@ void Motion::sendPvtSegment()
     // have to change.
     if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT )
     {
-        BodySegment newSegment;
-
         if( newPathReady )
         {
             if( lastSegmentSent_.time == ros::Time(0) )
@@ -1768,6 +1751,8 @@ void Motion::sendPvtSegment()
             ros::Time now=lastSegmentSent_.time+ros::Duration(lastSegmentSent_.port.duration);
 
             ROS_DEBUG_STREAM("first: " << firstSegment_.time << " second: " << secondSegment_.time << " now: ");
+
+            BodySegment newSegment;
 
             if(now < firstSegment_.time)
             {
@@ -1827,63 +1812,41 @@ void Motion::sendPvtSegment()
 
             newSegment.time = now;
 
+            // make sure the durations are all less than or equal to .255!!
+            double minDuration =
+                std::min( 0.250,
+                        std::min(newSegment.port.duration,
+                            std::min(newSegment.starboard.duration, newSegment.stern.duration)));
+
+            double maxDuration =
+                std::max(newSegment.port.duration,
+                        std::max(newSegment.starboard.duration, newSegment.stern.duration));
+            if( maxDuration > 0.255 )
+            {
+                ROS_DEBUG("Clipping duration");
+                newSegment.port.duration = minDuration;
+                newSegment.starboard.duration = minDuration;
+                newSegment.stern.duration = minDuration;
+            }
+
+            ROS_DEBUG_STREAM("newSegment.time: " << newSegment.time );
+            ROS_DEBUG("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
+            ROS_DEBUG("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
+            ROS_DEBUG("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
+
+            // now just send the new segment, whatever it was.
+            port->move(newSegment.port);
+            starboard->move(newSegment.starboard);
+            stern->move(newSegment.stern);
+
+            lastSegmentSent_ = newSegment;
         }
         else
         {
             ROS_DEBUG("out of path segments, sending zeros");
-
-            // if there is no path to follow, keep the buffers full of zeros
-            // this means we're constantly actually filling the buffer and
-            // don't have to worry about it being empty. that seems like
-            // a good thing.
-            // we'll just give all the wheel pods the same segment.
-
-            PodSegment segment;
-            segment.steeringAngle = 0.0;
-            segment.steeringVelocity = 0.0;
-            segment.wheelDistance = 0.0;
-            segment.wheelVelocity = 0.0;
-            segment.duration = .25;
-
-            // reset the steering angle for each pod so we don't move the
-            // steering.
-            segment.steeringAngle = lastSegmentSent_.port.steeringAngle;
-            newSegment.port = segment;
-            segment.steeringAngle = lastSegmentSent_.starboard.steeringAngle;
-            newSegment.starboard = segment;
-            segment.steeringAngle = lastSegmentSent_.stern.steeringAngle;
-            newSegment.stern = segment;
-            newSegment.time = lastSegmentSent_.time + ros::Duration(lastSegmentSent_.port.duration);
+            pvtToZero();
         }
 
-        // make sure the durations are all less than or equal to .255!!
-        double minDuration =
-            std::min( 0.250,
-                 std::min(newSegment.port.duration,
-                     std::min(newSegment.starboard.duration, newSegment.stern.duration)));
-
-        double maxDuration =
-                 std::max(newSegment.port.duration,
-                     std::max(newSegment.starboard.duration, newSegment.stern.duration));
-        if( maxDuration > 0.255 )
-        {
-            ROS_DEBUG("Clipping duration");
-            newSegment.port.duration = minDuration;
-            newSegment.starboard.duration = minDuration;
-            newSegment.stern.duration = minDuration;
-        }
-
-        ROS_DEBUG_STREAM("newSegment.time: " << newSegment.time );
-        ROS_DEBUG("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
-        ROS_DEBUG("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
-        ROS_DEBUG("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
-
-        // now just send the new segment, whatever it was.
-        port->move(newSegment.port);
-        starboard->move(newSegment.starboard);
-        stern->move(newSegment.stern);
-
-        lastSegmentSent_ = newSegment;
     }
     else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE )
     {
