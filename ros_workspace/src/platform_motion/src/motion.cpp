@@ -1145,6 +1145,14 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
         {
             // if all the wheel pods are ready to go, tell them to start
             // moving. this means they should all start at the same time!
+            ROS_DEBUG("Start moving %d %d %d %d %d %d",
+                    port->wheel.getPvtBufferDepth(),
+                    port->steering.getPvtBufferDepth(),
+                    starboard->wheel.getPvtBufferDepth(),
+                    starboard->steering.getPvtBufferDepth(),
+                    stern->wheel.getPvtBufferDepth(),
+                    stern->steering.getPvtBufferDepth()
+                    );
             port->startMoving();
             starboard->startMoving();
             stern->startMoving();
@@ -1478,6 +1486,7 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
     // all the servos as soon as one says it needs more
     if(!this->moreDataSent)
     {
+        ROS_DEBUG("More data needed %ld", node.node_id);
         // set the flag so we don't send data for every callback call this
         // sync fame
         this->moreDataSent = true;
@@ -1486,6 +1495,7 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         sendPvtSegment();
         if(restartPvt)
         {
+            ROS_DEBUG("Send priming segment");
             sendPvtSegment();
             sendPvtSegment();
             restartPvt = false;
@@ -1854,6 +1864,7 @@ void Motion::sendPvtSegment()
     {
         if( plannedPath.size() > 0 )
         {
+            ROS_INFO( "Clearing path in pause" );
             plannedPath.clear();
         }
         pvtToZero();
