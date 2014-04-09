@@ -1497,7 +1497,6 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         {
             ROS_DEBUG("Send priming segment");
             sendPvtSegment();
-            sendPvtSegment();
             restartPvt = false;
         }
     }
