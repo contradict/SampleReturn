@@ -1852,6 +1852,10 @@ void Motion::sendPvtSegment()
     }
     else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE )
     {
+        if( plannedPath.size() > 0 )
+        {
+            plannedPath.clear();
+        }
         pvtToZero();
     }
     else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK )
