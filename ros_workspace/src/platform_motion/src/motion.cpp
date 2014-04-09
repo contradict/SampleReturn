@@ -1766,7 +1766,9 @@ void Motion::sendPvtSegment()
             else if(now>secondSegment_.time)
             {
                 ROS_ERROR("past second");
-                return;
+                plannedPath.clear();
+                firstSegment_ = secondSegment_;
+                pvtToZero();
             }
             else
             {
