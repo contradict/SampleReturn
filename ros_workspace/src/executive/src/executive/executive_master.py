@@ -327,8 +327,8 @@ class HomePlatform(smach.State):
         self.announcer = announcer
 
         self.platform_motion_input_select = \
-                rospy.ServiceProxy("CAN_select_command_source",
-                platform_srv.SelectCommandSource)
+                rospy.ServiceProxy("CAN_select_motion_mode",
+                platform_srv.SelectMotionMode)
 
         # homing action clients
         self.home_wheelpods = \
@@ -377,7 +377,7 @@ class HomePlatform(smach.State):
                 rospy.logwarn('Failure during manipulator homing')
                 return 'aborted'
                     
-        self.platform_motion_input_select("None")    
+        self.platform_motion_input_select(platform_srv.SelectMotionModeRequest.MODE_HOME)    
         rospy.sleep(0.1)
         self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
         self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))

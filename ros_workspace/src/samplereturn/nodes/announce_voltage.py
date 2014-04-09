@@ -1,9 +1,8 @@
 #!/usr/bin/python
 import rospy
 import sys
-sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 from samplereturn_msgs.msg import VoiceAnnouncement
-from platform_motion.msg import GPIO
+from platform_motion_msgs.msg import GPIO
 from std_msgs.msg import Float64
 
 class VoltageAnnouncer(object):

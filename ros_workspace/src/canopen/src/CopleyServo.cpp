@@ -47,15 +47,24 @@ CopleyServo::CopleyServo(long int node_id, std::tr1::shared_ptr<Bus> bus) :
           bus,
           false),
     sync(std::tr1::shared_ptr<SYNC>(new SYNC(node_id,
-         SYNCCallbackObject(static_cast<TransferCallbackReceiver *>(this),
-                            static_cast<SYNCCallbackObject::CallbackFunction>(&CopleyServo::syncCallback))))),
+         SYNCCallbackObject(
+            static_cast<TransferCallbackReceiver *>(this),
+            static_cast<SYNCCallbackObject::CallbackFunction>(
+                 &CopleyServo::syncCallback
+            )
+         )))),
     emcy(std::tr1::shared_ptr<EMCY>(new EMCY(node_id,
          EMCYCallbackObject(static_cast<TransferCallbackReceiver *>(this),
                             static_cast<EMCYCallbackObject::CallbackFunction>(&CopleyServo::emcyCallback))))),
     syncProducer(false),
     allReady(false),
     gotPV(false),
-    mapsCreated(false)
+    mapsCreated(false),
+    m_lastErrorMessage(""),
+    m_freeBufferSlots(32),
+    m_expectedFreeBufferSlots(32),
+    m_pvtModeActive(false),
+    m_currentSegmentId(0)
 {
     bus->add(sync);
     bus->add(emcy);
@@ -75,7 +84,12 @@ CopleyServo::CopleyServo(long int node_id, int sync_interval, std::tr1::shared_p
     syncInterval(sync_interval),
     allReady(false),
     gotPV(false),
-    mapsCreated(false)
+    mapsCreated(false),
+    m_lastErrorMessage(""),
+    m_freeBufferSlots(32),
+    m_expectedFreeBufferSlots(32),
+    m_pvtModeActive(false),
+    m_currentSegmentId(0)
 {
     bus->add(sync);
     bus->add(emcy);
@@ -129,8 +143,13 @@ void CopleyServo::_mapPDOs(void)
     map.subindex = 0;
     map.bits = 8;
     maps.push_back(map);
+    // trajectory buffer status (for pvt mode)
+    map.index = 0x2012;
+    map.subindex = 0;
+    map.bits = 32;
+    maps.push_back(map);
     // Immediate event
-    status_mode_pdo = mapTPDO("Status/Mode", 1, maps, 0xff,
+    status_mode_pdo = mapTPDO("Status/Mode/PVT Buffer Status", 1, maps, 0xff,
             PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
                 static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::statusModePDOCallback)));
     bus->add(status_mode_pdo);
@@ -214,6 +233,16 @@ void CopleyServo::_mapPDOs(void)
     velocity_pdo = mapRPDO("Target Velocity", 3, maps, 0);
     bus->add(velocity_pdo);
 
+    // Target position, velocity and time
+    maps.clear();
+    map.index = 0x2010;
+    map.subindex = 0x0;
+    map.bits = 64;
+    maps.push_back(map);
+    // Immediate action
+    pvt_pdo = mapRPDO("Target Position, Velocity, & Time", 4, maps, 0xFF);
+    bus->add(pvt_pdo);
+
     mapsCreated = true;
 }
 
@@ -248,6 +277,35 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
     uint16_t falling_status =   status_word  & (~new_status_word);
     status_word = new_status_word;
 
+    // Trajectory buffer status part of the pdo
+    uint16_t nextSegmentExpected = pdo.data[3] | (pdo.data[4]<<8);
+    uint8_t freeBufferSlots = pdo.data[5];
+    uint8_t statusByte = pdo.data[6];
+
+    // if there are now more free slots than we had before, we've consumed one
+    bool segmentConsumed = (m_freeBufferSlots < freeBufferSlots);
+
+    m_expectedSegmentId = nextSegmentExpected;
+    m_freeBufferSlots = freeBufferSlots;
+    // expected free buffer slots decrements between status callbacks
+    // this is so we don't accidentally send too many segments too quickly.
+    // we need to keep the concept of how many are actually free though because
+    // we need to tell the servo to go only when it actually has enough
+    // segments! since the servo says the buffer is empty when pvt mode
+    // isn't enabled, don't reset expectedFreeBufferSlots!
+    if(status_word & STATUS_INTERPOLATED_POSITION)
+    {
+        m_expectedFreeBufferSlots = freeBufferSlots;
+        m_pvtModeActive = true;
+    }
+    else
+    {
+        m_pvtModeActive = false;
+    }
+
+    uint8_t risingPvtStatus = (~m_pvtStatusByte) & statusByte;
+    m_pvtStatusByte = statusByte;
+
     mode_of_operation = new_mode_of_operation;
 
     switch(mode_of_operation) {
@@ -266,6 +324,22 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
             }
             break;
         case InterpolatedPosition:
+            if(risingPvtStatus&PVT_GOT_ERROR)
+            {
+                handlePvtError(risingPvtStatus);
+            }
+            if(segmentConsumed)
+            {
+                // if we've consumed a segment, check to see if there
+                // are any more segments waiting
+                handlePvtSegmentConsumed();
+            }
+            else if((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) < PVT_MINIMUM_SEGMENTS)
+            {
+                // if we still don't think we have enough segments,
+                // ask for more!
+                more_data_needed_callback(*this);
+            }
             break;
         case CyclicSynchonousPosition:
             break;
@@ -422,9 +496,11 @@ void CopleyServo::syncCallback(SYNC &sync)
             gotPV &&
             !allReady) {
         allReady=true;
-        modeControl(CONTROL_SWITCH_ON|CONTROL_ENABLE_VOLTAGE|CONTROL_RESET_FAULT|CONTROL_QUICK_STOP,
+        modeControl(
+                CONTROL_SWITCH_ON|CONTROL_ENABLE_VOLTAGE|CONTROL_RESET_FAULT|CONTROL_QUICK_STOP,
                     CONTROL_ENABLE_OPERATION|CONTROL_HALT,
-                    ProfilePosition );
+                    ProfilePosition
+        );
     }
 }
 
@@ -442,6 +518,16 @@ void CopleyServo::setEMCYCallback(DS301CallbackObject cb)
 void CopleyServo::setStatusCallback(DS301CallbackObject cb)
 {
     status_callback = cb;
+}
+
+void CopleyServo::setErrorCallback(DS301CallbackObject cb)
+{
+    error_callback = cb;
+}
+
+void CopleyServo::setMoreDataNeededCallback(DS301CallbackObject cb)
+{
+    more_data_needed_callback = cb;
 }
 
 
@@ -492,9 +578,12 @@ std::string CopleyServo::operationModeName(enum OperationMode m)
     }
 }
 
-void CopleyServo::modeControl(uint16_t set, uint16_t clear,
+void CopleyServo::modeControl(
+        uint16_t set,
+        uint16_t clear,
         enum OperationMode mode,
-        PDOCallbackObject callback)
+        PDOCallbackObject callback
+    )
 {
     control_word |= set;
     control_word &= ~clear;
@@ -552,6 +641,12 @@ void CopleyServo::home(DS301CallbackObject callback)
     control( CONTROL_NEW_SETPOINT, 0);
 }
 
+void CopleyServo::cancelHome()
+{
+    modeControl(0, CONTROL_NEW_SETPOINT, ProfilePosition);
+    control( CONTROL_NEW_SETPOINT, 0);
+}
+
 void CopleyServo::setVelocity(int32_t v)
 {
     modeControl(0, 0, ProfileVelocity);
@@ -561,8 +656,13 @@ void CopleyServo::setVelocity(int32_t v)
 void CopleyServo::setPosition(int32_t p, DS301CallbackObject callback)
 {
     position_callback = callback;
-    modeControl(0, CONTROL_NEW_SETPOINT | CONTROL_CHANGE_SET_IMMEDIATE, ProfilePosition);
-    position_pdo->send(p,
+    modeControl(
+            0,
+            CONTROL_NEW_SETPOINT | CONTROL_CHANGE_SET_IMMEDIATE,
+            ProfilePosition
+    );
+    position_pdo->send(
+            p,
             PDOCallbackObject(static_cast<TransferCallbackReceiver *>(this),
                               static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::_positionGo)));
 }
@@ -614,6 +714,296 @@ void CopleyServo::outputPinFunction(int pin_index, enum OutputPinFunction functi
 void CopleyServo::setInputCallback(InputChangeCallback cb)
 {
     input_callback = cb;
+}
+
+void CopleyServo::clearPvtError(uint8_t errorFlags)
+{
+    std::vector<uint8_t> data;
+    // ensure that data is 8 bytes long
+    data.assign(8, 0);
+    data[0] = PVT_HEADER_CLEAR_ERRORS;
+    data[1] = errorFlags;
+    pvt_pdo->send(data);
+}
+
+void CopleyServo::popPvtBuffer(uint8_t numToPop)
+{
+    std::vector<uint8_t> data;
+    // ensure that data is 8 bytes long
+    data.assign(8, 0);
+    data[0] = PVT_HEADER_POP_BUFFER;
+    data[1] = numToPop;
+    pvt_pdo->send(data);
+}
+
+void CopleyServo::clearPvtBuffer()
+{
+    std::vector<uint8_t> data;
+    // ensure that data is 8 bytes long
+    data.assign(8, 0);
+    data[0] = PVT_HEADER_CLEAR_BUFFER;
+    pvt_pdo->send(data);
+    // clear the active segments. they're no longer valid
+    m_activeSegments.clear();
+    // we now expect that all the buffer slots will be free.
+    m_expectedFreeBufferSlots = 32;
+    m_freeBufferSlots = 32;
+}
+
+void CopleyServo::resetSegmentId()
+{
+    std::vector<uint8_t> data;
+    // ensure that data is 8 bytes long
+    data.assign(8, 0);
+    data[0] = PVT_HEADER_RESET_SEGMENT_ID;
+    pvt_pdo->send(data);
+
+    m_currentSegmentId = 0;
+    m_expectedSegmentId = 0;
+    // clear the active segments. they're no longer valid
+    m_activeSegments.clear();
+}
+
+void CopleyServo::handlePvtError(uint8_t statusByte)
+{
+    // reset the errors (probably not the best plan, maybe change this?)
+    // note that we have to clear the error before we can fix a sequence
+    // error
+    clearPvtError(statusByte);
+
+    // reset the error message. there may be more than one error here.
+    m_lastErrorMessage = "";
+    // figure out what kind of error we have
+    if(statusByte&PVT_SEQUENCE_ERROR)
+    {
+        // this is not good. it means we missed some segment
+        m_lastErrorMessage += "sequence ID error!\n";
+
+        // check to see if we have the sequence number the servo wants.
+        bool found = false;
+        for(auto segment : m_activeSegments)
+        {
+            if(segment.id == m_expectedSegmentId)
+            {
+                // we have the segment the controller is looking for!
+                bool found = true;
+                //sendPvtSegment(segment);
+                break;
+            }
+        }
+
+        // if we didn't find the segment the conroller wanted, we're
+        // totally hosed.
+        if(!found)
+        {
+            // reset everything back to a known state
+            clearPvtBuffer();
+            resetSegmentId();
+        }
+    }
+
+    if(statusByte&PVT_BUFFER_UNDERFLOW)
+    {
+        // we ran out of things to do!
+        m_lastErrorMessage += "buffer underflow!\n";
+
+        // try to recover from this by adding more segments from
+        // active segments, if we have them. it is very likely we don't
+        uint8_t slots = m_freeBufferSlots;
+        for(auto segment : m_activeSegments)
+        {
+            if(slots == 0)
+            {
+                // if we're out of slots, break
+                break;
+            }
+
+            if(segment.id >= m_expectedSegmentId)
+            {
+                // if this segment is the expected one or higher, add it
+                //sendPvtSegment(segment);
+                slots--;
+            }
+        }
+
+        // fire the more data needed callback
+        more_data_needed_callback(*this);
+    }
+
+    if(statusByte&PVT_BUFFER_OVERFLOW)
+    {
+        // too many things to do!
+        m_lastErrorMessage += "buffer overflow!\n";
+    }
+
+    if(statusByte&PVT_BUFFER_EMPTY)
+    {
+        // we ran out of things to do!
+        m_lastErrorMessage += "buffer empty!\n";
+
+        // fire the more data needed callback
+        more_data_needed_callback(*this);
+    }
+
+    // call the error callback
+    error_callback(*this);
+}
+
+void CopleyServo::handlePvtSegmentConsumed()
+{
+    // if we just consumed a segment, check to see if we've got more
+    // segments to send.
+    // first, remove all the segments with lower sequence numbers
+    while((m_activeSegments.size() > 0) &&
+          (m_activeSegments.front().id < m_expectedSegmentId))
+    {
+        m_activeSegments.pop_front();
+    }
+
+    // send one new segment if we happen to have the next one the
+    // servo expects to get
+    if((m_activeSegments.size() > 0) &&
+       (m_expectedFreeBufferSlots > 0) &&
+       (m_activeSegments.front().id == m_expectedSegmentId))
+    {
+        // send this segment.
+        //sendPvtSegment(m_activeSegments.front());
+    }
+
+    // if we're low on segments, fire the callback to ask for more.
+    if((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) <= PVT_MINIMUM_SEGMENTS)
+    {
+        more_data_needed_callback(*this);
+    }
+}
+
+void CopleyServo::addPvtSegment(int32_t position, int32_t velocity, uint8_t duration, bool lastInSequence)
+{
+    // ensure that we're in InterpolatedPosition mode.
+    // note that this doesn't cause the control word bit flip. you'll
+    // need to do that yourself as needed.
+    modeControl(0, 0, InterpolatedPosition);
+
+    // make a PvtSegment struct instance for this new segment
+    PvtSegment segment;
+    segment.id = m_currentSegmentId;
+    m_currentSegmentId++;
+    segment.position = position;
+    segment.velocity = velocity;
+    segment.time = duration;
+
+    // add the new segment to the back of the active list.
+    m_activeSegments.push_back(segment);
+
+    // send this if we think we can.
+    if(m_expectedFreeBufferSlots > 0)
+    {
+        sendPvtSegment(segment);
+
+        // decrement the free buffer slots between status updates
+        // this keeps us from overflowing when we have a ton of adds between
+        // status pdos. this seems unlikely, but possible.
+        m_expectedFreeBufferSlots--;
+    }
+
+    // if this is the last segment in a sequence, add a special extra
+    // sequence to make sure we actually get to the right place.
+    if(lastInSequence)
+    {
+        addPvtSegment(position, velocity, duration, false);
+    }
+}
+
+void CopleyServo::startPvtMove()
+{
+    // flip bit 4 in the control word to 0 so we can cause a 0 to 1
+    // transition. this causes the servo to start a pvt segment
+    modeControl(0, CONTROL_NEW_SETPOINT, InterpolatedPosition);
+    control( CONTROL_NEW_SETPOINT, 0);
+
+    // to prevent a race, assume pvt mode is active for now
+    // the flag will get set next status update anyways
+    m_pvtModeActive = true;
+}
+
+void CopleyServo::stopPvtMove(uint8_t duration, bool emergency)
+{
+    // clear the pvt buffer.
+    clearPvtBuffer();
+
+    // if this is an emergency, just disable pvt mode by flipping
+    // the control bit.
+    if(emergency)
+    {
+        modeControl(0, CONTROL_NEW_SETPOINT, InterpolatedPosition);
+    }
+    else
+    {
+        // add a pvt segment that takes duration time and is at 0
+        // velocity. leave position in place if we're absolute
+        if(m_isAbsolute)
+        {
+            // in absolute mode, set position to whatever it is now
+            // and set velocity to zero
+            addPvtSegment(this->position, 0, true);
+        }
+        else
+        {
+            // set position and velocity to 0 in relative mode
+            addPvtSegment(0, 0, duration, true);
+        }
+    }
+}
+
+bool CopleyServo::sendPvtSegment(PvtSegment &segment)
+{
+    // send this segment to the servo, return true if it actually happened
+    std::vector<uint8_t> data;
+    // ensure that data is 8 bytes long
+    data.assign(8, 0);
+
+    // get the sequence number in the right place
+    uint8_t headerByte = (uint8_t)(segment.id&PVT_HEADER_SEQUENCE_MASK);
+
+    // figure out the segment mode. these are on page 215 of the copley manual
+    if(m_isAbsolute)
+    {
+        // XXX TODO: support the faster mode (mode 1)
+        // for absolute 0.1 counts per sec we're done because it is mode 0
+    }
+    else
+    {
+        // XXX TODO: support the faster mode (mode 3)
+        // for relative 0.1 counts per sec, we need to specify mode 2
+        headerByte |= 2 << 3;
+    }
+
+    data[0] = headerByte;
+
+    // byte 1 is time
+    data[1] = segment.time;
+
+    // bytes 2-4 are 24 bit position (relative or absolute)
+    // please excuse my epic cast
+    data[2] = ((uint8_t *)&segment.position)[0];
+    data[3] = ((uint8_t *)&segment.position)[1];
+    data[4] = ((uint8_t *)&segment.position)[2];
+
+    // bytes 5-7 are 24 bit velocity
+    // please excuse my epic cast
+    data[5] = ((uint8_t *)&segment.velocity)[0];
+    data[6] = ((uint8_t *)&segment.velocity)[1];
+    data[7] = ((uint8_t *)&segment.velocity)[2];
+
+    pvt_pdo->send(data);
+
+    return true;
+}
+
+int CopleyServo::getPvtBufferDepth()
+{
+    // return the number of pvt segments currently in the buffer.
+    return PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots;
 }
 
 }

@@ -10,13 +10,15 @@ namespace CANOpen {
 class PDO;
 typedef CallbackObject<PDO> PDOCallbackObject;
 
-struct PDOMap {
+struct PDOMap
+{
     uint16_t index;
     uint8_t subindex;
     uint8_t bits;
 };
 
-class PDO : public Transfer {
+class PDO : public Transfer
+{
     public:
         PDO(std::string name,
             unsigned long node_id,
@@ -56,7 +58,8 @@ class PDO : public Transfer {
         PDOCallbackObject callback;
 };
 
-class RPDO : public PDO {
+class RPDO : public PDO
+{
     public:
         RPDO(std::string name,
              unsigned long node_id,
@@ -92,7 +95,8 @@ class RPDO : public PDO {
 
 };
 
-class TPDO : public PDO {
+class TPDO : public PDO
+{
     public:
         TPDO(std::string name,
              unsigned long node_id,

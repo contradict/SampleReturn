@@ -50,43 +50,96 @@ class ManualController(object):
                                                  'invalid_goal':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('SELECT_JOYSTICK',
-                                   SelectCommandSource(self.CAN_interface, 'Joystick'),
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_JOYSTICK),
                                    transitions = {'next':'JOYSTICK_LISTEN',
                                                  'aborted':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'SELECT_SERVO',
-                                                  'manipulator_grab_requested':'SELECT_NONE',
+                                                  'manipulator_grab_requested':'SELECT_PAUSE',
+                                                  'home_wheelpods_requested':'SELECT_HOME',
+                                                  'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
                                                   'aborted':'MANUAL_ABORTED'})           
             
             smach.StateMachine.add('SELECT_SERVO',
-                                   SelectCommandSource(self.CAN_interface, 'Servo'),
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED'})
              
+            self.last_sample_detected = rospy.get_time()
+            self.last_servo_feedback = rospy.get_time()
+            def visual_servo_feedback(self, feedback):
+                this_time = rospy.get_time()
+                if feedback.state != feedback.STOP_AND_WAIT:
+                    self.last_sample_detected = this_time
+                delta_time = (this_time - self.last_servo_feedback)
+                if delta_time > 5.0:
+                    if feedback.state == feedback.STOP_AND_WAIT:
+                        self.announcer.say("No sample detected")
+                    else:
+                        self.announcer.say("range %d"%(10*int(feedback.error/10)))
+                    self.last_servo_feedback = this_time
+                if (this_time - self.last_sample_detected) > 15.0:
+                    self.announcer.say('Canceling visual servo')
+                    return 'canceled'
+                return None
             smach.StateMachine.add('VISUAL_SERVO',
-                                    VisualServo(self.announcer),
+                                    InterruptibleActionClientState(
+                                        "visual_servo_action",
+                                        visual_servo_msg.VisualServoAction,
+                                        visual_servo_msg.VisualServoGoal(),
+                                        visual_servo_feedback,
+                                        self.announcer,
+                                        "Visual servo unavailable."
+                                        "Aligning to sample.",
+                                        120.0,
+                                        "Visual servo timed out"
+                                        ),
                                     transitions = {'complete':'SELECT_JOYSTICK',
                                                    'canceled':'SELECT_JOYSTICK',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
             
-            smach.StateMachine.add('SELECT_NONE',
-                                   SelectCommandSource(self.CAN_interface, 'None'),
+            smach.StateMachine.add('SELECT_PAUSE',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
                                                   'aborted':'MANUAL_ABORTED'})
             
+            grab_msg = manipulator_msg.ManipulatorGoal()
+            grab_msg.type = grab_msg.GRAB
+            grab_msg.grip_torque = 0.7
+            grab_msg.target_bin = 1
             smach.StateMachine.add('MANIPULATOR_GRAB',
-                                    ManipulatorGrab(input_keys=['button_cancel'],
-                                                    outcomes=['complete', 'canceled',
-                                                              'preempted', 'aborted']),
-                                    transitions = {'complete':'SELECT_JOYSTICK',
-                                                   'canceled':'SELECT_JOYSTICK',
+                                   InterruptibleActionClientState(
+                                       'manipulator_action',
+                                       manipulator_msg.ManipulatorAction,
+                                       grab_msg,
+                                       None,
+                                       self.announcer,
+                                       "Manipulator unavailable",
+                                       "Grabbing",
+                                       30.0,
+                                       "Manipulator grab timed out"),
+                                    transitions = {'complete':'RESUME_JOYSTICK',
+                                                   'canceled':'RESUME_JOYSTICK',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
              
+            smach.StateMachine.add('RESUME_JOYSTICK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_RESUME),
+                                   transitions = {'next':'JOYSTICK_LISTEN',
+                                                  'aborted':'MANUAL_ABORTED'})
+
             smach.StateMachine.add('MANUAL_PREEMPTED',
                                      ManualPreempted(self.CAN_interface),
                                      transitions = {'complete':'preempted',
@@ -96,8 +149,74 @@ class ManualController(object):
                                     ManualAborted(self.CAN_interface),
                                     transitions = {'recover':'SELECT_JOYSTICK',
                                                    'fail':'aborted'})
-            
-            #end with state_machine     
+
+            smach.StateMachine.add('SELECT_HOME',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_HOME),
+                                   transitions = {'next':'PERFORM_HOME',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            home_goal = platform_msg.HomeGoal()
+            home_goal.home_count = 3
+            smach.StateMachine.add('PERFORM_HOME',
+                                   InterruptibleActionClientState(
+                                       'wheel_pods/home',
+                                       platform_msg.HomeAction,
+                                       home_goal,
+                                       None,
+                                       self.announcer,
+                                       "Home ing unavailable",
+                                       "Home ing",
+                                       30.0,
+                                       "Home ing timed out"),
+                                    transitions = {'complete':'SELECT_JOYSTICK',
+                                                   'canceled':'SELECT_JOYSTICK',
+                                                   'preempted':'MANUAL_PREEMPTED',
+                                                   'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('SELECT_PAUSE_FOR_LOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE),
+                                   transitions = {'next':'SELECT_LOCK',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('SELECT_LOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_LOCK),
+                                   transitions = {'next':'WAIT_FOR_UNLOCK',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('WAIT_FOR_UNLOCK',
+                                    WaitForJoystickButton(
+                                        self.joy_state,
+                                        'BUTTON_LOCK',
+                                        self.announcer,
+                                        ),
+                                    transitions = {'pressed':'SELECT_UNLOCK',
+                                                   'timeout':'SELECT_LOCK',
+                                                   'preempted':'MANUAL_PREEMPTED',
+                                                   }
+                                    )
+
+            smach.StateMachine.add('SELECT_UNLOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_UNLOCK),
+                                   transitions = {'next':'RESUME_FROM_LOCK',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('RESUME_FROM_LOCK',
+                                   SelectMotionMode(self.CAN_interface,
+                                       self.announcer,
+                                       platform_srv.SelectMotionModeRequest.MODE_RESUME),
+                                   transitions = {'next':'JOYSTICK_LISTEN',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+
+             #end with state_machine
   
         #action server wrapper    
         manual_control_server = smach_ros.ActionServerWrapper(
@@ -160,15 +279,18 @@ class ProcessGoal(smach.State):
                         
         return 'valid_goal'
 
-class SelectCommandSource(smach.State):
-    def __init__(self, CAN_interface, source):
+class SelectMotionMode(smach.State):
+    def __init__(self, CAN_interface, announcer, motion_mode):
         smach.State.__init__(self, outcomes = ['next', 'aborted'])
         self.CAN_interface = CAN_interface
-        self.command_source = source
+        self.announcer = announcer
+        self.motion_mode = motion_mode
                       
     def execute(self, userdata):
-        self.CAN_interface.select_source(self.command_source)
+        self.CAN_interface.select_mode(self.motion_mode)
         self.CAN_interface.publish_zero()
+        if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_LOCK:
+            self.announcer.say("Wheel lock selected")
         return 'next'
                 
 class JoystickListen(smach.State):
@@ -176,6 +298,8 @@ class JoystickListen(smach.State):
         smach.State.__init__(self,
                              outcomes=['visual_servo_requested',
                                        'manipulator_grab_requested',
+                                       'home_wheelpods_requested',
+                                       'lock_wheelpods_requested',
                                        'preempted',
                                        'aborted'],
                              input_keys=['action_goal', 'allow_driving', 'allow_manipulator'],
@@ -189,7 +313,7 @@ class JoystickListen(smach.State):
     
         self.allow_driving = userdata.allow_driving
         self.allow_manipulator = userdata.allow_manipulator
-        self.callback_outcome = None
+        self.button_outcome = None
  
         #publish the joystick defined twist every 50ms    
         driving_timer = rospy.Timer(rospy.Duration(.05), self.driving_callback)
@@ -201,123 +325,191 @@ class JoystickListen(smach.State):
         
         driving_timer.shutdown()       
                 
-        return self.callback_outcome
-    
+        return self.button_outcome
+
+
+    def set_outcome(self, outcome):
+        self.button_outcome = outcome
+        self.button_CV.acquire()
+        self.button_CV.notifyAll()
+        self.button_CV.release()
+
     def driving_callback(self, event):
         
         if self.preempt_requested():
             rospy.loginfo("MANUAL CONTROL PREEMPTED")
             self.service_preempt()
-            self.callback_outcome = 'preempted'
-            self.button_CV.acquire()
-            self.button_CV.notifyAll()
-            self.button_CV.release()            
+            self.set_outcome('preempted')
             return
         
         if self.allow_manipulator:
             if self.joy_state.button('BUTTON_SERVO'):
-                self.callback_outcome = 'visual_servo_requested'
-                self.button_CV.acquire()
-                self.button_CV.notifyAll()
-                self.button_CV.release()
+                self.set_outcome( 'visual_servo_requested' )
                 return
             if self.joy_state.button('BUTTON_GRAB'):
-                self.callback_outcome = 'manipulator_grab_requested'
-                self.button_CV.acquire()
-                self.button_CV.notifyAll()
-                self.button_CV.release()
+                self.set_outcome( 'manipulator_grab_requested' )
                 return
+
         
         if self.allow_driving:
+            if self.joy_state.button('BUTTON_HOME'):
+                self.set_outcome( 'home_wheelpods_requested' )
+                return
+            if self.joy_state.button('BUTTON_LOCK'):
+                self.set_outcome( 'lock_wheelpods_requested' )
+                return
             self.CAN_interface.publish_joy_state(self.joy_state)
-        
-#drive to detected sample location        
-class VisualServo(smach.State):
-    def __init__(self, announcer):
+
+class WaitForJoystickButton(smach.State):
+    def __init__(self, joy_state, button, announcer, timeout=None):
+        smach.State.__init__(self,
+                             outcomes=['pressed',
+                                       'timeout',
+                                       'preempted',
+                                       ],
+                             )
+
+        self.joy_state = joy_state
+
+        self.button = button
+
+        self.announcer = announcer
+
+        self.timeout = timeout
+
+    def execute(self, userdata):
+        button_state = self.joy_state.button( self.button )
+
+        debounce_count = 5
+
+        debounce = debounce_count
+
+        outcome = None
+
+        timeout = self.timeout
+
+        dt = 0.1
+
+        rate = rospy.Rate( 1./dt )
+        while outcome == None:
+            rate.sleep()
+            new_button_state =  self.joy_state.button( self.button )
+            if new_button_state and not button_state:
+                debounce -= 1
+                if debounce == 0:
+                    outcome = 'pressed'
+            else:
+                debounce = debounce_count
+                button_state = new_button_state
+            if self.preempt_requested():
+                self.outcome = 'preempted'
+            if timeout is not None:
+                timeout -= dt
+                if timeout <= 0:
+                    outcome = 'timeout'
+
+        self.announcer.say( "Release to unlock." )
+
+        while self.joy_state.button(self.button):
+            rate.sleep()
+
+        return outcome
+
+
+class InterruptibleActionClientState(smach.State):
+    def __init__(self, actionname, actionspec, goal,
+            feedback_cb = None,
+            announcer=None,
+            unavailable_msg=None,
+            active_msg=None,
+            timeout=None,
+            timeout_msg=None,
+            ):
         smach.State.__init__(self,
                              input_keys=['button_cancel'],
                              outcomes=['complete', 'canceled', 'preempted', 'aborted'])
-        
+
+        self.actionname = actionname
+
+        self.actionspec = actionspec
+
+        self.goal = goal
+
+        self.feedback_cb = feedback_cb
+
         self.announcer = announcer
-        
+
+        self.unavailable_msg = unavailable_msg
+
+        self.active_msg = active_msg
+
+        self.timeout = timeout
+
+        self.timeout_msg = timeout_msg
+
+
     def execute(self, userdata):
-        
-        working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
-    
-        visual_servo = actionlib.SimpleActionClient("visual_servo_action",
-                                                    visual_servo_msg.VisualServoAction)
-        
-        self.last_sample_detected = rospy.get_time()
-        self.last_servo_feedback = rospy.get_time()
-        visual_servo.send_goal(visual_servo_msg.VisualServoGoal(),
-                             feedback_cb = self.servo_feedback_cb)
-        
-        while True:
-            state = visual_servo.get_state()
-            if state == action_msg.GoalStatus.SUCCEEDED:
-                return 'complete'
-            if state == action_msg.GoalStatus.PREEMPTED:
-                return 'canceled' 
-            if state == action_msg.GoalStatus.ABORTED:
-                return 'aborted'
+        action_client = actionlib.SimpleActionClient(self.actionname,
+                self.actionspec)
+
+        if not action_client.wait_for_server(timeout=rospy.Duration(1.0)) :
+            if self.unavailable_msg is not None:
+                self.announcer.say( self.unavailable_msg )
+            return 'aborted'
+
+        action_client.send_goal( self.goal,
+                done_cb = self.goal_done,
+                active_cb = self.goal_active,
+                feedback_cb = self.goal_feedback
+                )
+
+        self.outcome = None
+
+        def timeoutcancel(evt):
+            action_client.cancel_all_goals()
+            if self.timeout_msg is not None:
+                self.announcer.say( self.timeout_msg )
+            self.outcome = 'canceled'
+
+        if self.timeout is not None:
+            timer = rospy.Timer( rospy.Duration( self.timeout ),
+                    timeoutcancel,
+                    oneshot=True )
+
+        rate = rospy.Rate( 0.1 )
+        while self.outcome == None:
             if userdata.button_cancel:
-                visual_servo.cancel_all_goals()
-                return 'canceled'
+                action_client.cancel_all_goals()
+                self.outcome = 'canceled'
             if self.preempt_requested():
-                self.service_preempt()
-                return 'preempted'
-            if (rospy.get_time() - self.last_sample_detected) > 10.0:
-                self.announcer.say('Canceling visual servo')
-                return 'canceled'
-            rospy.sleep(0.1)        
-    
-        return 'complete'
-    
-    def servo_feedback_cb(self, feedback):
-        this_time = rospy.get_time()
-        if feedback.state != feedback.STOP_AND_WAIT:
-            self.last_sample_detected = this_time
-        delta_time = (this_time - self.last_servo_feedback)
-        if delta_time > 5.0:
-            if feedback.state == feedback.STOP_AND_WAIT:
-                self.announcer.say("No sample detected")
-            else:
-                self.announcer.say("range %d"%(10*int(feedback.error/10)))
-            self.last_servo_feedback = this_time
-    
-class ManipulatorGrab(smach.State):
-    def execute(self, userdata):
+                action_client.cancel_all_goals()
+                self.outcome = 'preempted'
+            rate.sleep()
+
+        timer.shutdown()
+
+        return self.outcome
+
+    def goal_active(self):
+        if self.active_msg is not None:
+            self.announcer.say( self.active_msg )
+
+
+    def goal_done(self, state, result):
+        if state == action_msg.GoalStatus.SUCCEEDED:
+            self.outcome = 'complete'
+        if state == action_msg.GoalStatus.PREEMPTED:
+            self.outcome = 'canceled'
+        if state == action_msg.GoalStatus.ABORTED:
+            self.outcome = 'aborted'
         
-        working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
-               
-        self.manipulator = actionlib.SimpleActionClient('manipulator_action',
-                                                    manipulator_msg.ManipulatorAction)
-        
-        self.manipulator.wait_for_server()
-        
-        grab_msg = manipulator_msg.ManipulatorGoal()
-        grab_msg.type = grab_msg.GRAB
-        grab_msg.grip_torque = 0.7
-        grab_msg.target_bin = 1
-        
-        self.manipulator.send_goal(grab_msg)
-        
-        while True:
-            state = self.manipulator.get_state()
-            if state == action_msg.GoalStatus.SUCCEEDED:
-                return 'complete'
-            if state == action_msg.GoalStatus.PREEMPTED:
-                return 'canceled' #if robot is paused during grab, return to joystick_listen
-            if state == action_msg.GoalStatus.ABORTED:
-                return 'aborted'
-            if userdata.button_cancel:
-                self.manipulator.cancel_all_goals()
-                return 'canceled'
-            if self.preempt_requested():
-                self.service_preempt()
-                return 'preempted'
-            rospy.sleep(0.1)
-    
+    def goal_feedback(self, feedback):
+        if self.feedback_cb is not None:
+            result = self.feedback_cb( feedback )
+            if result is not None:
+                self.outcome = result
+
+
 class ManualPreempted(smach.State):
     def __init__(self, CAN_interface):
         smach.State.__init__(self, outcomes=['complete','fail'])
@@ -327,20 +519,22 @@ class ManualPreempted(smach.State):
     def execute(self, userdata):
         
         #we are preempted by the top state machine
-        #set command source to None and exit
-        self.CAN_interface.select_source('None')
+        #set motion mode to None and exit
+        self.CAN_interface.select_mode(
+                platform_srv.SelectMotionModeRequest.MODE_PAUSE )
         self.CAN_interface.publish_zero()
         
         return 'complete'
 
 class ManualAborted(smach.State):
     def __init__(self, CAN_interface):
-        smach.State.__init__(self, outcomes=['recover','fail'])
+        smach.State.__init__(self, outcomes=['recover','fail'],
+                output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
         
     def execute(self, userdata):
-        
+        action_result='fail'
         return 'fail'
 
 #classes to handle joystick and CAN interfacing
@@ -365,7 +559,7 @@ class JoyState(object):
         if button_index >= len(self.msg.buttons):
             return False #always return false if the requested button is not in the list
         else:
-            return self.msg.buttons[button_index]
+            return bool(self.msg.buttons[button_index])
     
     def scale_axis(self, scale, exponent, value):
         return math.copysign( scale*(abs(value)**exponent), value)
@@ -383,18 +577,18 @@ class JoyState(object):
                                           self.msg.axes[self.joy_params.ANGULAR_Z])
         
         return twist
- 
+
 class CANInterface(object):
     def __init__(self):
-        self.CAN_source_select = \
-                rospy.ServiceProxy("CAN_select_command_source",
-                platform_srv.SelectCommandSource)        
+        self.CAN_select_motion_mode = \
+                rospy.ServiceProxy("CAN_select_motion_mode",
+                platform_srv.SelectMotionMode)
         self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
         self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
         self.servo_command=rospy.Publisher("CAN_servo_command", geometry_msg.Twist)
-    
-    def select_source(self, source):
-        self.CAN_source_select(source)
+
+    def select_mode(self, motion_mode):
+        self.CAN_select_motion_mode(motion_mode)
         
     def publish_joy_state(self, joy_state):
         self.joystick_command.publish(joy_state.get_twist())

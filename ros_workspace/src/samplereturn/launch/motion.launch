@@ -9,7 +9,7 @@
     <remap from="enable_carousel" to="/motion/carousel/enable"/>
     <remap from="home_carousel" to="/motion/carousel/home"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
-    <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
+    <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
     <remap from="manipulator_pause" to="/motion/manipulator/pause"/>
     <remap from="carousel_angle" to="/motion/carousel/angle"/>
@@ -31,8 +31,8 @@
           output="log"
           ns="/motion">
         <!--launch-prefix="xterm -e gdb -ex run - -args"-->
-        <param name="port_steering_offset" type="double" value="0.138"/>
-        <param name="starboard_steering_offset" type="double" value="-0.176"/>
+        <param name="port_steering_offset" type="double" value="0.10"/>
+        <param name="starboard_steering_offset" type="double" value="0.0"/>
         <param name="stern_steering_offset" type="double" value="0.068"/>
 
         <param name="carousel_id" type="int" value="1"/>

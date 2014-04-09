@@ -1,7 +1,23 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
+    <arg name="user" default="zlizer"/>
+    <arg name="path" default="src"/>
+    <arg name="kind" default="devel"/>
+    <arg name="replay" default="false"/>
     <arg name="run_cameras" default="true"/>
+
+    <machine name="navigate"
+             address="sr1"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+
+    <machine name="search"
+             address="sr2"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
 
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>

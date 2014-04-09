@@ -9,6 +9,7 @@
         output="log"
         ns="/processes/executive">
 
+        <param name="wait_for_cameras" type="bool" value="true"/>
         <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
         <param name="gpio_servo_id" value="1"/>
@@ -31,7 +32,7 @@
         <remap from="search_point" to="/processes/sample_detection/point"/>
         <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
 
-        <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
+        <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
         <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
         <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
         <remap from="joystick_command" to="/motion/joystick_command"/>
