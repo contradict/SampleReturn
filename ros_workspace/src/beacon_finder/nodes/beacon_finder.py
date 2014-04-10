@@ -10,6 +10,7 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import Vector3, Quaternion, PoseStamped
 from tf.transformations import quaternion_from_matrix
+from matplotlib import pyplot as plt
 
 class BeaconFinder:
 	"""A class to locate the beacon in an image and publish a vector in the camera's frame from the robot to the beacon"""
@@ -25,6 +26,7 @@ class BeaconFinder:
 		self._num_rows = rospy.get_param("~num_rows", 3)
 		self._num_columns = rospy.get_param("~num_columns", 9)
 		self._blob_color = rospy.get_param("~blob_color", 0)
+		self._blob_color_alt = rospy.get_param("~blob_color_alt", 255)
 		self._blob_min_area = rospy.get_param("~blob_min_area", 9)
 		self._blob_max_area = rospy.get_param("~blob_max_area", 5000)
 		self._blob_min_threshold = rospy.get_param("~blob_min_threshold", 20)
@@ -44,7 +46,29 @@ class BeaconFinder:
 		self._blob_detector_params.thresholdStep = self._blob_threshold_step
 		self._blob_detector_params.minDistBetweenBlobs = self._blob_min_distance_between_blobs
 		self._blob_detector_params.minRepeatability = self._blob_repeatability
+		self._blob_detector_params.filterByColor = True
+		self._blob_detector_params.filterByArea = True
+		self._blob_detector_params.filterByCircularity = False
+		self._blob_detector_params.filterByInertia = False
+		self._blob_detector_params.filterByConvexity = True
+
+		self._blob_detector_params_alt = cv2.SimpleBlobDetector_Params()
+		self._blob_detector_params_alt.blobColor = self._blob_color_alt
+		self._blob_detector_params_alt.minArea = self._blob_min_area
+		self._blob_detector_params_alt.maxArea = self._blob_max_area
+		self._blob_detector_params_alt.minThreshold = self._blob_min_threshold
+		self._blob_detector_params_alt.maxThreshold = self._blob_max_threshold
+		self._blob_detector_params_alt.thresholdStep = self._blob_threshold_step
+		self._blob_detector_params_alt.minDistBetweenBlobs = self._blob_min_distance_between_blobs
+		self._blob_detector_params_alt.minRepeatability = self._blob_repeatability
+		self._blob_detector_params_alt.filterByColor = True
+		self._blob_detector_params_alt.filterByArea = True
+		self._blob_detector_params_alt.filterByCircularity = False
+		self._blob_detector_params_alt.filterByInertia = False
+		self._blob_detector_params_alt.filterByConvexity = True
+
 		self._blob_detector = cv2.SimpleBlobDetector(self._blob_detector_params)
+		self._blob_detector_alt = cv2.SimpleBlobDetector(self._blob_detector_params_alt)
 		self._camera_matrix = numpy.array([0])
 
 		if self._do_histogram_equalization:
@@ -76,11 +100,17 @@ class BeaconFinder:
 		if self._camera_matrix.any():
 			image_cv = numpy.asarray(self._cv_bridge.imgmsg_to_cv(image, 'bgr8'))
 
+			#image_cv = cv2.undistort(image_cv, self._camera_matrix, self._distortion_coefficients)
+
 			if self._do_histogram_equalization:
 				image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)
 				image_cv = cv2.equalizeHist(image_cv)
 
+			#image_cv = cv2.resize(image_cv, (1920, 1080))
+
 			found_beacon, centers = cv2.findCirclesGrid(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID, blobDetector=self._blob_detector)
+			if not found_beacon:
+				found_beacon, centers = cv2.findCirclesGrid(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID, blobDetector=self._blob_detector_alt)
 
 			if found_beacon:
 				beacon_pose = PoseStamped()
@@ -109,6 +139,8 @@ class BeaconFinder:
 			else:
 				# Publish debug beacon image if there are subscribers
 				if self._beacon_debug_image.get_num_connections() > 0:
+					#keypoints = self._blob_detector.detect(image_cv)
+					#image_cv = cv2.drawKeypoints(image_cv, keypoints, color=(255, 255, 255), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
 
 	def camera_info_callback(self, camera_info):
