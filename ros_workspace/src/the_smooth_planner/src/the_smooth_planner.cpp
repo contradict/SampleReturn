@@ -82,6 +82,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.knots.resize(path.poses.size());
 	path_msg.header.stamp = timestamp;
 	path_msg.header.seq = 0;
+	path_msg.header.frame_id = "map";
 
 	visualization_msgs::MarkerArray visualizationMarkerArray;
 	visualizationMarkerArray.markers.resize(1); // Just a single marker for now
@@ -97,6 +98,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	{
 		path_msg.knots[0].header.stamp = timestamp;
 		path_msg.knots[0].header.seq = 0;
+		path_msg.knots[0].header.frame_id = "map";
 		path_msg.knots[0].pose = path.poses[0].pose;
 		path_msg.knots[0].twist = odometry.twist.twist;
 
@@ -176,6 +178,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 		path_msg.knots[i+1].header.seq = i+1;
 		path_msg.knots[i+1].header.stamp = timestamp;
+		path_msg.knots[i+1].header.frame_id = "map";
 		path_msg.knots[i+1].pose = path.poses[i+1].pose;
 		path_msg.knots[i+1].twist.linear.x = finalLinearVelocity(0);
 		path_msg.knots[i+1].twist.linear.y = finalLinearVelocity(1);
