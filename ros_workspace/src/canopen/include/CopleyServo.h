@@ -128,6 +128,7 @@ class CopleyServo : public DS301 {
         bool enabled(void);
 
         void home(DS301CallbackObject callback=DS301CallbackObject());
+        void cancelHome();
 
         void setVelocity(int32_t v);
         void setPosition(int32_t p, DS301CallbackObject
@@ -210,6 +211,7 @@ class CopleyServo : public DS301 {
         void resetLastError() {m_lastErrorMessage = "";}
 
         bool getNeedsToStart() {return ((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) >= PVT_MINIMUM_SEGMENTS) && !m_pvtModeActive;}
+        bool getPvtActive() {return m_pvtModeActive;};
 
         int32_t position;
         int32_t velocity;

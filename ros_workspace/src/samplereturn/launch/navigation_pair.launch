@@ -105,7 +105,7 @@
               type="image_desync.py"
               ns="/cameras/navigation/$(arg namespace)">
             <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/manager"/>
-            <param name="max_desync" type="double" value="0.02"/>
+            <param name="max_desync" type="double" value="0.033"/>
         </node>
     </group>
 

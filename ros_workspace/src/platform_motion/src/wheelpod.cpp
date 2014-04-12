@@ -60,6 +60,11 @@ void WheelPod::home(CANOpen::DS301CallbackObject cb)
     steering.home(cb);
 }
 
+void WheelPod::cancelHome()
+{
+    steering.cancelHome();
+}
+
 void WheelPod::move(PodSegment &segment)
 {
     // we're going to use pvt mode here
@@ -243,6 +248,14 @@ void WheelPod::computeSteeringAndVelocity(
 void WheelPod::_setMode(enum PodMode m)
 {
     if(currentMode == m) return;
+
+    if(currentMode == PodPosition)
+    {
+        // if we're leaving pvt mode, clear the pvt buffer on the servo
+        steering.clearPvtBuffer();
+        wheel.clearPvtBuffer();
+    }
+
     switch(m) {
         case PodPosition:
             steering.setPvtAbsolute();

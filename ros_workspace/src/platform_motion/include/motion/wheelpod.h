@@ -66,6 +66,7 @@ class WheelPod : public CANOpen::TransferCallbackReceiver {
         void move(std::vector<PodSegment> &segments);
         void move(PodSegment &segment);
         void home(CANOpen::DS301CallbackObject cb);
+        void cancelHome();
         void enable(bool state, CANOpen::DS301CallbackObject cb);
         bool enabled(void);
         bool ready(void);

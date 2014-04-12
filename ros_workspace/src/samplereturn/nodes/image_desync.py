@@ -87,6 +87,8 @@ class image_desync(object):
 
         self.check_interval    = rospy.get_param("~check_interval",     1.0)
         self.max_desync        = rospy.get_param("~max_desync",         0.10)
+        self.restart_on_desync = rospy.get_param("~restart_on_desync",  False)
+        self.restart_on_missing= rospy.get_param("~restart_on_missing", True)
         self.max_desync_count  = rospy.get_param("~max_desync_count",  10)
         self.max_missing_count = rospy.get_param("~max_missing_count", 10)
         self.startup_delay     = rospy.get_param("~startup_delay", 60)
@@ -174,19 +176,23 @@ class image_desync(object):
             self.status_pub.publish(String("Ready"))
         if self.desync_count > self.max_desync_count:
             self.status_pub.publish(String("Desynchronized"))
-            self.restart_manager("Cameras Desynchronized")
+            if self.restart_on_desync:
+                self.restart_manager("Cameras Desynchronized")
 
     def check_missing(self):
         if self.missing_count['left'] > self.max_missing_count and \
            self.missing_count['right'] > self.max_missing_count:
             self.status_pub.publish(String("Both Missing"))
-            self.restart_manager("Cameras failed")
+            if self.restart_on_missing:
+                self.restart_manager("Cameras failed")
         elif self.missing_count['left'] > self.max_missing_count:
             self.status_pub.publish(String("Left Missing"))
-            self.restart_manager("Left camera failed")
+            if self.restart_on_missing:
+                self.restart_manager("Left camera failed")
         elif self.missing_count['right'] > self.max_missing_count:
             self.status_pub.publish(String("Right Missing"))
-            self.restart_manager("Right camera failed")
+            if self.restart_on_missing:
+                self.restart_manager("Right camera failed")
 
 if __name__=="__main__":
     rospy.init_node('image_desync')

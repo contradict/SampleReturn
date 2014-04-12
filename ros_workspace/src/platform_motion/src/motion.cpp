@@ -27,7 +27,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <platform_motion_msgs/HomeAction.h>
 #include <platform_motion_msgs/Enable.h>
-#include <platform_motion_msgs/SelectCommandSource.h>
+#include <platform_motion_msgs/SelectMotionMode.h>
 #include <platform_motion/PlatformParametersConfig.h>
 #include <platform_motion_msgs/GPIO.h>
 #include <platform_motion_msgs/ServoStatus.h>
@@ -45,7 +45,8 @@ Motion::Motion() :
     param_nh("~"),
     home_pods_action_server(nh_, "home_wheel_pods", false),
     home_carousel_action_server(nh_, "home_carousel", false),
-    command_source(COMMAND_SOURCE_NONE),
+    motion_mode(platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE),
+    saved_mode(platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE),
     CAN_fd(-1),
     gpio_enabled(false),
     carousel_setup(false),
@@ -53,6 +54,7 @@ Motion::Motion() :
     desired_pod_state(false),
     carousel_enabled(false),
     desired_carousel_state(false),
+    targetReached_(false),
     pv_counter(0),
     joint_seq(0),
     moreDataSent(false),
@@ -90,14 +92,23 @@ Motion::Motion() :
 
     param_nh.param("enable_wait_timeout_ms", enable_wait_timeout, 500);
 
+    param_nh.param("plan_to_zero_decel", planToZeroDecel_, 2.0);
+    param_nh.param("plan_to_zero_period", planToZeroPeriod_, 0.050);
+
+    param_nh.param("port_steering_lock", portSteeringLock_, M_PI/3.);
+    param_nh.param("starboard_steering_lock", starboardSteeringLock_, -M_PI/3.);
+    param_nh.param("stern_steering_lock", sternSteeringLock_, 0.0);
+
+    param_nh.param("steering_tolerance", steeringTolerance_, 0.01);
+    param_nh.param("steering_accel", steeringAccel_, M_PI);
+    param_nh.param("steering_max_v", steeringMaxV_, M_PI/4.);
+
     body_pt << center_pt_x, center_pt_y;
-    enable_pods_server = nh_.advertiseService("enable_wheel_pods",
-            &Motion::enableWheelPodsCallback, this);
     enable_carousel_server = nh_.advertiseService("enable_carousel",
             &Motion::enableCarouselCallback, this);
 
-    select_command_server = nh_.advertiseService("CAN_select_command_source",
-            &Motion::selectCommandSourceCallback, this);
+    motion_mode_server = nh_.advertiseService("CAN_select_motion_mode",
+            &Motion::selectMotionModeCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
     joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
     servo_sub = nh_.subscribe("CAN_servo_command", 2, &Motion::servoTwistCallback, this);
@@ -120,6 +131,7 @@ Motion::Motion() :
 
     stitchedPath_pub_ = nh_.advertise<platform_motion_msgs::Path>("stitched_path", 1);
 
+    motionMode_pub_ = nh_.advertise<platform_motion_msgs::SelectMotionModeResponse>("current_motion_mode", 1, true);
 
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
@@ -311,14 +323,13 @@ void Motion::shutdown(void)
         return;
     enable_pods_count = 6;
     enable_pods(false);
-    boost::system_time now=boost::get_system_time();
     boost::unique_lock<boost::mutex> pod_lock(enable_pods_mutex);
     while( pods_enabled == true )
-        enable_pods_cond.timed_wait(pod_lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+        enable_pods_cond.timed_wait(pod_lock, boost::posix_time::milliseconds(enable_wait_timeout));
     enable_carousel(false);
     boost::unique_lock<boost::mutex> carousel_lock(enable_carousel_mutex);
     while( carousel_enabled == true )
-        enable_carousel_cond.timed_wait(carousel_lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
+        enable_carousel_cond.timed_wait(carousel_lock, boost::posix_time::milliseconds(enable_wait_timeout));
     carousel->output(0x0, 0x7);
 }
 
@@ -363,7 +374,7 @@ void Motion::runBus(void)
         }
     }
 }
- 
+
 void Motion::start(void)
 {
     ROS_INFO("Start CAN bus thread");
@@ -410,64 +421,380 @@ void Motion::start(void)
 
 void Motion::plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
-    if(command_source == COMMAND_SOURCE_PLANNER)
+    if(motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST)
         handleTwist(twist);
 }
 
 void Motion::joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
-    if(command_source == COMMAND_SOURCE_JOYSTICK)
+    if(motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK)
         handleTwist(twist);
 }
 
 void Motion::servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist)
 {
-    if(command_source == COMMAND_SOURCE_SERVO)
+    if(motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO)
         handleTwist(twist);
 }
 
-bool Motion::selectCommandSourceCallback(platform_motion_msgs::SelectCommandSource::Request &req,
-                                          platform_motion_msgs::SelectCommandSource::Response &resp)
+std::string motion_mode_string(int mode)
 {
-    resp.valid=true;
-    resp.source=req.source;
-    if(req.source == std::string("Joystick"))
-        command_source=COMMAND_SOURCE_JOYSTICK;
-    else if(req.source == std::string("Planner"))
-        command_source=COMMAND_SOURCE_PLANNER;
-    else if(req.source == std::string("Servo"))
-        command_source=COMMAND_SOURCE_SERVO;
-    else if(req.source == std::string("None"))
+    switch(mode)
     {
-        command_source=COMMAND_SOURCE_NONE;
-        geometry_msgs::Twist *twist = new geometry_msgs::Twist();
-        twist->linear.x=0;
-        twist->linear.y=0;
-        twist->angular.z=0;
-        handleTwist(geometry_msgs::Twist::ConstPtr(twist));
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY:
+            return "Query";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
+            return "Home";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
+            return "Joystick";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
+            return "Planner Twist";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
+            return "Servo";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            return "Planner PVT";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
+            return "Pause";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME:
+            return "Resume";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK:
+            return "Lock";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_UNLOCK:
+            return "Unlock";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
+            return "Enable";
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE:
+            return "Disable";
+        default:
+            return "Unknown";
     }
-    else
+}
+
+bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Request &req,
+                                      platform_motion_msgs::SelectMotionMode::Response &resp)
+{
+    ROS_INFO("Requested motion mode %s", motion_mode_string(req.mode).c_str());
+    // Handle query right away
+    if( req.mode == platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY )
     {
-        ROS_ERROR("Unrecognized command source %s", req.source.c_str());
-        switch(command_source)
-        {
-            case COMMAND_SOURCE_PLANNER:
-                resp.source="Planner";
-                break;
-            case COMMAND_SOURCE_JOYSTICK:
-                resp.source="Joystick";
-                break;
-            case COMMAND_SOURCE_SERVO:
-                resp.source="Servo";
-                break;
-            case COMMAND_SOURCE_NONE:
-                resp.source="None";
-                break;
-        }
-        resp.valid=false;
+        resp.mode = motion_mode;
+        return true;
     }
-    ROS_INFO("Selected command source %s", req.source.c_str());
+    // Check states which have special exit conditions
+    switch( motion_mode )
+    {
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            // no special action needed
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
+            if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
+                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK)
+            {
+                ROS_ERROR("Attempted mode transition other than RESUME or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME:
+            // no special action needed
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK:
+            if(req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_UNLOCK)
+            {
+                ROS_ERROR("Attempted mode transition other than UNLOCK from LOCK: %s", motion_mode_string(req.mode).c_str());
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_UNLOCK:
+            // no special action needed
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
+            // no special action needed
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE:
+            if(req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE)
+            {
+                ROS_ERROR("Attempted mode transition other than ENABLE from DISABLE: %s", motion_mode_string(req.mode).c_str());
+                return false;
+            }
+            break;
+        default:
+            ROS_FATAL("In unknown mode, serious error: %d", motion_mode);
+    }
+    bool podsResult;
+    // Enter new state if possible
+    switch(req.mode)
+    {
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY:
+            // already handled
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
+            // These states can be entered from anywhere you can get out of
+            // and need to take no immediate action
+            motion_mode = req.mode;
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            motion_mode = req.mode;
+            primePVT();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
+            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_HOME ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE)
+            {
+                // remember where you were for resume and
+                saved_mode = motion_mode;
+                // take care of slowing down
+                motion_mode = req.mode;
+                handlePause();
+            }
+            else
+            {
+                ROS_ERROR( "Cannot PAUSE from %s", motion_mode_string(motion_mode).c_str() );
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME:
+            // Can only enter RESUME if we were in PAUSE
+            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE )
+            {
+                // move immediately to saved mode
+                motion_mode = saved_mode;
+            }
+            else
+            {
+                ROS_ERROR( "Attempted RESUME from state other than PAUSE: %s", motion_mode_string( motion_mode ).c_str() );
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK:
+            // Can only LOCK if already PAUSED
+            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE )
+            {
+                motion_mode = req.mode;
+                handleLock();
+            }
+            else
+            {
+                ROS_ERROR( "Attempted LOCK from state other than PAUSE: %s", motion_mode_string( motion_mode ).c_str() );
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_UNLOCK:
+            // Can only UNLOCK if already LOCKED
+            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK )
+            {
+                motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_UNLOCK;
+                handleUnlock();
+            }
+            else
+            {
+                ROS_ERROR( "Attempted UNLOCK from state other than LOCK: %s", motion_mode_string( motion_mode ).c_str() );
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
+            // can only ENABLE from DISABLE or PAUSE
+            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE ||
+                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE)
+            {
+                if( !handleEnablePods(true, &podsResult) )
+                    return false;
+                if( podsResult )
+                    motion_mode = req.mode;
+            }
+            else
+            {
+                ROS_ERROR( "Attempted ENABLE from state other than DISABLE or PAUSE: %s", motion_mode_string( motion_mode ).c_str() );
+                return false;
+            }
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE:
+            // can DISABLE from anywhere
+            if( !handleEnablePods(false, &podsResult) )
+                return false;
+            if( !podsResult )
+                motion_mode = req.mode;
+            break;
+        default:
+            ROS_ERROR("Unrecognized motion mode %d", req.mode);
+            return false;
+    }
+    ROS_INFO("Selected motion mode %s", motion_mode_string(motion_mode).c_str());
+    resp.mode=motion_mode;
+    motionMode_pub_.publish( resp );
     return true;
+}
+
+void Motion::cancelHome( void )
+{
+    if( home_pods_action_server.isActive() ){
+        home_pods_action_server.setAborted(home_pods_result, "Paused");
+    }
+    port->cancelHome();
+    starboard->cancelHome();
+    stern->cancelHome();
+}
+
+void Motion::handlePause( void )
+{
+    switch(saved_mode)
+    {
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
+            cancelHome();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
+            planToZeroTwist();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            primePVT();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
+            // nothing to do, already here
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
+            // nothing to do, already safe
+            break;
+        default:
+            ROS_ERROR("Unexpected state on pause entry: %s", motion_mode_string(motion_mode).c_str());
+            break;
+     }
+}
+
+void Motion::planToZeroTwist( void )
+{
+    double port_steering, starboard_steering, stern_steering;
+    double port_wheel_velocity, starboard_wheel_velocity,
+           stern_wheel_velocity;
+
+    port->getPosition(&port_steering, NULL, NULL, &port_wheel_velocity);
+    starboard->getPosition(&starboard_steering, NULL, NULL, &starboard_wheel_velocity);
+    stern->getPosition(&stern_steering, NULL, NULL, &stern_wheel_velocity);
+
+    double max_velocity = std::max(port_wheel_velocity, std::max(starboard_wheel_velocity, stern_wheel_velocity));
+    double planToZeroTime = max_velocity/planToZeroDecel_;
+    if(planToZeroTime>planToZeroPeriod_)
+    {
+        int count=ceil(planToZeroTime/planToZeroPeriod_);
+
+        double port_decel = port_wheel_velocity/count;
+        double starboard_decel = starboard_wheel_velocity/count;
+        double stern_decel = stern_wheel_velocity/count;
+
+        ros::Rate loop(1./planToZeroPeriod_);
+        for(int i=0;i<count;i++)
+        {
+            port_wheel_velocity -= port_decel;
+            starboard_wheel_velocity -= starboard_decel;
+            stern_wheel_velocity -= stern_decel;
+
+            port->drive( port_steering, port_wheel_velocity );
+            starboard->drive( port_steering, port_wheel_velocity );
+            stern->drive( port_steering, port_wheel_velocity );
+        }
+    }
+    port->drive( port_steering, 0.0 );
+    starboard->drive( port_steering, 0.0 );
+    stern->drive( port_steering, 0.0 );
+}
+
+void Motion::handleLock( void )
+{
+    // Should only get here from PAUSE
+    // so saved_mode tells us what system is active
+    switch(saved_mode)
+    {
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
+            driveToLock();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            primePVT();
+            waitForLockCond();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK:
+            // nothing to do, already here
+            break;
+        default:
+            ROS_ERROR("Unexpected state on lock entry: %s", motion_mode_string(motion_mode).c_str());
+            break;
+     }
+}
+
+void Motion::waitForLockCond( void )
+{
+    boost::unique_lock<boost::mutex> l(lock_state_mutex_);
+    if( !lock_state_cond_.timed_wait( l, boost::posix_time::seconds(30) ) )
+        ROS_ERROR( "WaitForLockCond timed out" );
+}
+
+void Motion::handleUnlock( void )
+{
+    // Should only get here through PAUSE
+    // so saved_mode tells us what system is active
+    switch(saved_mode)
+    {
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_HOME:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_JOYSTICK:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
+            driveToUnLock();
+            break;
+        case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            primePVT();
+            waitForLockCond();
+            break;
+        default:
+            ROS_ERROR("Unexpected state on lock entry: %s", motion_mode_string(motion_mode).c_str());
+            break;
+     }
+}
+
+void Motion::driveToLock( void )
+{
+    int timeout=300;
+    do
+    {
+        port->drive( portSteeringLock_, 0.0 );
+        starboard->drive( starboardSteeringLock_, 0.0 );
+        stern->drive( sternSteeringLock_, 0.0 );
+        ros::Duration(0.1).sleep();
+        timeout--;
+    }
+    while( timeout>0 && !targetReached_ && ros::ok());
+}
+
+void Motion::driveToUnLock( void )
+{
+    int timeout=300;
+    do
+    {
+        port->drive( 0.0, 0.0 );
+        starboard->drive( 0.0, 0.0 );
+        stern->drive( 0.0, 0.0 );
+        ros::Duration(0.1).sleep();
+        timeout--;
+    }
+    while( timeout>0 && !targetReached_ && ros::ok());
+    // Move back to PAUSE
+    motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE;
 }
 
 void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
@@ -529,7 +856,7 @@ void Motion::doHomePods(void)
     home_pods_count = 3;
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     home_pods_action_server.acceptNewGoal();
-    if(pods_enabled == true && command_source == COMMAND_SOURCE_NONE)
+    if(pods_enabled == true && motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_HOME)
     {
         ROS_INFO("Home pods goal accepted");
         CANOpen::DS301CallbackObject
@@ -541,7 +868,7 @@ void Motion::doHomePods(void)
     }
     else
     {
-        const char * reason=pods_enabled ? "Command source not None" : "Pods not enabled";
+        const char * reason=pods_enabled ? "Not in motion mode MODE_HOME" : "Pods not enabled";
         ROS_INFO("Home pods goal aborted - %s", reason);
         home_pods_result.homed.clear();
         home_pods_result.homed.push_back(false);
@@ -600,27 +927,23 @@ bool Motion::ready(void)
     return port->ready() && starboard->ready() && stern->ready() && carousel->ready();
 }
 
-bool Motion::enableWheelPodsCallback(platform_motion_msgs::Enable::Request &req,
-                                     platform_motion_msgs::Enable::Response &resp)
+bool Motion::handleEnablePods(bool en, bool *result)
 {
     bool notified=false;
-    if(req.state==pods_enabled){
+    if(en==pods_enabled){
         ROS_DEBUG("Pods already in state %s", pods_enabled?"enabled":"disabled");
     }
     boost::unique_lock<boost::mutex> lock(enable_pods_mutex);
     boost::system_time now=boost::get_system_time();
-    if(home_pods_action_server.isActive() && req.state == false){
-        home_pods_action_server.setAborted(home_pods_result, "Paused");
-    }
-    enable_pods(req.state);
+    enable_pods(en);
     notified = enable_pods_cond.timed_wait(lock, now+boost::posix_time::milliseconds(enable_wait_timeout));
     if(!notified)
     {
-        if( (port->enabled() == req.state) &&
-            (starboard->enabled() == req.state) &&
-            (stern->enabled() == req.state) )
+        if( (port->enabled() == en) &&
+            (starboard->enabled() == en) &&
+            (stern->enabled() == en) )
         {
-            pods_enabled = req.state;
+            pods_enabled = en;
             // not really, but successful anyway
             notified=true;
         }
@@ -629,7 +952,7 @@ bool Motion::enableWheelPodsCallback(platform_motion_msgs::Enable::Request &req,
             ROS_ERROR("Wheel pods enable unsuccessful time out");
         }
     }
-    resp.state = pods_enabled;
+    if(result) *result = pods_enabled;
     return notified;
 }
 
@@ -814,7 +1137,7 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
 
     // check to see if we're ready to start a coordinated pvt move
     // assuming we're in a mode that uses pvt moves..
-    if( command_source == COMMAND_SOURCE_PLANNER )
+    if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT )
     {
         if(port->getNeedsToStart() &&
            starboard->getNeedsToStart() &&
@@ -822,6 +1145,20 @@ void Motion::syncCallback(CANOpen::SYNC &sync)
         {
             // if all the wheel pods are ready to go, tell them to start
             // moving. this means they should all start at the same time!
+            ROS_DEBUG("Start moving %d %d %d %d %d %d %d %d %d %d %d %d",
+                    port->wheel.getPvtBufferDepth(),
+                    port->wheel.getPvtActive(),
+                    port->steering.getPvtBufferDepth(),
+                    port->steering.getPvtActive(),
+                    starboard->wheel.getPvtBufferDepth(),
+                    starboard->wheel.getPvtActive(),
+                    starboard->steering.getPvtBufferDepth(),
+                    starboard->steering.getPvtActive(),
+                    stern->wheel.getPvtBufferDepth(),
+                    stern->wheel.getPvtActive(),
+                    stern->steering.getPvtBufferDepth(),
+                    stern->steering.getPvtActive()
+                    );
             port->startMoving();
             starboard->startMoving();
             stern->startMoving();
@@ -977,6 +1314,17 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status.status = status_stream.str();
     status.mode = mode_stream.str();
     status_pub.publish(status);
+
+    bool this_reached = ( (svo->getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED );
+    if( svo->node_id == stern->steering.node_id )
+    {
+        targetReached_ = this_reached;
+    }
+    else if( svo->node_id == starboard->steering.node_id ||
+             svo->node_id == port->steering.node_id )
+    {
+        targetReached_ &= this_reached;
+    }
 }
 
 platform_motion_msgs::Knot
@@ -1010,7 +1358,7 @@ transformKnot( Eigen::Quaterniond rotation,
 
 void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path)
 {
-    if(command_source != COMMAND_SOURCE_PLANNER)
+    if(motion_mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT)
     {
         // if the planner hasn't been put in charge, don't listen to it
         return;
@@ -1046,10 +1394,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         else if(plannedPath.size() > 0)
         {
             // append at end of present path
-            // if there are more segments than just the safety, drop the safety segment
             ROS_DEBUG("Append to existing path");
-            if(plannedPath.size() > 1 )
-                plannedPath.pop_back();
             platform_motion_msgs::Knot k = plannedPath.back();
             tf::quaternionMsgToEigen( k.pose.orientation, rotation );
             tf::pointMsgToEigen( k.pose.position, translation );
@@ -1107,18 +1452,6 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         }
     }
 
-    // add a "safety" segment to the very end that will stop the robot
-    // one second after the end of the path. this seems like a good thing
-    platform_motion_msgs::Knot lastPose = plannedPath.back();
-    lastPose.header.stamp += ros::Duration(1.0);
-    lastPose.twist.linear.x = 0;
-    lastPose.twist.linear.y = 0;
-    lastPose.twist.linear.z = 0;
-    lastPose.twist.angular.x = 0;
-    lastPose.twist.angular.y = 0;
-    lastPose.twist.angular.z = 0;
-    plannedPath.push_back(lastPose);
-
     // publish stitched path for visualization
     if( stitchedPath_pub_.getNumSubscribers() > 0 )
     {
@@ -1134,12 +1467,18 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
 
     }
 
+    primePVT();
+}
+
+void Motion::primePVT(void)
+{
     // check to see if the wheel pods are out of data. if they are,
     // send a couple of segments to get things moving.
     if((port->getMinBufferDepth() < 3) ||
             (starboard->getMinBufferDepth() < 3) ||
             (stern->getMinBufferDepth() < 3))
     {
+        ROS_DEBUG( "Restart needed" );
         restartPvt = true;
         sendPvtSegment();
     }
@@ -1153,6 +1492,7 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
     // all the servos as soon as one says it needs more
     if(!this->moreDataSent)
     {
+        ROS_DEBUG("More data needed %ld", node.node_id);
         // set the flag so we don't send data for every callback call this
         // sync fame
         this->moreDataSent = true;
@@ -1161,7 +1501,7 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
         sendPvtSegment();
         if(restartPvt)
         {
-            sendPvtSegment();
+            ROS_DEBUG("Send priming segment");
             sendPvtSegment();
             restartPvt = false;
         }
@@ -1390,10 +1730,8 @@ void Motion::sendPvtSegment()
     // stomping all over other commands from other sources.
     // if the joystick and visual servo ever use pvt mode, this will
     // have to change.
-    if( command_source == COMMAND_SOURCE_PLANNER )
+    if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT )
     {
-        BodySegment newSegment;
-
         if( newPathReady )
         {
             if( lastSegmentSent_.time == ros::Time(0) )
@@ -1429,6 +1767,8 @@ void Motion::sendPvtSegment()
 
             ROS_DEBUG_STREAM("first: " << firstSegment_.time << " second: " << secondSegment_.time << " now: ");
 
+            BodySegment newSegment;
+
             if(now < firstSegment_.time)
             {
                 ROS_DEBUG("last segment too old, sending first blindly");
@@ -1441,7 +1781,9 @@ void Motion::sendPvtSegment()
             else if(now>secondSegment_.time)
             {
                 ROS_ERROR("past second");
-                return;
+                plannedPath.clear();
+                firstSegment_ = secondSegment_;
+                pvtToZero();
             }
             else
             {
@@ -1487,64 +1829,205 @@ void Motion::sendPvtSegment()
 
             newSegment.time = now;
 
+            // make sure the durations are all less than or equal to .255!!
+            double minDuration =
+                std::min( 0.250,
+                        std::min(newSegment.port.duration,
+                            std::min(newSegment.starboard.duration, newSegment.stern.duration)));
+
+            double maxDuration =
+                std::max(newSegment.port.duration,
+                        std::max(newSegment.starboard.duration, newSegment.stern.duration));
+            if( maxDuration > 0.255 )
+            {
+                ROS_DEBUG("Clipping duration");
+                newSegment.port.duration = minDuration;
+                newSegment.starboard.duration = minDuration;
+                newSegment.stern.duration = minDuration;
+            }
+
+            ROS_DEBUG_STREAM("newSegment.time: " << newSegment.time );
+            ROS_DEBUG("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
+            ROS_DEBUG("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
+            ROS_DEBUG("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
+
+            // now just send the new segment, whatever it was.
+            port->move(newSegment.port);
+            starboard->move(newSegment.starboard);
+            stern->move(newSegment.stern);
+
+            lastSegmentSent_ = newSegment;
         }
         else
         {
             ROS_DEBUG("out of path segments, sending zeros");
-
-            // if there is no path to follow, keep the buffers full of zeros
-            // this means we're constantly actually filling the buffer and
-            // don't have to worry about it being empty. that seems like
-            // a good thing.
-            // we'll just give all the wheel pods the same segment.
-
-            PodSegment segment;
-            segment.steeringAngle = 0.0;
-            segment.steeringVelocity = 0.0;
-            segment.wheelDistance = 0.0;
-            segment.wheelVelocity = 0.0;
-            segment.duration = .25;
-
-            // reset the steering angle for each pod so we don't move the
-            // steering.
-            segment.steeringAngle = lastSegmentSent_.port.steeringAngle;
-            newSegment.port = segment;
-            segment.steeringAngle = lastSegmentSent_.starboard.steeringAngle;
-            newSegment.starboard = segment;
-            segment.steeringAngle = lastSegmentSent_.stern.steeringAngle;
-            newSegment.stern = segment;
-            newSegment.time = lastSegmentSent_.time + ros::Duration(lastSegmentSent_.port.duration);
+            pvtToZero();
         }
 
-        // make sure the durations are all less than or equal to .255!!
-        double minDuration =
-            std::min( 0.250,
-                 std::min(newSegment.port.duration,
-                     std::min(newSegment.starboard.duration, newSegment.stern.duration)));
-
-        double maxDuration =
-                 std::max(newSegment.port.duration,
-                     std::max(newSegment.starboard.duration, newSegment.stern.duration));
-        if( maxDuration > 0.255 )
-        {
-            ROS_DEBUG("Clipping duration");
-            newSegment.port.duration = minDuration;
-            newSegment.starboard.duration = minDuration;
-            newSegment.stern.duration = minDuration;
-        }
-
-        ROS_DEBUG_STREAM("newSegment.time: " << newSegment.time );
-        ROS_DEBUG("port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.port.steeringAngle, newSegment.port.steeringVelocity, newSegment.port.wheelDistance, newSegment.port.wheelVelocity, newSegment.port.duration);
-        ROS_DEBUG("starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.starboard.steeringAngle, newSegment.starboard.steeringVelocity, newSegment.starboard.wheelDistance, newSegment.starboard.wheelVelocity, newSegment.starboard.duration);
-        ROS_DEBUG("stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", newSegment.stern.steeringAngle, newSegment.stern.steeringVelocity, newSegment.stern.wheelDistance, newSegment.stern.wheelVelocity, newSegment.stern.duration);
-
-        // now just send the new segment, whatever it was.
-        port->move(newSegment.port);
-        starboard->move(newSegment.starboard);
-        stern->move(newSegment.stern);
-
-        lastSegmentSent_ = newSegment;
     }
+    else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE )
+    {
+        if( plannedPath.size() > 0 )
+        {
+            ROS_INFO( "Clearing path in pause" );
+            plannedPath.clear();
+        }
+        pvtToZero();
+    }
+    else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK )
+    {
+        if( lastSegmentSent_.port.wheelVelocity > 0 ||
+            lastSegmentSent_.starboard.wheelVelocity > 0 ||
+            lastSegmentSent_.stern.wheelVelocity > 0 )
+        {
+            pvtToZero();
+        }
+        else
+        {
+            pvtToLock();
+        }
+    }
+    else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_UNLOCK )
+    {
+        pvtToUnlock();
+    }
+    else
+    {
+        ROS_ERROR( "Not sending PVT from mode %s", motion_mode_string( motion_mode ).c_str() );
+    }
+}
+
+double decelWheel( double xdot, double a, double dt, double *dx )
+{
+    double s=fabs(xdot);
+    s = std::max(0.0, s-a*dt);
+    double xdotprime = copysign( s, xdot );
+    *dx = dt*(xdot+xdotprime)/2.;
+    return xdotprime;
+}
+
+double decelSteering( double thetadot, double a, double dt, double *theta )
+{
+    double s=fabs(thetadot);
+    s = std::max(0.0, s-a*dt);
+    double thetadotprime = copysign( s, thetadot );
+    *theta += dt*(thetadot + thetadotprime)/2.;
+    return thetadotprime;
+}
+
+void Motion::pvtToZero( void )
+{
+    lastSegmentSent_.time += ros::Duration(0.250);
+    lastSegmentSent_.port.duration = 0.250;
+    lastSegmentSent_.starboard.duration = 0.250;
+    lastSegmentSent_.stern.duration = 0.250;
+    if( lastSegmentSent_.port.wheelVelocity > 0 ||
+        lastSegmentSent_.starboard.wheelVelocity > 0 ||
+        lastSegmentSent_.stern.wheelVelocity > 0 )
+    {
+        ROS_DEBUG( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
+        lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
+        lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
+        lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
+        lastSegmentSent_.starboard.steeringVelocity = decelSteering(lastSegmentSent_.starboard.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.starboard.steeringAngle );
+        lastSegmentSent_.stern.wheelVelocity = decelWheel(lastSegmentSent_.stern.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.stern.wheelDistance );
+        lastSegmentSent_.stern.steeringVelocity = decelSteering(lastSegmentSent_.stern.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.stern.steeringAngle );
+    }
+    port->move(lastSegmentSent_.port);
+    starboard->move(lastSegmentSent_.starboard);
+    stern->move(lastSegmentSent_.stern);
+    ROS_DEBUG( "Zeroing: %f %f %f %f %f %f",
+            lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
+            lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
+            lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
+}
+
+bool Motion::setSteering( PodSegment &pod, double goal, double dt)
+{
+    double error = ( goal - pod.steeringAngle );
+    if(fabs(error)<steeringTolerance_)
+    {
+        pod.steeringAngle = goal;
+        pod.steeringVelocity = 0;
+        return false;
+    }
+    double vprime;
+    if(fabs(error)<=0.5*steeringMaxV_*steeringMaxV_/steeringAccel_)
+    {
+        // decel region
+        vprime = copysign( sqrt(2.0*fabs(error)*steeringAccel_) , error );
+    }
+    else
+    {
+        vprime = copysign( std::min( steeringMaxV_, fabs(pod.steeringVelocity) + dt*steeringAccel_ ), error );
+    }
+    double dtheta = dt*(pod.steeringVelocity + vprime)/2.;
+    if( fabs(dtheta)<fabs(error) )
+    {
+        pod.steeringAngle += dtheta;
+        pod.steeringVelocity = vprime;
+    }
+    else
+    {
+        pod.steeringAngle = goal;
+        pod.steeringVelocity = 0;
+    }
+    return true;
+}
+
+void Motion::pvtToLock( void )
+{
+    lastSegmentSent_.time += ros::Duration(0.250);
+    lastSegmentSent_.port.duration = 0.250;
+    lastSegmentSent_.starboard.duration = 0.250;
+    lastSegmentSent_.starboard.duration = 0.250;
+    bool moving;
+    moving = setSteering( lastSegmentSent_.port, portSteeringLock_, 0.25);
+    moving |= setSteering( lastSegmentSent_.starboard, starboardSteeringLock_,  0.25);
+    moving |= setSteering( lastSegmentSent_.stern, sternSteeringLock_, 0.25);
+    if( !moving )
+    {
+        boost::unique_lock<boost::mutex> l(lock_state_mutex_);
+        lock_state_cond_.notify_all();
+    }
+    port->move(lastSegmentSent_.port);
+    starboard->move(lastSegmentSent_.starboard);
+    stern->move(lastSegmentSent_.stern);
+    ROS_DEBUG( "Locking: %f %f %f %f %f %f",
+            lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
+            lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
+            lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
+}
+
+void Motion::pvtToUnlock( void )
+{
+    lastSegmentSent_.time += ros::Duration(0.250);
+    lastSegmentSent_.port.duration = 0.250;
+    lastSegmentSent_.starboard.duration = 0.250;
+    lastSegmentSent_.starboard.duration = 0.250;
+    bool moving;
+    moving = setSteering( lastSegmentSent_.port, 0.0, 0.25);
+    moving |= setSteering( lastSegmentSent_.starboard, 0.0, 0.25);
+    moving |= setSteering( lastSegmentSent_.stern, 0.0, .25);
+    if( !moving )
+    {
+        motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE;
+        platform_motion_msgs::SelectMotionMode::Response msg;
+        msg.mode = motion_mode;
+        motionMode_pub_.publish( msg );
+        boost::unique_lock<boost::mutex> l(lock_state_mutex_);
+        lock_state_cond_.notify_all();
+    }
+    port->move(lastSegmentSent_.port);
+    starboard->move(lastSegmentSent_.starboard);
+    stern->move(lastSegmentSent_.stern);
+    ROS_DEBUG( "Unlocking: %f %f %f %f %f %f",
+            lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
+            lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
+            lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
 }
 
 }
