@@ -7,6 +7,9 @@
 [submodule "ros_workspace/src/navigation"]
 	path = ros_workspace/src/navigation
 	url = git://github.com/contradict/ros-navigation
+[submodule "ros_workspace/src/sbpl_lattice_planner"]
+	path = ros_workspace/src/sbpl_lattice_planner
+	url = https://github.com/brandon-m-booth/sbpl_lattice_planner.git
 [submodule "ros_workspace/src/camera1394"]
 	path = ros_workspace/src/camera1394
 	url = https://github.com/zaclizer/camera1394.git
