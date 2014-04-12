@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(platform_motion)
 
+# use c++0x
+add_definitions(-std=c++11)
+
 find_package(catkin REQUIRED
     COMPONENTS
         roscpp
@@ -19,6 +22,7 @@ find_package(catkin REQUIRED
         platform_motion_msgs
 	    visual_servo_msgs
 	    manipulator_msgs
+        rviz
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -29,14 +33,24 @@ find_package(Eigen REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(BFL REQUIRED orocos-bfl)
 
-# use c++0x
-set( CMAKE_CXX_FLAGS -std=c++0x)
-
-include_directories(${BFL_INCLUDE_DIRS})
-
 message("BFL include dirs:" ${BFL_INCLUDE_DIRS})
 message("BFL library dirs:" ${BFL_LIBRARY_DIRS})
 link_directories(${BFL_LIBRARY_DIRS})
+include_directories(${BFL_INCLUDE_DIRS})
+
+## This plugin includes Qt widgets, so we must include Qt like so:
+find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
+include(${QT_USE_FILE})
+
+## I prefer the Qt signals and slots to avoid defining "emit", "slots",
+## etc because they can conflict with boost signals, so define QT_NO_KEYWORDS here.
+add_definitions(-DQT_NO_KEYWORDS)
+
+## Here we specify which header files need to be run through "moc",
+## Qt's meta-object compiler.
+qt4_wrap_cpp(MOC_FILES
+  include/visualization/path_display.h
+)
 
 
 # dynamic reconfigure
@@ -60,15 +74,18 @@ include_directories(
     )
 
 #common commands for building c++ executables and libraries
-add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS})
+# add_library(${PROJECT_NAME} src/motion.cpp src/wheelpod.cpp)
+# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
-add_executable(motion_node src/motion_node.cpp)
+add_executable(motion_node
+    src/motion.cpp
+    src/wheelpod.cpp
+    src/motion_node.cpp)
 target_link_libraries(motion_node
-    ${PROJECT_NAME}
     ${Boost_LIBRARIES}
     ${catkin_LIBRARIES}
 )
+add_dependencies(motion_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 add_executable(least_squares_odometry
     src/odometry_node.cpp
@@ -110,16 +127,24 @@ target_link_libraries(test_path
     ${catkin_LIBRARIES}
     )
 
+add_library(path_viz
+  src/path_display.cpp
+  src/path_visual.cpp
+  ${MOC_FILES}
+  )
+target_link_libraries(path_viz ${QT_LIBRARIES} ${catkin_LIBRARIES})
+
+
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
     src/acceleration_limit.cpp)
 
 install(
     TARGETS
-      ${PROJECT_NAME}
       motion_node
       least_squares_odometry
       EKF_odometry
       test_path
+      path_viz
 
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -132,3 +157,7 @@ install(
         nodes/manual_control_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+install(FILES
+  plugin_description.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

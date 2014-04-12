@@ -27,6 +27,7 @@
     <build_depend>platform_motion_msgs</build_depend>
     <build_depend>visual_servo_msgs</build_depend>
     <build_depend>manipulator_msgs</build_depend>
+    <build_depend>rviz</build_depend>
 
     <run_depend>platform_motion_msgs</run_depend>
     <run_depend>message_runtime</run_depend>
@@ -46,7 +47,11 @@
     <run_depend>bfl</run_depend>
     <run_depend>visual_servo_msgs</run_depend>
     <run_depend>manipulator_msgs</run_depend>
+    <run_depend>rviz</run_depend>
 
+    <export>
+        <rviz plugin="${prefix}/plugin_description.xml"/>
+    </export>
 
 </package>
 
