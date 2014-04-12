@@ -22,8 +22,6 @@ link_directories(${catkin_LIBRARY_DIRS} ${THE_SMOOTH_LIBRARY_DIRS})
 # Generate messages
 ##############################################################################
 
-generate_messages(DEPENDENCIES geometry_msgs)
-
 ##############################################################################
 # Define package
 ##############################################################################
