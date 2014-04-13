@@ -1,12 +1,218 @@
+#include <limits>
+
 #include <ros/ros.h>
+
+#include <Eigen/Dense>
 
 #include <tf/transform_listener.h>
 #include <tf/tf.h>
+#include <tf_conversions/tf_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 #include <platform_motion_msgs/Path.h>
 #include <platform_motion_msgs/ScaryTestMode.h>
 
 namespace platform_motion {
+
+const double LARGE_RADIUS = 2e3;
+const double SMALL_RADIUS = 0.01;
+
+class Circle
+{
+    double kappa_;
+    double R_;
+    double v_;
+    double omega_;
+
+public:
+
+    double time_;
+    double yaw_;
+    double theta_;
+    Eigen::Vector3d pos_;
+
+    void curvature(double k)
+    {
+        kappa_ = k;
+        if( k>1./SMALL_RADIUS )
+        {
+            R_ = 1./k;
+        }
+        else
+        {
+            R_ = std::numeric_limits<double>::infinity();
+        }
+    }
+
+    void radius(double R)
+    {
+        R_ = R;
+        if( R>SMALL_RADIUS )
+        {
+            kappa_ = 1./R_;
+        }
+        else
+        {
+            kappa_ = std::numeric_limits<double>::infinity();
+        }
+    }
+
+    double curvature(void) const
+    {
+        if( isinf( kappa_ ) )
+        {
+            if( R_ == 0)
+            {
+                return kappa_;
+            }
+            else
+            {
+                return 1./R_;
+            }
+        }
+        else
+        {
+            return kappa_;
+        }
+    }
+
+    double radius(void) const
+    {
+        if( isinf(R_) )
+        {
+            return 1./kappa_;
+        }
+        else
+        {
+            return R_;
+        }
+    }
+
+    void omega(double w)
+    {
+        omega_ = w;
+        if( isinf(kappa_) )
+        {
+            v_ = omega_*R_;
+        }
+        else
+        {
+            v_ = omega_/kappa_;
+        }
+    }
+
+    double omega(void) const
+    {
+        return omega_;
+    };
+
+    void speed(double v)
+    {
+        v_ = v;
+        if( isinf(kappa_) && R_ != 0 )
+        {
+            omega_ = v_/R_;
+        }
+        else
+        {
+            omega_ = kappa_*v_;
+        }
+    };
+
+    double speed(void) const
+    {
+        return v_;
+    }
+
+    Eigen::Vector3d velocity(void)
+    {
+        Eigen::Vector3d vel;
+        vel << speed()*cos(theta_+yaw_-M_PI_2), speed()*sin(theta_+yaw_-M_PI_2), 0;
+        return vel;
+    };
+
+    platform_motion_msgs::Knot knot(void)
+    {
+        platform_motion_msgs::Knot k;
+        k.header.stamp = ros::Time( time_ );
+        tf::pointEigenToMsg( pos_, k.pose.position );
+        tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0,0,yaw_), k.pose.orientation);
+        tf::vectorEigenToMsg( velocity(), k.twist.linear );
+        k.twist.angular.x = 0;
+        k.twist.angular.y = 0;
+        k.twist.angular.z = omega();
+        return k;
+    };
+
+    Circle adjust(Circle target, double dt, double maxphidot, double acceleration, double alpha, double wheelbase)
+    {
+        Circle adjusted;
+        double thetaerror = theta_ - target.theta_;
+        double kappa, targetkappa;
+        if( isinf(curvature()) )
+        {
+            kappa = 1./SMALL_RADIUS;
+        }
+        else
+        {
+            kappa = curvature();
+        }
+        if( isinf( target.curvature() ) )
+        {
+            targetkappa = 1./SMALL_RADIUS;
+        }
+        else
+        {
+            targetkappa = target.curvature();
+        }
+        double kappaerror = kappa - targetkappa;
+        double phierror = thetaerror + kappaerror*wheelbase*(1.0+pow(kappa*wheelbase, 2.0));
+        double newkappa;
+        if(maxphidot*dt<fabs(phierror))
+        {
+            adjusted.theta_ = theta_ - copysign(maxphidot*dt*thetaerror/phierror, thetaerror);
+            newkappa = kappa - kappaerror/phierror;
+        }
+        else
+        {
+            adjusted.theta_ = target.theta_;
+            newkappa = target.curvature();
+        }
+        if( isinf(target.curvature()) && newkappa >= 1./SMALL_RADIUS)
+        {
+            adjusted.radius( 0.0 );
+        }
+        else
+        {
+            adjusted.curvature( newkappa );
+        }
+        if( target.R_ == 0 )
+        {
+            double werror = omega() - target.omega();
+            double deltaw = std::min( dt*alpha, fabs(werror) );
+            adjusted.omega( omega() + copysign( deltaw, werror ) );
+        }
+        else
+        {
+            double verror=speed() - target.speed();
+            double deltav=std::min( dt*acceleration, fabs(verror) );
+            adjusted.speed( speed() + copysign( deltav, verror ) );
+        }
+        Eigen::Vector3d dir;
+        dir << cos(theta_+yaw_-M_PI_2), sin(theta_+yaw_-M_PI_2), 0;
+        adjusted.pos_ = pos_ + dt*(speed()+adjusted.speed())/2.*dir;
+        adjusted.yaw_ = yaw_ + dt*(omega() + adjusted.omega())/2.;
+        adjusted.time_ = time_ + dt;
+        return adjusted;
+    };
+
+    double distance(const Circle other)
+    {
+        return (pos_ - other.pos_).norm();
+    };
+
+};
+
 
 class TestPath {
     public:
@@ -14,6 +220,14 @@ class TestPath {
     void init(void);
 
     private:
+        const double wheelbase_;
+        const double acceleration_;
+        const double maxv_;
+        const double alpha_;
+        const double maxomega_;
+        const double maxphidot_;
+        const double dt_;
+
         ros::Subscriber scary_test_mode_sub_;
         ros::Publisher path_pub_;
 
@@ -21,14 +235,24 @@ class TestPath {
 
         // scary pvt test mode enable. only do this on blocks!!!
         void scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::ConstPtr msg);
-        std::list<platform_motion_msgs::Knot> computeCirclePath(double dt, double R, double a, double vmax);
-        std::list<platform_motion_msgs::Knot> computeStraightPath(double dt, double tconst, double a, double vmax);
-        std::list<platform_motion_msgs::Knot> computeFigureEight(int numPoints, double amplitude, double omega, double acceleration);
+        std::list<platform_motion_msgs::Knot> computeCirclePath(double R);
+        std::list<platform_motion_msgs::Knot> computeStraightPath(double tconst);
+        std::list<platform_motion_msgs::Knot> computeFigureEight(int numPoints, double amplitude, double omega);
         std::list<platform_motion_msgs::Knot> computeScaryPath(int which);
 
+        std::list<Circle> computeLeftHook(Circle initial, double distance, double radius );
+        std::list<Circle> computeRightPivot(Circle initial, double dtheta);
+        void testMultipleSegments();
 };
 
-TestPath::TestPath()
+TestPath::TestPath() :
+    wheelbase_(1.125),
+    acceleration_(0.1),
+    maxv_(1.5),
+    alpha_(0.13),
+    maxomega_(2.0),
+    maxphidot_(M_PI/2),
+    dt_(0.5)
 {
 }
 
@@ -57,30 +281,139 @@ void TestPath::scaryTestModeCallback(const platform_motion_msgs::ScaryTestMode::
     path_pub_.publish(path);
 }
 
-std::list<platform_motion_msgs::Knot> TestPath::computeStraightPath(double dt, double tconst, double a, double vmax)
+std::list<Circle> TestPath::computeLeftHook(Circle initial, double distance, double radius)
+{
+    std::list<Circle> ret;
+
+    ret.push_back( initial );
+
+    Circle target;
+    target.curvature( 0 );
+    target.theta_ = M_PI_2;
+    target.speed( maxv_ );
+
+    Circle current = initial;
+
+    ros::Time now = ros::Time(0);
+
+    while( initial.distance(current)<distance )
+    {
+        current = current.adjust( target, dt_, maxphidot_, acceleration_, alpha_, wheelbase_ );
+        ret.push_back( current );
+    }
+
+    target.radius( radius );
+
+    while( (current.yaw_-initial.yaw_)<M_PI_2 )
+    {
+        target.speed( std::min( maxv_, (M_PI_2 - (current.yaw_ - initial.yaw_))/dt_ ) );
+        current = current.adjust( target, dt_, maxphidot_, acceleration_, alpha_, wheelbase_ );
+        ret.push_back( current );
+    }
+
+    return ret;
+}
+
+std::list<Circle> TestPath::computeRightPivot(Circle initial, double dtheta)
+{
+    std::list<Circle> ret;
+
+    ret.push_back(initial);
+
+    Circle current=initial;
+    Circle target=initial;
+
+    target.radius( 0.0 );
+    target.theta_ = M_PI_2;
+    target.yaw_ += dtheta;
+    target.omega( maxomega_ );
+
+    while( (current.yaw_ - initial.yaw_)<dtheta )
+    {
+        double yerror = (dtheta-(current.yaw_ - initial.yaw_)<dtheta );
+        target.omega( copysign(std::min( maxomega_, yerror/dt_ ), dtheta) );
+        current.adjust( target, dt_, maxphidot_, acceleration_, alpha_, wheelbase_ );
+        ret.push_back( current );
+    }
+
+    return ret;
+}
+
+template<typename T, typename P>
+T find_last_if( const std::list<T> &seg, P pred )
+{
+    return *std::find_if(
+            typename std::list<T>::const_reverse_iterator( seg.end() ),
+            typename std::list<T>::const_reverse_iterator( seg.begin() ),
+            pred
+            );
+}
+
+void TestPath::testMultipleSegments()
+{
+    std::vector<std::list<Circle> > segments;
+    Circle start;
+    start.curvature( 0 );
+    start.speed( 0 );
+    start.time_ = 0;
+    start.yaw_ = 0;
+    start.theta_ = M_PI_2;
+    start.pos_ = Eigen::Vector3d::Zero();
+
+    Circle lastStraight;
+    for(int i=0;i<4;i++)
+    {
+        segments.push_back(computeLeftHook( start, 3.0, 1.5 ));
+
+        lastStraight = find_last_if(
+                segments.back(),
+                [](Circle c){ return c.curvature() == 0; }
+                );
+        segments.push_back( computeRightPivot( lastStraight, -M_PI_2 ) );
+
+        start = segments.back().back();
+    }
+
+    platform_motion_msgs::Path path;
+    path.header.stamp = ros::Time(0);
+    path.header.frame_id = "map";
+    for( auto seg : segments )
+    {
+        path.header.stamp = ros::Time( seg.front().time_ );
+        path.knots.clear();
+        std::transform( seg.begin(), seg.end(), path.knots.begin(),
+                [](Circle c)->platform_motion_msgs::Knot { return c.knot(); }
+                );
+        path_pub_.publish(path);
+
+        ros::Duration( 1.0 ).sleep();
+    }
+}
+
+std::list<platform_motion_msgs::Knot> TestPath::computeStraightPath(double tconst)
 {
     std::list<platform_motion_msgs::Knot> retval;
 
     platform_motion_msgs::Knot knot;
     knot.pose.orientation.w=1.0;
 
-    ros::Duration step = ros::Duration(dt);
+    ros::Duration step = ros::Duration(dt_);
 
-    while(knot.twist.linear.x<vmax)
+    while(knot.twist.linear.x<maxv_)
     {
         retval.push_back(knot);
         knot.header.stamp += step;
         knot.header.seq += 1;
         double t = (knot.header.stamp).toSec();
-        knot.twist.linear.x  = a*t;
-        knot.pose.position.x = dt*a*t*t;
+        knot.twist.linear.x  = acceleration_*t;
+        knot.pose.position.x = dt_*acceleration_*t*t;
     }
     knot = retval.back();
-    knot.twist.linear.x = vmax;
-    for(double t=0;t<tconst;t+=dt) {
+    knot.twist.linear.x = maxv_;
+    for(double t=0;t<tconst;t+=dt_) {
         knot.header.stamp += step;
         knot.header.seq += 1;
-        knot.pose.position.x += vmax*dt;
+        knot.pose.position.x += maxv_*dt_;
         retval.push_back(knot);
     }
     ros::Time tdecel=knot.header.stamp;
@@ -90,38 +423,38 @@ std::list<platform_motion_msgs::Knot> TestPath::computeStraightPath(double dt, d
         knot.header.stamp += step;
         knot.header.seq += 1;
         double t = (knot.header.stamp - tdecel).toSec();
-        knot.twist.linear.x  = vmax - a*t;
-        knot.pose.position.x = xdecel + (vmax*t - dt*a*t*t);
+        knot.twist.linear.x  = maxv_ - acceleration_*t;
+        knot.pose.position.x = xdecel + (maxv_*t - dt_*acceleration_*t*t);
         if(knot.twist.linear.x>0) retval.push_back(knot);
     }
     knot = retval.back();
-    double decelrest=knot.twist.linear.x/a;
+    double decelrest=knot.twist.linear.x/acceleration_;
     knot.header.stamp    += ros::Duration(decelrest);
-    knot.pose.position.x += dt*a*decelrest*decelrest;
+    knot.pose.position.x += dt_*acceleration_*decelrest*decelrest;
     knot.twist.linear.x   = 0;
     retval.push_back(knot);
 
     return retval;
 }
 
-std::list<platform_motion_msgs::Knot> TestPath::computeCirclePath(double dt, double R, double a, double vmax)
+std::list<platform_motion_msgs::Knot> TestPath::computeCirclePath(double R )
 {
     std::list<platform_motion_msgs::Knot> retval;
 
     platform_motion_msgs::Knot knot;
     knot.pose.orientation.w=1.0;
 
-    ros::Duration step = ros::Duration(dt);
+    ros::Duration step = ros::Duration(dt_);
 
     double s=0, v=0, t=0, theta=0;
     retval.push_back(knot);
-    while(v<vmax)
+    while(v<maxv_)
     {
         knot.header.stamp += step;
         knot.header.seq += 1;
-        t += dt;
-        v = a*t;
-        s = dt*a*t*t;
+        t += dt_;
+        v = acceleration_*t;
+        s = dt_*acceleration_*t*t;
         theta = s/R;
         tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0,0,theta), knot.pose.orientation);
         knot.twist.angular.z = v/R;
@@ -136,8 +469,8 @@ std::list<platform_motion_msgs::Knot> TestPath::computeCirclePath(double dt, dou
     {
         knot.header.stamp += step;
         knot.header.seq += 1;
-        t += dt;
-        s += v*dt;
+        t += dt_;
+        s += v*dt_;
         theta = s/R;
         tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0,0,theta), knot.pose.orientation);
         knot.twist.angular.z = v/R;
@@ -153,9 +486,9 @@ std::list<platform_motion_msgs::Knot> TestPath::computeCirclePath(double dt, dou
     {
         knot.header.stamp += step;
         knot.header.seq += 1;
-        t += dt;
-        v  = vdecel-a*t;
-        s  = sdecel+vdecel*t-dt*a*t*t;
+        t += dt_;
+        v  = vdecel-acceleration_*t;
+        s  = sdecel+vdecel*t-dt_*acceleration_*t*t;
         theta = s/R;
         tf::quaternionTFToMsg(tf::createQuaternionFromRPY(0,0,theta), knot.pose.orientation);
         knot.twist.angular.z = v/R;
@@ -168,7 +501,7 @@ std::list<platform_motion_msgs::Knot> TestPath::computeCirclePath(double dt, dou
     return retval;
 }
 
-std::list<platform_motion_msgs::Knot> TestPath::computeFigureEight(int numPoints, double amplitude, double omega, double acceleration)
+std::list<platform_motion_msgs::Knot> TestPath::computeFigureEight(int numPoints, double amplitude, double omega)
 {
     std::list<platform_motion_msgs::Knot> retval;
     // compute the time step between each point
@@ -187,8 +520,8 @@ std::list<platform_motion_msgs::Knot> TestPath::computeFigureEight(int numPoints
     double xDot0 = 2.0 * amplitude * omega;
     double yDot0 = 2.0 * amplitude * omega;
     double theta0 = f(g(xDot0, yDot0));
-    double startDistance = 0.5 * (pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
-    double startDuration = sqrt(pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration;
+    double startDistance = 0.5 * (pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration_;
+    double startDuration = sqrt(pow(xDot0, 2.0) + pow(yDot0, 2.0)) / acceleration_;
     platform_motion_msgs::Knot start;
     start.pose.orientation.w=1.0;
     start.pose.position.x = startDistance * cos(theta0 + M_PI);
@@ -227,9 +560,9 @@ std::list<platform_motion_msgs::Knot> TestPath::computeFigureEight(int numPoints
     // now add a ramp down to zero at the end.
     platform_motion_msgs::Knot end;
     double endDistance = 0.5 * (pow(retval.back().twist.linear.x, 2.0) + pow(retval.back().twist.linear.y, 2.0))
-        / acceleration;
+        / acceleration_;
     double endDuration = sqrt(pow(retval.back().twist.linear.x, 2.0) + pow(retval.back().twist.linear.y, 2.0)) /
-        acceleration;
+        acceleration_;
 
     end.header.stamp = retval.back().header.stamp + ros::Duration(endDuration);
     end.header.seq = seq++;
@@ -269,13 +602,13 @@ std::list<platform_motion_msgs::Knot> TestPath::computeScaryPath(int which)
 
     switch(which) {
         case platform_motion_msgs::ScaryTestMode::Circle:
-            retval=computeCirclePath(dt, R,  a, vmax);
+            retval=computeCirclePath(R);
             break;
         case platform_motion_msgs::ScaryTestMode::Straight:
-            retval=computeStraightPath(dt, tconst, a, vmax);
+            retval=computeStraightPath(tconst);
             break;
         case platform_motion_msgs::ScaryTestMode::FigureEight:
-            retval=computeFigureEight(numPoints, amplitude, omega, a);
+            retval=computeFigureEight(numPoints, amplitude, omega);
             break;
         default:
             ROS_ERROR("Unknown path %d", which);
