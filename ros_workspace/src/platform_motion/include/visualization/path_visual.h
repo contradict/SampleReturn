@@ -50,17 +50,43 @@ public:
 
   // Set the color and alpha of the visual, which are user-editable
   // parameters and therefore don't come from the SLAMGraph message.
-  void setPathColor( Ogre::ColourValue &edgecolor,
-                 float a );
+  void setSlowColor( Ogre::ColourValue &slowcolor );
+  void setFastColor( Ogre::ColourValue &fastcolor );
+  void setAlpha( double a );
+  void setPoseLength( double l );
+  void setPoseRadius( double r );
+  void setShaftRadius( double r );
+  void setShaftLength( double l );
+  void setHeadRadius( double r );
+  void setHeadLength( double l );
+  void setVelocityScale( double s );
+  void setAngularRateScale( double r );
+
 
 private:
+  void redrawArrows( void );
+
   // The object implementing the actual arrow shape
   std::vector<boost::shared_ptr<rviz::Axes> > poses_;
-  std::vector<boost::shared_ptr<rviz::Arrow> > velocities_;
-  std::vector<boost::shared_ptr<rviz::Arrow> > angular_rates_;
-  Ogre::ColourValue path_color_;
+  std::vector<double> scaled_velocities_;
+  std::vector<boost::shared_ptr<rviz::Arrow> > velocity_arrows_;
+  std::vector<double> scaled_rates_;
+  std::vector<boost::shared_ptr<rviz::Arrow> > angular_rate_arrows_;
+
+  Ogre::ColourValue slow_color_;
+  Ogre::ColourValue fast_color_;
 
   float alpha_;
+
+  double pose_length_;
+  double pose_radius_;
+  double shaft_radius_;
+  double shaft_length_;
+  double head_radius_;
+  double head_length_;
+  double velocity_scale_;
+  double angular_rate_scale_;
+
 
   // A SceneNode whose pose is set to match the coordinate frame of
   // the SLAMGraph message header.

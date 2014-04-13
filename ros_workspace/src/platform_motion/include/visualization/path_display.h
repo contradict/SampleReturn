@@ -66,8 +66,19 @@ protected:
 
   // These Qt slots get connected to signals indicating changes in the user-editable properties.
 private Q_SLOTS:
-  void updateColorAndAlpha();
   void updateHistoryLength();
+  void updateSlowColor();
+  void updateFastColor();
+  void updateAlpha();
+  void updatePoseLength();
+  void updatePoseRadius();
+  void updateShaftRadius();
+  void updateShaftLength();
+  void updateHeadRadius();
+  void updateHeadLength();
+  void updateVelocityScale();
+  void updateAngularRateScale();
+
 
   // Function to handle an incoming ROS message.
 private:
@@ -78,9 +89,19 @@ private:
   boost::circular_buffer<boost::shared_ptr<PathVisual> > visuals_;
 
   // User-editable property variables.
-  rviz::ColorProperty* path_color_;
-  rviz::FloatProperty* alpha_property_;
   rviz::IntProperty* history_length_property_;
+  rviz::ColorProperty* fast_color_property_;
+  rviz::ColorProperty* slow_color_property_;
+  rviz::FloatProperty* alpha_property_;
+  rviz::FloatProperty* pose_length_property_;
+  rviz::FloatProperty* pose_radius_property_;
+  rviz::FloatProperty* shaft_radius_property_;
+  rviz::FloatProperty* shaft_length_property_;
+  rviz::FloatProperty* head_radius_property_;
+  rviz::FloatProperty* head_length_property_;
+  rviz::FloatProperty* velocity_scale_property_;
+  rviz::FloatProperty* angular_rate_scale_property_;
+
 };
 // END_TUTORIAL
 

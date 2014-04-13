@@ -24,19 +24,76 @@ namespace path_viz
 // constructor the parameters it needs to fully initialize.
 PathDisplay::PathDisplay()
 {
-  path_color_ = new rviz::ColorProperty( "Point Color", QColor( 204, 51, 204 ),
-                                          "Color to draw the points.",
-                                           this, SLOT( updateColorAndAlpha() ));
-
-  alpha_property_ = new rviz::FloatProperty( "Alpha", 1.0,
-                                             "0 is fully transparent, 1.0 is fully opaque.",
-                                             this, SLOT( updateColorAndAlpha() ));
-
   history_length_property_ = new rviz::IntProperty( "History Length", 1,
                                                     "Number of prior measurements to display.",
                                                     this, SLOT( updateHistoryLength() ));
   history_length_property_->setMin( 1 );
   history_length_property_->setMax( 100000 );
+
+  slow_color_property_ = new rviz::ColorProperty( "Slow Color", QColor( 255, 0, 0 ),
+                                          "Color to draw low speeds.",
+                                           this, SLOT( updateSlowColor() ));
+
+  fast_color_property_ = new rviz::ColorProperty( "Fast Color", QColor( 0, 255, 0 ),
+                                          "Color to draw high speeds.",
+                                           this, SLOT( updateFastColor() ));
+
+  alpha_property_ = new rviz::FloatProperty( "Alpha", 1.0,
+                                             "0 is transparent, 1 is opaque.",
+                                             this, SLOT( updateAlpha() ));
+  alpha_property_->setMin( 0.0 );
+  alpha_property_->setMax( 1.0 );
+
+  pose_length_property_ = new rviz::FloatProperty( "Pose Length", 0.3,
+                                             "Length of pose gnomon arms.",
+                                             this, SLOT( updatePoseLength() ));
+  pose_length_property_->setMin( 0. );
+  pose_length_property_->setMax( 5. );
+
+  pose_radius_property_ = new rviz::FloatProperty( "Pose Radius", 0.03,
+                                             "Radius of pose gnomon arms.",
+                                             this, SLOT( updatePoseRadius() ));
+  pose_radius_property_->setMin( 0. );
+  pose_radius_property_->setMax( 1. );
+
+  shaft_length_property_ = new rviz::FloatProperty( "Shaft Length", 0.1,
+                                             "Length of arrow shafts.",
+                                             this, SLOT( updateShaftLength() ));
+  shaft_length_property_->setMin( 0. );
+  shaft_length_property_->setMax( 5. );
+
+
+  shaft_radius_property_ = new rviz::FloatProperty( "Shaft Radius", 0.04,
+                                             "Radius of arrow shafts.",
+                                             this, SLOT( updateShaftRadius() ));
+  shaft_radius_property_->setMin( 0. );
+  shaft_radius_property_->setMax( 1. );
+
+  head_length_property_ = new rviz::FloatProperty( "Head Length", 0.08,
+                                             "Length of arrow head.",
+                                             this, SLOT( updateHeadLength() ));
+  head_length_property_->setMin( 0. );
+  head_length_property_->setMax( 5. );
+
+
+  head_radius_property_ = new rviz::FloatProperty( "Head Radius", 0.06,
+                                             "Radius of arrow head.",
+                                             this, SLOT( updateHeadRadius() ));
+  head_radius_property_->setMin( 0. );
+  head_radius_property_->setMax( 2. );
+
+  velocity_scale_property_ = new rviz::FloatProperty( "Velocity Scale", 2.0,
+                                             "Velocity to length scale.",
+                                             this, SLOT( updateVelocityScale() ));
+  velocity_scale_property_->setMin( 0.01 );
+  velocity_scale_property_->setMax( 10.0 );
+
+  angular_rate_scale_property_ = new rviz::FloatProperty( "Angular Rate Scale", 2.7,
+                                             "Angular rate to length scale.",
+                                             this, SLOT( updateAngularRateScale() ));
+  velocity_scale_property_->setMin( 0.01 );
+  velocity_scale_property_->setMax( 10.0 );
+
 }
 
 // After the top-level rviz::Display::initialize() does its own setup,
@@ -66,22 +123,112 @@ void PathDisplay::reset()
   visuals_.clear();
 }
 
-// Set the current color and alpha values for each visual.
-void PathDisplay::updateColorAndAlpha()
-{
-  float alpha = alpha_property_->getFloat();
-  Ogre::ColourValue pathcolor = path_color_->getOgreColor();
-
-  for( size_t i = 0; i < visuals_.size(); i++ )
-  {
-    visuals_[ i ]->setPathColor( pathcolor, alpha );
-  }
-}
-
 // Set the number of past visuals to show.
 void PathDisplay::updateHistoryLength()
 {
   visuals_.rset_capacity(history_length_property_->getInt());
+}
+
+// Set the current color and alpha values for each visual.
+void PathDisplay::updateSlowColor()
+{
+  Ogre::ColourValue c = slow_color_property_->getOgreColor();
+
+  for( size_t i = 0; i < visuals_.size(); i++ )
+  {
+    visuals_[ i ]->setSlowColor( c );
+  }
+}
+
+void PathDisplay::updateFastColor()
+{
+  Ogre::ColourValue c = fast_color_property_->getOgreColor();
+
+  for( size_t i = 0; i < visuals_.size(); i++ )
+  {
+    visuals_[ i ]->setFastColor( c );
+  }
+}
+
+void PathDisplay::updateAlpha()
+{
+    float alpha = alpha_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setAlpha( alpha );
+    }
+}
+
+void PathDisplay::updatePoseLength()
+{
+    float l = pose_radius_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setPoseLength( l );
+    }
+}
+
+void PathDisplay::updatePoseRadius()
+{
+    float r = pose_radius_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setPoseRadius( r );
+    }
+}
+
+void PathDisplay::updateShaftRadius()
+{
+    float r = shaft_radius_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setShaftRadius( r );
+    }
+}
+
+void PathDisplay::updateShaftLength()
+{
+    float l = shaft_length_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setShaftLength( l );
+    }
+}
+
+void PathDisplay::updateHeadRadius()
+{
+    float r = head_radius_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setHeadRadius( r );
+    }
+}
+
+void PathDisplay::updateHeadLength()
+{
+    float l = head_length_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setHeadLength( l );
+    }
+}
+
+void PathDisplay::updateVelocityScale()
+{
+    float s = velocity_scale_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setVelocityScale( s );
+    }
+}
+
+void PathDisplay::updateAngularRateScale()
+{
+    float r = angular_rate_scale_property_->getFloat();
+    for( size_t i = 0; i < visuals_.size(); i++ )
+    {
+        visuals_[ i ]->setAngularRateScale( r );
+    }
 }
 
 // This is our callback to handle an incoming message.
@@ -114,8 +261,29 @@ void PathDisplay::processMessage( const platform_motion_msgs::Path::ConstPtr& ms
   }
 
   float alpha = alpha_property_->getFloat();
-  Ogre::ColourValue pathcolor = path_color_->getOgreColor();
-  visual->setPathColor( pathcolor, alpha);
+  Ogre::ColourValue c = slow_color_property_->getOgreColor();
+  visual->setSlowColor( c );
+  c = fast_color_property_->getOgreColor();
+  visual->setFastColor( c );
+  float a = alpha_property_->getFloat();
+  visual->setAlpha( a );
+  float l = pose_length_property_->getFloat();
+  visual->setPoseLength( l );
+  float r = pose_radius_property_->getFloat();
+  visual->setPoseRadius( r );
+  r = shaft_radius_property_->getFloat();
+  visual->setShaftRadius( r );
+  l = shaft_length_property_->getFloat();
+  visual->setShaftLength( l );
+  r = head_radius_property_->getFloat();
+  visual->setHeadRadius( r );
+  l = head_length_property_->getFloat();
+  visual->setHeadLength( l );
+  float s = velocity_scale_property_->getFloat();
+  visual->setVelocityScale( s );
+  r = angular_rate_scale_property_->getFloat();
+  visual->setAngularRateScale( r );
+
   // Now set or update the contents of the chosen visual.
   visual->setMessage( msg );
   visual->setFramePosition( position );
