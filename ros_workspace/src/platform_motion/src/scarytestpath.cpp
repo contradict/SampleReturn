@@ -610,6 +610,12 @@ std::list<platform_motion_msgs::Knot> TestPath::computeScaryPath(int which)
         case platform_motion_msgs::ScaryTestMode::FigureEight:
             retval=computeFigureEight(numPoints, amplitude, omega);
             break;
+        case platform_motion_msgs::ScaryTestMode::Box:
+            // testMultipleSegments does the sending, so there's no return value here
+            // this will also test the behavior of sending an empty path, which should
+            // work, but is currently untested!
+            testMultipleSegments();
+            break;
         default:
             ROS_ERROR("Unknown path %d", which);
             return retval;
