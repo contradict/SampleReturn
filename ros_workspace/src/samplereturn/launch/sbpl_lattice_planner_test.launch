@@ -42,7 +42,7 @@
     <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
     <include file="$(find samplereturn)/launch/search_detection.launch"/>
     <include file="$(find visual_servo)/launch/visual_servo.launch"/>
-    <include file="$(find samplereturn)/launch/planner_test.launch"/>
+    <include file="$(find samplereturn)/launch/planner_sbpl_smooth.launch"/>
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
     <include file="$(find executive)/launch/executive.launch"/>
 </launch>
