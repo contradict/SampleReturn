@@ -1921,25 +1921,25 @@ void Motion::pvtToZero( void )
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
     lastSegmentSent_.stern.duration = 0.250;
-    if( lastSegmentSent_.port.wheelVelocity > 0 ||
-        lastSegmentSent_.starboard.wheelVelocity > 0 ||
-        lastSegmentSent_.stern.wheelVelocity > 0 )
-    {
-        ROS_DEBUG( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
-        lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
-        lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
-        lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
-        lastSegmentSent_.starboard.steeringVelocity = decelSteering(lastSegmentSent_.starboard.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.starboard.steeringAngle );
-        lastSegmentSent_.stern.wheelVelocity = decelWheel(lastSegmentSent_.stern.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.stern.wheelDistance );
-        lastSegmentSent_.stern.steeringVelocity = decelSteering(lastSegmentSent_.stern.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.stern.steeringAngle );
-    }
+    ROS_DEBUG( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
+    lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
+    lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
+    lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
+    lastSegmentSent_.starboard.steeringVelocity = decelSteering(lastSegmentSent_.starboard.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.starboard.steeringAngle );
+    lastSegmentSent_.stern.wheelVelocity = decelWheel(lastSegmentSent_.stern.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.stern.wheelDistance );
+    lastSegmentSent_.stern.steeringVelocity = decelSteering(lastSegmentSent_.stern.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.stern.steeringAngle );
     port->move(lastSegmentSent_.port);
     starboard->move(lastSegmentSent_.starboard);
     stern->move(lastSegmentSent_.stern);
-    ROS_DEBUG( "Zeroing: %f %f %f %f %f %f",
+    ROS_DEBUG( "Zeroing steering: %f %f %f %f %f %f",
             lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
             lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
             lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
+    ROS_DEBUG( "Zeroing wheels: %f %f %f %f %f %f",
+            lastSegmentSent_.port.wheelDistance, lastSegmentSent_.port.wheelVelocity,
+            lastSegmentSent_.starboard.wheelDistance, lastSegmentSent_.starboard.wheelVelocity,
+            lastSegmentSent_.stern.wheelDistance, lastSegmentSent_.stern.wheelVelocity
             );
 }
 
