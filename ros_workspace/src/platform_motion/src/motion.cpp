@@ -1461,10 +1461,9 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         stitchedPath_pub_.publish( stitched );
     }
 
-    if(firstSegment_.time >= secondSegment_.time)
+    if( plannedPath.size()>0 && firstSegment_.time >= secondSegment_.time)
     {
         newPathReady = true;
-
     }
 
     primePVT();
