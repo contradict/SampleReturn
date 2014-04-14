@@ -26,12 +26,18 @@
         <arg name="kind" value="$(arg kind)"/>
     </include>
 
-    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization" ns="/processes">
+    <!-- Nodes -->
+    <node machine="navigate"
+          pkg="fake_localization"
+          type="fake_localization"
+          name="fake_localization"
+          ns="/processes">
         <remap from="base_pose_ground_truth" to="/motion/odometry"/>
     </node>
 
-    <!--<node pkg="tf" type="static_transform_publisher" name="map_odom_broadcaster" args="0 0 0 0 0 0 map odom 100" />-->
+    <param name="use_sim_time" value="False" type="bool"/>
 
+    <!-- Launch Files -->
     <include file="$(find samplereturn)/launch/motion.launch"/>
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
