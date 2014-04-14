@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  geometry_msgs
   message_generation
 )
 
@@ -76,6 +77,7 @@ add_message_files(
   FILES
   VoiceAnnouncement.msg
   CameraParams.msg
+  NamedPoint.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -95,6 +97,7 @@ add_message_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
     DEPENDENCIES
+        geometry_msgs
         std_msgs
 )
 
@@ -111,7 +114,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES visual_servo_msgs
-  CATKIN_DEPENDS message_runtime std_msgs
+  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
 #  DEPENDS system_lib
 )
 
