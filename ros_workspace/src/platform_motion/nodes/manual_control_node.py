@@ -54,7 +54,7 @@ class ManualController(object):
                                        self.announcer,
                                        platform_srv.SelectMotionModeRequest.MODE_JOYSTICK),
                                    transitions = {'next':'JOYSTICK_LISTEN',
-                                                 'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'MANUAL_ABORTED'})
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
@@ -68,9 +68,10 @@ class ManualController(object):
             smach.StateMachine.add('SELECT_SERVO',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_SERVO),
+                                       platform_srv.SelectMotionModeRequest.MODE_SERVO,
+                                       failannounce="Unable to select visual servo."),
                                    transitions = {'next':'VISUAL_SERVO',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'SELECT_JOYSTICK'})
              
             self.last_sample_detected = rospy.get_time()
             self.last_servo_feedback = rospy.get_time()
@@ -109,9 +110,11 @@ class ManualController(object):
             smach.StateMachine.add('SELECT_PAUSE',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE),
+                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE,
+                                       failannounce="Unable to pause for grab."
+                                       ),
                                    transitions = {'next':'MANIPULATOR_GRAB',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'SELECT_JOYSTICK'})
             
             grab_msg = manipulator_msg.ManipulatorGoal()
             grab_msg.type = grab_msg.GRAB
@@ -136,9 +139,10 @@ class ManualController(object):
             smach.StateMachine.add('RESUME_JOYSTICK',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_RESUME),
+                                       platform_srv.SelectMotionModeRequest.MODE_RESUME,
+                                       failannounce="Unable to resume from grab."),
                                    transitions = {'next':'JOYSTICK_LISTEN',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
                                      ManualPreempted(self.CAN_interface),
@@ -153,9 +157,10 @@ class ManualController(object):
             smach.StateMachine.add('SELECT_HOME',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_HOME),
+                                       platform_srv.SelectMotionModeRequest.MODE_HOME,
+                                       failannounce="Unable to select home ing mode."),
                                    transitions = {'next':'PERFORM_HOME',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'SELECT_JOYSTICK'})
 
             home_goal = platform_msg.HomeGoal()
             home_goal.home_count = 3
@@ -178,16 +183,18 @@ class ManualController(object):
             smach.StateMachine.add('SELECT_PAUSE_FOR_LOCK',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE),
+                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE,
+                                       failannounce="Unable to pause for lock, attempting lock anyway."),
                                    transitions = {'next':'SELECT_LOCK',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'SELECT_LOCK'})
 
             smach.StateMachine.add('SELECT_LOCK',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_LOCK),
+                                       platform_srv.SelectMotionModeRequest.MODE_LOCK,
+                                       failannounce="Unable to lock."),
                                    transitions = {'next':'WAIT_FOR_UNLOCK',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'RESUME_FROM_LOCK'})
 
             smach.StateMachine.add('WAIT_FOR_UNLOCK',
                                     WaitForJoystickButton(
@@ -204,16 +211,18 @@ class ManualController(object):
             smach.StateMachine.add('SELECT_UNLOCK',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_UNLOCK),
+                                       platform_srv.SelectMotionModeRequest.MODE_UNLOCK,
+                                       failannounce="Unable to unlock."),
                                    transitions = {'next':'RESUME_FROM_LOCK',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'RESUME_FROM_LOCK'})
 
             smach.StateMachine.add('RESUME_FROM_LOCK',
                                    SelectMotionMode(self.CAN_interface,
                                        self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_RESUME),
+                                       platform_srv.SelectMotionModeRequest.MODE_RESUME,
+                                       failannounce="Resume from unlock failed."),
                                    transitions = {'next':'JOYSTICK_LISTEN',
-                                                  'aborted':'MANUAL_ABORTED'})
+                                                  'failed':'SELECT_JOYSTICK'})
 
 
              #end with state_machine
@@ -280,14 +289,22 @@ class ProcessGoal(smach.State):
         return 'valid_goal'
 
 class SelectMotionMode(smach.State):
-    def __init__(self, CAN_interface, announcer, motion_mode):
-        smach.State.__init__(self, outcomes = ['next', 'aborted'])
+    def __init__(self, CAN_interface, announcer, motion_mode, failannounce=None):
+        smach.State.__init__(self, outcomes = ['next', 'failed'])
         self.CAN_interface = CAN_interface
         self.announcer = announcer
         self.motion_mode = motion_mode
+        self.failannounce = failannounce
                       
     def execute(self, userdata):
-        self.CAN_interface.select_mode(self.motion_mode)
+        try:
+            self.CAN_interface.select_mode(self.motion_mode)
+        except:
+            rospy.logerr( "Unable to select mode %d", self.motion_mode )
+            if self.failannounce is not None:
+                rospy.logerr( self.failannounce )
+                self.announcer.say(self.failannounce)
+            return 'failed'
         self.CAN_interface.publish_zero()
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_LOCK:
             self.announcer.say("Wheel lock selected")
