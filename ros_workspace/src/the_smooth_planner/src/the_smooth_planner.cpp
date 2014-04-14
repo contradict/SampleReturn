@@ -1,14 +1,13 @@
 #include <the_smooth_planner/the_smooth_planner.h>
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
-#include <ecl/geometry/cubic_spline.hpp>
 #include <platform_motion_msgs/Path.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
+#include <Eigen/Dense>
 
 using namespace std;
 using namespace ros;
-using namespace ecl;
 
 PLUGINLIB_DECLARE_CLASS(the_smooth_planner, TheSmoothPlanner, the_smooth_planner::TheSmoothPlanner, nav_core::BaseLocalPlanner);
 
@@ -72,7 +71,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 	// What direction is the robot going and what is the linear/angular vel?
 	Time timestamp = Time::now();
+	timestamp.sec = 0;
+	timestamp.nsec = 0;
 	Eigen::Vector3d linearVelocity(odometry.twist.twist.linear.x, odometry.twist.twist.linear.y, odometry.twist.twist.linear.z);
+	Eigen::Vector3d angularVelocity(odometry.twist.twist.angular.x, odometry.twist.twist.angular.y, odometry.twist.twist.angular.z);
 	double currentVelocityMagnitude = linearVelocity.norm();
 	double pathVelocityMagnitude = currentVelocityMagnitude;
 
@@ -98,41 +100,22 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
-		// 1) Fit a cubic spline to each pair of points, given P and V direction
-		Array<double> times(2);
-		Array<double> positions_x(2);
-		Array<double> positions_y(2);
-		Array<double> angles(2);
-		double linear_direction_xf;
-		double linear_direction_yf;
-
-		times << 0.00, 1.00;
-		positions_x << path.poses[i].pose.position.x, path.poses[i+1].pose.position.x;
-		positions_y << path.poses[i].pose.position.y, path.poses[i+1].pose.position.y;
-		tf::Quaternion initialOrientationQuat(path.poses[i].pose.orientation.x,
-                                              path.poses[i].pose.orientation.y,
-                                              path.poses[i].pose.orientation.z,
-                                              path.poses[i].pose.orientation.w);
-		tf::Quaternion finalOrientationQuat(path.poses[i+1].pose.orientation.x,
-                                            path.poses[i+1].pose.orientation.y,
-                                            path.poses[i+1].pose.orientation.z,
-                                            path.poses[i+1].pose.orientation.w);
-		double roll_0, pitch_0, yaw_0;
-		double roll_f, pitch_f, yaw_f;
-		tf::Matrix3x3(initialOrientationQuat).getRPY(roll_0, pitch_0, yaw_0);
-		tf::Matrix3x3(finalOrientationQuat).getRPY(roll_f, pitch_f, yaw_f);
-		angles << yaw_0, yaw_f;
-		linear_direction_xf = cos(yaw_f);
-		linear_direction_yf = sin(yaw_f);
-		// TODO - Control the curvature of the spline by normalizing linearVelocity?
-		CubicSpline positionXSpline = CubicSpline::ContinuousDerivatives(times, positions_x, linearVelocity(0), linear_direction_xf);
-		CubicSpline positionYSpline = CubicSpline::ContinuousDerivatives(times, positions_y, linearVelocity(1), linear_direction_yf);
+		// 1) Compute a final direction vector from the final orientation
+		tf::Vector3 forwardVector(1, 0, 0);
+		tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
+                                                 path.poses[i].pose.orientation.y,
+                                                 path.poses[i].pose.orientation.z,
+                                                 path.poses[i].pose.orientation.w);
+		tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
+                                               path.poses[i+1].pose.orientation.y,
+                                               path.poses[i+1].pose.orientation.z,
+                                               path.poses[i+1].pose.orientation.w);
+		tf::Vector3 finalLinearDirection = tf::quatRotate(finalQuaternion, forwardVector);
 
 		// 2) Based on input V magnitude, compute the output V magnitude
-		// 3) Based on input theta_dot, compute the output theta_dot
 		double deltaX = (path.poses[i+1].pose.position.x - path.poses[i].pose.position.x);
 		double deltaY = (path.poses[i+1].pose.position.y - path.poses[i].pose.position.y);
-		double linear_distance = sqrt(deltaX*deltaX + deltaY*deltaY); // TODO - Better spline length computation?
+		double linear_distance = sqrt(deltaX*deltaX + deltaY*deltaY);
 		distanceTraveled += linear_distance;
 
 		double finalLinearVelocityMagnitude = maximum_linear_velocity;
@@ -140,16 +123,18 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		if (isAccelerating)
 		{
 			finalLinearVelocityMagnitude = (maximum_linear_velocity-currentVelocityMagnitude)*(distanceTraveled/stopAcceleratingDistance) + currentVelocityMagnitude;
-			//finalLinearVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.0*linear_acceleration*distanceTraveled);
 			finalLinearVelocityMagnitude = min(finalLinearVelocityMagnitude, maximum_linear_velocity);
 		}
+		tf::Vector3 finalLinearVelocity = finalLinearDirection;
+		finalLinearVelocity *= finalLinearVelocityMagnitude;
+
+		// 3) Based on input theta_dot, compute the output theta_dot
+		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+pathVelocityMagnitude);
+		double angle = initialQuaternion.angleShortestPath(finalQuaternion);
+		double angular_velocity = angle/delta_time_seconds;
 
 		// 4) Store the data in a new message format containing PVT for linear
 		//    and angular metrics
-		Eigen::Vector2d finalLinearVelocity(linear_direction_xf, linear_direction_yf);
-		finalLinearVelocity *= finalLinearVelocityMagnitude;
-
-		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+pathVelocityMagnitude);
 		timestamp.sec += static_cast<int>(delta_time_seconds);
 		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
 
@@ -157,12 +142,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		path_msg.knots[i+1].header.stamp = timestamp;
 		path_msg.knots[i+1].header.frame_id = "map";
 		path_msg.knots[i+1].pose = path.poses[i+1].pose;
-		path_msg.knots[i+1].twist.linear.x = finalLinearVelocity(0);
-		path_msg.knots[i+1].twist.linear.y = finalLinearVelocity(1);
+		path_msg.knots[i+1].twist.linear.x = finalLinearVelocity.x();
+		path_msg.knots[i+1].twist.linear.y = finalLinearVelocity.y();
 		path_msg.knots[i+1].twist.linear.z = 0.0;
 		path_msg.knots[i+1].twist.angular.x = 0.0;
 		path_msg.knots[i+1].twist.angular.y = 0.0;
-		path_msg.knots[i+1].twist.angular.z = 0.0;
+		path_msg.knots[i+1].twist.angular.z = angular_velocity;
 
 		pathVelocityMagnitude = finalLinearVelocityMagnitude;
 	}
