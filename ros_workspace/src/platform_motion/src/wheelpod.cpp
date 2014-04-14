@@ -8,6 +8,15 @@
 
 namespace platform_motion {
 
+std::ostream& operator<<(std::ostream& os, const PodSegment& seg)
+{
+    os << "<"  << seg.steeringAngle << ", " << seg.steeringVelocity
+        << ", " << seg.wheelDistance << ", " << seg.wheelVelocity
+        << ", " << seg.duration
+        << ">";
+    return os;
+}
+
 void WheelPod::setCallbacks(CANOpen::DS301CallbackObject wheelcb,
       CANOpen::DS301CallbackObject steeringcb,
       CANOpen::CopleyServo::InputChangeCallback gpiocb,

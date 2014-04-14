@@ -101,7 +101,8 @@ Motion::Motion() :
 
     param_nh.param("steering_tolerance", steeringTolerance_, 0.01);
     param_nh.param("steering_accel", steeringAccel_, M_PI);
-    param_nh.param("steering_max_v", steeringMaxV_, M_PI/4.);
+    param_nh.param("maximum_steering_velocity", maxSteeringVelocity_, M_PI/4.);
+    param_nh.param("maximum_wheel_acceleration", maxWheelAcceleration_, 2.0);
 
     body_pt << center_pt_x, center_pt_y;
     enable_carousel_server = nh_.advertiseService("enable_carousel",
@@ -1461,10 +1462,9 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         stitchedPath_pub_.publish( stitched );
     }
 
-    if(firstSegment_.time >= secondSegment_.time)
+    if( plannedPath.size()>0 && firstSegment_.time >= secondSegment_.time)
     {
         newPathReady = true;
-
     }
 
     primePVT();
@@ -1554,6 +1554,58 @@ void Motion::pathToBody()
     }
     ROS_DEBUG("pathToBody exit");
 }
+
+bool Motion::checkSegmentAcceleration()
+{
+    double dt = (secondSegment_.time - firstSegment_.time).toSec();
+    typedef std::tuple<std::string, PodSegment, PodSegment> segtuple;
+    std::vector< segtuple > segs;
+
+    segs.push_back( segtuple( std::string("port"), firstSegment_.port, secondSegment_.port ) );
+    segs.push_back( segtuple( std::string("starboard"), firstSegment_.starboard, secondSegment_.starboard ) );
+    segs.push_back( segtuple( std::string("stern"), firstSegment_.stern, secondSegment_.stern ) );
+
+    bool ok=true;
+    for( auto seg : segs )
+    {
+        std::string name;
+        PodSegment first, second;
+        std::tie( name, first, second )=seg;
+        if( fabs(second.wheelVelocity - first.wheelVelocity) > maxWheelAcceleration_*dt )
+        {
+            ROS_ERROR_STREAM("Excessive wheel acceleration for " << name << " :" << first << " - " << second);
+            ok=false;
+        }
+        if( fabs(second.steeringAngle - first.steeringAngle) > maxSteeringVelocity_*dt )
+        {
+            ROS_ERROR_STREAM("Excessive steering change for " << name << " :" << first << " - " << second);
+            ok=false;
+        }
+    }
+    return ok;
+}
+
+double Motion::computeSafeInterval(double dt)
+{
+    typedef std::tuple<std::string, PodSegment, PodSegment> segtuple;
+    std::vector< segtuple > segs;
+
+    segs.push_back( segtuple( std::string("port"), firstSegment_.port, secondSegment_.port ) );
+    segs.push_back( segtuple( std::string("starboard"), firstSegment_.starboard, secondSegment_.starboard ) );
+    segs.push_back( segtuple( std::string("stern"), firstSegment_.stern, secondSegment_.stern ) );
+
+    for( auto seg : segs )
+    {
+        std::string name;
+        PodSegment first, second;
+        std::tie( name, first, second )=seg;
+        dt = std::max( dt, fabs(second.wheelVelocity - first.wheelVelocity)/maxWheelAcceleration_ );
+        dt = std::max( dt, fabs(second.steeringAngle - first.steeringAngle)/maxSteeringVelocity_ );
+    }
+    return dt;
+}
+
+
 
 // helper function needed only for pathToPod below
 double unwrap(double theta)
@@ -1755,6 +1807,8 @@ void Motion::sendPvtSegment()
 
             pathToBody();
 
+            firstSegment_.time = secondSegment_.time - ros::Duration(computeSafeInterval(0.25));
+
             newPathReady = false;
         }
 
@@ -1791,6 +1845,8 @@ void Motion::sendPvtSegment()
                     ROS_DEBUG("No interpolation needed");
                     newSegment = secondSegment_;
                     pathToBody( );
+                    checkSegmentAcceleration();
+
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
                     ROS_DEBUG("interpolating to now");
@@ -1953,14 +2009,14 @@ bool Motion::setSteering( PodSegment &pod, double goal, double dt)
         return false;
     }
     double vprime;
-    if(fabs(error)<=0.5*steeringMaxV_*steeringMaxV_/steeringAccel_)
+    if(fabs(error)<=0.5*maxSteeringVelocity_*maxSteeringVelocity_/steeringAccel_)
     {
         // decel region
         vprime = copysign( sqrt(2.0*fabs(error)*steeringAccel_) , error );
     }
     else
     {
-        vprime = copysign( std::min( steeringMaxV_, fabs(pod.steeringVelocity) + dt*steeringAccel_ ), error );
+        vprime = copysign( std::min( maxSteeringVelocity_, fabs(pod.steeringVelocity) + dt*steeringAccel_ ), error );
     }
     double dtheta = dt*(pod.steeringVelocity + vprime)/2.;
     if( fabs(dtheta)<fabs(error) )
