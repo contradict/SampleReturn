@@ -9,6 +9,7 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
+  samplereturn_msgs
   cv_bridge
   dynamic_reconfigure
   Eigen)
@@ -128,6 +129,7 @@ add_library(color_naming
 
  target_link_libraries(saliency_detector_node
    saliency_detector_core
+   color_naming
    ${catkin_LIBRARIES}
    BMS
  )
