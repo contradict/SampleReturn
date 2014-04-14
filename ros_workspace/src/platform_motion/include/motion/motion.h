@@ -73,6 +73,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         // pvt mode
         void pathToBody( void );
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
+        bool checkSegmentAcceleration();
+        double computeSafeInterval(double dt);
         Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
         PodSegment pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle);
         void moreDataNeededCallback(CANOpen::DS301 &node);
@@ -146,7 +148,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         double planToZeroDecel_, planToZeroPeriod_;
 
         double portSteeringLock_, starboardSteeringLock_, sternSteeringLock_;
-        double steeringTolerance_, steeringAccel_, steeringMaxV_;
+        double steeringTolerance_, steeringAccel_;
+
+        double maxWheelAcceleration_, maxSteeringVelocity_;
 
         int carousel_encoder_counts;
         double carousel_jerk_limit;
