@@ -137,6 +137,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		//    and angular metrics
 		timestamp.sec += static_cast<int>(delta_time_seconds);
 		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
+		if (timestamp.nsec > 1000000000)
+		{
+			timestamp.sec += 1;
+			timestamp.nsec -= 1000000000;
+		}
 
 		path_msg.knots[i+1].header.seq = i+1;
 		path_msg.knots[i+1].header.stamp = timestamp;
