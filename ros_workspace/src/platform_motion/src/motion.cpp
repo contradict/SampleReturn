@@ -1455,7 +1455,9 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     {
         platform_motion_msgs::Path stitched;
         stitched.knots.insert(stitched.knots.end(), plannedPath.begin(), plannedPath.end());
-        stitched.header = plannedPath.front().header;
+        stitched.header.frame_id="odom";
+        stitched.header.stamp = ros::Time::now();
+        stitched.header.seq = path->header.seq;
         stitchedPath_pub_.publish( stitched );
     }
 
