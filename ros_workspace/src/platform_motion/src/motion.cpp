@@ -477,6 +477,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
     // Handle query right away
     if( req.mode == platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY )
     {
+        ROS_INFO("Query mode %s", motion_mode_string(motion_mode).c_str());
         resp.mode = motion_mode;
         return true;
     }
