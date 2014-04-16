@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   samplereturn_msgs
   cv_bridge
   dynamic_reconfigure
+  image_geometry
   Eigen)
 
 ## System dependencies are found with CMake's conventions
