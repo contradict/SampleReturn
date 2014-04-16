@@ -54,7 +54,6 @@ Motion::Motion() :
     desired_pod_state(false),
     carousel_enabled(false),
     desired_carousel_state(false),
-    targetReached_(false),
     pv_counter(0),
     joint_seq(0),
     moreDataSent(false),
@@ -478,6 +477,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
     // Handle query right away
     if( req.mode == platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY )
     {
+        ROS_INFO("Query mode %s", motion_mode_string(motion_mode).c_str());
         resp.mode = motion_mode;
         return true;
     }
@@ -768,6 +768,13 @@ void Motion::handleUnlock( void )
      }
 }
 
+bool Motion::targetReached( void )
+{
+    return ((port->steering.getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED) &&
+           ((starboard->steering.getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED) &&
+           ((stern->steering.getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED);
+}
+
 void Motion::driveToLock( void )
 {
     int timeout=300;
@@ -779,7 +786,7 @@ void Motion::driveToLock( void )
         ros::Duration(0.1).sleep();
         timeout--;
     }
-    while( timeout>0 && !targetReached_ && ros::ok());
+    while( timeout>0 && !targetReached() && ros::ok());
 }
 
 void Motion::driveToUnLock( void )
@@ -793,7 +800,7 @@ void Motion::driveToUnLock( void )
         ros::Duration(0.1).sleep();
         timeout--;
     }
-    while( timeout>0 && !targetReached_ && ros::ok());
+    while( timeout>0 && !targetReached() && ros::ok());
     // Move back to PAUSE
     motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE;
 }
@@ -1316,16 +1323,6 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status.mode = mode_stream.str();
     status_pub.publish(status);
 
-    bool this_reached = ( (svo->getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED );
-    if( svo->node_id == stern->steering.node_id )
-    {
-        targetReached_ = this_reached;
-    }
-    else if( svo->node_id == starboard->steering.node_id ||
-             svo->node_id == port->steering.node_id )
-    {
-        targetReached_ &= this_reached;
-    }
 }
 
 platform_motion_msgs::Knot
@@ -1458,7 +1455,9 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     {
         platform_motion_msgs::Path stitched;
         stitched.knots.insert(stitched.knots.end(), plannedPath.begin(), plannedPath.end());
-        stitched.header = plannedPath.front().header;
+        stitched.header.frame_id="odom";
+        stitched.header.stamp = ros::Time::now();
+        stitched.header.seq = path->header.seq;
         stitchedPath_pub_.publish( stitched );
     }
 
