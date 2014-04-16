@@ -70,6 +70,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         void statusPublishCallback(const ros::TimerEvent& event);
 
+        bool targetReached( void );
+
         // pvt mode
         void pathToBody( void );
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
@@ -173,6 +175,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool carousel_enabled;
         bool desired_carousel_state;
         bool targetReached_;
+        boost::mutex target_reached_mutex_;
 
         Eigen::Vector2d body_pt;
         int pv_counter;
