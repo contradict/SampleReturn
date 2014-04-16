@@ -13,19 +13,6 @@ ColorNaming::ColorNaming()
   }
 }
 
-//ColorNaming::ColorNaming(std::string filename)
-//{
-//  std::ifstream infile(filename);
-//  //For the full version, 32768*14=458752
-//  if(infile.is_open())
-//  {
-//    for(int i=0; i<458752; i++)
-//    {
-//      infile >> color_index_array_[i];
-//    }
-//  }
-//}
-
 int ColorNaming::computeIndex(cv::Vec3b pixel)
 {
   int index = floor(pixel[0]/8.) + 32*floor(pixel[1]/8.) + 32*32*floor(pixel[2]/8.);
@@ -139,8 +126,8 @@ Eigen::Matrix<float,11,1> ColorNaming::computeExteriorColor(cv::Mat image, cv::M
 std::string ColorNaming::getDominantColor(Eigen::Matrix<float,11,1> color_score)
 {
   std::string names[11] = {"black","blue","brown","gray","green","orange","pink","purple","red","white","yellow"};
-  int maxIndex = color_score.maxCoeff();
-  std::cout << maxIndex << std::endl;
+  int maxIndex;
+  color_score.maxCoeff(&maxIndex);
   return names[maxIndex];
 }
 
