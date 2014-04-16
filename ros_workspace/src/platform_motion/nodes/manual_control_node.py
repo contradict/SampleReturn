@@ -298,8 +298,15 @@ class SelectMotionMode(smach.State):
                       
     def execute(self, userdata):
         try:
+            mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
+            if mode.mode == self.motion_mode:
+                return 'next'
+        except rospy.ServiceException:
+            rospy.logerr( "Unable to query present motion mode")
+            self.announcer.say( "Unable to query present mode." )
+        try:
             self.CAN_interface.select_mode(self.motion_mode)
-        except:
+        except rospy.ServiceException:
             rospy.logerr( "Unable to select mode %d", self.motion_mode )
             if self.failannounce is not None:
                 rospy.logerr( self.failannounce )
@@ -605,7 +612,7 @@ class CANInterface(object):
         self.servo_command=rospy.Publisher("CAN_servo_command", geometry_msg.Twist)
 
     def select_mode(self, motion_mode):
-        self.CAN_select_motion_mode(motion_mode)
+        return self.CAN_select_motion_mode(motion_mode)
         
     def publish_joy_state(self, joy_state):
         self.joystick_command.publish(joy_state.get_twist())
