@@ -90,7 +90,7 @@ class SaliencyDetectorNode
 
     blob_params_.blobColor = 255;
     blob_params_.minArea = 5;
-    blob_params_.maxArea = 200;
+    blob_params_.maxArea = 2000;
     blob_params_.filterByColor = true;
     blob_params_.filterByArea = true;
     blob_params_.minDistBetweenBlobs = 50.;
@@ -136,7 +136,7 @@ class SaliencyDetectorNode
 
     if (blobDetect_on_) {
       cv::Mat blob_copy;
-      blob_copy = debug_bms_img_.clone();
+      cv::threshold(debug_bms_img_, blob_copy, 50, 255, cv::THRESH_BINARY);
       blob_.detect(blob_copy, kp);
       ROS_INFO("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
@@ -155,7 +155,6 @@ class SaliencyDetectorNode
       int size = 2*kp[i].size;
       sub_img = small(Range(max(y-size,0), min(y+size,small.rows)), Range(max(x-size,0), min(x+size,small.cols)));
       sub_mask = debug_bms_img_(Range(max(y-size,0), min(y+size,small.rows)), Range(max(x-size,0), min(x+size,small.cols)));
-      //cv::threshold(sub_mask, sub_mask, 70, 255, cv::THRESH_BINARY);
       Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
       Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
       exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
