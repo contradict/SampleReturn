@@ -89,10 +89,13 @@ class SaliencyDetectorNode
       nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 3);
 
     blob_params_.blobColor = 255;
-    blob_params_.minArea = 5;
-    blob_params_.maxArea = 2000;
+    blob_params_.minArea = 15;
+    blob_params_.maxArea = 4000;
     blob_params_.filterByColor = true;
     blob_params_.filterByArea = true;
+    blob_params_.filterByCircularity = false;
+    blob_params_.filterByConvexity = false;
+    blob_params_.filterByInertia = false;
     blob_params_.minDistBetweenBlobs = 50.;
     blob_ = cv::SimpleBlobDetector(blob_params_);
   }
@@ -136,7 +139,7 @@ class SaliencyDetectorNode
 
     if (blobDetect_on_) {
       cv::Mat blob_copy;
-      cv::threshold(debug_bms_img_, blob_copy, 50, 255, cv::THRESH_BINARY);
+      cv::threshold(debug_bms_img_, blob_copy, 30, 255, cv::THRESH_BINARY);
       blob_.detect(blob_copy, kp);
       ROS_INFO("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
@@ -162,8 +165,10 @@ class SaliencyDetectorNode
 
       string dominant_color = cn_.getDominantColor(interiorColor);
       std::cout << "Dominant color " << dominant_color << std::endl;
+      string dominant_exterior_color = cn_.getDominantColor(exteriorColor);
+      std::cout << "Dominant exterior color " << dominant_exterior_color << std::endl;
 
-      if (cam_model_.initialized()) {
+      if (cam_model_.initialized() && dominant_color != "black" && dominant_exterior_color == "green" ) {
         float scale = cv_ptr->image.rows/600.;
         cv::Point3d ray =
           cam_model_.projectPixelTo3dRay(cv::Point2d((kp[i].pt.x*scale+bms_top_trim_),kp[i].pt.y*scale));
@@ -183,7 +188,7 @@ class SaliencyDetectorNode
     if (kp[1].pt.x > 30 && kp[1].pt.y > 30 && kp[1].pt.x < 500 && kp[1].pt.y < 350) {
       sub_img = small(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
       sub_mask = debug_bms_img_(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-      cv::threshold(sub_mask, sub_mask, 70, 255, cv::THRESH_BINARY);
+      cv::threshold(sub_mask, sub_mask, 30, 255, cv::THRESH_BINARY);
       Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
       Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
       exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
