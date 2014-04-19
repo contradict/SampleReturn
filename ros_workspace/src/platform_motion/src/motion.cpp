@@ -1806,7 +1806,11 @@ void Motion::sendPvtSegment()
 
             pathToBody();
 
-            firstSegment_.time = secondSegment_.time - ros::Duration(computeSafeInterval(0.25));
+            double dt = computeSafeInterval(0.25);
+            firstSegment_.time = secondSegment_.time - ros::Duration(dt);
+            firstSegment_.port.duration = dt;
+            firstSegment_.starboard.duration = dt;
+            firstSegment_.stern.duration = dt;
             lastSegmentSent_.time = firstSegment_.time - ros::Duration(lastSegmentSent_.port.duration);
 
             newPathReady = false;
