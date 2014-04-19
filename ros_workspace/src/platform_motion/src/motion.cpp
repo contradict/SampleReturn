@@ -1330,7 +1330,6 @@ transformKnot( Eigen::Quaterniond rotation,
                Eigen::Vector3d translation,
                Eigen::Vector3d omega,
                Eigen::Vector3d velocity,
-               std::string newframe,
                platform_motion_msgs::Knot k)
 {
     Eigen::Quaterniond orientation;
@@ -1350,7 +1349,6 @@ transformKnot( Eigen::Quaterniond rotation,
     tf::pointEigenToMsg( position, k.pose.position );
     tf::vectorEigenToMsg( kvelocity, k.twist.linear );
     tf::vectorEigenToMsg( komega, k.twist.angular );
-    k.header.frame_id = newframe;
     return k;
 }
 
@@ -1365,13 +1363,54 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     // asking for time 0 asks for the most recent transform
     ros::Time most_recent(0);
 
-
+    /***************************************************
+     * 4 things we might want to do:
+     * Absolute path in "odom" appended to path: path header != 0, knot[0] == 0
+     * Absolute path in "odom" replaces path: path header !=0 , knot[0] != 0
+     * Relative to body frame appended to path: path header == 0, knot[0]==0
+     * Relative to body frame replaces path: path header == 0, knot[0] != 0
+     *
+     * Path interpretation strategy
+     *
+     * if path->knots[0].header.stamp != 0:
+     *     drop all knots in plannedPath with stamp>=knots[0].header.stamp
+     *
+     * if path->knots[0].header.stamp == 0:
+     *     if plannedPath.size() == 0:
+     *         T = [ "odom" => "base link" ]
+     *     else
+     *         T = [ "odom" => plannedPath.back().pose ]
+     * else
+     *     T = [path->header => "odom"]
+     *
+     * append T*knot to plannedPath for all knots in path->knots
+     *
+     * In the relative case, the first point should be an identity transform
+     * and the second point should be the first move. This allows a time
+     * interval to be computed for this segment
+     */
+    if( path->knots[0].header.stamp != ros::Time(0) )
+    {
+        // knots have non-zero time, remove any segments after that time
+        //
+        // take the new path and insert it into the plannedPath
+        // list in the right spot.
+        // first, remove everything in the list that is now made obsolete
+        // by the new planned path.
+        ros::Time startTime = path->knots[0].header.stamp;
+        plannedPath.remove_if(
+                [startTime](platform_motion_msgs::Knot p)
+                {
+                return p.header.stamp >= startTime;
+                }
+                );
+    }
+    ros::Time startTime;
+    Eigen::Quaterniond rotation;
+    Eigen::Vector3d translation, velocity, omega;
     if(path->header.stamp == ros::Time(0))
     {
-        // 0 means append after whatever is going on as a relative path
-        ros::Time startTime;
-        Eigen::Quaterniond rotation;
-        Eigen::Vector3d translation, velocity, omega;
+        // 0 mean relative to after whatever is going on as a relative path
         if(plannedPath.size() == 0 )
         {
             // No existing path, start at present position
@@ -1400,54 +1439,40 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             tf::vectorMsgToEigen( k.twist.angular, omega );
             startTime = k.header.stamp;
         }
-        ros::Duration dt=startTime - ros::Time(0);
-        for( auto k : path->knots )
-        {
-            if(plannedPath.size()>0 && k.header.stamp == ros::Time(0))
-                continue;
-            k = transformKnot( rotation, translation, omega, velocity, "odom", k);
-            k.header.stamp += dt;
-            plannedPath.push_back(k);
-        }
     }
     else
     {
-        // path has non-zero time, replaces any segments after that time
-        //
-        // take the new path and insert it into the plannedPath
-        // list in the right spot.
-        // first, remove everything in the list that is now made obsolete
-        // by the new planned path.
-        ros::Time startTime = path->header.stamp;
-        plannedPath.remove_if(
-                [startTime](platform_motion_msgs::Knot p)
-                {
-                return p.header.stamp >= startTime;
-                }
-                );
-
-        Eigen::Quaterniond rotation;
-        Eigen::Vector3d translation, velocity, omega;
+        // non-zero means this is a valid frame transform which should be looked
+        // up
         tf::StampedTransform T;
         try {
-            listener.lookupTransform(path->header.frame_id, "odom", most_recent, T );
+            listener.lookupTransform(path->header.frame_id, "odom", path->header.stamp, T );
         } catch( tf::TransformException ex) {
-            ROS_ERROR("Error looking up %s: %s", "base_link", ex.what());
+            ROS_ERROR("Error looking up %s->%s: %s", path->header.frame_id.c_str(), "odom", ex.what());
             return;
         }
         tf::quaternionTFToEigen( T.getRotation(), rotation );
         tf::vectorTFToEigen( T.getOrigin(), translation );
+        // TODO: should probably listen to Odometry for these
         velocity.setZero();
         omega.setZero();
+        startTime = path->header.stamp;
+    }
 
-        ros::Duration dt = startTime - ros::Time(0);
 
-        for( auto k : path->knots )
-        {
-            k = transformKnot( rotation, translation, omega, velocity, "odom", k);
-            k.header.stamp += dt;
-            plannedPath.push_back( k );
-        }
+    ros::Duration dt = startTime - path->knots[0].header.stamp;
+
+    for( auto k : path->knots )
+    {
+        // skip first point of relative path, it exists only to
+        // set initial time interval and should be identical to the
+        // the one before it.
+        if(plannedPath.size()>0 && k.header.stamp == ros::Time(0))
+            continue;
+        k = transformKnot( rotation, translation, omega, velocity, k);
+        k.header.stamp += dt;
+        k.header.frame_id = "odom";
+        plannedPath.push_back(k);
     }
 
     // publish stitched path for visualization
