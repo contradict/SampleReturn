@@ -1498,9 +1498,9 @@ void Motion::primePVT(void)
 {
     // check to see if the wheel pods are out of data. if they are,
     // send a couple of segments to get things moving.
-    if((port->getMinBufferDepth() < 3) ||
-            (starboard->getMinBufferDepth() < 3) ||
-            (stern->getMinBufferDepth() < 3))
+    if((port->getMinBufferDepth() < 1) ||
+            (starboard->getMinBufferDepth() < 1) ||
+            (stern->getMinBufferDepth() < 1))
     {
         ROS_DEBUG( "Restart needed" );
         restartPvt = true;
