@@ -1385,7 +1385,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
      *
      * append T*knot to plannedPath for all knots in path->knots
      *
-     * In the relative case, the first point should be an identity transform
+     * In the relative case, the first point should be an identity motion
      * and the second point should be the first move. This allows a time
      * interval to be computed for this segment
      */
@@ -1410,7 +1410,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     Eigen::Vector3d translation, velocity, omega;
     if(path->header.stamp == ros::Time(0))
     {
-        // 0 mean relative to after whatever is going on as a relative path
+        // 0 means relative to after whatever is going on as a relative path
         if(plannedPath.size() == 0 )
         {
             // No existing path, start at present position
