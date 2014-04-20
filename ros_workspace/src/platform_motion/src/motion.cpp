@@ -1829,20 +1829,22 @@ void Motion::sendPvtSegment()
                         nullptr, &lastSegmentSent_.stern.wheelVelocity);
             }
 
-            // prime second segment so pathToBody moves it to first.
+            // pathToBody() move this to firstSegment_
             secondSegment_ = lastSegmentSent_;
+            secondSegment_.time = plannedPath.front().header.stamp;
 
             pathToBody();
 
-            double dt = 0.25;
-            dt = computeSafeInterval(dt);
-            ROS_DEBUG( "Initial interval %f", dt);
-            firstSegment_.time = secondSegment_.time - ros::Duration(dt);
+            // reset dt for first, this is computed by pathToBody for all future
+            // segments
+            double dt = (secondSegment_.time - firstSegment_.time).toSec();
             firstSegment_.port.duration = dt;
             firstSegment_.starboard.duration = dt;
             firstSegment_.stern.duration = dt;
 
-            lastSegmentSent_.time = firstSegment_.time - ros::Duration(lastSegmentSent_.port.duration);
+            // set time so now works out to just past first, triggers
+            // interpolation
+            lastSegmentSent_.time=firstSegment_.time-ros::Duration(lastSegmentSent_.port.duration+0.01);
 
             newPathReady = false;
         }
