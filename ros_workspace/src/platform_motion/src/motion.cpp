@@ -1834,8 +1834,9 @@ void Motion::sendPvtSegment()
 
             pathToBody();
 
-            double dt = (secondSegment_.time - firstSegment_.time).toSec();
+            double dt = 0.25;
             dt = computeSafeInterval(dt);
+            ROS_DEBUG( "Initial interval %f", dt);
             firstSegment_.time = secondSegment_.time - ros::Duration(dt);
             firstSegment_.port.duration = dt;
             firstSegment_.starboard.duration = dt;
