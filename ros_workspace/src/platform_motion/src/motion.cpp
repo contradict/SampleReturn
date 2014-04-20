@@ -1829,11 +1829,8 @@ void Motion::sendPvtSegment()
                         nullptr, &lastSegmentSent_.stern.wheelVelocity);
             }
 
-            lastSegmentSent_.time = plannedPath.front().header.stamp - ros::Duration(0.25);
-
             // prime second segment so pathToBody moves it to first.
             secondSegment_ = lastSegmentSent_;
-            secondSegment_.time += ros::Duration(0.25);
 
             pathToBody();
 
@@ -1843,6 +1840,7 @@ void Motion::sendPvtSegment()
             firstSegment_.port.duration = dt;
             firstSegment_.starboard.duration = dt;
             firstSegment_.stern.duration = dt;
+
             lastSegmentSent_.time = firstSegment_.time - ros::Duration(lastSegmentSent_.port.duration);
 
             newPathReady = false;
