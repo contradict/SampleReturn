@@ -1908,6 +1908,7 @@ void Motion::sendPvtSegment()
                     // we're also past the first segment, so remove it from the
                     // path and convert the next set.
                     pathToBody( );
+                    checkSegmentAcceleration();
                 }
                 else
                 {
