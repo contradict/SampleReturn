@@ -1859,9 +1859,18 @@ void Motion::sendPvtSegment()
 
             BodySegment newSegment;
 
-            if(now <= firstSegment_.time)
+            if(now < firstSegment_.time)
             {
-                ROS_DEBUG("last segment too old, sending first blindly");
+                ROS_DEBUG("now too old, sending first blindly");
+
+                // if the last segment we sent was before this path, just send
+                // the first segment. that's all we can really do.
+                newSegment = firstSegment_;
+
+            }
+            else if(now == firstSegment_.time)
+            {
+                ROS_DEBUG("first segment reached exactly");
 
                 // if the last segment we sent was before this path, just send
                 // the first segment. that's all we can really do.
