@@ -1358,6 +1358,12 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         return;
     }
 
+    if( path->knots.size() < 2 )
+    {
+        ROS_ERROR( "Path too short: %ld", path->knots.size() );
+        return;
+    }
+
     // asking for time 0 asks for the most recent transform
     ros::Time most_recent(0);
 
