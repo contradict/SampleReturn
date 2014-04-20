@@ -1338,7 +1338,7 @@ transformKnot( Eigen::Quaterniond rotation,
     tf::vectorMsgToEigen( k.twist.linear, kvelocity );
     tf::vectorMsgToEigen( k.twist.angular, komega );
 
-    orientation = rotation*orientation;
+    orientation = orientation*rotation;
     position = translation + rotation*position;
     kvelocity = rotation*kvelocity;
     komega = rotation*komega;
