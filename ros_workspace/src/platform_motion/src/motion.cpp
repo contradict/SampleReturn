@@ -1582,6 +1582,7 @@ void Motion::pathToBody()
         plannedPath.clear();
         ROS_DEBUG("Finished path");
     }
+    checkSegmentAcceleration();
     ROS_DEBUG("pathToBody exit");
 }
 
@@ -1891,7 +1892,6 @@ void Motion::sendPvtSegment()
                     ROS_DEBUG("No interpolation needed");
                     newSegment = secondSegment_;
                     pathToBody( );
-                    checkSegmentAcceleration();
 
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
@@ -1911,7 +1911,6 @@ void Motion::sendPvtSegment()
                     // we're also past the first segment, so remove it from the
                     // path and convert the next set.
                     pathToBody( );
-                    checkSegmentAcceleration();
                 }
                 else
                 {
