@@ -1892,11 +1892,12 @@ void Motion::sendPvtSegment()
                     ROS_DEBUG("No interpolation needed");
                     newSegment = secondSegment_;
                     pathToBody( );
-
                 } else {
                     // compute the distance with the fancy cubic interpolation thing.
                     ROS_DEBUG("interpolating to now");
                     newSegment = interpolatePodSegments(firstSegment_, secondSegment_, lastSegmentSent_, now);
+                    if( now == secondSegment_.time )
+                        pathToBody( );
                 }
                 if((secondSegment_.time - now).toSec() < 0.255)
                 {
