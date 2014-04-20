@@ -1328,8 +1328,6 @@ void Motion::statusCallback(CANOpen::DS301 &node)
 platform_motion_msgs::Knot
 transformKnot( Eigen::Quaterniond rotation,
                Eigen::Vector3d translation,
-               Eigen::Vector3d omega,
-               Eigen::Vector3d velocity,
                platform_motion_msgs::Knot k)
 {
     Eigen::Quaterniond orientation;
@@ -1342,8 +1340,8 @@ transformKnot( Eigen::Quaterniond rotation,
 
     orientation = rotation*orientation;
     position = translation + rotation*position;
-    kvelocity = velocity + rotation*kvelocity + omega.cross( position );
-    komega = omega + rotation*komega;
+    kvelocity = rotation*kvelocity;
+    komega = rotation*komega;
 
     tf::quaternionEigenToMsg( orientation, k.pose.orientation );
     tf::pointEigenToMsg( position, k.pose.position );
@@ -1469,7 +1467,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         // the one before it.
         if(plannedPath.size()>0 && k.header.stamp == ros::Time(0))
             continue;
-        k = transformKnot( rotation, translation, omega, velocity, k);
+        k = transformKnot( rotation, translation, k);
         k.header.stamp += dt;
         k.header.frame_id = "odom";
         plannedPath.push_back(k);
