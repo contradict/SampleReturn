@@ -1693,8 +1693,8 @@ PodSegment Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_moti
         // return early. that's all we can do for now.
         retval.steeringAngle = lastValidSteeringAngle;
         retval.steeringVelocity = 0.0;
-        retval.wheelDistance = 0.0;
-        retval.wheelVelocity = 0.0;
+        retval.wheelDistance = 0.0;  // velocity is zero, so better not go anywhere
+        retval.wheelVelocity = 0.0;  // clamp ksidot to zero
         return retval;
     }
 
