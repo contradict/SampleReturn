@@ -1907,10 +1907,6 @@ void Motion::sendPvtSegment()
                     newSegment.port.duration = duration;
                     newSegment.starboard.duration = duration;
                     newSegment.stern.duration = duration;
-
-                    // we're also past the first segment, so remove it from the
-                    // path and convert the next set.
-                    pathToBody( );
                 }
                 else
                 {
