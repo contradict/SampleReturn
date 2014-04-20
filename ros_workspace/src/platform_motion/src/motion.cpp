@@ -1857,7 +1857,7 @@ void Motion::sendPvtSegment()
 
             BodySegment newSegment;
 
-            if(now < firstSegment_.time)
+            if(now <= firstSegment_.time)
             {
                 ROS_DEBUG("last segment too old, sending first blindly");
 
