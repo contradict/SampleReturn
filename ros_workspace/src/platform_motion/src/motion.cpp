@@ -1750,6 +1750,16 @@ PodSegment Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_moti
     // update last valid steering angle in case we hit another zero velocity path.
     lastValidSteeringAngle = phi;
 
+    if( isnan(retval.steeringAngle) || isnan(retval.steeringVelocity) ||
+        isnan(retval.wheelDistance) || isnan(retval.wheelVelocity) )
+    {
+        ROS_ERROR( "Bad segments" );
+        ROS_ERROR_STREAM( "prev: " << previous );
+        ROS_ERROR_STREAM( "current: " << current );
+        ROS_ERROR_STREAM( "next: " << next );
+
+    }
+
     return retval;
 }
 
