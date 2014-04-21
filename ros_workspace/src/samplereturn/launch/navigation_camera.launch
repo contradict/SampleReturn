@@ -13,8 +13,8 @@
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
         <arg name="namespace" value="center"/>
-        <arg name="left_guid" value="00b09d0100bb69fb"/>
-        <arg name="right_guid" value="00b09d0100bd09ce"/>
+        <arg name="left_guid" value="00b09d0100bd09ce"/>
+        <arg name="right_guid" value="00b09d0100bb69fb"/>
     </include>
 
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
