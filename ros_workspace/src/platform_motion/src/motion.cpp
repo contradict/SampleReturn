@@ -1578,9 +1578,9 @@ void Motion::pathToBody()
         secondSegment_.starboard = pathToPod(previous, current, next, starboard_pos_, lastSegmentSent_.starboard.steeringAngle);
         secondSegment_.stern = pathToPod(previous, current, next, stern_pos_, lastSegmentSent_.stern.steeringAngle);
 
-        ROS_DEBUG("%d: port:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.port.steeringAngle, secondSegment_.port.steeringVelocity, secondSegment_.port.wheelDistance, secondSegment_.port.wheelVelocity, secondSegment_.port.duration);
-        ROS_DEBUG("%d: starboard:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.starboard.steeringAngle, secondSegment_.starboard.steeringVelocity, secondSegment_.starboard.wheelDistance, secondSegment_.starboard.wheelVelocity, secondSegment_.starboard.duration);
-        ROS_DEBUG("%d: stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.stern.steeringAngle, secondSegment_.stern.steeringVelocity, secondSegment_.stern.wheelDistance, secondSegment_.stern.wheelVelocity, secondSegment_.stern.duration);
+        ROS_DEBUG("%d: port: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.port.steeringAngle, secondSegment_.port.steeringVelocity, secondSegment_.port.wheelDistance, secondSegment_.port.wheelVelocity, secondSegment_.port.duration);
+        ROS_DEBUG("%d: starboard: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.starboard.steeringAngle, secondSegment_.starboard.steeringVelocity, secondSegment_.starboard.wheelDistance, secondSegment_.starboard.wheelVelocity, secondSegment_.starboard.duration);
+        ROS_DEBUG("%d: stern: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.stern.steeringAngle, secondSegment_.stern.steeringVelocity, secondSegment_.stern.wheelDistance, secondSegment_.stern.wheelVelocity, secondSegment_.stern.duration);
         ROS_DEBUG("first: %f second: %f", firstSegment_.time.toSec(), secondSegment_.time.toSec());
     }
     else
