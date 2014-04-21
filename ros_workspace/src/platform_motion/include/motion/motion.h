@@ -1,3 +1,5 @@
+#include <mutex>
+
 #include <nav_msgs/Path.h>
 #include <std_msgs/Bool.h>
 #include <platform_motion_msgs/Path.h>
@@ -187,6 +189,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool newPathReady;
         std::list<platform_motion_msgs::Knot> plannedPath;
         BodySegment firstSegment_, secondSegment_, lastSegmentSent_; // the last segment we actually gave the wheelpods
+        std::mutex path_mutex_;
 };
 
 }

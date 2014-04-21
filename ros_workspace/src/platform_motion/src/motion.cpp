@@ -1402,12 +1402,14 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         // first, remove everything in the list that is now made obsolete
         // by the new planned path.
         ros::Time startTime = path->knots[0].header.stamp;
+        std::unique_lock<std::mutex> lck(path_mutex_);
         plannedPath.remove_if(
                 [startTime](platform_motion_msgs::Knot p)
                 {
                 return p.header.stamp >= startTime;
                 }
                 );
+        lck.unlock();
     }
     ros::Time startTime;
     Eigen::Quaterniond rotation;
@@ -1466,6 +1468,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
 
     ros::Duration dt = startTime - path->knots[0].header.stamp;
 
+    std::unique_lock<std::mutex> lck(path_mutex_);
     for( auto k : path->knots )
     {
         // skip first point of relative path, it exists only to
@@ -1478,6 +1481,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         k.header.frame_id = "odom";
         plannedPath.push_back(k);
     }
+    lck.unlock();
 
     // publish stitched path for visualization
     if( stitchedPath_pub_.getNumSubscribers() > 0 )
@@ -1554,6 +1558,7 @@ void Motion::pathToBody()
     if( plannedPath.size() > 1 )
     {
         ROS_DEBUG("move to next segment");
+        std::unique_lock<std::mutex> lck(path_mutex_);
         auto knots = plannedPath.begin();
         platform_motion_msgs::Knot previous = *knots++;
         platform_motion_msgs::Knot current = *knots++;
@@ -1566,6 +1571,7 @@ void Motion::pathToBody()
             next.header.stamp += ros::Duration(0.25);
         }
         plannedPath.pop_front();
+        lck.unlock();
 
         secondSegment_.time = current.header.stamp;
         secondSegment_.port = pathToPod(previous, current, next, port_pos_, lastSegmentSent_.port.steeringAngle);
