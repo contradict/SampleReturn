@@ -1393,6 +1393,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
      * and the second point should be the first move. This allows a time
      * interval to be computed for this segment
      */
+    ros::Time startTime;
     if( path->knots[0].header.stamp != ros::Time(0) )
     {
         // knots have non-zero time, remove any segments after that time
@@ -1401,7 +1402,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         // list in the right spot.
         // first, remove everything in the list that is now made obsolete
         // by the new planned path.
-        ros::Time startTime = path->knots[0].header.stamp;
+        startTime = path->knots[0].header.stamp;
         std::unique_lock<std::mutex> lck(path_mutex_);
         plannedPath.remove_if(
                 [startTime](platform_motion_msgs::Knot p)
@@ -1411,7 +1412,21 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
                 );
         lck.unlock();
     }
-    ros::Time startTime;
+    else
+    {
+        if(plannedPath.size() == 0 )
+        {
+            // appending, but nothing to append to, start now
+            startTime = ros::Time::now();
+        }
+        else
+        {
+            // appending, first point is an identity so use timestamp from
+            // second
+            startTime = plannedPath.back().header.stamp +
+                (path->knots[1].header.stamp - path->knots[0].header.stamp);
+        }
+    }
     Eigen::Quaterniond rotation;
     Eigen::Vector3d translation, velocity, omega;
     if(path->header.stamp == ros::Time(0))
@@ -1432,7 +1447,6 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             tf::vectorTFToEigen( initial.getOrigin(), translation );
             velocity.setZero();
             omega.setZero();
-            startTime = ros::Time::now();
         }
         else if(plannedPath.size() > 0)
         {
@@ -1443,7 +1457,6 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             tf::pointMsgToEigen( k.pose.position, translation );
             tf::vectorMsgToEigen( k.twist.linear, velocity );
             tf::vectorMsgToEigen( k.twist.angular, omega );
-            startTime = k.header.stamp;
         }
     }
     else
@@ -1462,9 +1475,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         // TODO: should probably listen to Odometry for these
         velocity.setZero();
         omega.setZero();
-        startTime = path->header.stamp;
     }
-
 
     ros::Duration dt = startTime - path->knots[0].header.stamp;
 
