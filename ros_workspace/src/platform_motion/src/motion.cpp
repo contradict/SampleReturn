@@ -1533,9 +1533,10 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
     (void) node;
     // only send more data once per sync pulse. this way we send data to
     // all the servos as soon as one says it needs more
+    int depth = static_cast<CANOpen::CopleyServo&>(node).getPvtBufferDepth();
+    ROS_DEBUG("More data needed %ld: %d", node.node_id, depth);
     if(!this->moreDataSent)
     {
-        ROS_DEBUG("More data needed %ld", node.node_id);
         // set the flag so we don't send data for every callback call this
         // sync fame
         this->moreDataSent = true;
