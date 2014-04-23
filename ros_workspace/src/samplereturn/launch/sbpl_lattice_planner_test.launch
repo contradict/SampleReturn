@@ -1,10 +1,9 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-<!--
     <arg name="user" default="smooth"/>
     <arg name="path" default="AppliedMinds"/>
-    <arg name="kind" default="install"/>
+    <arg name="kind" default="devel"/>
     <machine name="search"
              address="localhost"
              env-loader="/home/$(arg user)/$(arg path)/AppliedMinds/SampleReturn/ros_workspace/$(arg kind)/env.sh"
@@ -15,8 +14,8 @@
              env-loader="/home/$(arg user)/$(arg path)/AppliedMinds/SampleReturn/ros_workspace/$(arg kind)/env.sh"
              user="$(arg user)"
              />
--->
 
+<!--
     <arg name="user" default="brandon"/>
     <arg name="path" default="Desktop"/>
     <arg name="kind" default="devel"/>
@@ -25,6 +24,7 @@
         <arg name="path" value="$(arg path)"/>
         <arg name="kind" value="$(arg kind)"/>
     </include>
+-->
 
     <!-- Nodes -->
     <node machine="navigate"
@@ -35,20 +35,20 @@
         <remap from="base_pose_ground_truth" to="/motion/odometry"/>
     </node>
 
-    <param name="use_sim_time" value="False" type="bool"/>
+    <param name="use_sim_time" value="True" type="bool"/>
 
     <!-- Launch Files -->
     <include file="$(find samplereturn)/launch/motion.launch"/>
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
     <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
     <include file="$(find samplereturn)/launch/search_camera.launch"/>
-    <include file="$(find samplereturn)/launch/joystick.launch"/>
-    <include file="$(find manipulator)/launch/manipulator.launch"/>
-    <include file="$(find samplereturn)/launch/audio.launch"/>
-    <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
-    <include file="$(find samplereturn)/launch/search_detection.launch"/>
-    <include file="$(find visual_servo)/launch/visual_servo.launch"/>
+    <!--<include file="$(find samplereturn)/launch/joystick.launch"/>-->
+    <!--<include file="$(find manipulator)/launch/manipulator.launch"/>-->
+    <!--<include file="$(find samplereturn)/launch/audio.launch"/>-->
+    <!--<include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>-->
+    <!--<include file="$(find samplereturn)/launch/search_detection.launch"/>-->
+    <!--<include file="$(find visual_servo)/launch/visual_servo.launch"/>-->
     <include file="$(find samplereturn)/launch/planner_sbpl_smooth.launch"/>
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
-    <include file="$(find executive)/launch/executive.launch"/>
+    <!--<include file="$(find beacon_finder)/launch/beacon_finder.launch"/>-->
+    <!--<include file="$(find executive)/launch/executive.launch"/>-->
 </launch>

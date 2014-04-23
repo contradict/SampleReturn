@@ -31,13 +31,11 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	ros::NodeHandle rootNodeHandle("/");
 
 	localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
-	localNodeHandle.param("maximum_angular_velocity", maximum_angular_velocity, 1.0);
 	localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
-	localNodeHandle.param("angular_acceleration", angular_acceleration, 1.0);
 
 	this->odometry = nav_msgs::Odometry();
 
-	pose_subscriber = parentNodeHandle.subscribe("SBPLLatticePlanner/plan", 1, &TheSmoothPlanner::setPath, this);
+	pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
 	odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
 
 	smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
@@ -45,29 +43,39 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
-	ROS_INFO("COMPUTE VELOCITY COMMANDS");
+	// This is handled in the pvt_segment code instead of this local planner
 	return true;
 }
 
 bool TheSmoothPlanner::isGoalReached()
 {
-	// TODO - return true when the goal pose specified by the global planner
-	//        has been reached
-	ROS_INFO("IS GOAL REACHED");
-	return true;
+	// The pvt_segment code in platform_motion knows how to answer this
+	// question much better than the local planner.  The goal is reached
+	// when all pvt segments have been executed to completion.  Since this
+	// is a much better measure than some kind of tolerance-based logic here,
+	// we return false in protest.
+	ROS_DEBUG("IS GOAL REACHED");
+	return false;
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
 {
-	// TODO - Set the local planner from the input global plan.  Make sure
-	//        the local plan fits inside the grid
-	ROS_INFO("RECEIVED PLAN");
+	// The global planner emits a nav_msgs::Path instead of this message type.
+	// We reuse the nav_msgs::Path handler here
+	if (plan.size() > 0)
+	{
+		nav_msgs::Path path;
+		path.poses = plan;
+		path.header = plan[0].header;
+		this->setPath(path);
+	}
+	ROS_DEBUG("RECEIVED PLAN");
 	return true;
 }
 
 void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
-	ROS_INFO("RECEIVED PATH");
+	ROS_DEBUG("RECEIVED PATH");
 
 	// What direction is the robot going and what is the linear/angular vel?
 	Time timestamp = Time::now();
@@ -133,8 +141,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		double angle = initialQuaternion.angleShortestPath(finalQuaternion);
 		double angular_velocity = angle/delta_time_seconds;
 
-		// 4) Store the data in a new message format containing PVT for linear
-		//    and angular metrics
+		// 4) Store the data in a new message format containing linear and
+		//    angular PVT values
 		timestamp.sec += static_cast<int>(delta_time_seconds);
 		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
 		if (timestamp.nsec > 1000000000)
@@ -186,7 +194,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 {
-	ROS_INFO("RECEIVED ODOMETRY");
+	ROS_DEBUG("RECEIVED ODOMETRY");
 	this->odometry = odometry;
 	return;
 }

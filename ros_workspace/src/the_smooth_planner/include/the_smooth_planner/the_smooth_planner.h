@@ -37,9 +37,7 @@ private:
 	ros::Subscriber pose_subscriber;
 	ros::Subscriber odom_subscriber;
 	double maximum_linear_velocity;
-	double maximum_angular_velocity;
 	double linear_acceleration;
-	double angular_acceleration;
 	nav_msgs::Odometry odometry;
 };
 };
