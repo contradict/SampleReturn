@@ -86,11 +86,11 @@ add_message_files(
 # )
 
 ## Generate actions
-#add_action_files(
-#	DIRECTORY action
-#	FILES
-#	VisualServo.action
-#)
+add_action_files(
+	DIRECTORY action
+	FILES
+    GeneralExecutive.action
+)
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
@@ -189,4 +189,4 @@ include_directories(
 # endif()
 
 ## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
+# catkin_add_nosetestsatest)

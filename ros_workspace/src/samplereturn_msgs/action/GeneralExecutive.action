@@ -1,0 +1,12 @@
+# Goal
+bool do_action
+---
+# Result
+uint8 COMPLETE=0
+uint8 PREEMPTED=1
+uint8 ABORTED=2
+uint8 result
+---
+# Feedback
+string state
+float32 output
