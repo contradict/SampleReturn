@@ -12,30 +12,30 @@ local_costmap:
         obstacle_range: 15.0
         raytrace_range: 16.0
 
-    port_point_cloud: {
-        data_type: PointCloud2,
-        topic: /cameras/navigation/port/points2,
-        observation_persistence: 0.0,
-        expected_update_rate: 0.1,
-        marking: true, clearing: true,
-        max_obstacle_height: 0.5, min_obstacle_height: 0.10,
-        obstacle_range: 15.0, raytrace_range: 16.0}
-    center_point_cloud: {
-        data_type: PointCloud2,
-        topic: /cameras/navigation/center/points2,
-        observation_persistence: 0.0,
-        expected_update_rate: 0.1,
-        marking: true, clearing: true,
-        max_obstacle_height: 0.5, min_obstacle_height: 0.10,
-        obstacle_range: 15.0, raytrace_range: 16.0}
-    starboard_point_cloud: {
-        data_type: PointCloud2,
-        topic: /cameras/navigation/starboard/points2,
-        observation_persistence: 0.0,
-        expected_update_rate: 0.1,
-        marking: true, clearing: true,
-        max_obstacle_height: 0.5, min_obstacle_height: 0.10,
-        obstacle_range: 15.0, raytrace_range: 16.0}
+		port_point_cloud: {
+			data_type: PointCloud2,
+			topic: /cameras/navigation/port/points2,
+			observation_persistence: 0.0,
+			expected_update_rate: 0.1,
+			marking: true, clearing: true,
+			max_obstacle_height: 0.5, min_obstacle_height: 0.10,
+			obstacle_range: 15.0, raytrace_range: 16.0}
+		center_point_cloud: {
+			data_type: PointCloud2,
+			topic: /cameras/navigation/center/points2,
+			observation_persistence: 0.0,
+			expected_update_rate: 0.1,
+			marking: true, clearing: true,
+			max_obstacle_height: 0.5, min_obstacle_height: 0.10,
+			obstacle_range: 15.0, raytrace_range: 16.0}
+		starboard_point_cloud: {
+			data_type: PointCloud2,
+			topic: /cameras/navigation/starboard/points2,
+			observation_persistence: 0.0,
+			expected_update_rate: 0.1,
+			marking: true, clearing: true,
+			max_obstacle_height: 0.5, min_obstacle_height: 0.10,
+			obstacle_range: 15.0, raytrace_range: 16.0}
 
     #START VOXEL STUFF
     map_type: voxel

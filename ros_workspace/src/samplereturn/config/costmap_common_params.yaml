@@ -5,6 +5,11 @@ publish_frequency: 1.0
 footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
 circumscribed_radius: 1.55
 
+plugins:
+    - { name: footprint_layer, type: "costmap_2d::FootprintLayer" }
+    - { name: obstacle_layer, type: "costmap_2d::VoxelLayer" }
+    - { name: inflation_layer, type: "costmap_2d::InflationLayer" }
+
 inflation_layer:
     cost_scaling_factor: 2.0
     inflation_radius: 5.0
