@@ -6,6 +6,8 @@
 
 #include <motion/wheelpod.h>
 
+#include <ros/ros.h>
+
 namespace platform_motion {
 
 std::ostream& operator<<(std::ostream& os, const PodSegment& seg)
@@ -229,17 +231,13 @@ void WheelPod::computeSteeringAndVelocity(
     // keep steering inside of acceptable range
     if(steeringAngle > steering_max)
     {
-        steeringAngle -= M_PI;
-        steeringVelocity *= -1.0;
-        wheelVelocity *= -1.0;
-        wheelDistance *= -1.0;
+        ROS_ERROR( "Steering angle too large: %f > %f", steeringAngle, steering_max);
+        steeringAngle = steering_max;
     }
     if(steeringAngle < steering_min)
     {
-        steeringAngle += M_PI;
-        steeringVelocity *= -1.0;
-        wheelVelocity *= -1.0;
-        wheelDistance *= -1.0;
+        ROS_ERROR( "Steering angle too small: %f < %f", steeringAngle, steering_min);
+        steeringAngle = steering_min;
     }
 
     // account for the steering angle offset

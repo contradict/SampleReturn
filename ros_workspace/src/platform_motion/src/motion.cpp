@@ -1690,6 +1690,25 @@ Eigen::Vector2d Motion::podVelocity(const platform_motion_msgs::Knot &current, E
     return (omegacross * (rot * pod_pos) + Vbody).head(2);
 }
 
+bool limit_steering_angle(double *phi)
+{
+    if(fabs(*phi+M_PI_2)<0.001)
+    {
+        *phi = -M_PI_2;
+    }
+    else if(fabs(*phi-M_PI_2)<0.001)
+    {
+        *phi = M_PI_2;
+    }
+    else if(fabs(*phi)>M_PI_2)
+    {
+        ROS_DEBUG( "Flipping velocity for smaller steering move" );
+        *phi = unwrap(*phi+M_PI);
+        return true;
+    }
+    return false;
+}
+
 bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle, PodSegment* retval)
 {
     // this is a helper that does the actual math for each pod segment.
@@ -1712,19 +1731,16 @@ bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msg
 
     double ksidot = Vpod.norm();
 
-    if(ksidot < 0.001)
+    if(ksidot<0.001)
     {
-        // if ksidot is nearly zero, steering angle and velocity will be wrong!
-        // set steering velocity to 0 and steering angle to the last valid and
-        // return early. that's all we can do for now.
+        // if wheel velocity is small, all other calculations are not possible
         retval->steeringAngle = lastValidSteeringAngle;
         retval->steeringVelocity = 0.0;
-        retval->wheelDistance = 0.0;  // velocity is zero, so better not go anywhere
-        retval->wheelVelocity = 0.0;  // clamp ksidot to zero
+        retval->wheelDistance = 0.0;
+        retval->wheelVelocity = 0.0;
+
         return true;
     }
-
-    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - currentTheta);
 
     // add motion due to rotation about body axis of pod
     Eigen::Matrix2d rot;
@@ -1751,14 +1767,26 @@ bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msg
         dksi = fabs(dtheta) * sqrt(pow(dx, 2) + pow(dy, 2)) / sqrt(2 * (1.0 - cos(dtheta)));
     }
 
-    double alpha = unwrap(phi + currentTheta);
-
-    Eigen::Vector2d Vpod_prev = podVelocity(previous, pod_pos);
+    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - currentTheta);
+    if( limit_steering_angle(&phi) )
+    {
+        ksidot *= -1;
+        dksi *= -1;
+    }
+    
     Eigen::Vector2d Vpod_next = podVelocity(next, pod_pos);
-    Eigen::Vector2d Vdot = ((Vpod-Vpod_prev)/dt_prev + (Vpod_next-Vpod)/dt_next)/2.;
+    double phi_next;
+    if( Vpod_next.norm() > 0.001 )
+    {
+        phi_next = unwrap(atan2(Vpod_next[1], Vpod_next[0])-nextTheta);
+    }
+    else
+    {
+        phi_next = phi;
+    }
+    limit_steering_angle(&phi_next);
 
-    double phidot = (Vdot[0] * cos(-alpha - M_PI/2.0) - Vdot[1] * sin(-alpha - M_PI/2.0)) /
-        ksidot - current.twist.angular.z;
+    double phidot = (phi_next - phi)/dt_next;
 
     if( isnan(phi) || isnan(phidot) ||
         isnan(dksi) || isnan(ksidot) )
