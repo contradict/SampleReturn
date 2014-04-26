@@ -100,14 +100,21 @@ def drawPath(p,N=1):
     velocity=p[::N,3:5]
     f=pylab.figure(1)
     f.clear()
+
     ax1 = f.add_subplot(221)
     ax1.set_title("heading")
     ax1.set_aspect(1)
     ax1.quiver(base[:,0], base[:,1], heading[:,0], heading[:,1])
+    ax1.set_xlim(base[:,0].min()-0.25, base[:,0].max()+0.25)
+    ax1.set_ylim(base[:,1].min()-0.25, base[:,1].max()+0.25)
+
     ax2 = f.add_subplot(222)
-    ax2.quiver(base[:,0], base[:,1], velocity[:,0], velocity[:,1])
     ax2.set_title("velocity")
     ax2.set_aspect(1)
+    ax2.quiver(base[:,0], base[:,1], velocity[:,0], velocity[:,1])
+    ax2.set_xlim(base[:,0].min()-0.25, base[:,0].max()+0.25)
+    ax2.set_ylim(base[:,1].min()-0.25, base[:,1].max()+0.25)
+
     tdot = p[::N,5:6]*np.c_[cos(p[::N,2]+pi/2), sin(p[::N,2]+pi/2)]
     ax3=f.add_subplot(223)
     ax3.set_title("thetadot")
