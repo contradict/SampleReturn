@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <arg name="run_cameras" default="true"/>
+    <arg name="run_cameras" default="false"/>
 
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>

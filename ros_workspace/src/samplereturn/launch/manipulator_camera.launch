@@ -2,7 +2,7 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <!-- Manipulator Nodelet Host process -->
-    <arg name="run_cameras" default="true"/>
+    <arg name="run_cameras" default="false"/>
     
     <node name="manager"
           machine="search"

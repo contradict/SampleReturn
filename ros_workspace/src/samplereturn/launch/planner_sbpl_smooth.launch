@@ -29,6 +29,13 @@
         <param name="base_local_planner" type="string" value="TheSmoothPlanner"/>
     </node>
 
+	<node
+		machine="navigate"
+		pkg="costmap_2d"
+		type="costmap_2d_markers"
+		name="voxel_visualizer"
+        ns="/processes/planner/mover/local_costmap">
+	</node>
 
     <node
         machine="navigate"
