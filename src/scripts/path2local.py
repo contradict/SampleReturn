@@ -163,6 +163,7 @@ def path2local(p, R, initialphi=0, small=1e-3):
     ksidot = sqrt(Vx**2+Vy**2)
     # phi = arg(V)-theta
     phi = unwrap(arctan2(Vy, Vx) - theta)
+    phi = np.where( abs(abs(phi)-pi)<0.001, pi, phi )
     last_good_phi=initialphi
     for i in xrange(phi.shape[0]):
         if ksidot[i]<small:
@@ -171,25 +172,40 @@ def path2local(p, R, initialphi=0, small=1e-3):
             last_good_phi = phi[i]
     dksi = np.where(abs(dtheta)<small, sqrt(dx**2+dy**2),
                                   abs(dtheta)*sqrt(dx**2+dy**2)/sqrt(2*(1.-cos(dtheta))))
-    # V = ksidot exp(i(phi+theta))
-    alpha = unwrap(phi+theta)
-    # Vdot = ksiddot exp(i alpha) + i alpha (phidot+thetadot) ksidot exp(i alpha)
-    dt = np.diff(t, axis=0)
-    Vdot = np.r_[diff(V, axis=0)/dt, [[0,0]]]
-    Vdotx = Vdot[:,0:1]
-    Vdoty = Vdot[:,1:2]
-    ksiddot = (Vx**2+Vy**2)**(-1./2)*(Vx*Vdotx + Vy*Vdoty)
-    # Vdot = (ksiddot + i (phidot+thetadot) ksidot) exp(i alpha)
-    # (Vdot exp(-i alpha) - ksiddot)/(i ksidot) - thetadot = phidot
-    # (Vdot exp(-i (alpha+pi/2)) + i ksiddot)/(ksidot) - thetadot = phidot
-    # ([Vdotx cos(-alpha-pi/2) - Vdoty sin(-alpha-pi/2),
-    #   Vdoty cos(-alpha-pi/2) + Vdotx sin(-alpha-pi/2)+ksiddot])/(ksidot) - thetadot = phidot
-    phidot = np.where(ksidot>small, (Vdotx*cos(-alpha-pi/2) -
-        Vdoty*sin(-alpha-pi/2))/ksidot - thetadot, 0)
-    # this should be very small (analytically, it should be zero) everywhere
-    imphidot = np.where(ksidot>small, (Vdoty*cos(-alpha-pi/2) +
-        Vdotx*sin(-alpha-pi/2)+ksiddot)/ksidot, 0)
-    assert(allclose(imphidot, 0))
+    if 0:
+        # V = ksidot exp(i(phi+theta))
+        alpha = unwrap(phi+theta)
+        # Vdot = ksiddot exp(i alpha) + i alpha (phidot+thetadot) ksidot exp(i alpha)
+        dt = np.diff(t, axis=0)
+        Vdot = np.r_[diff(V, axis=0)/dt, [[0,0]]]
+        Vdotx = Vdot[:,0:1]
+        Vdoty = Vdot[:,1:2]
+        ksiddot = (Vx**2+Vy**2)**(-1./2)*(Vx*Vdotx + Vy*Vdoty)
+        # Vdot = (ksiddot + i (phidot+thetadot) ksidot) exp(i alpha)
+        # (Vdot exp(-i alpha) - ksiddot)/(i ksidot) - thetadot = phidot
+        # (Vdot exp(-i (alpha+pi/2)) + i ksiddot)/(ksidot) - thetadot = phidot
+        # ([Vdotx cos(-alpha-pi/2) - Vdoty sin(-alpha-pi/2),
+        #   Vdoty cos(-alpha-pi/2) + Vdotx sin(-alpha-pi/2)+ksiddot])/(ksidot) - thetadot = phidot
+        phidot = np.where(ksidot>small, (Vdotx*cos(-alpha-pi/2) -
+            Vdoty*sin(-alpha-pi/2))/ksidot - thetadot, 0)
+        # this should be very small (analytically, it should be zero) everywhere
+        imphidot = np.where(ksidot>small, (Vdoty*cos(-alpha-pi/2) +
+            Vdotx*sin(-alpha-pi/2)+ksiddot)/ksidot, 0)
+        assert(allclose(imphidot, 0))
+    else:
+        for i in xrange(phi.shape[0]):
+            if abs(phi[i]-pi/2) < 0.001:
+                phi[i] = pi/2
+            elif abs(phi[i]+pi/2) < 0.001:
+                phi[i] = -pi/2
+            elif abs(phi[i])>pi/2:
+                phi[i] = unwrap(phi[i]+pi)
+                ksidot[i] *= -1
+                dksi[i] *= -1
+        phidot = np.r_[ np.zeros((1,1)), 
+                        ((phi[1:-1,:]-phi[:-2,:])/(t[1:-1,:]-t[:-2,:]) + 
+                         (phi[2:,:]-phi[1:-1,:])/(t[2:,:]-t[1:-1,:]))/2.,
+                        np.zeros((1,1)) ]
     return np.c_[phi, phidot, dksi, ksidot, t]
 
 def plotlocal(l):
