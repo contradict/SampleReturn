@@ -1908,9 +1908,9 @@ void Motion::sendPvtSegment()
                 firstSegment_.starboard.duration = dt;
                 firstSegment_.stern.duration = dt;
 
-                // set time so now works out to just past first, triggers
+                // set time so now works out to first, triggers
                 // interpolation
-                lastSegmentSent_.time=firstSegment_.time-ros::Duration(lastSegmentSent_.port.duration+0.01);
+                lastSegmentSent_.time=firstSegment_.time-ros::Duration(lastSegmentSent_.port.duration);
             }
             newPathReady = false;
         }
