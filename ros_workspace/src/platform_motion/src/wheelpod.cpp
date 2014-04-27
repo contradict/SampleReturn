@@ -226,8 +226,6 @@ void WheelPod::computeSteeringAndVelocity(
         wheelDistance *= -1.0;
     }
 
-    // account for the steering angle offset
-    steeringAngle -= steering_offset;
     // keep steering inside of acceptable range
     if(steeringAngle > steering_max)
     {
@@ -243,6 +241,9 @@ void WheelPod::computeSteeringAndVelocity(
         wheelVelocity *= -1.0;
         wheelDistance *= -1.0;
     }
+
+    // account for the steering angle offset
+    steeringAngle -= steering_offset;
 
     steeringPosition = round(steering_encoder_counts*steeringAngle/2.0/M_PI);
     steeringVelocityCounts =
