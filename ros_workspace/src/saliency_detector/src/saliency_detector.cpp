@@ -46,6 +46,7 @@ class SaliencyDetectorNode
   int bms_thresh_;
   bool bms_thresh_on_;
   double bms_top_trim_;
+  double bms_img_width_;
 
   image_geometry::PinholeCameraModel cam_model_;
   cv::Mat inv_K_;
@@ -122,7 +123,7 @@ class SaliencyDetectorNode
 
     cv::Mat small;
     cv::resize(cv_ptr->image.rowRange(bms_top_trim_,cv_ptr->image.rows),
-        small,cv::Size(600.0,(cv_ptr->image.rows-bms_top_trim_)*(600.0/cv_ptr->image.cols)),
+        small,cv::Size(bms_img_width_,(cv_ptr->image.rows-bms_top_trim_)*(bms_img_width_/cv_ptr->image.cols)),
         0.0,0.0,cv::INTER_AREA);
 
     bms_.computeSaliency(small, bms_sample_step_);
@@ -233,6 +234,7 @@ class SaliencyDetectorNode
     bms_thresh_ = config.bms_thresh;
     bms_thresh_on_ = config.bms_thresh_on;
     bms_top_trim_ = config.bms_top_trim;
+    bms_img_width_ = config.bms_img_width;
 
     blobDetect_on_ = config.blobDetect_on;
 
