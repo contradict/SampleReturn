@@ -12,8 +12,9 @@ find_package(catkin REQUIRED COMPONENTS
   samplereturn_msgs
   cv_bridge
   dynamic_reconfigure
-  image_geometry
-  Eigen)
+  image_geometry)
+
+find_package(Eigen REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -87,9 +88,12 @@ generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
+  INCLUDE_DIRS
+    include
+    ${Eigen_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
   CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
-  DEPENDS opencv2
+  DEPENDS opencv2 Eigen
 )
 
 ###########
@@ -99,8 +103,11 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
  include_directories(include
+   ${Eigen_INCLUDE_DIRS}
    ${catkin_INCLUDE_DIRS}
 )
+
+add_definitions(${Eigen_DEFINITIONS})
 
 ## Declare a cpp library
 add_library(BMS
