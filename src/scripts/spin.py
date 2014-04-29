@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import pi, tan, arctan2, any, isnan
+from numpy import pi, tan, arctan2, any, isnan, sin, cos, arctan
 from numpy.linalg import norm
 import rospy
 import platform_motion_msgs.msg as plat_msgs
@@ -27,7 +27,7 @@ def moveR(path, knot, N, R0, R1, phidot=pi/2, omegasmall=3e-3, vsmall=3e-3, whee
     T, phi, _ = scurve(phi0, phi1, phidot)
     P = np.r_[knot.pose.position.x, knot.pose.position.y]
     V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
-    for x in xrange(N):
+    for x in xrange(1,N):
         s = float(x)/(N-1)
         t = s*T
         R = wheelbase*tan(pi/2-phi(s))
@@ -58,7 +58,7 @@ def rotate(path, knot, N, yaw1, omegapeak=pi/8):
     T, yaw, omega = scurve(yaw0, yaw1, omegapeak)
     P = np.r_[knot.pose.position.x, knot.pose.position.y]
     V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
-    for x in xrange(int(N)):
+    for x in xrange(1,int(N)):
         s = x/float(N-1)
         t = T*s
         yawtoknot(knot, yaw(s))
@@ -81,8 +81,8 @@ def decel(path, knot, N, a):
         return path, knot
     T = v0/a
     v = lambda s : v0 - a*T*s
-    x = lambda s : a*(s*T)*(s*T)/2.
-    for n in xrange(N):
+    x = lambda s : v0*s*T - a*(s*T)*(s*T)/2.
+    for n in xrange(1,N):
         s = n/float(N-1)
         t = s*T
         V = Vdir*v(s)
@@ -136,7 +136,7 @@ def makeHook(path, knot, N, forward=3, R=3, arc0=0, arc1=-pi/2):
     yaw0 = yawfromknot(knot)
     P0 = np.r_[knot.pose.position.x, knot.pose.position.y]
     V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
-    for n in xrange(N):
+    for n in xrange(1,N):
         s=n/float(N-1)
         t=s*T
         if l(s)<forward:
@@ -194,7 +194,8 @@ def insertSpinAndHook(stitchedpath):
     hookstart = False
     i=0
     for k in stitchedpath.knots[::-1]:
-        if hookstart and k.twist.angular.z == 0:
+        smallomega = abs(k.twist.angular.z) < 1e-4
+        if hookstart and smallomega:
             break
         elif k.twist.angular.z != 0:
             hookstart = True
@@ -206,8 +207,9 @@ def insertSpinAndHook(stitchedpath):
 
     # for testing to see what shape results after stitching
     #newpath.knots = deepcopy(stitchedpath.knots[:i])
-    newpath.knots.append(k)
-    rospy.loginfo( "inserting at %f", k.header.stamp.to_sec() )
+    newpath.knots.append(deepcopy(k))
+    rospy.loginfo( "inserting at %f, seq=%d, i=%d", k.header.stamp.to_sec(),
+            k.header.seq, i )
 
     N = 20
     newpath, knot = decel(newpath, k, N, 0.5)
@@ -265,8 +267,6 @@ def testPathStitching():
                 sendnext.planpub.publish(newpath)
             else:
                 sendnext.cleanup()
-        else:
-            sendnext.cleanup()
         sendnext.i -= 1
 
     sendnext.i = 4
@@ -290,3 +290,4 @@ def testPathStitching():
     h = hookRight()
     sendnext.planpub.publish(hookRight())
 
+    return cleanup
