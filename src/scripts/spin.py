@@ -291,3 +291,12 @@ def testPathStitching():
     sendnext.planpub.publish(hookRight())
 
     return cleanup
+
+# Left commented out for experimentation in ipython
+# turn it back on to run from command line
+# if __name__ == "__main__":
+#     rospy.init_node("stitchtest")
+#     cleanup = testPathStitching()
+#     rospy.on_shutdown(cleanup)
+#     rospy.spin()
+
