@@ -1473,7 +1473,6 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         }
         tf::quaternionTFToEigen( T.getRotation(), rotation );
         tf::vectorTFToEigen( T.getOrigin(), translation );
-        // TODO: should probably listen to Odometry for these
         velocity.setZero();
         omega.setZero();
     }
