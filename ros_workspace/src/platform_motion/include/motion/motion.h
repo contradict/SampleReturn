@@ -85,6 +85,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void errorCallback(CANOpen::DS301 &node);
 
         void sendPvtSegment(); // send next pvt segment to all wheelpods
+        void setLastSegmentToCurrent( void );
         void primePVT(void);
 
         // debug print statement variable. probably shouldn't be committed

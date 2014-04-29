@@ -543,6 +543,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
             motion_mode = req.mode;
+            setLastSegmentToCurrent( );
             primePVT();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
@@ -1869,6 +1870,20 @@ Motion::BodySegment Motion::interpolatePodSegments(const BodySegment &first, con
     return retval;
 }
 
+void Motion::setLastSegmentToCurrent( void )
+{
+    lastSegmentSent_.port.duration = 0.25;
+    lastSegmentSent_.starboard.duration = 0.0;
+    lastSegmentSent_.stern.duration = 0.0;
+    port->getPosition(&lastSegmentSent_.port.steeringAngle, &lastSegmentSent_.port.steeringVelocity,
+            nullptr, &lastSegmentSent_.port.wheelVelocity);
+    starboard->getPosition(&lastSegmentSent_.starboard.steeringAngle, &lastSegmentSent_.starboard.steeringVelocity,
+            nullptr, &lastSegmentSent_.starboard.wheelVelocity);
+    stern->getPosition(&lastSegmentSent_.stern.steeringAngle, &lastSegmentSent_.stern.steeringVelocity,
+            nullptr, &lastSegmentSent_.stern.wheelVelocity);
+    lastSegmentSent_.time = ros::Time::now();
+}
+
 void Motion::sendPvtSegment()
 {
     // for now, only the planner should be sending pvt segments.
@@ -1883,15 +1898,7 @@ void Motion::sendPvtSegment()
         {
             if( lastSegmentSent_.time == ros::Time(0) )
             {
-                lastSegmentSent_.port.duration = 0.25;
-                lastSegmentSent_.starboard.duration = 0.0;
-                lastSegmentSent_.stern.duration = 0.0;
-                port->getPosition(&lastSegmentSent_.port.steeringAngle, &lastSegmentSent_.port.steeringVelocity,
-                        nullptr, &lastSegmentSent_.port.wheelVelocity);
-                starboard->getPosition(&lastSegmentSent_.starboard.steeringAngle, &lastSegmentSent_.starboard.steeringVelocity,
-                        nullptr, &lastSegmentSent_.starboard.wheelVelocity);
-                stern->getPosition(&lastSegmentSent_.stern.steeringAngle, &lastSegmentSent_.stern.steeringVelocity,
-                        nullptr, &lastSegmentSent_.stern.wheelVelocity);
+                setLastSegmentToCurrent();
             }
 
             // pathToBody() move this to firstSegment_
