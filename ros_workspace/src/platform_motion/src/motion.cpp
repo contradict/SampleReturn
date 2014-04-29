@@ -54,7 +54,6 @@ Motion::Motion() :
     desired_pod_state(false),
     carousel_enabled(false),
     desired_carousel_state(false),
-    targetReached_(false),
     pv_counter(0),
     joint_seq(0),
     moreDataSent(false),
@@ -101,7 +100,8 @@ Motion::Motion() :
 
     param_nh.param("steering_tolerance", steeringTolerance_, 0.01);
     param_nh.param("steering_accel", steeringAccel_, M_PI);
-    param_nh.param("steering_max_v", steeringMaxV_, M_PI/4.);
+    param_nh.param("maximum_steering_velocity", maxSteeringVelocity_, M_PI/4.);
+    param_nh.param("maximum_wheel_acceleration", maxWheelAcceleration_, 2.0);
 
     body_pt << center_pt_x, center_pt_y;
     enable_carousel_server = nh_.advertiseService("enable_carousel",
@@ -477,6 +477,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
     // Handle query right away
     if( req.mode == platform_motion_msgs::SelectMotionMode::Request::MODE_QUERY )
     {
+        ROS_INFO("Query mode %s", motion_mode_string(motion_mode).c_str());
         resp.mode = motion_mode;
         return true;
     }
@@ -542,6 +543,7 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
             motion_mode = req.mode;
+            setLastSegmentToCurrent( );
             primePVT();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
@@ -767,6 +769,13 @@ void Motion::handleUnlock( void )
      }
 }
 
+bool Motion::targetReached( void )
+{
+    return ((port->steering.getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED) &&
+           ((starboard->steering.getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED) &&
+           ((stern->steering.getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED);
+}
+
 void Motion::driveToLock( void )
 {
     int timeout=300;
@@ -778,7 +787,7 @@ void Motion::driveToLock( void )
         ros::Duration(0.1).sleep();
         timeout--;
     }
-    while( timeout>0 && !targetReached_ && ros::ok());
+    while( timeout>0 && !targetReached() && ros::ok());
 }
 
 void Motion::driveToUnLock( void )
@@ -792,7 +801,7 @@ void Motion::driveToUnLock( void )
         ros::Duration(0.1).sleep();
         timeout--;
     }
-    while( timeout>0 && !targetReached_ && ros::ok());
+    while( timeout>0 && !targetReached() && ros::ok());
     // Move back to PAUSE
     motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE;
 }
@@ -1315,24 +1324,11 @@ void Motion::statusCallback(CANOpen::DS301 &node)
     status.mode = mode_stream.str();
     status_pub.publish(status);
 
-    bool this_reached = ( (svo->getStatusWord() & STATUS_TARGET_REACHED) == STATUS_TARGET_REACHED );
-    if( svo->node_id == stern->steering.node_id )
-    {
-        targetReached_ = this_reached;
-    }
-    else if( svo->node_id == starboard->steering.node_id ||
-             svo->node_id == port->steering.node_id )
-    {
-        targetReached_ &= this_reached;
-    }
 }
 
 platform_motion_msgs::Knot
 transformKnot( Eigen::Quaterniond rotation,
                Eigen::Vector3d translation,
-               Eigen::Vector3d omega,
-               Eigen::Vector3d velocity,
-               std::string newframe,
                platform_motion_msgs::Knot k)
 {
     Eigen::Quaterniond orientation;
@@ -1343,16 +1339,15 @@ transformKnot( Eigen::Quaterniond rotation,
     tf::vectorMsgToEigen( k.twist.linear, kvelocity );
     tf::vectorMsgToEigen( k.twist.angular, komega );
 
-    orientation = rotation*orientation;
+    orientation = orientation*rotation;
     position = translation + rotation*position;
-    kvelocity = velocity + rotation*kvelocity + omega.cross( position );
-    komega = omega + rotation*komega;
+    kvelocity = rotation*kvelocity;
+    komega = rotation*komega;
 
     tf::quaternionEigenToMsg( orientation, k.pose.orientation );
     tf::pointEigenToMsg( position, k.pose.position );
     tf::vectorEigenToMsg( kvelocity, k.twist.linear );
     tf::vectorEigenToMsg( komega, k.twist.angular );
-    k.header.frame_id = newframe;
     return k;
 }
 
@@ -1364,16 +1359,80 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         return;
     }
 
+    if( path->knots.size() < 2 )
+    {
+        ROS_ERROR( "Path too short: %ld", path->knots.size() );
+        return;
+    }
+
     // asking for time 0 asks for the most recent transform
     ros::Time most_recent(0);
 
-
+    /***************************************************
+     * 4 things we might want to do:
+     * Absolute path in "odom" appended to path: path header != 0, knot[0] == 0
+     * Absolute path in "odom" replaces path: path header !=0 , knot[0] != 0
+     * Relative to body frame appended to path: path header == 0, knot[0]==0
+     * Relative to body frame replaces path: path header == 0, knot[0] != 0
+     *
+     * Path interpretation strategy
+     *
+     * if path->knots[0].header.stamp != 0:
+     *     drop all knots in plannedPath with stamp>=knots[0].header.stamp
+     *
+     * if path->knots[0].header.stamp == 0:
+     *     if plannedPath.size() == 0:
+     *         T = [ "odom" => "base link" ]
+     *     else
+     *         T = [ "odom" => plannedPath.back().pose ]
+     * else
+     *     T = [path->header => "odom"]
+     *
+     * append T*knot to plannedPath for all knots in path->knots
+     *
+     * In the relative case, the first point should be an identity motion
+     * and the second point should be the first move. This allows a time
+     * interval to be computed for this segment
+     */
+    ros::Time startTime;
+    if( path->knots[0].header.stamp != ros::Time(0) )
+    {
+        // knots have non-zero time, remove any segments after that time
+        //
+        // take the new path and insert it into the plannedPath
+        // list in the right spot.
+        // first, remove everything in the list that is now made obsolete
+        // by the new planned path.
+        startTime = path->knots[0].header.stamp;
+        std::unique_lock<std::mutex> lck(path_mutex_);
+        plannedPath.remove_if(
+                [startTime](platform_motion_msgs::Knot p)
+                {
+                return p.header.stamp >= startTime;
+                }
+                );
+        lck.unlock();
+    }
+    else
+    {
+        if(plannedPath.size() == 0 )
+        {
+            // appending, but nothing to append to, start now
+            startTime = ros::Time::now();
+        }
+        else
+        {
+            // appending, first point is an identity so use timestamp from
+            // second
+            startTime = plannedPath.back().header.stamp +
+                (path->knots[1].header.stamp - path->knots[0].header.stamp);
+        }
+    }
+    Eigen::Quaterniond rotation;
+    Eigen::Vector3d translation, velocity, omega;
     if(path->header.stamp == ros::Time(0))
     {
-        // 0 means append after whatever is going on as a relative path
-        ros::Time startTime;
-        Eigen::Quaterniond rotation;
-        Eigen::Vector3d translation, velocity, omega;
+        // 0 means relative to after whatever is going on as a relative path
         if(plannedPath.size() == 0 )
         {
             // No existing path, start at present position
@@ -1389,7 +1448,6 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             tf::vectorTFToEigen( initial.getOrigin(), translation );
             velocity.setZero();
             omega.setZero();
-            startTime = ros::Time::now();
         }
         else if(plannedPath.size() > 0)
         {
@@ -1400,71 +1458,56 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
             tf::pointMsgToEigen( k.pose.position, translation );
             tf::vectorMsgToEigen( k.twist.linear, velocity );
             tf::vectorMsgToEigen( k.twist.angular, omega );
-            startTime = k.header.stamp;
-        }
-        ros::Duration dt=startTime - ros::Time(0);
-        for( auto k : path->knots )
-        {
-            if(plannedPath.size()>0 && k.header.stamp == ros::Time(0))
-                continue;
-            k = transformKnot( rotation, translation, omega, velocity, "odom", k);
-            k.header.stamp += dt;
-            plannedPath.push_back(k);
         }
     }
     else
     {
-        // path has non-zero time, replaces any segments after that time
-        //
-        // take the new path and insert it into the plannedPath
-        // list in the right spot.
-        // first, remove everything in the list that is now made obsolete
-        // by the new planned path.
-        ros::Time startTime = path->header.stamp;
-        plannedPath.remove_if(
-                [startTime](platform_motion_msgs::Knot p)
-                {
-                return p.header.stamp >= startTime;
-                }
-                );
-
-        Eigen::Quaterniond rotation;
-        Eigen::Vector3d translation, velocity, omega;
+        // non-zero means this is a valid frame transform which should be looked
+        // up
         tf::StampedTransform T;
         try {
-            listener.lookupTransform(path->header.frame_id, "odom", most_recent, T );
+            listener.lookupTransform(path->header.frame_id, "odom", path->header.stamp, T );
         } catch( tf::TransformException ex) {
-            ROS_ERROR("Error looking up %s: %s", "base_link", ex.what());
+            ROS_ERROR("Error looking up %s->%s: %s", path->header.frame_id.c_str(), "odom", ex.what());
             return;
         }
         tf::quaternionTFToEigen( T.getRotation(), rotation );
         tf::vectorTFToEigen( T.getOrigin(), translation );
         velocity.setZero();
         omega.setZero();
-
-        ros::Duration dt = startTime - ros::Time(0);
-
-        for( auto k : path->knots )
-        {
-            k = transformKnot( rotation, translation, omega, velocity, "odom", k);
-            k.header.stamp += dt;
-            plannedPath.push_back( k );
-        }
     }
+
+    ros::Duration dt = startTime - path->knots[0].header.stamp;
+
+    std::unique_lock<std::mutex> lck(path_mutex_);
+    for( auto k : path->knots )
+    {
+        // skip first point of relative path, it exists only to
+        // set initial time interval and should be identical to the
+        // the one before it.
+        if(plannedPath.size()>0 && k.header.stamp == ros::Time(0))
+            continue;
+        k = transformKnot( rotation, translation, k);
+        k.header.stamp += dt;
+        k.header.frame_id = "odom";
+        plannedPath.push_back(k);
+    }
+    lck.unlock();
 
     // publish stitched path for visualization
     if( stitchedPath_pub_.getNumSubscribers() > 0 )
     {
         platform_motion_msgs::Path stitched;
         stitched.knots.insert(stitched.knots.end(), plannedPath.begin(), plannedPath.end());
-        stitched.header = plannedPath.front().header;
+        stitched.header.frame_id="odom";
+        stitched.header.stamp = ros::Time::now();
+        stitched.header.seq = path->header.seq;
         stitchedPath_pub_.publish( stitched );
     }
 
-    if(firstSegment_.time >= secondSegment_.time)
+    if( plannedPath.size()>0 && firstSegment_.time >= secondSegment_.time)
     {
         newPathReady = true;
-
     }
 
     primePVT();
@@ -1474,9 +1517,9 @@ void Motion::primePVT(void)
 {
     // check to see if the wheel pods are out of data. if they are,
     // send a couple of segments to get things moving.
-    if((port->getMinBufferDepth() < 3) ||
-            (starboard->getMinBufferDepth() < 3) ||
-            (stern->getMinBufferDepth() < 3))
+    if((port->getMinBufferDepth() < 1) ||
+            (starboard->getMinBufferDepth() < 1) ||
+            (stern->getMinBufferDepth() < 1))
     {
         ROS_DEBUG( "Restart needed" );
         restartPvt = true;
@@ -1490,16 +1533,18 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
     (void) node;
     // only send more data once per sync pulse. this way we send data to
     // all the servos as soon as one says it needs more
+    int depth = static_cast<CANOpen::CopleyServo&>(node).getPvtBufferDepth();
+    ROS_DEBUG("More data needed %ld: %d", node.node_id, depth);
     if(!this->moreDataSent)
     {
-        ROS_DEBUG("More data needed %ld", node.node_id);
         // set the flag so we don't send data for every callback call this
         // sync fame
         this->moreDataSent = true;
 
         // send the next segment
         sendPvtSegment();
-        if(restartPvt)
+        depth++;
+        for(;depth<3;depth++)
         {
             ROS_DEBUG("Send priming segment");
             sendPvtSegment();
@@ -1517,7 +1562,7 @@ void Motion::errorCallback(CANOpen::DS301 &node)
             static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
 }
 
-void Motion::pathToBody()
+bool Motion::pathToBody()
 {
     ROS_DEBUG("pathToBody enter");
 
@@ -1526,6 +1571,7 @@ void Motion::pathToBody()
     if( plannedPath.size() > 1 )
     {
         ROS_DEBUG("move to next segment");
+        std::unique_lock<std::mutex> lck(path_mutex_);
         auto knots = plannedPath.begin();
         platform_motion_msgs::Knot previous = *knots++;
         platform_motion_msgs::Knot current = *knots++;
@@ -1538,22 +1584,85 @@ void Motion::pathToBody()
             next.header.stamp += ros::Duration(0.25);
         }
         plannedPath.pop_front();
+        lck.unlock();
 
-        secondSegment_.time = current.header.stamp;
-        secondSegment_.port = pathToPod(previous, current, next, port_pos_, lastSegmentSent_.port.steeringAngle);
-        secondSegment_.starboard = pathToPod(previous, current, next, starboard_pos_, lastSegmentSent_.starboard.steeringAngle);
-        secondSegment_.stern = pathToPod(previous, current, next, stern_pos_, lastSegmentSent_.stern.steeringAngle);
-
-        ROS_DEBUG("%d: stern:\nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.stern.steeringAngle, secondSegment_.stern.steeringVelocity, secondSegment_.stern.wheelDistance, secondSegment_.stern.wheelVelocity, secondSegment_.stern.duration);
-        ROS_DEBUG("first: %f second: %f", firstSegment_.time.toSec(), secondSegment_.time.toSec());
+        if(   !pathToPod(previous, current, next, port_pos_, lastSegmentSent_.port.steeringAngle, &secondSegment_.port)
+           || !pathToPod(previous, current, next, starboard_pos_, lastSegmentSent_.starboard.steeringAngle, &secondSegment_.starboard)
+           || !pathToPod(previous, current, next, stern_pos_, lastSegmentSent_.stern.steeringAngle, &secondSegment_.stern) )
+        {
+            plannedPath.clear();
+            return false;
+        }
+        else
+        {
+            secondSegment_.time = current.header.stamp;
+            ROS_DEBUG("%d: port: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.port.steeringAngle, secondSegment_.port.steeringVelocity, secondSegment_.port.wheelDistance, secondSegment_.port.wheelVelocity, secondSegment_.port.duration);
+            ROS_DEBUG("%d: starboard: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.starboard.steeringAngle, secondSegment_.starboard.steeringVelocity, secondSegment_.starboard.wheelDistance, secondSegment_.starboard.wheelVelocity, secondSegment_.starboard.duration);
+            ROS_DEBUG("%d: stern: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.stern.steeringAngle, secondSegment_.stern.steeringVelocity, secondSegment_.stern.wheelDistance, secondSegment_.stern.wheelVelocity, secondSegment_.stern.duration);
+            ROS_DEBUG("first: %f second: %f", firstSegment_.time.toSec(), secondSegment_.time.toSec());
+        }
     }
     else
     {
         plannedPath.clear();
         ROS_DEBUG("Finished path");
     }
+    checkSegmentAcceleration();
     ROS_DEBUG("pathToBody exit");
+    return true;
 }
+
+bool Motion::checkSegmentAcceleration()
+{
+    double dt = (secondSegment_.time - firstSegment_.time).toSec();
+    typedef std::tuple<std::string, PodSegment, PodSegment> segtuple;
+    std::vector< segtuple > segs;
+
+    segs.push_back( segtuple( std::string("port"), firstSegment_.port, secondSegment_.port ) );
+    segs.push_back( segtuple( std::string("starboard"), firstSegment_.starboard, secondSegment_.starboard ) );
+    segs.push_back( segtuple( std::string("stern"), firstSegment_.stern, secondSegment_.stern ) );
+
+    bool ok=true;
+    for( auto seg : segs )
+    {
+        std::string name;
+        PodSegment first, second;
+        std::tie( name, first, second )=seg;
+        if( fabs(second.wheelVelocity - first.wheelVelocity) > maxWheelAcceleration_*dt )
+        {
+            ROS_ERROR_STREAM("Excessive wheel acceleration for " << name << " :" << first << " - " << second);
+            ok=false;
+        }
+        if( fabs(second.steeringAngle - first.steeringAngle) > maxSteeringVelocity_*dt )
+        {
+            ROS_ERROR_STREAM("Excessive steering change for " << name << " :" << first << " - " << second);
+            ok=false;
+        }
+    }
+    return ok;
+}
+
+double Motion::computeSafeInterval(double dt)
+{
+    typedef std::tuple<std::string, PodSegment, PodSegment> segtuple;
+    std::vector< segtuple > segs;
+
+    segs.push_back( segtuple( std::string("port"), firstSegment_.port, secondSegment_.port ) );
+    segs.push_back( segtuple( std::string("starboard"), firstSegment_.starboard, secondSegment_.starboard ) );
+    segs.push_back( segtuple( std::string("stern"), firstSegment_.stern, secondSegment_.stern ) );
+
+    for( auto seg : segs )
+    {
+        std::string name;
+        PodSegment first, second;
+        std::tie( name, first, second )=seg;
+        dt = std::max( dt, fabs(second.wheelVelocity - first.wheelVelocity)/maxWheelAcceleration_ );
+        dt = std::max( dt, fabs(second.steeringAngle - first.steeringAngle)/maxSteeringVelocity_ );
+    }
+    return dt;
+}
+
+
 
 // helper function needed only for pathToPod below
 double unwrap(double theta)
@@ -1581,7 +1690,26 @@ Eigen::Vector2d Motion::podVelocity(const platform_motion_msgs::Knot &current, E
     return (omegacross * (rot * pod_pos) + Vbody).head(2);
 }
 
-PodSegment Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle)
+bool limit_steering_angle(double *phi)
+{
+    if(fabs(*phi+M_PI_2)<0.001)
+    {
+        *phi = -M_PI_2;
+    }
+    else if(fabs(*phi-M_PI_2)<0.001)
+    {
+        *phi = M_PI_2;
+    }
+    else if(fabs(*phi)>M_PI_2)
+    {
+        ROS_DEBUG( "Flipping velocity for smaller steering move" );
+        *phi = unwrap(*phi+M_PI);
+        return true;
+    }
+    return false;
+}
+
+bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle, PodSegment* retval)
 {
     // this is a helper that does the actual math for each pod segment.
     // this math comes from contradict's path2local.py and I'm using those vairable names
@@ -1597,26 +1725,22 @@ PodSegment Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_moti
     double dt_prev = (current.header.stamp - previous.header.stamp).toSec();
     double dt_next = (next.header.stamp - current.header.stamp).toSec();
 
-    PodSegment retval;
-    retval.duration = dt_next;
+    retval->duration = dt_next;
 
     Eigen::Vector2d Vpod = podVelocity(current, pod_pos);
 
     double ksidot = Vpod.norm();
 
-    if(ksidot < 0.001)
+    if(ksidot<0.001)
     {
-        // if ksidot is nearly zero, steering angle and velocity will be wrong!
-        // set steering velocity to 0 and steering angle to the last valid and
-        // return early. that's all we can do for now.
-        retval.steeringAngle = lastValidSteeringAngle;
-        retval.steeringVelocity = 0.0;
-        retval.wheelDistance = 0.0;
-        retval.wheelVelocity = 0.0;
-        return retval;
-    }
+        // if wheel velocity is small, all other calculations are not possible
+        retval->steeringAngle = lastValidSteeringAngle;
+        retval->steeringVelocity = 0.0;
+        retval->wheelDistance = 0.0;
+        retval->wheelVelocity = 0.0;
 
-    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - currentTheta);
+        return true;
+    }
 
     // add motion due to rotation about body axis of pod
     Eigen::Matrix2d rot;
@@ -1643,25 +1767,48 @@ PodSegment Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_moti
         dksi = fabs(dtheta) * sqrt(pow(dx, 2) + pow(dy, 2)) / sqrt(2 * (1.0 - cos(dtheta)));
     }
 
-    double alpha = unwrap(phi + currentTheta);
-
-    Eigen::Vector2d Vpod_prev = podVelocity(previous, pod_pos);
+    double phi = unwrap(atan2(Vpod[1], Vpod[0]) - currentTheta);
+    if( limit_steering_angle(&phi) )
+    {
+        ksidot *= -1;
+        dksi *= -1;
+    }
+    
     Eigen::Vector2d Vpod_next = podVelocity(next, pod_pos);
-    Eigen::Vector2d Vdot = ((Vpod-Vpod_prev)/dt_prev + (Vpod_next-Vpod)/dt_next)/2.;
+    double phi_next;
+    if( Vpod_next.norm() > 0.001 )
+    {
+        phi_next = unwrap(atan2(Vpod_next[1], Vpod_next[0])-nextTheta);
+    }
+    else
+    {
+        phi_next = phi;
+    }
+    limit_steering_angle(&phi_next);
 
-    double phidot = (Vdot[0] * cos(-alpha - M_PI/2.0) - Vdot[1] * sin(-alpha - M_PI/2.0)) /
-        ksidot - current.twist.angular.z;
+    double phidot = (phi_next - phi)/dt_next;
+
+    if( isnan(phi) || isnan(phidot) ||
+        isnan(dksi) || isnan(ksidot) )
+    {
+        ROS_ERROR( "Bad segments" );
+        ROS_ERROR( "phi: %f phidot: %f dksi: %f ksidot: %f", phi, phidot, dksi, ksidot );
+        ROS_ERROR_STREAM( "prev: " << previous );
+        ROS_ERROR_STREAM( "current: " << current );
+        ROS_ERROR_STREAM( "next: " << next );
+        return false;
+    }
 
     // we've actually computed everything now! stick the results into retval!
-    retval.steeringAngle = phi;
-    retval.steeringVelocity = phidot;
-    retval.wheelDistance = dksi;
-    retval.wheelVelocity = ksidot;
+    retval->steeringAngle = phi;
+    retval->steeringVelocity = phidot;
+    retval->wheelDistance = dksi;
+    retval->wheelVelocity = ksidot;
 
     // update last valid steering angle in case we hit another zero velocity path.
     lastValidSteeringAngle = phi;
 
-    return retval;
+    return true;
 }
 
 // function definition interlude!
@@ -1722,6 +1869,20 @@ Motion::BodySegment Motion::interpolatePodSegments(const BodySegment &first, con
     return retval;
 }
 
+void Motion::setLastSegmentToCurrent( void )
+{
+    lastSegmentSent_.port.duration = 0.25;
+    lastSegmentSent_.starboard.duration = 0.0;
+    lastSegmentSent_.stern.duration = 0.0;
+    port->getPosition(&lastSegmentSent_.port.steeringAngle, &lastSegmentSent_.port.steeringVelocity,
+            nullptr, &lastSegmentSent_.port.wheelVelocity);
+    starboard->getPosition(&lastSegmentSent_.starboard.steeringAngle, &lastSegmentSent_.starboard.steeringVelocity,
+            nullptr, &lastSegmentSent_.starboard.wheelVelocity);
+    stern->getPosition(&lastSegmentSent_.stern.steeringAngle, &lastSegmentSent_.stern.steeringVelocity,
+            nullptr, &lastSegmentSent_.stern.wheelVelocity);
+    lastSegmentSent_.time = ros::Time::now();
+}
+
 void Motion::sendPvtSegment()
 {
     // for now, only the planner should be sending pvt segments.
@@ -1736,25 +1897,27 @@ void Motion::sendPvtSegment()
         {
             if( lastSegmentSent_.time == ros::Time(0) )
             {
-                lastSegmentSent_.port.duration = 0.25;
-                lastSegmentSent_.starboard.duration = 0.0;
-                lastSegmentSent_.stern.duration = 0.0;
-                port->getPosition(&lastSegmentSent_.port.steeringAngle, &lastSegmentSent_.port.steeringVelocity,
-                        nullptr, &lastSegmentSent_.port.wheelVelocity);
-                starboard->getPosition(&lastSegmentSent_.starboard.steeringAngle, &lastSegmentSent_.starboard.steeringVelocity,
-                        nullptr, &lastSegmentSent_.starboard.wheelVelocity);
-                stern->getPosition(&lastSegmentSent_.stern.steeringAngle, &lastSegmentSent_.stern.steeringVelocity,
-                        nullptr, &lastSegmentSent_.stern.wheelVelocity);
+                setLastSegmentToCurrent();
             }
 
-            lastSegmentSent_.time = plannedPath.front().header.stamp - ros::Duration(0.25);
-
-            // prime second segment so pathToBody moves it to first.
+            // pathToBody() move this to firstSegment_
             secondSegment_ = lastSegmentSent_;
-            secondSegment_.time += ros::Duration(0.25);
+            secondSegment_.time = plannedPath.front().header.stamp;
 
-            pathToBody();
+            if(pathToBody())
+            {
 
+                // reset dt for first, this is computed by pathToBody for all future
+                // segments
+                double dt = (secondSegment_.time - firstSegment_.time).toSec();
+                firstSegment_.port.duration = dt;
+                firstSegment_.starboard.duration = dt;
+                firstSegment_.stern.duration = dt;
+
+                // set time so now works out to first, triggers
+                // interpolation
+                lastSegmentSent_.time=firstSegment_.time-ros::Duration(lastSegmentSent_.port.duration);
+            }
             newPathReady = false;
         }
 
@@ -1765,13 +1928,22 @@ void Motion::sendPvtSegment()
             // get the next two path segments out of the path
             ros::Time now=lastSegmentSent_.time+ros::Duration(lastSegmentSent_.port.duration);
 
-            ROS_DEBUG_STREAM("first: " << firstSegment_.time << " second: " << secondSegment_.time << " now: ");
+            ROS_DEBUG_STREAM("first: " << firstSegment_.time << " second: " << secondSegment_.time << " now: " << now);
 
             BodySegment newSegment;
 
             if(now < firstSegment_.time)
             {
-                ROS_DEBUG("last segment too old, sending first blindly");
+                ROS_DEBUG("now too old, sending first blindly");
+
+                // if the last segment we sent was before this path, just send
+                // the first segment. that's all we can really do.
+                newSegment = firstSegment_;
+
+            }
+            else if(now == firstSegment_.time)
+            {
+                ROS_DEBUG("first segment reached exactly");
 
                 // if the last segment we sent was before this path, just send
                 // the first segment. that's all we can really do.
@@ -1795,6 +1967,8 @@ void Motion::sendPvtSegment()
                     // compute the distance with the fancy cubic interpolation thing.
                     ROS_DEBUG("interpolating to now");
                     newSegment = interpolatePodSegments(firstSegment_, secondSegment_, lastSegmentSent_, now);
+                    if( now == secondSegment_.time )
+                        pathToBody( );
                 }
                 if((secondSegment_.time - now).toSec() < 0.255)
                 {
@@ -1805,10 +1979,6 @@ void Motion::sendPvtSegment()
                     newSegment.port.duration = duration;
                     newSegment.starboard.duration = duration;
                     newSegment.stern.duration = duration;
-
-                    // we're also past the first segment, so remove it from the
-                    // path and convert the next set.
-                    pathToBody( );
                 }
                 else
                 {
@@ -1921,25 +2091,25 @@ void Motion::pvtToZero( void )
     lastSegmentSent_.port.duration = 0.250;
     lastSegmentSent_.starboard.duration = 0.250;
     lastSegmentSent_.stern.duration = 0.250;
-    if( lastSegmentSent_.port.wheelVelocity > 0 ||
-        lastSegmentSent_.starboard.wheelVelocity > 0 ||
-        lastSegmentSent_.stern.wheelVelocity > 0 )
-    {
-        ROS_DEBUG( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
-        lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
-        lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
-        lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
-        lastSegmentSent_.starboard.steeringVelocity = decelSteering(lastSegmentSent_.starboard.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.starboard.steeringAngle );
-        lastSegmentSent_.stern.wheelVelocity = decelWheel(lastSegmentSent_.stern.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.stern.wheelDistance );
-        lastSegmentSent_.stern.steeringVelocity = decelSteering(lastSegmentSent_.stern.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.stern.steeringAngle );
-    }
+    ROS_DEBUG( "lastSegmentSent_.port.wheelVelocity: %f", lastSegmentSent_.port.wheelVelocity);
+    lastSegmentSent_.port.wheelVelocity = decelWheel(lastSegmentSent_.port.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.port.wheelDistance );
+    lastSegmentSent_.port.steeringVelocity = decelSteering(lastSegmentSent_.port.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.port.steeringAngle );
+    lastSegmentSent_.starboard.wheelVelocity = decelWheel(lastSegmentSent_.starboard.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.starboard.wheelDistance );
+    lastSegmentSent_.starboard.steeringVelocity = decelSteering(lastSegmentSent_.starboard.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.starboard.steeringAngle );
+    lastSegmentSent_.stern.wheelVelocity = decelWheel(lastSegmentSent_.stern.wheelVelocity, planToZeroDecel_, 0.25, &lastSegmentSent_.stern.wheelDistance );
+    lastSegmentSent_.stern.steeringVelocity = decelSteering(lastSegmentSent_.stern.steeringVelocity, steeringAccel_, 0.25, &lastSegmentSent_.stern.steeringAngle );
     port->move(lastSegmentSent_.port);
     starboard->move(lastSegmentSent_.starboard);
     stern->move(lastSegmentSent_.stern);
-    ROS_DEBUG( "Zeroing: %f %f %f %f %f %f",
+    ROS_DEBUG( "Zeroing steering: %f %f %f %f %f %f",
             lastSegmentSent_.port.steeringAngle, lastSegmentSent_.port.steeringVelocity,
             lastSegmentSent_.starboard.steeringAngle, lastSegmentSent_.starboard.steeringVelocity,
             lastSegmentSent_.stern.steeringAngle, lastSegmentSent_.stern.steeringVelocity
+            );
+    ROS_DEBUG( "Zeroing wheels: %f %f %f %f %f %f",
+            lastSegmentSent_.port.wheelDistance, lastSegmentSent_.port.wheelVelocity,
+            lastSegmentSent_.starboard.wheelDistance, lastSegmentSent_.starboard.wheelVelocity,
+            lastSegmentSent_.stern.wheelDistance, lastSegmentSent_.stern.wheelVelocity
             );
 }
 
@@ -1953,14 +2123,14 @@ bool Motion::setSteering( PodSegment &pod, double goal, double dt)
         return false;
     }
     double vprime;
-    if(fabs(error)<=0.5*steeringMaxV_*steeringMaxV_/steeringAccel_)
+    if(fabs(error)<=0.5*maxSteeringVelocity_*maxSteeringVelocity_/steeringAccel_)
     {
         // decel region
         vprime = copysign( sqrt(2.0*fabs(error)*steeringAccel_) , error );
     }
     else
     {
-        vprime = copysign( std::min( steeringMaxV_, fabs(pod.steeringVelocity) + dt*steeringAccel_ ), error );
+        vprime = copysign( std::min( maxSteeringVelocity_, fabs(pod.steeringVelocity) + dt*steeringAccel_ ), error );
     }
     double dtheta = dt*(pod.steeringVelocity + vprime)/2.;
     if( fabs(dtheta)<fabs(error) )

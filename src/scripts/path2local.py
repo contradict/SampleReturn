@@ -100,14 +100,21 @@ def drawPath(p,N=1):
     velocity=p[::N,3:5]
     f=pylab.figure(1)
     f.clear()
+
     ax1 = f.add_subplot(221)
     ax1.set_title("heading")
     ax1.set_aspect(1)
     ax1.quiver(base[:,0], base[:,1], heading[:,0], heading[:,1])
+    ax1.set_xlim(base[:,0].min()-0.25, base[:,0].max()+0.25)
+    ax1.set_ylim(base[:,1].min()-0.25, base[:,1].max()+0.25)
+
     ax2 = f.add_subplot(222)
-    ax2.quiver(base[:,0], base[:,1], velocity[:,0], velocity[:,1])
     ax2.set_title("velocity")
     ax2.set_aspect(1)
+    ax2.quiver(base[:,0], base[:,1], velocity[:,0], velocity[:,1])
+    ax2.set_xlim(base[:,0].min()-0.25, base[:,0].max()+0.25)
+    ax2.set_ylim(base[:,1].min()-0.25, base[:,1].max()+0.25)
+
     tdot = p[::N,5:6]*np.c_[cos(p[::N,2]+pi/2), sin(p[::N,2]+pi/2)]
     ax3=f.add_subplot(223)
     ax3.set_title("thetadot")
@@ -156,6 +163,7 @@ def path2local(p, R, initialphi=0, small=1e-3):
     ksidot = sqrt(Vx**2+Vy**2)
     # phi = arg(V)-theta
     phi = unwrap(arctan2(Vy, Vx) - theta)
+    phi = np.where( abs(abs(phi)-pi)<0.001, pi, phi )
     last_good_phi=initialphi
     for i in xrange(phi.shape[0]):
         if ksidot[i]<small:
@@ -164,25 +172,40 @@ def path2local(p, R, initialphi=0, small=1e-3):
             last_good_phi = phi[i]
     dksi = np.where(abs(dtheta)<small, sqrt(dx**2+dy**2),
                                   abs(dtheta)*sqrt(dx**2+dy**2)/sqrt(2*(1.-cos(dtheta))))
-    # V = ksidot exp(i(phi+theta))
-    alpha = unwrap(phi+theta)
-    # Vdot = ksiddot exp(i alpha) + i alpha (phidot+thetadot) ksidot exp(i alpha)
-    dt = np.diff(t, axis=0)
-    Vdot = np.r_[diff(V, axis=0)/dt, [[0,0]]]
-    Vdotx = Vdot[:,0:1]
-    Vdoty = Vdot[:,1:2]
-    ksiddot = (Vx**2+Vy**2)**(-1./2)*(Vx*Vdotx + Vy*Vdoty)
-    # Vdot = (ksiddot + i (phidot+thetadot) ksidot) exp(i alpha)
-    # (Vdot exp(-i alpha) - ksiddot)/(i ksidot) - thetadot = phidot
-    # (Vdot exp(-i (alpha+pi/2)) + i ksiddot)/(ksidot) - thetadot = phidot
-    # ([Vdotx cos(-alpha-pi/2) - Vdoty sin(-alpha-pi/2),
-    #   Vdoty cos(-alpha-pi/2) + Vdotx sin(-alpha-pi/2)+ksiddot])/(ksidot) - thetadot = phidot
-    phidot = np.where(ksidot>small, (Vdotx*cos(-alpha-pi/2) -
-        Vdoty*sin(-alpha-pi/2))/ksidot - thetadot, 0)
-    # this should be very small (analytically, it should be zero) everywhere
-    imphidot = np.where(ksidot>small, (Vdoty*cos(-alpha-pi/2) +
-        Vdotx*sin(-alpha-pi/2)+ksiddot)/ksidot, 0)
-    assert(allclose(imphidot, 0))
+    if 0:
+        # V = ksidot exp(i(phi+theta))
+        alpha = unwrap(phi+theta)
+        # Vdot = ksiddot exp(i alpha) + i alpha (phidot+thetadot) ksidot exp(i alpha)
+        dt = np.diff(t, axis=0)
+        Vdot = np.r_[diff(V, axis=0)/dt, [[0,0]]]
+        Vdotx = Vdot[:,0:1]
+        Vdoty = Vdot[:,1:2]
+        ksiddot = (Vx**2+Vy**2)**(-1./2)*(Vx*Vdotx + Vy*Vdoty)
+        # Vdot = (ksiddot + i (phidot+thetadot) ksidot) exp(i alpha)
+        # (Vdot exp(-i alpha) - ksiddot)/(i ksidot) - thetadot = phidot
+        # (Vdot exp(-i (alpha+pi/2)) + i ksiddot)/(ksidot) - thetadot = phidot
+        # ([Vdotx cos(-alpha-pi/2) - Vdoty sin(-alpha-pi/2),
+        #   Vdoty cos(-alpha-pi/2) + Vdotx sin(-alpha-pi/2)+ksiddot])/(ksidot) - thetadot = phidot
+        phidot = np.where(ksidot>small, (Vdotx*cos(-alpha-pi/2) -
+            Vdoty*sin(-alpha-pi/2))/ksidot - thetadot, 0)
+        # this should be very small (analytically, it should be zero) everywhere
+        imphidot = np.where(ksidot>small, (Vdoty*cos(-alpha-pi/2) +
+            Vdotx*sin(-alpha-pi/2)+ksiddot)/ksidot, 0)
+        assert(allclose(imphidot, 0))
+    else:
+        for i in xrange(phi.shape[0]):
+            if abs(phi[i]-pi/2) < 0.001:
+                phi[i] = pi/2
+            elif abs(phi[i]+pi/2) < 0.001:
+                phi[i] = -pi/2
+            elif abs(phi[i])>pi/2:
+                phi[i] = unwrap(phi[i]+pi)
+                ksidot[i] *= -1
+                dksi[i] *= -1
+        phidot = np.r_[ np.zeros((1,1)), 
+                        ((phi[1:-1,:]-phi[:-2,:])/(t[1:-1,:]-t[:-2,:]) + 
+                         (phi[2:,:]-phi[1:-1,:])/(t[2:,:]-t[1:-1,:]))/2.,
+                        np.zeros((1,1)) ]
     return np.c_[phi, phidot, dksi, ksidot, t]
 
 def plotlocal(l):
