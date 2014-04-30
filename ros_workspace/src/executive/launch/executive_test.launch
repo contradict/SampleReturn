@@ -1,24 +1,26 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-   
-    <node
-        name="navigate_audio"
-        pkg="sound_play"
-        type="soundplay_node.py"
-        ns="/io/audio">
-        <remap from="robotsound" to="navigate_soundplay"/>
-    </node>
+
+    <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
+    <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
+    <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
+    <remap from="joystick_command" to="/motion/joystick_command"/>
     
-    <node
-        name="navigate_announcer"
-        pkg="samplereturn"
-        type="announcer.py"
-        ns="/io/audio">
-        <remap from="audio_in" to="navigate"/>
-        <remap from="audio_out" to="navigate_soundplay"/>
-    </node>
-  
+    <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
+    <remap from="planner_command" to="/processes/planner/command"/>        
+    <remap from="planner_move_base" to="/processes/planner/move_base"/>        
+    <remap from="manipulator_detection_point" to="processes/sample_detection/manipulator/named_point"/>
+    <remap from="detected_samples" to="/processes/sample_detection/detected_samples"/>
+
+    <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
+    <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
+    <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
+
+    <remap from="announcer" to="/io/announcer"/>
+    <remap from="audio_search" to="/io/audio/search"/>
+    <remap from="audio_navigate" to="/io/audio/navigate"/>
+
     <node
         pkg="executive"
         type="executive_master_node.py"
@@ -26,8 +28,6 @@
         output="log"
         ns="/processes/executive">
 
-        <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
-        <param name="maximum_pursuit_error" type="double" value="0.5"/>
         <param name="gpio_servo_id" value="1"/>
         <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
         <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
@@ -40,35 +40,38 @@
 
         <remap from="home_wheel_pods" to="/motion/wheel_pods/home"/>
         <remap from="home_carousel" to="/motion/carousel/home"/>
-        <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
         <remap from="manual_control" to="/motion/manual_control"/>
-        
-        <remap from="manipulator_detection_point" 
-               to="processes/sample_detection/manipulator/named_point"/>
-        <remap from="search_point" to="/processes/sample_detection/point"/>
-        <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
 
-        <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
-        <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
-        <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
-        <remap from="joystick_command" to="/motion/joystick_command"/>
-
-        <remap from="announcer" to="/io/announcer"/>
-        <remap from="audio_search" to="/io/audio/search"/>
-        <remap from="audio_navigate" to="/io/audio/navigate"/>
         <remap from="gpio_read" to="/io/gpio_read"/>
         <remap from="pause_state" to="/io/pause_state"/>
-        
-        <remap from="DWAPlanner_set_parameters"
-               to="/planner/mover/DWAPlannerROS/set_parameters"/>
-        <remap from="planner_command" to="/processes/planner/command"/>        
-        <remap from="planner_move_base" to="/processes/planner/move_base"/>        
+    </node>
 
-        <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
-        
-        <!--
-        <remap from="img_point" to="filtered_points"/
-        -->
+    <node
+        pkg="executive"
+        type="level_one_node.py"
+        name="level_one"
+        output="log"
+        ns="/processes/executive">
+
+        <param name="home_pursuit_complete_distance" type="double" value="4.0"/>
+        <param name="maximum_pursuit_error" type="double" value="0.5"/>
+    </node>
+
+    <node
+        name="navigate_audio"
+        pkg="sound_play"
+        type="soundplay_node.py"
+        ns="/io/audio">
+        <remap from="robotsound" to="navigate_soundplay"/>
+    </node>
+
+    <node
+        name="navigate_announcer"
+        pkg="samplereturn"
+        type="announcer.py"
+        ns="/io/audio">
+        <remap from="audio_in" to="navigate"/>
+        <remap from="audio_out" to="navigate_soundplay"/>
     </node>
 
 </launch>
