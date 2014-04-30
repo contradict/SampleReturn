@@ -24,12 +24,10 @@ import visual_servo_msgs.msg as visual_servo_msg
 import linemod_detector.msg as linemod_msg
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
-import tf_conversions
+import samplereturn_msgs.msg as samplereturn_msg
 
-from executive import executive_level_one
-from executive import executive_level_two
-
-from executive.monitor_topic_state import MonitorTopicState
+from executive.executive_states import MonitorTopicState
+from executive.executive_states import WaitForFlagState
 
 class ExecutiveMaster(object):
     
@@ -52,8 +50,6 @@ class ExecutiveMaster(object):
         self.node_params = util.get_node_params()
         self.GPIO_PIN_LEVEL_ONE = int(self.node_params.GPIO_PIN_LEVEL_ONE, 16)
         self.GPIO_PIN_LEVEL_TWO = int(self.node_params.GPIO_PIN_LEVEL_TWO, 16)
-        
-        self.listener = tf.TransformListener()
         
         # create publishers
         self.announcer = util.AnnouncerInterface("audio_navigate")
@@ -152,10 +148,13 @@ class ExecutiveMaster(object):
                                    transitions = {'next':'CHECK_MODE'})
             
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
-                                   WaitForUnpause(self.announcer),
-                                   transitions = {'unpaused':'HOME_PLATFORM',
-                                                  'paused':'WAIT_FOR_UNPAUSE',
-                                                  'aborted':'TOP_ABORTED'})
+                                   WaitForFlagState('paused',
+                                                    flag_trigger_value = False,
+                                                    timeout = 10,
+                                                    announcer = self.announcer,
+                                                    start_message ='Waiting for system enable'),
+                                   transitions = {'next':'HOME_PLATFORM',
+                                                  'timeout':'WAIT_FOR_UNPAUSE'})
             
             smach.StateMachine.add('HOME_PLATFORM',
                                    HomePlatform(self.announcer),
@@ -173,24 +172,30 @@ class ExecutiveMaster(object):
                                                   'preempted':'TOP_PREEMPTED',
                                                   'aborted':'TOP_ABORTED'})                       
 
-            #create the mode state machines, and pass them to the
-            #function which adds their states
-            level_one = smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
-            executive_level_one.AddStates(level_one, self.announcer)
             smach.StateMachine.add('LEVEL_ONE_MODE',
-                                   level_one,
-                                   transitions = {'complete':'CHECK_MODE',
+                                   smach_ros.SimpleActionState('level_one',
+                                   samplereturn_msg.GeneralExecutiveAction,
+                                   goal = samplereturn_msg.GeneralExecutiveGoal()),
+                                   transitions = {'succeeded':'WAIT_FOR_MODE_CHANGE',
                                                   'preempted':'TOP_PREEMPTED',
                                                   'aborted':'TOP_ABORTED'})
 
-            level_two = smach.StateMachine(outcomes=['complete', 'preempted', 'aborted'])
-            executive_level_two.AddStates(level_two)
             smach.StateMachine.add('LEVEL_TWO_MODE',
-                                   level_two,
-                                   transitions = {'complete':'CHECK_MODE',
+                                   smach_ros.SimpleActionState('level_two',
+                                   samplereturn_msg.GeneralExecutiveAction,
+                                   goal = samplereturn_msg.GeneralExecutiveGoal()),
+                                   transitions = {'succeeded':'WAIT_FOR_MODE_CHANGE',
                                                   'preempted':'TOP_PREEMPTED',
                                                   'aborted':'TOP_ABORTED'})
-
+            
+            smach.StateMachine.add('WAIT_FOR_MODE_CHANGE',
+                                   WaitForFlagState('selected_mode',
+                                                    flag_trigger_value = 'manual',
+                                                    timeout = 10,
+                                                    announcer = self.announcer,
+                                                    start_message ='Mode complete, switch to manual'),
+                                   transitions = {'next':'CHECK_MODE',
+                                                  'timeout':'WAIT_FOR_MODE_CHANGE'})
             
             mcg = platform_msg.ManualControlGoal()
             mcg.mode = mcg.FULL_CONTROL
@@ -255,6 +260,7 @@ class ExecutiveMaster(object):
         self.last_detected_mode = detected_mode
         
         if (detected_mode != self.selected_mode) and detect_match:
+            rospy.loginfo("MASTER EXECUTIVE new mode selected: " + detected_mode)
             self.selected_mode = detected_mode
             self.state_machine.userdata.selected_mode = detected_mode
             active_state = self.state_machine.get_active_states()[0]
@@ -310,10 +316,12 @@ class WaitForUnpause(smach.State):
             self.announcer.say(words)
         
         start_time = rospy.get_time()
-        while (rospy.get_time() - start_time) < 10.0:
+        while True:
             if not userdata.paused:
                 return 'unpaused'
             rospy.sleep(0.1)
+            if (rospy.get_time() - start_time) > timeout:
+                return 'timeout'
                 
         return 'paused'
         
@@ -343,8 +351,6 @@ class HomePlatform(smach.State):
                 actionlib.SimpleActionClient('manipulator_action',
                 manipulator_msg.ManipulatorAction)
     
-        self.working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
-    
     def execute(self, userdata):
        
         #ensure that homing services are live, wait 10 seconds
@@ -368,7 +374,7 @@ class HomePlatform(smach.State):
         while True: 
             rospy.sleep(0.1)
             manipulator_state = self.manipulator.get_state()
-            if manipulator_state not in self.working_states:
+            if manipulator_state not in util.actionlib_working_states:
                 break           
         if manipulator_state != action_msg.GoalStatus.SUCCEEDED:             
             if userdata.paused:
@@ -385,8 +391,8 @@ class HomePlatform(smach.State):
             rospy.sleep(0.1)
             wheelpods_state = self.home_wheelpods.get_state()
             carousel_state = self.home_carousel.get_state()
-            if wheelpods_state not in self.working_states \
-               and carousel_state not in self.working_states:
+            if wheelpods_state not in util.actionlib_working_states \
+               and carousel_state not in util.actionlib_working_states:
                 break
         if wheelpods_state != action_msg.GoalStatus.SUCCEEDED \
            or carousel_state != action_msg.GoalStatus.SUCCEEDED:
@@ -430,7 +436,7 @@ class CheckMode(smach.State):
             else:
                 rospy.logwarn("Unexpected camera_status in executive")
                 return 'aborted'
-    
+            
 class CameraFailure(smach.State):
     def execute(self, userdata):
         userdata.camera_status = 'error'
