@@ -430,23 +430,14 @@ class InterruptibleActionClientState(smach.State):
                              outcomes=['complete', 'canceled', 'preempted', 'aborted'])
 
         self.actionname = actionname
-
         self.actionspec = actionspec
-
         self.goal = goal
-
         self.feedback_cb = feedback_cb
-
         self.announcer = announcer
-
         self.unavailable_msg = unavailable_msg
-
         self.active_msg = active_msg
-
         self.timeout = timeout
-
         self.timeout_msg = timeout_msg
-
 
     def execute(self, userdata):
         action_client = actionlib.SimpleActionClient(self.actionname,
@@ -512,7 +503,8 @@ class InterruptibleActionClientState(smach.State):
 
 class ManualPreempted(smach.State):
     def __init__(self, CAN_interface):
-        smach.State.__init__(self, outcomes=['complete','fail'])
+        smach.State.__init__(self, outcomes=['complete','fail'],
+                                   output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
         
@@ -529,7 +521,7 @@ class ManualPreempted(smach.State):
 class ManualAborted(smach.State):
     def __init__(self, CAN_interface):
         smach.State.__init__(self, outcomes=['recover','fail'],
-                output_keys=['action_result'])
+                                   output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
         
