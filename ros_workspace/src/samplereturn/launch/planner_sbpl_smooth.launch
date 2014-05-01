@@ -24,7 +24,7 @@
         <rosparam file="$(find samplereturn)/config/sbpl/the_smooth_params.yaml" command="load"/>
 
         <param name="SBPLLatticePlanner/primitive_filename" type="string" value="$(find samplereturn)/config/sbpl/motion_primitives.mprim"/>
-        <param name="planner_frequency" type="double" value="0.5"/>
+        <param name="planner_frequency" type="double" value="0.0"/>
         <param name="base_global_planner" type="string" value="SBPLLatticePlanner"/>
         <param name="base_local_planner" type="string" value="TheSmoothPlanner"/>
     </node>
