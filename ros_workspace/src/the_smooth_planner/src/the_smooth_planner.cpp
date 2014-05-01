@@ -79,8 +79,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 	// What direction is the robot going and what is the linear/angular vel?
 	Time timestamp = Time::now();
-	timestamp.sec = 0;
-	timestamp.nsec = 0;
+	//timestamp.sec = 0;
+	//timestamp.nsec = 0;
 	Eigen::Vector3d linearVelocity(odometry.twist.twist.linear.x, odometry.twist.twist.linear.y, odometry.twist.twist.linear.z);
 	Eigen::Vector3d angularVelocity(odometry.twist.twist.angular.x, odometry.twist.twist.angular.y, odometry.twist.twist.angular.z);
 	double currentVelocityMagnitude = linearVelocity.norm();
