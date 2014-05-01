@@ -29,7 +29,7 @@
     <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
     <include file="$(find samplereturn)/launch/search_detection.launch"/>
     <include file="$(find visual_servo)/launch/visual_servo.launch"/>
-    <include file="$(find samplereturn)/launch/planner.launch"/>
+    <include file="$(find samplereturn)/launch/planner_carrot_dwa.launch"/>
     <!--
     <include file="$(find samplereturn)/launch/imu.launch"/>
     -->

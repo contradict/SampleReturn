@@ -10,5 +10,5 @@
         <arg name="kind" value="$(arg kind)"/>
     </include>
 
-    <include file="$(find samplereturn)/launch/planner.launch"/>
+    <include file="$(find samplereturn)/launch/planner_carrot_dwa.launch"/>
 </launch>
