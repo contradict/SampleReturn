@@ -145,13 +145,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 		// 4) Store the data in a new message format containing linear and
 		//    angular PVT values
-		timestamp.sec += static_cast<int>(delta_time_seconds);
-		timestamp.nsec += static_cast<int>((delta_time_seconds - static_cast<int>(delta_time_seconds))*1000000000);
-		if (timestamp.nsec > 1000000000)
-		{
-			timestamp.sec += 1;
-			timestamp.nsec -= 1000000000;
-		}
+		timestamp += ros::Duration(delta_time_seconds);
 
 		path_msg.knots[i+1].header.seq = i+1;
 		path_msg.knots[i+1].header.stamp = timestamp;
@@ -183,9 +177,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		path_msg.knots[i].twist.linear.x *= targetDecelerationVelocity;
 		path_msg.knots[i].twist.linear.y *= targetDecelerationVelocity;
 
-		double delta_time_seconds = (path_msg.knots[i].header.stamp.sec-path_msg.knots[i-1].header.stamp.sec) +
-                                    (path_msg.knots[i].header.stamp.nsec-path_msg.knots[i-1].header.stamp.nsec)/1000000000.0;
-
+		double delta_time_seconds = path_msg.knots[i].header.stamp.toSec() - path_msg.knots[i-1].header.stamp.toSec();
 		targetDecelerationVelocity += linear_acceleration*delta_time_seconds;
 	}
 
