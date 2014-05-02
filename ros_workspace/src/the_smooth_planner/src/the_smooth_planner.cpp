@@ -138,7 +138,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 		// 3) Based on input theta_dot, compute the output theta_dot
 		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+pathVelocityMagnitude);
-		double angle = initialQuaternion.angleShortestPath(finalQuaternion);
+		//double angle = initialQuaternion.angleShortestPath(finalQuaternion);
+		tf::Quaternion initialToFinalQuaternion = initialQuaternion.inverse()*finalQuaternion;
+		double angle = tf::getYaw(initialToFinalQuaternion);
 		double angular_velocity = angle/delta_time_seconds;
 
 		// 4) Store the data in a new message format containing linear and
