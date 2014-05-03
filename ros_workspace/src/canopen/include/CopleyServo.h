@@ -210,7 +210,7 @@ class CopleyServo : public DS301 {
         std::string getLastError() {return m_lastErrorMessage;}
         void resetLastError() {m_lastErrorMessage = "";}
 
-        bool getNeedsToStart() {return ((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) >= PVT_MINIMUM_SEGMENTS) && !m_pvtModeActive;}
+        bool getNeedsToStart() {return ((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) >= PVT_MINIMUM_SEGMENTS) && !m_pvtModeActive;}
         bool getPvtActive() {return m_pvtModeActive;};
 
         int32_t position;
@@ -234,8 +234,6 @@ class CopleyServo : public DS301 {
 
         void _setPositionValue(PDO &pdo);
         void _positionGo(PDO &pdo);
-
-        void _pvtSendCompleteCallback(PDO &pdo);
 
         // a struct for keeping track of pvt segments.
         struct PvtSegment

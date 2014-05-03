@@ -286,6 +286,7 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
     bool segmentConsumed = (m_freeBufferSlots < freeBufferSlots);
 
     m_expectedSegmentId = nextSegmentExpected;
+    m_freeBufferSlots = freeBufferSlots;
     // expected free buffer slots decrements between status callbacks
     // this is so we don't accidentally send too many segments too quickly.
     // we need to keep the concept of how many are actually free though because
@@ -294,7 +295,6 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
     // isn't enabled, don't reset expectedFreeBufferSlots!
     if(status_word & STATUS_INTERPOLATED_POSITION)
     {
-        m_freeBufferSlots = freeBufferSlots;
         m_expectedFreeBufferSlots = freeBufferSlots;
         m_pvtModeActive = true;
     }
@@ -334,7 +334,7 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
                 // are any more segments waiting
                 handlePvtSegmentConsumed();
             }
-            else if((PVT_NUM_BUFFER_SLOTS - m_freeBufferSlots) < PVT_MINIMUM_SEGMENTS)
+            else if((PVT_NUM_BUFFER_SLOTS - m_expectedFreeBufferSlots) < PVT_MINIMUM_SEGMENTS)
             {
                 // if we still don't think we have enough segments,
                 // ask for more!
@@ -863,7 +863,7 @@ void CopleyServo::handlePvtSegmentConsumed()
     // send one new segment if we happen to have the next one the
     // servo expects to get
     if((m_activeSegments.size() > 0) &&
-       (m_freeBufferSlots > 0) &&
+       (m_expectedFreeBufferSlots > 0) &&
        (m_activeSegments.front().id == m_expectedSegmentId))
     {
         // send this segment.
@@ -995,24 +995,9 @@ bool CopleyServo::sendPvtSegment(PvtSegment &segment)
     data[6] = ((uint8_t *)&segment.velocity)[1];
     data[7] = ((uint8_t *)&segment.velocity)[2];
 
-    pvt_pdo->send(data, PDOCallbackObject(static_cast<TransferCallbackReceiver*>(this),
-                                          static_cast<PDOCallbackObject::CallbackFunction>(&CopleyServo::_pvtSendCompleteCallback)));
+    pvt_pdo->send(data);
 
     return true;
-}
-
-void CopleyServo::_pvtSendCompleteCallback(PDO &pdo)
-{
-    if(!m_pvtModeActive && m_freeBufferSlots > 0)
-    {
-        // Decrement free buffer slots when not running in pvt mode.
-        // Normally, we want to update this variable in the PDO status
-        // callback, but when pvt mode is inactive, the status bits
-        // always report the buffer as empty.  We assume that a completed
-        // pvt send means that the buffer will get the pvt segment copied
-        // into it, and thus we can decrement the number of free slots.
-        m_freeBufferSlots--;
-    }
 }
 
 int CopleyServo::getPvtBufferDepth()
