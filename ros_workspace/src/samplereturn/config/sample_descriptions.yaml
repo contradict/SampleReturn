@@ -1,0 +1,37 @@
+samples:
+  sample_id: pre_cached
+    bin_size: small
+    color: white
+    grip_size: 8.0
+  sample_id: red_puck
+    bin_size: small
+    color: red
+    grip_size: 8.0
+  sample_id: orange_pipe
+    bin_size: large
+    color: orange
+    grip_size: 2.7
+  sample_id: pink_tennis_ball
+    bin_size: small
+    color: pink
+    grip_size: 6.7
+  sample_id: blue_rock
+    bin_size: small
+    color: blue
+    grip_size: [ 6.0, 10.0 ]
+  sample_id: wooden_cube
+    bin_size: large
+    color: blue
+    grip_size: [ 8.0, 10.0 ]
+  sample_id: metal_1
+    bin_size: small
+    color:
+    grip_size: [ 5.0, 10.0 ]
+  sample_id: metal_2
+    bin_size: small
+    color:
+    grip_size: [ 5.0, 10.0 ]
+  sample_id: metal_3
+    bin_size: small
+    color:
+    grip_size: [ 5.0, 10.0 ]
