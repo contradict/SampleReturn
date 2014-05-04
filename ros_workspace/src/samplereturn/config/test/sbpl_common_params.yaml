@@ -1,9 +1,0 @@
-SBPLLatticePlanner:
-    planner_type: ARAPlanner
-    #planner_type: ADPlanner
-    allocated_time: 10
-    initial_epsilon: 3.0
-    #force_scratch_limit: 500
-    nominalvel_mpersecs: 0.4
-    timetoturn45degsinplace_secs: 2.0
-    lethal_obstacle: 20
