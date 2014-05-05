@@ -1,4 +1,5 @@
 #include <the_smooth_planner/the_smooth_planner.h>
+#include <the_smooth_planner/circle.h>
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
 #include <platform_motion_msgs/Path.h>
@@ -32,6 +33,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 
 	localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
 	localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
+	localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
 
 	this->odometry = nav_msgs::Odometry();
 
@@ -39,6 +41,31 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
 
 	smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
+
+	// Wait for and look up the transform for the stern wheel pod
+	ROS_INFO("Waiting for stern wheel transform");
+	ros::Time now(0);
+	ros::Duration waitDuration(1.0);
+	while (!tf->waitForTransform("base_link", "stern_suspension", now, waitDuration) && ros::ok())
+	{
+		ROS_INFO("Waiting for stern wheel transform");
+	}
+	if (ros::ok())
+	{
+		ROS_INFO("Received stern wheel transform");
+	}
+
+	now = ros::Time(0);
+	tf::StampedTransform sternPodStampedTf;
+	try
+	{
+		tf->lookupTransform("base_link", "stern_suspension", most_recent, sternPodStampedTf);
+	}
+	catch (tf::TransformException e)
+	{
+		ROS_ERROR("Error looking up %s: %s", "stern_suspension", e.what());
+	}
+	tf::vectorTFToEigen(sternPodStampedTf.getOrigin(), sternPodVector);
 }
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
@@ -133,17 +160,28 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 			finalLinearVelocityMagnitude = (maximum_linear_velocity-currentVelocityMagnitude)*(distanceTraveled/stopAcceleratingDistance) + currentVelocityMagnitude;
 			finalLinearVelocityMagnitude = min(finalLinearVelocityMagnitude, maximum_linear_velocity);
 		}
+
+
+		// 3) Compute the minimum allowable time between this path point and the next based on the path curvature and the slew
+		//    rate limit of the wheel pod servos, then make sure the chosen time is no smaller
+		tf::Vector3 initialLinearVelocityDirection(path_msg.knots[i].twist.linear.x, path_msg.knots[i].twist.linear.y, 0.0);
+		double minimumPathTime = this->ComputeMinimumPathTime(path, i);
+		if (finalLinearVelocity > maximumPathVelocity)
+		{
+			finalLinearVelocity = maximumPathVelocity;
+		}
 		tf::Vector3 finalLinearVelocity = finalLinearDirection;
 		finalLinearVelocity *= finalLinearVelocityMagnitude;
+		
 
-		// 3) Based on input theta_dot, compute the output theta_dot
+		// 4) Based on input theta_dot, compute the output theta_dot
 		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+pathVelocityMagnitude);
 		//double angle = initialQuaternion.angleShortestPath(finalQuaternion);
 		tf::Quaternion initialToFinalQuaternion = initialQuaternion.inverse()*finalQuaternion;
 		double angle = tf::getYaw(initialToFinalQuaternion);
 		double angular_velocity = angle/delta_time_seconds;
 
-		// 4) Store the data in a new message format containing linear and
+		// 5) Store the data in a new message format containing linear and
 		//    angular PVT values
 		timestamp += ros::Duration(delta_time_seconds);
 
@@ -161,7 +199,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		pathVelocityMagnitude = finalLinearVelocityMagnitude;
 	}
 
-	// 5) Handle deceleration
+	// 6) Handle deceleration
 	double targetDecelerationVelocity = 0.0;
 	for (unsigned int i = path.poses.size() - 1; i > 0; --i)
 	{
@@ -181,7 +219,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		targetDecelerationVelocity += linear_acceleration*delta_time_seconds;
 	}
 
-	// 6) Publish the_smooth_path and visualization messages
+	// 7) Publish the_smooth_path and visualization messages
 	smooth_path_publisher.publish(path_msg);
 	return;
 }
@@ -191,6 +229,56 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 	ROS_DEBUG("RECEIVED ODOMETRY");
 	this->odometry = odometry;
 	return;
+}
+
+double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
+												unsigned int i)
+{
+	// This formula comes from a lengthy derivation in my notes. The important relation is:
+	// dR/dt = -dPhi_j/dt * P_jy * csc^2(Phi_j)
+	// The math here assumes the the sternPodVector is located directly
+	// behind the origin (ie. has no y value)
+
+	Eigen::Vector2d pointPrev;
+	Eigen::Vector2d pointCur;
+	Eigen::Vector2d pointNext;
+	Eigen::Vector2d pointAfterNext;
+	if (i > 0 && i < path.poses.size() - 2)
+	{
+		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
+		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
+		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
+	}
+	else if (i == 0)
+	{
+		// TODO - Handle this later.  First try planning from stop to stop assuming
+		//        the pointPrev is co-linear with pointCur and pointNext.  Later,
+		//        have this planner track the whole plan so it can splice in
+		//        the new path request and look up existing point data
+		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
+		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
+	}
+	else if (i >= path.poses.size() - 2)
+	{
+		// TODO - Make the end of the path segment straight, with and infinite radius
+		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
+		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
+		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
+	}
+
+	Circle prevCircle(pointPrev, pointCur, pointNext);
+	Circle nextCircle(pointCur, pointNext, pointAfterNext);
+
+	double deltaRadius = nextCircle.GetRadius() - prevCircle.GetRadius();
+	double sternAngle = atan(-sternPodVector(0)/prevCircle.GetRadius());
+	double sineSternAngle = sin(sternAngle);
+	double requiredDeltaSternAngle = deltaRadius * (1.00/sternPodVector(0)) * sineSternAngle * sineSternAngle;
+	double minimumDeltaTime = requiredDeltaSternAngle / maximum_slew_radians_per_second;
+		
+	return minimumDeltaTime;
 }
 
 }

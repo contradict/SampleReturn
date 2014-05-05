@@ -9,6 +9,7 @@
 #include <nav_core/base_local_planner.h>
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
+#include <tf/transform_listener.h>
 
 namespace the_smooth_planner
 {
@@ -32,12 +33,17 @@ public:
 	void setOdometry(const nav_msgs::Odometry& odometry);
   
 private:
+	double ComputeMinimumPathTime(const nav_msgs::Path& path,
+								  unsigned int i);
+
 	ros::Publisher smooth_path_publisher;
 	ros::Publisher visualization_publisher;
 	ros::Subscriber pose_subscriber;
 	ros::Subscriber odom_subscriber;
 	double maximum_linear_velocity;
 	double linear_acceleration;
+	double maximum_slew_radians_per_second;
 	nav_msgs::Odometry odometry;
+	Eigen::Vector3d sternPodVector;
 };
 };
