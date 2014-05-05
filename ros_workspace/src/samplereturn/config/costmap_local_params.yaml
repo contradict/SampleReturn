@@ -1,6 +1,6 @@
 rolling_window: true
-width: 15.0
-height: 15.0
+width: 30.0
+height: 30.0
 resolution: 0.10
 
 inscribed_radius: 0.4
@@ -18,15 +18,15 @@ plugins:
         type: "costmap_2d::InflationLayer"
 
 obstacle_layer:
-    origin_z: 0.10
+    origin_z: 0.0
     z_resolution: 0.10
-    z_voxels: 16
-    unknown_threshold: 8
-    mark_threshold: 3
+    z_voxels: 14
+    unknown_threshold: 1
+    mark_threshold: 4
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 15.0,
+    obstacle_range: 15.5
     raytrace_range: 16.0
 
     observation_sources: port_point_cloud center_point_cloud starboard_point_cloud
@@ -37,8 +37,10 @@ obstacle_layer:
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
-        min_obstacle_height: 0.10,
-        max_obstacle_height: 0.5,
+        min_obstacle_height: 0.0,
+        max_obstacle_height: 4.0,
+        obstacle_range: 15.5,
+        raytrace_range: 16.0,
         }
     center_point_cloud: {
         topic: /cameras/navigation/center/points2,
@@ -47,8 +49,10 @@ obstacle_layer:
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
-        min_obstacle_height: 0.10,
-        max_obstacle_height: 0.5,
+        min_obstacle_height: 0.0,
+        max_obstacle_height: 4.0,
+        obstacle_range: 15.5,
+        raytrace_range: 16.0,
         }
     starboard_point_cloud: {
         topic: /cameras/navigation/starboard/points2,
@@ -57,8 +61,10 @@ obstacle_layer:
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
-        min_obstacle_height: 0.10,
-        max_obstacle_height: 0.5,
+        min_obstacle_height: 0.0,
+        max_obstacle_height: 4.0,
+        obstacle_range: 15.5,
+        raytrace_range: 16.0,
         }
 
 inflation_layer:
