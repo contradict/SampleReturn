@@ -30,6 +30,7 @@
         type="costmap_2d_cloud"
         name="voxel_visualizer_cloud"
         ns="/processes/planner/mover/local_costmap">
+        <remap from="voxel_grid" to="obstacle_layer/voxel_grid"/>
     </node>
 
 
