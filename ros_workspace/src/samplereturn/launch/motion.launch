@@ -10,7 +10,6 @@
     <remap from="home_carousel" to="/motion/carousel/home"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
-    <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
     <remap from="manipulator_pause" to="/motion/manipulator/pause"/>
     <remap from="carousel_angle" to="/motion/carousel/angle"/>
     <remap from="select_carousel_bin" to="/motion/carousel/select_bin"/>
@@ -20,8 +19,6 @@
     <remap from="joy" to="/io/joy"/>
     <remap from="battery_voltage" to="/io/battery_voltage"/>
     <remap from="audio_search" to="/io/audio/search"/>
-
-    <remap from="planner_command" to="/processes/planner/command"/>
 
     <!-- platform node -->
     <node name="motion"

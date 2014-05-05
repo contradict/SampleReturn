@@ -40,7 +40,6 @@
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
-    <remap from="twist" to="joystick_command"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="joy" to="/io/joy"/>
 

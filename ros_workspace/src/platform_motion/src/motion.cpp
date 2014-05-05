@@ -111,7 +111,7 @@ Motion::Motion() :
             &Motion::selectMotionModeCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
     joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
-    servo_sub = nh_.subscribe("CAN_servo_command", 2, &Motion::servoTwistCallback, this);
+    servo_sub = nh_.subscribe("servo_command", 2, &Motion::servoTwistCallback, this);
 
     carousel_sub = nh_.subscribe("carousel_angle", 2, &Motion::carouselCallback,
             this);

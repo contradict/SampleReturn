@@ -609,7 +609,7 @@ class CANInterface(object):
                 platform_srv.SelectMotionMode)
         self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
         self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
-        self.servo_command=rospy.Publisher("CAN_servo_command", geometry_msg.Twist)
+        self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist)
 
     def select_mode(self, motion_mode):
         return self.CAN_select_motion_mode(motion_mode)
