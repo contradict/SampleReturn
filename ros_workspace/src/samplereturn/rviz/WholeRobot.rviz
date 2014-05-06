@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Status1
         - /Navigation Center Left1/Status1
+        - /VoxelGrid1
         - /VoxelGrid1/Status1
       Splitter Ratio: 0.740947
     Tree Height: 674
@@ -46,8 +47,8 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 10
-      Reference Frame: <Fixed Frame>
+      Plane Cell Count: 20
+      Reference Frame: map
       Value: true
     - Class: rviz/TF
       Enabled: false
@@ -124,7 +125,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.01
+      Size (m): 0.1
       Style: Flat Squares
       Topic: /cameras/navigation/center/points2
       Use Fixed Frame: true
@@ -175,7 +176,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.01
+      Size (m): 0.1
       Style: Flat Squares
       Topic: /cameras/navigation/port/points2
       Use Fixed Frame: true
@@ -226,7 +227,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.01
+      Size (m): 0.1
       Style: Flat Squares
       Topic: /cameras/navigation/starboard/points2
       Use Fixed Frame: true
@@ -302,7 +303,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.1
+      Size (m): 0.08
       Style: Boxes
       Topic: /processes/planner/mover/local_costmap/voxel_marked_cloud
       Use Fixed Frame: true
@@ -426,7 +427,7 @@ Visualization Manager:
       Topic: /processes/beacon_finder/beacon_pose
       Value: false
     - Class: rviz/Image
-      Enabled: false
+      Enabled: true
       Image Topic: /processes/sample_detection/manipulator/debug_img
       Max Value: 1
       Median window: 5
@@ -435,15 +436,15 @@ Visualization Manager:
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
-      Value: false
+      Value: true
     - Alpha: 0.7
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Local Costmap
       Topic: /processes/planner/mover/local_costmap/costmap
-      Value: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -463,22 +464,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 23.0044
+      Distance: 46.4933
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.137439
-        Y: 0.05733
-        Z: -0.0351498
+        X: -0.0112015
+        Y: 0.00396237
+        Z: 0.750746
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.3998
+      Pitch: 0.634797
       Target Frame: base_link
       Value: Orbit (rviz)
-      Yaw: 3.125
+      Yaw: 3.085
     Saved: ~
 Window Geometry:
   Displays:
@@ -510,5 +511,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1574
-  X: 339
-  Y: 175
+  X: 268
+  Y: 53
