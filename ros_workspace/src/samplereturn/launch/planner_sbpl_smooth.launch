@@ -8,6 +8,7 @@
         type="move_base"
         ns="/processes/planner"
         output="log"
+		launch-prefix="xterm -e gdb --args"
         >
 
         <remap from="odom" to="odometry"/>

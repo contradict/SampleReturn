@@ -48,7 +48,6 @@
         <param name="status_publish_interval" type="double" value="1.0"/>
     </node>
 
-<!--
     <node name="odometry"
           machine="navigate"
           pkg="platform_motion"
@@ -58,7 +57,6 @@
         <param name="wheel_diameter" type="double" value="0.314"/>
         <param name="odom_frame_id" type="string" value="/odom"/>
     </node>
--->
 
     <node name="carousel_indexer"
           machine="navigate" 
