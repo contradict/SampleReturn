@@ -3,6 +3,9 @@
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
 #include <platform_motion_msgs/Path.h>
+#include <tf/tf.h>
+#include <tf_conversions/tf_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <tf/LinearMath/Quaternion.h>
 #include <tf/LinearMath/Matrix3x3.h>
 #include <Eigen/Dense>
@@ -59,7 +62,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	tf::StampedTransform sternPodStampedTf;
 	try
 	{
-		tf->lookupTransform("base_link", "stern_suspension", most_recent, sternPodStampedTf);
+		tf->lookupTransform("base_link", "stern_suspension", now, sternPodStampedTf);
 	}
 	catch (tf::TransformException e)
 	{
@@ -108,10 +111,6 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	Time timestamp = Time::now();
 	//timestamp.sec = 0;
 	//timestamp.nsec = 0;
-	Eigen::Vector3d linearVelocity(odometry.twist.twist.linear.x, odometry.twist.twist.linear.y, odometry.twist.twist.linear.z);
-	Eigen::Vector3d angularVelocity(odometry.twist.twist.angular.x, odometry.twist.twist.angular.y, odometry.twist.twist.angular.z);
-	double currentVelocityMagnitude = linearVelocity.norm();
-	double pathVelocityMagnitude = currentVelocityMagnitude;
 
 	platform_motion_msgs::Path path_msg;
 	path_msg.knots.resize(path.poses.size());
@@ -119,108 +118,139 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.header.seq = 0;
 	path_msg.header.frame_id = "map";
 
-	// Compute the distance we should travel before we stop accelerating
-	double stopAcceleratingDistance = (maximum_linear_velocity*maximum_linear_velocity - currentVelocityMagnitude*currentVelocityMagnitude)/(2.0*linear_acceleration);
-	double distanceTraveled = 0.0;
-
 	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
 	{
-		path_msg.knots[0].header.stamp = timestamp;
 		path_msg.knots[0].header.seq = 0;
+		path_msg.knots[0].header.stamp = timestamp;
 		path_msg.knots[0].header.frame_id = "map";
 		path_msg.knots[0].pose = path.poses[0].pose;
 		path_msg.knots[0].twist = odometry.twist.twist;
 	}
 
+	// Store time stamps for all poses in the path ensuring that there is enough
+	// time to achieve each one
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
-		// 1) Compute a final direction vector from the final orientation
-		tf::Vector3 forwardVector(1, 0, 0);
-		tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
-                                                 path.poses[i].pose.orientation.y,
-                                                 path.poses[i].pose.orientation.z,
-                                                 path.poses[i].pose.orientation.w);
-		tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
-                                               path.poses[i+1].pose.orientation.y,
-                                               path.poses[i+1].pose.orientation.z,
-                                               path.poses[i+1].pose.orientation.w);
-		tf::Vector3 finalLinearDirection = tf::quatRotate(finalQuaternion, forwardVector);
+		// Compute the minimum allowable time between this path point and the next based on the path curvature and the slew
+		// rate limit of the wheel pod servos
+		tf::Vector3 initialLinearVelocityDirection(path_msg.knots[i].twist.linear.x, path_msg.knots[i].twist.linear.y, 0.0);
+		double minimumPathTime = this->ComputeMinimumPathTime(path, i);
 
-		// 2) Based on input V magnitude, compute the output V magnitude
+		timestamp += ros::Duration(minimumPathTime);
+
+		// Fill the outbound message data
+		path_msg.knots[i+1].header.seq = i+1;
+		path_msg.knots[i+1].header.stamp = timestamp;
+		path_msg.knots[i+1].header.frame_id = "map";
+		path_msg.knots[i+1].pose = path.poses[i+1].pose;
+	}
+
+	// Compute and store velocities with smooth acceleration up to the maximum linear velocity
+	Eigen::Vector3d linearVelocity(odometry.twist.twist.linear.x, odometry.twist.twist.linear.y, odometry.twist.twist.linear.z);
+	Eigen::Vector3d angularVelocity(odometry.twist.twist.angular.x, odometry.twist.twist.angular.y, odometry.twist.twist.angular.z);
+	double currentVelocityMagnitude = linearVelocity.norm(); // Current robot velocity
+	double pathVelocityMagnitude = currentVelocityMagnitude; // Used to accumulate velocity changes over the planned path
+	double distanceTraveled = 0.0;
+	Time* actualTimestamps = new Time[path.poses.size()];
+	double* actualVelocities = new double[path.poses.size()];
+	if (path.poses.size() > 0)
+	{
+		actualTimestamps[0] = path_msg.knots[0].header.stamp;
+		actualVelocities[0] = sqrt(path_msg.knots[0].twist.linear.x*path_msg.knots[0].twist.linear.x +
+								   path_msg.knots[0].twist.linear.y*path_msg.knots[0].twist.linear.y);
+	}
+	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
+	{
+		// Approximate the distance to the next point in the path linearly.  This underestimates the actual distance
+		// that will be traveled, but will lead to slower velocities, which is acceptable
 		double deltaX = (path.poses[i+1].pose.position.x - path.poses[i].pose.position.x);
 		double deltaY = (path.poses[i+1].pose.position.y - path.poses[i].pose.position.y);
 		double linear_distance = sqrt(deltaX*deltaX + deltaY*deltaY);
 		distanceTraveled += linear_distance;
 
-		double finalLinearVelocityMagnitude = maximum_linear_velocity;
-		bool isAccelerating = (distanceTraveled < stopAcceleratingDistance);
-		if (isAccelerating)
+		// Compute the maximum attainable average velocity required to get to the next point with the current time stamps, which
+		// completely ignore linear acceleration constraints.  The velocity is a maximum because the time stamps assigned in the
+		// previous step were minimum times
+		double deltaTime = (path.poses[i+1].header.stamp - path.poses[i].header.stamp).toSec();
+		double maximumAttainableAverageVelocity = std::numeric_limits<double>::infinity();
+		if (deltaTime > 0)
 		{
-			finalLinearVelocityMagnitude = (maximum_linear_velocity-currentVelocityMagnitude)*(distanceTraveled/stopAcceleratingDistance) + currentVelocityMagnitude;
-			finalLinearVelocityMagnitude = min(finalLinearVelocityMagnitude, maximum_linear_velocity);
+			maximumAttainableAverageVelocity = linear_distance / deltaTime;
 		}
 
+		// Use the biggest velocity not bigger than the maximum linear velocity
+		double desiredAverageVelocity = min(maximumAttainableAverageVelocity, maximum_linear_velocity);
 
-		// 3) Compute the minimum allowable time between this path point and the next based on the path curvature and the slew
-		//    rate limit of the wheel pod servos, then make sure the chosen time is no smaller
-		tf::Vector3 initialLinearVelocityDirection(path_msg.knots[i].twist.linear.x, path_msg.knots[i].twist.linear.y, 0.0);
-		double minimumPathTime = this->ComputeMinimumPathTime(path, i);
-		if (finalLinearVelocity > maximumPathVelocity)
-		{
-			finalLinearVelocity = maximumPathVelocity;
-		}
-		tf::Vector3 finalLinearVelocity = finalLinearDirection;
-		finalLinearVelocity *= finalLinearVelocityMagnitude;
-		
+		// Account for acceleration rate and compute the actual velocity at the next point and
+		// save it for later use
+		pathVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
+		pathVelocityMagnitude = min(pathVelocityMagnitude, desiredAverageVelocity);
+		actualVelocities[i+1] = pathVelocityMagnitude;
 
-		// 4) Based on input theta_dot, compute the output theta_dot
-		double delta_time_seconds = 2.00*linear_distance/(finalLinearVelocityMagnitude+pathVelocityMagnitude);
-		//double angle = initialQuaternion.angleShortestPath(finalQuaternion);
+		// Recompute the amount of time required to get to the next point and save the
+		// timestamp in a separate array so we don't overwrite the time stamps in the message
+		deltaTime = linear_distance / pathVelocityMagnitude;
+		actualTimestamps[i+1] = actualTimestamps[i] + ros::Duration(deltaTime);
+
+		// Compute and store the angular rates in the outbound message
+		tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
+										 path.poses[i].pose.orientation.y,
+										 path.poses[i].pose.orientation.z,
+										 path.poses[i].pose.orientation.w);
+		tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
+									   path.poses[i+1].pose.orientation.y,
+									   path.poses[i+1].pose.orientation.z,
+									   path.poses[i+1].pose.orientation.w);
 		tf::Quaternion initialToFinalQuaternion = initialQuaternion.inverse()*finalQuaternion;
 		double angle = tf::getYaw(initialToFinalQuaternion);
-		double angular_velocity = angle/delta_time_seconds;
-
-		// 5) Store the data in a new message format containing linear and
-		//    angular PVT values
-		timestamp += ros::Duration(delta_time_seconds);
-
-		path_msg.knots[i+1].header.seq = i+1;
-		path_msg.knots[i+1].header.stamp = timestamp;
-		path_msg.knots[i+1].header.frame_id = "map";
-		path_msg.knots[i+1].pose = path.poses[i+1].pose;
-		path_msg.knots[i+1].twist.linear.x = finalLinearVelocity.x();
-		path_msg.knots[i+1].twist.linear.y = finalLinearVelocity.y();
-		path_msg.knots[i+1].twist.linear.z = 0.0;
+		double angularVelocity = angle / deltaTime;
 		path_msg.knots[i+1].twist.angular.x = 0.0;
 		path_msg.knots[i+1].twist.angular.y = 0.0;
-		path_msg.knots[i+1].twist.angular.z = angular_velocity;
+		path_msg.knots[i+1].twist.angular.z = angularVelocity;
 
-		pathVelocityMagnitude = finalLinearVelocityMagnitude;
+		// Compute and store unit-length linear velocities in the outbound message.  This
+		// will be scaled in the next step
+		tf::Vector3 forwardVector(1, 0, 0);
+		tf::Vector3 finalLinearDirection = tf::quatRotate(finalQuaternion, forwardVector);
+		path_msg.knots[i+1].twist.linear.x = finalLinearDirection.x();
+		path_msg.knots[i+1].twist.linear.y = finalLinearDirection.y();
+		path_msg.knots[i+1].twist.linear.z = 0.0;
 	}
 
-	// 6) Handle deceleration
-	double targetDecelerationVelocity = 0.0;
-	for (unsigned int i = path.poses.size() - 1; i > 0; --i)
+	// Set the actual timestamps for the outbound message
+	for (unsigned int i = 0; i < path.poses.size(); ++i)
 	{
-		double velocitySquared = (path_msg.knots[i].twist.linear.x*path_msg.knots[i].twist.linear.x +
-                                 path_msg.knots[i].twist.linear.y*path_msg.knots[i].twist.linear.y);
+		path_msg.knots[i].header.stamp = actualTimestamps[i];
+	}
 
-		if (targetDecelerationVelocity*targetDecelerationVelocity >= velocitySquared)
+	// Set the velocity at the last point to be zero
+	actualVelocities[path.poses.size()-1] = 0.00;
+	
+	// Compute and store smooth decelerations to replace the velocity dicontinuities created
+	// in the previous step
+	for (unsigned int i = path.poses.size()-1; i > 0; --i)
+	{
+		double currentVelocity = actualVelocities[i];
+		double previousVelocity = actualVelocities[i-1];
+		double deltaTime = (path_msg.knots[i].header.stamp - path_msg.knots[i-1].header.stamp).toSec();
+		if ((previousVelocity - currentVelocity)/deltaTime > linear_acceleration)
 		{
-			break;
+			actualVelocities[i-1] = actualVelocities[i] + linear_acceleration*deltaTime;
 		}
 
-		// Update the velocity for this path point
-		path_msg.knots[i].twist.linear.x *= targetDecelerationVelocity;
-		path_msg.knots[i].twist.linear.y *= targetDecelerationVelocity;
-
-		double delta_time_seconds = path_msg.knots[i].header.stamp.toSec() - path_msg.knots[i-1].header.stamp.toSec();
-		targetDecelerationVelocity += linear_acceleration*delta_time_seconds;
+		path_msg.knots[i-1].twist.linear.x *= actualVelocities[i-1];
+		path_msg.knots[i-1].twist.linear.y *= actualVelocities[i-1];
 	}
+	path_msg.knots[0].twist = odometry.twist.twist;
 
-	// 7) Publish the_smooth_path and visualization messages
+	// Free up memory
+	delete [] actualTimestamps;
+	delete [] actualVelocities;
+
+	// Publish path
 	smooth_path_publisher.publish(path_msg);
+
 	return;
 }
 
@@ -256,17 +286,46 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 		//        the pointPrev is co-linear with pointCur and pointNext.  Later,
 		//        have this planner track the whole plan so it can splice in
 		//        the new path request and look up existing point data
+		Eigen::Quaterniond quatPrev;
+		tf::quaternionMsgToEigen(path.poses[i].pose.orientation, quatPrev);
+		Eigen::Vector3d forwardDirPrev = quatPrev * Eigen::Vector3d(1.00, 0.00, 0.00);
+		pointPrev << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+		pointPrev(0) -= forwardDirPrev(0);
+		pointPrev(1) -= forwardDirPrev(1);
+
 		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
 		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
 		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
 	}
-	else if (i >= path.poses.size() - 2)
+	else if (i == path.poses.size() - 2)
 	{
-		// TODO - Make the end of the path segment straight, with and infinite radius
+		// Make the end of the path segment straight, with and infinite radius
 		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
 		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
 		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
-		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
+
+		Eigen::Quaterniond quatNext;
+		tf::quaternionMsgToEigen(path.poses[i+1].pose.orientation, quatNext);
+		Eigen::Vector3d forwardDirNext = quatNext * Eigen::Vector3d(1.00, 0.00, 0.00);
+		pointAfterNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
+		pointAfterNext(0) += forwardDirNext(0);
+		pointAfterNext(1) += forwardDirNext(1);
+	}
+	else if (i == path.poses.size() - 1)
+	{
+		// Make the end of the path segment straight, with and infinite radius
+		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
+		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+
+		Eigen::Quaterniond quatCur;
+		tf::quaternionMsgToEigen(path.poses[i].pose.orientation, quatCur);
+		Eigen::Vector3d forwardDirCur = quatCur * Eigen::Vector3d(1.00, 0.00, 0.00);
+		pointNext << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+		pointNext(0) += forwardDirCur(0);
+		pointNext(1) += forwardDirCur(1);
+		pointAfterNext << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+		pointAfterNext(0) += 2.0*forwardDirCur(0);
+		pointAfterNext(1) += 2.0*forwardDirCur(1);
 	}
 
 	Circle prevCircle(pointPrev, pointCur, pointNext);

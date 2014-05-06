@@ -6,7 +6,7 @@
 class Circle
 {
 public:
-	Circle(const Eigen::Vector2d p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);
+	Circle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);
 	~Circle();
 
 	double GetRadius() { return radius; }
@@ -17,10 +17,10 @@ protected:
 	Circle() {}
 
 	// Calculate the radius and center point of a circle circumscribing three points
-	void CalculateCircle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);
+	bool CalculateCircle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);
 
 	// Check if the line p1,p2 or p2,p3 are axis-aligned
-	bool IsOrthogonal(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2);
+	bool IsOrthogonal(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);
 
 	double radius;
 	Eigen::Vector2d center;

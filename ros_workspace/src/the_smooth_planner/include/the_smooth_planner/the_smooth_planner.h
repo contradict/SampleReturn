@@ -10,6 +10,7 @@
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_listener.h>
+#include <Eigen/Dense>
 
 namespace the_smooth_planner
 {

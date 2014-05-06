@@ -34,7 +34,7 @@ bool Circle::CalculateCircle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p
 	double deltaY1 = p2(1) - p1(1);
 	double deltaX1 = p2(0) - p1(0);
 	double deltaY2 = p3(1) - p2(1);
-	double deltaY2 = p3(0) - p2(0);
+	double deltaX2 = p3(0) - p2(0);
 
 	if (fabs(deltaX1) <= epsilon && fabs(deltaY2) <= epsilon)
 	{
@@ -61,12 +61,12 @@ bool Circle::CalculateCircle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p
 	return true;
 }
 
-bool Circle::IsOrthogonal(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2)
+bool Circle::IsOrthogonal(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3)
 {
 	double deltaY1 = p2(1) - p1(1);
 	double deltaX1 = p2(0) - p1(0);
 	double deltaY2 = p3(1) - p2(1);
-	double deltaY2 = p3(0) - p2(0);
+	double deltaX2 = p3(0) - p2(0);
 
 	if (fabs(deltaX1) <= epsilon && fabs(deltaY2) <= epsilon)
 	{

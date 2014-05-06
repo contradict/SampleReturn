@@ -39,7 +39,7 @@ catkin_package(
 # Build
 ##############################################################################
 
-add_library(${PROJECT_NAME} src/the_smooth_planner.cpp)
+add_library(${PROJECT_NAME} src/the_smooth_planner.cpp src/circle.cpp)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${THE_SMOOTH_LIBRARIES})
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_generated_messages_cpp)
 
