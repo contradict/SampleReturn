@@ -20,10 +20,6 @@
       output="log"
       args="tf
             tf_static
-            /cameras/navigation/port/right/image_raw
-            /cameras/navigation/port/right/camera_info
-            /cameras/navigation/port/left/image_raw
-            /cameras/navigation/port/left/camera_info
             /cameras/navigation/center/right/image_raw
             /cameras/navigation/center/right/camera_info
             /cameras/navigation/center/left/image_raw
@@ -52,7 +48,22 @@
        type="record"
        name="search_record"
        output="log"
-       args="tf tf_static /cameras/search/image /cameras/search/info /cameras/manipulator/left/image_raw /cameras/manipulator/right/image_raw /cameras/manipulator/left/camera_info /cameras/manipulator/right/camera_info /process/beacon_finder/beacon_pose /process/sample_detection/named_point /process/sample_detection/manipulator/named_point "
+       args="tf
+             tf_static
+             /cameras/navigation/port/right/image_raw
+             /cameras/navigation/port/right/camera_info
+             /cameras/navigation/port/left/image_raw
+             /cameras/navigation/port/left/camera_info
+             /cameras/search/image
+             /cameras/search/info
+             /cameras/manipulator/left/image_raw
+             /cameras/manipulator/right/image_raw
+             /cameras/manipulator/left/camera_info
+             /cameras/manipulator/right/camera_info
+             /process/beacon_finder/beacon_pose
+             /process/sample_detection/named_point
+             /process/sample_detection/manipulator/named_point
+             "
        >
    </node>
 </launch>
