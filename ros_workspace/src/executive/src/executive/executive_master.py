@@ -191,7 +191,7 @@ class ExecutiveMaster(object):
             smach.StateMachine.add('WAIT_FOR_MODE_CHANGE',
                                    WaitForFlagState('selected_mode',
                                                     flag_trigger_value = 'manual',
-                                                    timeout = 10,
+                                                    timeout = 20,
                                                     announcer = self.announcer,
                                                     start_message ='Mode complete, switch to manual'),
                                    transitions = {'next':'CHECK_MODE',
@@ -292,7 +292,9 @@ class StartState(smach.State):
             if ((rospy.get_time() - start_time) > 20.0):
                 rospy.logwarn('Timeout waiting for callbacks')
                 return 'aborted'
-            rospy.loginfo('START_MASTER_EXECUTIVE: ' + str(self.announcer.audio_ready()) + ', ' + str(userdata.selected_mode) + ', ' + str(userdata.paused))
+            rospy.loginfo('START_MASTER_EXECUTIVE: ' + str(self.announcer.audio_ready()) + ', ' +
+                                                       str(userdata.selected_mode) + ', ' +
+                                                       str(userdata.paused))
             if self.announcer.audio_ready() \
                and userdata.selected_mode is not None \
                and userdata.paused is not None:
