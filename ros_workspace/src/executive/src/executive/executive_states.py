@@ -135,21 +135,17 @@ class DriveToPoseState(smach.State):
                  
         smach.State.__init__(self,
                              outcomes=['complete', 'timeout', 'sample_detected', 'preempted','aborted'],
-                             input_keys=['target_pose', 'velocity', 'pursue_samples'],
+                             input_keys=['target_pose', 'velocity', 'pursue_samples', 'detected_sample'],
                              output_keys=['actual_point'])
         
         self.move_client = move_client
-        self.sample_listener = rospy.Subscriber('detected_samples',
-                                                samplereturn_msg.NamedPoint,
-                                                self.sample_detection_cb)
+
         self.listener = listener
         self.sample_detected = False
                 
     def execute(self, ud):
         
-        self.sample_detected = False
-        #start_pose = util.get_current_robot_pose(self.listener)
-        start_pose = ud.target_pose
+        start_pose = util.get_current_robot_pose(self.listener)
         target_pose = ud.target_pose
         velocity = ud.velocity
         
@@ -164,7 +160,7 @@ class DriveToPoseState(smach.State):
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
                 break
-            if self.sample_detected and ud.pursue_samples:
+            if (ud.detected_sample is not None) and ud.pursue_samples:
                 return 'sample_detected'
 
         if move_state == action_msg.GoalStatus.SUCCEEDED:
@@ -172,8 +168,5 @@ class DriveToPoseState(smach.State):
         else:
             return 'aborted'
 
-    def sample_detection_cb(self, detected_sample):
-        self.sample_detected = True
-        
         
 
