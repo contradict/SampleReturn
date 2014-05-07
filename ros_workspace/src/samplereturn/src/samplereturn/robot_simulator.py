@@ -6,9 +6,12 @@ import rosnode
 import actionlib
 import tf
 import tf_conversions
+import numpy as np
 
 import smach
 import smach_ros
+
+import samplereturn.util as util
 
 import actionlib_msgs.msg as action_msg
 import std_msgs.msg as std_msg
@@ -25,8 +28,6 @@ import samplereturn_msgs.msg as samplereturn_msg
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
 
-from visual_servo_msgs.msg import VisualServoAction, VisualServoResult, VisualServoFeedback, TunableConstants
-
 class RobotSimulator(object):
     
     def __init__(self):
@@ -41,8 +42,9 @@ class RobotSimulator(object):
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = True
-        self.fake_sample = {'x':35, 'y':25, 'name':'PRECACHED'}
-    
+        self.fake_sample = {'x':30, 'y':10, 'name':'PRECACHED'}
+        
+
         #topic and action names
         manipulator_action_name = "/motion/manipulator/grab_action"
         home_wheelpods_name = "/motion/wheel_pods/home"
@@ -65,8 +67,22 @@ class RobotSimulator(object):
         
         visual_servo_name = "/processes/visual_servo/servo_action"
         
-        detected_sample_name = "/processes/sample_detection/detected_samples"
-   
+        detected_sample_search_name = "/processes/sample_detection/detected_sample_search"
+        detected_sample_manipulator_name = "/processes/sample_detection/detected_sample_manipulator"
+        beacon_pose_name = "/processes/beacon_finder/beacon_pose"
+
+        #tf stuff
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.tf_listener = tf.TransformListener()
+        
+        self.zero_translation = (0,0,0)
+        self.zero_rotation = (0,0,0,1)
+                                                  
+        self.fake_robot_pose = geometry_msg.Pose(geometry_msg.Point(0,0,0),
+                                                 geometry_msg.Quaternion(0,0,0,1))
+        
+        rospy.Timer(rospy.Duration(0.1), self.broadcast_tf)        
+       
         #manipulator stuff
         self.manipulator_sm = smach.StateMachine(
             outcomes=['success', 'aborted', 'preempted'],
@@ -137,20 +153,48 @@ class RobotSimulator(object):
         
         self.move_base_server.start()
         
-        #sample detection stuff
-        self.sample_pub = rospy.Publisher(detected_sample_name, samplereturn_msg.NamedPoint)
-        rospy.Timer(rospy.Duration(3.0), self.publish_sample_detection)        
+        #sample and beacon detection stuff
+        self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
+        rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
+
+        self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name, samplereturn_msg.NamedPoint)
+        rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_manipulator)         
+                
+        self.fake_beacon_pose = geometry_msg.Pose(geometry_msg.Point(-1,0,0),
+                                                  geometry_msg.Quaternion(0,0,0,1))
         
-        
+        self.beacon_pose_pub = rospy.Publisher(beacon_pose_name, geometry_msg.PoseStamped)
+        rospy.Timer(rospy.Duration(1.0), self.publish_beacon_pose)
+                
                 
         #visual servo stuff
         self.visual_servo_server = actionlib.SimpleActionServer(visual_servo_name,
-                                                           VisualServoAction,
+                                                           visual_servo_msg.VisualServoAction,
                                                            self.run_visual_servo_action,
                                                            False)
         self.visual_servo_server.start()        
 
         #rospy.spin()
+        
+    def broadcast_tf(self, event):
+        now = rospy.Time.now()
+        
+        self.tf_broadcaster.sendTransform(self.zero_translation,
+                                          self.zero_rotation,
+                                          now,
+                                          '/odom',
+                                          '/map')
+        
+        trans = (self.fake_robot_pose.position.x,
+                       self.fake_robot_pose.position.y,
+                       self.fake_robot_pose.position.z)
+        
+        rot = (self.fake_robot_pose.orientation.x,
+                    self.fake_robot_pose.orientation.y,
+                    self.fake_robot_pose.orientation.z,
+                    self.fake_robot_pose.orientation.w)
+        
+        self.tf_broadcaster.sendTransform(trans, rot, now, '/base_link', '/odom')
 
     def publish_cam_status(self, event):
         if self.cameras_ready:
@@ -161,15 +205,31 @@ class RobotSimulator(object):
         for pub in self.cam_publishers:
             pub.publish(std_msg.String(msg))        
 
-    def publish_sample_detection(self, event):
+    def publish_sample_detection_search(self, event):
         if self.publish_samples:
             msg = samplereturn_msg.NamedPoint()
-            msg.header = header = std_msg.Header(0, rospy.Time(0), '/map')
+            msg.header = std_msg.Header(0, rospy.Time.now(), '/map')
             msg.point = geometry_msg.Point(self.fake_sample['x'],
                                                    self.fake_sample['y'],
                                                    0.0)
             msg.name = self.fake_sample['name']
-            self.sample_pub.publish(msg)        
+            self.search_sample_pub.publish(msg)
+            
+    def publish_sample_detection_manipulator(self, event):
+        if self.publish_samples:
+            msg = samplereturn_msg.NamedPoint()
+            msg.header = std_msg.Header(0, rospy.Time.now(), '/map')
+            msg.point = geometry_msg.Point(self.fake_sample['x'],
+                                                   self.fake_sample['y'],
+                                                   0.0)
+            msg.name = self.fake_sample['name']
+            self.manipulator_sample_pub.publish(msg)
+            
+    def publish_beacon_pose(self, event):
+        msg = geometry_msg.PoseStamped()
+        msg.header = std_msg.Header(0, rospy.Time.now(), '/map')
+        msg.pose = self.fake_beacon_pose
+        self.beacon_pose_pub.publish(msg)
 
     def publish_GPIO(self, event):
         msg = platform_msg.GPIO()
@@ -199,18 +259,36 @@ class RobotSimulator(object):
 
     def move_base(self, goal):
         target_pose = goal.target_pose
-        fake_feedback = move_base_msg.MoveBaseFeedback()
-        fake_feedback.base_position = target_pose
-        rospy.sleep(5.0)
-        self.move_base_server.publish_feedback(fake_feedback)
+        travel_time = 5.0        
+        update_period = 0.1
+        steps = int(travel_time / update_period)
+        start_pose = util.get_current_robot_pose(self.tf_listener)
+        x_list = np.linspace(start_pose.pose.position.x,
+                             target_pose.pose.position.x,
+                             num = steps)
+        y_list = np.linspace(start_pose.pose.position.y,
+                             target_pose.pose.position.y,
+                             num = steps)
+        for i in range(len(x_list)):
+            rospy.sleep(update_period)
+            self.fake_robot_pose.position.x = x_list[i]
+            self.fake_robot_pose.position.y = y_list[i]
+            header = std_msg.Header(0, rospy.Time.now(), '/map')
+            fake_feedback = move_base_msg.MoveBaseFeedback()
+            fake_feedback.base_position.header = header
+            fake_feedback.base_position.pose = self.fake_robot_pose
+            self.move_base_server.publish_feedback(fake_feedback)
+
+        self.fake_robot_pose.orientation = target_pose.pose.orientation 
+        
         self.move_base_server.set_succeeded()
 
     def run_visual_servo_action(self, goal):
-        servo_result = VisualServoResult()
-        servo_feedback = VisualServoFeedback()
+        servo_result = visual_servo_msg.VisualServoResult()
+        servo_feedback = visual_servo_msg.VisualServoFeedback()
     
         update_rate = rospy.Rate(10.0)
-        fake_distance = 100
+        fake_distance = 150
         step = 1
             
         while not rospy.is_shutdown():
@@ -220,7 +298,7 @@ class RobotSimulator(object):
                 self.visual_servo_server.set_succeeded(result=servo_result)
                 break
             else:
-                servo_feedback.state = VisualServoStates.MOVE_FORWARD
+                servo_feedback.state = visual_servo_msg.VisualServoFeedback.MOVE_FORWARD
                 servo_feedback.error = fake_distance
                 self.visual_servo_server.publish_feedback(servo_feedback)
                 if self.visual_servo_server.is_preempt_requested():
@@ -236,6 +314,12 @@ class RobotSimulator(object):
         fake_result = platform_msg.HomeResult([True])
         rospy.sleep(3.0)
         self.home_carousel_server.set_succeeded(result=fake_result)
+        
+    def hide_samples(self):
+        self.fake_sample['name'] = 'none'
+        
+    def show_samples(self):
+        self.fake_sample['name'] = 'PREEMPTED'
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
