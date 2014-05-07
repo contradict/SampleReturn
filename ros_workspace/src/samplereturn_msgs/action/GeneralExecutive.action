@@ -1,12 +1,10 @@
 # Goal
-bool do_action
+string name
+float32 input_value
 ---
 # Result
-uint8 COMPLETE=0
-uint8 PREEMPTED=1
-uint8 ABORTED=2
-uint8 result
+string message
 ---
 # Feedback
 string state
-float32 output
+float32 output_value
