@@ -19,9 +19,9 @@ Circle::Circle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen
 		CalculateCircle(p3, p2, p1);
 	else
 	{
-		radius = std::numeric_limits<double>::quiet_NaN();
-		center(0) = std::numeric_limits<double>::quiet_NaN();
-		center(1) = std::numeric_limits<double>::quiet_NaN();
+		radius = std::numeric_limits<double>::infinity();
+		center(0) = std::numeric_limits<double>::infinity();
+		center(1) = std::numeric_limits<double>::infinity();
 	}
 }
 
@@ -50,6 +50,9 @@ bool Circle::CalculateCircle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p
 	double slopeB = deltaY2/deltaX2;
 	if (fabs(slopeA - slopeB) <= epsilon)
 	{
+		center(0) = std::numeric_limits<double>::infinity();
+		center(1) = std::numeric_limits<double>::infinity();
+		radius = std::numeric_limits<double>::infinity();
 		return false;
 	}
 

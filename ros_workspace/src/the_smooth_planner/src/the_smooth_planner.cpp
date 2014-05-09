@@ -331,10 +331,37 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 	Circle prevCircle(pointPrev, pointCur, pointNext);
 	Circle nextCircle(pointCur, pointNext, pointAfterNext);
 
-	double deltaRadius = nextCircle.GetRadius() - prevCircle.GetRadius();
-	double sternAngle = atan(-sternPodVector(0)/prevCircle.GetRadius());
+	Eigen::Vector3d pointPrev3d(pointPrev(0), pointPrev(1), 0);
+	Eigen::Vector3d pointCur3d(pointCur(0), pointCur(1), 0);
+	Eigen::Vector3d pointNext3d(pointNext(0), pointNext(1), 0);
+	Eigen::Vector3d prevCircleCenter(prevCircle.GetCenterX(), prevCircle.GetCenterY(), 0);
+	Eigen::Vector3d nextCircleCenter(nextCircle.GetCenterX(), nextCircle.GetCenterY(), 0);
+	Eigen::Vector3d vectorToPrevCenter = prevCircleCenter - pointPrev3d;
+	Eigen::Vector3d centerToNextCenter = nextCircleCenter - pointCur3d;
+	double prevCircleCurvature = prevCircle.GetCurvature();
+	double nextCircleCurvature = nextCircle.GetCurvature();
+	if ((pointCur3d - pointPrev3d).cross((prevCircleCenter - pointPrev3d))(2) < 0)
+	{
+		prevCircleCurvature = -prevCircleCurvature;
+	}
+	if ((pointNext3d - pointCur3d).cross((nextCircleCenter - pointCur3d))(2) < 0)
+	{
+		nextCircleCurvature = -nextCircleCurvature;
+	}
+
+	double deltaCurvature = nextCircleCurvature - prevCircleCurvature;
+	double sternAngle = atan(-sternPodVector(0)*nextCircleCurvature);
 	double sineSternAngle = sin(sternAngle);
-	double requiredDeltaSternAngle = deltaRadius * (1.00/sternPodVector(0)) * sineSternAngle * sineSternAngle;
+	double sineSternAngleSquared = sineSternAngle * sineSternAngle;
+	double requiredDeltaSternAngle;
+	if (sineSternAngleSquared > 0.0001)
+	{
+		requiredDeltaSternAngle = deltaCurvature / (nextCircleCurvature*nextCircleCurvature) * (1.00/sternPodVector(0)) * sineSternAngle * sineSternAngle;
+	}
+	else
+	{
+		requiredDeltaSternAngle = 0.0;
+	}
 	double minimumDeltaTime = requiredDeltaSternAngle / maximum_slew_radians_per_second;
 		
 	return minimumDeltaTime;

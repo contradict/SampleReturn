@@ -10,6 +10,7 @@ public:
 	~Circle();
 
 	double GetRadius() { return radius; }
+	double GetCurvature() { return 1.00/radius; }
 	double GetCenterX() { return center(0); }
 	double GetCenterY() { return center(1); }
 
