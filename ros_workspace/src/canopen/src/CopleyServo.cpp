@@ -287,21 +287,6 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
 
     m_expectedSegmentId = nextSegmentExpected;
     m_freeBufferSlots = freeBufferSlots;
-    // expected free buffer slots decrements between status callbacks
-    // this is so we don't accidentally send too many segments too quickly.
-    // we need to keep the concept of how many are actually free though because
-    // we need to tell the servo to go only when it actually has enough
-    // segments! since the servo says the buffer is empty when pvt mode
-    // isn't enabled, don't reset expectedFreeBufferSlots!
-    if(status_word & STATUS_INTERPOLATED_POSITION)
-    {
-        m_expectedFreeBufferSlots = freeBufferSlots;
-        m_pvtModeActive = true;
-    }
-    else
-    {
-        m_pvtModeActive = false;
-    }
 
     uint8_t risingPvtStatus = (~m_pvtStatusByte) & statusByte;
     m_pvtStatusByte = statusByte;
@@ -324,6 +309,24 @@ void CopleyServo::statusModePDOCallback(PDO &pdo)
             }
             break;
         case InterpolatedPosition:
+            // NOTE: the status_word only means PVT mode active if the control mode of operation
+            // is PVT mode. otherwise it means random other stuff depending on mode!
+            // expected free buffer slots decrements between status callbacks
+            // this is so we don't accidentally send too many segments too quickly.
+            // we need to keep the concept of how many are actually free though because
+            // we need to tell the servo to go only when it actually has enough
+            // segments! since the servo says the buffer is empty when pvt mode
+            // isn't enabled, don't reset expectedFreeBufferSlots!
+            if(status_word & STATUS_INTERPOLATED_POSITION)
+            {
+                m_expectedFreeBufferSlots = freeBufferSlots;
+                m_pvtModeActive = true;
+            }
+            else
+            {
+                m_pvtModeActive = false;
+            }
+
             if(risingPvtStatus&PVT_GOT_ERROR)
             {
                 handlePvtError(risingPvtStatus);

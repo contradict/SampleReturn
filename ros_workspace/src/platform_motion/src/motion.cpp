@@ -490,7 +490,13 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_TWIST:
         case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
-            // no special action needed
+            // make sure PVT buffers are all cleared.
+            port->wheel.clearPvtBuffer();
+            port->steering.clearPvtBuffer();
+            starboard->wheel.clearPvtBuffer();
+            starboard->steering.clearPvtBuffer();
+            stern->wheel.clearPvtBuffer();
+            stern->steering.clearPvtBuffer();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
@@ -1556,10 +1562,13 @@ void Motion::moreDataNeededCallback(CANOpen::DS301 &node)
 void Motion::errorCallback(CANOpen::DS301 &node)
 {
     // handle a pvt related error here!
-    // for now, just print out the error...
-    ROS_ERROR("Servo with id %lu had the following error:%s",
-            node.node_id,
-            static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
+    // for now, just print out the error if we're in pvt mode...
+    if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT )
+    {
+        ROS_ERROR("Servo with id %lu had the following error:%s",
+                node.node_id,
+                static_cast<CANOpen::CopleyServo*>(&node)->getLastError().c_str());
+    }
 }
 
 bool Motion::pathToBody()
