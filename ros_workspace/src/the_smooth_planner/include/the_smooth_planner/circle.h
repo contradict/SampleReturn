@@ -6,6 +6,7 @@
 class Circle
 {
 public:
+	Circle();
 	Circle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);
 	~Circle();
 
@@ -15,7 +16,6 @@ public:
 	double GetCenterY() { return center(1); }
 
 protected:
-	Circle() {}
 
 	// Calculate the radius and center point of a circle circumscribing three points
 	bool CalculateCircle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3);

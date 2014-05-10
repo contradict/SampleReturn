@@ -130,12 +130,13 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 	// Store time stamps for all poses in the path ensuring that there is enough
 	// time to achieve each one
+	double* distances = new double[path.poses.size()];
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
 		// Compute the minimum allowable time between this path point and the next based on the path curvature and the slew
 		// rate limit of the wheel pod servos
 		tf::Vector3 initialLinearVelocityDirection(path_msg.knots[i].twist.linear.x, path_msg.knots[i].twist.linear.y, 0.0);
-		double minimumPathTime = this->ComputeMinimumPathTime(path, i);
+		double minimumPathTime = this->ComputeMinimumPathTime(path, i, distances[i]);
 
 		timestamp += ros::Duration(minimumPathTime);
 
@@ -162,12 +163,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	}
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
-		// Approximate the distance to the next point in the path linearly.  This underestimates the actual distance
-		// that will be traveled, but will lead to slower velocities, which is acceptable
-		double deltaX = (path.poses[i+1].pose.position.x - path.poses[i].pose.position.x);
-		double deltaY = (path.poses[i+1].pose.position.y - path.poses[i].pose.position.y);
-		double linear_distance = sqrt(deltaX*deltaX + deltaY*deltaY);
-		distanceTraveled += linear_distance;
+		distanceTraveled += distances[i];
 
 		// Compute the maximum attainable average velocity required to get to the next point with the current time stamps, which
 		// completely ignore linear acceleration constraints.  The velocity is a maximum because the time stamps assigned in the
@@ -176,7 +172,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		double maximumAttainableAverageVelocity = std::numeric_limits<double>::infinity();
 		if (deltaTime > 0)
 		{
-			maximumAttainableAverageVelocity = linear_distance / deltaTime;
+			maximumAttainableAverageVelocity = distances[i] / deltaTime;
 		}
 
 		// Use the biggest velocity not bigger than the maximum linear velocity
@@ -190,24 +186,39 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 		// Recompute the amount of time required to get to the next point and save the
 		// timestamp in a separate array so we don't overwrite the time stamps in the message
-		deltaTime = linear_distance / pathVelocityMagnitude;
+		deltaTime = distances[i] / pathVelocityMagnitude;
 		actualTimestamps[i+1] = actualTimestamps[i] + ros::Duration(deltaTime);
 
 		// Compute and store the angular rates in the outbound message
-		tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
-										 path.poses[i].pose.orientation.y,
-										 path.poses[i].pose.orientation.z,
-										 path.poses[i].pose.orientation.w);
-		tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
-									   path.poses[i+1].pose.orientation.y,
-									   path.poses[i+1].pose.orientation.z,
-									   path.poses[i+1].pose.orientation.w);
-		tf::Quaternion initialToFinalQuaternion = initialQuaternion.inverse()*finalQuaternion;
-		double angle = tf::getYaw(initialToFinalQuaternion);
-		double angularVelocity = angle / deltaTime;
-		path_msg.knots[i+1].twist.angular.x = 0.0;
-		path_msg.knots[i+1].twist.angular.y = 0.0;
-		path_msg.knots[i+1].twist.angular.z = angularVelocity;
+        tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
+                                       path.poses[i+1].pose.orientation.y,
+                                       path.poses[i+1].pose.orientation.z,
+                                       path.poses[i+1].pose.orientation.w);
+        if (i > 0)
+        {
+            tf::Quaternion prevQuaternion(path.poses[i-1].pose.orientation.x,
+                                          path.poses[i-1].pose.orientation.y,
+                                          path.poses[i-1].pose.orientation.z,
+                                          path.poses[i-1].pose.orientation.w);
+            tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
+                                             path.poses[i].pose.orientation.y,
+                                             path.poses[i].pose.orientation.z,
+                                             path.poses[i].pose.orientation.w);
+            tf::Quaternion prevToInitialQuaternion = prevQuaternion.inverse()*initialQuaternion;
+            tf::Quaternion initialToFinalQuaternion = initialQuaternion.inverse()*finalQuaternion;
+            double nextAngle = tf::getYaw(initialToFinalQuaternion);
+            double prevAngle = tf::getYaw(prevToInitialQuaternion);
+            double nextAngularVelocity = nextAngle / deltaTime;
+            double prevAngularVelocity = prevAngle / deltaTime;
+            double angularVelocity = nextAngularVelocity;
+            if (fabs(prevAngularVelocity) < fabs(nextAngularVelocity))
+            {
+                angularVelocity = prevAngularVelocity;
+            }
+            path_msg.knots[i].twist.angular.x = 0.0;
+            path_msg.knots[i].twist.angular.y = 0.0;
+            path_msg.knots[i].twist.angular.z = angularVelocity;
+        }
 
 		// Compute and store unit-length linear velocities in the outbound message.  This
 		// will be scaled in the next step
@@ -217,6 +228,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		path_msg.knots[i+1].twist.linear.y = finalLinearDirection.y();
 		path_msg.knots[i+1].twist.linear.z = 0.0;
 	}
+    path_msg.knots[path.poses.size()-1].twist.angular.x = 0.0;
+    path_msg.knots[path.poses.size()-1].twist.angular.y = 0.0;
+    path_msg.knots[path.poses.size()-1].twist.angular.z = 0.0;
 
 	// Set the actual timestamps for the outbound message
 	for (unsigned int i = 0; i < path.poses.size(); ++i)
@@ -247,6 +261,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.knots[0].twist = odometry.twist.twist;
 
 	// Free up memory
+    delete [] distances;
 	delete [] actualTimestamps;
 	delete [] actualVelocities;
 
@@ -264,7 +279,8 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 }
 
 double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
-												unsigned int i)
+												unsigned int i,
+                                                double& distanceTraveled)
 {
 	// This formula comes from a lengthy derivation in my notes. The important relation is:
 	// dR/dt = -dPhi_j/dt * P_jy * csc^2(Phi_j)
@@ -338,8 +354,6 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 	Eigen::Vector3d pointNext3d(pointNext(0), pointNext(1), 0);
 	Eigen::Vector3d prevCircleCenter(prevCircle.GetCenterX(), prevCircle.GetCenterY(), 0);
 	Eigen::Vector3d nextCircleCenter(nextCircle.GetCenterX(), nextCircle.GetCenterY(), 0);
-	Eigen::Vector3d vectorToPrevCenter = prevCircleCenter - pointPrev3d;
-	Eigen::Vector3d centerToNextCenter = nextCircleCenter - pointCur3d;
 	double prevCircleCurvature = prevCircle.GetCurvature();
 	double nextCircleCurvature = nextCircle.GetCurvature();
 	if ((pointCur3d - pointPrev3d).cross((prevCircleCenter - pointPrev3d))(2) < 0)
@@ -365,6 +379,10 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 		requiredDeltaSternAngle = 0.0;
 	}
 	double minimumDeltaTime = fabs(requiredDeltaSternAngle) / maximum_slew_radians_per_second;
+
+	Eigen::Vector3d vectorCurToPrevCenter = prevCircleCenter - pointCur3d;
+    Eigen::Vector3d vectorNextToPrevCenter = prevCircleCenter - pointNext3d;
+    distanceTraveled = nextCircle.GetRadius() * acos(vectorCurToPrevCenter.dot(vectorNextToPrevCenter)/(prevCircle.GetRadius()*prevCircle.GetRadius()));
 		
 	return minimumDeltaTime;
 }

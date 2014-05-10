@@ -3,6 +3,13 @@
 
 static double epsilon = 0.000000001;
 
+Circle::Circle()
+{
+	radius = std::numeric_limits<double>::infinity();
+	center(0) = std::numeric_limits<double>::infinity();
+	center(1) = std::numeric_limits<double>::infinity();
+}
+
 Circle::Circle(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3)
 {
 	if (!IsOrthogonal(p1, p2, p3))

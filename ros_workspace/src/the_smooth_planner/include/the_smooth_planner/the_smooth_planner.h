@@ -35,7 +35,8 @@ public:
   
 private:
 	double ComputeMinimumPathTime(const nav_msgs::Path& path,
-								  unsigned int i);
+								  unsigned int i,
+                                  double& distanceTraveled);
 
 	ros::Publisher smooth_path_publisher;
 	ros::Publisher visualization_publisher;
