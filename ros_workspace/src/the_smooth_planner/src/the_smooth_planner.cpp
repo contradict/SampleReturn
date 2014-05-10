@@ -172,7 +172,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		// Compute the maximum attainable average velocity required to get to the next point with the current time stamps, which
 		// completely ignore linear acceleration constraints.  The velocity is a maximum because the time stamps assigned in the
 		// previous step were minimum times
-		double deltaTime = (path.poses[i+1].header.stamp - path.poses[i].header.stamp).toSec();
+		double deltaTime = (path_msg.knots[i+1].header.stamp - path_msg.knots[i].header.stamp).toSec();
 		double maximumAttainableAverageVelocity = std::numeric_limits<double>::infinity();
 		if (deltaTime > 0)
 		{
@@ -226,6 +226,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 	// Set the velocity at the last point to be zero
 	actualVelocities[path.poses.size()-1] = 0.00;
+	path_msg.knots[path.poses.size()-1].twist.linear.x = 0.00;
+	path_msg.knots[path.poses.size()-1].twist.linear.y = 0.00;
 	
 	// Compute and store smooth decelerations to replace the velocity dicontinuities created
 	// in the previous step
@@ -362,7 +364,7 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 	{
 		requiredDeltaSternAngle = 0.0;
 	}
-	double minimumDeltaTime = requiredDeltaSternAngle / maximum_slew_radians_per_second;
+	double minimumDeltaTime = fabs(requiredDeltaSternAngle) / maximum_slew_radians_per_second;
 		
 	return minimumDeltaTime;
 }
