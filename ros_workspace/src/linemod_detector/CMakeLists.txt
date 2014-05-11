@@ -16,6 +16,7 @@ find_package(catkin REQUIRED
         cv_bridge
         message_generation
         image_geometry
+        saliency_detector
         )
 
 find_package(Eigen REQUIRED)
@@ -100,9 +101,9 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
 # add_dependencies(cv_test_node cv_test_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-add_library(linemod_color_naming
-  src/color_naming.cpp
-)
+#add_library(linemod_color_naming
+#  src/color_naming.cpp
+#)
 
  target_link_libraries(linemod_trainer
    new_modalities
@@ -116,7 +117,7 @@ add_library(linemod_color_naming
    ${catkin_LIBRARIES}
  )
  target_link_libraries(linemod_detector_2d
-   linemod_color_naming
+   #color_naming
    ${catkin_LIBRARIES}
  )
 
