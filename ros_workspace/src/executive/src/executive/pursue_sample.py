@@ -21,6 +21,7 @@ import geometry_msgs.msg as geometry_msg
 import samplereturn.util as util
 
 from executive.executive_states import DriveToPoseState
+from executive.executive_states import PursueDetectedPoint
 
 class PursueSample(object):
     
@@ -32,17 +33,15 @@ class PursueSample(object):
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                                                        move_base_msg.MoveBaseAction)
         
-
-        
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
         
-        self.state_machine.userdata.target_sample = None
-        self.state_machine.userdata.manipulator_search_distance = 5
+        self.state_machine.userdata.target_point = None
+        self.state_machine.userdata.min_pursuit_distance = 5
         self.state_machine.userdata.max_pursuit_error = 0.2
-        self.state_machine.userdata.max_sample_lost_time = 20
+        self.state_machine.userdata.max_point_lost_time = 20
         self.state_machine.userdata.square_search_size = 0.5
     
         with self.state_machine:
@@ -52,11 +51,13 @@ class PursueSample(object):
                                        transitions = {'next':'APPROACH_SAMPLE'})
                 
                 smach.StateMachine.add('APPROACH_SAMPLE',
-                                       ApproachSample(self.announcer,
-                                                      self.move_base,
-                                                      self.tf_listener),
-                                       transitions = {'close_enough':'MANIPULATOR_SEARCH',
-                                                      'sample_lost':'PURSUE_SAMPLE_ABORTED'})
+                                       PursueDetectedPoint(self.announcer,
+                                                           self.move_base,
+                                                           self.tf_listener,
+                                                           within_min_msg = 'Switching to manipulator detection'),
+                                       transitions = {'min_distance':'MANIPULATOR_SEARCH',
+                                                      'point_lost':'PURSUE_SAMPLE_ABORTED'},
+                                       remapping = {'target_point':'target_sample'})
                 
                 smach.StateMachine.add('MANIPULATOR_SEARCH',
                                        DriveToPoseState(self.move_base, self.tf_listener),
@@ -150,16 +151,17 @@ class PursueSample(object):
                                                         samplereturn_msg.NamedPoint,
                                                         self.sample_detection_manipulator)
 
-        
     def sample_detection_search(self, sample):
-        self.state_machine.userdata.target_sample = sample
-    
+        if sample.name == 'none':
+            self.state_machine.userdata.target_sample = None
+        else:
+            self.state_machine.userdata.target_sample = sample
+
     def sample_detection_manipulator(self, sample):
         if sample.name == 'none':
             self.state_machine.userdata.detected_sample = None
         else:
             self.state_machine.userdata.detected_sample = sample
-        
     
 #searches the globe   
 class StartSamplePursuit(smach.State):
@@ -167,7 +169,7 @@ class StartSamplePursuit(smach.State):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys=['target_sample','action_goal'],
-                             output_keys=['target_sample','action_result'])
+                             output_keys=['target_sample', 'velocity', 'pursue_samples', 'action_result'])
     
         self.announcer = announcer
     
@@ -176,6 +178,8 @@ class StartSamplePursuit(smach.State):
         result = samplereturn_msg.GeneralExecutiveResult('initialized')
         userdata.action_result = result
         userdata.target_sample = None
+        userdata.pursue_samples = True
+        userdata.velocity = 0.5
         
         while True:
             if userdata.target_sample is not None:
@@ -184,74 +188,6 @@ class StartSamplePursuit(smach.State):
             
         self.announcer.say("Sample detected, pursue ing")               
         return 'next'
-    
-    
-class ApproachSample(smach.State):
-    def __init__(self, announcer, move_client, listener):
-        smach.State.__init__(self,
-                             outcomes=['close_enough', 'sample_lost'],
-                             input_keys=['target_sample',
-                                         'manipulator_search_distance',
-                                         'max_pursuit_error',
-                                         'max_sample_lost_time'],
-                             output_keys=['target_sample',
-                                          'target_pose',
-                                          'velocity',
-                                          'pursue_samples'])
-    
-        self.announcer = announcer
-        self.move_client = move_client
-        self.listener = listener
-
-    def execute(self, userdata):
-        
-        move_goal = move_base_msg.MoveBaseGoal()
-        header = std_msg.Header(0, rospy.Time(0), '/map')
-        start_pose = util.get_current_robot_pose(self.listener)
-        rospy.loginfo("APPROACH start pose: " + str(start_pose))
-        sample_on_map = self.listener.transformPoint('/map', userdata.target_sample)
-        
-        goal_pose = geometry_msg.Pose()
-        goal_pose.position = sample_on_map.point
-        goal_pose.orientation = start_pose.pose.orientation
-        move_goal.target_pose = geometry_msg.PoseStamped(header, goal_pose) 
-        self.move_client.send_goal(move_goal)
-        
-        rospy.loginfo("PURSUE SAMPLE initial pursuit point: %s", sample_on_map)
-
-        last_sample_detection = rospy.get_time()
-
-        while True:
-            current_pose= util.get_current_robot_pose(self.listener)
-            move_state = self.move_client.get_state()
-            if move_state not in util.actionlib_working_states:
-                return 'aborted'
-            
-            sample_distance = util.pose_distance_2d(current_pose, move_goal.target_pose)
-            rospy.loginfo("APPROACH DISTANCE: " + str(sample_distance))
-            if sample_distance < userdata.manipulator_search_distance:
-                userdata.velocity = 0.5
-                userdata.pursue_samples = True
-                userdata.target_pose = move_goal.target_pose
-                self.announcer.say("Switching to manipulator detection")
-                return 'close_enough'
-            
-            if userdata.target_sample is not None:
-                last_sample_detection = rospy.get_time()
-                sample_on_map = self.listener.transformPoint('/map', userdata.target_sample)
-                
-                current_point = move_goal.target_pose.pose.position
-                sample_distance_delta = util.point_distance_2d(current_point, sample_on_map.point)
-                if  sample_distance_delta > userdata.max_pursuit_error:
-                    rospy.loginfo("PURSUE SAMPLE updated pursuit point %s", sample_on_map)
-                    move_goal.target_pose.pose.position = sample_on_map.point
-                    self.move_client.send_goal(move_goal)
-            
-            if (rospy.get_time() - last_sample_detection) > userdata.max_sample_lost_time:
-                return 'sample_lost'
-                            
-            userdata.target_sample = None       
-            rospy.sleep(0.2)
 
 class LoadSearchPath(smach.State):
     def __init__(self, listener, announcer):

@@ -15,6 +15,8 @@ import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
 
 from executive.executive_states import DriveToPoseState
+from executive.executive_states import PursueDetectedPoint
+
 
 import samplereturn.util as util
 
@@ -45,8 +47,8 @@ class LevelOne(object):
                 output_keys = ['action_result'])
 
         self.state_machine.userdata.max_pursuit_error = 0.2        
-        self.state_machine.userdata.beacon_close_distance = 3
-        self.state_machine.userdata.max_beacon_lost_time = 30
+        self.state_machine.userdata.min_pursuit_distance = 3
+        self.state_machine.userdata.max_point_lost_time = 30
         
         with self.state_machine:
             
@@ -92,12 +94,14 @@ class LevelOne(object):
                                        transitions = {'next':'APPROACH_BEACON'})
                 
                 smach.StateMachine.add('APPROACH_BEACON',
-                                       ApproachBeacon(self.announcer,
-                                                      self.move_base,
-                                                      self.tf_listener),
-                                       transitions = {'close_enough':'MOUNT_PLATFORM',
-                                                      'beacon_lost':'RETURN_HOME'})
-                
+                       PursueDetectedPoint(self.announcer,
+                                           self.move_base,
+                                           self.tf_listener,
+                                           within_min_msg = 'Reverse ing on to platform'),
+                       transitions = {'min_distance':'MOUNT_PLATFORM',
+                                      'point_lost':'RETURN_HOME'},
+                       remapping = {'target_point':'beacon_target'})
+
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
                                                         self.tf_listener),
@@ -144,12 +148,16 @@ class LevelOne(object):
                                                 self.beacon_update)
         
     def sample_update(self, sample):
-        self.state_machine.userdata.detected_sample = sample
-        
+        if sample.name == 'none':
+            self.state_machine.userdata.detected_sample = None
+        else:
+            self.state_machine.userdata.detected_sample = sample
+            
     def beacon_update(self, beacon_pose):
-        self.state_machine.userdata.beacon_target = beacon_pose
-        
-    
+        header = beacon_pose.header
+        point = beacon_pose.pose.position
+        beacon_target = geometry_msg.PointStamped(header, point)
+        self.state_machine.userdata.beacon_target = beacon_target
     
 #drives to the expected sample location    
 class StartLevelOne(smach.State):
@@ -181,7 +189,7 @@ class StartLevelOne(smach.State):
 
         #put the expected sample location on the end of the path list
         #same orientation as the robot's last pose
-        sample_position = geometry_msg.Point(35, 25, 0)
+        sample_position = geometry_msg.Point(35, 10, 0)
         pose = geometry_msg.Pose()
         pose.position = sample_position
         pose.orientation = path_pose_list[-1].pose.orientation
@@ -235,7 +243,8 @@ class ReturnHome(smach.State):
                              outcomes=['next',
                                        'preempted',
                                        'aborted'],
-                             output_keys=['beacon_target'])
+                             output_keys=['beacon_target',
+                                          'pursue_samples'])
         
         self.announcer = announcer
 
@@ -244,14 +253,12 @@ class ReturnHome(smach.State):
         self.announcer.say("Return ing to platform")
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
-        pose = geometry_msg.Pose()
-        pose.position = geometry_msg.Point(15, 0, 0)
-        quat_array = tf.transformations.quaternion_from_euler(0, 0, 180)           
-        pose.orientation = geometry_msg.Quaternion(*quat_array)
-        userdata.beacon_target = geometry_msg.PoseStamped(header, pose)        
+        #the beacon is probably not in view, drive to a point 15m in front of it
+        point = geometry_msg.PointStamped(header, geometry_msg.Point(15, 0, 0))
+        userdata.beacon_target = point
+        userdata.pursue_samples = False
         
         return 'next'
-
 
 class ApproachBeacon(smach.State):
     def __init__(self, announcer, move_client, listener):
@@ -292,7 +299,7 @@ class ApproachBeacon(smach.State):
                 userdata.velocity = 0.5
                 userdata.pursue_samples = False
                 userdata.target_pose = move_goal.target_pose
-                self.announcer.say("Close to beacon, reverse ing on to platform")
+                self.announcer.say("Reverse ing on to platform")
                 return 'close_enough'
             
             if userdata.beacon_target is not None:
