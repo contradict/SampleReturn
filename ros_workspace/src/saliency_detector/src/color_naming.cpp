@@ -2,7 +2,9 @@
 
 ColorNaming::ColorNaming()
 {
-  std::ifstream infile("w2c.txt");
+  std::string path = ros::package::getPath("saliency_detector");
+  path = path + "/src/w2c.txt";
+  std::ifstream infile(path.c_str());
   //For the full version, 32768*14=458752
   if(infile.is_open())
   {
