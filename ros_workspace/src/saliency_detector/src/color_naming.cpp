@@ -32,10 +32,35 @@ cv::Mat ColorNaming::computeIndexImage(cv::Mat image)
   return index_image;
 }
 
+Eigen::Matrix<float,11,1> ColorNaming::computeInteriorColorStats(cv::Mat image, cv::Mat mask)
+{
+  cv::Mat index_image = computeIndexImage(image);
+  cv::Mat eroded_mask;
+  Eigen::Matrix<float,11,1> sum_color_score(Eigen::Matrix<float,11,1>::Zero());
+  cv::erode(mask, eroded_mask, cv::Mat(), cv::Point(-1,-1), 1);
+  int count = 0;
+  for (int i=0; i<image.rows; i++) {
+    for (int j=0; j<image.cols; j++) {
+      if (eroded_mask.at<unsigned char>(i,j) != 0) {
+        count += 1;
+        int index = 14*index_image.at<unsigned short>(i,j);
+        Eigen::Matrix<float,11,1> color_score;
+        for (int k=3; k<14; k++) {
+          color_score[k-3] = color_index_array_[k+index];
+        }
+        int maxIndex;
+        color_score.maxCoeff(&maxIndex);
+        sum_color_score[maxIndex] += 1;
+      }
+    }
+  }
+  return sum_color_score;
+}
+
 Eigen::Matrix<float,11,1> ColorNaming::computeInteriorColor(cv::Mat image, cv::Mat mask)
 {
-  ROS_INFO("Sub image size: %i, %i", image.size().width, image.size().height);
-  ROS_INFO("Sub mask size: %i, %i", mask.size().width, mask.size().height);
+  //ROS_INFO("Sub image size: %i, %i", image.size().width, image.size().height);
+  //ROS_INFO("Sub mask size: %i, %i", mask.size().width, mask.size().height);
   cv::Mat index_image = computeIndexImage(image);
   cv::Mat eroded_mask;
   Eigen::Matrix<float,11,1> sum_color_score(Eigen::Matrix<float,11,1>::Zero());
@@ -46,7 +71,7 @@ Eigen::Matrix<float,11,1> ColorNaming::computeInteriorColor(cv::Mat image, cv::M
   int count = 0;
   for (int i=0; i<image.rows; i++) {
     for (int j=0; j<image.cols; j++) {
-      if (eroded_mask.at<unsigned short>(i,j) != 0) {
+      if (eroded_mask.at<unsigned char>(i,j) != 0) {
         count += 1;
         int index = 14*index_image.at<unsigned short>(i,j);
         Eigen::Matrix<float,11,1> color_score;
@@ -75,7 +100,7 @@ Eigen::Matrix<float,11,1> ColorNaming::computeInteriorColor(cv::Mat image,
   int count = 0;
   for (int i=0; i<image.rows; i++) {
     for (int j=0; j<image.cols; j++) {
-      if (eroded_mask.at<unsigned short>(i,j) != 0) {
+      if (eroded_mask.at<unsigned char>(i,j) != 0) {
         int index = 14*index_image.at<unsigned short>(i,j);
         Eigen::Matrix<float,11,1> color_score;
         for (int k=3; k<14; k++) {
@@ -107,7 +132,7 @@ Eigen::Matrix<float,11,1> ColorNaming::computeExteriorColor(cv::Mat image, cv::M
   int count = 0;
   for (int i=0; i<image.rows; i++) {
     for (int j=0; j<image.cols; j++) {
-      if (dilated_mask.at<unsigned short>(i,j) == 0) {
+      if (dilated_mask.at<unsigned char>(i,j) == 0) {
         count += 1;
         int index = 14*index_image.at<unsigned short>(i,j);
         Eigen::Matrix<float,11,1> color_score;
@@ -145,7 +170,7 @@ int ColorNaming::computeInteriorColorMax(cv::Mat image, cv::Mat mask)
   int count = 0;
   for (int i=0; i<image.rows; i++) {
     for (int j=0; j<image.cols; j++) {
-      if (eroded_mask.at<unsigned short>(i,j) != 0) {
+      if (eroded_mask.at<unsigned char>(i,j) != 0) {
         count += 1;
         int index = 14*index_image.at<unsigned short>(i,j);
         Eigen::Matrix<float,11,1> color_score;
