@@ -123,7 +123,7 @@ class LineMOD_Detector
     cv_bridge::CvImagePtr color_ptr;
     try
     {
-      color_ptr = cv_bridge::toCvCopy(msg, "");
+      color_ptr = cv_bridge::toCvCopy(msg, "rgb8");
     }
     catch (cv_bridge::Exception& e)
     {
