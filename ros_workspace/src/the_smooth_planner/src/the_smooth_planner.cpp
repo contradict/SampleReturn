@@ -382,7 +382,14 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 
 	Eigen::Vector3d vectorCurToPrevCenter = prevCircleCenter - pointCur3d;
     Eigen::Vector3d vectorNextToPrevCenter = prevCircleCenter - pointNext3d;
-    distanceTraveled = nextCircle.GetRadius() * acos(vectorCurToPrevCenter.dot(vectorNextToPrevCenter)/(prevCircle.GetRadius()*prevCircle.GetRadius()));
+	if (prevCircle.GetRadius() == std::numeric_limits<double>::infinity())
+	{
+		distanceTraveled = (pointNext3d - pointCur3d).norm();
+	}
+	else
+	{
+    	distanceTraveled = prevCircle.GetRadius() * acos(vectorCurToPrevCenter.dot(vectorNextToPrevCenter)/(prevCircle.GetRadius()*prevCircle.GetRadius()));
+	}
 		
 	return minimumDeltaTime;
 }
