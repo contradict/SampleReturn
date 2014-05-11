@@ -8,6 +8,7 @@ set(CMAKE_BUILD_TYPE Debug)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  roslib
   sensor_msgs
   samplereturn_msgs
   cv_bridge
@@ -91,7 +92,7 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-  LIBRARIES ${PROJECT_NAME}
+    LIBRARIES BMS color_naming saliency_detector_core
   CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
