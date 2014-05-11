@@ -120,7 +120,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.header.frame_id = "map";
 
     visualization_msgs::MarkerArray visualizationMarkerArray;
-    visualizationMarkerArray.markers.resize(path.poses.size());
+    visualizationMarkerArray.markers.resize(path.poses.size()-1);
 
 	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
@@ -146,25 +146,34 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		timestamp += ros::Duration(minimumPathTime);
 
         tf::Vector3 circleCenter(circles[i].GetCenterX(), circles[i].GetCenterY(), 0.0);
-        visualizationMarkerArray.markers[i].points.resize(1);
-        visualizationMarkerArray.markers[i].colors.resize(1);
-        visualizationMarkerArray.markers[i].header.seq = 0;
+        double circleDiameter = circles[i].GetRadius()*2.0;
+        if (circles[i].GetRadius() == std::numeric_limits<double>::infinity())
+        {
+            // Don't both visualization infinite circles
+            circleCenter = tf::Vector3(100000, 100000, 100000);
+            circleDiameter = 0.01;
+        }
+        visualizationMarkerArray.markers[i].header.seq = i;
         visualizationMarkerArray.markers[i].header.frame_id = "map";
         visualizationMarkerArray.markers[i].header.stamp = timestamp;
         visualizationMarkerArray.markers[i].ns = "SmoothPlannerVisualization";
-        visualizationMarkerArray.markers[i].id = 0;
+        visualizationMarkerArray.markers[i].id = i;
         visualizationMarkerArray.markers[i].type = visualization_msgs::Marker::CYLINDER;
         visualizationMarkerArray.markers[i].action = visualization_msgs::Marker::ADD;
-        visualizationMarkerArray.markers[i].points[0].x = circles[i].GetCenterX();
-        visualizationMarkerArray.markers[i].points[0].y = circles[i].GetCenterY();
-        visualizationMarkerArray.markers[i].points[0].z = 0.0;
-        visualizationMarkerArray.markers[i].scale.x = circles[i].GetRadius()*2.0;
-        visualizationMarkerArray.markers[i].scale.y = circles[i].GetRadius()*2.0;
+        visualizationMarkerArray.markers[i].pose.position.x = circleCenter.x();
+        visualizationMarkerArray.markers[i].pose.position.y = circleCenter.y();
+        visualizationMarkerArray.markers[i].pose.position.z = circleCenter.z();
+        visualizationMarkerArray.markers[i].pose.orientation.x = 0;
+        visualizationMarkerArray.markers[i].pose.orientation.y = 0;
+        visualizationMarkerArray.markers[i].pose.orientation.z = 0;
+        visualizationMarkerArray.markers[i].pose.orientation.w = 1;
+        visualizationMarkerArray.markers[i].scale.x = circleDiameter;
+        visualizationMarkerArray.markers[i].scale.y = circleDiameter;
         visualizationMarkerArray.markers[i].scale.z = 0.5;
-        visualizationMarkerArray.markers[i].colors[0].r = 1.0;
-        visualizationMarkerArray.markers[i].colors[0].g = 0.0;
-        visualizationMarkerArray.markers[i].colors[0].b = 1.0;
-        visualizationMarkerArray.markers[i].colors[0].a = 0.3;
+        visualizationMarkerArray.markers[i].color.r = 1.0;
+        visualizationMarkerArray.markers[i].color.g = 0.0;
+        visualizationMarkerArray.markers[i].color.b = 1.0;
+        visualizationMarkerArray.markers[i].color.a = 0.3;
 
 		// Fill the outbound message data
 		path_msg.knots[i+1].header.seq = i+1;
