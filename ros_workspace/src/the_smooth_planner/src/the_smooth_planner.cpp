@@ -1,8 +1,8 @@
 #include <the_smooth_planner/the_smooth_planner.h>
-#include <the_smooth_planner/circle.h>
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
 #include <platform_motion_msgs/Path.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
 #include <eigen_conversions/eigen_msg.h>
@@ -44,6 +44,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 	odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
 
 	smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
+    visualization_publisher = localNodeHandle.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
 	// Wait for and look up the transform for the stern wheel pod
 	ROS_INFO("Waiting for stern wheel transform");
@@ -118,6 +119,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.header.seq = 0;
 	path_msg.header.frame_id = "map";
 
+    visualization_msgs::MarkerArray visualizationMarkerArray;
+    visualizationMarkerArray.markers.resize(path.poses.size());
+
 	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
 	{
@@ -131,14 +135,36 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	// Store time stamps for all poses in the path ensuring that there is enough
 	// time to achieve each one
 	double* distances = new double[path.poses.size()];
+    Circle* circles = new Circle[path.poses.size()];
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
 		// Compute the minimum allowable time between this path point and the next based on the path curvature and the slew
 		// rate limit of the wheel pod servos
 		tf::Vector3 initialLinearVelocityDirection(path_msg.knots[i].twist.linear.x, path_msg.knots[i].twist.linear.y, 0.0);
-		double minimumPathTime = this->ComputeMinimumPathTime(path, i, distances[i]);
+		double minimumPathTime = this->ComputeMinimumPathTime(path, i, distances[i], circles[i]);
 
 		timestamp += ros::Duration(minimumPathTime);
+
+        tf::Vector3 circleCenter(circles[i].GetCenterX(), circles[i].GetCenterY(), 0.0);
+        visualizationMarkerArray.markers[i].points.resize(1);
+        visualizationMarkerArray.markers[i].colors.resize(1);
+        visualizationMarkerArray.markers[i].header.seq = 0;
+        visualizationMarkerArray.markers[i].header.frame_id = "map";
+        visualizationMarkerArray.markers[i].header.stamp = timestamp;
+        visualizationMarkerArray.markers[i].ns = "SmoothPlannerVisualization";
+        visualizationMarkerArray.markers[i].id = 0;
+        visualizationMarkerArray.markers[i].type = visualization_msgs::Marker::CYLINDER;
+        visualizationMarkerArray.markers[i].action = visualization_msgs::Marker::ADD;
+        visualizationMarkerArray.markers[i].points[0].x = circles[i].GetCenterX();
+        visualizationMarkerArray.markers[i].points[0].y = circles[i].GetCenterY();
+        visualizationMarkerArray.markers[i].points[0].z = 0.0;
+        visualizationMarkerArray.markers[i].scale.x = circles[i].GetRadius()*2.0;
+        visualizationMarkerArray.markers[i].scale.y = circles[i].GetRadius()*2.0;
+        visualizationMarkerArray.markers[i].scale.z = 0.5;
+        visualizationMarkerArray.markers[i].colors[0].r = 1.0;
+        visualizationMarkerArray.markers[i].colors[0].g = 0.0;
+        visualizationMarkerArray.markers[i].colors[0].b = 1.0;
+        visualizationMarkerArray.markers[i].colors[0].a = 0.3;
 
 		// Fill the outbound message data
 		path_msg.knots[i+1].header.seq = i+1;
@@ -267,6 +293,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
 	// Publish path
 	smooth_path_publisher.publish(path_msg);
+    visualization_publisher.publish(visualizationMarkerArray);
 
 	return;
 }
@@ -280,7 +307,8 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 
 double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 												unsigned int i,
-                                                double& distanceTraveled)
+                                                double& distanceTraveled,
+                                                Circle& outCircle)
 {
 	// This formula comes from a lengthy derivation in my notes. The important relation is:
 	// dR/dt = -dPhi_j/dt * P_jy * csc^2(Phi_j)
@@ -390,6 +418,8 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
 	{
     	distanceTraveled = prevCircle.GetRadius() * acos(vectorCurToPrevCenter.dot(vectorNextToPrevCenter)/(prevCircle.GetRadius()*prevCircle.GetRadius()));
 	}
+
+    outCircle = nextCircle;
 		
 	return minimumDeltaTime;
 }

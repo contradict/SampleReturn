@@ -12,6 +12,8 @@
 #include <tf/transform_listener.h>
 #include <Eigen/Dense>
 
+#include <the_smooth_planner/circle.h>
+
 namespace the_smooth_planner
 {
 
@@ -36,7 +38,8 @@ public:
 private:
 	double ComputeMinimumPathTime(const nav_msgs::Path& path,
 								  unsigned int i,
-                                  double& distanceTraveled);
+                                  double& distanceTraveled,
+                                  Circle& outCircle);
 
 	ros::Publisher smooth_path_publisher;
 	ros::Publisher visualization_publisher;
