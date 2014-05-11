@@ -7,6 +7,7 @@
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <ros/console.h>
+#include <ros/package.h>
 
 /* Load color matrix
  * Compute index
@@ -27,6 +28,7 @@ class ColorNaming
     Eigen::Matrix<float,11,1> computeInteriorColor(cv::Mat image,
         cv::Mat mask, Eigen::Matrix<float,11,1> exteriorColor);
     std::string getDominantColor(Eigen::Matrix<float,11,1> color_score);
+    Eigen::Matrix<float,11,1> computeInteriorColorStats(cv::Mat image, cv::Mat mask);
   private:
     float color_index_array_ [458752];
 };
