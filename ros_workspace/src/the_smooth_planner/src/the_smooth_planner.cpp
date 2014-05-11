@@ -1,4 +1,5 @@
 #include <the_smooth_planner/the_smooth_planner.h>
+#include <the_smooth_planner/bezier_cubic_spline.h>
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
 #include <platform_motion_msgs/Path.h>
