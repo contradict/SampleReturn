@@ -39,10 +39,6 @@ catkin_package(
 # Build
 ##############################################################################
 
-CHECK_CXX_COMPILER_FLAG("-std=c++11", COMPILER_SUPPORTS_CXX11)
-if (COMPILER_SUPPORTS_CXX11)
-	set(CMAKE_CXX_FLAGS "-std=c++11")
-
 add_library(${PROJECT_NAME} src/the_smooth_planner.cpp src/circle.cpp src/bezier_cubic_spline.hpp)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${THE_SMOOTH_LIBRARIES})
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_generated_messages_cpp)

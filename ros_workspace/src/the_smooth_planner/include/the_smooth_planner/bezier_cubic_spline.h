@@ -16,30 +16,30 @@ public:
                  const T& p1,
                  const T& p2,
                  const T& p3,
-                 std::function<double(const T&)> normFunc,
-                 std::function<double(const T&, const T&)> dotFunc,
-                 std::function<T(const T&, const T&)> crossFunc);
+                 double (*normFunc)(const T&),
+                 double (*dotFunc)(const T&, const T&),
+                 T (*crossFunc)(const T&, const T&));
 
 	// Given input t between 0 and 1, return the spline interpolation
 	// between p0 and p3 respectively
-	T Interpolate(double t);
+	T Interpolate(double t) const;
 
 	// Compute the arc length
-	double ComputeArcLength(double tStep = 0.05);
+	double ComputeArcLength(double tStep = 0.05) const;
 
 	// Given input t between 0 and 1, return the tangent, normal, and
 	// binormal vectors specified by t
-	void ComputeTNB(double t, T& tangent, T& normal, T& binormal);
+	void ComputeTNB(double t, T& tangent, T& normal, T& binormal) const;
 
 	// Given input t between 0 and 1, return the curvature at the point
 	// specified by t
-	double ComputeCurvature(double t);
+	double ComputeCurvature(double t) const;
 
 protected:
 	T p0, p1, p2, p3;
-	std::function<double(const T&)> normFunc;
-	std::function<double(const T&, const T&)> dotFunc;
-	std::function<T(const T&, const T&)> crossFunc;
+	double (*normFunc)(const T&);
+	double (*dotFunc)(const T&, const T&);
+	T (*crossFunc)(const T&, const T&);
 };
 
 #include "../../src/bezier_cubic_spline.hpp"

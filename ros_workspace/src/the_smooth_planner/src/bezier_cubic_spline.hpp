@@ -1,16 +1,16 @@
 template <typename T>
-BezierCubicSpline::BezierCubicSpline()
+BezierCubicSpline<T>::BezierCubicSpline()
 {
 }
 
 template <typename T>
-BezierCubicSpline::SetData(const T& p0,
-                           const T& p1,
-                           const T& p2,
-                           const T& p3,
-                           std::function<double(const T&)> normFunc
-						   std::function<double(const T&, const T&)> dotFunc,
-						   std::function<T(const T&, const T&)> crossFunc)
+void BezierCubicSpline<T>::SetData(const T& p0,
+                                   const T& p1,
+                                   const T& p2,
+                                   const T& p3,
+                                   double (*normFunc)(const T&),
+                                   double (*dotFunc)(const T&, const T&),
+                                   T (*crossFunc)(const T&, const T&))
 {
 	this->p0 = p0;
 	this->p1 = p1;
@@ -22,7 +22,7 @@ BezierCubicSpline::SetData(const T& p0,
 }
 
 template <typename T>
-T BezierCubicSpline::Interpolate(double t)
+T BezierCubicSpline<T>::Interpolate(double t) const
 {
 	double t2 = t*t;
 	double t3 = t2*t;
@@ -34,26 +34,26 @@ T BezierCubicSpline::Interpolate(double t)
 }
 
 template <typename T>
-double BezierCubicSpline::ComputeArcLength(double tStep)
+double BezierCubicSpline<T>::ComputeArcLength(double tStep) const
 {
 	double arcLength = 0.00;
-	T lastPoint = p0;
-	t = tStep;
+	T previousPoint = p0;
+	double t = tStep;
 	while (t < 1.00)
 	{
-		T currentPoint = Interpolate(nextStep);
-		arcLength += normFunc(currentPoint, nextPoint);
+		T currentPoint = Interpolate(t);
+		arcLength += normFunc(previousPoint - currentPoint);
 
-		lastPoint = currentPoint;
+		previousPoint = currentPoint;
 		t += tStep;
 	}
-	arcLength += normFunc(lastPoint, p3);
+	arcLength += normFunc(previousPoint - p3);
 	
 	return arcLength;
 }
 
 template <typename T>
-void BezierCubicSpline::ComputeTNB(double t, T& tangent, T& normal, T& binormal)
+void BezierCubicSpline<T>::ComputeTNB(double t, T& tangent, T& normal, T& binormal) const
 {
 	double t2 = t*t;
 	double oneMinusT = 1.00 - t;
@@ -69,7 +69,7 @@ void BezierCubicSpline::ComputeTNB(double t, T& tangent, T& normal, T& binormal)
 }
 
 template <typename T>
-double BezierCubicSpline::ComputeCurvature(double t)
+double BezierCubicSpline<T>::ComputeCurvature(double t) const
 {
 	double t2 = t*t;
 	double oneMinusT = 1.00 - t;

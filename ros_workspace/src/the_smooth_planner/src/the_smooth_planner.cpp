@@ -3,7 +3,6 @@
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
 #include <platform_motion_msgs/Path.h>
-#include <visualization_msgs/MarkerArray.h>
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
 #include <eigen_conversions/eigen_msg.h>
@@ -137,12 +136,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	// time to achieve each one.  For our robot, this time is dominated by the rate at
 	// which the wheels can rotate to achieve the desired wheel angle
 	Eigen::Vector3d pathLinearVelocity;
-	tf::vectorTFToEigen(odometry.twist.twist.linear, pathLinearVelocity);
+	tf::vectorMsgToEigen(odometry.twist.twist.linear, pathLinearVelocity);
 	double pathVelocityMagnitude = pathLinearVelocity.norm();
-	BezierCubicSpline<Eigen::Vector2d>* splines = new BezierCubicSpline<Eigen::Vector2d>[path.poses.size()-1];
+	BezierCubicSpline<Eigen::Vector3d>* splines = new BezierCubicSpline<Eigen::Vector3d>[path.poses.size()-1];
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
-		bool success = this->FitCubicSpline(path, i, pathVelocityMagnitude, maximum_linear_+velocity, splines[i]);
+		bool success = this->FitCubicSpline(path, i, pathVelocityMagnitude, maximum_linear_velocity, splines[i]);
 		if (!success)
 		{
 			ROS_DEBUG("Failed to fit a cubic spline to the path. FIX ME!");
@@ -171,10 +170,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[i]);
 
 		// Compute the next linear velocity
-		tf::Quaternion nextQuaternion(path.poses[i+1].pose.orientation.x,
-                                      path.poses[i+1].pose.orientation.y,
-                                      path.poses[i+1].pose.orientation.z,
-                                      path.poses[i+1].pose.orientation.w);
+		Eigen::Quaterniond nextQuaternion(path.poses[i+1].pose.orientation.w,
+                                          path.poses[i+1].pose.orientation.x,
+                                          path.poses[i+1].pose.orientation.y,
+                                          path.poses[i+1].pose.orientation.z);
 		Eigen::Vector3d nextVelocityVector = nextQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
 		nextVelocityVector *= nextVelocityMagnitude;
 
@@ -203,14 +202,14 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	// Compute and store smooth decelerations
 	for (unsigned int i = path.poses.size()-1; i > 0; --i)
 	{
-		Eigen::Vector3d currentVelocityVec
-		Eigen::Vector2d previousVelocityVec;
+		Eigen::Vector3d currentVelocityVec;
+		Eigen::Vector3d previousVelocityVec;
 		tf::vectorMsgToEigen(path_msg.knots[i].twist.linear, currentVelocityVec);
 		tf::vectorMsgToEigen(path_msg.knots[i-1].twist.linear, previousVelocityVec);
 		double currentVelocityMagnitude = currentVelocityVec.norm();
-		double previousVelocityMagnitude = previousVelociyVec.norm();
+		double previousVelocityMagnitude = previousVelocityVec.norm();
 		double deltaTime = (path_msg.knots[i].header.stamp - path_msg.knots[i-1].header.stamp).toSec();
-		if (previousVelocityMagnitude - currentVelocityMagnitude)/deltaTime > linear_acceleration)
+		if ((previousVelocityMagnitude - currentVelocityMagnitude)/deltaTime > linear_acceleration)
 		{
 			double previousVelocityScale = (currentVelocityMagnitude + linear_acceleration*deltaTime)/previousVelocityMagnitude;
 			path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
@@ -237,31 +236,31 @@ bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
                                       unsigned int i,
                                       double initialVelocityMagnitude,
                                       double finalVelocityMagnitude,
-                                      BezierCubicSpline<Eigen::Vector2d>& outCubicSpline)
+                                      BezierCubicSpline<Eigen::Vector3d>& outCubicSpline)
 {
 	// Create a tunable scalar for intermediate control point generation
 	const double SplineVelocityScalar = 1.0;
 	
 	// Create the four control points needed for the spline interpolation
-	Eigen::Vector2d pointCur;
-	Eigen::Vector2d pointNext;
-	Eigen::Vector2d pointCurPlusVelocity;
-	Eigen::Vector2d pointNextMinusVelocity;
+	Eigen::Vector3d pointCur;
+	Eigen::Vector3d pointNext;
+	Eigen::Vector3d pointCurPlusVelocity;
+	Eigen::Vector3d pointNextMinusVelocity;
 
-	tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
-									 path.poses[i].pose.orientation.y,
-									 path.poses[i].pose.orientation.z,
-									 path.poses[i].pose.orientation.w);
-	tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
-	 							   path.poses[i+1].pose.orientation.y,
-								   path.poses[i+1].pose.orientation.z,
-								   path.poses[i+1].pose.orientation.w);
+	Eigen::Quaterniond initialQuaternion(path.poses[i].pose.orientation.w,
+					 					 path.poses[i].pose.orientation.x,
+									 	 path.poses[i].pose.orientation.y,
+									 	 path.poses[i].pose.orientation.z);
+	Eigen::Quaterniond finalQuaternion(path.poses[i+1].pose.orientation.w,
+	 								   path.poses[i+1].pose.orientation.x,
+									   path.poses[i+1].pose.orientation.y,
+									   path.poses[i+1].pose.orientation.z);
 	Eigen::Vector3d initialForwardVector = initialQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
 	Eigen::Vector3d finalForwardVector = finalQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
 
-	pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-	pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
-	pointCurPlusVelocity = pointCur + SplineVelocityScalar*initialForwardVector*initialVelociytMagnitude;
+	pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y, 0.00;
+	pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y, 0.00;
+	pointCurPlusVelocity = pointCur + SplineVelocityScalar*initialForwardVector*initialVelocityMagnitude;
 	pointNextMinusVelocity = pointNext - SplineVelocityScalar*finalForwardVector*finalVelocityMagnitude;
 
 	// Fit a cubic spline to the control points
@@ -269,14 +268,14 @@ bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
                            pointCurPlusVelocity,
                            pointNextMinusVelocity,
                            pointNext,
-                           [](const Eigen::Vector2d& vec) -> double {return vec.norm();},
-                           [](const Eigen::Vector2d& v1, const Eigen::Vector2d& v2) -> double {return v1.dot(v2);},
-                           [](const Eigen::Vector2d& v1, const Eigen::Vector2d& v2) -> Eigen::Vector2d {return v1.cross(v2);});
+                           &this->EigenVectorNorm,
+                           &this->EigenVectorDot,
+                           &this->EigenVectorCross);
 
 	return true;
 }
 
-double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector2d>& spline,
+double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector3d>& spline,
                                                 double initialVelocity,
                                                 double finalVelocity)
 {
@@ -309,8 +308,8 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
 	return minimumDeltaTime;
 }
 
-void BezierCubicSpline::PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector2d>& spline,
-                                                               visualization_msgs::Marker& marker)
+void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,
+                                                              visualization_msgs::Marker& marker)
 {
 	double epsilon = 0.001;
 	marker.type = visualization_msgs::Marker::LINE_STRIP;
@@ -338,7 +337,7 @@ void BezierCubicSpline::PopulateSplineVisualizationMarkerArray(const BezierCubic
 	unsigned int i = 0;
 	for (double t = 0.00; t <= 1.00-epsilon; t += tStep)
 	{
-		Eigen::Vector2d currentPoint = spline.Interpolate(t);
+		Eigen::Vector3d currentPoint = spline.Interpolate(t);
 		marker.points[i].x = currentPoint(0);
 		marker.points[i].y = currentPoint(1);
 		marker.points[i].z = currentPoint(2);

@@ -4,13 +4,14 @@
 #include <vector>
 
 /** ROS **/
+#include <Eigen/Dense>
 #include <ros/ros.h>
 #include <costmap_2d/costmap_2d_ros.h>
 #include <nav_core/base_local_planner.h>
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_listener.h>
-#include <Eigen/Dense>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <the_smooth_planner/bezier_cubic_spline.h>
 
@@ -36,11 +37,21 @@ public:
 	void setOdometry(const nav_msgs::Odometry& odometry);
   
 private:
-	double ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector2d>& spline,
+	static double EigenVectorNorm(const Eigen::Vector3d& vec) { return vec.norm(); }
+	static double EigenVectorDot(const Eigen::Vector3d& v1, const Eigen::Vector3d& v2) { return v1.dot(v2); }
+	static Eigen::Vector3d EigenVectorCross(const Eigen::Vector3d& v1, const Eigen::Vector3d& v2) { return v1.cross(v2); }
+
+	bool FitCubicSpline(const nav_msgs::Path& path,
+                        unsigned int i,
+                        double initialVelocityMagnitude,
+                        double finalVelocityMagnitude,
+                        BezierCubicSpline<Eigen::Vector3d>& outCubicSpline);
+	
+	double ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector3d>& spline,
 								  double initialVelocity,
 								  double finalVelocity);
 
-	void PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector2d>& spline,
+	void PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,
                                                 visualization_msgs::Marker& marker);
 
 
