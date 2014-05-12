@@ -59,6 +59,7 @@
         <param name="maximum_pursuit_error" type="double" value="0.5"/>
     </node>
 
+    <!--
     <node
         pkg="executive"
         type="level_two_node.py"
@@ -67,6 +68,7 @@
         output="log"
         ns="/processes/executive">
     </node>
+    -->
 
     <node
         pkg="executive"
@@ -75,6 +77,8 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
+        
+        <param name="sample_list" value="fill this out"/>
     </node>
 
 </launch>
