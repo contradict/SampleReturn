@@ -204,6 +204,7 @@ class LoadSearchPath(smach.State):
         pose_list = []
         square_step = 2
         start_pose = util.get_current_robot_pose(self.listener)
+        rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
         next_pose = util.pose_translate(self.listener, start_pose, square_step, 0 )
         next_pose = util.pose_rotate(self.listener, next_pose, math.pi/2)
         pose_list.append(next_pose)
@@ -219,9 +220,7 @@ class LoadSearchPath(smach.State):
         next_pose = util.pose_rotate(self.listener, next_pose, math.pi/2)   
         pose_list.append(next_pose)
         userdata.pose_list = pose_list
-        
-        rospy.loginfo("SEARCH POSE LIST: " + str(pose_list))
-        
+                
         self.announcer.say("No sample found. Searching area")
         
         return 'next'

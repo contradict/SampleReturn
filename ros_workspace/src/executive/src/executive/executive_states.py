@@ -201,16 +201,17 @@ class PursueDetectedPoint(smach.State):
         move_goal = move_base_msg.MoveBaseGoal()
         header = std_msg.Header(0, rospy.Time(0), '/map')
         start_pose = util.get_current_robot_pose(self.listener)
-        rospy.loginfo("PURSUIT start pose: " + str(start_pose))
+        rospy.logdebug("PURSUIT start pose: " + str(start_pose))
         point_on_map = self.listener.transformPoint('/map', userdata.target_point)
         
         goal_pose = geometry_msg.Pose()
         goal_pose.position = point_on_map.point
-        goal_pose.orientation = start_pose.pose.orientation
+        goal_pose.orientation = util.pointing_quaternion_2d(start_pose.pose.position,
+                                                            point_on_map.point)
         move_goal.target_pose = geometry_msg.PoseStamped(header, goal_pose) 
         self.move_client.send_goal(move_goal)
         
-        rospy.loginfo("PURSUIT initial target point: %s", point_on_map)
+        rospy.logdebug("PURSUIT initial target point: %s", point_on_map)
 
         last_point_detection = rospy.get_time()
 
@@ -218,10 +219,11 @@ class PursueDetectedPoint(smach.State):
             current_pose= util.get_current_robot_pose(self.listener)
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
-                return 'aborted'
+                rospy.logdebug("PURSUIT action server not in working state")
+            #    return 'aborted'
             
             point_distance = util.pose_distance_2d(current_pose, move_goal.target_pose)
-            rospy.loginfo("PURSUIT distance: " + str(point_distance))
+            rospy.logdebug("PURSUIT distance: " + str(point_distance))
             if point_distance < userdata.min_pursuit_distance:
                 userdata.target_pose = move_goal.target_pose
                 if self.within_min_msg is not None:
@@ -235,7 +237,7 @@ class PursueDetectedPoint(smach.State):
                 current_point = move_goal.target_pose.pose.position
                 sample_distance_delta = util.point_distance_2d(current_point, point_on_map.point)
                 if  sample_distance_delta > userdata.max_pursuit_error:
-                    rospy.loginfo("PURSUE point updated: %s", point_on_map)
+                    rospy.logdebug("PURSUE point updated: %s", point_on_map)
                     move_goal.target_pose.pose.position = point_on_map.point
                     self.move_client.send_goal(move_goal)
             
