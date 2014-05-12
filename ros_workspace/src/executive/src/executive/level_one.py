@@ -70,8 +70,8 @@ class LevelOne(object):
                 
                 smach.StateMachine.add('SEARCH_FOR_SAMPLE',
                                        DriveToPoseState(self.move_base, self.tf_listener),
-                                       transitions = {'complete':'RETURN_HOME',
-                                                      'timeout':'RETURN_HOME',
+                                       transitions = {'complete':'START_RETURN_HOME',
+                                                      'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'PURSUE_SAMPLE'})
                 
                 
@@ -85,13 +85,20 @@ class LevelOne(object):
                                       smach_ros.SimpleActionState('pursue_sample',
                                       samplereturn_msg.GeneralExecutiveAction,
                                       goal_cb = get_pursuit_goal_cb),
-                                      transitions = {'succeeded':'RETURN_HOME',
+                                      transitions = {'succeeded':'START_RETURN_HOME',
                                                      'preempted':'PURSUE_SAMPLE',
                                                      'aborted':'LEVEL_ONE_ABORTED'})               
                
-                smach.StateMachine.add('RETURN_HOME',
-                                       ReturnHome(self.announcer),
-                                       transitions = {'next':'APPROACH_BEACON'})
+                smach.StateMachine.add('START_RETURN_HOME',
+                                       StartReturnHome(self.announcer),
+                                       transitions = {'next':'DRIVE_TO_BEACON_APPROACH_START'})
+                
+                smach.StateMachine.add('DRIVE_TO_BEACON_APPROACH_START',
+                                       DriveToPoseState(self.move_base,
+                                                        self.tf_listener),
+                                       transitions = {'complete':'APPROACH_BEACON',
+                                                      'timeout':'START_RETURN_HOME',
+                                                      'sample_detected':'LEVEL_ONE_ABORTED'})
                 
                 smach.StateMachine.add('APPROACH_BEACON',
                        PursueDetectedPoint(self.announcer,
@@ -99,14 +106,14 @@ class LevelOne(object):
                                            self.tf_listener,
                                            within_min_msg = 'Reverse ing on to platform'),
                        transitions = {'min_distance':'MOUNT_PLATFORM',
-                                      'point_lost':'RETURN_HOME'},
+                                      'point_lost':'START_RETURN_HOME'},
                        remapping = {'target_point':'beacon_target'})
 
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
                                                         self.tf_listener),
                                        transitions = {'complete':'complete',
-                                                      'timeout':'RETURN_HOME',
+                                                      'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'LEVEL_ONE_ABORTED'})
                 
                 smach.StateMachine.add('LEVEL_ONE_PREEMPTED',
@@ -154,8 +161,10 @@ class LevelOne(object):
             self.state_machine.userdata.detected_sample = sample
             
     def beacon_update(self, beacon_pose):
-        header = beacon_pose.header
-        point = beacon_pose.pose.position
+        beacon_pose.header.stamp = rospy.Time(0)
+        map_beacon_pose = self.tf_listener.transformPose('/map', beacon_pose)
+        header = map_beacon_pose.header
+        point = map_beacon_pose.pose.position
         beacon_target = geometry_msg.PointStamped(header, point)
         self.state_machine.userdata.beacon_target = beacon_target
     
@@ -171,9 +180,9 @@ class StartLevelOne(smach.State):
         
     def execute(self, userdata):
         
-        pose_2d_list = [{'x':3, 'y':0, 'heading':45},
-                        {'x':13, 'y':10, 'heading':30},
-                        {'x':20, 'y':15, 'heading':0}]
+        pose_2d_list = [{'x':3, 'y':0, 'yaw':math.radians(45)},
+                        {'x':13, 'y':10, 'yaw':math.radians(30)},
+                        {'x':20, 'y':15, 'yaw':math.radians(0)}]
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
         path_pose_list = []
@@ -182,7 +191,7 @@ class StartLevelOne(smach.State):
             pose.position = geometry_msg.Point(pose_2d['x'],
                                                pose_2d['y'],
                                                0.0)
-            quat_array = tf.transformations.quaternion_from_euler(0, 0, pose_2d['heading'])           
+            quat_array = tf.transformations.quaternion_from_euler(0, 0, pose_2d['yaw'])           
             pose.orientation = geometry_msg.Quaternion(*quat_array)
             pose_stamped = geometry_msg.PoseStamped(header, pose)
             path_pose_list.append(pose_stamped)
@@ -235,7 +244,7 @@ class DriveToSearch(smach.State):
             return 'complete'
 
    
-class ReturnHome(smach.State):
+class StartReturnHome(smach.State):
  
     def __init__(self, announcer):
 
@@ -243,7 +252,8 @@ class ReturnHome(smach.State):
                              outcomes=['next',
                                        'preempted',
                                        'aborted'],
-                             output_keys=['beacon_target',
+                             output_keys=['target_pose',
+                                          'velocity',
                                           'pursue_samples'])
         
         self.announcer = announcer
@@ -254,76 +264,15 @@ class ReturnHome(smach.State):
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
         #the beacon is probably not in view, drive to a point 15m in front of it
-        point = geometry_msg.PointStamped(header, geometry_msg.Point(15, 0, 0))
-        userdata.beacon_target = point
+        point = geometry_msg.Point(15, 0, 0)
+        quat_array = tf.transformations.quaternion_from_euler(0, 0, math.pi)           
+        pose = geometry_msg.Pose(point, geometry_msg.Quaternion(*quat_array))
+                
+        userdata.target_pose = geometry_msg.PoseStamped(header, pose)
         userdata.pursue_samples = False
         
         return 'next'
-
-class ApproachBeacon(smach.State):
-    def __init__(self, announcer, move_client, listener):
-        smach.State.__init__(self,
-                             outcomes=['close_enough', 'beacon_lost'],
-                             input_keys=['beacon_target',
-                                       'beacon_close_distance',
-                                       'max_pursuit_error',
-                                       'max_beacon_lost_time'],
-                             output_keys=['beacon_target',
-                                          'target_pose',
-                                          'velocity',
-                                          'pursue_samples'])
-    
-        self.announcer = announcer
-        self.move_client = move_client
-        self.listener = listener
-
-    def execute(self, userdata):
-        
-        move_goal = move_base_msg.MoveBaseGoal()
-        move_goal.target_pose = userdata.beacon_target 
-        self.move_client.send_goal(move_goal)
-        
-        rospy.loginfo("PURSUE BEACON initial pursuit point: %s", userdata.beacon_target)
-
-        last_beacon_detection = rospy.get_time()
-
-        while True:
-            current_pose= util.get_current_robot_pose(self.listener)
-            move_state = self.move_client.get_state()
-            if move_state not in util.actionlib_working_states:
-                return 'aborted'
-            
-            beacon_distance = util.pose_distance_2d(current_pose, move_goal.target_pose)
-            rospy.loginfo("APPROACH DISTANCE: " + str(beacon_distance))
-            if beacon_distance < userdata.beacon_close_distance:
-                userdata.velocity = 0.5
-                userdata.pursue_samples = False
-                userdata.target_pose = move_goal.target_pose
-                self.announcer.say("Reverse ing on to platform")
-                return 'close_enough'
-            
-            if userdata.beacon_target is not None:
-                last_beacon_detection = rospy.get_time()
-                beacon_target_point = geometry_msg.PointStamped()
-                beacon_target_point.header = userdata.beacon_target.header
-                beacon_target_point.point = userdata.beacon_target.pose.position
-                beacon_on_map = self.listener.transformPoint('/map', beacon_target_point)
-                
-                current_point = move_goal.target_pose.pose.position
-                beacon_distance_delta = util.point_distance_2d(current_point, beacon_on_map.point)
-                if  beacon_distance_delta > userdata.max_pursuit_error:
-                    rospy.loginfo("PURSUE BEACON updated pursuit point %s", beacon_on_map)
-                    
-                    move_goal.target_pose.pose.position = beacon_on_map.point
-                    self.move_client.send_goal(move_goal)
-            
-            if (rospy.get_time() - last_beacon_detection) > userdata.max_beacon_lost_time:
-                return 'beacon_lost'
-                            
-            userdata.beacon_target = None       
-            rospy.sleep(0.2)
-    
-    
+   
 class LevelOnePreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self,
