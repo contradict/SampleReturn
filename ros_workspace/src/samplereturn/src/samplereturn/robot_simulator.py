@@ -42,7 +42,7 @@ class RobotSimulator(object):
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = True
-        self.fake_sample = {'x':30, 'y':10, 'name':'PRECACHED'}
+        self.fake_sample = {'x':25, 'y':-5, 'name':'PRECACHED'}
         
 
         #topic and action names
@@ -159,9 +159,13 @@ class RobotSimulator(object):
 
         self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name, samplereturn_msg.NamedPoint)
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_manipulator)         
-                
-        self.fake_beacon_pose = geometry_msg.Pose(geometry_msg.Point(-1,0,0),
-                                                  geometry_msg.Quaternion(0,0,0,1))
+        
+        beacon_rot = tf.transformations.quaternion_from_euler(0.0,
+                                                              0.0,
+                                                              0.0,
+                                                             'rxyz')        
+        self.fake_beacon_pose = geometry_msg.Pose(geometry_msg.Point(0,0,0),
+                                                  geometry_msg.Quaternion(*beacon_rot))
         
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name, geometry_msg.PoseStamped)
         rospy.Timer(rospy.Duration(1.0), self.publish_beacon_pose)
@@ -195,6 +199,24 @@ class RobotSimulator(object):
                     self.fake_robot_pose.orientation.w)
         
         self.tf_broadcaster.sendTransform(trans, rot, now, '/base_link', '/odom')
+        
+
+        beacon_trans = (-1.3, 0, 1.0)
+        beacon_rot = tf.transformations.quaternion_from_euler(0.0,
+                                                              math.pi/2,
+                                                              math.pi/2,
+                                                              'rxyz')
+        self.tf_broadcaster.sendTransform(beacon_trans,
+                                          beacon_rot,
+                                          now,
+                                          '/beacon',
+                                          '/map')
+
+        self.tf_broadcaster.sendTransform((0,-1.0, 3.0),
+                                          tf.transformations.quaternion_inverse(beacon_rot),
+                                          now,
+                                          '/platform',
+                                          '/beacon')
 
     def publish_cam_status(self, event):
         if self.cameras_ready:
@@ -227,7 +249,7 @@ class RobotSimulator(object):
             
     def publish_beacon_pose(self, event):
         msg = geometry_msg.PoseStamped()
-        msg.header = std_msg.Header(0, rospy.Time.now(), '/map')
+        msg.header = std_msg.Header(0, rospy.Time.now(), '/beacon')
         msg.pose = self.fake_beacon_pose
         self.beacon_pose_pub.publish(msg)
 
@@ -258,29 +280,47 @@ class RobotSimulator(object):
         return req.state
 
     def move_base(self, goal):
-        target_pose = goal.target_pose
         travel_time = 5.0        
         update_period = 0.1
         steps = int(travel_time / update_period)
-        start_pose = util.get_current_robot_pose(self.tf_listener)
-        x_list = np.linspace(start_pose.pose.position.x,
-                             target_pose.pose.position.x,
-                             num = steps)
-        y_list = np.linspace(start_pose.pose.position.y,
-                             target_pose.pose.position.y,
-                             num = steps)
-        for i in range(len(x_list)):
-            rospy.sleep(update_period)
-            self.fake_robot_pose.position.x = x_list[i]
-            self.fake_robot_pose.position.y = y_list[i]
-            header = std_msg.Header(0, rospy.Time.now(), '/map')
-            fake_feedback = move_base_msg.MoveBaseFeedback()
-            fake_feedback.base_position.header = header
-            fake_feedback.base_position.pose = self.fake_robot_pose
-            self.move_base_server.publish_feedback(fake_feedback)
+ 
+        while True:
+            target_pose = goal.target_pose
+            start_pose = util.get_current_robot_pose(self.tf_listener)
+            
+            rospy.loginfo("SIMULATOR move base translation x,y:" + \
+                          str(target_pose.pose.position.x - start_pose.pose.position.x) + ", " + \
+                          str(target_pose.pose.position.y - start_pose.pose.position.y))
+            q = target_pose.pose.orientation
+            rpy = tf.transformations.euler_from_quaternion((q.x, q.y, q.z, q.w))
+            rospy.loginfo("SIMULATOR move base target yaw:" + str(math.degrees(rpy[2])))
+            x_list = np.linspace(start_pose.pose.position.x,
+                                 target_pose.pose.position.x,
+                                 num = steps)
+            y_list = np.linspace(start_pose.pose.position.y,
+                                 target_pose.pose.position.y,
+                                 num = steps)
+            for i in range(len(x_list)):
+                rospy.sleep(update_period)
+                if self.move_base_server.is_preempt_requested():
+                    if self.move_base_server.is_new_goal_available():
+                        rospy.loginfo("SIMULATOR new move_base goal received before complete")
+                        goal = self.move_base_server.accept_new_goal()
+                        break
+                    else:
+                        self.move_base_server.set_preempted()
+                        return
+                self.fake_robot_pose.position.x = x_list[i]
+                self.fake_robot_pose.position.y = y_list[i]
+                header = std_msg.Header(0, rospy.Time.now(), '/map')
+                fake_feedback = move_base_msg.MoveBaseFeedback()
+                fake_feedback.base_position.header = header
+                fake_feedback.base_position.pose = self.fake_robot_pose
+                self.move_base_server.publish_feedback(fake_feedback)
+            
+            if i >= (steps-1): break
 
         self.fake_robot_pose.orientation = target_pose.pose.orientation 
-        
         self.move_base_server.set_succeeded()
 
     def run_visual_servo_action(self, goal):
