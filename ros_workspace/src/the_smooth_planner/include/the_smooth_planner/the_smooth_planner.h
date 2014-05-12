@@ -12,7 +12,7 @@
 #include <tf/transform_listener.h>
 #include <Eigen/Dense>
 
-#include <the_smooth_planner/circle.h>
+#include <the_smooth_planner/bezier_cubic_spline.h>
 
 namespace the_smooth_planner
 {
@@ -36,10 +36,13 @@ public:
 	void setOdometry(const nav_msgs::Odometry& odometry);
   
 private:
-	double ComputeMinimumPathTime(const nav_msgs::Path& path,
-								  unsigned int i,
-                                  double& distanceTraveled,
-                                  Circle& outCircle);
+	double ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector2d>& spline,
+								  double initialVelocity,
+								  double finalVelocity);
+
+	void PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector2d>& spline,
+                                                visualization_msgs::Marker& marker);
+
 
 	ros::Publisher smooth_path_publisher;
 	ros::Publisher visualization_publisher;

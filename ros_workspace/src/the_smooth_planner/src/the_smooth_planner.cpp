@@ -133,173 +133,91 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		path_msg.knots[0].twist = odometry.twist.twist;
 	}
 
-	// Store time stamps for all poses in the path ensuring that there is enough
-	// time to achieve each one
-	double* distances = new double[path.poses.size()];
-    Circle* circles = new Circle[path.poses.size()];
+	// Store minimum time stamps for all poses in the path ensuring that there is enough
+	// time to achieve each one.  For our robot, this time is dominated by the rate at
+	// which the wheels can rotate to achieve the desired wheel angle
+	Eigen::Vector3d pathLinearVelocity;
+	tf::vectorTFToEigen(odometry.twist.twist.linear, pathLinearVelocity);
+	double pathVelocityMagnitude = pathLinearVelocity.norm();
+	BezierCubicSpline<Eigen::Vector2d>* splines = new BezierCubicSpline<Eigen::Vector2d>[path.poses.size()-1];
 	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
 	{
-		// Compute the minimum allowable time between this path point and the next based on the path curvature and the slew
-		// rate limit of the wheel pod servos
-		tf::Vector3 initialLinearVelocityDirection(path_msg.knots[i].twist.linear.x, path_msg.knots[i].twist.linear.y, 0.0);
-		double minimumPathTime = this->ComputeMinimumPathTime(path, i, distances[i], circles[i]);
+		bool success = this->FitCubicSpline(path, i, pathVelocityMagnitude, maximum_linear_+velocity, splines[i]);
+		if (!success)
+		{
+			ROS_DEBUG("Failed to fit a cubic spline to the path. FIX ME!");
+		}
 
+		double distanceTraveled = splines[i].ComputeArcLength();
+
+		// Account for acceleration rate and compute the actual velocity at the next point
+		double nextVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
+		nextVelocityMagnitude = min(nextVelocityMagnitude, maximum_linear_velocity);
+
+		// Compute the minimum about of time necessary for the robot to traverse the
+		// spline with starting and ending velocities.  This accounts for the specific
+		// kinematic constraints, such as the wheel angle rotation rate limit
+		double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
+
+		// Update the timestamp
 		timestamp += ros::Duration(minimumPathTime);
 
-        tf::Vector3 circleCenter(circles[i].GetCenterX(), circles[i].GetCenterY(), 0.0);
-        double circleDiameter = circles[i].GetRadius()*2.0;
-        if (circles[i].GetRadius() == std::numeric_limits<double>::infinity())
-        {
-            // Don't both visualization infinite circles
-            circleCenter = tf::Vector3(100000, 100000, 100000);
-            circleDiameter = 0.01;
-        }
+		// Update the rviz visualization marker array
         visualizationMarkerArray.markers[i].header.seq = i;
         visualizationMarkerArray.markers[i].header.frame_id = "map";
         visualizationMarkerArray.markers[i].header.stamp = timestamp;
         visualizationMarkerArray.markers[i].ns = "SmoothPlannerVisualization";
         visualizationMarkerArray.markers[i].id = i;
-        visualizationMarkerArray.markers[i].type = visualization_msgs::Marker::CYLINDER;
-        visualizationMarkerArray.markers[i].action = visualization_msgs::Marker::ADD;
-        visualizationMarkerArray.markers[i].pose.position.x = circleCenter.x();
-        visualizationMarkerArray.markers[i].pose.position.y = circleCenter.y();
-        visualizationMarkerArray.markers[i].pose.position.z = circleCenter.z();
-        visualizationMarkerArray.markers[i].pose.orientation.x = 0;
-        visualizationMarkerArray.markers[i].pose.orientation.y = 0;
-        visualizationMarkerArray.markers[i].pose.orientation.z = 0;
-        visualizationMarkerArray.markers[i].pose.orientation.w = 1;
-        visualizationMarkerArray.markers[i].scale.x = circleDiameter;
-        visualizationMarkerArray.markers[i].scale.y = circleDiameter;
-        visualizationMarkerArray.markers[i].scale.z = 0.5;
-        visualizationMarkerArray.markers[i].color.r = 1.0;
-        visualizationMarkerArray.markers[i].color.g = 0.0;
-        visualizationMarkerArray.markers[i].color.b = 1.0;
-        visualizationMarkerArray.markers[i].color.a = 0.3;
+		PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[i]);
+
+		// Compute the next linear velocity
+		tf::Quaternion nextQuaternion(path.poses[i+1].pose.orientation.x,
+                                      path.poses[i+1].pose.orientation.y,
+                                      path.poses[i+1].pose.orientation.z,
+                                      path.poses[i+1].pose.orientation.w);
+		Eigen::Vector3d nextVelocityVector = nextQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
+		nextVelocityVector *= nextVelocityMagnitude;
+
+		// Compute the next angular velocity
+		double curvature = splines[i].ComputeCurvature(1.00);
+		double angularVelocity = nextVelocityMagnitude * curvature;
 
 		// Fill the outbound message data
 		path_msg.knots[i+1].header.seq = i+1;
 		path_msg.knots[i+1].header.stamp = timestamp;
 		path_msg.knots[i+1].header.frame_id = "map";
 		path_msg.knots[i+1].pose = path.poses[i+1].pose;
-	}
 
-	// Compute and store velocities with smooth acceleration up to the maximum linear velocity
-	Eigen::Vector3d linearVelocity(odometry.twist.twist.linear.x, odometry.twist.twist.linear.y, odometry.twist.twist.linear.z);
-	Eigen::Vector3d angularVelocity(odometry.twist.twist.angular.x, odometry.twist.twist.angular.y, odometry.twist.twist.angular.z);
-	double currentVelocityMagnitude = linearVelocity.norm(); // Current robot velocity
-	double pathVelocityMagnitude = currentVelocityMagnitude; // Used to accumulate velocity changes over the planned path
-	double distanceTraveled = 0.0;
-	Time* actualTimestamps = new Time[path.poses.size()];
-	double* actualVelocities = new double[path.poses.size()];
-	if (path.poses.size() > 0)
-	{
-		actualTimestamps[0] = path_msg.knots[0].header.stamp;
-		actualVelocities[0] = sqrt(path_msg.knots[0].twist.linear.x*path_msg.knots[0].twist.linear.x +
-								   path_msg.knots[0].twist.linear.y*path_msg.knots[0].twist.linear.y);
-	}
-	for (unsigned int i = 0; i < path.poses.size()-1; ++i)
-	{
-		distanceTraveled += distances[i];
-
-		// Compute the maximum attainable average velocity required to get to the next point with the current time stamps, which
-		// completely ignore linear acceleration constraints.  The velocity is a maximum because the time stamps assigned in the
-		// previous step were minimum times
-		double deltaTime = (path_msg.knots[i+1].header.stamp - path_msg.knots[i].header.stamp).toSec();
-		double maximumAttainableAverageVelocity = std::numeric_limits<double>::infinity();
-		if (deltaTime > 0)
-		{
-			maximumAttainableAverageVelocity = distances[i] / deltaTime;
-		}
-
-		// Use the biggest velocity not bigger than the maximum linear velocity
-		double desiredAverageVelocity = min(maximumAttainableAverageVelocity, maximum_linear_velocity);
-
-		// Account for acceleration rate and compute the actual velocity at the next point and
-		// save it for later use
-		pathVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
-		pathVelocityMagnitude = min(pathVelocityMagnitude, desiredAverageVelocity);
-		actualVelocities[i+1] = pathVelocityMagnitude;
-
-		// Recompute the amount of time required to get to the next point and save the
-		// timestamp in a separate array so we don't overwrite the time stamps in the message
-		deltaTime = distances[i] / pathVelocityMagnitude;
-		actualTimestamps[i+1] = actualTimestamps[i] + ros::Duration(deltaTime);
-
-		// Compute and store the angular rates in the outbound message
-        tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
-                                       path.poses[i+1].pose.orientation.y,
-                                       path.poses[i+1].pose.orientation.z,
-                                       path.poses[i+1].pose.orientation.w);
-        if (i > 0)
-        {
-            tf::Quaternion prevQuaternion(path.poses[i-1].pose.orientation.x,
-                                          path.poses[i-1].pose.orientation.y,
-                                          path.poses[i-1].pose.orientation.z,
-                                          path.poses[i-1].pose.orientation.w);
-            tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
-                                             path.poses[i].pose.orientation.y,
-                                             path.poses[i].pose.orientation.z,
-                                             path.poses[i].pose.orientation.w);
-            tf::Quaternion prevToInitialQuaternion = prevQuaternion.inverse()*initialQuaternion;
-            tf::Quaternion initialToFinalQuaternion = initialQuaternion.inverse()*finalQuaternion;
-            double nextAngle = tf::getYaw(initialToFinalQuaternion);
-            double prevAngle = tf::getYaw(prevToInitialQuaternion);
-            double nextAngularVelocity = nextAngle / deltaTime;
-            double prevAngularVelocity = prevAngle / deltaTime;
-            double angularVelocity = nextAngularVelocity;
-            if (fabs(prevAngularVelocity) < fabs(nextAngularVelocity))
-            {
-                angularVelocity = prevAngularVelocity;
-            }
-            path_msg.knots[i].twist.angular.x = 0.0;
-            path_msg.knots[i].twist.angular.y = 0.0;
-            path_msg.knots[i].twist.angular.z = angularVelocity;
-        }
-
-		// Compute and store unit-length linear velocities in the outbound message.  This
-		// will be scaled in the next step
-		tf::Vector3 forwardVector(1, 0, 0);
-		tf::Vector3 finalLinearDirection = tf::quatRotate(finalQuaternion, forwardVector);
-		path_msg.knots[i+1].twist.linear.x = finalLinearDirection.x();
-		path_msg.knots[i+1].twist.linear.y = finalLinearDirection.y();
+		path_msg.knots[i+1].twist.linear.x = nextVelocityVector.x();
+		path_msg.knots[i+1].twist.linear.y = nextVelocityVector.y();
 		path_msg.knots[i+1].twist.linear.z = 0.0;
-	}
-    path_msg.knots[path.poses.size()-1].twist.angular.x = 0.0;
-    path_msg.knots[path.poses.size()-1].twist.angular.y = 0.0;
-    path_msg.knots[path.poses.size()-1].twist.angular.z = 0.0;
-
-	// Set the actual timestamps for the outbound message
-	for (unsigned int i = 0; i < path.poses.size(); ++i)
-	{
-		path_msg.knots[i].header.stamp = actualTimestamps[i];
+		path_msg.knots[i+1].twist.angular.x = 0.0;
+		path_msg.knots[i+1].twist.angular.y = 0.0;
+		path_msg.knots[i+1].twist.angular.z = angularVelocity;
 	}
 
 	// Set the velocity at the last point to be zero
-	actualVelocities[path.poses.size()-1] = 0.00;
 	path_msg.knots[path.poses.size()-1].twist.linear.x = 0.00;
 	path_msg.knots[path.poses.size()-1].twist.linear.y = 0.00;
 	
-	// Compute and store smooth decelerations to replace the velocity dicontinuities created
-	// in the previous step
+	// Compute and store smooth decelerations
 	for (unsigned int i = path.poses.size()-1; i > 0; --i)
 	{
-		double currentVelocity = actualVelocities[i];
-		double previousVelocity = actualVelocities[i-1];
+		Eigen::Vector3d currentVelocityVec
+		Eigen::Vector2d previousVelocityVec;
+		tf::vectorMsgToEigen(path_msg.knots[i].twist.linear, currentVelocityVec);
+		tf::vectorMsgToEigen(path_msg.knots[i-1].twist.linear, previousVelocityVec);
+		double currentVelocityMagnitude = currentVelocityVec.norm();
+		double previousVelocityMagnitude = previousVelociyVec.norm();
 		double deltaTime = (path_msg.knots[i].header.stamp - path_msg.knots[i-1].header.stamp).toSec();
-		if ((previousVelocity - currentVelocity)/deltaTime > linear_acceleration)
+		if (previousVelocityMagnitude - currentVelocityMagnitude)/deltaTime > linear_acceleration)
 		{
-			actualVelocities[i-1] = actualVelocities[i] + linear_acceleration*deltaTime;
+			double previousVelocityScale = (currentVelocityMagnitude + linear_acceleration*deltaTime)/previousVelocityMagnitude;
+			path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
+			path_msg.knots[i-1].twist.linear.y *= previousVelocityScale;
 		}
 
-		path_msg.knots[i-1].twist.linear.x *= actualVelocities[i-1];
-		path_msg.knots[i-1].twist.linear.y *= actualVelocities[i-1];
 	}
-	path_msg.knots[0].twist = odometry.twist.twist;
-
-	// Free up memory
-    delete [] distances;
-	delete [] actualTimestamps;
-	delete [] actualVelocities;
 
 	// Publish path
 	smooth_path_publisher.publish(path_msg);
@@ -315,123 +233,121 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 	return;
 }
 
-double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path,
-												unsigned int i,
-                                                double& distanceTraveled,
-                                                Circle& outCircle)
+bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
+                                      unsigned int i,
+                                      double initialVelocityMagnitude,
+                                      double finalVelocityMagnitude,
+                                      BezierCubicSpline<Eigen::Vector2d>& outCubicSpline)
 {
+	// Create a tunable scalar for intermediate control point generation
+	const double SplineVelocityScalar = 1.0;
+	
+	// Create the four control points needed for the spline interpolation
+	Eigen::Vector2d pointCur;
+	Eigen::Vector2d pointNext;
+	Eigen::Vector2d pointCurPlusVelocity;
+	Eigen::Vector2d pointNextMinusVelocity;
+
+	tf::Quaternion initialQuaternion(path.poses[i].pose.orientation.x,
+									 path.poses[i].pose.orientation.y,
+									 path.poses[i].pose.orientation.z,
+									 path.poses[i].pose.orientation.w);
+	tf::Quaternion finalQuaternion(path.poses[i+1].pose.orientation.x,
+	 							   path.poses[i+1].pose.orientation.y,
+								   path.poses[i+1].pose.orientation.z,
+								   path.poses[i+1].pose.orientation.w);
+	Eigen::Vector3d initialForwardVector = initialQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
+	Eigen::Vector3d finalForwardVector = finalQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
+
+	pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
+	pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
+	pointCurPlusVelocity = pointCur + SplineVelocityScalar*initialForwardVector*initialVelociytMagnitude;
+	pointNextMinusVelocity = pointNext - SplineVelocityScalar*finalForwardVector*finalVelocityMagnitude;
+
+	// Fit a cubic spline to the control points
+	outCubicSpline.SetData(pointCur,
+                           pointCurPlusVelocity,
+                           pointNextMinusVelocity,
+                           pointNext,
+                           [](const Eigen::Vector2d& vec) -> double {return vec.norm();},
+                           [](const Eigen::Vector2d& v1, const Eigen::Vector2d& v2) -> double {return v1.dot(v2);},
+                           [](const Eigen::Vector2d& v1, const Eigen::Vector2d& v2) -> Eigen::Vector2d {return v1.cross(v2);});
+
+	return true;
+}
+
+double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector2d>& spline,
+                                                double initialVelocity,
+                                                double finalVelocity)
+{
+	double distanceTraveled = spline.ComputeArcLength();
+	double averageVelocity = (initialVelocity + finalVelocity)/2.00;
+	double minimumDeltaTime = distanceTraveled / averageVelocity;
 	// This formula comes from a lengthy derivation in my notes. The important relation is:
 	// dR/dt = -dPhi_j/dt * P_jy * csc^2(Phi_j)
 	// The math here assumes the the sternPodVector is located directly
 	// behind the origin (ie. has no y value)
 
-	Eigen::Vector2d pointPrev;
-	Eigen::Vector2d pointCur;
-	Eigen::Vector2d pointNext;
-	Eigen::Vector2d pointAfterNext;
-	if (i > 0 && i < path.poses.size() - 2)
-	{
-		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
-		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
-		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
-	}
-	else if (i == 0)
-	{
-		// TODO - Handle this later.  First try planning from stop to stop assuming
-		//        the pointPrev is co-linear with pointCur and pointNext.  Later,
-		//        have this planner track the whole plan so it can splice in
-		//        the new path request and look up existing point data
-		Eigen::Quaterniond quatPrev;
-		tf::quaternionMsgToEigen(path.poses[i].pose.orientation, quatPrev);
-		Eigen::Vector3d forwardDirPrev = quatPrev * Eigen::Vector3d(1.00, 0.00, 0.00);
-		pointPrev << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-		pointPrev(0) -= forwardDirPrev(0);
-		pointPrev(1) -= forwardDirPrev(1);
+	//double deltaCurvature = splines[i].ComputeCurvature(1.00) - splines[i].ComputeCurvature(0.99);
+	//double deltaSpace = (splines[i].Interpolate(1.00) - splines[i].Interpolate(0.99)).norm();
+	//double deltaCurvatureByDeltaTime = deltaCurvature/deltaSpace * nextVelocityMagnitude;
+	
+	//double sternAngle = atan(-sternPodVector(0)*nextCircleCurvature);
+	//double sineSternAngle = sin(sternAngle);
+	//double sineSternAngleSquared = sineSternAngle * sineSternAngle;
+	//double requiredDeltaSternAngle;
+	//if (sineSternAngleSquared > 0.0001)
+	//{
+	//	requiredDeltaSternAngle = deltaCurvature / (nextCircleCurvature*nextCircleCurvature) * (1.00/sternPodVector(0)) * sineSternAngle * sineSternAngle;
+	//}
+	//else
+	//{
+	//	requiredDeltaSternAngle = 0.0;
+	//}
+	//double minimumDeltaTime = fabs(requiredDeltaSternAngle) / maximum_slew_radians_per_second;
 
-		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
-		pointAfterNext << path.poses[i+2].pose.position.x, path.poses[i+2].pose.position.y;
-	}
-	else if (i == path.poses.size() - 2)
-	{
-		// Make the end of the path segment straight, with and infinite radius
-		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
-		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-		pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
-
-		Eigen::Quaterniond quatNext;
-		tf::quaternionMsgToEigen(path.poses[i+1].pose.orientation, quatNext);
-		Eigen::Vector3d forwardDirNext = quatNext * Eigen::Vector3d(1.00, 0.00, 0.00);
-		pointAfterNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y;
-		pointAfterNext(0) += forwardDirNext(0);
-		pointAfterNext(1) += forwardDirNext(1);
-	}
-	else if (i == path.poses.size() - 1)
-	{
-		// Make the end of the path segment straight, with and infinite radius
-		pointPrev << path.poses[i-1].pose.position.x, path.poses[i-1].pose.position.y;
-		pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-
-		Eigen::Quaterniond quatCur;
-		tf::quaternionMsgToEigen(path.poses[i].pose.orientation, quatCur);
-		Eigen::Vector3d forwardDirCur = quatCur * Eigen::Vector3d(1.00, 0.00, 0.00);
-		pointNext << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-		pointNext(0) += forwardDirCur(0);
-		pointNext(1) += forwardDirCur(1);
-		pointAfterNext << path.poses[i].pose.position.x, path.poses[i].pose.position.y;
-		pointAfterNext(0) += 2.0*forwardDirCur(0);
-		pointAfterNext(1) += 2.0*forwardDirCur(1);
-	}
-
-	Circle prevCircle(pointPrev, pointCur, pointNext);
-	Circle nextCircle(pointCur, pointNext, pointAfterNext);
-
-	Eigen::Vector3d pointPrev3d(pointPrev(0), pointPrev(1), 0);
-	Eigen::Vector3d pointCur3d(pointCur(0), pointCur(1), 0);
-	Eigen::Vector3d pointNext3d(pointNext(0), pointNext(1), 0);
-	Eigen::Vector3d prevCircleCenter(prevCircle.GetCenterX(), prevCircle.GetCenterY(), 0);
-	Eigen::Vector3d nextCircleCenter(nextCircle.GetCenterX(), nextCircle.GetCenterY(), 0);
-	double prevCircleCurvature = prevCircle.GetCurvature();
-	double nextCircleCurvature = nextCircle.GetCurvature();
-	if ((pointCur3d - pointPrev3d).cross((prevCircleCenter - pointPrev3d))(2) < 0)
-	{
-		prevCircleCurvature = -prevCircleCurvature;
-	}
-	if ((pointNext3d - pointCur3d).cross((nextCircleCenter - pointCur3d))(2) < 0)
-	{
-		nextCircleCurvature = -nextCircleCurvature;
-	}
-
-	double deltaCurvature = nextCircleCurvature - prevCircleCurvature;
-	double sternAngle = atan(-sternPodVector(0)*nextCircleCurvature);
-	double sineSternAngle = sin(sternAngle);
-	double sineSternAngleSquared = sineSternAngle * sineSternAngle;
-	double requiredDeltaSternAngle;
-	if (sineSternAngleSquared > 0.0001)
-	{
-		requiredDeltaSternAngle = deltaCurvature / (nextCircleCurvature*nextCircleCurvature) * (1.00/sternPodVector(0)) * sineSternAngle * sineSternAngle;
-	}
-	else
-	{
-		requiredDeltaSternAngle = 0.0;
-	}
-	double minimumDeltaTime = fabs(requiredDeltaSternAngle) / maximum_slew_radians_per_second;
-
-	Eigen::Vector3d vectorCurToPrevCenter = prevCircleCenter - pointCur3d;
-    Eigen::Vector3d vectorNextToPrevCenter = prevCircleCenter - pointNext3d;
-	if (prevCircle.GetRadius() == std::numeric_limits<double>::infinity())
-	{
-		distanceTraveled = (pointNext3d - pointCur3d).norm();
-	}
-	else
-	{
-    	distanceTraveled = prevCircle.GetRadius() * acos(vectorCurToPrevCenter.dot(vectorNextToPrevCenter)/(prevCircle.GetRadius()*prevCircle.GetRadius()));
-	}
-
-    outCircle = nextCircle;
-		
 	return minimumDeltaTime;
+}
+
+void BezierCubicSpline::PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector2d>& spline,
+                                                               visualization_msgs::Marker& marker)
+{
+	double epsilon = 0.001;
+	marker.type = visualization_msgs::Marker::LINE_STRIP;
+	marker.action = visualization_msgs::Marker::ADD;
+	marker.pose.position.x = 0.0;
+	marker.pose.position.y = 0.0;
+	marker.pose.position.z = 0.0;
+	marker.pose.orientation.x = 0;
+	marker.pose.orientation.y = 0;
+	marker.pose.orientation.z = 0;
+	marker.pose.orientation.w = 1;
+	marker.scale.x = 0.05; // Width of line strip
+	marker.scale.y = 1.0; // NOT USED
+	marker.scale.z = 1.0; // NOT USED
+	marker.color.r = 1.0;
+	marker.color.g = 0.0;
+	marker.color.b = 1.0;
+	marker.color.a = 1.0;
+
+	unsigned int numSteps = 20;
+	marker.points.resize(numSteps);
+	marker.colors.resize(numSteps);
+
+	double tStep = 1.00/numSteps;
+	unsigned int i = 0;
+	for (double t = 0.00; t <= 1.00-epsilon; t += tStep)
+	{
+		Eigen::Vector2d currentPoint = spline.Interpolate(t);
+		marker.points[i].x = currentPoint(0);
+		marker.points[i].y = currentPoint(1);
+		marker.points[i].z = currentPoint(2);
+		marker.colors[i].r = 1.0;
+		marker.colors[i].g = 0.0;
+		marker.colors[i].b = 1.0;
+		marker.colors[i].a = 1.0;
+		++i;
+	}
 }
 
 }

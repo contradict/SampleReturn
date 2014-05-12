@@ -1,11 +1,16 @@
 template <typename T>
-BezierCubicSpline::BezierCubicSpline(const T& p0,
-                                     const T& p1,
-                                     const T& p2,
-                                     const T& p3,
-                                     std::function<double(const T&)> normFunc
-									 std::function<double(const T&, const T&)> dotFunc,
-									 std::function<T(const T&, const T&)> crossFunc)
+BezierCubicSpline::BezierCubicSpline()
+{
+}
+
+template <typename T>
+BezierCubicSpline::SetData(const T& p0,
+                           const T& p1,
+                           const T& p2,
+                           const T& p3,
+                           std::function<double(const T&)> normFunc
+						   std::function<double(const T&, const T&)> dotFunc,
+						   std::function<T(const T&, const T&)> crossFunc)
 {
 	this->p0 = p0;
 	this->p1 = p1;

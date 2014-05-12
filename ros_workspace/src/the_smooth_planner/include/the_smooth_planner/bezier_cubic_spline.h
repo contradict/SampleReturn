@@ -8,13 +8,17 @@ template <typename T>
 class BezierCubicSpline
 {
 public:
-	BezierCubicSpline(const T& p0,
-                      const T& p1,
-                      const T& p2,
-                      const T& p3,
-                      std::function<double(const T&)> normFunc,
-					  std::function<double(const T&, const T&)> dotFunc,
-					  std::function<T(const T&, const T&)> crossFunc);
+	BezierCubicSpline();
+
+	// Sets up the spline instance with all of the data necessary to
+	// interpolate and make other computations
+	void SetData(const T& p0,
+                 const T& p1,
+                 const T& p2,
+                 const T& p3,
+                 std::function<double(const T&)> normFunc,
+                 std::function<double(const T&, const T&)> dotFunc,
+                 std::function<T(const T&, const T&)> crossFunc);
 
 	// Given input t between 0 and 1, return the spline interpolation
 	// between p0 and p3 respectively
