@@ -181,9 +181,9 @@ class StartLevelOne(smach.State):
         
     def execute(self, userdata):
         
-        pose_2d_list = [{'x':3, 'y':0, 'yaw':math.radians(45)},
-                        {'x':13, 'y':10, 'yaw':math.radians(30)},
-                        {'x':20, 'y':15, 'yaw':math.radians(0)}]
+        pose_2d_list = [{'x':1, 'y':0, 'yaw':math.radians(45)},
+                        {'x':2, 'y':-1, 'yaw':math.radians(30)},
+                        {'x':2, 'y':-2, 'yaw':math.radians(0)}]
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
         path_pose_list = []
@@ -199,7 +199,7 @@ class StartLevelOne(smach.State):
 
         #put the expected sample location on the end of the path list
         #same orientation as the robot's last pose
-        sample_position = geometry_msg.Point(35, 10, 0)
+        sample_position = geometry_msg.Point(2,-5, 0)
         pose = geometry_msg.Pose()
         pose.position = sample_position
         pose.orientation = path_pose_list[-1].pose.orientation
@@ -265,7 +265,7 @@ class StartReturnHome(smach.State):
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
         #the beacon is probably not in view, drive to a point 15m in front of it
-        point = geometry_msg.Point(15, 0, 0)
+        point = geometry_msg.Point(2, 0, 0)
         quat_array = tf.transformations.quaternion_from_euler(0, 0, math.pi)           
         pose = geometry_msg.Pose(point, geometry_msg.Quaternion(*quat_array))
                 

@@ -44,7 +44,7 @@ class PursueSample(object):
         self.state_machine.userdata.min_pursuit_distance = 5
         self.state_machine.userdata.max_pursuit_error = 0.2
         self.state_machine.userdata.max_point_lost_time = 20
-        self.state_machine.userdata.square_search_size = 0.5
+        self.state_machine.userdata.square_search_size = 0.3
     
         with self.state_machine:
             
