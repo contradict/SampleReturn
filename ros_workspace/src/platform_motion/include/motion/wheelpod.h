@@ -1,3 +1,5 @@
+#include <ostream>
+
 namespace platform_motion {
 
 enum PodMode {
@@ -20,7 +22,9 @@ struct PodSegment
         wheelDistance(0.0),
         wheelVelocity(0.0),
         duration(0.0)
-    {}
+    {};
+
+    friend std::ostream& operator<<(std::ostream& os, const PodSegment& seg);
 };
 
 class WheelPod : public CANOpen::TransferCallbackReceiver {

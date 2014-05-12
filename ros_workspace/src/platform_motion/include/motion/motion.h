@@ -1,3 +1,5 @@
+#include <mutex>
+
 #include <nav_msgs/Path.h>
 #include <std_msgs/Bool.h>
 #include <platform_motion_msgs/Path.h>
@@ -70,15 +72,20 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         void statusPublishCallback(const ros::TimerEvent& event);
 
+        bool targetReached( void );
+
         // pvt mode
-        void pathToBody( void );
+        bool pathToBody( void );
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
+        bool checkSegmentAcceleration();
+        double computeSafeInterval(double dt);
         Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
-        PodSegment pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle);
+        bool pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle, PodSegment *retval);
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
 
         void sendPvtSegment(); // send next pvt segment to all wheelpods
+        void setLastSegmentToCurrent( void );
         void primePVT(void);
 
         // debug print statement variable. probably shouldn't be committed
@@ -146,7 +153,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         double planToZeroDecel_, planToZeroPeriod_;
 
         double portSteeringLock_, starboardSteeringLock_, sternSteeringLock_;
-        double steeringTolerance_, steeringAccel_, steeringMaxV_;
+        double steeringTolerance_, steeringAccel_;
+
+        double maxWheelAcceleration_, maxSteeringVelocity_;
 
         int carousel_encoder_counts;
         double carousel_jerk_limit;
@@ -169,6 +178,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool carousel_enabled;
         bool desired_carousel_state;
         bool targetReached_;
+        boost::mutex target_reached_mutex_;
 
         Eigen::Vector2d body_pt;
         int pv_counter;
@@ -180,6 +190,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool newPathReady;
         std::list<platform_motion_msgs::Knot> plannedPath;
         BodySegment firstSegment_, secondSegment_, lastSegmentSent_; // the last segment we actually gave the wheelpods
+        std::mutex path_mutex_;
 };
 
 }
