@@ -11,7 +11,8 @@ import geometry_msgs.msg as geometry_msg
 import actionlib_msgs.msg as action_msg
 
 
-actionlib_working_states = [action_msg.GoalStatus.ACTIVE, action_msg.GoalStatus.PENDING]
+actionlib_working_states = [action_msg.GoalStatus.ACTIVE,
+                            action_msg.GoalStatus.PENDING]
 
 class AnnouncerInterface(object):
     def __init__(self, topic):
@@ -60,6 +61,12 @@ def pose_distance_2d(pose1, pose2):
     return math.sqrt((pose1.pose.position.x-pose2.pose.position.x)**2 + \
                      (pose1.pose.position.y-pose2.pose.position.y)**2)
 
+#takes two Points and returns the quaternion that points from pt1 to pt2
+def pointing_quaternion_2d(pt1, pt2):
+    yaw = math.atan2(pt2.y - pt1.y, pt2.x - pt1.x)
+    quat_vals = tf.transformations.quaternion_from_euler(0, 0, yaw)
+    return geometry_msg.Quaternion(*quat_vals)
+
 #takes a stamped pose and returns a stamped pose distance forward in /map frame
 def pose_translate(listener, start_pose, dx, dy):
     rospy.loginfo('start pose: %s', start_pose)
@@ -75,13 +82,13 @@ def pose_translate(listener, start_pose, dx, dy):
     
 def pose_rotate(listener, start_pose, angle):
     #rospy.loginfo('start pose: %s', start_pose)
-    goal_quat = tf.transformations.quaternion_from_euler(0,0,math.radians(angle))
+    goal_quat = tf.transformations.quaternion_from_euler(0,0, angle)
     start_quat = (start_pose.pose.orientation.x,
                   start_pose.pose.orientation.y,
                   start_pose.pose.orientation.z,
                   start_pose.pose.orientation.w)
     
-    new_quat = tf.transformations.quaternion_multiply(goal_quat, start_quat)
+    new_quat = tf.transformations.quaternion_multiply(start_quat, goal_quat)
     new_orientation = geometry_msg.Quaternion(*new_quat)
     new_pose = geometry_msg.Pose(start_pose.pose.position, new_orientation)
     header = std_msg.Header(0, rospy.Time(0), '/map')
