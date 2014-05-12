@@ -38,6 +38,8 @@ class PursueSample(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
         
+        self.state_machine.userdata.detected_sample = None
+        self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.target_point = None
         self.state_machine.userdata.min_pursuit_distance = 5
         self.state_machine.userdata.max_pursuit_error = 0.2

@@ -49,6 +49,7 @@ class LevelOne(object):
         self.state_machine.userdata.max_pursuit_error = 0.2        
         self.state_machine.userdata.min_pursuit_distance = 3
         self.state_machine.userdata.max_point_lost_time = 30
+        self.state_machine.userdata.detected_sample = None
         
         with self.state_machine:
             
