@@ -256,7 +256,8 @@ class ProcessGoal(smach.State):
                              outcomes=['valid_goal',
                                        'invalid_goal'],
                              input_keys=['action_goal'],
-                             output_keys=['action_feedback',
+                             output_keys=['action_result',
+                                          'action_feedback',
                                           'allow_driving',
                                           'allow_manipulator'])
         
@@ -266,6 +267,8 @@ class ProcessGoal(smach.State):
         
         fb = platform_msg.ManualControlFeedback()
         fb.state = "PROCESS_GOAL"
+        result = samplereturn_msg.GeneralExecutiveResult('initialized')
+        userdata.action_result = result        
 
         self.announcer.say("Entering manual mode.")
                         
@@ -540,6 +543,9 @@ class ManualPreempted(smach.State):
                 platform_srv.SelectMotionModeRequest.MODE_PAUSE )
         self.CAN_interface.publish_zero()
         
+        result = samplereturn_msg.GeneralExecutiveResult('preempted')
+        userdata.action_result = result
+        
         return 'complete'
 
 class ManualAborted(smach.State):
@@ -550,7 +556,9 @@ class ManualAborted(smach.State):
         self.CAN_interface = CAN_interface
         
     def execute(self, userdata):
-        action_result='fail'
+        result = samplereturn_msg.GeneralExecutiveResult('aborted')
+        userdata.action_result = result
+        
         return 'fail'
 
 #classes to handle joystick and CAN interfacing
