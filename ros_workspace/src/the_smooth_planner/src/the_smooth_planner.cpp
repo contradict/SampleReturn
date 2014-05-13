@@ -206,6 +206,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	// Set the velocity at the last point to be zero
 	path_msg.knots[path.poses.size()-1].twist.linear.x = 0.00;
 	path_msg.knots[path.poses.size()-1].twist.linear.y = 0.00;
+	path_msg.knots[path.poses.size()-1].twist.linear.z = 0.00;
 	
 	// Compute and store smooth decelerations
 	for (unsigned int i = path.poses.size()-1; i > 0; --i)
@@ -222,8 +223,15 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 			double previousVelocityScale = (currentVelocityMagnitude + linear_acceleration*deltaTime)/previousVelocityMagnitude;
 			path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
 			path_msg.knots[i-1].twist.linear.y *= previousVelocityScale;
+			path_msg.knots[i-1].twist.linear.z = 0.00;
 		}
 
+	}
+
+	if (path_msg.knots[path.poses.size()-1].twist.linear.x != 0.0 ||
+        path_msg.knots[path.poses.size()-1].twist.linear.y != 0.0)
+	{
+		ROS_DEBUG("WHAT THE WAAAAAAAAAAAA!!!!");
 	}
 
 	// Publish path
