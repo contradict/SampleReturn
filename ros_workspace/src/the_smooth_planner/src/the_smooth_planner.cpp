@@ -120,7 +120,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.header.frame_id = "map";
 
     visualization_msgs::MarkerArray visualizationMarkerArray;
-    visualizationMarkerArray.markers.resize(2*(path.poses.size()-1));
+    visualizationMarkerArray.markers.resize(3*(path.poses.size()-1));
 
 	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
@@ -162,17 +162,22 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		timestamp += ros::Duration(minimumPathTime);
 
 		// Update the rviz visualization marker array
-        visualizationMarkerArray.markers[2*i].header.seq = 2*i;
-        visualizationMarkerArray.markers[2*i].header.frame_id = "map";
-        visualizationMarkerArray.markers[2*i].header.stamp = timestamp;
-        visualizationMarkerArray.markers[2*i].ns = "SmoothPlannerVisualization";
-        visualizationMarkerArray.markers[2*i].id = 2*i;
-        visualizationMarkerArray.markers[2*i+1].header.seq = 2*i+1;
-        visualizationMarkerArray.markers[2*i+1].header.frame_id = "map";
-        visualizationMarkerArray.markers[2*i+1].header.stamp = timestamp;
-        visualizationMarkerArray.markers[2*i+1].ns = "SmoothPlannerVisualization";
-        visualizationMarkerArray.markers[2*i+1].id = 2*i+1;
-		PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[2*i], visualizationMarkerArray.markers[2*i+1]);
+        visualizationMarkerArray.markers[3*i].header.seq = 3*i;
+        visualizationMarkerArray.markers[3*i].header.frame_id = "map";
+        visualizationMarkerArray.markers[3*i].header.stamp = timestamp;
+        visualizationMarkerArray.markers[3*i].ns = "SmoothPlannerVisualization";
+        visualizationMarkerArray.markers[3*i].id = 3*i;
+        visualizationMarkerArray.markers[3*i+1].header.seq = 3*i+1;
+        visualizationMarkerArray.markers[3*i+1].header.frame_id = "map";
+        visualizationMarkerArray.markers[3*i+1].header.stamp = timestamp;
+        visualizationMarkerArray.markers[3*i+1].ns = "SmoothPlannerVisualization";
+        visualizationMarkerArray.markers[3*i+1].id = 3*i+1;
+        visualizationMarkerArray.markers[3*i+2].header.seq = 3*i+2;
+        visualizationMarkerArray.markers[3*i+2].header.frame_id = "map";
+        visualizationMarkerArray.markers[3*i+2].header.stamp = timestamp;
+        visualizationMarkerArray.markers[3*i+2].ns = "SmoothPlannerVisualization";
+        visualizationMarkerArray.markers[3*i+2].id = 3*i+2;
+		PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[3*i], visualizationMarkerArray.markers[3*i+1], visualizationMarkerArray.markers[3*i+2]);
 
 		// Compute the next linear velocity
 		Eigen::Quaterniond nextQuaternion(path.poses[i+1].pose.orientation.w,
@@ -298,7 +303,7 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
                                                 double initialVelocity,
                                                 double finalVelocity)
 {
-	double distanceTraveled = spline.ComputeArcLength();
+	double distanceTraveled = spline.ComputeArcLength(0.01);
 	double averageVelocity = (initialVelocity + finalVelocity)/2.00;
 	double minimumDeltaTime = distanceTraveled / averageVelocity;
 	// This formula comes from a lengthy derivation in my notes. The important relation is:
@@ -329,7 +334,8 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
 
 void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,
                                                               visualization_msgs::Marker& marker,
-                                                              visualization_msgs::Marker& pointsMarker)
+                                                              visualization_msgs::Marker& pointsMarker,
+                                                              visualization_msgs::Marker& circleMarker)
 {
 	marker.type = visualization_msgs::Marker::LINE_STRIP;
 	marker.action = visualization_msgs::Marker::ADD;
@@ -397,6 +403,39 @@ void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicS
 		pointsMarker.points[i].y = points[i](1);
 		pointsMarker.points[i].z = points[i](2);
 	}
+
+    // Draw the circle of curvature
+    Eigen::Vector3d tangent, normal, binormal;
+    spline.ComputeTNB(1.00, tangent, normal, binormal);
+    double curvature = spline.ComputeCurvature(1.00);
+    if (fabs(curvature) > 0.001)
+    {
+        Eigen::Vector3d circleCenter = spline.Interpolate(1.00) + normal/fabs(curvature);
+        circleMarker.pose.position.x = circleCenter(0);
+        circleMarker.pose.position.y = circleCenter(1);
+        circleMarker.pose.position.z = circleCenter(2);
+        circleMarker.scale.x = 2.00/fabs(curvature);
+        circleMarker.scale.y = 2.00/fabs(curvature);
+    }
+    else
+    {
+        circleMarker.pose.position.x = 10000;
+        circleMarker.pose.position.y = 10000;
+        circleMarker.pose.position.z = 10000;
+        circleMarker.scale.x = 0.1;
+        circleMarker.scale.y = 0.1;
+    }
+	circleMarker.type = visualization_msgs::Marker::CYLINDER;
+	circleMarker.action = visualization_msgs::Marker::ADD;
+	circleMarker.pose.orientation.x = 0;
+	circleMarker.pose.orientation.y = 0;
+	circleMarker.pose.orientation.z = 0;
+	circleMarker.pose.orientation.w = 1;
+	circleMarker.scale.z = 0.05;
+	circleMarker.color.r = 1.0;
+	circleMarker.color.g = 0.0;
+	circleMarker.color.b = 1.0;
+	circleMarker.color.a = 0.3;
 }
 
 }

@@ -36,10 +36,11 @@ T BezierCubicSpline<T>::Interpolate(double t) const
 template <typename T>
 double BezierCubicSpline<T>::ComputeArcLength(double tStep) const
 {
+    double epsilon = 0.0001;
 	double arcLength = 0.00;
 	T previousPoint = p0;
 	double t = tStep;
-	while (t < 1.00)
+	while (t < 1.00 - epsilon)
 	{
 		T currentPoint = Interpolate(t);
 		arcLength += normFunc(previousPoint - currentPoint);
@@ -65,7 +66,7 @@ void BezierCubicSpline<T>::ComputeTNB(double t, T& tangent, T& normal, T& binorm
 	normal = secondDerivative - dotFunc(secondDerivative, tangent)*tangent;
 	normal /= normFunc(normal);
 	binormal = crossFunc(tangent, normal);
-	binormal /= normfunc(binormal);
+	binormal /= normFunc(binormal);
 }
 
 template <typename T>
@@ -75,10 +76,18 @@ double BezierCubicSpline<T>::ComputeCurvature(double t) const
 	double oneMinusT = 1.00 - t;
 	double oneMinusT2 = oneMinusT*oneMinusT;
 	T firstDerivative = 3.00*oneMinusT2*(p1-p0) + 6.00*oneMinusT*t*(p2-p1) + 3.00*t2*(p3-p2);
-	//T secondDerivative = 6.00*oneMinusT*(p2-2.00*p1+p0) + 6.00*t*(p3-2.00*p2+p1);
+	T secondDerivative = 6.00*oneMinusT*(p2-2.00*p1+p0) + 6.00*t*(p3-2.00*p2+p1);
 
-	//return normFunc(crossFunc(secondDerivative, firstDerivative));
+	T tangent = firstDerivative / normFunc(firstDerivative);
+	T normal = secondDerivative - dotFunc(secondDerivative, tangent)*tangent;
+	T binormal = crossFunc(tangent, normal);
+    double curvature = normFunc(crossFunc(secondDerivative, firstDerivative))/pow(normFunc(firstDerivative), 3);
+    if (binormal(2) > 0)
+        curvature = fabs(curvature);
+    else
+        curvature = -fabs(curvature);
+	return  curvature;
 
-	double arcLength = ComputeArcLength();
-	return normFunc(firstDerivative/arcLength);
+	//double arcLength = ComputeArcLength();
+	//return normFunc(firstDerivative/arcLength);
 }

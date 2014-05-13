@@ -53,7 +53,8 @@ private:
 
 	void PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,
                                                 visualization_msgs::Marker& marker,
-                                                visualization_msgs::Marker& pointsMarker);
+                                                visualization_msgs::Marker& pointsMarker,
+                                                visualization_msgs::Marker& circleMarker);
 
 
 	ros::Publisher smooth_path_publisher;
