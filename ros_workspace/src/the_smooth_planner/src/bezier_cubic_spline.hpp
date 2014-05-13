@@ -74,8 +74,11 @@ double BezierCubicSpline<T>::ComputeCurvature(double t) const
 	double t2 = t*t;
 	double oneMinusT = 1.00 - t;
 	double oneMinusT2 = oneMinusT*oneMinusT;
-	T firstDerivative = 3.00*oneMinusT2*(p0-p1) + 6.00*oneMinusT*t*(p2-p1) + 3.00*t2*(p3-p2);
-	T secondDerivative = 6.00*oneMinusT*(p2-2.00*p1+p0) + 6.00*t*(p3-2.00*p2+p1);
+	T firstDerivative = 3.00*oneMinusT2*(p1-p0) + 6.00*oneMinusT*t*(p2-p1) + 3.00*t2*(p3-p2);
+	//T secondDerivative = 6.00*oneMinusT*(p2-2.00*p1+p0) + 6.00*t*(p3-2.00*p2+p1);
 
-	return normFunc(crossFunc(secondDerivative, firstDerivative));
+	//return normFunc(crossFunc(secondDerivative, firstDerivative));
+
+	double arcLength = ComputeArcLength();
+	return normFunc(firstDerivative/arcLength);
 }
