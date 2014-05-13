@@ -20,6 +20,9 @@ public:
                  double (*dotFunc)(const T&, const T&),
                  T (*crossFunc)(const T&, const T&));
 
+	// Returns the control points
+	void GetData(T& p0, T& p1, T& p2, T& p3) const {p0 = this->p0; p1 = this->p1; p2 = this->p2; p3 = this->p3;}
+
 	// Given input t between 0 and 1, return the spline interpolation
 	// between p0 and p3 respectively
 	T Interpolate(double t) const;

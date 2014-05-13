@@ -52,7 +52,8 @@ private:
 								  double finalVelocity);
 
 	void PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,
-                                                visualization_msgs::Marker& marker);
+                                                visualization_msgs::Marker& marker,
+                                                visualization_msgs::Marker& pointsMarker);
 
 
 	ros::Publisher smooth_path_publisher;

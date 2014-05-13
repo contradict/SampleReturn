@@ -120,7 +120,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 	path_msg.header.frame_id = "map";
 
     visualization_msgs::MarkerArray visualizationMarkerArray;
-    visualizationMarkerArray.markers.resize(path.poses.size()-1);
+    visualizationMarkerArray.markers.resize(2*(path.poses.size()-1));
 
 	// Populate the first entry with the current kinematic data.
 	if (path.poses.size() > 0)
@@ -162,12 +162,17 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		timestamp += ros::Duration(minimumPathTime);
 
 		// Update the rviz visualization marker array
-        visualizationMarkerArray.markers[i].header.seq = i;
-        visualizationMarkerArray.markers[i].header.frame_id = "map";
-        visualizationMarkerArray.markers[i].header.stamp = timestamp;
-        visualizationMarkerArray.markers[i].ns = "SmoothPlannerVisualization";
-        visualizationMarkerArray.markers[i].id = i;
-		PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[i]);
+        visualizationMarkerArray.markers[2*i].header.seq = 2*i;
+        visualizationMarkerArray.markers[2*i].header.frame_id = "map";
+        visualizationMarkerArray.markers[2*i].header.stamp = timestamp;
+        visualizationMarkerArray.markers[2*i].ns = "SmoothPlannerVisualization";
+        visualizationMarkerArray.markers[2*i].id = 2*i;
+        visualizationMarkerArray.markers[2*i+1].header.seq = 2*i+1;
+        visualizationMarkerArray.markers[2*i+1].header.frame_id = "map";
+        visualizationMarkerArray.markers[2*i+1].header.stamp = timestamp;
+        visualizationMarkerArray.markers[2*i+1].ns = "SmoothPlannerVisualization";
+        visualizationMarkerArray.markers[2*i+1].id = 2*i+1;
+		PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[2*i], visualizationMarkerArray.markers[2*i+1]);
 
 		// Compute the next linear velocity
 		Eigen::Quaterniond nextQuaternion(path.poses[i+1].pose.orientation.w,
@@ -180,6 +185,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 		// Compute the next angular velocity
 		double curvature = splines[i].ComputeCurvature(1.00);
 		double angularVelocity = nextVelocityMagnitude * curvature;
+
+		// Update path velocity
+		pathVelocityMagnitude = nextVelocityMagnitude;
 
 		// Fill the outbound message data
 		path_msg.knots[i+1].header.seq = i+1;
@@ -238,7 +246,6 @@ bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
                                       double finalVelocityMagnitude,
                                       BezierCubicSpline<Eigen::Vector3d>& outCubicSpline)
 {
-	// Create a tunable scalar for intermediate control point generation
 	const double SplineVelocityScalar = 1.0;
 	
 	// Create the four control points needed for the spline interpolation
@@ -260,8 +267,12 @@ bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
 
 	pointCur << path.poses[i].pose.position.x, path.poses[i].pose.position.y, 0.00;
 	pointNext << path.poses[i+1].pose.position.x, path.poses[i+1].pose.position.y, 0.00;
-	pointCurPlusVelocity = pointCur + SplineVelocityScalar*initialForwardVector*initialVelocityMagnitude;
-	pointNextMinusVelocity = pointNext - SplineVelocityScalar*finalForwardVector*finalVelocityMagnitude;
+
+	double approxDistanceBetweenPoints = (pointNext - pointCur).norm();
+	//pointCurPlusVelocity = pointCur + SplineVelocityScalar*initialForwardVector*initialVelocityMagnitude;
+	//pointNextMinusVelocity = pointNext - SplineVelocityScalar*finalForwardVector*finalVelocityMagnitude;
+	pointCurPlusVelocity = pointCur + initialForwardVector*approxDistanceBetweenPoints/3.0;
+	pointNextMinusVelocity = pointNext - finalForwardVector*approxDistanceBetweenPoints/3.0;
 
 	// Fit a cubic spline to the control points
 	outCubicSpline.SetData(pointCur,
@@ -309,9 +320,9 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
 }
 
 void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,
-                                                              visualization_msgs::Marker& marker)
+                                                              visualization_msgs::Marker& marker,
+                                                              visualization_msgs::Marker& pointsMarker)
 {
-	double epsilon = 0.001;
 	marker.type = visualization_msgs::Marker::LINE_STRIP;
 	marker.action = visualization_msgs::Marker::ADD;
 	marker.pose.position.x = 0.0;
@@ -321,7 +332,7 @@ void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicS
 	marker.pose.orientation.y = 0;
 	marker.pose.orientation.z = 0;
 	marker.pose.orientation.w = 1;
-	marker.scale.x = 0.05; // Width of line strip
+	marker.scale.x = 0.01; // Width of line strip
 	marker.scale.y = 1.0; // NOT USED
 	marker.scale.z = 1.0; // NOT USED
 	marker.color.r = 1.0;
@@ -329,14 +340,18 @@ void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicS
 	marker.color.b = 1.0;
 	marker.color.a = 1.0;
 
-	unsigned int numSteps = 20;
-	marker.points.resize(numSteps);
-	marker.colors.resize(numSteps);
+	unsigned int numSteps = 100;
+	marker.points.resize(numSteps+1);
+	marker.colors.resize(numSteps+1);
 
 	double tStep = 1.00/numSteps;
 	unsigned int i = 0;
-	for (double t = 0.00; t <= 1.00-epsilon; t += tStep)
+	for (double t = 0.00; t < 1.00+(tStep/2.00); t += tStep)
 	{
+		if (t > 1.00)
+		{
+			t = 1.00;
+		}
 		Eigen::Vector3d currentPoint = spline.Interpolate(t);
 		marker.points[i].x = currentPoint(0);
 		marker.points[i].y = currentPoint(1);
@@ -346,6 +361,33 @@ void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicS
 		marker.colors[i].b = 1.0;
 		marker.colors[i].a = 1.0;
 		++i;
+	}
+
+	// Also draw lines for the Bezier polygon
+	Eigen::Vector3d points[4];
+	spline.GetData(points[0], points[1], points[2], points[3]);
+	pointsMarker.type = visualization_msgs::Marker::SPHERE_LIST;
+	pointsMarker.action = visualization_msgs::Marker::ADD;
+	pointsMarker.pose.position.x = 0.0;
+	pointsMarker.pose.position.y = 0.0;
+	pointsMarker.pose.position.z = 0.0;
+	pointsMarker.pose.orientation.x = 0;
+	pointsMarker.pose.orientation.y = 0;
+	pointsMarker.pose.orientation.z = 0;
+	pointsMarker.pose.orientation.w = 1;
+	pointsMarker.scale.x = 0.07;
+	pointsMarker.scale.y = 0.07;
+	pointsMarker.scale.z = 0.07;
+	pointsMarker.color.r = 0.5;
+	pointsMarker.color.g = 0.5;
+	pointsMarker.color.b = 0.5;
+	pointsMarker.color.a = 1.0;
+	pointsMarker.points.resize(4);
+	for (unsigned int i = 0; i < 4; ++i)
+	{
+		pointsMarker.points[i].x = points[i](0);
+		pointsMarker.points[i].y = points[i](1);
+		pointsMarker.points[i].z = points[i](2);
 	}
 }
 
