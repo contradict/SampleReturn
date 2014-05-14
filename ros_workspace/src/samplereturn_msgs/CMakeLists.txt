@@ -79,6 +79,7 @@ add_message_files(
   VoiceAnnouncement.msg
   CameraParams.msg
   NamedPoint.msg  
+)
 
 add_service_files(
     DIRECTORY srv

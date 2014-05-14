@@ -1,7 +1,8 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <stereo_msgs/DisparityImage.h>
-#include <linemod_detector/NamedPoint.h>
+//#include <linemod_detector/NamedPoint.h>
+#include <samplereturn_msgs/NamedPoint.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
@@ -111,8 +112,8 @@ class LineMOD_Detector
     depth_sub = nh.subscribe("depth", 1, &LineMOD_Detector::depthCallback, this);
     disp_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
     cam_info_sub = nh.subscribe("cam_info", 1, &LineMOD_Detector::cameraInfoCallback, this);
-    img_point_pub = nh.advertise<linemod_detector::NamedPoint>("img_point", 1);
-    point_pub = nh.advertise<linemod_detector::NamedPoint>("point", 1);
+    img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
+    point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
     matching_threshold = 80;
     got_color = false;
     K = cv::Mat(3,3,CV_64FC1);
@@ -304,8 +305,8 @@ class LineMOD_Detector
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m, cv::Mat& depth, std_msgs::Header header)
   {
     ROS_DEBUG("Publishing POint");
-    linemod_detector::NamedPoint img_point_msg;
-    linemod_detector::NamedPoint point_msg;
+    samplereturn_msgs::NamedPoint img_point_msg;
+    samplereturn_msgs::NamedPoint point_msg;
     img_point_msg.name = m.class_id;
     img_point_msg.header = header;
     // We only care about the base pyramid level gradient modality
