@@ -80,6 +80,12 @@ add_message_files(
   NamedPoint.msg
 )
 
+add_service_files(
+    DIRECTORY srv
+    FILES
+        Enable.srv
+)
+
 ## Generate services in the 'srv' folder
 # add_service_files(
 #   FILES
