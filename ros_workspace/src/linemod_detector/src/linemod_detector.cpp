@@ -14,6 +14,10 @@
 void drawResponse(const std::vector<cv::linemod::Template>& templates,
                   int num_modalities, cv::Mat& dst, cv::Point offset, int T);
 
+void templateConvexHull(const std::vector<cv::linemod::Template>& templates,
+                        int num_modalities, cv::Point offset, cv::Size size,
+                        cv::Mat& dst);
+
 static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
 {
   cv::Ptr<cv::linemod::Detector> detector = new cv::linemod::Detector;
@@ -50,6 +54,29 @@ void drawResponse(const std::vector<cv::linemod::Template>& templates,
       cv::circle(dst, pt, T / 2, color);
     }
   }
+}
+
+void templateConvexHull(const std::vector<cv::linemod::Template>& templates,
+                        int num_modalities, cv::Point offset, cv::Size size,
+                        cv::Mat& dst)
+{
+  std::vector<cv::Point> points;
+  for (int m = 1; m < num_modalities; ++m)
+  {
+    for (int i = 0; i < (int)templates[m].features.size(); ++i)
+    {
+      cv::linemod::Feature f = templates[m].features[i];
+      points.push_back(cv::Point(f.x, f.y) + offset);
+    }
+  }
+
+  std::vector<cv::Point> hull;
+  cv::convexHull(points, hull);
+
+  dst = cv::Mat::zeros(size, CV_8U);
+  const int hull_count = (int)hull.size();
+  const cv::Point* hull_pts = &hull[0];
+  cv::fillPoly(dst, &hull_pts, &hull_count, 1, cv::Scalar(255));
 }
 
 class LineMOD_Detector
@@ -116,8 +143,8 @@ class LineMOD_Detector
         cv::invert(LineMOD_Detector::K, LineMOD_Detector::inv_K);
       }
     }
-    std::cout << LineMOD_Detector::K << std::endl;
-    std::cout << LineMOD_Detector::inv_K << std::endl;
+    //std::cout << LineMOD_Detector::K << std::endl;
+    //std::cout << LineMOD_Detector::inv_K << std::endl;
   }
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)

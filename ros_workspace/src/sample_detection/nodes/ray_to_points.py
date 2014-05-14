@@ -33,6 +33,8 @@ class ray_to_points(object):
     self.pitch_error = rospy.get_param("~pitch_error",0.1)
     self.yaw_error = rospy.get_param("~yaw_error",0.1)
 
+    self.count = 0
+
   def handle_named_point(self, point_in):
     rospy.logdebug("handle_named_point x: %s y: %s z: %s",
         point_in.point.x,
@@ -64,8 +66,10 @@ class ray_to_points(object):
     m.color.g=0.8
     m.color.b=0.8
     m.color.a=1.0
+    m.id = self.count
     #m.text=named_pt.name
     self.marker_pub.publish(m)
+    self.count += 1
 
   def cast_ray(self, point_in, tf, name):
     base_link_point = tf.transformPoint('/base_link', point_in)

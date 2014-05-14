@@ -31,8 +31,8 @@
     <param name="BUTTON_CANCEL" value="2"/>
     <param name="BUTTON_LOCK" value="0"/>
     <!-- Scaling -->
-    <param name="LINEAR_SCALE" value="1" type="double"/>
-    <param name="LINEAR_EXP" value="2" type="double"/>
+    <param name="LINEAR_SCALE" value="1.5" type="double"/>
+    <param name="LINEAR_EXP" value="1.5" type="double"/>
     <param name="ANGULAR_SCALE" value="3.14" type="double"/>
     <param name="ANGULAR_EXP" value="2" type="double"/>
 

@@ -1,10 +1,18 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(detection_filter)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS tf rospy)
+find_package(catkin REQUIRED COMPONENTS tf rospy
+  roscpp
+  sensor_msgs
+  samplereturn_msgs
+  cv_bridge
+  image_geometry
+  samplereturn_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -44,7 +52,10 @@ catkin_python_setup()
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS roscpp roslib
+  DEPENDS opencv2
+  )
 
 ###########
 ## Build ##
@@ -53,21 +64,27 @@ catkin_package()
 ## Specify additional locations of header files
 # include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
+ include_directories(include
+   ${catkin_INCLUDE_DIRS}
+)
+
+add_definitions( -std=gnu++0x )
+
 ## Declare a cpp library
 # add_library(sample_detection
 #   src/${PROJECT_NAME}/sample_detection.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(sample_detection_node src/sample_detection_node.cpp)
+ add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
 
 ## Add dependencies to the executable
 # add_dependencies(sample_detection_node ${PROJECT_NAME})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(sample_detection_node
-#   ${catkin_LIBRARIES}
-# )
+ target_link_libraries(kalman_filter_node
+   ${catkin_LIBRARIES}
+ )
 
 #############
 ## Install ##

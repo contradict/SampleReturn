@@ -79,6 +79,11 @@ add_message_files(
   VoiceAnnouncement.msg
   CameraParams.msg
   NamedPoint.msg  
+
+add_service_files(
+    DIRECTORY srv
+    FILES
+        Enable.srv
 )
 
 ## Generate services in the 'srv' folder
@@ -116,7 +121,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES visual_servo_msgs
-  CATKIN_DEPENDS message_runtime std_msgs
+  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
 #  DEPENDS system_lib
 )
 
