@@ -44,6 +44,7 @@ class RobotSimulator(object):
         self.publish_samples = True
         self.fake_sample = {'x':25, 'y':-5, 'name':'PRECACHED'}
         
+        self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
         #topic and action names
         manipulator_action_name = "/motion/manipulator/grab_action"
@@ -268,8 +269,12 @@ class RobotSimulator(object):
         self.pause_pub.publish(std_msg.Bool(self.paused))
         
     def service_motion_mode_request(self, req):
-        rospy.sleep(0.5)
-        return req.mode
+        rospy.sleep(0.2)
+        if req.mode == platform_srv.SelectMotionModeRequest.MODE_QUERY:
+            return self.motion_mode
+        else:
+            self.motion_mode = req.mode
+            return self.motion_mode
     
     def service_enable_wheelpods(self, req):
         rospy.sleep(0.5)
