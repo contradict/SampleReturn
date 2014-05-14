@@ -17,6 +17,7 @@ find_package(catkin REQUIRED
         message_generation
         image_geometry
         saliency_detector
+        tf
         )
 
 find_package(Eigen REQUIRED)

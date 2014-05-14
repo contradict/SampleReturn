@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <stereo_msgs/DisparityImage.h>
-#include <linemod_detector/NamedPoint.h>
+#include <samplereturn_msgs/NamedPoint.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
