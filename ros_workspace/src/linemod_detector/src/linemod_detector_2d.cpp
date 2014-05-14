@@ -12,6 +12,7 @@
 #include <color_naming.h>
 #include <image_geometry/stereo_camera_model.h>
 #include <tf/transform_listener.h>
+#include <samplereturn_msgs/Enable.h>
 
 // Function prototypes
 void drawResponse(const std::vector<cv::linemod::Template>& templates,
@@ -88,6 +89,8 @@ class LineMOD_Detector
   image_geometry::StereoCameraModel cam_model_;
 
   tf::TransformListener listener_;
+  ros::ServiceServer service_;
+  bool enabled_;
 
   public:
   LineMOD_Detector(): it(nh)
@@ -103,6 +106,8 @@ class LineMOD_Detector
     got_color = false;
     K = cv::Mat(3,3,CV_64FC1);
 
+    service_ = nh.advertiseService("enable",&LineMOD_Detector::enable,this);
+
     std::string filename;
     ros::param::get("~template_file", filename);
     ros::param::get("~pub_threshold", LineMOD_Detector::pub_threshold);
@@ -117,6 +122,15 @@ class LineMOD_Detector
     detector = readLinemod(filename);
     num_modalities = (int)detector->getModalities().size();
     std::cout << num_modalities << std::endl;
+
+    enabled_ = true;
+  }
+
+  bool enable(samplereturn_msgs::Enable::Request &req,
+              samplereturn_msgs::Enable::Response &res) {
+    enabled_ = req.state;
+    res.state = enabled_;
+    return true;
   }
 
   void leftCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
@@ -140,6 +154,9 @@ class LineMOD_Detector
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
   {
+    if (!enabled_) {
+      return;
+    }
     cv_bridge::CvImagePtr disp_ptr;
     try
     {
@@ -160,6 +177,9 @@ class LineMOD_Detector
 
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
   {
+    if (!enabled_) {
+      return;
+    }
     bool show_match_result = true;
     cv_bridge::CvImagePtr color_ptr;
     try
@@ -304,6 +324,7 @@ class LineMOD_Detector
       temp_point.point.x = xyz.x;
       temp_point.point.y = xyz.y;
       temp_point.point.z = xyz.z;
+      listener_.waitForTransform("/odom", header.frame_id, header.stamp, ros::Duration(0.03));
       listener_.transformPoint("/odom", temp_point, odom_point);
 
       //std::cout << "Camera 3D point: " << temp_point << std::endl;
