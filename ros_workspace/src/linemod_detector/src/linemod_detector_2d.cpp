@@ -9,6 +9,9 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
+#include <color_naming.h>
+#include <image_geometry/stereo_camera_model.h>
+#include <tf/transform_listener.h>
 
 // Function prototypes
 void drawResponse(const std::vector<cv::linemod::Template>& templates,
@@ -57,15 +60,19 @@ class LineMOD_Detector
   ros::NodeHandle nh;
   image_transport::ImageTransport it;
   image_transport::Subscriber color_sub;
-  ros::Subscriber cam_info_sub;
+  ros::Subscriber disparity_sub;
+  ros::Subscriber left_cam_info_sub;
+  ros::Subscriber right_cam_info_sub;
   ros::Publisher img_point_pub;
   ros::Publisher point_pub;
   ros::Publisher debug_img_pub;
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
+  cv::Mat disparity_img;
   cv::Mat display;
   cv::Mat K;
   cv::Ptr<cv::linemod::Detector> detector;
+  sensor_msgs::CameraInfo right_camera_info_msg;
   int matching_threshold;
   int num_modalities;
   int num_classes;
@@ -76,14 +83,22 @@ class LineMOD_Detector
   float min_count;
   bool _publish_debug_img;
 
+  ColorNaming cn;
+  //image_geometry::PinholeCameraModel cam_model_;
+  image_geometry::StereoCameraModel cam_model_;
+
+  tf::TransformListener listener_;
+
   public:
   LineMOD_Detector(): it(nh)
   {
     color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
-    cam_info_sub = nh.subscribe("cam_info", 1, &LineMOD_Detector::cameraInfoCallback, this);
-    img_point_pub = nh.advertise<linemod_detector::NamedPoint>("img_point", 1);
+    left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
+    right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
+    disparity_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
+    img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
     debug_img_pub = nh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
-    point_pub = nh.advertise<linemod_detector::NamedPoint>("point", 1);
+    point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
     matching_threshold = 80;
     got_color = false;
     K = cv::Mat(3,3,CV_64FC1);
@@ -104,8 +119,10 @@ class LineMOD_Detector
     std::cout << num_modalities << std::endl;
   }
 
-  void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  void leftCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
+    right_camera_info_msg.header.frame_id = msg.header.frame_id;
+    cam_model_.fromCameraInfo(msg, right_camera_info_msg);
     for (int i = 0; (i < 3); i++)
     {
       for (int j = 0; (j < 3); j++)
@@ -116,6 +133,30 @@ class LineMOD_Detector
     //std::cout << LineMOD_Detector::K << std::endl;
   }
 
+  void rightCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  {
+    right_camera_info_msg = msg;
+  }
+
+  void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
+  {
+    cv_bridge::CvImagePtr disp_ptr;
+    try
+    {
+      disp_ptr = cv_bridge::toCvCopy(msg->image, "");
+    }
+    catch (cv_bridge::Exception& e)
+    {
+      ROS_ERROR("disp cv_bridge exception: %s", e.what());
+      return;
+    }
+
+    //float f = msg->f;
+    //float T = msg->T;
+    //cv::Mat depth_img = (f*T*1000)/(disp_ptr->image).clone();
+    //depth_img.convertTo(depth_img, CV_16U);
+    disparity_img = (disp_ptr->image).clone();
+  }
 
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
   {
@@ -172,10 +213,41 @@ class LineMOD_Detector
 
         // Draw matching template
         const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
-        drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
+
+        cv::Mat mask = cv::Mat::zeros(display.size(), CV_8U);
+        std::vector<cv::Point> hull;
+        hull = templateConvexHull(templates, LineMOD_Detector::num_modalities, cv::Point(m.x,m.y), mask.size(),
+            mask);
+        //cv::imshow("mask", mask);
+        //std::cout << "Mask size: " << mask.size() << std::endl;
+        //std::cout << "Mask channels: " << mask.channels() << std::endl;
+        //cv::imshow("display", LineMOD_Detector::display);
+        //cv::waitKey(10);
+        Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
+        //interiorColor = cn.computeInteriorColor(LineMOD_Detector::display, mask);
+        interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
+        //std::cout << "Interior color: " << interiorColor << std::endl;
+        std::string dominant_color = cn.getDominantColor(interiorColor);
+        std::cout << "Dominant color " << dominant_color << std::endl;
+
+        cv::RotatedRect rect = cv::minAreaRect(hull);
+        float angle;
+        if (rect.size.width < rect.size.height) {
+          angle = rect.angle + 90;
+        }
+        else {
+          angle = rect.angle + 180;
+        }
+
+        std::cout << "Angle: " << angle << std::endl;
+
+        if (dominant_color != "green") {
+          drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
+        }
+
         if (m.similarity > LineMOD_Detector::pub_threshold)
         {
-          LineMOD_Detector::publishPoint(templates, m);
+          LineMOD_Detector::publishPoint(templates, m, color_ptr->header, angle);
         }
 
       }
@@ -190,20 +262,86 @@ class LineMOD_Detector
     LineMOD_Detector::sources.clear();
   }
 
-  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m)
+//  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
+//      std_msgs::Header header)
+//  {
+//    ROS_DEBUG("Publishing Point");
+//    samplereturn_msgs::NamedPoint point_msg;
+//
+
+  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
+      std_msgs::Header header, float grip_angle)
   {
-    ROS_DEBUG("Publishing POint");
-    linemod_detector::NamedPoint img_point_msg;
-    linemod_detector::NamedPoint point_msg;
+    ROS_DEBUG("Publishing Img Point");
+    samplereturn_msgs::NamedPoint img_point_msg;
     img_point_msg.name = m.class_id;
-    //img_point_msg.header =
+    img_point_msg.header = header;
     // We only care about the base pyramid level gradient modality
     img_point_msg.point.x = m.x + templates[1].width/2;
     img_point_msg.point.y = m.y + templates[1].height/2;
+    img_point_msg.grip_angle = grip_angle;
     ROS_DEBUG("Point x and y: %f, %f", img_point_msg.point.x, img_point_msg.point.y);
+
+    if (cam_model_.initialized()) {
+      samplereturn_msgs::NamedPoint point_msg;
+      geometry_msgs::PointStamped temp_point;
+      geometry_msgs::PointStamped odom_point;
+      temp_point.header = header;
+      cv::Point3d xyz;
+      float median_disp;
+      float half_width = templates[1].width/2;
+      float half_height = templates[1].height/2;
+
+      cv::Mat sub_disp = disparity_img(cv::Range(m.y,m.y+2*half_height),
+          cv::Range(m.x,m.x+2*half_width)).clone();
+      cv::Mat flat = sub_disp.reshape(0,1);
+      cv::sort(flat, flat, CV_SORT_ASCENDING+CV_SORT_EVERY_ROW);
+      median_disp = flat.at<float>(0,(flat.cols/2));
+      std::cout << "Median Disp: " << median_disp << std::endl;
+
+      cam_model_.projectDisparityTo3d(cv::Point2d(m.x+templates[1].width/2,m.y+templates[1].height/2),
+          median_disp, xyz);
+      temp_point.point.x = xyz.x;
+      temp_point.point.y = xyz.y;
+      temp_point.point.z = xyz.z;
+      listener_.transformPoint("/odom", temp_point, odom_point);
+
+      //std::cout << "Camera 3D point: " << temp_point << std::endl;
+      point_msg.name = m.class_id;
+      point_msg.header = header;
+      point_msg.header.frame_id = "/odom";
+      point_msg.grip_angle = grip_angle;
+      point_msg.point = odom_point.point;
+      LineMOD_Detector::point_pub.publish(point_msg);
+    }
 
     LineMOD_Detector::img_point_pub.publish(img_point_msg);
   }
+
+  std::vector<cv::Point> templateConvexHull(const std::vector<cv::linemod::Template>& templates,
+                          int num_modalities, cv::Point offset, cv::Size size,
+                          cv::Mat& dst)
+  {
+    std::vector<cv::Point> points;
+    for (int m = 0; m < num_modalities; ++m)
+    {
+      for (int i = 0; i < (int)templates[m].features.size(); ++i)
+      {
+        cv::linemod::Feature f = templates[m].features[i];
+        points.push_back(cv::Point(f.x, f.y) + offset);
+      }
+    }
+
+    std::vector<cv::Point> hull;
+    cv::convexHull(points, hull);
+
+    //dst = cv::Mat::zeros(size, CV_8U);
+    const int hull_count = (int)hull.size();
+    const cv::Point* hull_pts = &hull[0];
+    cv::fillPoly(dst, &hull_pts, &hull_count, 1, cv::Scalar(255));
+    return hull;
+  }
+
 };
 
 int main(int argc, char ** argv)
