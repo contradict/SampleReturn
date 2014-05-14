@@ -9,6 +9,8 @@ import rosgraph_msgs.msg as rosgraph_msg
 import std_msgs.msg as std_msg
 import geometry_msgs.msg as geometry_msg
 import actionlib_msgs.msg as action_msg
+import platform_motion_msgs.msg as platform_msg
+import platform_motion_msgs.srv as platform_srv
 
 
 actionlib_working_states = [action_msg.GoalStatus.ACTIVE,
@@ -107,5 +109,32 @@ def get_current_robot_pose(tf_listener):
                              geometry_msg.Quaternion(*quat))
                                     
     return geometry_msg.PoseStamped(header, pose)
+
+class CANInterface(object):
+    def __init__(self):
+        self.CAN_select_motion_mode = \
+                rospy.ServiceProxy("CAN_select_motion_mode",
+                platform_srv.SelectMotionMode)
+        self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
+        self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
+        self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist)
+
+    def select_mode(self, motion_mode):
+        return self.CAN_select_motion_mode(motion_mode)
+        
+    def publish_joy_state(self, joy_state):
+        self.joystick_command.publish(joy_state.get_twist())
+        
+    def publish_zero(self):
+        t=geometry_msg.Twist()
+        t.linear.x=0
+        t.linear.y=0
+        t.linear.z=0
+        t.angular.x=0
+        t.angular.y=0
+        t.angular.z=0        
+        self.joystick_command.publish(t)
+        self.planner_command.publish(t)
+        self.servo_command.publish(t)
     
 
