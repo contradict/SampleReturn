@@ -13,6 +13,8 @@ import geometry_msgs.msg as geometry_msg
 import actionlib_msgs.msg as action_msg
 import move_base_msgs.msg as move_base_msg
 import samplereturn_msgs.msg as samplereturn_msg
+import platform_motion_msgs.msg as platform_msg
+import platform_motion_msgs.srv as platform_srv
 
 import samplereturn.util as util
 
@@ -250,5 +252,41 @@ class PursueDetectedPoint(smach.State):
                             
             userdata.target_point = None       
             rospy.sleep(0.2)
+            
+class SelectMotionMode(smach.State):
+    def __init__(self, CAN_interface, announcer, motion_mode, failannounce=None):
+        smach.State.__init__(self, outcomes = ['next', 'failed'])
+        self.CAN_interface = CAN_interface
+        self.announcer = announcer
+        self.motion_mode = motion_mode
+        self.failannounce = failannounce
+                      
+    def execute(self, userdata):
+        try:
+            mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
+            if mode.mode == self.motion_mode:
+                return 'next'
+        except rospy.ServiceException:
+            rospy.logerr( "Unable to query present motion mode")
+            self.announcer.say( "Unable to query present motion mode." )
+        try:
+            self.CAN_interface.select_mode(self.motion_mode)
+        except rospy.ServiceException:
+            rospy.logerr( "Unable to select mode %d", self.motion_mode )
+            if self.failannounce is not None:
+                rospy.logerr( self.failannounce )
+                self.announcer.say(self.failannounce)
+            return 'failed'
+        self.CAN_interface.publish_zero()
+        return 'next'
+    
+class AnnounceState(smach.State):
+    def __init__(self, announcer, announcement):
+        smach.State.__init__(self, outcomes = ['next'])
+        self.announcer = announcer
+        self.announcement = announcement
+    def execute(self, userdata):
+        self.announcer.say(self.announcement)
+        return 'next'
         
 

@@ -13,10 +13,13 @@ import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
+import platform_motion_msgs.msg as platform_msg
+import platform_motion_msgs.srv as platform_srv
 
 from executive.executive_states import DriveToPoseState
 from executive.executive_states import PursueDetectedPoint
-
+from executive.executive_states import SelectMotionMode
+from executive.executive_states import AnnounceState
 
 import samplereturn.util as util
 
@@ -31,6 +34,7 @@ class LevelOne(object):
 
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                                                        move_base_msg.MoveBaseAction)
+        self.CAN_interface = util.CANInterface()
         
         start_time = rospy.get_time()
         while True:
@@ -54,8 +58,23 @@ class LevelOne(object):
         with self.state_machine:
             
                 smach.StateMachine.add('START_LEVEL_ONE',
-                                       StartLevelOne(self.announcer),
-                                       transitions = {'next':'DRIVE_TO_SEARCH_START'})
+                                       StartLevelOne(output_keys=['action_result',
+                                                                  'pose_list'],
+                                                     outcomes=['next']),
+                                       transitions = {'next':'ANNOUNCE_LEVEL_ONE'})
+                                       
+                smach.StateMachine.add('ANNOUNCE_LEVEL_ONE',
+                                       AnnounceState(self.announcer,
+                                                     'Enter ing level one mode'),
+                                       transitions = {'next':'SELECT_PLANNER'})
+                
+                MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
+                smach.StateMachine.add('SELECT_PLANNER',
+                                        SelectMotionMode(self.CAN_interface,
+                                                         self.announcer,
+                                                         MODE_PLANNER),
+                                        transitions = {'next':'DRIVE_TO_SEARCH_START',
+                                                      'failed':'LEVEL_ONE_ABORTED'})                
                 
                 smach.StateMachine.add('DRIVE_TO_SEARCH_START',
                                        DriveToSearch(self.announcer),
@@ -113,12 +132,20 @@ class LevelOne(object):
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
                                                         self.tf_listener),
-                                       transitions = {'complete':'complete',
+                                       transitions = {'complete':'DESELECT_PLANNER',
                                                       'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'LEVEL_ONE_ABORTED'})
+
+                MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
+                smach.StateMachine.add('DESELECT_PLANNER',
+                                        SelectMotionMode(self.CAN_interface,
+                                                         self.announcer,
+                                                         MODE_ENABLE),
+                                        transitions = {'next':'complete',
+                                                      'failed':'LEVEL_ONE_ABORTED'})    
                 
                 smach.StateMachine.add('LEVEL_ONE_PREEMPTED',
-                                       LevelOnePreempted(),
+                                       LevelOnePreempted(self.CAN_interface),
                                        transitions = {'complete':'preempted',
                                                       'fail':'aborted'})
                 
@@ -171,14 +198,7 @@ class LevelOne(object):
     
 #drives to the expected sample location    
 class StartLevelOne(smach.State):
-    def __init__(self, announcer):
-        smach.State.__init__(self,
-                             output_keys=['action_result',
-                                         'pose_list'],
-                             outcomes=['next'])
-        
-        self.announcer = announcer
-        
+
     def execute(self, userdata):
         
         pose_2d_list = [{'x':1, 'y':0, 'yaw':math.radians(45)},
@@ -210,9 +230,6 @@ class StartLevelOne(smach.State):
         
         result = samplereturn_msg.GeneralExecutiveResult('initialized')
         userdata.action_result = result
-        
-        self.announcer.say("Entering level one mode")
-        rospy.sleep(3.0)
         
         return 'next'
 
@@ -275,12 +292,18 @@ class StartReturnHome(smach.State):
         return 'next'
    
 class LevelOnePreempted(smach.State):
-    def __init__(self):
+    def __init__(self, CAN_interface):
         smach.State.__init__(self,
                              output_keys=['action_result'],
                              outcomes=['complete','fail'])
+        
+        self.CAN_interface = CAN_interface  
           
     def execute(self, userdata):
+        
+        self.CAN_interface.select_mode(
+            platform_srv.SelectMotionModeRequest.MODE_ENABLE )
+        self.CAN_interface.publish_zero()        
         
         result = samplereturn_msg.GeneralExecutiveResult('preempted')
         userdata.action_result = result
