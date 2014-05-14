@@ -434,8 +434,8 @@ class Image_test
   public:
   Image_test(): it(nh)
   {
-    color_sub = it.subscribe("color", 1, &Image_test::colorCallback, this);
-    disp_sub = nh.subscribe("disparity", 1, &Image_test::disparityCallback, this);
+    color_sub = it.subscribe("/cameras/manipulator/left/image_color", 1, &Image_test::colorCallback, this);
+    disp_sub = nh.subscribe("/cameras/manipulator/disparity", 1, &Image_test::disparityCallback, this);
     cv::namedWindow("color");
     //cv::namedWindow("disparity");
     cv::namedWindow("mask");
@@ -578,6 +578,30 @@ class Image_test
         Image_test::b_size += 5;
         std::cout << "b size: " << b_size << std::endl;
       }
+      else if (key == 'i')
+      {
+        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
+        mod->weak_threshold -= float(10.0);
+        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+      }
+      else if (key == 'I')
+      {
+        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
+        mod->weak_threshold += float(10.0);
+        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+      }
+      else if (key == 'u')
+      {
+        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
+        mod->weak_threshold -= float(1.0);
+        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+      }
+      else if (key == 'U')
+      {
+        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
+        mod->weak_threshold += float(1.0);
+        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+      }
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
@@ -658,7 +682,7 @@ class Image_test
     cv_bridge::CvImagePtr color_ptr;
     try
     {
-      color_ptr = cv_bridge::toCvCopy(msg, "");
+      color_ptr = cv_bridge::toCvCopy(msg, "rgb8");
     }
     catch (cv_bridge::Exception& e)
     {
