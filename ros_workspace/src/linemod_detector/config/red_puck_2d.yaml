@@ -4,7 +4,7 @@ T: [ 5, 8 ]
 modalities:
    -
       type: ColorGradient
-      weak_threshold: 10.
+      weak_threshold: 50.
       num_features: 63
       strong_threshold: 55.
 classes:
