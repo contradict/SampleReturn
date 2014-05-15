@@ -451,7 +451,7 @@ class InterruptibleActionClientState(smach.State):
             timeout_msg=None,
             ):
         smach.State.__init__(self,
-                             input_keys=['button_cancel'],
+                             input_keys=['button_cancel', 'detected_sample'],
                              outcomes=['complete', 'canceled', 'preempted', 'aborted'])
 
         self.actionname = actionname
