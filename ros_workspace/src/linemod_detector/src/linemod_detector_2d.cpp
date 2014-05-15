@@ -265,6 +265,10 @@ class LineMOD_Detector
           angle = rect.angle + 180;
         }
 
+        if (angle > 90.) {
+          angle = 180.-90.;
+        }
+
         std::cout << "Angle: " << angle << std::endl;
 
         if (dominant_color != "green") {
