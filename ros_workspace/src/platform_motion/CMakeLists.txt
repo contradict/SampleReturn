@@ -134,6 +134,7 @@ add_library(path_viz
   )
 target_link_libraries(path_viz ${QT_LIBRARIES} ${catkin_LIBRARIES})
 
+add_dependencies(path_viz ${PROJECT_NAME}_gencfg)
 
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
     src/acceleration_limit.cpp)

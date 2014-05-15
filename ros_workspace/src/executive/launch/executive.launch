@@ -10,8 +10,8 @@
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
-    <remap from="manipulator_detection_point" to="processes/sample_detection/manipulator/named_point"/>
-    <remap from="search_point" to="/processes/sample_detection/point"/>
+    <remap from="manipulator_detection_point" to="processes/sample_detection/manipulator/point"/>
+    <remap from="search_point" to="/processes/sample_detection/search/point"/>
 
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>

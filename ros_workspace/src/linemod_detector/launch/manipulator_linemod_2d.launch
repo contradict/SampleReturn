@@ -6,7 +6,8 @@
         machine="search"
         pkg="linemod_detector"
         type="linemod_detector_2d"
-        name="manipulator_linemod_detector_2d">
+        name="manipulator_linemod_detector_2d"
+        ns="/processes/sample_detection/manipulator">
       <remap from="color" to="/manipulator/left/image_rect_color"/>
       <remap from="disparity" to="/manipulator/disparity"/>
       <remap from "left_cam_info" to="/manipulator/left/camera_info"/>
