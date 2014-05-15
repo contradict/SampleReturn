@@ -79,6 +79,7 @@ class LineMOD_Detector
   int num_classes;
   bool got_color;
   bool got_right_camera_info_;
+  bool got_disp_;
   float pub_threshold;
   float min_depth;
   float max_depth;
@@ -126,6 +127,7 @@ class LineMOD_Detector
 
     enabled_ = true;
     got_right_camera_info_ = false;
+    got_disp_ = false;
   }
 
   bool enable(samplereturn_msgs::Enable::Request &req,
@@ -179,11 +181,15 @@ class LineMOD_Detector
     //cv::Mat depth_img = (f*T*1000)/(disp_ptr->image).clone();
     //depth_img.convertTo(depth_img, CV_16U);
     disparity_img = (disp_ptr->image).clone();
+    got_disp_ = true;
   }
 
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     if (!enabled_) {
+      return;
+    }
+    if (!got_disp_) {
       return;
     }
     bool show_match_result = true;
