@@ -8,7 +8,7 @@ import yaml
 from sensor_msgs.msg import Image,CameraInfo,PointCloud2
 from stereo_msgs.msg import DisparityImage
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
-from linemod_detector.msg import NamedPoint
+from samplereturn_msgs.msg import NamedPoint
 from cv_bridge import CvBridge
 from tf import TransformListener
 

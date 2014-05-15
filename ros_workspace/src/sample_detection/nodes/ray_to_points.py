@@ -7,7 +7,7 @@ import copy
 
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
 from sensor_msgs.msg import PointCloud2
-from linemod_detector.msg import NamedPoint
+from samplereturn_msgs.msg import NamedPoint
 from visualization_msgs.msg import Marker
 from cv_bridge import CvBridge
 from tf import TransformListener
