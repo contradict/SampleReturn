@@ -334,7 +334,11 @@ class LineMOD_Detector
       temp_point.point.x = xyz.x;
       temp_point.point.y = xyz.y;
       temp_point.point.z = xyz.z;
-      listener_.waitForTransform("/odom", header.frame_id, header.stamp, ros::Duration(0.03));
+      bool wait =
+        listener_.waitForTransform("/odom", header.frame_id, header.stamp, ros::Duration(0.03));
+      if (!wait) {
+        return;
+      }
       listener_.transformPoint("/odom", temp_point, odom_point);
 
       //std::cout << "Camera 3D point: " << temp_point << std::endl;
