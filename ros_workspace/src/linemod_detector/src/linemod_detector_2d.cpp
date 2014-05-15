@@ -264,10 +264,8 @@ class LineMOD_Detector
         else {
           angle = rect.angle + 180;
         }
-
-        if (angle > 90.) {
-          angle = 180.-90.;
-        }
+        angle -= 90.;
+        angle = angle*(M_PI/180);
 
         std::cout << "Angle: " << angle << std::endl;
 
