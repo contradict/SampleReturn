@@ -264,7 +264,7 @@ class LineMOD_Detector
 
         cv::RotatedRect rect = cv::minAreaRect(hull);
         float angle;
-        if (rect.size.width < rect.size.height) {
+        if (rect.size.width > rect.size.height) {
           angle = rect.angle + 90;
         }
         else {
