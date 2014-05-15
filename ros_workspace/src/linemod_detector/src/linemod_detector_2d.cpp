@@ -78,6 +78,7 @@ class LineMOD_Detector
   int num_modalities;
   int num_classes;
   bool got_color;
+  bool got_right_camera_info_;
   float pub_threshold;
   float min_depth;
   float max_depth;
@@ -124,6 +125,7 @@ class LineMOD_Detector
     std::cout << num_modalities << std::endl;
 
     enabled_ = true;
+    got_right_camera_info_ = false;
   }
 
   bool enable(samplereturn_msgs::Enable::Request &req,
@@ -135,6 +137,9 @@ class LineMOD_Detector
 
   void leftCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
+    if (!got_right_camera_info_) {
+      return;
+    }
     right_camera_info_msg.header.frame_id = msg.header.frame_id;
     cam_model_.fromCameraInfo(msg, right_camera_info_msg);
     for (int i = 0; (i < 3); i++)
@@ -150,6 +155,7 @@ class LineMOD_Detector
   void rightCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
     right_camera_info_msg = msg;
+    got_right_camera_info_ = true;
   }
 
   void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
