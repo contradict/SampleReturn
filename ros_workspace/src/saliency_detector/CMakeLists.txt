@@ -130,6 +130,7 @@ add_library(color_naming
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
  add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
+ add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
