@@ -139,7 +139,11 @@ class DriveToPoseState(smach.State):
                  
         smach.State.__init__(self,
                              outcomes=['complete', 'timeout', 'sample_detected', 'preempted','aborted'],
-                             input_keys=['target_pose', 'velocity', 'pursue_samples', 'detected_sample'],
+                             input_keys=['target_pose',
+                                         'velocity',
+                                         'pursue_samples',
+                                         'stop_on_sample',
+                                         'detected_sample'],
                              output_keys=['actual_point'])
         
         self.move_client = move_client
@@ -165,6 +169,8 @@ class DriveToPoseState(smach.State):
             if move_state not in util.actionlib_working_states:
                 break
             if (ud.detected_sample is not None) and ud.pursue_samples:
+                if ud.stop_on_sample:
+                    self.move_client.cancel_all_goals()
                 return 'sample_detected'
 
         if move_state == action_msg.GoalStatus.SUCCEEDED:
