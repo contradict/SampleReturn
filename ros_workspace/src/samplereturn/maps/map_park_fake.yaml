@@ -1,0 +1,6 @@
+image: map_park_fake.png
+resolution: 0.375
+origin: [-100.0, -100.0, 0.0]
+occupied_thresh: 0.6
+free_thresh: 0.2
+negate: 0
