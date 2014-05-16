@@ -17,6 +17,7 @@ import platform_motion_msgs.msg as platform_msg
 import manipulator_msgs.msg as manipulator_msg
 import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
+import samplereturn_msgs.srv as samplereturn_srv
 
 import samplereturn.util as util
 
@@ -57,9 +58,16 @@ class PursueSample(object):
                                                            self.move_base,
                                                            self.tf_listener,
                                                            within_min_msg = 'Switching to manipulator detection'),
-                                       transitions = {'min_distance':'MANIPULATOR_SEARCH',
+                                       transitions = {'min_distance':'ENABLE_MANIPULATOR_DETECTOR',
                                                       'point_lost':'PURSUE_SAMPLE_ABORTED'},
                                        remapping = {'target_point':'target_sample'})
+                
+                smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
+                                        smach_ros.ServiceState('enable_manipulator_detector',
+                                                                samplereturn_srv.Enable,
+                                                                request = samplereturn_srv.EnableRequest(True)),
+                                         transitions = {'succeeded':'MANIPULATOR_SEARCH',
+                                                        'aborted':'PURSUE_SAMPLE_ABORTED'})
                 
                 smach.StateMachine.add('MANIPULATOR_SEARCH',
                                        DriveToPoseState(self.move_base, self.tf_listener),
@@ -96,6 +104,7 @@ class PursueSample(object):
                 def grab_goal_cb(userdata, request):
                     goal = manipulator_msg.ManipulatorGoal()
                     goal.type = goal.GRAB
+                    goal.wrist_angle = userdata.detected_sample.grip_angle                    
                     goal.grip_torque = 0.7
                     goal.target_bin = 1
                     return goal
@@ -110,10 +119,17 @@ class PursueSample(object):
         
                 smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
                                        ConfirmSampleAcquired(self.announcer),
-                                       transitions = {'sample_gone':'complete',
+                                       transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
                                                       'sample_present':'VISUAL_SERVO',
                                                       'preempted':'PURSUE_SAMPLE_PREEMPTED',
                                                       'aborted':'PURSUE_SAMPLE_ABORTED'})
+                
+                smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
+                                        smach_ros.ServiceState('enable_manipulator_detector',
+                                                                samplereturn_srv.Enable,
+                                                                request = samplereturn_srv.EnableRequest(False)),
+                                         transitions = {'succeeded':'complete',
+                                                        'aborted':'PURSUE_SAMPLE_ABORTED'})
         
                 smach.StateMachine.add('PURSUE_SAMPLE_PREEMPTED',
                                        PursueSamplePreempted(),
@@ -171,7 +187,11 @@ class StartSamplePursuit(smach.State):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys=['target_sample','action_goal'],
-                             output_keys=['target_sample', 'velocity', 'pursue_samples', 'action_result'])
+                             output_keys=['target_sample',
+                                          'velocity',
+                                          'pursue_samples',
+                                          'stop_on_sample',
+                                          'action_result'])
     
         self.announcer = announcer
     
@@ -181,6 +201,7 @@ class StartSamplePursuit(smach.State):
         userdata.action_result = result
         userdata.target_sample = None
         userdata.pursue_samples = True
+        userdata.stop_on_sample = True
         userdata.velocity = 0.5
         
         while True:
