@@ -23,6 +23,8 @@ import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
 import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
+import samplereturn_msgs.srv as samplereturn_srv
+
 
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
@@ -51,6 +53,8 @@ class RobotSimulator(object):
         home_carousel_name = "/motion/carousel/home"
         enable_wheelpods_name = "/motion/wheel_pods/enable"
         enable_carousel_name = "/motion/carousel/enable"
+
+        enable_manipulator_detector_name = "/processes/sample_detection/manipulator/enable"
         
         select_motion_name = "/motion/CAN/select_motion_mode"
 
@@ -169,7 +173,10 @@ class RobotSimulator(object):
         
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name, geometry_msg.PoseStamped)
         rospy.Timer(rospy.Duration(1.0), self.publish_beacon_pose)
-                
+        
+        self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
+                                                         samplereturn_srv.Enable,
+                                                         self.enable_manipulator_detector)
                 
         #visual servo stuff
         self.visual_servo_server = actionlib.SimpleActionServer(visual_servo_name,
@@ -266,6 +273,10 @@ class RobotSimulator(object):
         
     def publish_pause(self, event):
         self.pause_pub.publish(std_msg.Bool(self.paused))
+ 
+    def enable_manipulator_detector(self, req):
+        rospy.sleep(0.5)
+        return req.state
         
     def service_motion_mode_request(self, req):
         rospy.sleep(0.2)
