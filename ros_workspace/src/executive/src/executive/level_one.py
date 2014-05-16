@@ -50,16 +50,20 @@ class LevelOne(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
 
-        self.state_machine.userdata.max_pursuit_error = 0.2        
-        self.state_machine.userdata.min_pursuit_distance = 3
-        self.state_machine.userdata.max_point_lost_time = 30
+        self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
+        self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
+        self.state_machine.userdata.max_point_lost_time = self.node_params.max_point_lost_time
+        self.state_machine.userdata.search_poses_2d = self.node_params.search_poses_2d
+        self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
         self.state_machine.userdata.detected_sample = None
         
         with self.state_machine:
             
                 smach.StateMachine.add('START_LEVEL_ONE',
                                        StartLevelOne(output_keys=['action_result',
+                                                                  'stop_on_sample',
                                                                   'pose_list'],
+                                                     input_keys=['search_poses_2d'],
                                                      outcomes=['next']),
                                        transitions = {'next':'ANNOUNCE_LEVEL_ONE'})
                                        
@@ -201,9 +205,8 @@ class StartLevelOne(smach.State):
 
     def execute(self, userdata):
         
-        pose_2d_list = [{'x':1, 'y':0, 'yaw':math.radians(45)},
-                        {'x':2, 'y':-1, 'yaw':math.radians(30)},
-                        {'x':2, 'y':-2, 'yaw':math.radians(0)}]
+        #the expected sample location on the end of the path list
+        pose_2d_list = userdata.search_poses_2d
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
         path_pose_list = []
@@ -212,21 +215,14 @@ class StartLevelOne(smach.State):
             pose.position = geometry_msg.Point(pose_2d['x'],
                                                pose_2d['y'],
                                                0.0)
-            quat_array = tf.transformations.quaternion_from_euler(0, 0, pose_2d['yaw'])           
+            yaw = math.radians(pose_2d['yaw'])
+            quat_array = tf.transformations.quaternion_from_euler(0, 0, yaw)           
             pose.orientation = geometry_msg.Quaternion(*quat_array)
             pose_stamped = geometry_msg.PoseStamped(header, pose)
             path_pose_list.append(pose_stamped)
-
-        #put the expected sample location on the end of the path list
-        #same orientation as the robot's last pose
-        sample_position = geometry_msg.Point(2,-5, 0)
-        pose = geometry_msg.Pose()
-        pose.position = sample_position
-        pose.orientation = path_pose_list[-1].pose.orientation
-        pose_stamped = geometry_msg.PoseStamped(header, pose)
-        path_pose_list.append(pose_stamped)
         
         userdata.pose_list = path_pose_list        
+        userdata.stop_on_sample = False
         
         result = samplereturn_msg.GeneralExecutiveResult('initialized')
         userdata.action_result = result
@@ -237,7 +233,11 @@ class DriveToSearch(smach.State):
     def __init__(self, announcer):
         smach.State.__init__(self,
                              input_keys=['pose_list'],
-                             output_keys=['target_pose','velocity','pursue_samples', 'pose_list', 'detected_sample'],
+                             output_keys=['target_pose',
+                                          'velocity',
+                                          'pursue_samples',
+                                          'pose_list',
+                                          'detected_sample'],
                              outcomes=['next_point',
                                        'complete',
                                        'preempted',
@@ -270,6 +270,7 @@ class StartReturnHome(smach.State):
                              outcomes=['next',
                                        'preempted',
                                        'aborted'],
+                             input_keys=['beacon_approach_point'],
                              output_keys=['target_pose',
                                           'velocity',
                                           'pursue_samples'])
@@ -281,8 +282,11 @@ class StartReturnHome(smach.State):
         self.announcer.say("Return ing to platform")
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
-        #the beacon is probably not in view, drive to a point 15m in front of it
-        point = geometry_msg.Point(2, 0, 0)
+        #the beacon is probably not in view, drive to a point probably in front of it
+        approach_point = userdata.beacon_approach_point
+        point = geometry_msg.Point(approach_point['x'],
+                                   approach_point['y'],
+                                   math.radians(approach_point['yaw']))
         quat_array = tf.transformations.quaternion_from_euler(0, 0, math.pi)           
         pose = geometry_msg.Pose(point, geometry_msg.Quaternion(*quat_array))
                 
