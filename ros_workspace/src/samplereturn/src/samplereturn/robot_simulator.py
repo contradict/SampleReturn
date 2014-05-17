@@ -220,49 +220,6 @@ class RobotSimulator(object):
             self.integrate_odometry(self.fake_robot_pose,
                                     self.fake_odometry,
                                     twist)
-        
-    def initial_odometry(self):
-        odom = nav_msg.Odometry()
-        odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = 'odom'
-        odom.child_frame_id = 'base_link'
-        odom.pose.pose.orientation.w=1.0
-        odom.pose.covariance = list(eye(6).reshape((36,)))
-        odom.twist.covariance = list(eye(6).reshape((36,)))
-        return odom
-    
-    def initial_pose(self):
-        pose = geometry_msg.PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = "odom"
-        pose.pose.orientation.w = 1.0
-        return pose
-    
-    def integrate_odometry(self, current_pose, current_odometry, twist=None):
-        if twist is None:
-            twist = geometry_msg.Twist()
-            twist.angular.z = current_odometry.twist.twist.angular.z
-            twist.linear.x = current_odometry.twist.twist.linear.x
-            twist.linear.y = current_odometry.twist.twist.linear.z
-        now = rospy.Time.now();
-        dt = (now - current_pose.header.stamp).to_sec()
-        yaw = 2*arctan2(current_pose.pose.orientation.z,
-                        current_pose.pose.orientation.w)
-        cy = cos(yaw)
-        sy = sin(yaw)
-        current_pose.pose.position.x += (cy*current_odometry.twist.twist.linear.x*dt
-                                         -sy*current_odometry.twist.twist.linear.y*dt)
-        current_pose.pose.position.y += (sy*current_odometry.twist.twist.linear.x*dt
-                                         +cy*current_odometry.twist.twist.linear.y*dt)
-        yaw += current_odometry.twist.twist.angular.z*dt
-        current_pose.pose.orientation.w = cos(yaw/2)
-        current_pose.pose.orientation.z = sin(yaw/2)
-        current_pose.header.stamp = now
-        current_odometry.pose.pose = deepcopy(current_pose.pose)
-        current_odometry.twist.twist = deepcopy(twist)
-        current_odometry.header.stamp = now
-        return current_pose, current_odometry
-
 
     def publish_point_cloud(self, event):
         now = event.current_real
@@ -444,6 +401,9 @@ class RobotSimulator(object):
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
+        
+    def zero_robot(self):
+        self.fake_robot_pose = self.initial_pose()
 
     def get_pointcloud2(self, grid, position, target_frame, transform, range=10.0):
         header =  std_msg.Header(0, rospy.Time.now(), target_frame)
@@ -474,7 +434,48 @@ class RobotSimulator(object):
             pcpts = []
         pc = pc2.create_cloud_xyz32(header, pcpts)
         return pc
-        
+
+    def initial_odometry(self):
+        odom = nav_msg.Odometry()
+        odom.header.stamp = rospy.Time.now()
+        odom.header.frame_id = 'odom'
+        odom.child_frame_id = 'base_link'
+        odom.pose.pose.orientation.w=1.0
+        odom.pose.covariance = list(eye(6).reshape((36,)))
+        odom.twist.covariance = list(eye(6).reshape((36,)))
+        return odom
+    
+    def initial_pose(self):
+        pose = geometry_msg.PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = "odom"
+        pose.pose.orientation.w = 1.0
+        return pose
+    
+    def integrate_odometry(self, current_pose, current_odometry, twist=None):
+        if twist is None:
+            twist = geometry_msg.Twist()
+            twist.angular.z = current_odometry.twist.twist.angular.z
+            twist.linear.x = current_odometry.twist.twist.linear.x
+            twist.linear.y = current_odometry.twist.twist.linear.z
+        now = rospy.Time.now();
+        dt = (now - current_pose.header.stamp).to_sec()
+        yaw = 2*arctan2(current_pose.pose.orientation.z,
+                        current_pose.pose.orientation.w)
+        cy = cos(yaw)
+        sy = sin(yaw)
+        current_pose.pose.position.x += (cy*current_odometry.twist.twist.linear.x*dt
+                                         -sy*current_odometry.twist.twist.linear.y*dt)
+        current_pose.pose.position.y += (sy*current_odometry.twist.twist.linear.x*dt
+                                         +cy*current_odometry.twist.twist.linear.y*dt)
+        yaw += current_odometry.twist.twist.angular.z*dt
+        current_pose.pose.orientation.w = cos(yaw/2)
+        current_pose.pose.orientation.z = sin(yaw/2)
+        current_pose.header.stamp = now
+        current_odometry.pose.pose = deepcopy(current_pose.pose)
+        current_odometry.twist.twist = deepcopy(twist)
+        current_odometry.header.stamp = now
+        return current_pose, current_odometry        
    
 #dummy manipulator state, waits 10 seconds and
 #exits with success unless preempted
