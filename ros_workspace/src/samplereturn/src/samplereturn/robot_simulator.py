@@ -7,7 +7,8 @@ import actionlib
 import tf
 import tf_conversions
 import numpy as np
-from numpy import trunc,pi,ones_like,zeros,linspace
+from numpy import trunc,pi,ones_like,zeros,linspace, eye, sin, cos, arctan2
+from copy import deepcopy
 
 import smach
 import smach_ros
@@ -71,8 +72,6 @@ class RobotSimulator(object):
         gpio_read_name = "/io/gpio_read"
         pause_state_name = "/io/pause_state"
         
-        move_base_name = "/processes/planner/move_base"
-        
         visual_servo_name = "/processes/visual_servo/servo_action"
         
         detected_sample_search_name = "/processes/sample_detection/detected_sample_search"
@@ -91,8 +90,8 @@ class RobotSimulator(object):
         self.zero_translation = (0,0,0)
         self.zero_rotation = (0,0,0,1)
                                                   
-        self.fake_robot_pose = geometry_msg.Pose(geometry_msg.Point(0,0,0),
-                                                 geometry_msg.Quaternion(0,0,0,1))
+        self.fake_robot_pose = self.initial_pose()
+        self.fake_odometry = self.initial_odometry()
         
         rospy.Timer(rospy.Duration(0.1), self.broadcast_tf)        
        
@@ -159,12 +158,12 @@ class RobotSimulator(object):
         self.home_wheelpods_server.start()
 
         #planner
-        self.move_base_server = actionlib.SimpleActionServer(move_base_name,
-                                                             move_base_msg.MoveBaseAction,
-                                                             self.move_base,
-                                                             False)
+        self.planner_sub = rospy.Subscriber('/motion/planner_command',
+                                            geometry_msg.Twist,
+                                            self.handle_planner)
         
-        self.move_base_server.start()
+        self.odometry_pub = rospy.Publisher('/motion/odometry',
+                                            nav_msg.Odometry)
         
         #sample and beacon detection stuff
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
@@ -214,6 +213,56 @@ class RobotSimulator(object):
         rospy.Timer(rospy.Duration(0.2), self.publish_point_cloud)        
 
         #rospy.spin()
+        
+    def handle_planner(self, twist):
+        
+        self.fake_robot_pose, self.fake_odometry = \
+            self.integrate_odometry(self.fake_robot_pose,
+                                    self.fake_odometry,
+                                    twist)
+        
+    def initial_odometry(self):
+        odom = nav_msg.Odometry()
+        odom.header.stamp = rospy.Time.now()
+        odom.header.frame_id = 'odom'
+        odom.child_frame_id = 'base_link'
+        odom.pose.pose.orientation.w=1.0
+        odom.pose.covariance = list(eye(6).reshape((36,)))
+        odom.twist.covariance = list(eye(6).reshape((36,)))
+        return odom
+    
+    def initial_pose(self):
+        pose = geometry_msg.PoseStamped()
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = "odom"
+        pose.pose.orientation.w = 1.0
+        return pose
+    
+    def integrate_odometry(self, current_pose, current_odometry, twist=None):
+        if twist is None:
+            twist = geometry_msg.Twist()
+            twist.angular.z = current_odometry.twist.twist.angular.z
+            twist.linear.x = current_odometry.twist.twist.linear.x
+            twist.linear.y = current_odometry.twist.twist.linear.z
+        now = rospy.Time.now();
+        dt = (now - current_pose.header.stamp).to_sec()
+        yaw = 2*arctan2(current_pose.pose.orientation.z,
+                        current_pose.pose.orientation.w)
+        cy = cos(yaw)
+        sy = sin(yaw)
+        current_pose.pose.position.x += (cy*current_odometry.twist.twist.linear.x*dt
+                                         -sy*current_odometry.twist.twist.linear.y*dt)
+        current_pose.pose.position.y += (sy*current_odometry.twist.twist.linear.x*dt
+                                         +cy*current_odometry.twist.twist.linear.y*dt)
+        yaw += current_odometry.twist.twist.angular.z*dt
+        current_pose.pose.orientation.w = cos(yaw/2)
+        current_pose.pose.orientation.z = sin(yaw/2)
+        current_pose.header.stamp = now
+        current_odometry.pose.pose = deepcopy(current_pose.pose)
+        current_odometry.twist.twist = deepcopy(twist)
+        current_odometry.header.stamp = now
+        return current_pose, current_odometry
+
 
     def publish_point_cloud(self, event):
         now = event.current_real
@@ -233,9 +282,11 @@ class RobotSimulator(object):
                                                 transform)
             
             self.points_center_pub.publish(center_cloud)        
-            empty_cloud = sensor_msg.PointCloud2()
-            empty_cloud.header = std_msg.Header(0, now, '/map')
+ 
+            header = std_msg.Header(0, now, '/navigation_port_left_camera')
+            empty_cloud = pc2.create_cloud_xyz32(header,[])
             self.points_port_pub.publish(empty_cloud)
+            empty_cloud.header.frame_id = 'navigation_starboard_left_camera'
             self.points_starboard_pub.publish(empty_cloud)
         except ( tf.Exception, tf.LookupException, tf.ConnectivityException):
             pass
@@ -249,14 +300,17 @@ class RobotSimulator(object):
                                           '/odom',
                                           '/map')
         
-        trans = (self.fake_robot_pose.position.x,
-                       self.fake_robot_pose.position.y,
-                       self.fake_robot_pose.position.z)
+        self.fake_robot_pose, self.fake_odometry = \
+            self.integrate_odometry(self.fake_robot_pose, self.fake_odometry)
         
-        rot = (self.fake_robot_pose.orientation.x,
-                    self.fake_robot_pose.orientation.y,
-                    self.fake_robot_pose.orientation.z,
-                    self.fake_robot_pose.orientation.w)
+        trans = (self.fake_robot_pose.pose.position.x,
+                       self.fake_robot_pose.pose.position.y,
+                       self.fake_robot_pose.pose.position.z)
+        
+        rot = (self.fake_robot_pose.pose.orientation.x,
+                    self.fake_robot_pose.pose.orientation.y,
+                    self.fake_robot_pose.pose.orientation.z,
+                    self.fake_robot_pose.pose.orientation.w)
         
         self.tf_broadcaster.sendTransform(trans, rot, now, '/base_link', '/odom')
         
@@ -277,6 +331,9 @@ class RobotSimulator(object):
                                           now,
                                           '/platform',
                                           '/beacon')
+        
+        #also publish odometry
+        self.odometry_pub.publish(self.fake_odometry)
 
     def publish_cam_status(self, event):
         if self.cameras_ready:
@@ -346,51 +403,7 @@ class RobotSimulator(object):
     def service_enable_carousel(self, req):
         rospy.sleep(0.5)
         return req.state
-
-    def move_base(self, goal):
-        travel_time = 5.0        
-        update_period = 0.1
-        steps = int(travel_time / update_period)
  
-        while True:
-            target_pose = goal.target_pose
-            start_pose = util.get_current_robot_pose(self.tf_listener)
-            
-            rospy.loginfo("SIMULATOR move base translation x,y:" + \
-                          str(target_pose.pose.position.x - start_pose.pose.position.x) + ", " + \
-                          str(target_pose.pose.position.y - start_pose.pose.position.y))
-            q = target_pose.pose.orientation
-            rpy = tf.transformations.euler_from_quaternion((q.x, q.y, q.z, q.w))
-            rospy.loginfo("SIMULATOR move base target yaw:" + str(math.degrees(rpy[2])))
-            x_list = np.linspace(start_pose.pose.position.x,
-                                 target_pose.pose.position.x,
-                                 num = steps)
-            y_list = np.linspace(start_pose.pose.position.y,
-                                 target_pose.pose.position.y,
-                                 num = steps)
-            for i in range(len(x_list)):
-                rospy.sleep(update_period)
-                if self.move_base_server.is_preempt_requested():
-                    if self.move_base_server.is_new_goal_available():
-                        rospy.loginfo("SIMULATOR new move_base goal received before complete")
-                        goal = self.move_base_server.accept_new_goal()
-                        break
-                    else:
-                        self.move_base_server.set_preempted()
-                        return
-                self.fake_robot_pose.position.x = x_list[i]
-                self.fake_robot_pose.position.y = y_list[i]
-                header = std_msg.Header(0, rospy.Time.now(), '/map')
-                fake_feedback = move_base_msg.MoveBaseFeedback()
-                fake_feedback.base_position.header = header
-                fake_feedback.base_position.pose = self.fake_robot_pose
-                self.move_base_server.publish_feedback(fake_feedback)
-            
-            if i >= (steps-1): break
-
-        self.fake_robot_pose.orientation = target_pose.pose.orientation 
-        self.move_base_server.set_succeeded()
-
     def run_visual_servo_action(self, goal):
         servo_result = visual_servo_msg.VisualServoResult()
         servo_feedback = visual_servo_msg.VisualServoFeedback()
