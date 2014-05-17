@@ -210,12 +210,22 @@ class StartLevelOne(smach.State):
 
         header = std_msg.Header(0, rospy.Time(0), '/map')
         path_pose_list = []
-        for pose_2d in pose_2d_list:
+        yaw = 0
+        for i in range(len(pose_2d_list)):
             pose = geometry_msg.Pose()
-            pose.position = geometry_msg.Point(pose_2d['x'],
-                                               pose_2d['y'],
+            pose.position = geometry_msg.Point(pose_2d_list[i]['x'],
+                                               pose_2d_list[i]['y'],
                                                0.0)
-            yaw = math.radians(pose_2d['yaw'])
+            if 'yaw' in pose_2d_list[i]:
+                yaw = math.radians(pose_2d_list[i]['yaw'])
+            else:
+                if (i+1) < len(pose_2d_list):
+                    next_point = geometry_msg.Point(pose_2d_list[i + 1]['x'],
+                                                    pose_2d_list[i + 1]['y'],
+                                                    0.0)
+                    yaw = util.pointing_yaw(pose.position, next_point)
+                # if this is last point, just maintain current yaw                
+                            
             quat_array = tf.transformations.quaternion_from_euler(0, 0, yaw)           
             pose.orientation = geometry_msg.Quaternion(*quat_array)
             pose_stamped = geometry_msg.PoseStamped(header, pose)

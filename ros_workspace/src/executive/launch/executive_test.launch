@@ -64,11 +64,13 @@
         <param name="max_point_lost_time" type="double" value="30"/>
     
         <rosparam>
+            <!-- Specify x and y.  If yaw is unspecified, robot will point towards
+                 the next point in the path list -->
             search_poses_2d:
-                - {x: 5.0, y: 0.0, yaw: 0}
-                - {x: -2.0, y: -20.0, yaw: 0}
-                - {x: -20.0, y: -25.0, yaw: 0}
-                - {x: -25.0, y: -10.0, yaw: 0}
+                - {x: 5.0, y: 0.0}
+                - {x: -2.0, y: -20.0}
+                - {x: -20.0, y: -24.0}
+                - {x: -25.0, y: -10.0}
             beacon_approach_point:
                 {x: 5.0, y: 0, yaw: 180}
         </rosparam>
