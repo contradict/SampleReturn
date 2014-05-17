@@ -7,6 +7,7 @@ import actionlib
 import tf
 import tf_conversions
 import numpy as np
+from numpy import trunc,pi,ones_like,zeros,linspace
 
 import smach
 import smach_ros
@@ -15,7 +16,9 @@ import samplereturn.util as util
 
 import actionlib_msgs.msg as action_msg
 import std_msgs.msg as std_msg
-import sensor_msgs.msg as sensor_msgs
+import sensor_msgs.msg as sensor_msg
+import nav_msgs.msg as nav_msg
+import nav_msgs.srv as nav_srv
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import manipulator_msgs.msg as manipulator_msg
@@ -25,6 +28,7 @@ import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn_msgs.srv as samplereturn_srv
 
+import sensor_msgs.point_cloud2 as pc2
 
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
@@ -74,6 +78,11 @@ class RobotSimulator(object):
         detected_sample_search_name = "/processes/sample_detection/detected_sample_search"
         detected_sample_manipulator_name = "/processes/sample_detection/detected_sample_manipulator"
         beacon_pose_name = "/processes/beacon_finder/beacon_pose"
+
+        point_cloud_center_name = "/cameras/navigation/center/points2"
+        point_cloud_port_name = "/cameras/navigation/port/points2"
+        point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
+
 
         #tf stuff
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -183,9 +192,53 @@ class RobotSimulator(object):
                                                            visual_servo_msg.VisualServoAction,
                                                            self.run_visual_servo_action,
                                                            False)
-        self.visual_servo_server.start()        
+        self.visual_servo_server.start()
+        
+        
+        #map stuff
+        print "Waiting for map server"
+        rospy.wait_for_service('/static_map')
+        self.get_map = rospy.ServiceProxy('/static_map', nav_srv.GetMap)
+        self.global_map = self.get_map().map
+        print("map info: " + str(self.global_map.info))
+        
+
+        
+        self.points_center_pub = rospy.Publisher(point_cloud_center_name,
+                                                 sensor_msg.PointCloud2)
+        self.points_port_pub = rospy.Publisher(point_cloud_port_name,
+                                                 sensor_msg.PointCloud2)
+        self.points_starboard_pub = rospy.Publisher(point_cloud_starboard_name,
+                                                 sensor_msg.PointCloud2)
+        
+        rospy.Timer(rospy.Duration(0.2), self.publish_point_cloud)        
 
         #rospy.spin()
+
+    def publish_point_cloud(self, event):
+        now = event.current_real
+
+        header = std_msg.Header(0, now, '/map')
+        target_frame = '/navigation_center_left_camera'
+        try:
+            self.tf_listener.waitForTransform('/map',
+                                              target_frame,
+                                              now,
+                                              rospy.Duration(0.5))
+            current_pose = util.get_current_robot_pose(self.tf_listener)
+            transform = self.tf_listener.asMatrix(target_frame, header)
+            center_cloud = self.get_pointcloud2(self.global_map,
+                                                current_pose.pose.position,
+                                                target_frame,
+                                                transform)
+            
+            self.points_center_pub.publish(center_cloud)        
+            empty_cloud = sensor_msg.PointCloud2()
+            empty_cloud.header = std_msg.Header(0, now, '/map')
+            self.points_port_pub.publish(empty_cloud)
+            self.points_starboard_pub.publish(empty_cloud)
+        except ( tf.Exception, tf.LookupException, tf.ConnectivityException):
+            pass
         
     def broadcast_tf(self, event):
         now = rospy.Time.now()
@@ -378,6 +431,36 @@ class RobotSimulator(object):
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
+
+    def get_pointcloud2(self, grid, position, target_frame, transform, range=10.0):
+        header =  std_msg.Header(0, rospy.Time.now(), target_frame)
+        
+        grid_np = np.array(grid.data, dtype='u1').reshape((grid.info.height,grid.info.width))
+        origin = np.array((grid.info.origin.position.x,
+                           grid.info.origin.position.y,
+                           grid.info.origin.position.z))
+        world2map = lambda x:trunc((x-origin)/grid.info.resolution)
+        ll = world2map(np.r_[position.x-range, position.y-range, 0])
+        ll = np.clip(ll, zeros((3,)), np.r_[grid.info.height-1,
+            grid.info.width-1,0])
+        ur = world2map(np.r_[position.x+range, position.y+range, 0])
+        ur = np.clip(ur, zeros((3,)), np.r_[grid.info.height-1,
+            grid.info.width-1,0])
+    
+        submap = grid_np[ll[1]:ur[1],ll[0]:ur[0]]
+        mappts = np.c_[np.where(submap==100)][:,::-1] + ll[:2]
+        map2world = lambda x:(x+0.5)*grid.info.resolution+origin[:2]
+        wpts = np.array([map2world(x) for x in mappts])
+        pcpts=[]
+        if len(wpts>0):
+            for z in np.linspace(0,1,11):
+                pcpts.append(np.c_[wpts,z*ones_like(wpts[:,0])])
+            pcpts = np.vstack(pcpts)
+            pcpts = np.einsum("ki,...ji", transform, np.c_[pcpts,np.ones((len(pcpts),1))])[:,:3]   
+        else:
+            pcpts = []
+        pc = pc2.create_cloud_xyz32(header, pcpts)
+        return pc
         
    
 #dummy manipulator state, waits 10 seconds and
