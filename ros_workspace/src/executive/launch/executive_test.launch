@@ -1,7 +1,12 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-
+    
+    <machine name="search"
+             address="localhost"/>
+    <machine name="navigate"
+             address="localhost"/>
+     
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
     <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
@@ -60,12 +65,12 @@
     
         <rosparam>
             search_poses_2d:
-                - {x: 1.0, y: 0.0, yaw: 45}
-                - {x: 2.0, y: -1.0, yaw: 30}
-                - {x: 2.0, y: -2.0, yaw: -90}
-                - {x: 2.0, y: -5.0, yaw: -90}
+                - {x: 5.0, y: 0.0, yaw: 0}
+                - {x: -2.0, y: -20.0, yaw: 0}
+                - {x: -20.0, y: -25.0, yaw: 0}
+                - {x: -25.0, y: -10.0, yaw: 0}
             beacon_approach_point:
-                {x: 2.0, y: 0, yaw: 180}
+                {x: 5.0, y: 0, yaw: 180}
         </rosparam>
     
     </node>
@@ -88,38 +93,12 @@
         <remap from="robotsound" to="navigate_soundplay"/>
     </node>
     
-    <node pkg="platform_motion" 
-          type="manual_control_node.py" 
-          name="manual_control_node"
-          ns="/motion">
-              
-        <!-- Axes -->
-        <param name="LINEAR_X" value="1"/>
-        <param name="LINEAR_Y" value="0"/>
-        <param name="ANGULAR_Z" value="2"/>
-        <!-- Buttons -->
-        <param name="BUTTON_HOME" value="9"/>
-        <param name="BUTTON_GRAB" value="3"/>
-        <param name="BUTTON_SERVO" value="1"/>
-        <param name="BUTTON_CANCEL" value="2"/>
-        <param name="BUTTON_LOCK" value="0"/>
-        <!-- Scaling -->
-        <param name="LINEAR_SCALE" value="1" type="double"/>
-        <param name="LINEAR_EXP" value="2" type="double"/>
-        <param name="ANGULAR_SCALE" value="3.14" type="double"/>
-        <param name="ANGULAR_EXP" value="2" type="double"/>
-        <!-- Other -->
-        <param name="JOY_TIMEOUT" value="0.5" type="double"/>
-    
-        <!-- Remaps -->
-        <remap from="CAN_select_command_source" to="/motion/CAN/select_command_source"/>
-        <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
-        <remap from="grab_action" to="/manipulator/grab_action"/>
-        <remap from="twist" to="joystick_command"/>
-        <remap from="joy" to="/io/joy"/>
-    
-    </node>
-    
+    <include file="$(find samplereturn)/launch/joystick.launch"/>
+
+    <include file="$(find samplereturn)/launch/planner.launch">
+        <arg name="map_config" value="maps/map_park_fake.yaml"/>
+    </include>
+        
     <node
         name="navigate_announcer"
         pkg="samplereturn"
@@ -129,4 +108,18 @@
         <remap from="audio_out" to="navigate_soundplay"/>
     </node>
 
+    <!-- joint state publishing -->
+    <param name="robot_description"
+           command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+
+    <node name="state_publisher"
+          pkg="robot_state_publisher" 
+          type="robot_state_publisher"
+          output="log"
+          ns="/motion">
+        <remap from="joint_states" to="platform_joint_state"/>
+        <param name="publish_frequency" type="double" value="10"/>
+
+    </node>
+    
 </launch>

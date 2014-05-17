@@ -34,6 +34,7 @@
     </node>
 
 
+    <arg name="map_config" default="config/map_server.yaml"/>
     <node
         machine="navigate"
         name="map_server"
@@ -41,7 +42,7 @@
         type="map_server"
         ns="/processes/planner"
         output="log"
-        args="$(find samplereturn)/config/map_server.yaml"
+        args="$(find samplereturn)/$(arg map_config)"
         >
     </node>
 
