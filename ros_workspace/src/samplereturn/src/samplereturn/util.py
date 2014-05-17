@@ -69,6 +69,9 @@ def pointing_quaternion_2d(pt1, pt2):
     quat_vals = tf.transformations.quaternion_from_euler(0, 0, yaw)
     return geometry_msg.Quaternion(*quat_vals)
 
+def pointing_yaw(pt1, pt2):
+    return math.atan2(pt2.y - pt1.y, pt2.x - pt1.x)
+
 #takes a stamped pose and returns a stamped pose distance forward in /map frame
 def pose_translate(listener, start_pose, dx, dy):
     rospy.loginfo('start pose: %s', start_pose)
