@@ -204,7 +204,7 @@ class StartSamplePursuit(smach.State):
         userdata.stop_on_sample = True
         userdata.velocity = 0.5
         
-        while True:
+        while not rospy.is_shutdown():
             if userdata.target_sample is not None:
                 break
             rospy.sleep(0.1)
@@ -229,18 +229,18 @@ class LoadSearchPath(smach.State):
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
         next_pose = util.pose_translate(self.listener, start_pose, square_step, 0 )
-        next_pose = util.pose_rotate(self.listener, next_pose, math.pi/2)
+        next_pose = util.pose_rotate(next_pose, math.pi/2)
         pose_list.append(next_pose)
         next_pose = util.pose_translate(self.listener, start_pose, square_step, square_step )
-        next_pose = util.pose_rotate(self.listener, next_pose, math.pi)        
+        next_pose = util.pose_rotate(next_pose, math.pi)        
         pose_list.append(next_pose)
         next_pose = util.pose_translate(self.listener, start_pose, -1*square_step, square_step )
-        next_pose = util.pose_rotate(self.listener, next_pose, math.pi*3/2)                
+        next_pose = util.pose_rotate(next_pose, math.pi*3/2)                
         pose_list.append(next_pose)
         next_pose = util.pose_translate(self.listener, start_pose, -1*square_step, -1*square_step )
         pose_list.append(next_pose)
         next_pose = util.pose_translate(self.listener, start_pose, square_step, -1*square_step)
-        next_pose = util.pose_rotate(self.listener, next_pose, math.pi/2)   
+        next_pose = util.pose_rotate(next_pose, math.pi/2)   
         pose_list.append(next_pose)
         userdata.pose_list = pose_list
                 
@@ -295,7 +295,7 @@ class VisualServo(smach.State):
 
         self.announcer.say("Sample in manipulator view, servo ing")
     
-        while True:
+        while not rospy.is_shutdown():
             rospy.sleep(0.1)
             servo_state = self.servo.get_state()
             if servo_state not in util.actionlib_working_states:

@@ -286,7 +286,7 @@ class StartState(smach.State):
     def execute(self, userdata):
 
         start_time = rospy.get_time()
-        while True:
+        while not rospy.is_shutdown():
             rospy.sleep(0.1)
             if ((rospy.get_time() - start_time) > 20.0):
                 rospy.logwarn('Timeout waiting for callbacks')
@@ -317,7 +317,7 @@ class WaitForUnpause(smach.State):
             self.announcer.say(words)
         
         start_time = rospy.get_time()
-        while True:
+        while not rospy.is_shutdown():
             if not userdata.paused:
                 return 'unpaused'
             rospy.sleep(0.1)
@@ -356,7 +356,7 @@ class HomePlatform(smach.State):
        
         #ensure that homing services are live, wait 10 seconds
         start_time = rospy.get_time()    
-        while True:
+        while not rospy.is_shutdown():
             rospy.sleep(0.1)
             if self.home_wheelpods.wait_for_server(rospy.Duration(0.001))\
             and self.home_carousel.wait_for_server(rospy.Duration(0.001))\
@@ -372,7 +372,7 @@ class HomePlatform(smach.State):
         mh_msg = manipulator_msg.ManipulatorGoal()
         mh_msg.type = mh_msg.HOME
         self.manipulator.send_goal(mh_msg)
-        while True: 
+        while not rospy.is_shutdown(): 
             rospy.sleep(0.1)
             manipulator_state = self.manipulator.get_state()
             if manipulator_state not in util.actionlib_working_states:
@@ -388,7 +388,7 @@ class HomePlatform(smach.State):
         rospy.sleep(0.1)
         self.home_wheelpods.send_goal(platform_msg.HomeGoal(home_count=3))
         self.home_carousel.send_goal(platform_msg.HomeGoal(home_count=1))
-        while True:
+        while not rospy.is_shutdown():
             rospy.sleep(0.1)
             wheelpods_state = self.home_wheelpods.get_state()
             carousel_state = self.home_carousel.get_state()
