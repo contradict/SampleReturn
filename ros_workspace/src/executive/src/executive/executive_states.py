@@ -138,13 +138,18 @@ class DriveToPoseState(smach.State):
     def __init__(self, move_client, listener):
                  
         smach.State.__init__(self,
-                             outcomes=['complete', 'timeout', 'sample_detected', 'preempted','aborted'],
+                             outcomes=['complete',
+                                       'timeout',
+                                       'sample_detected',
+                                       'preempted','aborted'],
                              input_keys=['target_pose',
                                          'velocity',
                                          'pursue_samples',
                                          'stop_on_sample',
-                                         'detected_sample'],
-                             output_keys=['actual_point'])
+                                         'detected_sample',
+                                         'motion_check_interval',
+                                         'min_motion'],
+                             output_keys=['last_pose'])
         
         self.move_client = move_client
 
@@ -153,34 +158,50 @@ class DriveToPoseState(smach.State):
                 
     def execute(self, ud):
         
-        start_pose = util.get_current_robot_pose(self.listener)
+        last_pose = util.get_current_robot_pose(self.listener)
         target_pose = ud.target_pose
         velocity = ud.velocity
-        
-        distance = util.point_distance_2d(start_pose.pose.position,
-                                          target_pose.pose.position)
         
         goal = move_base_msg.MoveBaseGoal()
         goal.target_pose=target_pose
         self.move_client.send_goal(goal)
-        while True:
+        last_motion_check_time = rospy.get_time()
+        while self.move_client.get_state() in util.actionlib_working_states:
             rospy.sleep(0.1)
-            move_state = self.move_client.get_state()
-            if move_state not in util.actionlib_working_states:
-                break
+            current_pose = util.get_current_robot_pose(self.listener)
+            ud.last_pose = current_pose
+            #handle preempts
+            if self.preempt_requested():
+                self.move_client.cancel_all_goals()
+                return 'preempted'                            
+            #handle sample detection
             if (ud.detected_sample is not None) and ud.pursue_samples:
                 if ud.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
+            #handle target_pose changes
+            if target_pose != ud.target_pose:
+                target_pose = ud.target_pose
+                goal.target_pose = target_pose
+                self.move_client.send_goal(goal)
+            #check if we are stuck and move_base isn't handling it
+            now = rospy.get_time()
+            if (now - last_motion_check_time) > ud.motion_check_interval:
+                distance = util.pose_distance_2d(current_pose, last_pose)
+                last_pose = current_pose
+                last_motion_check_time = now
+                if (distance < ud.min_motion):
+                    self.move_client.cancel_all_goals()
+                    return 'timeout'    
 
-        if move_state == action_msg.GoalStatus.SUCCEEDED:
+        if self.move_client.get_state() == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
         else:
             return 'aborted'
 
 #pursues a detected point, changing the move_base goal if the detection point
 #changes too much.  Detection and movement all specified in /map.
-#exits once within min_pursuit_distance, and sets target_pose to the current
+#exits if pose is within min_pursuit_distance, and sets target_pose to the current
 #detection point with current robot orientation
 class PursueDetectedPoint(smach.State):
     def __init__(self,
@@ -189,7 +210,9 @@ class PursueDetectedPoint(smach.State):
                  listener,
                  within_min_msg = None):
         smach.State.__init__(self,
-                             outcomes=['min_distance', 'point_lost', 'preempted', 'aborted'],
+                             outcomes=['min_distance',
+                                       'point_lost',
+                                       'preempted', 'aborted'],
                              input_keys=['target_point',
                                          'min_pursuit_distance',
                                          'max_pursuit_error',
