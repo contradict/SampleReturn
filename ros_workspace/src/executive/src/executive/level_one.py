@@ -37,13 +37,13 @@ class LevelOne(object):
         self.CAN_interface = util.CANInterface()
         
         start_time = rospy.get_time()
-        while True:
-            if self.move_base.wait_for_server(rospy.Duration(0.001)):
+        while not rospy.is_shutdown():
+            if self.move_base.wait_for_server(rospy.Duration(0.1)):
                 break #all services up, exit this loop
             if (rospy.get_time() - start_time) > 10.0:
                 self.announcer.say("Move base not available")
                 rospy.logwarn('Timeout waiting for move base')
-            rospy.sleep(0.1)
+            rospy.sleep(0.5)
 
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -53,6 +53,8 @@ class LevelOne(object):
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_point_lost_time = self.node_params.max_point_lost_time
+        self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
+        self.state_machine.userdata.min_motion = self.node_params.min_motion        
         self.state_machine.userdata.search_poses_2d = self.node_params.search_poses_2d
         self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
         self.state_machine.userdata.detected_sample = None
