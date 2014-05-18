@@ -1,5 +1,6 @@
 import rospy
 import math
+from copy import deepcopy
 import tf
 
 from collections import namedtuple
@@ -83,11 +84,11 @@ def pose_translate(listener, start_pose, dx, dy):
     new_pose = geometry_msg.Pose(new_point.point, start_pose.pose.orientation)
     header = std_msg.Header(0, rospy.Time(0), '/map')
     rospy.loginfo('new pose: %s', new_pose)
-    return geometry_msg.PoseStamped(header, new_pose)    
+    return geometry_msg.PoseStamped(header, new_pose)
 
 #translates a stamped pose by yaw and distance, returns in same frame
 def pose_translate_by_yaw(start_pose, distance, yaw):
-        new_pose = start_pose
+        new_pose = deepcopy(start_pose)
         new_pose.pose.position.x = new_pose.pose.position.x + distance * math.cos(yaw)
         new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
         return new_pose   
