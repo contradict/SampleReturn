@@ -173,6 +173,7 @@ class DriveToPoseState(smach.State):
             #handle preempts
             if self.preempt_requested():
                 self.move_client.cancel_all_goals()
+                self.service_preempt()
                 return 'preempted'                            
             #handle sample detection
             if (ud.detected_sample is not None) and ud.pursue_samples:
@@ -181,6 +182,7 @@ class DriveToPoseState(smach.State):
                 return 'sample_detected'
             #handle target_pose changes
             if target_pose != ud.target_pose:
+                rospy.logdebug("DRIVE_TO_POSE replanning")
                 target_pose = ud.target_pose
                 goal.target_pose = target_pose
                 self.move_client.send_goal(goal)

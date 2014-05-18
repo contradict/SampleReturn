@@ -115,6 +115,7 @@ class LevelTwoRandom(object):
                     return True
                 
                 search_line = smach.Concurrence(outcomes = ['sample_detected',
+                                                            'move_complete',
                                                             'line_blocked',
                                                             'return_home',
                                                             'preempted', 'aborted'],
@@ -134,6 +135,7 @@ class LevelTwoRandom(object):
                                                'last_line_pose'],
                                 child_termination_cb = search_line_cb,
                                 outcome_map = { 'sample_detected' : {'DRIVE_TO_POSE':'sample_detected'},
+                                                'move_complete' : {'DRIVE_TO_POSE':'complete'},
                                                 'line_blocked' : {'SEARCH_LINE_MANAGER':'line_blocked'},
                                                 'line_blocked' : {'DRIVE_TO_POSE':'timeout'},
                                                 'return_home' : {'SEARCH_LINE_MANAGER':'return_home'},
@@ -157,6 +159,7 @@ class LevelTwoRandom(object):
                 smach.StateMachine.add('SEARCH_LINE',
                                        search_line,
                                        transitions = {'sample_detected':'PURSUE_SAMPLE',
+                                                      'move_complete':'SEARCH_LINE',
                                                       'line_blocked':'CHOOSE_NEW_LINE',
                                                       'return_home':'START_RETURN_HOME',
                                                       'preempted':'LEVEL_TWO_PREEMPTED',
@@ -339,15 +342,18 @@ class SearchLineManager(smach.State):
         while not rospy.is_shutdown():  
             
             if self.preempt_requested():
+                self.service_preempt()
                 return 'preempted'
 
             current_pose = util.get_current_robot_pose(self.listener)
             distance = util.pose_distance_2d(current_pose, userdata.next_line_pose)
             if distance < userdata.line_replan_distance:
                 self.announcer.say("Line is clear, continue ing")
+                
                 new_pose = util.pose_translate_by_yaw(userdata.next_line_pose,
                                                       userdata.line_plan_step,
                                                       userdata.line_yaw)
+                                
                 userdata.next_line_pose = new_pose
         
             if rospy.Time.now() > userdata.return_time:
