@@ -67,9 +67,9 @@
                  the next point in the path list -->
             search_poses_2d:
                 - {x: 5.0, y: 0.0}
-                - {x: 10.0, y: -10.0}
-                - {x: 12.0, y: -15.0}
-                - {x: 8.0, y: -25.0}
+                - {x: 10.0, y: -15.0}
+                - {x: 15.0, y: -15.0}
+                - {x: 25.0, y: -10.0}
             beacon_approach_point:
                 {x: 5.0, y: 0, yaw: 180}
         </rosparam>        
