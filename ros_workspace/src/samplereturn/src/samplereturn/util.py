@@ -72,7 +72,7 @@ def pointing_quaternion_2d(pt1, pt2):
 def pointing_yaw(pt1, pt2):
     return math.atan2(pt2.y - pt1.y, pt2.x - pt1.x)
 
-#takes a stamped pose and returns a stamped pose distance forward in /map frame
+#takes a stamped pose and returns a stamped pose translated by x and y in /map frame
 def pose_translate(listener, start_pose, dx, dy):
     rospy.loginfo('start pose: %s', start_pose)
     header = std_msg.Header(0, rospy.Time(0), '/base_link')
@@ -84,8 +84,16 @@ def pose_translate(listener, start_pose, dx, dy):
     header = std_msg.Header(0, rospy.Time(0), '/map')
     rospy.loginfo('new pose: %s', new_pose)
     return geometry_msg.PoseStamped(header, new_pose)    
-    
-def pose_rotate(listener, start_pose, angle):
+
+#translates a stamped pose by yaw and distance, returns in same frame
+def pose_translate_by_yaw(start_pose, distance, yaw):
+        new_pose = start_pose
+        new_pose.pose.position.x = new_pose.pose.position.x + distance * math.cos(yaw)
+        new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
+        return new_pose   
+
+#rotates a stamped pose, returns in /map frame  
+def pose_rotate(start_pose, angle):
     #rospy.loginfo('start pose: %s', start_pose)
     goal_quat = tf.transformations.quaternion_from_euler(0,0, angle)
     start_quat = (start_pose.pose.orientation.x,
@@ -100,7 +108,6 @@ def pose_rotate(listener, start_pose, angle):
     #rospy.loginfo('rotate %f', angle)
     #rospy.loginfo('new pose: %s', new_pose)
     return geometry_msg.PoseStamped(header, new_pose)    
-
 
 def get_current_robot_pose(tf_listener):
     now = tf_listener.getLatestCommonTime('/map', '/base_link')
