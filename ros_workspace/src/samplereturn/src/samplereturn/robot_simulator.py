@@ -36,7 +36,7 @@ import dynamic_reconfigure.msg as dynmsg
 
 class RobotSimulator(object):
     
-    def __init__(self):
+    def __init__(self, mode='level_one'):
     
         rospy.init_node("robot_simulator")
         
@@ -44,11 +44,11 @@ class RobotSimulator(object):
         self.GPIO_LEVEL_ONE = 0x20
         self.GPIO_LEVEL_TWO = 0x08
         
-        self.mode = 'level_one'
+        self.mode = mode
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = True
-        self.fake_sample = {'x':25, 'y':-5, 'name':'PRECACHED'}
+        self.fake_sample = {'x':9, 'y':-23, 'name':'PRECACHED'}
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
@@ -74,8 +74,8 @@ class RobotSimulator(object):
         
         visual_servo_name = "/processes/visual_servo/servo_action"
         
-        detected_sample_search_name = "/processes/sample_detection/detected_sample_search"
-        detected_sample_manipulator_name = "/processes/sample_detection/detected_sample_manipulator"
+        detected_sample_search_name = "/processes/sample_detection/search/point"
+        detected_sample_manipulator_name = "/processes/sample_detection/manipulator/point"
         beacon_pose_name = "/processes/beacon_finder/beacon_pose"
 
         point_cloud_center_name = "/cameras/navigation/center/points2"
@@ -92,8 +92,6 @@ class RobotSimulator(object):
                                                   
         self.fake_robot_pose = self.initial_pose()
         self.fake_odometry = self.initial_odometry()
-        
-        rospy.Timer(rospy.Duration(0.1), self.broadcast_tf)        
        
         #manipulator stuff
         self.manipulator_sm = smach.StateMachine(
@@ -157,13 +155,15 @@ class RobotSimulator(object):
         self.home_carousel_server.start()
         self.home_wheelpods_server.start()
 
-        #planner
+        #planner, odom and tf
         self.planner_sub = rospy.Subscriber('/motion/planner_command',
                                             geometry_msg.Twist,
                                             self.handle_planner)
         
         self.odometry_pub = rospy.Publisher('/motion/odometry',
                                             nav_msg.Odometry)
+        
+        rospy.Timer(rospy.Duration(0.1), self.broadcast_tf)        
         
         #sample and beacon detection stuff
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
@@ -193,16 +193,6 @@ class RobotSimulator(object):
                                                            False)
         self.visual_servo_server.start()
         
-        
-        #map stuff
-        print "Waiting for map server"
-        rospy.wait_for_service('/static_map')
-        self.get_map = rospy.ServiceProxy('/static_map', nav_srv.GetMap)
-        self.global_map = self.get_map().map
-        print("map info: " + str(self.global_map.info))
-        
-
-        
         self.points_center_pub = rospy.Publisher(point_cloud_center_name,
                                                  sensor_msg.PointCloud2)
         self.points_port_pub = rospy.Publisher(point_cloud_port_name,
@@ -211,6 +201,13 @@ class RobotSimulator(object):
                                                  sensor_msg.PointCloud2)
         
         rospy.Timer(rospy.Duration(0.2), self.publish_point_cloud)        
+
+        #map stuff
+        print "Waiting for map server"
+        rospy.wait_for_service('/processes/planner/static_map')
+        self.get_map = rospy.ServiceProxy('/processes/planner/static_map', nav_srv.GetMap)
+        self.global_map = self.get_map().map
+        print("map info: " + str(self.global_map.info))
 
         #rospy.spin()
         
@@ -405,7 +402,7 @@ class RobotSimulator(object):
     def zero_robot(self):
         self.fake_robot_pose = self.initial_pose()
 
-    def get_pointcloud2(self, grid, position, target_frame, transform, range=10.0):
+    def get_pointcloud2(self, grid, position, target_frame, transform, range=12.0):
         header =  std_msg.Header(0, rospy.Time.now(), target_frame)
         
         grid_np = np.array(grid.data, dtype='u1').reshape((grid.info.height,grid.info.width))
