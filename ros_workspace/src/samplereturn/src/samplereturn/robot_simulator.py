@@ -48,7 +48,7 @@ class RobotSimulator(object):
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = True
-        self.fake_sample = {'x':9, 'y':-23, 'name':'PRECACHED'}
+        self.fake_sample = {'x':9, 'y':-23, 'name':'none'}
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
@@ -200,7 +200,7 @@ class RobotSimulator(object):
         self.points_starboard_pub = rospy.Publisher(point_cloud_starboard_name,
                                                  sensor_msg.PointCloud2)
         
-        rospy.Timer(rospy.Duration(0.2), self.publish_point_cloud)        
+        rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
         #map stuff
         print "Waiting for map server"
@@ -394,7 +394,7 @@ class RobotSimulator(object):
         self.fake_sample['name'] = 'none'
         
     def show_samples(self):
-        self.fake_sample['name'] = 'PREEMPTED'
+        self.fake_sample['name'] = 'PRECACHED'
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
