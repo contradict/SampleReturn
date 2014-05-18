@@ -13,19 +13,19 @@ import rospkg
 class freq_fence_detection(object):
   def __init__(self):
     rospy.init_node('freq_fence_detection',anonymous=True, log_level=rospy.INFO)
-    self.img_sub = rospy.Subscriber('/cameras/navigation/port/left/image_rect_color',Image,self.detect_fence)
-    self.disp_sub = rospy.Subscriber('/cameras/navigation/port/disparity',DisparityImage,self.handle_disp)
+    self.img_sub = rospy.Subscriber('input_image',Image,self.detect_fence)
+    self.disp_sub = rospy.Subscriber('input_disparity',DisparityImage,self.handle_disp)
 
-    self.img_pub = rospy.Publisher('fence_img',Image)
-    self.disp_pub = rospy.Publisher('fence_disp',DisparityImage)
+    self.img_pub = rospy.Publisher('fence_image',Image)
+    self.disp_pub = rospy.Publisher('fence_disparity',DisparityImage)
 
     self.bridge = CvBridge()
 
     self.disp_img = None
 
-    self.mat = scipy.io.loadmat('/home/zlizer/Downloads/ColorNaming/w2c.mat')
-    #rospack = rospkg.RosPack()
-    #self.mat = scipy.io.loadmat(rospack.get_path('fence_detection')+'w2c.mat')
+    #self.mat = scipy.io.loadmat('/home/zlizer/Downloads/ColorNaming/w2c.mat')
+    rospack = rospkg.RosPack()
+    self.mat = scipy.io.loadmat(rospack.get_path('fence_detection')+'/w2c.mat')
 
   def detect_fence(self,Image):
     img = np.asarray(self.bridge.imgmsg_to_cv(Image,'rgb8'))

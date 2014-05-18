@@ -26,8 +26,8 @@
         >
         <param name="approximate_sync" type="bool" value="true"/>
         <remap from="left/image_rect_color" to="fence_img"/>
-        <remap from="left/camera_info" to="/navigation/left/camera_info"/>
-        <remap from="right/camera_info" to="/navigation/right/camera_info"/>
+        <remap from="left/camera_info" to="/cameras/navigation/left/camera_info"/>
+        <remap from="right/camera_info" to="/cameras/navigation/right/camera_info"/>
         <remap from="disparity" to="fence_disp"/>
     </node>
 
@@ -43,25 +43,8 @@
         <param name="max_h" type="int" value="15"/>
         <param name="min_s" type="int" value="155"/>
         <param name="max_s" type="int" value="180"/>
-    </node>
-
-    <!-- Fence Map -->
-    <node
-        machine="navigate"
-        pkg="costmap_2d"
-        type="costmap_2d_node"
-        name="costmap_node"
-        ns="fence"
-        output="log">
-        <rosparam file="$(find fence_detection)/config/costmap_params.yaml" command="load" ns="fence"/>
-    </node>
-
-    <node
-        machine="navigate"
-        pkg="costmap_2d"
-        type="costmap_2d_cloud"
-        name="voxel_visualizer_cloud"
-        ns="fence">
+        <remap from "input_image" to="/cameras/navigation/center/left/image_rect_color"/>
+        <remap from "input_disparity" to="/cameras/navigation/center/disparity"/>
     </node>
 
 </launch>
