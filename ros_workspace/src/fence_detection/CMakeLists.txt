@@ -81,6 +81,7 @@ catkin_package(
 ## not required for python when using catkin_python_setup()
  install(PROGRAMS
    nodes/fence_detection.py
+   nodes/freq_fence_detection.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
