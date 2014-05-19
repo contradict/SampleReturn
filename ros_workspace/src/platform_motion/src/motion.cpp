@@ -500,9 +500,10 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
+                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE &&
                 req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK)
             {
-                ROS_ERROR("Attempted mode transition other than RESUME or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
+                ROS_ERROR("Attempted mode transition other than RESUME, ENABLE or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
                 return false;
             }
             break;
