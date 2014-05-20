@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from numpy import pi, tan, arctan2, any, isnan, sin, cos, arctan
 from numpy.linalg import norm
 import rospy
@@ -19,16 +20,15 @@ def scurve(initial, final, dotmax):
 	xdot = lambda s: (final-initial)*3/2.0*s*(1.0-s)*4.0/T
 	return T, x, xdot
 
-def extendPathGridAlign(path, knot, gridspacing):
-	intermediatepoints = 3
+def extendPathGridAlign(path, knot, gridspacing, extendnumber=3):
 	yaw = yawfromknot(path.knots[-1])
 	P0 = np.r_[path.knots[-1].pose.position.x, path.knots[-1].pose.position.y]
-	extenddist = intermediatepoints*gridspacing
-	P1 = np.r_[round(P0[0] + extenddist*cos(yaw)), round(P0[1] + extenddist*sin(yaw))]
+	extenddist = extendnumber*gridspacing
+	P1 = np.r_[round((P0[0] + extenddist*cos(yaw))/gridspacing)*gridspacing, round((P0[1] + extenddist*sin(yaw))/gridspacing)*gridspacing]
 	yawtoknot(knot, yaw)
 
-	for i in xrange(1, intermediatepoints+1):
-		lerp = float(i)/intermediatepoints
+	for i in xrange(1, extendnumber+1):
+		lerp = float(i)/extendnumber
 		knot.pose.position.x = (1.0-lerp)*P0[0] + lerp*P1[0]
 		knot.pose.position.y = (1.0-lerp)*P0[1] + lerp*P1[1]
 		knot.twist.linear.x = 0
@@ -228,24 +228,22 @@ def nancheck(path):
             return False
     return True
 
-def hook(forward, R, initialyaw, deltayaw, gridSpacing=0.1):
+def hook(forward, R, initialyaw, deltayaw, gridSpacing=0.1, N=20, extendpathnum=3):
 	path = plat_msgs.Path()
 	knot = plat_msgs.Knot()
 	yawtoknot(knot, initialyaw)
 
-	N = 20
 	path, knot = makeHook(path, knot, N, forward, R, initialyaw, deltayaw)
-	path, knot = extendPathGridAlign(path, knot, gridSpacing)
+	path, knot = extendPathGridAlign(path, knot, gridSpacing, extendpathnum)
 
 	return path
 
-def forward(forward, yaw, gridSpacing=0.1):
+def forward(forward, yaw, gridSpacing=0.1, N=20, extendpathnum=3):
 	path = plat_msgs.Path()
 	knot = plat_msgs.Knot()
 
-	N = 20
 	path, knot = makeForward(path, knot, N, forward, yaw)
-	path, knot = extendPathGridAlign(path, knot, gridSpacing)
+	path, knot = extendPathGridAlign(path, knot, gridSpacing, extendpathnum)
 
 	return path
 
@@ -300,7 +298,7 @@ def addToPrimitivesFile(primdata, pathdata):
 		initialpos = path.knots[-1].pose.position
 		primfile.write("primID: %d\n" % primitiveid)
 		primfile.write("startangle_c: %d\n" % primdata['angles'])
-		primfile.write("endpose_c: %d %d %d\n" % (initialpos.x, initialpos.y, pathdatum['endpose_c']))
+		primfile.write("endpose_c: %d %d %d\n" % (initialpos.x/gridspacing, initialpos.y/gridspacing, pathdatum['endpose_c']))
 		primfile.write("additionalactioncostmult: %d\n" % cost)
 		primfile.write("intermediateposes: %d\n" % len(path.knots))
 		for knot in path.knots:
@@ -321,7 +319,7 @@ def closePrimitivesFile(primdata):
 
 def generateMotionPrimitives(showplots=False):
 	gridspacing = 0.1
-	numangles = 4
+	numangles = 8
 	prims = [[0.5, 2.3], [0.25, 1.2]] # list of [forward, radius]
 	primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
 	for i in xrange(0,numangles):
@@ -330,20 +328,31 @@ def generateMotionPrimitives(showplots=False):
 		pathdata = []
 		for prim in prims:
 			# Forward and right turn
-			path = hook(prim[0], prim[1], initialyaw, -deltayaw, gridspacing)
+			path = hook(prim[0], prim[1], initialyaw, -deltayaw, gridspacing, 20)
 			pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
 			if showplots:
 				plotPath(path)
 
 			# Forward
 			forwarddist = prim[0] + prim[1]*abs(deltayaw)
-			path = forward(forwarddist, initialyaw, gridspacing)
+			path = forward(forwarddist, initialyaw, gridspacing, 20)
+			pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
+			if showplots:
+				plotPath(path)
+
+			# Short forward
+			forwarddist = gridspacing
+			extendpathnum = 1
+			cardinalangleval = 4*float(i)/numangles
+			if math.fmod(cardinalangleval, 1.0) < 0.001:
+				extendpathnum = 0
+			path = forward(forwarddist, initialyaw, gridspacing, 2, extendpathnum)
 			pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
 			if showplots:
 				plotPath(path)
 
 			# Forward and left turn
-			path = hook(prim[0], prim[1], initialyaw, deltayaw, gridspacing)
+			path = hook(prim[0], prim[1], initialyaw, deltayaw, gridspacing, 20)
 			pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
 			if showplots:
 				plotPath(path)
