@@ -401,6 +401,7 @@ class RobotSimulator(object):
         
     def zero_robot(self):
         self.fake_robot_pose = self.initial_pose()
+        self.fake_odometry = self.initial_odometry()
 
     def get_pointcloud2(self, grid, position, target_frame, transform, range=12.0):
         header =  std_msg.Header(0, rospy.Time.now(), target_frame)
