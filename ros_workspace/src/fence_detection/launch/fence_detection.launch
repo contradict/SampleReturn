@@ -35,14 +35,10 @@
     <node
         machine="navigate"
         pkg="fence_detection"
-        type="fence_detection.py"
+        type="freq_fence_detection.py"
         name="fence_detection"
         ns="fence"
         output="log">
-        <param name="min_h" type="int" value="5"/>
-        <param name="max_h" type="int" value="15"/>
-        <param name="min_s" type="int" value="155"/>
-        <param name="max_s" type="int" value="180"/>
         <remap from "input_image" to="/cameras/navigation/center/left/image_rect_color"/>
         <remap from "input_disparity" to="/cameras/navigation/center/disparity"/>
     </node>
