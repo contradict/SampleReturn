@@ -3,6 +3,7 @@ import math
 import collections
 import threading
 import random
+import numpy as np
 
 import smach
 import smach_ros
@@ -11,6 +12,7 @@ import actionlib
 import tf
 
 import std_msgs.msg as std_msg
+import nav_msgs.msg as nav_msg
 import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import move_base_msgs.msg as move_base_msg
@@ -24,11 +26,12 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 
 import samplereturn.util as util
+import samplereturn.bresenham as bresenham
 
 class LevelTwoRandom(object):
     
     def __init__(self):
-
+        
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf_listener = tf.TransformListener()
         
@@ -43,9 +46,10 @@ class LevelTwoRandom(object):
             if self.move_base.wait_for_server(rospy.Duration(0.1)):
                 break #all services up, exit this loop
             if (rospy.get_time() - start_time) > 10.0:
+                start_time =  rospy.get_time()
                 self.announcer.say("Move base not available")
                 rospy.logwarn('Timeout waiting for move base')
-            rospy.sleep(0.5)
+            rospy.sleep(0.1)
         
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -67,7 +71,8 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.line_plan_step = self.node_params.line_plan_step
         self.state_machine.userdata.line_replan_distance = self.node_params.line_replan_distance
         self.state_machine.userdata.line_velocity = self.node_params.line_velocity
-        self.state_machine.userdata.block_check_distance = self.node_params.block_check_distance
+        self.state_machine.userdata.blocked_check_distance = self.node_params.blocked_check_distance
+        self.state_machine.userdata.blocked_check_width = self.node_params.blocked_check_width        
         self.state_machine.userdata.blocked_rotation = self.node_params.blocked_rotation
         self.state_machine.userdata.blocked_rotation_step = self.node_params.blocked_rotation_step
         self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
@@ -117,6 +122,7 @@ class LevelTwoRandom(object):
                 search_line = smach.Concurrence(outcomes = ['sample_detected',
                                                             'move_complete',
                                                             'line_blocked',
+                                                            'timeout',
                                                             'return_home',
                                                             'preempted', 'aborted'],
                                 default_outcome = 'aborted',
@@ -125,7 +131,8 @@ class LevelTwoRandom(object):
                                               'line_velocity',
                                               'line_plan_step',
                                               'line_replan_distance',
-                                              'block_check_distance',
+                                              'blocked_check_distance',
+                                              'blocked_check_width',
                                               'return_time',
                                               'detected_sample',
                                               'motion_check_interval',
@@ -137,7 +144,7 @@ class LevelTwoRandom(object):
                                 outcome_map = { 'sample_detected' : {'DRIVE_TO_POSE':'sample_detected'},
                                                 'move_complete' : {'DRIVE_TO_POSE':'complete'},
                                                 'line_blocked' : {'SEARCH_LINE_MANAGER':'line_blocked'},
-                                                'line_blocked' : {'DRIVE_TO_POSE':'timeout'},
+                                                'timeout' : {'DRIVE_TO_POSE':'timeout'},    
                                                 'return_home' : {'SEARCH_LINE_MANAGER':'return_home'},
                                                 'preempted' : {'DRIVE_TO_POSE':'preempted',
                                                                'SEARCH_LINE_MANAGER':'preempted'} })
@@ -161,6 +168,7 @@ class LevelTwoRandom(object):
                                        transitions = {'sample_detected':'PURSUE_SAMPLE',
                                                       'move_complete':'SEARCH_LINE',
                                                       'line_blocked':'CHOOSE_NEW_LINE',
+                                                      'timeout':'CHOOSE_NEW_LINE',
                                                       'return_home':'START_RETURN_HOME',
                                                       'preempted':'LEVEL_TWO_PREEMPTED',
                                                       'aborted':'LEVEL_TWO_ABORTED'})
@@ -271,10 +279,6 @@ class LevelTwoRandom(object):
                                             self.state_machine,
                                             '/START_LEVEL_TWO')
 
-        #start action servers and services
-        sls.start()
-        level_two_server.run_server()
-        
         self.sample_listener = rospy.Subscriber('detected_sample_search',
                                         samplereturn_msg.NamedPoint,
                                         self.sample_update)
@@ -282,6 +286,13 @@ class LevelTwoRandom(object):
         self.beacon_listener = rospy.Subscriber("beacon_pose",
                                                 geometry_msg.PoseStamped,
                                                 self.beacon_update)
+        
+        #start action servers and services
+        sls.start()
+        level_two_server.run_server()
+        rospy.spin()
+        sls.stop()
+        
 
     def sample_update(self, sample):
         if sample.name == 'none':
@@ -295,8 +306,7 @@ class LevelTwoRandom(object):
         header = map_beacon_pose.header
         point = map_beacon_pose.pose.position
         beacon_point = geometry_msg.PointStamped(header, point)
-        self.state_machine.userdata.beacon_pose = beacon_point
-
+        self.state_machine.userdata.beacon_point = beacon_point
 
     
 #searches the globe   
@@ -326,7 +336,8 @@ class SearchLineManager(smach.State):
                                            'line_plan_step',
                                            'line_yaw',
                                            'line_replan_distance',
-                                           'block_check_distance',
+                                           'blocked_check_distance',
+                                           'blocked_check_width',
                                            'return_time'],
                              output_keys = ['next_line_pose'],
                              outcomes=['sample_detected',
@@ -337,8 +348,19 @@ class SearchLineManager(smach.State):
         self.listener = listener
         self.announcer = announcer
         
+        self.costmap_listener = rospy.Subscriber('local_costmap',
+                                        nav_msg.OccupancyGrid,
+                                        self.costmap_update)
+        
+        self.costmap = nav_msg.OccupancyGrid()
+        self.new_costmap_available = True
+        
+        self.test_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+        
     def execute(self, userdata):
     
+        self.last_line_blocked = False
+        
         while not rospy.is_shutdown():  
             
             if self.preempt_requested():
@@ -360,16 +382,72 @@ class SearchLineManager(smach.State):
                 self.announcer.say("Search time expired")
                 return 'return_home'
             
-            if self.line_blocked():
-               self.announcer.say("Line is blocked, rotate ing to new line")
-               return 'line_blocked'   
+            if self.new_costmap_available:
+                self.new_costmap_available = False
+                if self.line_blocked(userdata):
+               
+                    self.announcer.say("Line is blocked, rotate ing to new line")
+                    return 'line_blocked'   
         
             rospy.sleep(0.2)
-
-    def line_blocked(self):
+            
+            if(self.preempt_requested): self.service_preempt()
         
+        return 'aborted'
+
+    def costmap_update(self, costmap):
+        self.new_costmap_available = True
+        self.costmap = costmap
+        
+    def line_blocked(self, userdata):
+        costmap = self.costmap
+        check_width = userdata.blocked_check_width/2
+        check_dist = userdata.blocked_check_distance
+        resolution = costmap.info.resolution
+        origin = (np.trunc(costmap.info.width/2),
+                  np.trunc(costmap.info.height/2))
+        yaw = userdata.line_yaw
+        ll = self.check_point(origin, check_width, (yaw - math.pi/2), resolution)
+        ul = self.check_point(origin, check_width, (yaw + math.pi/2), resolution)
+        lr = self.check_point(ll[0], check_dist, yaw, resolution)
+        ur = self.check_point(ul[0], check_dist, yaw, resolution)
+                   
+        map_np = np.array(costmap.data, dtype='i1').reshape((costmap.info.height,costmap.info.width))
+        
+        start_points = bresenham.points(ll, ul)
+        end_points = bresenham.points(lr, ur)
+        total_count = len(start_points)
+        
+        blocked_count = 0
+        max_vals = []
+        for start, end in zip(start_points, end_points):
+            line = bresenham.points(start[None,:], end[None,:])
+            line_vals = map_np[line[:,1], line[:,0]]
+            max_val = (np.amax(line_vals))
+            max_vals.append(max_val)
+            map_np[line[:,1], line[:,0]] = max_val
+            if np.any(line_vals > 90):
+                blocked_count += 1   
+
+        map_np[start_points[:,1], start_points[:,0]] = 64
+        map_np[end_points[:,1], end_points[:,0]] = 64
+            
+        costmap.data = list(np.reshape(map_np, -1))
+        self.test_map_pub.publish(costmap)                        
+        
+        rospy.loginfo("BLOCKED COUNT: " + str(blocked_count) + "/" + str(len(max_vals)))
+        rospy.loginfo("MAX_VALS: " + str(max_vals))
+        if (blocked_count/float(total_count)) > 0.70:        
+            return True
+                    
         return False
     
+    #array of array for bresenham implementation    
+    def check_point(self, start, distance, yaw, res):
+        x = np.trunc(start[0] + (distance * math.cos(yaw))/res).astype('i2')
+        y = np.trunc(start[1] + (distance * math.sin(yaw))/res).astype('i2')
+        return np.array([[x, y]])
+           
 class ChooseNewLine(smach.State):
     
     def execute(self, userdata):
@@ -426,7 +504,7 @@ class LevelTwoPreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['complete','fail'])
         
-    def execute(self):
+    def execute(self, userdata):
         
         return 'complete'
 
@@ -434,6 +512,6 @@ class LevelTwoAborted(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['recover','fail'])
         
-    def execute(self):
+    def execute(self, userdata):
         
         return 'fail'
