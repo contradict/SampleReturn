@@ -229,6 +229,14 @@ class KalmanDetectionFilter
     meas_state.at<float>(0) = msg.point.x;
     meas_state.at<float>(1) = msg.point.y;
 
+    for (int i=0; i<exclusion_list_.size(); i++) {
+      float dist = sqrt(pow((std::get<0>(exclusion_list_[i]) - msg.point.x),2) +
+        pow((std::get<1>(exclusion_list_[i]) - msg.point.y),2));
+      if (dist < std::get<2>(exclusion_list_[i])) {
+        return;
+      }
+    }
+
     if (accumulate_) {
       for (int i=0; i<latched_filter_list_.size(); i++) {
         cv::Mat dist = (latched_filter_list_[i]->measurementMatrix)*
@@ -341,6 +349,12 @@ class KalmanDetectionFilter
       float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
       cv::circle(img, mean, 5, cv::Scalar(255,255,0));
       cv::ellipse(img, mean, cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
+    }
+
+    for (int i=0; i<exclusion_list_.size(); i++) {
+      cv::circle(img, cv::Point(std::get<0>(exclusion_list_[i])*px_per_meter,
+            std::get<1>(exclusion_list_[i])*px_per_meter),
+          std::get<2>(exclusion_list_[i])*px_per_meter, cv::Scalar(255,255,255));
     }
 
     printFilterState();
