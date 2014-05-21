@@ -155,10 +155,6 @@ class PursueSample(object):
         sls = smach_ros.IntrospectionServer('smach_grab_introspection',
                                             self.state_machine,
                                             '/START_SAMPLE_PURSUIT')
-
-        #start action servers and services
-        sls.start()
-        pursue_sample_server.run_server()
         
         #subscribers, need to go after state_machine
         self.sample_sub_search = rospy.Subscriber('detected_sample_search',
@@ -168,6 +164,12 @@ class PursueSample(object):
         self.sample_sub_manipulator = rospy.Subscriber('detected_sample_manipulator',
                                                         samplereturn_msg.NamedPoint,
                                                         self.sample_detection_manipulator)
+
+        #start action servers and services
+        sls.start()
+        pursue_sample_server.run_server()
+        rospy.spin()
+        sls.stop()
 
     def sample_detection_search(self, sample):
         if sample.name == 'none':
