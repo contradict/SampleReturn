@@ -157,17 +157,20 @@ class DriveToPoseState(smach.State):
         self.sample_detected = False
                 
     def execute(self, ud):
-        
         last_pose = util.get_current_robot_pose(self.listener)
         target_pose = ud.target_pose
         velocity = ud.velocity
-        
         goal = move_base_msg.MoveBaseGoal()
         goal.target_pose=target_pose
         self.move_client.send_goal(goal)
+        move_state = self.move_client.get_state()
         last_motion_check_time = rospy.get_time()
-        while self.move_client.get_state() in util.actionlib_working_states:
+        while not rospy.is_shutdown():
             rospy.sleep(0.1)
+            #is action server still working?
+            move_state = self.move_client.get_state()
+            if move_state not in util.actionlib_working_states:
+                break
             current_pose = util.get_current_robot_pose(self.listener)
             ud.last_pose = current_pose
             #handle preempts
@@ -194,12 +197,12 @@ class DriveToPoseState(smach.State):
                 last_motion_check_time = now
                 if (distance < ud.min_motion):
                     self.move_client.cancel_all_goals()
-                    return 'timeout'    
+                    return 'timeout'
 
-        if self.move_client.get_state() == action_msg.GoalStatus.SUCCEEDED:
+        if move_state == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
-        else:
-            return 'aborted'
+        
+        return 'aborted'
 
 #pursues a detected point, changing the move_base goal if the detection point
 #changes too much.  Detection and movement all specified in /map.
@@ -283,6 +286,8 @@ class PursueDetectedPoint(smach.State):
                             
             userdata.target_point = None       
             rospy.sleep(0.2)
+            
+        return 'aborted'
             
 class SelectMotionMode(smach.State):
     def __init__(self, CAN_interface, announcer, motion_mode, failannounce=None):
