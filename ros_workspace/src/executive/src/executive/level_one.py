@@ -38,12 +38,13 @@ class LevelOne(object):
         
         start_time = rospy.get_time()
         while not rospy.is_shutdown():
+            start_time =  rospy.get_time()
             if self.move_base.wait_for_server(rospy.Duration(0.1)):
                 break #all services up, exit this loop
             if (rospy.get_time() - start_time) > 10.0:
                 self.announcer.say("Move base not available")
                 rospy.logwarn('Timeout waiting for move base')
-            rospy.sleep(0.5)
+            rospy.sleep(0.1)
 
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -174,11 +175,7 @@ class LevelOne(object):
         sls = smach_ros.IntrospectionServer('smach_grab_introspection',
                                             self.state_machine,
                                             '/START_LEVEL_ONE')
-
-        #start action servers and services
-        sls.start()
-        level_one_server.run_server()
-        
+       
         #subscribers, need to go after state_machine
         self.sample_listener = rospy.Subscriber('detected_sample_search',
                                         samplereturn_msg.NamedPoint,
@@ -187,6 +184,12 @@ class LevelOne(object):
         self.beacon_listener = rospy.Subscriber("beacon_pose",
                                                 geometry_msg.PoseStamped,
                                                 self.beacon_update)
+
+        #start action servers and services
+        sls.start()
+        level_one_server.run_server()
+        rospy.spin()
+        sls.stop()
         
     def sample_update(self, sample):
         if sample.name == 'none':
