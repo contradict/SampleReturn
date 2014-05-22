@@ -27,6 +27,8 @@ class LevelOne(object):
 
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf_listener = tf.TransformListener()
         
@@ -204,6 +206,11 @@ class LevelOne(object):
         point = map_beacon_pose.pose.position
         beacon_target = geometry_msg.PointStamped(header, point)
         self.state_machine.userdata.beacon_target = beacon_target
+        
+    def shutdown_cb(self):
+        self.state_machine.request_preempt()
+        while self.state_machine.is_running():
+            rospy.sleep(0.1)
     
 #drives to the expected sample location    
 class StartLevelOne(smach.State):

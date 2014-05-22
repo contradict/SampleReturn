@@ -28,6 +28,8 @@ class PursueSample(object):
     
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf_listener = tf.TransformListener()
         self.node_params = util.get_node_params()
@@ -182,6 +184,11 @@ class PursueSample(object):
             self.state_machine.userdata.detected_sample = None
         else:
             self.state_machine.userdata.detected_sample = sample
+            
+    def shutdown_cb(self):
+        self.state_machine.request_preempt()
+        while self.state_machine.is_running():
+            rospy.sleep(0.1)
     
 #searches the globe   
 class StartSamplePursuit(smach.State):

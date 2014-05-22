@@ -314,7 +314,7 @@ class LevelTwoRandom(object):
     def shutdown_cb(self):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
-            rospy.sleep(0.5)
+            rospy.sleep(0.1)
     
 #searches the globe   
 class StartLeveLTwo(smach.State):

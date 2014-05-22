@@ -30,13 +30,13 @@ class ManualController(object):
     
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        
         #stuff namedtuple with joystick parameters
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_navigate")
-            
-
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],
@@ -274,6 +274,11 @@ class ManualController(object):
             self.state_machine.userdata.detected_sample = None
         else:
             self.state_machine.userdata.detected_sample = sample
+
+    def shutdown_cb(self):
+        self.state_machine.request_preempt()
+        while self.state_machine.is_running():
+            rospy.sleep(0.1)
    
 class ProcessGoal(smach.State):
     def __init__(self, announcer):
