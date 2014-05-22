@@ -175,6 +175,7 @@ class DriveToPoseState(smach.State):
             ud.last_pose = current_pose
             #handle preempts
             if self.preempt_requested():
+                rospy.logdebug("PREEMPT REQUESTED IN DriveToPoseState")
                 self.move_client.cancel_all_goals()
                 self.service_preempt()
                 return 'preempted'                            

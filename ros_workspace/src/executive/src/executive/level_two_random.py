@@ -32,6 +32,8 @@ class LevelTwoRandom(object):
     
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf_listener = tf.TransformListener()
         
@@ -215,7 +217,8 @@ class LevelTwoRandom(object):
                                                         self.tf_listener),
                                        transitions = {'complete':'SEARCH_LINE',
                                                       'timeout':'CHOOSE_NEW_LINE',
-                                                      'sample_detected':'LEVEL_TWO_ABORTED'},
+                                                      'sample_detected':'LEVEL_TWO_ABORTED',
+                                                      'preempted':'LEVEL_TWO_PREEMPTED'},
                                        remapping = {'target_pose':'rotate_pose',
                                                     'pursue_samples':'false'})
                 
@@ -308,6 +311,10 @@ class LevelTwoRandom(object):
         beacon_point = geometry_msg.PointStamped(header, point)
         self.state_machine.userdata.beacon_point = beacon_point
 
+    def shutdown_cb(self):
+        self.state_machine.request_preempt()
+        while self.state_machine.is_running():
+            rospy.sleep(0.5)
     
 #searches the globe   
 class StartLeveLTwo(smach.State):
@@ -364,6 +371,7 @@ class SearchLineManager(smach.State):
         while not rospy.is_shutdown():  
             
             if self.preempt_requested():
+                rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
                 self.service_preempt()
                 return 'preempted'
 
@@ -390,8 +398,6 @@ class SearchLineManager(smach.State):
                     return 'line_blocked'   
         
             rospy.sleep(0.2)
-            
-            if(self.preempt_requested): self.service_preempt()
         
         return 'aborted'
 
