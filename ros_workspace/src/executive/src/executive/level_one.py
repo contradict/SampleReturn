@@ -53,13 +53,16 @@ class LevelOne(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
 
+        #beacon approach params
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_point_lost_time = self.node_params.max_point_lost_time
+        self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
+        
+        #other parameters
         self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
         self.state_machine.userdata.min_motion = self.node_params.min_motion        
         self.state_machine.userdata.search_poses_2d = self.node_params.search_poses_2d
-        self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
         self.state_machine.userdata.detected_sample = None
         
         with self.state_machine:
@@ -107,7 +110,8 @@ class LevelOne(object):
                 @smach.cb_interface(input_keys=['detected_sample'])
                 def get_pursuit_goal_cb(userdata, request):
                     goal = samplereturn_msg.GeneralExecutiveGoal()
-                    goal.name = userdata.detected_sample.name
+                    goal.input_point = userdata.detected_sample
+                    goal.input_string = "level_one_pursuit_request"
                     return goal
                                 
                 smach.StateMachine.add('PURSUE_SAMPLE',
@@ -116,7 +120,7 @@ class LevelOne(object):
                                       goal_cb = get_pursuit_goal_cb),
                                       transitions = {'succeeded':'START_RETURN_HOME',
                                                      'preempted':'PURSUE_SAMPLE',
-                                                     'aborted':'LEVEL_ONE_ABORTED'})               
+                                                     'aborted':'START_RETURN_HOME'})               
                
                 smach.StateMachine.add('START_RETURN_HOME',
                                        StartReturnHome(self.announcer),
@@ -204,6 +208,7 @@ class LevelOne(object):
         map_beacon_pose = self.tf_listener.transformPose('/map', beacon_pose)
         header = map_beacon_pose.header
         point = map_beacon_pose.pose.position
+        point.x += 1.5 #start point is 1.5 meters in front of beacon
         beacon_target = geometry_msg.PointStamped(header, point)
         self.state_machine.userdata.beacon_target = beacon_target
         
@@ -246,7 +251,8 @@ class StartLevelOne(smach.State):
         userdata.pose_list = path_pose_list        
         userdata.stop_on_sample = False
         
-        result = samplereturn_msg.GeneralExecutiveResult('initialized')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'initialized'
         userdata.action_result = result
         
         return 'next'
@@ -328,10 +334,11 @@ class LevelOnePreempted(smach.State):
     def execute(self, userdata):
         
         self.CAN_interface.select_mode(
-            platform_srv.SelectMotionModeRequest.MODE_ENABLE )
+            platform_srv.SelectMotionModeRequest.MODE_ENABLE)
         self.CAN_interface.publish_zero()        
         
-        result = samplereturn_msg.GeneralExecutiveResult('preempted')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'preempted'
         userdata.action_result = result
                 
         #shutdown all internal processes to level_one
@@ -346,7 +353,8 @@ class LevelOneAborted(smach.State):
         
     def execute(self, userdata):
         
-        result = samplereturn_msg.GeneralExecutiveResult('aborted')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'aborted'
         userdata.action_result = result
         
         return 'fail'
