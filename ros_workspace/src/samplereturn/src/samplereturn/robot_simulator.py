@@ -48,7 +48,7 @@ class RobotSimulator(object):
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = True
-        self.fake_sample = {'x':9, 'y':-23, 'name':'none'}
+        self.fake_sample = {'x':11, 'y':-11, 'name':'none', 'id':1}
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
@@ -306,6 +306,7 @@ class RobotSimulator(object):
                                                    self.fake_sample['y'],
                                                    0.0)
             msg.name = self.fake_sample['name']
+            msg.sample_id = self.fake_sample['id']
             self.search_sample_pub.publish(msg)
             
     def publish_sample_detection_manipulator(self, event):
@@ -316,6 +317,7 @@ class RobotSimulator(object):
                                                    self.fake_sample['y'],
                                                    0.0)
             msg.name = self.fake_sample['name']
+            msg.sample_id = self.fake_sample['id']
             self.manipulator_sample_pub.publish(msg)
             
     def publish_beacon_pose(self, event):
@@ -480,8 +482,8 @@ class RobotSimulator(object):
 class ManipulatorState(smach.State):
     def execute(self, userdata):
         start_time = rospy.get_time()
-        #wait 2 seconds then return success
-        while (rospy.get_time() - start_time) < 2:
+        #wait 5 seconds then return success
+        while (rospy.get_time() - start_time) < 5:
             if self.preempt_requested():
                 userdata.action_result = manipulator_msg.ManipulatorResult('fake_failure', False)
                 return 'preempted'
