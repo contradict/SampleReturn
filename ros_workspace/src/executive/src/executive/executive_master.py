@@ -314,30 +314,6 @@ class StartState(smach.State):
         userdata.camera_status = 'unknown'
         return 'next'
         
-class WaitForUnpause(smach.State):
-    def __init__(self, announcer):
-        smach.State.__init__(self,
-                             input_keys = ['paused'],
-                             outcomes=['unpaused', 'paused', 'aborted'])
-
-        self.announcer = announcer
-                
-    def execute(self, userdata):
-        
-        if userdata.paused:
-            words = "Waiting for system enable"
-            self.announcer.say(words)
-        
-        start_time = rospy.get_time()
-        while not rospy.is_shutdown():
-            if not userdata.paused:
-                return 'unpaused'
-            rospy.sleep(0.1)
-            if (rospy.get_time() - start_time) > timeout:
-                return 'timeout'
-                
-        return 'paused'
-        
 #this state homes all mechanisms on the robot platform
 class HomePlatform(smach.State):
     def __init__(self, announcer):
