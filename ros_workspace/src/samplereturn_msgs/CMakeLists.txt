@@ -78,7 +78,8 @@ add_message_files(
   FILES
   VoiceAnnouncement.msg
   CameraParams.msg
-  NamedPoint.msg  
+  NamedPoint.msg
+  PursuitResult.msg
 )
 
 add_service_files(
