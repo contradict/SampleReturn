@@ -64,9 +64,7 @@ class LevelTwoRandom(object):
                                                   rospy.Duration(self.node_params.return_time_minutes*60)
         
         #sample pursuit params
-        self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
-        self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
-        self.state_machine.userdata.max_point_lost_time = self.node_params.max_sample_lost_time
+
         self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
         
         #search line parameters
@@ -159,7 +157,7 @@ class LevelTwoRandom(object):
                                                         'velocity':'line_velocity',
                                                         'last_pose':'last_line_pose',
                                                         'pursue_samples':'true',
-                                                        'stop_on_samples':'false'})
+                                                        'stop_on_sample':'false'})
 
                     smach.Concurrence.add('SEARCH_LINE_MANAGER',
                                           SearchLineManager(self.tf_listener, self.announcer))
@@ -188,7 +186,7 @@ class LevelTwoRandom(object):
                                       goal_cb = get_pursuit_goal_cb),
                                       transitions = {'succeeded':'RETURN_TO_SEARCH_LINE',
                                                      'preempted':'RETURN_TO_SEARCH_LINE',
-                                                     'aborted':'LEVEL_TWO_ABORTED'})
+                                                     'aborted':'RETURN_TO_SEARCH_LINE'})
                 
 
                 smach.StateMachine.add('RETURN_TO_SEARCH_LINE',
@@ -196,18 +194,14 @@ class LevelTwoRandom(object):
                                                         self.tf_listener),
                                        transitions = {'complete':'SEARCH_LINE',
                                                       'timeout':'START_RETURN_HOME',
-                                                      'sample_detected':'LEVEL_TWO_ABORTED'},
-                                       remapping = {'target_pose':'last_line_pose'})
+                                                      'sample_detected':'PURSUE_SAMPLE'},
+                                       remapping = {'target_pose':'last_line_pose',
+                                                    'pursue_samples':'true',
+                                                    'stop_on_sample':'false'})
                 
                 smach.StateMachine.add('CHOOSE_NEW_LINE',
-                                       ChooseNewLine(outcomes=['next', 'preempted', 'aborted'],
-                                                     input_keys=['line_yaw',
-                                                                 'last_line_pose',
-                                                                 'line_plan_step',
-                                                                 'blocked_rotation'],
-                                                     output_keys=['line_yaw',
-                                                                  'next_line_pose',
-                                                                  'rotate_pose']),
+                                       ChooseNewLine(self.tf_listener),
+
                                        transitions = {'next':'ROTATE_TO_NEW_LINE',
                                                       'preempted':'LEVEL_TWO_PREEMPTED',
                                                       'aborted':'LEVEL_TWO_ABORTED'})
@@ -346,7 +340,8 @@ class SearchLineManager(smach.State):
                                            'blocked_check_distance',
                                            'blocked_check_width',
                                            'return_time'],
-                             output_keys = ['next_line_pose'],
+                             output_keys = ['next_line_pose',
+                                            'detected_sample'],
                              outcomes=['sample_detected',
                                        'line_blocked',
                                        'return_home',
@@ -359,6 +354,13 @@ class SearchLineManager(smach.State):
                                         nav_msg.OccupancyGrid,
                                         self.costmap_update)
         
+        #inside a concurrence, userdata cannot be manipulated from outside the state_machine
+        #so, this thing needs it
+        self.search_listener = rospy.Subscriber('detected_sample_search',
+                                samplereturn_msg.NamedPoint,
+                                self.search_update)
+        self.detected_sample = None
+        
         self.costmap = nav_msg.OccupancyGrid()
         self.new_costmap_available = True
         
@@ -369,6 +371,8 @@ class SearchLineManager(smach.State):
         self.last_line_blocked = False
         
         while not rospy.is_shutdown():  
+            
+            userdata.detected_sample = self.detected_sample
             
             if self.preempt_requested():
                 rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
@@ -393,13 +397,18 @@ class SearchLineManager(smach.State):
             if self.new_costmap_available:
                 self.new_costmap_available = False
                 if self.line_blocked(userdata):
-               
                     self.announcer.say("Line is blocked, rotate ing to new line")
                     return 'line_blocked'   
         
             rospy.sleep(0.2)
         
         return 'aborted'
+    
+    def search_update(self, sample):
+        if sample.name == 'none':
+            self.detected_sample = None
+        else:
+            self.detected_sample = sample        
 
     def costmap_update(self, costmap):
         self.new_costmap_available = True
@@ -441,8 +450,8 @@ class SearchLineManager(smach.State):
         costmap.data = list(np.reshape(map_np, -1))
         self.test_map_pub.publish(costmap)                        
         
-        rospy.loginfo("BLOCKED COUNT: " + str(blocked_count) + "/" + str(len(max_vals)))
-        rospy.loginfo("MAX_VALS: " + str(max_vals))
+        #rospy.loginfo("BLOCKED COUNT: " + str(blocked_count) + "/" + str(len(max_vals)))
+        #rospy.loginfo("MAX_VALS: " + str(max_vals))
         if (blocked_count/float(total_count)) > 0.70:        
             return True
                     
@@ -455,13 +464,32 @@ class SearchLineManager(smach.State):
         return np.array([[x, y]])
            
 class ChooseNewLine(smach.State):
+
+    def __init__(self, tf_listener):
+        smach.State.__init__(self,
+                             outcomes=['next', 'preempted', 'aborted'],
+                             input_keys=['line_yaw',
+                                         'last_line_pose',
+                                         'line_plan_step',
+                                         'blocked_rotation'],
+                             output_keys=['line_yaw',
+                                          'next_line_pose',
+                                          'rotate_pose']),  
+  
+        self.tf_listener = tf_listener        
     
     def execute(self, userdata):
-        current_pose = userdata.last_line_pose
+        rospy.sleep(1.0) #wait for robot to settle
+        current_pose = util.get_current_robot_pose(self.tf_listener)
+        yaw_quat = tf.transformations.quaternion_from_euler(0, 0, userdata.line_yaw)
+        #stupid planner may not have the robot oriented along the search line,
+        #set orientation to that value anyway
+        current_pose.pose.orientation = geometry_msg.Quaternion(*yaw_quat)
         yaw_changes = [math.radians(userdata.blocked_rotation),
                       math.radians(-1*userdata.blocked_rotation)]
         yaw_change = random.choice(yaw_changes)
         line_yaw = userdata.line_yaw + yaw_change
+        
         rotate_pose = util.pose_rotate(current_pose, yaw_change)
         next_line_pose = util.pose_translate_by_yaw(rotate_pose,
                                                     userdata.line_plan_step,
