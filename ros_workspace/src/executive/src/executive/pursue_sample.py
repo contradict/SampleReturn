@@ -44,10 +44,13 @@ class PursueSample(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.target_point = None
-        self.state_machine.userdata.min_pursuit_distance = 5
-        self.state_machine.userdata.max_pursuit_error = 0.2
-        self.state_machine.userdata.max_point_lost_time = 20
-        self.state_machine.userdata.square_search_size = 0.3
+        
+        self.state_machine.userdata.square_search_size = self.node_params.square_search_size
+        self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
+        self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
+        self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        
+        self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
+        self.state_machine.userdata.min_motion = self.node_params.min_motion 
     
         with self.state_machine:
             
@@ -62,7 +65,8 @@ class PursueSample(object):
                                                            within_min_msg = 'Switching to manipulator detection'),
                                        transitions = {'min_distance':'ENABLE_MANIPULATOR_DETECTOR',
                                                       'point_lost':'PURSUE_SAMPLE_ABORTED'},
-                                       remapping = {'target_point':'target_sample'})
+                                       remapping = {'target_point':'target_sample',
+                                                    'max_point_lost_time':'max_sample_lost_time'})
                 
                 smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                         smach_ros.ServiceState('enable_manipulator_detector',
@@ -234,7 +238,7 @@ class LoadSearchPath(smach.State):
     def execute(self, userdata):
 
         pose_list = []
-        square_step = 2
+        square_step = userdata.square_search_size
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
         next_pose = util.pose_translate(self.listener, start_pose, square_step, 0 )

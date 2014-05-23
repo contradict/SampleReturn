@@ -114,7 +114,13 @@
         output="log"
         ns="/processes/executive">
     
-        <param name="sample_list" value="fill this out"/>
+        <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <param name="max_pursuit_error" type="double" value="0.3"/>
+        <param name="max_sample_lost_time" type="double" value="30"/>
+        <param name="motion_check_interval" type="double" value="30"/>
+        <param name="min_motion" type="double" value="0.5"/>
+        <param name="square_search_size" type="double" value="0.3"/>
+
     </node>
 
     <node
