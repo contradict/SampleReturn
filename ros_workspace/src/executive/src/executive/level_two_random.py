@@ -176,8 +176,8 @@ class LevelTwoRandom(object):
                 
                 @smach.cb_interface(input_keys=['detected_sample'])
                 def get_pursuit_goal_cb(userdata, request):
-                    goal = samplereturn_msg.GeneralExecutiveGoal()
-                    goal.name = userdata.detected_sample.name
+                    goal.input_point = userdata.detected_sample
+                    goal.input_string = "level_two_pursuit_request"
                     return goal
                                 
                 smach.StateMachine.add('PURSUE_SAMPLE',
@@ -315,7 +315,8 @@ class StartLeveLTwo(smach.State):
 
     def execute(self, userdata):
         
-        result = samplereturn_msg.GeneralExecutiveResult('initialized')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'initialized'
         userdata.action_result = result
         userdata.line_yaw = 0
         userdata.velocity = 0.5

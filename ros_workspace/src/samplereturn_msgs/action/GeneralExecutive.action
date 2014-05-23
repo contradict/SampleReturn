@@ -1,10 +1,12 @@
 # Goal
-string name
-float32 input_value
+string input_string
+float32 input_float
+samplereturn_msgs/NamedPoint input_point
 ---
 # Result
-string result
+string result_string
+float32 result_float
 ---
 # Feedback
 string state
-float32 output_value
+float32 feedback_float
