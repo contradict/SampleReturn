@@ -220,12 +220,12 @@ class PursueDetectedPoint(smach.State):
                                        'point_lost',
                                        'preempted', 'aborted'],
                              input_keys=['target_point',
+                                         'velocity',
                                          'min_pursuit_distance',
                                          'max_pursuit_error',
                                          'max_point_lost_time'],
                              output_keys=['target_point',
                                           'target_pose',
-                                          'velocity',
                                           'pursue_samples'])
     
         self.announcer = announcer
@@ -240,6 +240,7 @@ class PursueDetectedPoint(smach.State):
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.logdebug("PURSUIT start pose: " + str(start_pose))
         point_on_map = self.listener.transformPoint('/map', userdata.target_point)
+        velocity = userdata.velocity
         
         goal_pose = geometry_msg.Pose()
         goal_pose.position = point_on_map.point
