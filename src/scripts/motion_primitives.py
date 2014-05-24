@@ -157,7 +157,7 @@ def makeForward(path, knot, N, forward, yaw):
 	#for n in xrange(1,N):
 		#s=n/float(N-1)
 	s = 0.0
-	while s <= l(1.0):
+	while s <= 1.0:
 		knot.pose.position.x = P0[0] + l(s)*cos(yaw)
 		knot.pose.position.y = P0[1] + l(s)*sin(yaw)
 		yawtoknot(knot, yaw)
@@ -171,19 +171,56 @@ def makeForward(path, knot, N, forward, yaw):
 		s = s + substep
 	return path, knot
 
-def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2):
+def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2, gridspacing=0.1):
+    # find the end point, with grid alignment
+    straighten = 0.5
     arcdist = R*abs(deltayaw)
-    straighten = 0.2
-    step = 0.1
+    yaw0 = initialyaw
+    P0 = np.r_[knot.pose.position.x, knot.pose.position.y]
+    P1 = np.r_[P0[0] + forward*cos(yaw0), P0[1] + forward*sin(yaw0)]
+    yaw = yaw0 + deltayaw
+    sign = np.sign(deltayaw)
+    theta = sign * -pi/2+yaw
+    center = R*np.r_[cos(yaw0+sign*pi/2), sin(yaw0+sign*pi/2)] + P1
+    P2 = np.r_[R*cos(theta) + center[0], R*sin(theta) + center[1]]
+    P3 = np.r_[P2[0] + straighten*cos(yaw), P2[1] + straighten*sin(yaw)]
+    P4 = np.r_[round(P3[0]/gridspacing)*gridspacing, round(P3[1]/gridspacing)*gridspacing]
+    # now find the intersection of the tangent line from the circle to P4
+    P4centerdist = norm(P4-center)
+    P4tangentdist = math.sqrt(P4centerdist*P4centerdist-R*R)
+    tempX = (R*R)/P4centerdist
+    centerToP4 = (P4-center) / P4centerdist
+    normalCenterToP4 = np.r_[centerToP4[1], -centerToP4[0]]
+    tempY = math.sqrt(R*R - tempX*tempX)
+    P5 = centerToP4*tempX + normalCenterToP4*tempY + center
+    P6 = centerToP4*tempX - normalCenterToP4*tempY + center
+    # pick from P5 and P6 the closer to P2
+    P5toP2dist = norm(P5-P2)
+    P6toP2dist = norm(P6-P2)
+    if P5toP2dist < P6toP2dist:
+        P7 = P5
+    else:
+        P7 = P6
+    # recompute the arcdist, deltayaw, and straighten
+    P7centerdist = norm(P7-center)
+    P1centerdist = norm(P1-center)
+    centerToP7 = (P7-center) / P7centerdist
+    centerToP1 = (P1-center) / P1centerdist
+    deltayaw = sign * abs(math.acos(centerToP7[0]*centerToP1[0] + centerToP7[1]*centerToP1[1]))
+    arcdist = R*abs(deltayaw)
+    straighten = norm(P7-P4)
+
+	# compute the path
+    step = gridspacing
     substep = step/20
     T, l, vl = scurve(0, forward+arcdist+straighten, 1.0)
-    yaw0 = yawfromknot(knot)
+    yaw0 = initialyaw
     P0 = np.r_[knot.pose.position.x, knot.pose.position.y]
     V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
     #for n in xrange(1,N):
     #    s=n/float(N-1)
     s = 0.0
-    while s <= l(1.0):
+    while s < 1.0:
         t=s*T
         if l(s)<forward:
             # drive forward
@@ -219,9 +256,18 @@ def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2):
             knot.twist.angular.z = 0
         knot.header.seq += 1
         knot.header.stamp += rospy.Duration(T/N)
-        if (math.fmod(s, step) < 0.0001):
+        if (math.fmod(s, step) < 0.001):
             path.knots.append(deepcopy(knot))
         s = s + substep
+    
+    yaw = initialyaw + deltayaw
+    knot.pose.position.x = P4[0]
+    knot.pose.position.y = P4[1]
+    yawtoknot(knot, yaw)
+    knot.twist.linear.x = vl(s)*cos(yaw)
+    knot.twist.linear.y = vl(s)*sin(yaw)
+    knot.twist.angular.z = 0
+    path.knots.append(deepcopy(knot))
     return path, knot
 
 def nancheck(path):
@@ -243,22 +289,21 @@ def nancheck(path):
             return False
     return True
 
-def hook(forward, R, initialyaw, deltayaw, gridSpacing=0.1, N=20, extendpathnum=3):
+def hook(forward, R, initialyaw, deltayaw, gridSpacing=0.1, N=20):
 	path = plat_msgs.Path()
 	knot = plat_msgs.Knot()
 	yawtoknot(knot, initialyaw)
 
-	path, knot = makeHook(path, knot, N, forward, R, initialyaw, deltayaw)
-	path, knot = extendPathGridAlign(path, knot, gridSpacing, extendpathnum)
+	path, knot = makeHook(path, knot, N, forward, R, initialyaw, deltayaw, gridSpacing)
 
 	return path
 
-def forward(forward, yaw, gridSpacing=0.1, N=20, extendpathnum=3):
+def forward(forward, yaw, gridSpacing=0.1, N=20):
 	path = plat_msgs.Path()
 	knot = plat_msgs.Knot()
 
 	path, knot = makeForward(path, knot, N, forward, yaw)
-	path, knot = extendPathGridAlign(path, knot, gridSpacing, extendpathnum)
+	path, knot = extendPathGridAlign(path, knot, gridSpacing)
 
 	return path
 
@@ -361,7 +406,7 @@ def generateMotionPrimitives(showplots=False):
 			cardinalangleval = 4*float(i)/numangles
 			if math.fmod(cardinalangleval, 1.0) < 0.001:
 				extendpathnum = 0
-			path = forward(forwarddist, initialyaw, gridspacing, 2, extendpathnum)
+			path = forward(forwarddist, initialyaw, gridspacing, 2)
 			pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
 			if showplots:
 				plotPath(path)
@@ -390,4 +435,4 @@ def generateMotionPrimitives(showplots=False):
 	
 
 if __name__ == "__main__":
-	generateMotionPrimitives(False)
+	generateMotionPrimitives(True)
