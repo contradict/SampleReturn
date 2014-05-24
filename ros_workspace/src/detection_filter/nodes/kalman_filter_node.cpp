@@ -53,13 +53,18 @@ class KalmanDetectionFilter
   double pos_exclusion_radius_;
   double neg_exclusion_radius_;
 
+  double process_noise_cov_;
+  double measurement_noise_cov_;
+  double error_cov_post_;
+  double period_;
+
   image_geometry::PinholeCameraModel cam_model_;
 
   public:
   KalmanDetectionFilter()
   {
-    //cam_info_topic = "camera_info";
-    cam_info_topic = "/cameras/manipulator/left/camera_info";
+    cam_info_topic = "camera_info";
+    //cam_info_topic = "/cameras/manipulator/left/camera_info";
     detection_topic = "point";
     img_detection_topic = "img_point";
     filtered_detection_topic = "filtered_point";
@@ -76,6 +81,11 @@ class KalmanDetectionFilter
     private_node_handle_.param("accumulate", accumulate_, false);
     private_node_handle_.param("positive_exclusion_radius", pos_exclusion_radius_, double(10.0));
     private_node_handle_.param("negative_exclusion_radius", neg_exclusion_radius_, double(1.5));
+
+    private_node_handle_.param("process_noise_cov", process_noise_cov_, double(0.05));
+    private_node_handle_.param("measurement_noise_cov", measurement_noise_cov_, double(0.5));
+    private_node_handle_.param("error_cov_post", error_cov_post_, double(0.5));
+    private_node_handle_.param("period", period_, double(2));
 
     sub_cam_info =
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
@@ -193,14 +203,14 @@ class KalmanDetectionFilter
     cv::Mat state(4, 1, CV_32F); /* x, y, vx, vy */
     cv::Mat processNoise(4, 1, CV_32F);
 
-    KF->transitionMatrix = (cv::Mat_<float>(4,4) << 1, 0, 0.03, 0,
-                                                    0, 1, 0, 0.03,
+    KF->transitionMatrix = (cv::Mat_<float>(4,4) << 1, 0, period_, 0,
+                                                    0, 1, 0, period_,
                                                     0, 0, 1, 0,
                                                     0, 0, 0, 1);
     cv::setIdentity(KF->measurementMatrix);
-    cv::setIdentity(KF->processNoiseCov, cv::Scalar(1e-3));
-    cv::setIdentity(KF->measurementNoiseCov, cv::Scalar(2e-2));
-    cv::setIdentity(KF->errorCovPost, cv::Scalar(1e-1));
+    cv::setIdentity(KF->processNoiseCov, cv::Scalar(process_noise_cov_));
+    cv::setIdentity(KF->measurementNoiseCov, cv::Scalar(measurement_noise_cov_));
+    cv::setIdentity(KF->errorCovPost, cv::Scalar(error_cov_post_));
 
     KF->statePost.at<float>(0) = msg.point.x;
     KF->statePost.at<float>(1) = msg.point.y;
