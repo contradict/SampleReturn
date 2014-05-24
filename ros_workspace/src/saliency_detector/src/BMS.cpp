@@ -157,7 +157,15 @@ Mat BMS::getAttentionMap(const Mat& bm)
 Mat BMS::getSaliencyMap()
 {
 	Mat ret;
-	normalize(_sm,ret,255.0,0.0,NORM_MINMAX);
+  //double minVal;
+  //double maxVal;
+  //minMaxLoc(_sm, &minVal, &maxVal);
+  //std::cout << "Max: " << maxVal << "Min: " << minVal << std::endl;
+  _sm.convertTo(_sm,CV_32FC1);
+  threshold(_sm,ret,1.5,0.0,THRESH_TRUNC);
+  ret *= 170.0;
+	//normalize(_sm,ret,255.0,0.0,NORM_MINMAX);
+	//normalize(_sm,ret,0.0,255.0,NORM_MINMAX);
 	ret.convertTo(ret,CV_8UC1);
 	return ret;
 }
