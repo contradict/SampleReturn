@@ -7,7 +7,7 @@ import copy
 
 from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
 from sensor_msgs.msg import PointCloud2
-from linemod_detector.msg import NamedPoint
+from samplereturn_msgs.msg import NamedPoint
 from visualization_msgs.msg import Marker
 from cv_bridge import CvBridge
 from tf import TransformListener
@@ -46,8 +46,8 @@ class ray_to_points(object):
 
     ground_named_point, odom_named_point = self.cast_ray(point_stamped,self.tf,point_in.name)
     rospy.logdebug("ground_named_point %s",ground_named_point)
-    self.named_point_pub.publish(ground_named_point)
     rospy.logdebug("odom_named_point %s",odom_named_point)
+    self.named_point_pub.publish(odom_named_point)
     self.send_marker(odom_named_point)
 
   def send_marker(self, named_pt):
@@ -68,6 +68,27 @@ class ray_to_points(object):
     m.color.a=1.0
     m.id = self.count
     #m.text=named_pt.name
+    self.marker_pub.publish(m)
+    self.count += 1
+
+    t=Marker()
+    t.header = copy.deepcopy(named_pt.header)
+    m.type = Marker.TEXT_VIEW_FACING
+    m.pose.position = named_pt.point
+    m.pose.position.z += 0.1
+    m.pose.orientation.x=0.707
+    m.pose.orientation.y=0.0
+    m.pose.orientation.z=0.0
+    m.pose.orientation.w=0.707
+    m.scale.x=0.2
+    m.scale.y=0.2
+    m.scale.z=0.2
+    m.color.r=0.8
+    m.color.g=0.8
+    m.color.b=0.8
+    m.color.a=1.0
+    m.text = named_pt.name
+    m.id = self.count
     self.marker_pub.publish(m)
     self.count += 1
 
@@ -93,7 +114,13 @@ class ray_to_points(object):
     ground_named_point.header.stamp = point_in.header.stamp
     ground_named_point.name = name
 
-    odom_named_point = self.tf.transformPoint('/odom',ground_named_point)
+    odom_named_point = NamedPoint()
+    odom_point = self.tf.transformPoint('/odom',ground_named_point)
+    odom_named_point.point = odom_point.point
+    odom_named_point.header = point_in.header
+    odom_named_point.header.frame_id = "/odom"
+    odom_named_point.header.stamp = point_in.header.stamp
+    odom_named_point.name = name
 
     return ground_named_point, odom_named_point
 
