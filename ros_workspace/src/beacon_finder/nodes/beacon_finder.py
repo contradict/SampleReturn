@@ -3,6 +3,8 @@ import sys
 import rospy
 import rosnode
 import math
+import Queue
+import threading
 import cv2
 import numpy
 import tf
@@ -10,15 +12,18 @@ from cv_bridge import CvBridge
 from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import Vector3, Quaternion, PoseStamped
-from tf.transformations import quaternion_from_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_inverse, quaternion_multiply
 from matplotlib import pyplot as plt
+from image_geometry import PinholeCameraModel
 
 class BeaconFinder:
 	"""A class to locate the beacon in an image and publish a vector in the camera's frame from the robot to the beacon"""
 	
 	def __init__(self):
-		self._image_subscriber = rospy.Subscriber('camera_image', Image, self.image_callback, None, 8)
-		self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo, self.camera_info_callback, None, 8)
+		self._image_subscriber = rospy.Subscriber('camera_image', Image,
+			self.image_callback, queue_size=1, buff_size=1024*1024*64)
+		self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo,
+			self.camera_info_callback, queue_size=1)
 		self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseStamped)
 		self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
 		self._cv_bridge = CvBridge()
@@ -74,94 +79,137 @@ class BeaconFinder:
 
 		self._blob_detector = cv2.SimpleBlobDetector(self._blob_detector_params)
 		self._blob_detector_alt = cv2.SimpleBlobDetector(self._blob_detector_params_alt)
-		self._camera_matrix = numpy.array([0])
+		self._camera_model = None
+
+		self._found_queue = Queue.Queue()
 
 		if self._do_histogram_equalization:
 			self._image_output_encoding = '8UC1'
 		else:
-			self._image_output_encoding = 'bgr8'
+			self._image_output_encoding = 'rgb8'
 
 		# Construct a matrix of points representing the circles grid facing the camera
 		d = rospy.get_param("~vertical_distance_between_circles", 0.3048)
-		if rospy.get_param("~is_first_column_shifted_down", False):
+		self._beacon_thickness = rospy.get_param("~beacon_thickness", 0.394)
+		shifted = rospy.get_param("~is_first_column_shifted_down", False)
+		self._circles_grid = self.create_circles_grid(d, shifted)
+
+	def create_circles_grid(self, d, shifted):
+		if shifted:
 			offset = -d/2.0
 		else:
 			offset = 0.0
-		self._circles_grid = numpy.array([0,0,0], dtype="float32") # Create a 'dummy' row
+		circles_grid = numpy.array([0,0,0], dtype="float32") # Create a 'dummy' row
 		for column in range(-self._num_columns/2+1, self._num_columns/2+1):
 			for row in range(0, -self._num_rows, -1):
-				self._circles_grid = numpy.vstack((self._circles_grid, numpy.array([column*d/2.0,row*d+offset,0.0])))
+		 		circles_grid = numpy.vstack((circles_grid, numpy.array([column*d/2.0,row*d+offset,0.0])))
 			if offset == 0.0:
 				offset = -d/2.0
 			else:
-				offset = 0.0
-		self._circles_grid = numpy.delete(self._circles_grid, 0, 0) # Delete the 'dummy' row
-		self._circles_grid = numpy.array(self._circles_grid, dtype="float32") # Ensure float32 data type, which shouldn't be necessary at this point, but it is...
+		 		offset = 0.0
+		circles_grid = numpy.delete(circles_grid, 0, 0) # Delete the 'dummy' row
+		circles_grid = numpy.array(circles_grid, dtype="float32") # Ensure float32 data type, which shouldn't be necessary at this point, but it is...
+		return circles_grid
+
+	def look(self, name, image, detector):
+		rospy.loginfo("Looking for %s", name)
+		found, centers = cv2.findCirclesGrid(image,
+			(self._num_rows, self._num_columns),
+			flags=cv2.CALIB_CB_ASYMMETRIC_GRID,
+			blobDetector=detector)
+		if found:
+			rospy.loginfo("Found %s", name)
+			self._found_queue.put((name, centers, found))
 
 	def image_callback(self, image):
 		# This function receives an image, attempts to locate the beacon
 		# in it, then if successful outputs a vector towards it in the
 		# camera's frame
-		if self._camera_matrix.any():
-			image_cv = numpy.asarray(self._cv_bridge.imgmsg_to_cv(image, 'bgr8'))
-
-			#image_cv = cv2.undistort(image_cv, self._camera_matrix, self._distortion_coefficients)
-
+		found = False
+		centers = numpy.array([])
+		image_cv = self._cv_bridge.imgmsg_to_cv2(image)
+		if self._camera_model is not None:
 			if self._do_histogram_equalization:
 				image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)
 				image_cv = cv2.equalizeHist(image_cv)
 
-			#image_cv = cv2.resize(image_cv, (1920, 1080))
+			while not self._found_queue.empty():
+				self._found_queue.get()
 
-			found_beacon, centers = cv2.findCirclesGrid(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID, blobDetector=self._blob_detector)
-			if not found_beacon:
-				found_beacon, centers = cv2.findCirclesGrid(image_cv, (self._num_rows, self._num_columns), flags=cv2.CALIB_CB_ASYMMETRIC_GRID, blobDetector=self._blob_detector_alt)
+			front_thread = threading.Thread( target=self.look,
+					args = ("Front", image_cv, self._blob_detector) )
+			front_thread.start()
+			back_thread = threading.Thread( target=self.look,
+					args = ("Back", image_cv, self._blob_detector_alt))
+			back_thread.start()
+			front_thread.join()
+			back_thread.join()
 
-			if found_beacon:
-				beacon_pose = PoseStamped()
+			while not self._found_queue.empty():
+				name, centers, found = self._found_queue.get()
+				if name == "Back":
+					transform =    numpy.r_[[[-1, 0,  0,  0]],
+								[[ 0, 1,  0,  0]],
+								[[ 0, 0, -1, -self._beacon_thickness]],
+								[[ 0, 0,  0,  1]]]
+				else:
+					transform = numpy.eye(4)
+				pose_matrix = self.compute_beacon_pose(centers, transform)
+				self.send_beacon_message(pose_matrix, image.header)
 
-				# Compute the position and orientation of the beacon
-				rotation_vector, translation_vector, inliers = cv2.solvePnPRansac(self._circles_grid, centers, self._camera_matrix, self._distortion_coefficients)
-				rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
-				rotation_matrix = numpy.hstack((rotation_matrix, numpy.array([[0],[0],[0]])))
-				rotation_matrix = numpy.vstack((rotation_matrix, numpy.array([0,0,0,1])))
-				quat = quaternion_from_matrix(rotation_matrix)
+		rospy.loginfo("Latency: %f", (rospy.Time.now() - image.header.stamp).to_sec())
+		self.send_debug_image( image_cv, centers, found)
 
-				beacon_pose.pose.position.x = translation_vector[0]
-				beacon_pose.pose.position.y = translation_vector[1]
-				beacon_pose.pose.position.z = translation_vector[2]
-				beacon_pose.pose.orientation.x = quat[0]
-				beacon_pose.pose.orientation.y = quat[1]
-				beacon_pose.pose.orientation.z = quat[2]
-				beacon_pose.pose.orientation.w = quat[3]
-				beacon_pose.header = image.header
-				self._beacon_pose_publisher.publish(beacon_pose)
+	def compute_beacon_pose(self, centers, transform):
+		# Compute the position and orientation of the beacon
+		rotation_vector, translation_vector, inliers = cv2.solvePnPRansac(
+			self._circles_grid,
+			centers,
+			numpy.asarray(self._camera_model.fullIntrinsicMatrix()),
+			numpy.asarray(self._camera_model.distortionCoeffs()))
 
-				# Publish debug beacon image with the beacon points circled if there are subscribers
-				if self._beacon_debug_image.get_num_connections() > 0:
-					cv2.drawChessboardCorners(image_cv, (self._num_rows, self._num_columns), centers, found_beacon)
-					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
-			else:
-				# Publish debug beacon image if there are subscribers
-				if self._beacon_debug_image.get_num_connections() > 0:
-					#keypoints = self._blob_detector.detect(image_cv)
-					#image_cv = cv2.drawKeypoints(image_cv, keypoints, color=(255, 255, 255), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-					self._beacon_debug_image.publish(self._cv_bridge.cv_to_imgmsg(cv2.cv.fromarray(image_cv), self._image_output_encoding))
+		rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
+		pose_matrix = numpy.vstack((rotation_matrix,
+			numpy.zeros((1,3))))
+		pose_matrix = numpy.hstack((pose_matrix, numpy.r_[translation_vector,[[1]]]))
+		pose_matrix = numpy.dot( pose_matrix, transform )
+
+		return pose_matrix
+
+	def send_beacon_message(self, pose_matrix, header):
+		quat = quaternion_from_matrix(pose_matrix)
+
+		beacon_pose = PoseStamped()
+		beacon_pose.pose.position.x = pose_matrix[0, -1]
+		beacon_pose.pose.position.y = pose_matrix[1, -1]
+		beacon_pose.pose.position.z = pose_matrix[2, -1]
+		beacon_pose.pose.orientation.x = quat[0]
+		beacon_pose.pose.orientation.y = quat[1]
+		beacon_pose.pose.orientation.z = quat[2]
+		beacon_pose.pose.orientation.w = quat[3]
+		beacon_pose.header = header
+		self._beacon_pose_publisher.publish(beacon_pose)
+
+	def send_debug_image(self, image, centers, found):
+		if self._beacon_debug_image.get_num_connections() > 0:
+			cv2.drawChessboardCorners(image,
+				(self._num_rows, self._num_columns),
+				centers,
+				found)
+			self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(image, self._image_output_encoding))
 
 	def camera_info_callback(self, camera_info):
-		self._camera_matrix = numpy.array( [ \
-										[camera_info.K[0], 0, camera_info.K[2]], \
-										[0, camera_info.K[4], camera_info.K[5]], \
-										[0, 0, 1]])
-		self._distortion_coefficients = camera_info.D
-		
-	def broadcast_beacon_tf():
+		camera_model = PinholeCameraModel()
+		camera_model.fromCameraInfo(camera_info)
+		self._camera_model = camera_model
+
+	def broadcast_beacon_tf(self, evt):
 		now = rospy.Time.now()
 		beacon_trans = (0.0, -1.3, -1.0)
 		beacon_rot = tf.transformations.quaternion_from_euler(-math.pi/2,
-								      0.0,
-								      -math.pi/2,
-								      'rxyz')
+									0.0,
+									-math.pi/2,
+									'rxyz')
 		self.tf_broadcaster.sendTransform(beacon_trans,
 						  beacon_rot,
 						  now,
