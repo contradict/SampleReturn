@@ -24,7 +24,7 @@
     pkg="detection_filter"
     type="kalman_filter_node"
     name="linemod_kalman_filter_node"
-    ns="sample_detection">
+    ns="/processes/sample_detection/manipulator">
     <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
     <param name="max_dist" type="double" value="0.1"/>
     <param name="max_cov" type="double" value="0.4"/>
