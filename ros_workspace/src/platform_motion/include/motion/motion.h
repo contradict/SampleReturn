@@ -80,6 +80,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool checkSegmentAcceleration();
         double computeSafeInterval(double dt);
         Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
+        void sendCompletedKnot(std_msgs::Header& header);
         bool pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle, PodSegment *retval);
         void moreDataNeededCallback(CANOpen::DS301 &node);
         void errorCallback(CANOpen::DS301 &node);
@@ -110,6 +111,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         ros::Publisher status_pub;
         ros::Publisher stitchedPath_pub_;
         ros::Publisher motionMode_pub_;
+        ros::Publisher completed_pub_;
 
         ros::Timer status_publish_timer;
 
