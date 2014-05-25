@@ -8,37 +8,37 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 
 def yawfromknot(knot):
-	return 2*arctan2(knot.pose.orientation.z, knot.pose.orientation.w)
+    return 2*arctan2(knot.pose.orientation.z, knot.pose.orientation.w)
 
 def yawtoknot(knot, yaw):
-	knot.pose.orientation.w = cos(yaw/2.0)
-	knot.pose.orientation.z = sin(yaw/2.0)
+    knot.pose.orientation.w = cos(yaw/2.0)
+    knot.pose.orientation.z = sin(yaw/2.0)
 
 def scurve(initial, final, dotmax):
-	#T = abs(final-initial)*3/2.0/dotmax
-	T = abs(final-initial)/dotmax
-	#x = lambda s: initial+(final-initial)*3/2.0*s*s*(1.0/2.0 - s/3.0)*4.0
-	x = lambda s: initial*(1.0-s) + final*(s)
-	#xdot = lambda s: (final-initial)*3/2.0*s*(1.0-s)*4.0/T
-	xdot = lambda s: (final-initial)/T
-	return T, x, xdot
+    #T = abs(final-initial)*3/2.0/dotmax
+    T = abs(final-initial)/dotmax
+    #x = lambda s: initial+(final-initial)*3/2.0*s*s*(1.0/2.0 - s/3.0)*4.0
+    x = lambda s: initial*(1.0-s) + final*(s)
+    #xdot = lambda s: (final-initial)*3/2.0*s*(1.0-s)*4.0/T
+    xdot = lambda s: (final-initial)/T
+    return T, x, xdot
 
 def extendPathGridAlign(path, knot, gridspacing, extendnumber=3):
-	yaw = yawfromknot(path.knots[-1])
-	P0 = np.r_[path.knots[-1].pose.position.x, path.knots[-1].pose.position.y]
-	extenddist = extendnumber*gridspacing
-	P1 = np.r_[round((P0[0] + extenddist*cos(yaw))/gridspacing)*gridspacing, round((P0[1] + extenddist*sin(yaw))/gridspacing)*gridspacing]
-	yawtoknot(knot, yaw)
+    yaw = yawfromknot(path.knots[-1])
+    P0 = np.r_[path.knots[-1].pose.position.x, path.knots[-1].pose.position.y]
+    extenddist = extendnumber*gridspacing
+    P1 = np.r_[round((P0[0] + extenddist*cos(yaw))/gridspacing)*gridspacing, round((P0[1] + extenddist*sin(yaw))/gridspacing)*gridspacing]
+    yawtoknot(knot, yaw)
 
-	for i in xrange(1, extendnumber+1):
-		lerp = float(i)/extendnumber
-		knot.pose.position.x = (1.0-lerp)*P0[0] + lerp*P1[0]
-		knot.pose.position.y = (1.0-lerp)*P0[1] + lerp*P1[1]
-		knot.twist.linear.x = 0
-		knot.twist.linear.y = 0
-		knot.twist.angular.z = 0;
-		path.knots.append(deepcopy(knot))
-	return path, knot
+    for i in xrange(1, extendnumber+1):
+        lerp = float(i)/extendnumber
+        knot.pose.position.x = (1.0-lerp)*P0[0] + lerp*P1[0]
+        knot.pose.position.y = (1.0-lerp)*P0[1] + lerp*P1[1]
+        knot.twist.linear.x = 0
+        knot.twist.linear.y = 0
+        knot.twist.angular.z = 0;
+        path.knots.append(deepcopy(knot))
+    return path, knot
 
 def moveR(path, knot, N, R0, R1, phidot=pi/2, omegasmall=3e-3, vsmall=3e-3, wheelbase=1.13):
     # v=w*r
@@ -75,19 +75,19 @@ def moveR(path, knot, N, R0, R1, phidot=pi/2, omegasmall=3e-3, vsmall=3e-3, whee
     return path, knot
 
 def rotate(path, knot, N, yaw1, omegapeak=pi/8):
-	yaw0 = yawfromknot(knot)
-	omega = knot.twist.angular.z
-	T, yaw, omega = scurve(yaw0, yaw1, omegapeak)
-	P = np.r_[knot.pose.position.x, knot.pose.position.y]
-	V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
-	for x in xrange(1,int(N)):
-		s = x/float(N-1)
-		t = T*s
-		yawtoknot(knot, yaw(s))
-		knot.twist.linear.x = 0
-		knot.twist.linear.y = 0
-		knot.twist.angular.z = omega(s)
-	return path, knot
+    yaw0 = yawfromknot(knot)
+    omega = knot.twist.angular.z
+    T, yaw, omega = scurve(yaw0, yaw1, omegapeak)
+    P = np.r_[knot.pose.position.x, knot.pose.position.y]
+    V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
+    for x in xrange(1,int(N)):
+        s = x/float(N-1)
+        t = T*s
+        yawtoknot(knot, yaw(s))
+        knot.twist.linear.x = 0
+        knot.twist.linear.y = 0
+        knot.twist.angular.z = omega(s)
+    return path, knot
 
 def decel(path, knot, N, a):
     V0 = np.r_[knot.twist.linear.x, knot.twist.linear.y]
@@ -149,27 +149,27 @@ def spinLeft():
     return path
 
 def makeForward(path, knot, N, forward, yaw):
-	T, l, vl = scurve(0, forward, 1.0)
-	P0 = np.r_[knot.pose.position.x, knot.pose.position.y]
-	V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
-	step = 0.1
-	substep = step/20
-	#for n in xrange(1,N):
-		#s=n/float(N-1)
-	s = 0.0
-	while s <= 1.0:
-		knot.pose.position.x = P0[0] + l(s)*cos(yaw)
-		knot.pose.position.y = P0[1] + l(s)*sin(yaw)
-		yawtoknot(knot, yaw)
-		knot.twist.linear.x = vl(s)*cos(yaw)
-		knot.twist.linear.y = vl(s)*sin(yaw)
+    T, l, vl = scurve(0, forward, 1.0)
+    P0 = np.r_[knot.pose.position.x, knot.pose.position.y]
+    V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
+    step = 0.1
+    substep = step/20
+    #for n in xrange(1,N):
+        #s=n/float(N-1)
+    s = 0.0
+    while s <= 1.0:
+        knot.pose.position.x = P0[0] + l(s)*cos(yaw)
+        knot.pose.position.y = P0[1] + l(s)*sin(yaw)
+        yawtoknot(knot, yaw)
+        knot.twist.linear.x = vl(s)*cos(yaw)
+        knot.twist.linear.y = vl(s)*sin(yaw)
 
-		knot.header.seq += 1
-		knot.header.stamp += rospy.Duration(T/N)
-		if (math.fmod(s, step) < 0.0001):
-		    path.knots.append(deepcopy(knot))
-		s = s + substep
-	return path, knot
+        knot.header.seq += 1
+        knot.header.stamp += rospy.Duration(T/N)
+        if (math.fmod(s, step) < 0.0001):
+            path.knots.append(deepcopy(knot))
+        s = s + substep
+    return path, knot
 
 def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2, gridspacing=0.1):
     # find the end point, with grid alignment
@@ -185,89 +185,91 @@ def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2, gridsp
     P2 = np.r_[R*cos(theta) + center[0], R*sin(theta) + center[1]]
     P3 = np.r_[P2[0] + straighten*cos(yaw), P2[1] + straighten*sin(yaw)]
     P4 = np.r_[round(P3[0]/gridspacing)*gridspacing, round(P3[1]/gridspacing)*gridspacing]
-    # now find the intersection of the tangent line from the circle to P4
-    P4centerdist = norm(P4-center)
-    P4tangentdist = math.sqrt(P4centerdist*P4centerdist-R*R)
-    tempX = (R*R)/P4centerdist
-    centerToP4 = (P4-center) / P4centerdist
-    normalCenterToP4 = np.r_[centerToP4[1], -centerToP4[0]]
-    tempY = math.sqrt(R*R - tempX*tempX)
-    P5 = centerToP4*tempX + normalCenterToP4*tempY + center
-    P6 = centerToP4*tempX - normalCenterToP4*tempY + center
-    # pick from P5 and P6 the closer to P2
-    P5toP2dist = norm(P5-P2)
-    P6toP2dist = norm(P6-P2)
-    if P5toP2dist < P6toP2dist:
-        P7 = P5
-    else:
-        P7 = P6
-    # recompute the arcdist, deltayaw, and straighten
-    P7centerdist = norm(P7-center)
-    P1centerdist = norm(P1-center)
-    centerToP7 = (P7-center) / P7centerdist
-    centerToP1 = (P1-center) / P1centerdist
-    deltayaw = sign * abs(math.acos(centerToP7[0]*centerToP1[0] + centerToP7[1]*centerToP1[1]))
+    # move backward from P4 along the right yaw and find a 
+    #new R to bridge the two straight paths
+    straightenvec = np.r_[cos(yaw), sin(yaw)]
+    determinant = -straightenvec[0]*(cos(yaw)-cos(yaw0)) + straightenvec[1]*(sin(yaw0)-sin(yaw))
+    straightendist = (1.0/determinant)*((cos(yaw)-cos(yaw0))*(P1[0]-P4[0]) + (sin(yaw)-sin(yaw0))*(P1[1]-P4[1]))
+    R = sign*(1.0/determinant)*(straightenvec[1]*(P1[0]-P4[0]) - straightenvec[0]*(P1[1]-P4[1]))
+    straighten = straightendist
+    P5 = P4 - straightendist*straightenvec
     arcdist = R*abs(deltayaw)
-    straighten = norm(P7-P4)
+    
 
-	# compute the path
-    step = gridspacing
-    substep = step/20
-    T, l, vl = scurve(0, forward+arcdist+straighten, 1.0)
+    # compute the path
+    totaldistance = forward+arcdist+straighten
+    T, l, vl = scurve(0, totaldistance, 1.0)
     yaw0 = initialyaw
     P0 = np.r_[knot.pose.position.x, knot.pose.position.y]
     V = np.r_[knot.twist.linear.x, knot.twist.linear.y]
-    #for n in xrange(1,N):
-    #    s=n/float(N-1)
-    s = 0.0
-    while s < 1.0:
-        t=s*T
-        if l(s)<forward:
-            # drive forward
-            knot.pose.position.x = P0[0] + l(s)*cos(yaw0)
-            knot.pose.position.y = P0[1] + l(s)*sin(yaw0)
-            P1 = np.r_[knot.pose.position.x, knot.pose.position.y]
-            yawtoknot(knot, yaw0)
-            knot.twist.linear.x = vl(s)*cos(yaw0)
-            knot.twist.linear.y = vl(s)*sin(yaw0)
-        elif l(s)<forward+arcdist:
-            # curve around hook
-            yaw = yaw0 + (l(s)-forward)/arcdist*deltayaw
-            sign = np.sign(deltayaw)
-            theta = sign * -pi/2+yaw
-            center = R*np.r_[cos(yaw0+sign*pi/2), sin(yaw0+sign*pi/2)]
-            knot.pose.position.x = P1[0] + R*cos(theta) + center[0]
-            knot.pose.position.y = P1[1] + R*sin(theta) + center[1]
-            P2 = np.r_[knot.pose.position.x, knot.pose.position.y]
-            yawtoknot(knot, yaw)
-            knot.twist.linear.x = vl(s)*cos(yaw)
-            knot.twist.linear.y = vl(s)*sin(yaw)
-            knot.twist.angular.z = -vl(s)/R
-        else:
-            # straighten out
-            x=l(s)-forward-arcdist
-            yaw = initialyaw + deltayaw
-            theta = pi/2+yaw
-            knot.pose.position.x = P2[0] + x*cos(yaw)
-            knot.pose.position.y = P2[1] + x*sin(yaw)
-            yawtoknot(knot, yaw)
-            knot.twist.linear.x = vl(s)*cos(yaw)
-            knot.twist.linear.y = vl(s)*sin(yaw)
-            knot.twist.angular.z = 0
+
+    # drive forward
+    epsilon = 0.0001
+    forwardN = math.ceil(forward / gridspacing)
+    forwardspacing = forward / forwardN
+    forwardcount = 0
+    while forwardcount <= (forwardN - epsilon):
+        forwardtraveled = forwardcount * forwardspacing
+        s = forwardtraveled / totaldistance
+        knot.pose.position.x = P0[0] + forwardtraveled*cos(yaw0)
+        knot.pose.position.y = P0[1] + forwardtraveled*sin(yaw0)
+        yawtoknot(knot, yaw0)
+        knot.twist.linear.x = vl(s)*cos(yaw0)
+        knot.twist.linear.y = vl(s)*sin(yaw0)
         knot.header.seq += 1
-        knot.header.stamp += rospy.Duration(T/N)
-        if (math.fmod(s, step) < 0.001):
-            path.knots.append(deepcopy(knot))
-        s = s + substep
-    
-    yaw = initialyaw + deltayaw
-    knot.pose.position.x = P4[0]
-    knot.pose.position.y = P4[1]
-    yawtoknot(knot, yaw)
-    knot.twist.linear.x = vl(s)*cos(yaw)
-    knot.twist.linear.y = vl(s)*sin(yaw)
-    knot.twist.angular.z = 0
-    path.knots.append(deepcopy(knot))
+        knot.header.stamp += rospy.Duration(T/forwardN)
+        path.knots.append(deepcopy(knot))
+        forwardcount = forwardcount + 1
+
+    # curve around hook
+    curveN = math.ceil(arcdist / gridspacing)
+    curvespacing = arcdist / curveN
+    curvecount = 0
+    while curvecount < (curveN - epsilon):
+        curvetraveled = curvecount * curvespacing
+        s = (curvetraveled + forward) / totaldistance
+        yaw = yaw0 + curvetraveled/arcdist*deltayaw
+        sign = np.sign(deltayaw)
+        theta = sign * -pi/2+yaw
+        center = R*np.r_[cos(yaw0+sign*pi/2), sin(yaw0+sign*pi/2)]
+        knot.pose.position.x = P1[0] + R*cos(theta) + center[0]
+        knot.pose.position.y = P1[1] + R*sin(theta) + center[1]
+        yawtoknot(knot, yaw)
+        knot.twist.linear.x = vl(s)*cos(yaw)
+        knot.twist.linear.y = vl(s)*sin(yaw)
+        knot.twist.angular.z = -vl(s)/R
+        knot.header.seq += 1
+        knot.header.stamp += rospy.Duration(T/curveN)
+        path.knots.append(deepcopy(knot))
+        curvecount = curvecount + 1
+
+    # straighten out
+    straightN = math.ceil(straighten / gridspacing)
+    straightspacing = straighten / straightN
+    straightcount = 0
+    while straightcount < (straightN - epsilon):
+        straighttraveled = straightcount * straightspacing
+        s = (straighttraveled + forward + arcdist) / totaldistance
+        yaw = yaw0 + deltayaw
+        knot.pose.position.x = P5[0] + straighttraveled*cos(yaw)
+        knot.pose.position.y = P5[1] + straighttraveled*sin(yaw)
+        yawtoknot(knot, yaw)
+        knot.twist.linear.x = vl(s)*cos(yaw)
+        knot.twist.linear.y = vl(s)*sin(yaw)
+        knot.twist.angular.z = 0
+        knot.header.seq += 1
+        knot.header.stamp += rospy.Duration(T/straightN)
+        path.knots.append(deepcopy(knot))
+        straightcount = straightcount + 1
+
+    #yaw = initialyaw + deltayaw
+    #knot.pose.position.x = P4[0]
+    #knot.pose.position.y = P4[1]
+    #yawtoknot(knot, yaw)
+    #knot.twist.linear.x = vl(s)*cos(yaw)
+    #knot.twist.linear.y = vl(s)*sin(yaw)
+    #knot.twist.angular.z = 0
+    #path.knots.append(deepcopy(knot))
     return path, knot
 
 def nancheck(path):
@@ -290,149 +292,149 @@ def nancheck(path):
     return True
 
 def hook(forward, R, initialyaw, deltayaw, gridSpacing=0.1, N=20):
-	path = plat_msgs.Path()
-	knot = plat_msgs.Knot()
-	yawtoknot(knot, initialyaw)
+    path = plat_msgs.Path()
+    knot = plat_msgs.Knot()
+    yawtoknot(knot, initialyaw)
 
-	path, knot = makeHook(path, knot, N, forward, R, initialyaw, deltayaw, gridSpacing)
+    path, knot = makeHook(path, knot, N, forward, R, initialyaw, deltayaw, gridSpacing)
 
-	return path
+    return path
 
 def forward(forward, yaw, gridSpacing=0.1, N=20):
-	path = plat_msgs.Path()
-	knot = plat_msgs.Knot()
+    path = plat_msgs.Path()
+    knot = plat_msgs.Knot()
 
-	path, knot = makeForward(path, knot, N, forward, yaw)
-	path, knot = extendPathGridAlign(path, knot, gridSpacing)
+    path, knot = makeForward(path, knot, N, forward, yaw)
+    path, knot = extendPathGridAlign(path, knot, gridSpacing)
 
-	return path
+    return path
 
 def turnInPlace(initialyaw, deltayaw):
-	path = plat_msgs.Path()
-	knot = plat_msgs.Knot()
-	yawtoknot(knot, initialyaw)
-	
-	N = 20
-	#path, knot = decel(path, knot, N, 0.5)
-	#if not nancheck(path):
-	#	rospy.logerr("NaN from decel")
+    path = plat_msgs.Path()
+    knot = plat_msgs.Knot()
+    yawtoknot(knot, initialyaw)
+    
+    N = 20
+    #path, knot = decel(path, knot, N, 0.5)
+    #if not nancheck(path):
+    #   rospy.logerr("NaN from decel")
 
-	path, knot = moveR(path, knot, N, 1e5, 0)
-	if not nancheck(path):
-		rospy.logerr("NaN from moveR 1e5->0")
+    path, knot = moveR(path, knot, N, 1e5, 0)
+    if not nancheck(path):
+        rospy.logerr("NaN from moveR 1e5->0")
 
-	yaw = yawfromknot(knot)
-	path, knot = rotate(path, knot, N, yaw+deltayaw)
-	if not nancheck(path):
-		rospy.logerr("NaN from rotate")
+    yaw = yawfromknot(knot)
+    path, knot = rotate(path, knot, N, yaw+deltayaw)
+    if not nancheck(path):
+        rospy.logerr("NaN from rotate")
 
-	path, knot = moveR(path, knot, N, 0, 1e5)
-	if not nancheck(path):
-		rospy.logerr("NaN from moveR 0->1e5")
+    path, knot = moveR(path, knot, N, 0, 1e5)
+    if not nancheck(path):
+        rospy.logerr("NaN from moveR 0->1e5")
 
-	return path
+    return path
 
 def plotPath(path):
-	max_distance = 4.0
-	for knot in path.knots:
-		plt.plot(knot.pose.position.x, knot.pose.position.y, marker=(3, 0, -90 + 180/pi*yawfromknot(knot)))
-	plt.xlim([-max_distance, max_distance])
-	plt.ylim([-max_distance, max_distance])
-	plt.show()
+    max_distance = 4.0
+    for knot in path.knots:
+        plt.plot(knot.pose.position.x, knot.pose.position.y, marker=(3, 0, -90 + 180/pi*yawfromknot(knot)))
+    plt.xlim([-max_distance, max_distance])
+    plt.ylim([-max_distance, max_distance])
+    plt.show()
 
 def openPrimitivesFile(filename, gridspacing):
-	primfile = open(filename, 'w+')
-	primdata = {'file' : primfile, 'angles' : 0, 'totalprims' : 0, 'gridspacing' : gridspacing}
-	primfile.write("resolution_m: %.6f\n" % 0)
-	primfile.write("numberofangles: %2d\n" % 0)
-	primfile.write("totalnumberofprimitives: %3d\n" % 0)
-	return primdata
+    primfile = open(filename, 'w+')
+    primdata = {'file' : primfile, 'angles' : 0, 'totalprims' : 0, 'gridspacing' : gridspacing}
+    primfile.write("resolution_m: %.6f\n" % 0)
+    primfile.write("numberofangles: %2d\n" % 0)
+    primfile.write("totalnumberofprimitives: %3d\n" % 0)
+    return primdata
 
 def addToPrimitivesFile(primdata, pathdata):
-	primfile = primdata['file']
-	gridspacing = primdata['gridspacing']
-	primitiveid = 0
-	for pathdatum in pathdata:
-		path = pathdatum['path']
-		cost = pathdatum['cost']
-		initialpos = path.knots[-1].pose.position
-		primfile.write("primID: %d\n" % primitiveid)
-		primfile.write("startangle_c: %d\n" % primdata['angles'])
-		primfile.write("endpose_c: %d %d %d\n" % (initialpos.x/gridspacing, initialpos.y/gridspacing, pathdatum['endpose_c']))
-		primfile.write("additionalactioncostmult: %d\n" % cost)
-		primfile.write("intermediateposes: %d\n" % len(path.knots))
-		for knot in path.knots:
-			yaw = yawfromknot(knot)
-			primfile.write("%.4f %.4f %.4f\n" % (knot.pose.position.x, knot.pose.position.y, yaw))
-		primitiveid = primitiveid + 1
+    primfile = primdata['file']
+    gridspacing = primdata['gridspacing']
+    primitiveid = 0
+    for pathdatum in pathdata:
+        path = pathdatum['path']
+        cost = pathdatum['cost']
+        initialpos = path.knots[-1].pose.position
+        primfile.write("primID: %d\n" % primitiveid)
+        primfile.write("startangle_c: %d\n" % primdata['angles'])
+        primfile.write("endpose_c: %d %d %d\n" % (initialpos.x/gridspacing, initialpos.y/gridspacing, pathdatum['endpose_c']))
+        primfile.write("additionalactioncostmult: %d\n" % cost)
+        primfile.write("intermediateposes: %d\n" % len(path.knots))
+        for knot in path.knots:
+            yaw = yawfromknot(knot)
+            primfile.write("%.4f %.4f %.4f\n" % (knot.pose.position.x, knot.pose.position.y, yaw))
+        primitiveid = primitiveid + 1
 
-	primdata['totalprims'] = primdata['totalprims'] + len(pathdata)
-	primdata['angles'] = primdata['angles'] + 1
+    primdata['totalprims'] = primdata['totalprims'] + len(pathdata)
+    primdata['angles'] = primdata['angles'] + 1
 
 def closePrimitivesFile(primdata):
-	primfile = primdata['file']
-	primfile.seek(0, 0)
-	primfile.write("resolution_m: %.6f\n" % primdata['gridspacing'])
-	primfile.write("numberofangles: %2d\n" % primdata['angles'])
-	primfile.write("totalnumberofprimitives: %3d\n" % primdata['totalprims'])
-	primfile.close()
+    primfile = primdata['file']
+    primfile.seek(0, 0)
+    primfile.write("resolution_m: %.6f\n" % primdata['gridspacing'])
+    primfile.write("numberofangles: %2d\n" % primdata['angles'])
+    primfile.write("totalnumberofprimitives: %3d\n" % primdata['totalprims'])
+    primfile.close()
 
 def generateMotionPrimitives(showplots=False):
-	gridspacing = 0.1
-	numangles = 8
-	prims = [[0.5, 2.3, 20], [0.25, 1.2, 10]] # list of [forward, radius, N]
-	primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
-	for i in xrange(0,numangles):
-		initialyaw = 2*pi*i/numangles
-		deltayaw = 2*pi/numangles
-		pathdata = []
-		for prim in prims:
-			# Forward and right turn
-			path = hook(prim[0], prim[1], initialyaw, -deltayaw, gridspacing, prim[2])
-			pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
-			if showplots:
-				plotPath(path)
+    gridspacing = 0.1
+    numangles = 8
+    prims = [[0.5, 2.3, 20], [0.25, 1.2, 10]] # list of [forward, radius, N]
+    primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
+    for i in xrange(0,numangles):
+        initialyaw = 2*pi*i/numangles
+        deltayaw = 2*pi/numangles
+        pathdata = []
+        for prim in prims:
+            # Forward and right turn
+            path = hook(prim[0], prim[1], initialyaw, -deltayaw, gridspacing, prim[2])
+            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
+            if showplots:
+                plotPath(path)
 
-			# Forward
-			forwarddist = prim[0] + prim[1]*abs(deltayaw)
-			path = forward(forwarddist, initialyaw, gridspacing, prim[2])
-			pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
-			if showplots:
-				plotPath(path)
+            # Forward
+            forwarddist = prim[0] + prim[1]*abs(deltayaw)
+            path = forward(forwarddist, initialyaw, gridspacing, prim[2])
+            pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
+            if showplots:
+                plotPath(path)
 
-			# Short forward
-			forwarddist = gridspacing
-			extendpathnum = 1
-			cardinalangleval = 4*float(i)/numangles
-			if math.fmod(cardinalangleval, 1.0) < 0.001:
-				extendpathnum = 0
-			path = forward(forwarddist, initialyaw, gridspacing, 2)
-			pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
-			if showplots:
-				plotPath(path)
+            # Short forward
+            forwarddist = gridspacing
+            extendpathnum = 1
+            cardinalangleval = 4*float(i)/numangles
+            if math.fmod(cardinalangleval, 1.0) < 0.001:
+                extendpathnum = 0
+            path = forward(forwarddist, initialyaw, gridspacing, 2)
+            pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
+            if showplots:
+                plotPath(path)
 
-			# Forward and left turn
-			path = hook(prim[0], prim[1], initialyaw, deltayaw, gridspacing, prim[2])
-			pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
-			if showplots:
-				plotPath(path)
+            # Forward and left turn
+            path = hook(prim[0], prim[1], initialyaw, deltayaw, gridspacing, prim[2])
+            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
+            if showplots:
+                plotPath(path)
 
-		# Turn in place to the right
-		#path = turnInPlace(initialyaw, -deltayaw)
-		#pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
-		#if showplots:
-		#	plotPath(path)
+        # Turn in place to the right
+        #path = turnInPlace(initialyaw, -deltayaw)
+        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
+        #if showplots:
+        #   plotPath(path)
 
-		# Turn in place to the left 
-		#path = turnInPlace(initialyaw, deltayaw)
-		#pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
-		#if showplots:
-		#	plotPath(path)
+        # Turn in place to the left 
+        #path = turnInPlace(initialyaw, deltayaw)
+        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
+        #if showplots:
+        #   plotPath(path)
 
-		addToPrimitivesFile(primfile, pathdata)
+        addToPrimitivesFile(primfile, pathdata)
 
-	closePrimitivesFile(primfile)
-	
+    closePrimitivesFile(primfile)
+    
 
 if __name__ == "__main__":
-	generateMotionPrimitives(True)
+    generateMotionPrimitives(True)
