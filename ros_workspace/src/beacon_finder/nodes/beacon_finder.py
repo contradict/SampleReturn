@@ -5,6 +5,7 @@ import rosnode
 import math
 import cv2
 import numpy
+import tf
 from cv_bridge import CvBridge
 from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo
@@ -20,6 +21,10 @@ class BeaconFinder:
 		self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseStamped)
 		self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
 		self._cv_bridge = CvBridge()
+		
+		#tf broadcaster stuff
+		self.tf_broadcaster = tf.TransformBroadcaster()
+		rospy.Timer(rospy.Duration(0.5), self.broadcast_beacon_tf) 
 
 		# Get params
 		self._num_rows = rospy.get_param("~num_rows", 3)
@@ -117,6 +122,27 @@ class BeaconFinder:
 										[0, camera_info.K[4], camera_info.K[5]], \
 										[0, 0, 1]])
 		self._distortion_coefficients = camera_info.D
+		
+	def broadcast_beacon_tf():
+		now = rospy.Time.now()
+		beacon_trans = (0.0, -1.3, -1.0)
+		beacon_rot = tf.transformations.quaternion_from_euler(-math.pi/2,
+								      0.0,
+								      -math.pi/2,
+								      'rxyz')
+		self.tf_broadcaster.sendTransform(beacon_trans,
+						  beacon_rot,
+						  now,
+						  '/beacon',
+						  '/platform')
+	
+		zero_translation = (0,0,0)
+		zero_rotation = (0,0,0,1)
+		self.tf_broadcaster.sendTransform(zero_translation,
+						  zero_rotation,
+						  now,
+						  '/platform',
+						  '/map')
 
 if __name__ == '__main__':
 	rospy.init_node('beacon_finder')

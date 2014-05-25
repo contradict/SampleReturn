@@ -1,0 +1,12 @@
+# Goal
+string input_string
+float32 input_float
+samplereturn_msgs/NamedPoint input_point
+---
+# Result
+string result_string
+float32 result_float
+---
+# Feedback
+string state
+float32 feedback_float

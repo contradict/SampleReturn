@@ -37,6 +37,7 @@
     <param name="ANGULAR_EXP" value="2" type="double"/>
 
     <!-- Remaps -->
+    <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/point"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
