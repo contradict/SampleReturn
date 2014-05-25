@@ -30,7 +30,7 @@
     <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
     <include file="$(find samplereturn)/launch/search_detection.launch"/>
     -->
-    <include file="$(find saliency_detector)/launch/filtered_saliency_detector.launch"/>
+    <include file="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
     <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
     <include file="$(find visual_servo)/launch/visual_servo.launch"/>
     <include file="$(find samplereturn)/launch/planner.launch"/>
