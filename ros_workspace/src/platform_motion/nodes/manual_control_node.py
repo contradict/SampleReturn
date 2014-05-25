@@ -297,7 +297,7 @@ class ProcessGoal(smach.State):
         
         fb = platform_msg.ManualControlFeedback()
         fb.state = "PROCESS_GOAL"
-        result = samplereturn_msg.GeneralExecutiveResult('initialized')
+        result = platform_msg.ManualControlResult('initialized')
         userdata.action_result = result        
 
         self.announcer.say("Entering manual mode.")
@@ -553,7 +553,7 @@ class ManualPreempted(smach.State):
         self.CAN_interface.select_mode(
                 platform_srv.SelectMotionModeRequest.MODE_ENABLE)
         
-        result = samplereturn_msg.GeneralExecutiveResult('preempted')
+        result = platform_msg.ManualControlResult('preempted')
         userdata.action_result = result
         
         return 'complete'
@@ -566,7 +566,7 @@ class ManualAborted(smach.State):
         self.CAN_interface = CAN_interface
         
     def execute(self, userdata):
-        result = samplereturn_msg.GeneralExecutiveResult('aborted')
+        result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
         
         return 'fail'
