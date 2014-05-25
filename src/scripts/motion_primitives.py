@@ -335,6 +335,16 @@ def turnInPlace(initialyaw, deltayaw):
 
     return path
 
+def fakeTurnInPlace(initialyaw, deltayaw):
+    path = plat_msgs.Path()
+    knot = plat_msgs.Knot()
+    yawtoknot(knot, initialyaw)
+    path.knots.append(deepcopy(knot))
+    yawtoknot(knot, initialyaw + deltayaw)
+    path.knots.append(deepcopy(knot))
+    
+    return path
+
 def plotPath(path):
     max_distance = 4.0
     for knot in path.knots:
@@ -431,6 +441,18 @@ def generateMotionPrimitives(showplots=False):
         #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
         #if showplots:
         #   plotPath(path)
+
+        # Turn in place to the right
+        path = fakeTurnInPlace(initialyaw, -deltayaw)
+        pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
+        if showplots:
+            plotPath(path)
+
+        # Turn in place to the left 
+        path = fakeTurnInPlace(initialyaw, deltayaw)
+        pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
+        if showplots:
+            plotPath(path)
 
         addToPrimitivesFile(primfile, pathdata)
 
