@@ -233,27 +233,30 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
     ROS_DEBUG("RECEIVED PATH");
 
+    // make a path copy to deal with stupid const stupid
+    nav_msgs::Path pathCopy(path);
+
     // What direction is the robot going and what is the linear/angular vel?
     Time timestamp = Time::now();
     //timestamp.sec = 0;
     //timestamp.nsec = 0;
 
     platform_motion_msgs::Path path_msg;
-    path_msg.knots.resize(path.poses.size());
+    path_msg.knots.resize(pathCopy.poses.size());
     path_msg.header.stamp = timestamp;
     path_msg.header.seq = 0;
     path_msg.header.frame_id = "map";
 
     visualization_msgs::MarkerArray visualizationMarkerArray;
-    visualizationMarkerArray.markers.resize(3*(path.poses.size()-1));
+    visualizationMarkerArray.markers.resize(3*(pathCopy.poses.size()-1));
 
     // Populate the first entry with the current kinematic data.
-    if (path.poses.size() > 0)
+    if (pathCopy.poses.size() > 0)
     {
         path_msg.knots[0].header.seq = 0;
         path_msg.knots[0].header.stamp = timestamp;
         path_msg.knots[0].header.frame_id = "map";
-        path_msg.knots[0].pose = path.poses[0].pose;
+        path_msg.knots[0].pose = pathCopy.poses[0].pose;
         path_msg.knots[0].twist = odometry.twist.twist;
     }
 
@@ -263,17 +266,17 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     Eigen::Vector3d pathLinearVelocity;
     tf::vectorMsgToEigen(odometry.twist.twist.linear, pathLinearVelocity);
     double pathVelocityMagnitude = pathLinearVelocity.norm();
-    BezierCubicSpline<Eigen::Vector3d>* splines = new BezierCubicSpline<Eigen::Vector3d>[path.poses.size()-1];
+    BezierCubicSpline<Eigen::Vector3d>* splines = new BezierCubicSpline<Eigen::Vector3d>[pathCopy.poses.size()-1];
 
     // keep track of special case turn in place motions so we can remove the intermediate ones
     std::vector<int> posesToRemove;
     bool lastPointWasTurnInPlace = false;
-    for (unsigned int i = 0; i < path.poses.size()-1; ++i)
+    for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
     {
         Eigen::Vector3d currentPoint;
         Eigen::Vector3d nextPoint;
-        tf::pointMsgToEigen(path.poses[i].pose.position, currentPoint);
-        tf::pointMsgToEigen(path.poses[i+1].pose.position, nextPoint);
+        tf::pointMsgToEigen(pathCopy.poses[i].pose.position, currentPoint);
+        tf::pointMsgToEigen(pathCopy.poses[i+1].pose.position, nextPoint);
         if((currentPoint - nextPoint).norm() < 0.001)
         {
             if(lastPointWasTurnInPlace)
@@ -289,12 +292,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
     for(auto iter = posesToRemove.rbegin(); iter != posesToRemove.rend(); ++iter)
     {
-        const_cast<nav_msgs::Path*>(&path)->poses.erase(const_cast<nav_msgs::Path*>(&path)->poses.begin()+(*iter));
+        pathCopy.poses.erase(pathCopy.poses.begin()+(*iter));
     }
 
-    for (unsigned int i = 0; i < path.poses.size()-1; ++i)
+    for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
     {
-        bool success = this->FitCubicSpline(path, i, pathVelocityMagnitude, maximum_linear_velocity, splines[i]);
+        bool success = this->FitCubicSpline(pathCopy, i, pathVelocityMagnitude, maximum_linear_velocity, splines[i]);
         if (!success)
         {
             ROS_ERROR("Failed to fit a cubic spline to the path. FIX ME!");
@@ -333,10 +336,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         PopulateSplineVisualizationMarkerArray(splines[i], visualizationMarkerArray.markers[3*i], visualizationMarkerArray.markers[3*i+1], visualizationMarkerArray.markers[3*i+2]);
 
         // Compute the next linear velocity
-        Eigen::Quaterniond nextQuaternion(path.poses[i+1].pose.orientation.w,
-                                          path.poses[i+1].pose.orientation.x,
-                                          path.poses[i+1].pose.orientation.y,
-                                          path.poses[i+1].pose.orientation.z);
+        Eigen::Quaterniond nextQuaternion(pathCopy.poses[i+1].pose.orientation.w,
+                                          pathCopy.poses[i+1].pose.orientation.x,
+                                          pathCopy.poses[i+1].pose.orientation.y,
+                                          pathCopy.poses[i+1].pose.orientation.z);
         Eigen::Vector3d nextVelocityVector = nextQuaternion * Eigen::Vector3d(1.00, 0.00, 0.00);
         nextVelocityVector *= nextVelocityMagnitude;
 
@@ -351,7 +354,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         path_msg.knots[i+1].header.seq = i+1;
         path_msg.knots[i+1].header.stamp = timestamp;
         path_msg.knots[i+1].header.frame_id = "map";
-        path_msg.knots[i+1].pose = path.poses[i+1].pose;
+        path_msg.knots[i+1].pose = pathCopy.poses[i+1].pose;
 
         path_msg.knots[i+1].twist.linear.x = nextVelocityVector.x();
         path_msg.knots[i+1].twist.linear.y = nextVelocityVector.y();
@@ -362,12 +365,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
 
     // Set the velocity at the last point to be zero
-    path_msg.knots[path.poses.size()-1].twist.linear.x = 0.00;
-    path_msg.knots[path.poses.size()-1].twist.linear.y = 0.00;
-    path_msg.knots[path.poses.size()-1].twist.linear.z = 0.00;
+    path_msg.knots[pathCopy.poses.size()-1].twist.linear.x = 0.00;
+    path_msg.knots[pathCopy.poses.size()-1].twist.linear.y = 0.00;
+    path_msg.knots[pathCopy.poses.size()-1].twist.linear.z = 0.00;
     
     // Compute and store smooth decelerations
-    for (unsigned int i = path.poses.size()-1; i > 0; --i)
+    for (unsigned int i = pathCopy.poses.size()-1; i > 0; --i)
     {
         Eigen::Vector3d currentVelocityVec;
         Eigen::Vector3d previousVelocityVec;
@@ -386,8 +389,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     }
 
-    //if (path_msg.knots[path.poses.size()-1].twist.linear.x != 0.0 ||
-    //    path_msg.knots[path.poses.size()-1].twist.linear.y != 0.0)
+    //if (path_msg.knots[pathCopy.poses.size()-1].twist.linear.x != 0.0 ||
+    //    path_msg.knots[pathCopy.poses.size()-1].twist.linear.y != 0.0)
     //{
     //    ROS_DEBUG("WHAT THE WAAAAAAAAAAAA!!!!");
     //}
@@ -428,7 +431,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     path_msg.knots[path_msg.knots.size()].header.stamp += totalTurnTime;
 
     // Store the maximum sequence ID of the path
-    path_end_sequence_id = path.poses.size();
+    path_end_sequence_id = pathCopy.poses.size();
 
     // Publish path
     smooth_path_publisher.publish(path_msg);
