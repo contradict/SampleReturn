@@ -41,9 +41,12 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
 
     this->odometry = nav_msgs::Odometry();
+    path_end_sequence_id = 0;
+    completed_knot_header = std_msgs::Header();
 
     pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
     odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
+    completed_knot_subscriber = parentNodeHandle.subscribe("completed_knot", 1, &TheSmoothPlanner::setCompletedKnot, this);
 
     smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
     visualization_publisher = localNodeHandle.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
@@ -84,11 +87,8 @@ bool TheSmoothPlanner::isGoalReached()
 {
     // The pvt_segment code in platform_motion knows how to answer this
     // question much better than the local planner.  The goal is reached
-    // when all pvt segments have been executed to completion.  Since this
-    // is a much better measure than some kind of tolerance-based logic here,
-    // we return false in protest.
-    ROS_DEBUG("IS GOAL REACHED");
-    return false;
+    // when all pvt segments have been executed to completion.
+    return completed_knot_header.seq == path_end_sequence_id;
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
@@ -428,6 +428,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     // the last point is never examined in the loop, so add the turn duration to it here.
     path_msg.knots[path_msg.knots.size()].header.stamp += totalTurnTime;
 
+    // Store the maximum sequence ID of the path
+    path_end_sequence_id = path.poses.size();
+
     // Publish path
     smooth_path_publisher.publish(path_msg);
     visualization_publisher.publish(visualizationMarkerArray);
@@ -439,6 +442,13 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 {
     ROS_DEBUG("RECEIVED ODOMETRY");
     this->odometry = odometry;
+    return;
+}
+
+void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHeader)
+{
+    ROS_DEBUG("RECEIVED COMPLETED KNOT");
+    this->completed_knot_header = completedKnotHeader;
     return;
 }
 
