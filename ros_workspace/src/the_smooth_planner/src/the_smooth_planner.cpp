@@ -428,7 +428,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
 
     // the last point is never examined in the loop, so add the turn duration to it here.
-    path_msg.knots[path_msg.knots.size()].header.stamp += totalTurnTime;
+    path_msg.knots.back().header.stamp += totalTurnTime;
 
     // Store the maximum sequence ID of the path
     path_end_sequence_id = pathCopy.poses.size();
