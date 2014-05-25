@@ -288,9 +288,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             lastPointWasTurnInPlace = false;
         }
     }
-    for(unsigned int i = posesToRemove.size()-1; i >= 0; i--)
+    for(auto iter = posesToRemove.rbegin(); iter != posesToRemove.rend(); ++iter)
     {
-        const_cast<nav_msgs::Path*>(&path)->poses.erase(const_cast<nav_msgs::Path*>(&path)->poses.begin()+i);
+        const_cast<nav_msgs::Path*>(&path)->poses.erase(const_cast<nav_msgs::Path*>(&path)->poses.begin()+(*iter));
     }
 
     for (unsigned int i = 0; i < path.poses.size()-1; ++i)
