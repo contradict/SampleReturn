@@ -133,6 +133,8 @@ Motion::Motion() :
 
     motionMode_pub_ = nh_.advertise<platform_motion_msgs::SelectMotionModeResponse>("current_motion_mode", 1, true);
 
+    completed_pub_ = nh_.advertise<std_msgs::Header>("completed_knot", 1);
+
     home_pods_action_server.registerGoalCallback(boost::bind(&Motion::doHomePods, this));
     home_carousel_action_server.registerGoalCallback(boost::bind(&Motion::doHomeCarousel, this));
 
@@ -1571,6 +1573,12 @@ void Motion::errorCallback(CANOpen::DS301 &node)
     }
 }
 
+
+void Motion::sendCompletedKnot(std_msgs::Header& header)
+{
+    completed_pub_.publish(header);
+}
+
 bool Motion::pathToBody()
 {
     ROS_DEBUG("pathToBody enter");
@@ -1592,6 +1600,7 @@ bool Motion::pathToBody()
             next = current;
             next.header.stamp += ros::Duration(0.25);
         }
+        sendCompletedKnot(previous.header);
         plannedPath.pop_front();
         lck.unlock();
 
@@ -1613,6 +1622,7 @@ bool Motion::pathToBody()
     }
     else
     {
+        sendCompletedKnot(plannedPath.back().header);
         plannedPath.clear();
         ROS_DEBUG("Finished path");
     }
