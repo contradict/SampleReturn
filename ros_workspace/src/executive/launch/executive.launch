@@ -6,6 +6,7 @@
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
     <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
     <remap from="joystick_command" to="/motion/joystick_command"/>
+    <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
     
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
@@ -55,28 +56,28 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
-
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.3"/>
-        <param name="max_point_lost_time" type="double" value="60"/>
+        
+        <!-- for DriveToPose states and approach to sample-->
         <param name="motion_check_interval" type="double" value="60"/>
         <param name="min_motion" type="double" value="0.5"/>
-    
         <rosparam>
             <!-- Specify x and y.  If yaw is unspecified, robot will point towards
                  the next point in the path list -->
             search_poses_2d:
-                - {x: 5.0, y: 0.0}
-                - {x: 10.0, y: -15.0}
-                - {x: 15.0, y: -15.0}
-                - {x: 25.0, y: -10.0}
-            beacon_approach_point:
-                {x: 5.0, y: 0, yaw: 180}
+                - {x: 2.0, y: 0.0}
+                - {x: 4.0, y: -2.0}
+                - {x: 10.0, y: -10.0}
         </rosparam>        
-            
+        <!-- for Beacon approach -->
+        <param name="min_pursuit_distance" type="double" value="3.0"/>
+        <param name="max_pursuit_error" type="double" value="0.3"/>
+        <param name="max_point_lost_time" type="double" value="60"/>
+        <rosparam>
+            beacon_approach_point:
+                {x: 8.0, y: 0, yaw: 180}
+        </rosparam>
     </node>
 
-    <!--
     <node
         pkg="executive"
         type="level_two_node.py"
@@ -84,9 +85,29 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
-    </node>
-    -->
 
+        <!-- for search  behaviour --> 
+        <param name="return_time_minutes" type="double" value="20"/>
+        <param name="line_plan_step" type="double" value="8"/>
+        <param name="line_replan_distance" type="double" value="1"/>
+        <param name="line_velocity" type="double" value="1.5"/>
+        <param name="blocked_check_distance" type="double" value="10"/>
+        <param name="blocked_check_width" type = "double" value="3"/>
+        <param name="blocked_rotation" type="double" value="120"/>
+        <param name="blocked_rotation_step" type="double" value="15"/>
+        <param name="motion_check_interval" type="double" value="20"/>
+        <param name="min_motion" type="double" value="0.5"/>
+
+        <!-- for Beacon approach -->
+        <param name="min_pursuit_distance" type="double" value="3.0"/>
+        <param name="max_pursuit_error" type="double" value="0.3"/>
+        <param name="max_point_lost_time" type="double" value="60"/>
+        <rosparam>
+            beacon_approach_point:
+                {x: 5.0, y: 0, yaw: 180}
+        </rosparam>
+    </node>
+        
     <node
         pkg="executive"
         type="pursue_sample_node.py"
@@ -94,8 +115,15 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
-        
-        <param name="sample_list" value="fill this out"/>
+    
+        <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <param name="max_pursuit_error" type="double" value="0.3"/>
+        <param name="max_sample_lost_time" type="double" value="30"/>
+        <param name="motion_check_interval" type="double" value="30"/>
+        <param name="min_motion" type="double" value="0.5"/>
+        <param name="square_search_size" type="double" value="0.3"/> 
+        <param name="pursuit_velocity" type="double" value="0.5"/>
+        <param name="search_velocity" type="double" value=".25"/>
     </node>
 
 </launch>

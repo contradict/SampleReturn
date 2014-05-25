@@ -176,6 +176,7 @@ class LevelTwoRandom(object):
                 
                 @smach.cb_interface(input_keys=['detected_sample'])
                 def get_pursuit_goal_cb(userdata, request):
+                    goal = samplereturn_msg.GeneralExecutiveGoal()
                     goal.input_point = userdata.detected_sample
                     goal.input_string = "level_two_pursuit_request"
                     return goal
