@@ -7,3 +7,4 @@ SBPLLatticePlanner:
     nominalvel_mpersecs: 0.4
     timetoturn45degsinplace_secs: 2.0
     lethal_obstacle: 20
+    planner_frequency: 2

@@ -13,7 +13,7 @@
 
         <remap from="odom" to="odometry"/>
         <remap from="cmd_vel" to="command"/>
-        <remap from="completed_knot" to="/motion/motion/completed_knot"/>
+        <remap from="completed_knot" to="/motion/completed_knot"/>
         <!-- <remap from="plan" to="~/SBPLLatticePlanner/plan"/> -->
 
         <rosparam ns="local_costmap" file="$(find samplereturn)/config/sbpl/costmap_common_params.yaml" command="load" />
