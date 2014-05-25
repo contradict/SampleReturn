@@ -298,7 +298,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         bool success = this->FitCubicSpline(path, i, pathVelocityMagnitude, maximum_linear_velocity, splines[i]);
         if (!success)
         {
-            ROS_DEBUG("Failed to fit a cubic spline to the path. FIX ME!");
+            ROS_ERROR("Failed to fit a cubic spline to the path. FIX ME!");
         }
 
         double distanceTraveled = splines[i].ComputeArcLength();
