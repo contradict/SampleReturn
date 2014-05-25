@@ -74,7 +74,7 @@ class KalmanDetectionFilter
 
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("max_dist", max_dist_, double(0.1));
-    private_node_handle_.param("max_cov", max_cov_, double(1.0));
+    private_node_handle_.param("max_cov", max_cov_, double(10.0));
     private_node_handle_.param("max_pub_cov", max_pub_cov_, double(0.1));
     private_node_handle_.param("max_pub_vel", max_pub_vel_, double(0.02));
 
@@ -344,21 +344,22 @@ class KalmanDetectionFilter
     }
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
     float px_per_meter = 50.0;
+    float offset = 250;
     for (auto filter_ptr : filter_list_){
       cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
           filter_ptr->statePost.at<float>(1) * px_per_meter);
       float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
       float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
-      cv::circle(img, mean, 5, cv::Scalar(255,0,0));
-      cv::ellipse(img, mean, cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
+      cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
+      cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
     }
     for (auto filter_ptr : latched_filter_list_) {
       cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
           filter_ptr->statePost.at<float>(1) * px_per_meter);
       float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
       float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
-      cv::circle(img, mean, 5, cv::Scalar(255,255,0));
-      cv::ellipse(img, mean, cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
+      cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,255,0));
+      cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
     }
 
     for (int i=0; i<exclusion_list_.size(); i++) {
