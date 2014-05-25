@@ -423,7 +423,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // since the turn in place path will probably pass the test in this if statement, we
             // need to advance i by enough places so the new points will be skipped and we'll end up
             // at what was i+1 before we did the above insert.
-            i+=turnKnots.size();
+            i+=turnKnots.size()-1;
         }
     }
 
