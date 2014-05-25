@@ -419,10 +419,10 @@ def generateMotionPrimitives(showplots=False):
         pathdata = []
         for prim in prims:
             # Forward and right turn
-            #path = hook(prim[0], prim[1], initialyaw, -deltayaw, gridspacing)
-            #pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
-            #if showplots:
-            #    plotPath(path)
+            path = hook(prim[0], prim[1], initialyaw, -deltayaw, gridspacing)
+            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
+            if showplots:
+                plotPath(path)
 
             # Forward
             forwarddist = prim[0] + prim[1]*abs(deltayaw) # Make the forward dist as long as the hook paths
@@ -431,18 +431,18 @@ def generateMotionPrimitives(showplots=False):
             if showplots:
                 plotPath(path)
 
-            # Short forward
-            forwarddist = gridspacing
-            path = forward(forwarddist, initialyaw, gridspacing)
-            pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
+            # Forward and left turn
+            path = hook(prim[0], prim[1], initialyaw, deltayaw, gridspacing)
+            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
             if showplots:
                 plotPath(path)
 
-            # Forward and left turn
-            #path = hook(prim[0], prim[1], initialyaw, deltayaw, gridspacing)
-            #pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
-            #if showplots:
-            #    plotPath(path)
+        # Short forward
+        forwarddist = gridspacing
+        path = forward(forwarddist, initialyaw, gridspacing)
+        pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
+        if showplots:
+            plotPath(path)
 
         # Turn in place to the right
         #path = turnInPlace(initialyaw, -deltayaw)
@@ -467,18 +467,6 @@ def generateMotionPrimitives(showplots=False):
         pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
         if showplots:
             plotPath(path)
-
-        # Turn in place to the right
-        #path = turnInPlace(initialyaw, -deltayaw)
-        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
-        #if showplots:
-        #   plotPath(path)
-
-        # Turn in place to the left 
-        #path = turnInPlace(initialyaw, deltayaw)
-        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
-        #if showplots:
-        #   plotPath(path)
 
         addToPrimitivesFile(primfile, pathdata)
 
