@@ -454,6 +454,18 @@ def generateMotionPrimitives(showplots=False):
         if showplots:
             plotPath(path)
 
+        # Turn in place to the right
+        #path = turnInPlace(initialyaw, -deltayaw)
+        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
+        #if showplots:
+        #   plotPath(path)
+
+        # Turn in place to the left 
+        #path = turnInPlace(initialyaw, deltayaw)
+        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
+        #if showplots:
+        #   plotPath(path)
+
         addToPrimitivesFile(primfile, pathdata)
 
     closePrimitivesFile(primfile)
