@@ -18,4 +18,22 @@
       <param name="max_depth" type="double" value="1000.0"/>
       <param name="min_count" type="double" value="100.0"/>
     </node>
+
+  <node
+    machine="search"
+    pkg="detection_filter"
+    type="kalman_filter_node"
+    name="linemod_kalman_filter_node"
+    ns="sample_detection">
+    <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
+    <param name="max_dist" type="double" value="0.1"/>
+    <param name="max_cov" type="double" value="0.4"/>
+    <param name="max_pub_cov" type="double" value="0.05"/>
+    <param name="max_pub_vel" type="double" value="0.02"/>
+    <param name="accumulate" type="bool" value="false"/>
+    <param name="error_cov_post" type="double" value="0.1"/>
+    <param name="process_noise_cov" type="double" value="0.001"/>
+    <param name="measurement_noise_cov" type="double" value="0.02"/>
+    <param name="period" type="double" value="0.03"/>
+  </node>
 </launch>
