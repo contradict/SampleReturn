@@ -72,6 +72,10 @@ void BezierCubicSpline<T>::ComputeTNB(double t, T& tangent, T& normal, T& binorm
 template <typename T>
 double BezierCubicSpline<T>::ComputeCurvature(double t) const
 {
+    if(ComputeArcLength() < 0.00001)
+    {
+        return 0.0;;
+    }
 	double t2 = t*t;
 	double oneMinusT = 1.00 - t;
 	double oneMinusT2 = oneMinusT*oneMinusT;
