@@ -130,10 +130,9 @@ void moveR(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::
     double phi1 = M_PI/2.0-atan(R1/wheelbase);
     double yaw = yawFromKnot(knot);
 
-    std::function<double(double)> phi;
-    std::function<double(double)> unused;
-    double T;
-    std::tie(T, phi, unused) = scurve(phi0, phi1, phidot);
+    double T = abs(phi1-phi0)*3.0/2.0/phidot;
+    auto phi = [=](double s) -> double {return phi0+(phi1-phi0)*3/2.0*s*s*(.5-s/3)*4.0;};
+
     Eigen::Vector2d P(knot.pose.position.x, knot.pose.position.y);
     Eigen::Vector2d V(knot.twist.linear.x, knot.twist.linear.y);
     for(int x = 1; x < N; x++)
@@ -172,10 +171,10 @@ void moveR(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::
 void rotate(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::Knot knot, int N, double yaw1, double omegapeak)
 {
     double yaw0 = yawFromKnot(knot);
-    std::function<double(double)> yaw;
-    std::function<double(double)> omega;
-    double T;
-    std::tie(T, yaw, omega) = scurve(yaw0, yaw1, omegapeak);
+    double T = abs(yaw1-yaw0)*3.0/2.0/omegapeak;
+    auto yaw = [=](double s) -> double {return yaw0+(yaw1-yaw0)*3/2.0*s*s*(.5-s/3)*4.0;};
+    auto omega = [=](double s) -> double {return (yaw1-yaw0)*3.0/2.0*s*(1.0-s)*4.0/T;};
+
     for(int x = 1; x < N; x++)
     {
         double s = ((double)x)/(N-1.0);
