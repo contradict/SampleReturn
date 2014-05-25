@@ -247,7 +247,7 @@ def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2, gridsp
     straightN = math.ceil(straighten / gridspacing)
     straightspacing = straighten / straightN
     straightcount = 0
-    while straightcount < (straightN - epsilon):
+    while straightcount < (straightN - epsilon): # save the last point for later
         straighttraveled = straightcount * straightspacing
         s = (straighttraveled + forward + arcdist) / totaldistance
         yaw = yaw0 + deltayaw
@@ -262,14 +262,15 @@ def makeHook(path, knot, N, forward=3, R=3, initialyaw=0, deltayaw=-pi/2, gridsp
         path.knots.append(deepcopy(knot))
         straightcount = straightcount + 1
 
-    #yaw = initialyaw + deltayaw
-    #knot.pose.position.x = P4[0]
-    #knot.pose.position.y = P4[1]
-    #yawtoknot(knot, yaw)
-    #knot.twist.linear.x = vl(s)*cos(yaw)
-    #knot.twist.linear.y = vl(s)*sin(yaw)
-    #knot.twist.angular.z = 0
-    #path.knots.append(deepcopy(knot))
+    # insert the exact end point
+    yaw = initialyaw + deltayaw
+    knot.pose.position.x = P4[0]
+    knot.pose.position.y = P4[1]
+    yawtoknot(knot, yaw)
+    knot.twist.linear.x = vl(1.0)*cos(yaw)
+    knot.twist.linear.y = vl(1.0)*sin(yaw)
+    knot.twist.angular.z = 0
+    path.knots.append(deepcopy(knot))
     return path, knot
 
 def nancheck(path):
@@ -437,4 +438,4 @@ def generateMotionPrimitives(showplots=False):
     
 
 if __name__ == "__main__":
-    generateMotionPrimitives(True)
+    generateMotionPrimitives(False)
