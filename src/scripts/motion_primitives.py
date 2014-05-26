@@ -192,13 +192,13 @@ def makeForward(path, knot, forward, yaw, gridspacing=0.1, pathspacing=0.1):
     # for some angles
     epsilon = 0.0001
     if math.fmod(yaw, pi/2.0) < epsilon:
-        forward = round(forward/gridspacing)*gridspacing
+        forward = math.ceil(forward/gridspacing)*gridspacing
     elif math.fmod(yaw, pi/4.0) < epsilon:
         deg45gridspacing = gridspacing * math.sqrt(2)
-        forward = round(forward/deg45gridspacing)*deg45gridspacing
+        forward = math.ceil(forward/deg45gridspacing)*deg45gridspacing
     elif math.fmod(yaw, pi/8.0) < epsilon:
         deg22p5gridspacing = gridspacing * math.sqrt(5.0*5.0 + 12.0*12.0)
-        forward = round(forward/deg22p5gridspacing)*deg22p5gridspacing
+        forward = math.ceil(forward/deg22p5gridspacing)*deg22p5gridspacing
 
     # make forward path
     T, l, vl = scurve(0, forward, 1.0)
