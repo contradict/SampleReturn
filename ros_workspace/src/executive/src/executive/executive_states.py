@@ -149,7 +149,8 @@ class DriveToPoseState(smach.State):
                                          'detected_sample',
                                          'motion_check_interval',
                                          'min_motion'],
-                             output_keys=['last_pose'])
+                             output_keys=['last_pose',
+                                          'detected_sample'])
         
         self.move_client = move_client
 
@@ -157,6 +158,8 @@ class DriveToPoseState(smach.State):
         self.sample_detected = False
                 
     def execute(self, ud):
+        #on entry to Drive To Pose clear old sample_detections!
+        ud.detected_sample = None
         last_pose = util.get_current_robot_pose(self.listener)
         velocity = ud.velocity
         goal = move_base_msg.MoveBaseGoal()
