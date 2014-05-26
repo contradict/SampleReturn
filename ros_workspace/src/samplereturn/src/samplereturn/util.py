@@ -40,7 +40,6 @@ class AnnouncerInterface(object):
     def audio_ready(self):
         return (self.pub.get_num_connections() > 0)
         
-        
     def __getstate__(self):
         return {'Class':'AnnouncerInterface'}
 
