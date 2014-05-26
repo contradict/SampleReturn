@@ -40,6 +40,7 @@
         <remap from="right_camera_info" to="/cameras/manipulator/right/camera_info"/>
 
         <remap from="debug_update_constants" to="/debug/visual_servo/update_constants"/>
-  
+
+        <remap from="servo_command" to="/motion/servo_command"/>
   </node>
 </launch>

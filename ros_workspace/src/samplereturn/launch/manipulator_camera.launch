@@ -29,7 +29,8 @@
             <param name="frame_id" value="manipulator_left_camera"/>
             <param name="frame_rate" value="30"/>
             <param name="bayer_pattern" value="rggb"/>
-            <param name="auto_exposure" type="int" value="2"/>
+            <param name="auto_exposure" type="int" value="3"/>
+            <param name="exposure" type="int" value="25"/>
             <!--
             <param name="auto_gain" type="int" value="3"/>
             <param name="auto_shutter" type="int" value="3"/>
@@ -57,7 +58,8 @@
             <param name="frame_id" value="manipulator_left_camera"/>
             <param name="frame_rate" value="30"/>
             <param name="bayer_pattern" value="rggb"/>
-            <param name="auto_exposure" type="int" value="2"/>
+            <param name="auto_exposure" type="int" value="3"/>
+            <param name="exposure" type="int" value="25"/>
             <!--
             <param name="auto_gain" type="int" value="3"/>
             <param name="auto_shutter" type="int" value="3"/>

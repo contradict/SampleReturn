@@ -11,10 +11,16 @@ find_package(catkin REQUIRED
         sensor_msgs
         stereo_msgs
         std_msgs
+        samplereturn_msgs
         image_transport
         cv_bridge
         message_generation
+        image_geometry
+        saliency_detector
+        tf
         )
+
+find_package(Eigen REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -30,10 +36,10 @@ find_package(catkin REQUIRED
 #######################################
 
 ## Generate messages in the 'msg' folder
- add_message_files(
-   FILES
-   NamedPoint.msg
- )
+# add_message_files(
+#   FILES
+#   NamedPoint.msg
+# )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -60,8 +66,9 @@ find_package(catkin REQUIRED
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
    LIBRARIES ${PROJECT_NAME}
+   INCLUDE_DIRS ${Eigen_INCLUDE_DIRS}
    CATKIN_DEPENDS roscpp roslib
-   DEPENDS opencv2
+   DEPENDS opencv2 Eigen
 )
 
 ###########
@@ -71,8 +78,11 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(include
+  ${Eigen_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
+
+add_definitions(${Eigen_DEFINITIONS})
 
 ## Declare a cpp library
  add_library(new_modalities
@@ -83,6 +93,7 @@ include_directories(include
  add_executable(linemod_trainer src/linemod_trainer.cpp)
  add_executable(linemod_detector src/linemod_detector.cpp)
  add_executable(linemod_detector_2d src/linemod_detector_2d.cpp)
+ add_executable(stereo_linemod_trainer src/stereo_linemod_trainer.cpp)
 
 add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
 add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
@@ -91,7 +102,15 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
 # add_dependencies(cv_test_node cv_test_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
+#add_library(linemod_color_naming
+#  src/color_naming.cpp
+#)
+
  target_link_libraries(linemod_trainer
+   new_modalities
+   ${catkin_LIBRARIES}
+ )
+ target_link_libraries(stereo_linemod_trainer
    new_modalities
    ${catkin_LIBRARIES}
  )
@@ -99,6 +118,7 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
    ${catkin_LIBRARIES}
  )
  target_link_libraries(linemod_detector_2d
+   #color_naming
    ${catkin_LIBRARIES}
  )
 

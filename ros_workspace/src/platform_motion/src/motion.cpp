@@ -114,7 +114,7 @@ Motion::Motion() :
             &Motion::selectMotionModeCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
     joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
-    servo_sub = nh_.subscribe("CAN_servo_command", 2, &Motion::servoTwistCallback, this);
+    servo_sub = nh_.subscribe("servo_command", 2, &Motion::servoTwistCallback, this);
 
     carousel_sub = nh_.subscribe("carousel_angle", 2, &Motion::carouselCallback,
             this);
@@ -505,9 +505,10 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
+                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE &&
                 req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK)
             {
-                ROS_ERROR("Attempted mode transition other than RESUME or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
+                ROS_ERROR("Attempted mode transition other than RESUME, ENABLE or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
                 return false;
             }
             break;
