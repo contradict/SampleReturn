@@ -312,6 +312,7 @@ class PursueDetectedPoint(smach.Concurrence):
         header = std_msg.Header(0, rospy.Time(0), '/map')
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.logdebug("PURSUIT start pose: " + str(start_pose))
+        rospy.loginfo("PURSUIT tranform now(%s), stamp(%s)" % (rospy.Time.now(), userdata.pursuit_point.point.stamp))
         point_on_map = self.listener.transformPoint('/map', userdata.pursuit_point)
         goal_pose = geometry_msg.Pose()
         goal_pose.position = point_on_map.point
