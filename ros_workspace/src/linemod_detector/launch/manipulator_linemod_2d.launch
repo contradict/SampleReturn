@@ -12,7 +12,7 @@
       <remap from="disparity" to="/cameras/manipulator/disparity"/>
       <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
       <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
-      <param name="template_file" type="string" value="$(find linemod_detector)/config/red_puck_2d.yaml"/>
+      <param name="template_file" type="string" value="$(find linemod_detector)/config/red_puck_2d_test.yaml"/>
       <param name="pub_threshold" type="double" value="86.0"/>
       <param name="min_depth" type="double" value="100.0"/>
       <param name="max_depth" type="double" value="1000.0"/>
