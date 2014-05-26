@@ -212,17 +212,10 @@ class PursueSample(object):
         sls.stop()
 
     def sample_detection_search(self, sample):
-        if sample.name == 'none':
-            self.state_machine.userdata.target_sample = None
-            self.pursue_detected_point.set_pursuit_point(None)
-        else:
             self.state_machine.userdata.target_sample = sample
             self.pursue_detected_point.set_pursuit_point(sample)
 
     def sample_detection_manipulator(self, sample):
-        if sample.name == 'none':
-            self.state_machine.userdata.detected_sample = None
-        else:
             self.state_machine.userdata.detected_sample = sample
 
     def pause_state_update(self, msg):

@@ -297,10 +297,7 @@ class LevelTwoRandom(object):
         
 
     def sample_update(self, sample):
-        if sample.name == 'none':
-            self.state_machine.userdata.detected_sample = None
-        else:
-            self.state_machine.userdata.detected_sample = sample
+        self.state_machine.userdata.detected_sample = sample
             
     def beacon_update(self, beacon_pose):
         beacon_pose.header.stamp = rospy.Time(0)
