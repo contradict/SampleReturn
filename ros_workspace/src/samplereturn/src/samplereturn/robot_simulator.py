@@ -48,8 +48,8 @@ class RobotSimulator(object):
         self.mode = mode
         self.cameras_ready = True
         self.paused = False
-        self.publish_samples = True
-        self.fake_sample = {'x':11, 'y':-11, 'name':'none', 'id':1}
+        self.publish_samples = False
+        self.fake_sample = {'x':11, 'y':-11, 'id':1}
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
@@ -306,7 +306,6 @@ class RobotSimulator(object):
             msg.point = geometry_msg.Point(self.fake_sample['x'],
                                                    self.fake_sample['y'],
                                                    0.0)
-            msg.name = self.fake_sample['name']
             msg.sample_id = self.fake_sample['id']
             self.search_sample_pub.publish(msg)
             
@@ -317,7 +316,6 @@ class RobotSimulator(object):
             msg.point = geometry_msg.Point(self.fake_sample['x'],
                                                    self.fake_sample['y'],
                                                    0.0)
-            msg.name = self.fake_sample['name']
             msg.sample_id = self.fake_sample['id']
             self.manipulator_sample_pub.publish(msg)
             
@@ -394,10 +392,10 @@ class RobotSimulator(object):
         self.home_carousel_server.set_succeeded(result=fake_result)
         
     def hide_samples(self):
-        self.fake_sample['name'] = 'none'
+        self.publish_samples = False
         
     def show_samples(self):
-        self.fake_sample['name'] = 'PRECACHED'
+        self.publish_samples = True
         
     def shift_sample(self):
         shifts = [1,-1]

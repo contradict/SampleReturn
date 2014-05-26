@@ -118,12 +118,12 @@ class LevelTwoRandom(object):
                 def search_line_cb(outcome_map):
                     return True
                 
-                search_line = smach.Concurrence(outcomes = ['sample_detected',
-                                                            'move_complete',
-                                                            'line_blocked',
-                                                            'timeout',
-                                                            'return_home',
-                                                            'preempted', 'aborted'],
+                self.line_manager = smach.Concurrence(outcomes = ['sample_detected',
+                                                                'move_complete',
+                                                                'line_blocked',
+                                                                'timeout',
+                                                                'return_home',
+                                                                'preempted', 'aborted'],
                                 default_outcome = 'aborted',
                                 input_keys = ['next_line_pose',
                                               'line_yaw',
@@ -148,7 +148,7 @@ class LevelTwoRandom(object):
                                                 'preempted' : {'DRIVE_TO_POSE':'preempted',
                                                                'SEARCH_LINE_MANAGER':'preempted'} })
                 
-                with search_line:
+                with self.line_manager:
                     
                     smach.Concurrence.add('DRIVE_TO_POSE',
                                            DriveToPoseState(self.move_base, self.tf_listener),
@@ -163,7 +163,7 @@ class LevelTwoRandom(object):
                                             
                                             
                 smach.StateMachine.add('SEARCH_LINE',
-                                       search_line,
+                                       self.line_manager,
                                        transitions = {'sample_detected':'PURSUE_SAMPLE',
                                                       'move_complete':'SEARCH_LINE',
                                                       'line_blocked':'CHOOSE_NEW_LINE',
@@ -227,7 +227,9 @@ class LevelTwoRandom(object):
                                                         self.tf_listener),
                                        transitions = {'complete':'APPROACH_BEACON',
                                                       'timeout':'START_RETURN_HOME',
-                                                      'sample_detected':'LEVEL_TWO_ABORTED'})
+                                                      'sample_detected':'LEVEL_TWO_ABORTED'},
+                                       remapping = {'velocity':'line_velocity',
+                                                    'pursue_samples':'false'})
 
                 approach_beacon = GetPursueDetectedPointState(self.move_base,
                                                               self.tf_listener)
@@ -239,14 +241,17 @@ class LevelTwoRandom(object):
                                                       'complete':'START_RETURN_HOME',
                                                       'timeout':'START_RETURN_HOME',
                                                       'aborted':'LEVEL_TWO_ABORTED'},
-                                       remapping = {'pursue_samples':'false'})                
+                                       remapping = {'velocity':'line_velocity',
+                                                    'pursue_samples':'false'})                
 
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
                                                         self.tf_listener),
                                        transitions = {'complete':'DESELECT_PLANNER',
                                                       'timeout':'START_RETURN_HOME',
-                                                      'sample_detected':'LEVEL_TWO_ABORTED'})
+                                                      'sample_detected':'LEVEL_TWO_ABORTED'},
+                                       remapping = {'velocity':'line_velocity',
+                                                    'pursue_samples':'false'})         
 
                 MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
                 smach.StateMachine.add('DESELECT_PLANNER',
@@ -298,6 +303,7 @@ class LevelTwoRandom(object):
 
     def sample_update(self, sample):
         self.state_machine.userdata.detected_sample = sample
+        self.line_manager.userdata.detected_sample = sample
             
     def beacon_update(self, beacon_pose):
         beacon_pose.header.stamp = rospy.Time(0)
@@ -343,8 +349,7 @@ class SearchLineManager(smach.State):
                                            'blocked_check_distance',
                                            'blocked_check_width',
                                            'return_time'],
-                             output_keys = ['next_line_pose',
-                                            'detected_sample'],
+                             output_keys = ['next_line_pose'],
                              outcomes=['sample_detected',
                                        'line_blocked',
                                        'return_home',
@@ -357,13 +362,6 @@ class SearchLineManager(smach.State):
                                         nav_msg.OccupancyGrid,
                                         self.costmap_update)
         
-        #inside a concurrence, userdata cannot be manipulated from outside the state_machine
-        #so, this thing needs it
-        self.search_listener = rospy.Subscriber('detected_sample_search',
-                                samplereturn_msg.NamedPoint,
-                                self.search_update)
-        self.detected_sample = None
-        
         self.costmap = nav_msg.OccupancyGrid()
         self.new_costmap_available = True
         
@@ -374,8 +372,6 @@ class SearchLineManager(smach.State):
         self.last_line_blocked = False
         
         while not rospy.is_shutdown():  
-            
-            userdata.detected_sample = self.detected_sample
             
             if self.preempt_requested():
                 rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
@@ -406,12 +402,6 @@ class SearchLineManager(smach.State):
             rospy.sleep(0.2)
         
         return 'aborted'
-    
-    def search_update(self, sample):
-        if sample.name == 'none':
-            self.detected_sample = None
-        else:
-            self.detected_sample = sample        
 
     def costmap_update(self, costmap):
         self.new_costmap_available = True
