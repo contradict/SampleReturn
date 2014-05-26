@@ -118,7 +118,7 @@ void yawToKnot(platform_motion_msgs::Knot &knot, double yaw)
 
 std::tuple<double, std::function<double(double)>, std::function<double(double)> > scurve(double initial, double final, double dotmax)
 {
-    double T = abs(final-initial)*3.0/2.0/dotmax;
+    double T = fabs(final-initial)*3.0/2.0/dotmax;
     auto x = [=](double s) -> double {return initial+(final-initial)*3/2.0*s*s*(.5-s/3)*4.0;};
     auto xdot = [=](double s) -> double {return (final-initial)*3.0/2.0*s*(1.0-s)*4.0/T;};
     std::make_tuple(T, x, xdot);
@@ -130,7 +130,7 @@ void moveR(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::
     double phi1 = M_PI/2.0-atan(R1/wheelbase);
     double yaw = yawFromKnot(knot);
 
-    double T = abs(phi1-phi0)*3.0/2.0/phidot;
+    double T = fabs(phi1-phi0)*3.0/2.0/phidot;
     auto phi = [=](double s) -> double {return phi0+(phi1-phi0)*3/2.0*s*s*(.5-s/3)*4.0;};
 
     Eigen::Vector2d P(knot.pose.position.x, knot.pose.position.y);
@@ -171,7 +171,16 @@ void moveR(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::
 void rotate(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::Knot knot, int N, double yaw1, double omegapeak)
 {
     double yaw0 = yawFromKnot(knot);
-    double T = abs(yaw1-yaw0)*3.0/2.0/omegapeak;
+    // keep from going the long way around...
+    if((yaw0 -yaw1) < -M_PI)
+    {
+        yaw1 -= 2.0*M_PI;
+    }
+    else if((yaw0 -yaw1) > M_PI)
+    {
+        yaw1 += 2.0*M_PI;
+    }
+    double T = fabs(yaw1-yaw0)*3.0/2.0/omegapeak;
     auto yaw = [=](double s) -> double {return yaw0+(yaw1-yaw0)*3/2.0*s*s*(.5-s/3)*4.0;};
     auto omega = [=](double s) -> double {return (yaw1-yaw0)*3.0/2.0*s*(1.0-s)*4.0/T;};
 
@@ -197,7 +206,7 @@ std::vector<platform_motion_msgs::Knot> computeTurnInPlace(platform_motion_msgs:
     int numPoints = 20;
     double startR = 1e5;
     double endR = 0.0;
-    double wheelbase = sternPodVector.norm();
+    double wheelbase = fabs(sternPodVector[0]);
     double phidot = M_PI/2.0;
     double omegasmall = 3e-3;
     double vsmall = 3e-3;
@@ -236,6 +245,46 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     // make a path copy to deal with stupid const stupid
     nav_msgs::Path pathCopy(path);
 
+    // debug print! print all the points, something is strange about them!
+    for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
+    {
+        ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+    }
+
+    // keep track of special case turn in place motions so we can remove the intermediate ones
+    std::vector<int> posesToRemove;
+    bool lastPointWasTurnInPlace = false;
+    for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
+    {
+        Eigen::Vector3d currentPoint;
+        Eigen::Vector3d nextPoint;
+        tf::pointMsgToEigen(pathCopy.poses[i].pose.position, currentPoint);
+        tf::pointMsgToEigen(pathCopy.poses[i+1].pose.position, nextPoint);
+        if((currentPoint - nextPoint).norm() < 0.001)
+        {
+            if(lastPointWasTurnInPlace)
+            {
+                posesToRemove.push_back(i);
+            }
+            lastPointWasTurnInPlace = true;
+        }
+        else
+        {
+            lastPointWasTurnInPlace = false;
+        }
+    }
+    for(auto iter = posesToRemove.rbegin(); iter != posesToRemove.rend(); ++iter)
+    {
+        pathCopy.poses.erase(pathCopy.poses.begin()+(*iter));
+    }
+
+    ROS_ERROR("pathCopy post erasing:");
+
+    for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
+    {
+        ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+    }
+
     // What direction is the robot going and what is the linear/angular vel?
     Time timestamp = Time::now();
     //timestamp.sec = 0;
@@ -268,33 +317,6 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     double pathVelocityMagnitude = pathLinearVelocity.norm();
     BezierCubicSpline<Eigen::Vector3d>* splines = new BezierCubicSpline<Eigen::Vector3d>[pathCopy.poses.size()-1];
 
-    // keep track of special case turn in place motions so we can remove the intermediate ones
-    std::vector<int> posesToRemove;
-    bool lastPointWasTurnInPlace = false;
-    for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
-    {
-        Eigen::Vector3d currentPoint;
-        Eigen::Vector3d nextPoint;
-        tf::pointMsgToEigen(pathCopy.poses[i].pose.position, currentPoint);
-        tf::pointMsgToEigen(pathCopy.poses[i+1].pose.position, nextPoint);
-        if((currentPoint - nextPoint).norm() < 0.001)
-        {
-            if(lastPointWasTurnInPlace)
-            {
-                posesToRemove.push_back(i);
-            }
-            lastPointWasTurnInPlace = true;
-        }
-        else
-        {
-            lastPointWasTurnInPlace = false;
-        }
-    }
-    for(auto iter = posesToRemove.rbegin(); iter != posesToRemove.rend(); ++iter)
-    {
-        pathCopy.poses.erase(pathCopy.poses.begin()+(*iter));
-    }
-
     for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
     {
         bool success = this->FitCubicSpline(pathCopy, i, pathVelocityMagnitude, maximum_linear_velocity, splines[i]);
@@ -304,6 +326,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         }
 
         double distanceTraveled = splines[i].ComputeArcLength();
+
+        if(distanceTraveled < 0.0)
+        {
+            ROS_ERROR("distanceTraveled is %f for point %d!!!", distanceTraveled, i);
+        }
 
         // Account for acceleration rate and compute the actual velocity at the next point
         double nextVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
@@ -374,6 +401,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.x = 0.00;
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.y = 0.00;
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.z = 0.00;
+
+    ROS_ERROR("\n\npath_msg.knots:");
+    for(unsigned int i = 0; i < path_msg.knots.size(); i++)
+    {
+        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+    }
     
     // Compute and store smooth decelerations
     for (unsigned int i = pathCopy.poses.size()-1; i > 0; --i)
@@ -395,6 +428,13 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     }
 
+    ROS_ERROR("\n\npath_msg.knots post decel:");
+    for(unsigned int i = 0; i < path_msg.knots.size(); i++)
+    {
+        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+    }
+    
+
     // now it is time to add the turn in place segments!
     // loop back over the path, and add a bunch of magical turn in place segements!
     // keep track of accumulated turn segment time offset to we can make sure all the
@@ -413,6 +453,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             ros::Duration turnTime;
             auto turnKnots = computeTurnInPlace(path_msg.knots[i], path_msg.knots[i+1], turnTime, sternPodVector);
 
+            // drop the last knot to make stitching a little easier...
+            turnKnots.pop_back();
+
             // keep track of the total time these turns are adding so we can offset timestamps
             // accordingly
             totalTurnTime += turnTime;
@@ -427,6 +470,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // at what was i+1 before we did the above insert.
             i+=turnKnots.size();
         }
+    }
+
+    ROS_ERROR("\n\npath_msg.knots post turn in place inflation:");
+    for(unsigned int i = 0; i < path_msg.knots.size(); i++)
+    {
+        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
     }
 
     // the last point is never examined in the loop, so add the turn duration to it here.
@@ -508,7 +557,7 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
 {
     double distanceTraveled = spline.ComputeArcLength(0.01);
     double averageVelocity = (initialVelocity + finalVelocity)/2.00;
-    if((distanceTraveled < 0.0001) || (abs(averageVelocity) < 0.0001))
+    if((distanceTraveled < 0.0001) || (averageVelocity < 0.0001))
     {
         ROS_ERROR("Error distance traveled %f, averageVelocity %f. Setting minimum path time to 0!", distanceTraveled, averageVelocity);
         return 0.0;
