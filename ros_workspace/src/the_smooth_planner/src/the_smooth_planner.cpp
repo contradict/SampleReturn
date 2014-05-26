@@ -484,7 +484,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         if((currentPoint - nextPoint).norm() < 0.001)
         {
             ros::Duration turnTime;
-            auto turnKnots = computeTurnInPlace(path_msg.knots[i], path_msg.knots[i+1], turnTime, sternPodVector);
+            auto turnKnots = computeTurnInPlace(
+                    path_msg.knots[i],
+                    path_msg.knots[i+1],
+                    turnTime,
+                    sternPodVector
+            );
 
             // drop the last knot to make stitching a little easier...
             turnKnots.pop_back();
