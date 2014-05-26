@@ -75,6 +75,8 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
         ROS_ERROR("Error looking up %s: %s", "stern_suspension", e.what());
     }
     tf::vectorTFToEigen(sternPodStampedTf.getOrigin(), sternPodVector);
+
+    ROS_ERROR("sternPodVector.norm: %f", sternPodVector[0]);
 }
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
