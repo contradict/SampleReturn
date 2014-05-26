@@ -488,20 +488,19 @@ def generateMotionPrimitives(showplots=False):
     gridspacing = 0.1
     pathspacing = 0.2
     numangles = 8
-    prims = [[0.5, 2.3], [0.25, 1.2]] # list of [forward, radius]
+    deltayaw = 2*pi/numangles
+    forwards = [10.0, 8.0]
+    shortforwards = [gridspacing, 1.0,5.0]
     primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
     for i in xrange(0,numangles):
         initialyaw = 2*pi*i/numangles
-        deltayaw = 2*pi/numangles
         pathdata = []
-        for prim in prims:
-            forwarddist = prim[0] + prim[1]*abs(deltayaw) # Make the forward dist as long as the hook paths
-
+        for forwarddist in forwards:
             # Forward and right turn
-            #path = smoothhook(forwarddist, initialyaw, -deltayaw, gridspacing, pathspacing)
-            #pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
-            #if showplots:
-            #    plotPath(path)
+            path = smoothhook(forwarddist, initialyaw, -deltayaw, gridspacing, pathspacing)
+            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
+            if showplots:
+                plotPath(path)
 
             # Forward
             path = forward(forwarddist, initialyaw, gridspacing, pathspacing)
@@ -510,41 +509,41 @@ def generateMotionPrimitives(showplots=False):
                 plotPath(path)
 
             # Forward and left turn
-            #path = smoothhook(forwarddist, initialyaw, deltayaw, gridspacing, pathspacing)
-            #pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
+            path = smoothhook(forwarddist, initialyaw, deltayaw, gridspacing, pathspacing)
+            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
+            if showplots:
+                plotPath(path)
+
+        for shortforward in shortforwards:
+            # Short forward
+            path = forward(shortforward, initialyaw, gridspacing, pathspacing)
+            pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
+            if showplots:
+                plotPath(path)
+
+            # Turn in place to the right
+            #path = turnInPlace(initialyaw, -deltayaw)
+            #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
             #if showplots:
-            #    plotPath(path)
+            #   plotPath(path)
 
-        # Short forward
-        forwarddist = gridspacing
-        path = forward(forwarddist, initialyaw, gridspacing, pathspacing)
-        pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
-        if showplots:
-            plotPath(path)
+            # Turn in place to the left 
+            #path = turnInPlace(initialyaw, deltayaw)
+            #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
+            #if showplots:
+            #   plotPath(path)
 
-        # Turn in place to the right
-        #path = turnInPlace(initialyaw, -deltayaw)
-        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
-        #if showplots:
-        #   plotPath(path)
+            # Turn in place to the right
+            path = fakeTurnInPlace(initialyaw, -deltayaw)
+            pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
+            if showplots:
+                plotPath(path)
 
-        # Turn in place to the left 
-        #path = turnInPlace(initialyaw, deltayaw)
-        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
-        #if showplots:
-        #   plotPath(path)
-
-        # Turn in place to the right
-        path = fakeTurnInPlace(initialyaw, -deltayaw)
-        pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
-        if showplots:
-            plotPath(path)
-
-        # Turn in place to the left 
-        path = fakeTurnInPlace(initialyaw, deltayaw)
-        pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
-        if showplots:
-            plotPath(path)
+            # Turn in place to the left 
+            path = fakeTurnInPlace(initialyaw, deltayaw)
+            pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
+            if showplots:
+                plotPath(path)
 
         addToPrimitivesFile(primfile, pathdata)
 
