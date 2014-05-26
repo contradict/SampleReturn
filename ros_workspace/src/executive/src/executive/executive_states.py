@@ -301,18 +301,18 @@ class PursueDetectedPoint(smach.Concurrence):
                            'point_lost':{'PURSUIT_MANAGER':'point_lost'},
                            'complete':{'DRIVE_TO_POSE':'complete'},
                            'timeout':{'DRIVE_TO_POSE':'timeout'}})
-        
+
         self.listener = listener
-        
+
     def execute(self, userdata):
-        
+
         #Get start pose and pursuit point, calculate the first target_pose
         #and put it in the userdata.  Put start_pose into last_pose as well
         #Then, execute concurrence as normal.
         header = std_msg.Header(0, rospy.Time(0), '/map')
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.logdebug("PURSUIT start pose: " + str(start_pose))
-        rospy.loginfo("PURSUIT tranform now(%s), stamp(%s)" % (rospy.Time.now(), userdata.pursuit_point.point.stamp))
+        rospy.loginfo("PURSUIT tranform now(%s), stamp(%s)" % (rospy.Time.now(), userdata.pursuit_point.header.stamp))
         point_on_map = self.listener.transformPoint('/map', userdata.pursuit_point)
         goal_pose = geometry_msg.Pose()
         goal_pose.position = point_on_map.point
