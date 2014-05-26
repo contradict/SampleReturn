@@ -395,12 +395,6 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     }
 
-    //if (path_msg.knots[pathCopy.poses.size()-1].twist.linear.x != 0.0 ||
-    //    path_msg.knots[pathCopy.poses.size()-1].twist.linear.y != 0.0)
-    //{
-    //    ROS_DEBUG("WHAT THE WAAAAAAAAAAAA!!!!");
-    //}
-
     // now it is time to add the turn in place segments!
     // loop back over the path, and add a bunch of magical turn in place segements!
     // keep track of accumulated turn segment time offset to we can make sure all the
@@ -426,10 +420,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // add the new knots to the path remembering that insert inserts BEFORE the given element!
             path_msg.knots.insert(path_msg.knots.begin()+i+1, turnKnots.begin(), turnKnots.end());
 
+            ROS_ERROR("Adding turn-in-place at index %d with %d segments", i, turnKnots.size());
+
             // since the turn in place path will probably pass the test in this if statement, we
             // need to advance i by enough places so the new points will be skipped and we'll end up
             // at what was i+1 before we did the above insert.
-            i+=turnKnots.size()-1;
+            i+=turnKnots.size();
         }
     }
 
