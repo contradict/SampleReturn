@@ -496,12 +496,17 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
         case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
             // make sure PVT buffers are all cleared.
-            port->wheel.clearPvtBuffer();
-            port->steering.clearPvtBuffer();
-            starboard->wheel.clearPvtBuffer();
-            starboard->steering.clearPvtBuffer();
-            stern->wheel.clearPvtBuffer();
-            stern->steering.clearPvtBuffer();
+            // if we're going to something other than pause or planner pvt mode.
+            if((req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT) &&
+                (req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE))
+            {
+                port->wheel.clearPvtBuffer();
+                port->steering.clearPvtBuffer();
+                starboard->wheel.clearPvtBuffer();
+                starboard->steering.clearPvtBuffer();
+                stern->wheel.clearPvtBuffer();
+                stern->steering.clearPvtBuffer();
+            }
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
