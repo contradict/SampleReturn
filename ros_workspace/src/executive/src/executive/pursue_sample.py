@@ -129,6 +129,7 @@ class PursueSample(object):
                                    VisualServo(self.announcer),
                                    transitions = {'complete':'GRAB_SAMPLE',
                                                   'sample_lost':'LOAD_SEARCH_PATH',
+                                                  'preempted':'PURSUE_SAMPLE_ABORTED',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'})  
 
             @smach.cb_interface(input_keys=['latched_sample'])
@@ -327,12 +328,13 @@ class VisualServo(smach.State):
 
         self.servo = actionlib.SimpleActionClient("visual_servo_action",
                                                    visual_servo_msg.VisualServoAction)
+        self.sample_lost = False
         
     def execute(self, userdata):
         
+        self.sample_lost = False
         self.last_sample_detected = rospy.get_time()
         self.last_servo_feedback = rospy.get_time()
-        self.smach_outcome = 'aborted'
         self.servo.wait_for_server(rospy.Duration(5))
         self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb)
@@ -341,19 +343,26 @@ class VisualServo(smach.State):
     
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
+            if self.preempt_requested():    
+                self.servo.cancel_all_goals()
+                self.service_preempt()
+                return 'preempted' 
             servo_state = self.servo.get_state()
             if servo_state not in util.actionlib_working_states:
-                break    
+                break
+            
+        if self.sample_lost:
+            return 'sample_lost'
     
         if servo_state == action_msg.GoalStatus.SUCCEEDED:
             self.announcer.say('Servo complete, deploy ing gripper')
             userdata.latched_sample = userdata.detected_sample
-            self.smach_outcome = 'complete'
+            return 'complete'
         else:
-            self.announcer.say('Visual servo action server failure')
-            self.smach_outcome = 'aborted'
+            self.announcer.say('Visual servo unexpected failure')
+            return 'aborted'
                 
-        return self.smach_outcome
+        return 'aborted'
     
     def servo_feedback_cb(self, feedback):
          this_time = rospy.get_time()
@@ -369,7 +378,7 @@ class VisualServo(smach.State):
          if (this_time - self.last_sample_detected) > 15.0:
              self.servo.cancel_all_goals()
              self.announcer.say('Canceling visual servo')
-             self.smach_outcome = 'sample_lost'
+             self.sample_lost = True
 
 class ConfirmSampleAcquired(smach.State):
     def __init__(self, announcer, result_pub):
