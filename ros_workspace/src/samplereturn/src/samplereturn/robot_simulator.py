@@ -1,17 +1,18 @@
 #!/usr/bin/env pyth
 import sys
 import math
+import numpy as np
+from numpy import trunc,pi,ones_like,zeros,linspace, eye, sin, cos, arctan2
+from copy import deepcopy
+import random
+
+import smach
+import smach_ros
 import rospy
 import rosnode
 import actionlib
 import tf
 import tf_conversions
-import numpy as np
-from numpy import trunc,pi,ones_like,zeros,linspace, eye, sin, cos, arctan2
-from copy import deepcopy
-
-import smach
-import smach_ros
 
 import samplereturn.util as util
 
@@ -36,7 +37,7 @@ import dynamic_reconfigure.msg as dynmsg
 
 class RobotSimulator(object):
     
-    def __init__(self, mode='level_one'):
+    def __init__(self, mode='level_two'):
     
         rospy.init_node("robot_simulator")
         
@@ -398,6 +399,11 @@ class RobotSimulator(object):
     def show_samples(self):
         self.fake_sample['name'] = 'PRECACHED'
         
+    def shift_sample(self):
+        shifts = [1,-1]
+        self.fake_sample['x'] += random.choice(shifts)
+        self.fake_sample['y'] += random.choice(shifts)
+        
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
         
@@ -482,8 +488,13 @@ class RobotSimulator(object):
 class ManipulatorState(smach.State):
     def execute(self, userdata):
         start_time = rospy.get_time()
-        #wait 5 seconds then return success
-        while (rospy.get_time() - start_time) < 5:
+        #wait then return success
+        if userdata.action_goal.type == manipulator_msg.ManipulatorGoal.HOME:
+            wait_time = 2.0
+        else:
+            wait_time = 5.0
+        
+        while (rospy.get_time() - start_time) < wait_time:
             if self.preempt_requested():
                 userdata.action_result = manipulator_msg.ManipulatorResult('fake_failure', False)
                 return 'preempted'
