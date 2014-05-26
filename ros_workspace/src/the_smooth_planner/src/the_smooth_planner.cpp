@@ -317,7 +317,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     Eigen::Vector3d pathLinearVelocity;
     tf::vectorMsgToEigen(odometry.twist.twist.linear, pathLinearVelocity);
     double pathVelocityMagnitude = pathLinearVelocity.norm();
+    double initialPathVelocity = pathVelocityMagnitude;
     BezierCubicSpline<Eigen::Vector3d>* splines = new BezierCubicSpline<Eigen::Vector3d>[pathCopy.poses.size()-1];
+
+    double totalDistance = 0.0;
 
     for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
     {
@@ -329,13 +332,15 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
         double distanceTraveled = splines[i].ComputeArcLength();
 
+        totalDistance += distanceTraveled;
+
         if(distanceTraveled < 0.0)
         {
             ROS_ERROR("distanceTraveled is %f for point %d!!!", distanceTraveled, i);
         }
 
         // Account for acceleration rate and compute the actual velocity at the next point
-        double nextVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
+        double nextVelocityMagnitude = sqrt(initialPathVelocity*initialPathVelocity + 2.00*linear_acceleration*totalDistance);
         nextVelocityMagnitude = min(nextVelocityMagnitude, maximum_linear_velocity);
 
         if(distanceTraveled < 0.0001)
@@ -419,15 +424,38 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         tf::vectorMsgToEigen(path_msg.knots[i-1].twist.linear, previousVelocityVec);
         double currentVelocityMagnitude = currentVelocityVec.norm();
         double previousVelocityMagnitude = previousVelocityVec.norm();
-        double deltaTime = (path_msg.knots[i].header.stamp - path_msg.knots[i-1].header.stamp).toSec();
-        if ((previousVelocityMagnitude - currentVelocityMagnitude)/deltaTime > linear_acceleration)
+        double distanceTraveled = splines[i-1].ComputeArcLength();
+        double expectedVelocityMagnitude = sqrt(currentVelocityMagnitude*currentVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
+        if (previousVelocityMagnitude > (expectedVelocityMagnitude+0.005))
         {
-            double previousVelocityScale = (currentVelocityMagnitude + linear_acceleration*deltaTime)/previousVelocityMagnitude;
+            double previousVelocityScale = expectedVelocityMagnitude/previousVelocityMagnitude;
             path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.y *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.z = 0.00;
         }
 
+    }
+
+    for(unsigned int i = 0; i < path_msg.knots.size()-1; i++)
+    {
+        // modify the time in i+1 to match the actual velocity between points i and i+1
+        Eigen::Vector3d currentVelocityVec;
+        Eigen::Vector3d nextVelocityVec;
+        tf::vectorMsgToEigen(path_msg.knots[i].twist.linear, currentVelocityVec);
+        tf::vectorMsgToEigen(path_msg.knots[i+1].twist.linear, nextVelocityVec);
+        double currentVelocityMagnitude = currentVelocityVec.norm();
+        double nextVelocityMagnitude = nextVelocityVec.norm();
+        double distanceTraveled = splines[i].ComputeArcLength();
+
+        if((nextVelocityMagnitude+currentVelocityMagnitude) > 0.0)
+        {
+            path_msg.knots[i+1].header.stamp = path_msg.knots[i].header.stamp +
+                ros::Duration(distanceTraveled*2/(nextVelocityMagnitude+currentVelocityMagnitude));
+        }
+        else
+        {
+            path_msg.knots[i+1].header.stamp = path_msg.knots[i].header.stamp;
+        }
     }
 
     ROS_ERROR("\n\npath_msg.knots post decel:");
