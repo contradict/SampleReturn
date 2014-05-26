@@ -309,6 +309,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         double nextVelocityMagnitude = sqrt(pathVelocityMagnitude*pathVelocityMagnitude + 2.00*linear_acceleration*distanceTraveled);
         nextVelocityMagnitude = min(nextVelocityMagnitude, maximum_linear_velocity);
 
+        if(distanceTraveled < 0.0001)
+        {
+            // if we barely move, we are probably in a turn in place and want to be at zero velocity!
+            nextVelocityMagnitude = 0.0;
+        }
+
         // Compute the minimum about of time necessary for the robot to traverse the
         // spline with starting and ending velocities.  This accounts for the specific
         // kinematic constraints, such as the wheel angle rotation rate limit
@@ -506,6 +512,11 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
 {
     double distanceTraveled = spline.ComputeArcLength(0.01);
     double averageVelocity = (initialVelocity + finalVelocity)/2.00;
+    if((distanceTraveled < 0.0001) || (abs(averageVelocity) < 0.0001))
+    {
+        ROS_ERROR("Error distance traveled %f, averageVelocity %f. Setting minimum path time to 0!", distanceTraveled, averageVelocity);
+        return 0.0;
+    }
     double minimumDeltaTime = distanceTraveled / averageVelocity;
     // This formula comes from a lengthy derivation in my notes. The important relation is:
     // dR/dt = -dPhi_j/dt * P_jy * csc^2(Phi_j)
