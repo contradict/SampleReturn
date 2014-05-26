@@ -6,7 +6,7 @@
     <machine name="search"
              address="localhost"/>
     <machine name="navigate"
-        address="localhost"/>
+             address="localhost"/>
     <!-- end test arguments -->
      
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>

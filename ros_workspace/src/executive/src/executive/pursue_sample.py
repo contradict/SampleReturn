@@ -24,7 +24,8 @@ import samplereturn.util as util
 from executive.executive_states import DriveToPoseState
 from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import WaitForFlagState
-
+from executive.executive_states import AnnounceState
+from executive.executive_states import GetPursueDetectedPointState
 
 class PursueSample(object):
     
@@ -61,105 +62,121 @@ class PursueSample(object):
         self.state_machine.userdata.min_motion = self.node_params.min_motion
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
-    
+        
+        #use these
+        self.state_machine.userdata.true = True
+        self.state_machine.userdata.false = False
+
         with self.state_machine:
             
-                smach.StateMachine.add('START_SAMPLE_PURSUIT',
-                                       StartSamplePursuit(self.announcer),
-                                       transitions = {'next':'APPROACH_SAMPLE'})
-                
-                smach.StateMachine.add('APPROACH_SAMPLE',
-                                       PursueDetectedPoint(self.announcer,
-                                                           self.move_base,
-                                                           self.tf_listener,
-                                                           within_min_msg = 'Switching to manipulator detection'),
-                                       transitions = {'min_distance':'ENABLE_MANIPULATOR_DETECTOR',
-                                                      'point_lost':'PURSUE_SAMPLE_ABORTED'},
-                                       remapping = {'target_point':'target_sample',
-                                                    'velocity':'pursuit_velocity',
-                                                    'max_point_lost_time':'max_sample_lost_time'})
-                
-                smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
-                                        smach_ros.ServiceState('enable_manipulator_detector',
-                                                                samplereturn_srv.Enable,
-                                                                request = samplereturn_srv.EnableRequest(True)),
-                                         transitions = {'succeeded':'MANIPULATOR_SEARCH',
-                                                        'aborted':'PURSUE_SAMPLE_ABORTED'})
-                
-                smach.StateMachine.add('MANIPULATOR_SEARCH',
-                                       DriveToPoseState(self.move_base, self.tf_listener),
-                                       transitions = {'complete':'LOAD_SEARCH_PATH',
-                                                      'timeout':'LOAD_SEARCH_PATH',
-                                                      'sample_detected':'VISUAL_SERVO'})
-                
-                smach.StateMachine.add('LOAD_SEARCH_PATH',
-                                       LoadSearchPath(self.tf_listener, self.announcer),
-                                       transitions = {'next':'DRIVE_SEARCH_PATH',
-                                                      'aborted':'PURSUE_SAMPLE_ABORTED'})
+            smach.StateMachine.add('START_SAMPLE_PURSUIT',
+                                   StartSamplePursuit(self.announcer),
+                                   transitions = {'next':'APPROACH_SAMPLE'})
+            
 
-                smach.StateMachine.add('DRIVE_SEARCH_PATH',
-                                       DriveSearchPath(self.announcer),
-                                       transitions = {'next_point':'DRIVE_TO_SEARCH_POSE',
-                                                      'complete':'PURSUE_SAMPLE_ABORTED'})
-                
-                smach.StateMachine.add('DRIVE_TO_SEARCH_POSE',
-                                       DriveToPoseState(self.move_base, self.tf_listener),
-                                       transitions = {'complete':'DRIVE_SEARCH_PATH',
-                                                      'timeout':'DRIVE_SEARCH_PATH',
-                                                      'sample_detected':'VISUAL_SERVO'})
+            self.pursue_detected_point = GetPursueDetectedPointState(self.move_base,
+                                                                     self.tf_listener)
+            
+            smach.StateMachine.add('APPROACH_SAMPLE',
+                                   self.pursue_detected_point,
+                                   transitions = {'min_distance':'ENABLE_MANIPULATOR_DETECTOR',
+                                                  'point_lost':'PURSUE_SAMPLE_ABORTED',
+                                                  'complete':'PURSUE_SAMPLE_ABORTED',
+                                                  'timeout':'PURSUE_SAMPLE_ABORTED',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'},
+                                   remapping = {'velocity':'pursuit_velocity',                
+                                                'max_point_lost_time':'max_sample_lost_time',
+                                                'pursue_samples':'false'})                
+            
+            smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'ANNOUNCE_MANIPULATOR_SEARCH',
+                                                    'aborted':'PURSUE_SAMPLE_ABORTED'})
+            
+            smach.StateMachine.add('ANNOUNCE_MANIPULATOR_SEARCH',
+                                   AnnounceState(self.announcer,
+                                                 'Switch ing to manipulator detection'),
+                                   transitions = {'next':'MANIPULATOR_SEARCH'})                
+            
+            
+            smach.StateMachine.add('MANIPULATOR_SEARCH',
+                                   DriveToPoseState(self.move_base, self.tf_listener),
+                                   transitions = {'complete':'LOAD_SEARCH_PATH',
+                                                  'timeout':'LOAD_SEARCH_PATH',
+                                                  'sample_detected':'VISUAL_SERVO'},
+                                   remapping = {'pursue_samples':'true'})
+            
+            smach.StateMachine.add('LOAD_SEARCH_PATH',
+                                   LoadSearchPath(self.tf_listener, self.announcer),
+                                   transitions = {'next':'DRIVE_SEARCH_PATH',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
 
-                smach.StateMachine.add('VISUAL_SERVO',
-                                       VisualServo(self.announcer),
-                                       transitions = {'complete':'GRAB_SAMPLE',
-                                                      'sample_lost':'LOAD_SEARCH_PATH',
-                                                      'aborted':'PURSUE_SAMPLE_ABORTED'})  
- 
-                @smach.cb_interface(input_keys=['latched_sample'])
-                def grab_goal_cb(userdata, request):
-                    goal = manipulator_msg.ManipulatorGoal()
-                    goal.type = goal.GRAB
-                    goal.wrist_angle = userdata.latched_sample.grip_angle                    
-                    goal.grip_torque = 0.7
-                    goal.target_bin = 1
-                    return goal
-        
-                #if Steve pauses the robot during this action, it returns preempted,
-                #try again after unpause
-                smach.StateMachine.add('GRAB_SAMPLE',
-                                       smach_ros.SimpleActionState('manipulator_action',
-                                       manipulator_msg.ManipulatorAction,
-                                       goal_cb = grab_goal_cb),
-                                       transitions = {'succeeded':'CONFIRM_SAMPLE_ACQUIRED',
-                                                      'preempted':'WAIT_FOR_UNPAUSE',
-                                                      'aborted':'PURSUE_SAMPLE_ABORTED'})
-        
-                smach.StateMachine.add('WAIT_FOR_UNPAUSE',
-                                       WaitForFlagState('paused',
-                                                        flag_trigger_value = False,
-                                                        timeout = 10,
-                                                        announcer = self.announcer,
-                                                        start_message ='Waiting for system enable'),
-                                       transitions = {'next':'GRAB_SAMPLE',
-                                                      'timeout':'WAIT_FOR_UNPAUSE'})        
-        
-                smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
-                                       ConfirmSampleAcquired(self.announcer, self.result_pub),
-                                       transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
-                                                      'sample_present':'VISUAL_SERVO',
-                                                      'preempted':'PURSUE_SAMPLE_ABORTED',
-                                                      'aborted':'PURSUE_SAMPLE_ABORTED'})
-                
-                smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
-                                        smach_ros.ServiceState('enable_manipulator_detector',
-                                                                samplereturn_srv.Enable,
-                                                                request = samplereturn_srv.EnableRequest(False)),
-                                         transitions = {'succeeded':'complete',
-                                                        'aborted':'PURSUE_SAMPLE_ABORTED'})
+            smach.StateMachine.add('DRIVE_SEARCH_PATH',
+                                   DriveSearchPath(self.announcer),
+                                   transitions = {'next_point':'DRIVE_TO_SEARCH_POSE',
+                                                  'complete':'PURSUE_SAMPLE_ABORTED'})
+            
+            smach.StateMachine.add('DRIVE_TO_SEARCH_POSE',
+                                   DriveToPoseState(self.move_base, self.tf_listener),
+                                   transitions = {'complete':'DRIVE_SEARCH_PATH',
+                                                  'timeout':'DRIVE_SEARCH_PATH',
+                                                  'sample_detected':'VISUAL_SERVO'},
+                                   remapping = {'pursue_samples':'true'})
 
-                smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
-                                       PursueSampleAborted(self.result_pub),
-                                       transitions = {'recover':'START_SAMPLE_PURSUIT',
-                                                      'fail':'complete'})
+            smach.StateMachine.add('VISUAL_SERVO',
+                                   VisualServo(self.announcer),
+                                   transitions = {'complete':'GRAB_SAMPLE',
+                                                  'sample_lost':'LOAD_SEARCH_PATH',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})  
+
+            @smach.cb_interface(input_keys=['latched_sample'])
+            def grab_goal_cb(userdata, request):
+                goal = manipulator_msg.ManipulatorGoal()
+                goal.type = goal.GRAB
+                goal.wrist_angle = userdata.latched_sample.grip_angle                    
+                goal.grip_torque = 0.7
+                goal.target_bin = 1
+                return goal
+    
+            #if Steve pauses the robot during this action, it returns preempted,
+            #try again after unpause
+            smach.StateMachine.add('GRAB_SAMPLE',
+                                   smach_ros.SimpleActionState('manipulator_action',
+                                   manipulator_msg.ManipulatorAction,
+                                   goal_cb = grab_goal_cb),
+                                   transitions = {'succeeded':'CONFIRM_SAMPLE_ACQUIRED',
+                                                  'preempted':'WAIT_FOR_UNPAUSE',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
+    
+            smach.StateMachine.add('WAIT_FOR_UNPAUSE',
+                                   WaitForFlagState('paused',
+                                                    flag_trigger_value = False,
+                                                    timeout = 10,
+                                                    announcer = self.announcer,
+                                                    start_message ='Waiting for system enable'),
+                                   transitions = {'next':'GRAB_SAMPLE',
+                                                  'timeout':'WAIT_FOR_UNPAUSE'})        
+    
+            smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
+                                   ConfirmSampleAcquired(self.announcer, self.result_pub),
+                                   transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
+                                                  'sample_present':'VISUAL_SERVO',
+                                                  'preempted':'PURSUE_SAMPLE_ABORTED',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
+            
+            smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'complete',
+                                                    'aborted':'PURSUE_SAMPLE_ABORTED'})
+
+            smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
+                                   PursueSampleAborted(self.result_pub),
+                                   transitions = {'recover':'START_SAMPLE_PURSUIT',
+                                                  'fail':'complete'})
 
 
         #action server wrapper    
@@ -197,8 +214,10 @@ class PursueSample(object):
     def sample_detection_search(self, sample):
         if sample.name == 'none':
             self.state_machine.userdata.target_sample = None
+            self.pursue_detected_point.set_pursuit_point(None)
         else:
             self.state_machine.userdata.target_sample = sample
+            self.pursue_detected_point.set_pursuit_point(sample)
 
     def sample_detection_manipulator(self, sample):
         if sample.name == 'none':
@@ -222,9 +241,8 @@ class StartSamplePursuit(smach.State):
                              input_keys=['target_sample',
                                          'search_velocity',
                                          'action_goal'],
-                             output_keys=['target_sample',
-                                          'velocity',
-                                          'pursue_samples',
+                             output_keys=['velocity',
+                                          'pursuit_point',
                                           'stop_on_sample',
                                           'action_result'])
     
@@ -235,13 +253,12 @@ class StartSamplePursuit(smach.State):
         result = samplereturn_msg.GeneralExecutiveResult()
         result.result_string = 'initialized'        
         userdata.action_result = result
-        userdata.pursue_samples = True
         userdata.stop_on_sample = True
         #default velocity for all moves is search velocity,
         #initial approach pursuit done at pursuit_velocity
         userdata.velocity = userdata.search_velocity
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))
-        userdata.target_sample = userdata.action_goal.input_point
+        userdata.pursuit_point = userdata.action_goal.input_point
             
         self.announcer.say("Sample detected, pursue ing")               
         return 'next'
