@@ -192,6 +192,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         bool newPathReady;
         std::list<platform_motion_msgs::Knot> plannedPath;
         BodySegment firstSegment_, secondSegment_, lastSegmentSent_; // the last segment we actually gave the wheelpods
+        // keep track of the last valid steering angle computed by path to pod. this is important
+        // to avoid flipping steering angle all the damn time!
+        double lastValidSternSteeringAngle, lastValidPortSteeringAngle, lastValidStarboardSteeringAngle;
         std::mutex path_mutex_;
 };
 

@@ -58,7 +58,10 @@ Motion::Motion() :
     joint_seq(0),
     moreDataSent(false),
     restartPvt(false),
-    newPathReady(false)
+    newPathReady(false),
+    lastValidSternSteeringAngle(0.0),
+    lastValidPortSteeringAngle(0.0),
+    lastValidStarboardSteeringAngle(0.0)
 {
     lastSegmentSent_.port.steeringAngle = 0.0;
     lastSegmentSent_.port.steeringVelocity = 0.0;
@@ -1604,9 +1607,9 @@ bool Motion::pathToBody()
         plannedPath.pop_front();
         lck.unlock();
 
-        if(   !pathToPod(previous, current, next, port_pos_, lastSegmentSent_.port.steeringAngle, &secondSegment_.port)
-           || !pathToPod(previous, current, next, starboard_pos_, lastSegmentSent_.starboard.steeringAngle, &secondSegment_.starboard)
-           || !pathToPod(previous, current, next, stern_pos_, lastSegmentSent_.stern.steeringAngle, &secondSegment_.stern) )
+        if(   !pathToPod(previous, current, next, port_pos_, lastValidPortSteeringAngle, &secondSegment_.port)
+           || !pathToPod(previous, current, next, starboard_pos_, lastValidStarboardSteeringAngle, &secondSegment_.starboard)
+           || !pathToPod(previous, current, next, stern_pos_, lastValidSternSteeringAngle, &secondSegment_.stern) )
         {
             plannedPath.clear();
             return false;
@@ -1709,23 +1712,35 @@ Eigen::Vector2d Motion::podVelocity(const platform_motion_msgs::Knot &current, E
     return (omegacross * (rot * pod_pos) + Vbody).head(2);
 }
 
-bool limit_steering_angle(double *phi)
+bool limit_steering_angle(double *phi, double lastPhi)
 {
+    bool flipped = false;
     if(fabs(*phi+M_PI_2)<0.001)
     {
+        ROS_DEBUG("Clamping phi from %f to -M_PI_2", *phi);
         *phi = -M_PI_2;
     }
     else if(fabs(*phi-M_PI_2)<0.001)
     {
+        ROS_DEBUG("Clamping phi from %f to M_PI_2", *phi);
         *phi = M_PI_2;
     }
     else if(fabs(*phi)>M_PI_2)
     {
-        ROS_DEBUG( "Flipping velocity for smaller steering move" );
+        double oldPhi = *phi;
         *phi = unwrap(*phi+M_PI);
-        return true;
+        ROS_DEBUG( "Flipping velocity for smaller breaking things. Phi was %f, is now %f", oldPhi, *phi );
+        flipped = true;
     }
-    return false;
+
+    if(fabs(fabs(*phi-lastPhi) - M_PI) < 0.001)
+    {
+        // oops, we flipped the steering angle in one segment, that's bad.
+        ROS_DEBUG( "Ooops, single segment caused steering angle to move PI! Tried to go from %f to %f", lastPhi, *phi );
+        *phi = lastPhi;
+        flipped ^= true;
+    }
+    return flipped;
 }
 
 bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msgs::Knot &current, platform_motion_msgs::Knot &next, Eigen::Vector3d pod_pos, double &lastValidSteeringAngle, PodSegment* retval)
@@ -1787,7 +1802,7 @@ bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msg
     }
 
     double phi = unwrap(atan2(Vpod[1], Vpod[0]) - currentTheta);
-    if( limit_steering_angle(&phi) )
+    if( limit_steering_angle(&phi, lastValidSteeringAngle) )
     {
         ksidot *= -1;
         dksi *= -1;
@@ -1803,7 +1818,7 @@ bool Motion::pathToPod(platform_motion_msgs::Knot &previous, platform_motion_msg
     {
         phi_next = phi;
     }
-    limit_steering_angle(&phi_next);
+    limit_steering_angle(&phi_next, phi);
 
     double phidot = (phi_next - phi)/dt_next;
 
@@ -1900,6 +1915,10 @@ void Motion::setLastSegmentToCurrent( void )
     stern->getPosition(&lastSegmentSent_.stern.steeringAngle, &lastSegmentSent_.stern.steeringVelocity,
             nullptr, &lastSegmentSent_.stern.wheelVelocity);
     lastSegmentSent_.time = ros::Time::now();
+
+    lastValidSternSteeringAngle = lastSegmentSent_.stern.steeringAngle;
+    lastValidPortSteeringAngle = lastSegmentSent_.port.steeringAngle;
+    lastValidStarboardSteeringAngle = lastSegmentSent_.starboard.steeringAngle;
 }
 
 void Motion::sendPvtSegment()
