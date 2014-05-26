@@ -226,6 +226,7 @@ class LevelTwoRandom(object):
                                        DriveToPoseState(self.move_base,
                                                         self.tf_listener),
                                        transitions = {'complete':'APPROACH_BEACON',
+                                                      'velocity':'line_velocity',
                                                       'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'LEVEL_TWO_ABORTED'})
 
@@ -239,14 +240,17 @@ class LevelTwoRandom(object):
                                                       'complete':'START_RETURN_HOME',
                                                       'timeout':'START_RETURN_HOME',
                                                       'aborted':'LEVEL_TWO_ABORTED'},
-                                       remapping = {'pursue_samples':'false'})                
+                                       remapping = {'velocity':'line_velocity',
+                                                    'pursue_samples':'false'})                
 
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
                                                         self.tf_listener),
                                        transitions = {'complete':'DESELECT_PLANNER',
                                                       'timeout':'START_RETURN_HOME',
-                                                      'sample_detected':'LEVEL_TWO_ABORTED'})
+                                                      'sample_detected':'LEVEL_TWO_ABORTED'},
+                                       remapping = {'velocity':'line_velocity',
+                                                    'pursue_samples':'false'})         
 
                 MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
                 smach.StateMachine.add('DESELECT_PLANNER',
