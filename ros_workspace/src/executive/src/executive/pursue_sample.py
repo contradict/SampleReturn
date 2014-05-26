@@ -379,7 +379,8 @@ class ConfirmSampleAcquired(smach.State):
                                        'preempted',
                                        'aborted'],
                              input_keys=['latched_sample',
-                                        'detected_sample'])
+                                        'detected_sample'],
+                             output_keys=['detected_sample'])
 
         self.announcer = announcer
         self.result_pub = result_pub
@@ -387,6 +388,7 @@ class ConfirmSampleAcquired(smach.State):
     def execute(self, userdata):
         
         #wait for 1 second, see if sample is present in view
+        userdata.detected_sample = None
         rospy.sleep(1.0)
         if userdata.detected_sample is None:
             self.announcer.say("Sample acquired")
