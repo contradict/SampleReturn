@@ -47,6 +47,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
     odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
     completed_knot_subscriber = parentNodeHandle.subscribe("completed_knot", 1, &TheSmoothPlanner::setCompletedKnot, this);
+    max_velocity_subscriber = parentNodeHandle.subscribe("max_velocity", 1, &TheSmoothPlanner::setMaximumVelocity, this);
 
     smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
     visualization_publisher = localNodeHandle.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
@@ -535,6 +536,11 @@ void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHea
     ROS_DEBUG("RECEIVED COMPLETED KNOT");
     this->completed_knot_header = completedKnotHeader;
     return;
+}
+
+void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity)
+{
+    this->maximum_linear_velocity = velocity->data;
 }
 
 bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,

@@ -10,6 +10,7 @@
 #include <nav_core/base_local_planner.h>
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Float64.h>
 #include <tf/transform_listener.h>
 #include <visualization_msgs/MarkerArray.h>
 
@@ -36,6 +37,7 @@ public:
     void setPath(const nav_msgs::Path& path);
     void setOdometry(const nav_msgs::Odometry& odometry);
     void setCompletedKnot(const std_msgs::Header& completedKnot);
+    void setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity);
   
 private:
     static double EigenVectorNorm(const Eigen::Vector3d& vec) { return vec.norm(); }
@@ -63,6 +65,7 @@ private:
     ros::Subscriber pose_subscriber;
     ros::Subscriber odom_subscriber;
     ros::Subscriber completed_knot_subscriber;
+    ros::Subscriber max_velocity_subscriber;
     double maximum_linear_velocity;
     double linear_acceleration;
     double maximum_slew_radians_per_second;
