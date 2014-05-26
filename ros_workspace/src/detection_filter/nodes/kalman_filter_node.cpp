@@ -26,6 +26,7 @@ class KalmanDetectionFilter
   ros::Subscriber sub_cam_info;
   ros::Publisher pub_detection;
   ros::Publisher pub_img_detection;
+  ros::Publisher pub_debug_img;
 
   ros::Subscriber sub_ack;
 
@@ -35,6 +36,7 @@ class KalmanDetectionFilter
   std::string filtered_detection_topic;
   std::string filtered_img_detection_topic;
   std::string ack_topic;
+  std::string debug_img_topic;
 
   std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
   std::vector<std::shared_ptr<cv::KalmanFilter> > latched_filter_list_;
@@ -69,6 +71,7 @@ class KalmanDetectionFilter
     img_detection_topic = "img_point";
     filtered_detection_topic = "filtered_point";
     filtered_img_detection_topic = "filtered_img_point";
+    debug_img_topic = "debug_img";
 
     ack_topic = "ack";
 
@@ -101,6 +104,9 @@ class KalmanDetectionFilter
 
     pub_img_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_img_detection_topic.c_str(), 3);
+
+    pub_debug_img =
+      nh.advertise<sensor_msgs::Image>(debug_img_topic.c_str(), 3);
 
     if(accumulate_) {
       sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
@@ -369,8 +375,12 @@ class KalmanDetectionFilter
     }
 
     printFilterState();
-    cv::imshow("Filter States", img);
-    cv::waitKey(10);
+    //cv::imshow("Filter States", img);
+    //cv::waitKey(10);
+    std_msgs::Header header;
+    sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",img).toImageMsg();
+    pub_debug_img.publish(debug_img_msg);
+
   }
 
   void printFilterState() {
