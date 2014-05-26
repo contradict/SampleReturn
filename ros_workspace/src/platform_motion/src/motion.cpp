@@ -678,6 +678,10 @@ void Motion::handlePause( void )
             planToZeroTwist();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            // clear first and second segment's time so they don't cause problems on restart.
+            // this fixes a "second is 7 months from now" bug.
+            firstSegment_.time = ros::Time(0);
+            secondSegment_.time = ros::Time(0);
             primePVT();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
