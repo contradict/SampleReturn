@@ -347,6 +347,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         {
             // if we barely move, we are probably in a turn in place and want to be at zero velocity!
             nextVelocityMagnitude = 0.0;
+            pathVelocityMagnitude = 0.0;
+            totalDistance = 0.0;
         }
 
         // Compute the minimum about of time necessary for the robot to traverse the
