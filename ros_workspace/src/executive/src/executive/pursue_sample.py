@@ -267,7 +267,8 @@ class LoadSearchPath(smach.State):
     def __init__(self, listener, announcer):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
-                             input_keys=['target_sample'],
+                             input_keys=['square_search_size',
+                                         'target_sample'],
                              output_keys=['pose_list'])
     
         self.listener = listener
