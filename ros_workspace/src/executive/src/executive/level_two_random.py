@@ -24,6 +24,7 @@ from executive.executive_states import DriveToPoseState
 from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
+from executive.executive_states import GetPursueDetectedPointState
 
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
@@ -63,8 +64,8 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(self.node_params.return_time_minutes*60)
         
-        #sample pursuit params
-
+        #beacon pursuit params
+        self.beacon_point = None #this variable is observed by the concurrence that control beacon pursuit
         self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
         
         #search line parameters
@@ -81,7 +82,7 @@ class LevelTwoRandom(object):
         #search line variables
         self.state_machine.userdata.next_line_pose = None
         self.state_machine.userdata.last_line_pose = None
-        self.state_machine.userdata.line_yaw = None #IN RADIANS!
+        self.state_machine.userdata.line_yaw = 0 #IN RADIANS!
         
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.beacon_point = None
@@ -96,9 +97,7 @@ class LevelTwoRandom(object):
                                        StartLeveLTwo(input_keys=['line_yaw',
                                                                  'line_plan_step'],
                                                      output_keys=['action_result',
-                                                                  'next_line_pose',
-                                                                  'line_yaw',
-                                                                  'velocity'],
+                                                                  'next_line_pose'],
                                                      outcomes=['next']),
                                        transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
                 
@@ -197,6 +196,7 @@ class LevelTwoRandom(object):
                                                       'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'PURSUE_SAMPLE'},
                                        remapping = {'target_pose':'last_line_pose',
+                                                    'velocity':'line_velocity',
                                                     'pursue_samples':'true',
                                                     'stop_on_sample':'false'})
                 
@@ -215,6 +215,7 @@ class LevelTwoRandom(object):
                                                       'sample_detected':'LEVEL_TWO_ABORTED',
                                                       'preempted':'LEVEL_TWO_PREEMPTED'},
                                        remapping = {'target_pose':'rotate_pose',
+                                                    'velocity':'line_velocity',
                                                     'pursue_samples':'false'})
                 
                 smach.StateMachine.add('START_RETURN_HOME',
@@ -227,15 +228,18 @@ class LevelTwoRandom(object):
                                        transitions = {'complete':'APPROACH_BEACON',
                                                       'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'LEVEL_TWO_ABORTED'})
+
+                approach_beacon = GetPursueDetectedPointState(self.move_base,
+                                                              self.tf_listener)
                 
                 smach.StateMachine.add('APPROACH_BEACON',
-                       PursueDetectedPoint(self.announcer,
-                                           self.move_base,
-                                           self.tf_listener,
-                                           within_min_msg = 'Reverse ing on to platform'),
-                       transitions = {'min_distance':'MOUNT_PLATFORM',
-                                      'point_lost':'START_RETURN_HOME'},
-                       remapping = {'target_point':'beacon_point'})
+                                       approach_beacon,
+                                       transitions = {'min_distance':'MOUNT_PLATFORM',
+                                                      'point_lost':'START_RETURN_HOME',
+                                                      'complete':'START_RETURN_HOME',
+                                                      'timeout':'START_RETURN_HOME',
+                                                      'aborted':'LEVEL_TWO_ABORTED'},
+                                       remapping = {'pursue_samples':'false'})                
 
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
@@ -303,7 +307,9 @@ class LevelTwoRandom(object):
         map_beacon_pose = self.tf_listener.transformPose('/map', beacon_pose)
         header = map_beacon_pose.header
         point = map_beacon_pose.pose.position
+        point.x += 1.5 #start point is 1.5 meters in front of beacon
         beacon_point = geometry_msg.PointStamped(header, point)
+        self.beacon_point = beacon_point
         self.state_machine.userdata.beacon_point = beacon_point
 
     def shutdown_cb(self):
@@ -319,8 +325,6 @@ class StartLeveLTwo(smach.State):
         result = samplereturn_msg.GeneralExecutiveResult()
         result.result_string = 'initialized'
         userdata.action_result = result
-        userdata.line_yaw = 0
-        userdata.velocity = 0.5
         
         header = std_msg.Header(0, rospy.Time(0), '/map')        
         first_pose = geometry_msg.Pose()

@@ -20,6 +20,7 @@ from executive.executive_states import DriveToPoseState
 from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
+from executive.executive_states import GetPursueDetectedPointState
 
 import samplereturn.util as util
 
@@ -31,6 +32,7 @@ class LevelOne(object):
         
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf_listener = tf.TransformListener()
+        self.beacon_point = None
         
         self.node_params = util.get_node_params()
 
@@ -64,6 +66,10 @@ class LevelOne(object):
         self.state_machine.userdata.min_motion = self.node_params.min_motion        
         self.state_machine.userdata.search_poses_2d = self.node_params.search_poses_2d
         self.state_machine.userdata.detected_sample = None
+
+        #use these
+        self.state_machine.userdata.true = True
+        self.state_machine.userdata.false = False
         
         with self.state_machine:
             
@@ -132,15 +138,18 @@ class LevelOne(object):
                                        transitions = {'complete':'APPROACH_BEACON',
                                                       'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'LEVEL_ONE_ABORTED'})
+
+                approach_beacon = GetPursueDetectedPointState(self.move_base,
+                                                              self.tf_listener)
                 
                 smach.StateMachine.add('APPROACH_BEACON',
-                       PursueDetectedPoint(self.announcer,
-                                           self.move_base,
-                                           self.tf_listener,
-                                           within_min_msg = 'Reverse ing on to platform'),
-                       transitions = {'min_distance':'MOUNT_PLATFORM',
-                                      'point_lost':'START_RETURN_HOME'},
-                       remapping = {'target_point':'beacon_target'})
+                                       approach_beacon,
+                                       transitions = {'min_distance':'MOUNT_PLATFORM',
+                                                      'point_lost':'START_RETURN_HOME',
+                                                      'complete':'START_RETURN_HOME',
+                                                      'timeout':'START_RETURN_HOME',
+                                                      'aborted':'LEVEL_ONE_ABORTED'},
+                                       remapping = {'pursue_samples':'false'})                
 
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
