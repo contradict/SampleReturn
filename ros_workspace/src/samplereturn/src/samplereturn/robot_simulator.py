@@ -1,17 +1,18 @@
 #!/usr/bin/env pyth
 import sys
 import math
+import numpy as np
+from numpy import trunc,pi,ones_like,zeros,linspace, eye, sin, cos, arctan2
+from copy import deepcopy
+import random
+
+import smach
+import smach_ros
 import rospy
 import rosnode
 import actionlib
 import tf
 import tf_conversions
-import numpy as np
-from numpy import trunc,pi,ones_like,zeros,linspace, eye, sin, cos, arctan2
-from copy import deepcopy
-
-import smach
-import smach_ros
 
 import samplereturn.util as util
 
@@ -36,7 +37,7 @@ import dynamic_reconfigure.msg as dynmsg
 
 class RobotSimulator(object):
     
-    def __init__(self, mode='level_one'):
+    def __init__(self, mode='level_two'):
     
         rospy.init_node("robot_simulator")
         
@@ -47,8 +48,8 @@ class RobotSimulator(object):
         self.mode = mode
         self.cameras_ready = True
         self.paused = False
-        self.publish_samples = True
-        self.fake_sample = {'x':9, 'y':-23, 'name':'none'}
+        self.publish_samples = False
+        self.fake_sample = {'x':11, 'y':-11, 'id':1}
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
@@ -305,7 +306,7 @@ class RobotSimulator(object):
             msg.point = geometry_msg.Point(self.fake_sample['x'],
                                                    self.fake_sample['y'],
                                                    0.0)
-            msg.name = self.fake_sample['name']
+            msg.sample_id = self.fake_sample['id']
             self.search_sample_pub.publish(msg)
             
     def publish_sample_detection_manipulator(self, event):
@@ -315,7 +316,7 @@ class RobotSimulator(object):
             msg.point = geometry_msg.Point(self.fake_sample['x'],
                                                    self.fake_sample['y'],
                                                    0.0)
-            msg.name = self.fake_sample['name']
+            msg.sample_id = self.fake_sample['id']
             self.manipulator_sample_pub.publish(msg)
             
     def publish_beacon_pose(self, event):
@@ -391,16 +392,22 @@ class RobotSimulator(object):
         self.home_carousel_server.set_succeeded(result=fake_result)
         
     def hide_samples(self):
-        self.fake_sample['name'] = 'none'
+        self.publish_samples = False
         
     def show_samples(self):
-        self.fake_sample['name'] = 'PRECACHED'
+        self.publish_samples = True
+        
+    def shift_sample(self):
+        shifts = [1,-1]
+        self.fake_sample['x'] += random.choice(shifts)
+        self.fake_sample['y'] += random.choice(shifts)
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
         
     def zero_robot(self):
         self.fake_robot_pose = self.initial_pose()
+        self.fake_odometry = self.initial_odometry()
 
     def get_pointcloud2(self, grid, position, target_frame, transform, range=12.0):
         header =  std_msg.Header(0, rospy.Time.now(), target_frame)
@@ -479,8 +486,13 @@ class RobotSimulator(object):
 class ManipulatorState(smach.State):
     def execute(self, userdata):
         start_time = rospy.get_time()
-        #wait 2 seconds then return success
-        while (rospy.get_time() - start_time) < 2:
+        #wait then return success
+        if userdata.action_goal.type == manipulator_msg.ManipulatorGoal.HOME:
+            wait_time = 2.0
+        else:
+            wait_time = 5.0
+        
+        while (rospy.get_time() - start_time) < wait_time:
             if self.preempt_requested():
                 userdata.action_result = manipulator_msg.ManipulatorResult('fake_failure', False)
                 return 'preempted'

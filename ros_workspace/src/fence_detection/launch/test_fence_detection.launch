@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+
+<!--Graph for testing fence detection-->
+<launch>
+    <!-- Navigation Nodelet Host process -->
+    <arg name="run_cameras" default="true"/>
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="manager"
+        args="manager"
+        ns="/navigation"
+        output="log"
+        />
+    <!-- Compute Stereo -->
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="stereo_image_disparity"
+        args="load stereo_image_proc/disparity manager"
+        ns="/navigation"
+        output="log"
+        >
+        <param name="correlation_window_size" type="int" value="17"/>
+        <param name="min_disparity" type="int" value="0"/>
+        <param name="disparity_range" type="int" value="128"/>
+        <param name="uniqueness_ratio" type="int" value="5"/>
+        <param name="texture_threshold" type="int" value="1000"/>
+        <param name="approximate_sync" type="bool" value="true"/>
+    </node>
+
+    <!-- Compute Stereo Point Cloud -->
+    <node
+        pkg="nodelet"
+        type="nodelet"
+        name="stereo_image_points"
+        args="load stereo_image_proc/point_cloud2 /navigation/manager"
+        ns="/navigation"
+        output="log"
+        >
+        <param name="approximate_sync" type="bool" value="true"/>
+    </node>
+
+    <node
+        pkg="fence_detection"
+        type="fence_detection.py"
+        name="fence_detection">
+        <param name="min_h" type="int" value="5"/>
+        <param name="max_h" type="int" value="15"/>
+        <param name="min_s" type="int" value="155"/>
+        <param name="max_s" type="int" value="180"/>
+      </node>
+
+</launch>

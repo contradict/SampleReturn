@@ -91,7 +91,7 @@ class SaliencyDetectorNode
 
     blob_params_.blobColor = 255;
     blob_params_.minArea = 15;
-    blob_params_.maxArea = 4000;
+    blob_params_.maxArea = 600;
     blob_params_.filterByColor = true;
     blob_params_.filterByArea = true;
     blob_params_.filterByCircularity = false;
@@ -169,14 +169,21 @@ class SaliencyDetectorNode
       string dominant_exterior_color = cn_.getDominantColor(exteriorColor);
       std::cout << "Dominant exterior color " << dominant_exterior_color << std::endl;
 
-      if (cam_model_.initialized() && dominant_color != "black" && dominant_exterior_color == "green" ) {
-        float scale = cv_ptr->image.rows/600.;
+      if (cam_model_.initialized() && dominant_color != "black"
+          && dominant_color != "green" && dominant_color != "brown"
+          && dominant_exterior_color == "green") {
+        //float scale = cv_ptr->image.rows/600.;
+        float scale = cv_ptr->image.cols/bms_img_width_;
         cv::Point3d ray =
-          cam_model_.projectPixelTo3dRay(cv::Point2d((kp[i].pt.x*scale+bms_top_trim_),kp[i].pt.y*scale));
-        std_msgs::Header header;
-        header.frame_id = "/search_camera_lens";
+          //cam_model_.projectPixelTo3dRay(cv::Point2d((kp[i].pt.x*scale+bms_top_trim_),kp[i].pt.y*scale));
+          cam_model_.projectPixelTo3dRay(cv::Point2d(kp[i].pt.x*scale,(kp[i].pt.y*scale+bms_top_trim_)));
+        std::cout << "BMS Coords: x: "<<kp[i].pt.x<<" y: "<<kp[i].pt.y<<std::endl;
+        std::cout << "Pixel coords: x:" << kp[i].pt.x*scale <<"y: " << kp[i].pt.y*scale+bms_top_trim_ << std::endl;
+        //std_msgs::Header header;
+        //header.frame_id = "/search_camera_lens";
         samplereturn_msgs::NamedPoint np_msg;
-        np_msg.header = header;
+        np_msg.header = msg->header;
+        np_msg.header.frame_id = "/search_camera_lens";
         np_msg.name = dominant_color;
         np_msg.point.x = ray.x;
         np_msg.point.y = ray.y;
@@ -185,32 +192,32 @@ class SaliencyDetectorNode
       }
     }
 
-    if (kp.size() != 0) {
-    if (kp[1].pt.x > 30 && kp[1].pt.y > 30 && kp[1].pt.x < 500 && kp[1].pt.y < 350) {
-      sub_img = small(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-      sub_mask = debug_bms_img_(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-      cv::threshold(sub_mask, sub_mask, 30, 255, cv::THRESH_BINARY);
-      Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-      Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
-      exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
-      interiorColor = cn_.computeInteriorColor(sub_img,sub_mask,exteriorColor);
+    //if (kp.size() != 0) {
+    //if (kp[1].pt.x > 30 && kp[1].pt.y > 30 && kp[1].pt.x < 500 && kp[1].pt.y < 350) {
+    //  sub_img = small(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
+    //  sub_mask = debug_bms_img_(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
+    //  cv::threshold(sub_mask, sub_mask, 30, 255, cv::THRESH_BINARY);
+    //  Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
+    //  Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
+    //  exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
+    //  interiorColor = cn_.computeInteriorColor(sub_img,sub_mask,exteriorColor);
 
-      std::cout << "Exterior Color" << std::endl;
-      std::cout << exteriorColor << std::endl;
-      std::cout << "Interior Color" << std::endl;
-      std::cout << interiorColor << std::endl;
+    //  std::cout << "Exterior Color" << std::endl;
+    //  std::cout << exteriorColor << std::endl;
+    //  std::cout << "Interior Color" << std::endl;
+    //  std::cout << interiorColor << std::endl;
 
-      string dominant_color = cn_.getDominantColor(interiorColor);
-      std::cout << "Dominant color " << dominant_color << std::endl;
+    //  string dominant_color = cn_.getDominantColor(interiorColor);
+    //  std::cout << "Dominant color " << dominant_color << std::endl;
 
-      std_msgs::Header sub_header;
-      sensor_msgs::ImagePtr sub_img_msg = cv_bridge::CvImage(sub_header,"rgb8",sub_img).toImageMsg();
-      pub_sub_img.publish(sub_img_msg);
+    //  std_msgs::Header sub_header;
+    //  sensor_msgs::ImagePtr sub_img_msg = cv_bridge::CvImage(sub_header,"rgb8",sub_img).toImageMsg();
+    //  pub_sub_img.publish(sub_img_msg);
 
-      sensor_msgs::ImagePtr sub_mask_msg = cv_bridge::CvImage(sub_header,"mono8",sub_mask).toImageMsg();
-      pub_sub_mask.publish(sub_mask_msg);
-    }
-    }
+    //  sensor_msgs::ImagePtr sub_mask_msg = cv_bridge::CvImage(sub_header,"mono8",sub_mask).toImageMsg();
+    //  pub_sub_mask.publish(sub_mask_msg);
+    //}
+    //}
 
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();

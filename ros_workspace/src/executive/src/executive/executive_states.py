@@ -1,7 +1,7 @@
-
 import threading
 import traceback
 import collections
+from copy import deepcopy
 
 import rospy
 import actionlib
@@ -23,23 +23,23 @@ class MonitorTopicState(smach.State):
     values.  Each specified value tiggers an outcome of the state.
     """
     def __init__(self, topic, field, msg_type, topic_value_outcomes, timeout=None):
-        
+
         self._values = []
         #this is named outcome_list so as not to stomp
         #on the _outcomes variable in smach.State
         self._outcome_list = []
         self._thresholds = []
         self._value_counts = []
-        
+
         for tvo in topic_value_outcomes:
             self._values.append(tvo[0])
             self._outcome_list.append(tvo[1])
             self._thresholds.append(tvo[2])
             self._value_counts.append(0)
-            
+
         self._outcome_list.append('timeout')
         self._outcome_list.append('preempted')
-        
+
         smach.State.__init__(self, outcomes=self._outcome_list)
 
         self._topic = topic
@@ -57,7 +57,7 @@ class MonitorTopicState(smach.State):
         self._trigger_cond.acquire()
         self._trigger_cond.wait(timeout=self._timeout)
         self._trigger_cond.release()
-        
+
         self._sub.unregister()
 
         if self._triggered_outcome is not None:
@@ -76,7 +76,7 @@ class MonitorTopicState(smach.State):
             self._trigger_cond.notify()
             self._trigger_cond.release()
 
-    #returns true if one of the values received meets an outcome threshold, else, false    
+    #returns true if one of the values received meets an outcome threshold, else, false
     def _value_check(self, check_value):
         if check_value in self._values:
             i = self._values.index(check_value)
@@ -84,59 +84,58 @@ class MonitorTopicState(smach.State):
             if (self._value_counts[i] >= self._thresholds[i]):
                 self._triggered_outcome = self._outcome_list[i]
                 return True
-        
-        return False        
+
+        return False
 
     def request_preempt(self):
         smach.State.request_preempt(self)
         self._trigger_cond.acquire()
         self._trigger_cond.notify()
         self._trigger_cond.release()
-        
+
 #state that waits for a userdata flag to change, this must be
 #done outside the state machine... which is maybe cool
 class WaitForFlagState(smach.State):
-    
+
     def __init__(self,
                  flag_name,
                  flag_trigger_value=True,
                  timeout=0,
                  announcer=None,
                  start_message=None):
-    
+
         smach.State.__init__(self,
-                             outcomes=['next', 'timeout'],
+                             outcomes=['next', 'timeout', 'aborted'],
                              input_keys=[flag_name])
-        
+
         self.flag_name = flag_name
         self.flag_trigger_value = flag_trigger_value
         self.timeout = timeout
         self.announcer = announcer
         self.start_message = start_message
-                
+
     def execute(self, userdata):
-        
+
         if getattr(userdata, self.flag_name) != self.flag_trigger_value and \
            (self.announcer is not None) and \
            (self.start_message is not None):
             self.announcer.say(self.start_message)
-    
+
         start_time = rospy.get_time()
-        while True:
+        while not rospy.is_shutdown():
             if getattr(userdata, self.flag_name) == self.flag_trigger_value:
                 return 'next'
             rospy.sleep(0.1)
             if (self.timeout > 0) and ((rospy.get_time() - start_time) > self.timeout):
                 return 'timeout'
-                
-        return 'paused'                
-        
+
+        return 'paused'
 
 #general class for using the robot's planner to drive to a point
 class DriveToPoseState(smach.State):
-    
+
     def __init__(self, move_client, listener):
-                 
+
         smach.State.__init__(self,
                              outcomes=['complete',
                                        'timeout',
@@ -148,43 +147,51 @@ class DriveToPoseState(smach.State):
                                          'stop_on_sample',
                                          'detected_sample',
                                          'motion_check_interval',
-                                         'min_motion'],
-                             output_keys=['last_pose'])
-        
+                                         'min_motion',
+                                         'paused'],
+                             output_keys=['last_pose',
+                                          'detected_sample'])
+
         self.move_client = move_client
 
         self.listener = listener
         self.sample_detected = False
-                
+
     def execute(self, ud):
-        
+        #on entry to Drive To Pose clear old sample_detections!
+        ud.detected_sample = None
         last_pose = util.get_current_robot_pose(self.listener)
-        target_pose = ud.target_pose
         velocity = ud.velocity
-        
         goal = move_base_msg.MoveBaseGoal()
-        goal.target_pose=target_pose
+        goal.target_pose=ud.target_pose
         self.move_client.send_goal(goal)
+        rospy.loginfo("DriveToPose initial goal: %s" % (goal))
+        move_state = self.move_client.get_state()
         last_motion_check_time = rospy.get_time()
-        while self.move_client.get_state() in util.actionlib_working_states:
+        while not rospy.is_shutdown():
             rospy.sleep(0.1)
+            #log current pose for use in other states
             current_pose = util.get_current_robot_pose(self.listener)
             ud.last_pose = current_pose
+            #is action server still working?
+            move_state = self.move_client.get_state()
+            if move_state not in util.actionlib_working_states:
+                break
             #handle preempts
             if self.preempt_requested():
+                rospy.loginfo("PREEMPT REQUESTED IN DriveToPoseState")
                 self.move_client.cancel_all_goals()
                 self.service_preempt()
-                return 'preempted'                            
+                return 'preempted'
             #handle sample detection
             if (ud.detected_sample is not None) and ud.pursue_samples:
                 if ud.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
             #handle target_pose changes
-            if target_pose != ud.target_pose:
-                rospy.logdebug("DRIVE_TO_POSE replanning")
-                target_pose = ud.target_pose
-                goal.target_pose = target_pose
+            if ud.target_pose != goal.target_pose:
+                rospy.loginfo("DriveToPose replanning")
+                goal.target_pose = ud.target_pose
                 self.move_client.send_goal(goal)
             #check if we are stuck and move_base isn't handling it
             now = rospy.get_time()
@@ -194,96 +201,153 @@ class DriveToPoseState(smach.State):
                 last_motion_check_time = now
                 if (distance < ud.min_motion):
                     self.move_client.cancel_all_goals()
-                    return 'timeout'    
-
-        if self.move_client.get_state() == action_msg.GoalStatus.SUCCEEDED:
+                    return 'timeout'
+            #if we are paused, cancel goal and wait, then resend
+            #last goal and reset timeout timer
+            if ud.paused:
+                self.move_client.cancel_all_goals()
+                while not rospy.is_shutdown():
+                    rospy.sleep(0.2)
+                    if not ud.paused:
+                        break
+                self.move_client.send_goal(goal)
+                self.last_motion_check_time = rospy.get_time()
+                    
+        if move_state == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
-        else:
-            return 'aborted'
+
+        return 'aborted'
 
 #pursues a detected point, changing the move_base goal if the detection point
 #changes too much.  Detection and movement all specified in /map.
 #exits if pose is within min_pursuit_distance, and sets target_pose to the current
 #detection point with current robot orientation
-class PursueDetectedPoint(smach.State):
-    def __init__(self,
-                 announcer,
-                 move_client,
-                 listener,
-                 within_min_msg = None):
+class PursuePointManager(smach.State):
+
+    def __init__(self, listener):
+
         smach.State.__init__(self,
                              outcomes=['min_distance',
                                        'point_lost',
                                        'preempted', 'aborted'],
-                             input_keys=['target_point',
+                             input_keys=['target_pose',
+                                         'pursuit_point',
+                                         'last_pose',
                                          'min_pursuit_distance',
                                          'max_pursuit_error',
                                          'max_point_lost_time'],
-                             output_keys=['target_point',
-                                          'target_pose',
-                                          'velocity',
-                                          'pursue_samples'])
-    
-        self.announcer = announcer
-        self.move_client = move_client
+                             output_keys=['target_pose'])
+
         self.listener = listener
-        self.within_min_msg = within_min_msg
 
     def execute(self, userdata):
-        
-        move_goal = move_base_msg.MoveBaseGoal()
+
+        last_point_detection = userdata.pursuit_point.header.stamp
+
+        while not rospy.is_shutdown():
+            #last_pose is updated by DriveToPose
+            current_pose = userdata.last_pose
+            point_distance = util.pose_distance_2d(current_pose, userdata.target_pose)
+            rospy.logdebug("PURSUIT distance: " + str(point_distance))
+            if point_distance < userdata.min_pursuit_distance:
+                return 'min_distance'
+
+            #has pursuit point been changed outside the state?
+            #check with the time stamp.
+            pursuit_point = userdata.pursuit_point
+            if pursuit_point is not None and \
+             (pursuit_point.header.stamp != last_point_detection):
+                last_point_detection = pursuit_point.header.stamp
+                point_on_map = self.listener.transformPoint('/map', pursuit_point)
+
+                #if so, has it moved more the max pursuit error?
+                #compare the transformed input point to the point in target_pose
+                point_delta = util.point_distance_2d(userdata.target_pose.pose.position,
+                                                     point_on_map.point)
+                if point_delta > userdata.max_pursuit_error:
+                    rospy.loginfo("POINT_DELTA: " + str(point_delta))
+                    rospy.logdebug("PURSUE point updated: %s", point_on_map)
+                    new_pose = deepcopy(userdata.target_pose)
+                    new_pose.pose.position = point_on_map.point
+                    userdata.target_pose = new_pose
+
+            if (rospy.Time.now() - last_point_detection) > \
+             rospy.Duration(userdata.max_point_lost_time):
+                return 'point_lost'
+
+            if self.preempt_requested():
+                self.service_preempt()
+                return 'preempted'
+
+            rospy.sleep(0.2)
+
+        return 'aborted'
+
+#the class that contains both the pursuit manager and the move_base handling state
+class PursueDetectedPoint(smach.Concurrence):
+
+    def __init__(self, listener):
+
+        smach.Concurrence.__init__(self,
+            outcomes=['min_distance',
+                      'complete',
+                      'timeout',
+                      'point_lost',
+                      'preempted', 'aborted'],
+            default_outcome = 'aborted',
+            input_keys=['target_pose',
+                        'last_pose',
+                        'pursuit_point',
+                        'pursue_samples',
+                        'stop_on_sample',
+                        'detected_sample',
+                        'velocity',
+                        'min_pursuit_distance',
+                        'max_pursuit_error',
+                        'max_point_lost_time',
+                        'motion_check_interval',
+                        'min_motion',
+                        'paused'],
+            output_keys=['target_pose',
+                         'last_pose'],
+            child_termination_cb = lambda preempt: True,
+            outcome_map = {'min_distance':{'PURSUIT_MANAGER':'min_distance'},
+                           'point_lost':{'PURSUIT_MANAGER':'point_lost'},
+                           'complete':{'DRIVE_TO_POSE':'complete'},
+                           'timeout':{'DRIVE_TO_POSE':'timeout'}})
+
+        self.listener = listener
+
+    def execute(self, userdata):
+
+        #Get start pose and pursuit point, calculate the first target_pose
+        #and put it in the userdata.  Put start_pose into last_pose as well
+        #Then, execute concurrence as normal.
         header = std_msg.Header(0, rospy.Time(0), '/map')
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.logdebug("PURSUIT start pose: " + str(start_pose))
-        point_on_map = self.listener.transformPoint('/map', userdata.target_point)
-        
+        point_on_map = self.listener.transformPoint('/map', userdata.pursuit_point)
         goal_pose = geometry_msg.Pose()
         goal_pose.position = point_on_map.point
         goal_pose.orientation = util.pointing_quaternion_2d(start_pose.pose.position,
                                                             point_on_map.point)
-        move_goal.target_pose = geometry_msg.PoseStamped(header, goal_pose) 
-        self.move_client.send_goal(move_goal)
-        
+        userdata.target_pose = geometry_msg.PoseStamped(header, goal_pose)
+        userdata.last_pose = start_pose
         rospy.logdebug("PURSUIT initial target point: %s", point_on_map)
 
-        last_point_detection = rospy.get_time()
+        return smach.Concurrence.execute(self, userdata)
 
-        while True:
-            current_pose= util.get_current_robot_pose(self.listener)
-            move_state = self.move_client.get_state()
-            if move_state not in util.actionlib_working_states:
-                rospy.logdebug("PURSUIT action server not in working state")
-            #    return 'aborted'
-            
-            point_distance = util.pose_distance_2d(current_pose, move_goal.target_pose)
-            rospy.logdebug("PURSUIT distance: " + str(point_distance))
-            if point_distance < userdata.min_pursuit_distance:
-                userdata.target_pose = move_goal.target_pose
-                if self.within_min_msg is not None:
-                    self.announcer.say(self.within_min_msg)
-                return 'min_distance'
-            
-            if userdata.target_point is not None:
-                last_point_detection = rospy.get_time()
-                point_on_map = self.listener.transformPoint('/map', userdata.target_point)
-                
-                current_point = move_goal.target_pose.pose.position
-                sample_distance_delta = util.point_distance_2d(current_point, point_on_map.point)
-                if  sample_distance_delta > userdata.max_pursuit_error:
-                    rospy.logdebug("PURSUE point updated: %s", point_on_map)
-                    move_goal.target_pose.pose.position = point_on_map.point
-                    self.move_client.send_goal(move_goal)
-            
-            if (rospy.get_time() - last_point_detection) > userdata.max_point_lost_time:
-                return 'point_lost'
-            
-            if self.preempt_requested():
-                self.service_preempt()
-                return 'preempted'
-                            
-            userdata.target_point = None       
-            rospy.sleep(0.2)
-            
+def GetPursueDetectedPointState(move_client, listener):
+
+    pursue = PursueDetectedPoint(listener)
+    with pursue:
+        smach.Concurrence.add('PURSUIT_MANAGER',
+                              PursuePointManager(listener))
+        smach.Concurrence.add('DRIVE_TO_POSE',
+                              DriveToPoseState(move_client, listener))
+
+    return pursue
+
 class SelectMotionMode(smach.State):
     def __init__(self, CAN_interface, announcer, motion_mode, failannounce=None):
         smach.State.__init__(self, outcomes = ['next', 'failed'])
@@ -291,7 +355,7 @@ class SelectMotionMode(smach.State):
         self.announcer = announcer
         self.motion_mode = motion_mode
         self.failannounce = failannounce
-                      
+
     def execute(self, userdata):
         try:
             mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
@@ -310,7 +374,7 @@ class SelectMotionMode(smach.State):
             return 'failed'
         self.CAN_interface.publish_zero()
         return 'next'
-    
+
 class AnnounceState(smach.State):
     def __init__(self, announcer, announcement):
         smach.State.__init__(self, outcomes = ['next'])
@@ -319,5 +383,5 @@ class AnnounceState(smach.State):
     def execute(self, userdata):
         self.announcer.say(self.announcement)
         return 'next'
-        
+
 

@@ -20,6 +20,7 @@ from executive.executive_states import DriveToPoseState
 from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
+from executive.executive_states import GetPursueDetectedPointState
 
 import samplereturn.util as util
 
@@ -27,8 +28,11 @@ class LevelOne(object):
 
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf_listener = tf.TransformListener()
+        self.beacon_point = None
         
         self.node_params = util.get_node_params()
 
@@ -38,26 +42,35 @@ class LevelOne(object):
         
         start_time = rospy.get_time()
         while not rospy.is_shutdown():
+            start_time =  rospy.get_time()
             if self.move_base.wait_for_server(rospy.Duration(0.1)):
                 break #all services up, exit this loop
             if (rospy.get_time() - start_time) > 10.0:
                 self.announcer.say("Move base not available")
                 rospy.logwarn('Timeout waiting for move base')
-            rospy.sleep(0.5)
+            rospy.sleep(0.1)
 
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
 
+        #beacon approach params
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_point_lost_time = self.node_params.max_point_lost_time
+        self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
+        
+        #other parameters
         self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
         self.state_machine.userdata.min_motion = self.node_params.min_motion        
         self.state_machine.userdata.search_poses_2d = self.node_params.search_poses_2d
-        self.state_machine.userdata.beacon_approach_point = self.node_params.beacon_approach_point
         self.state_machine.userdata.detected_sample = None
+
+        #use these
+        self.state_machine.userdata.paused = False
+        self.state_machine.userdata.true = True
+        self.state_machine.userdata.false = False
         
         with self.state_machine:
             
@@ -104,7 +117,8 @@ class LevelOne(object):
                 @smach.cb_interface(input_keys=['detected_sample'])
                 def get_pursuit_goal_cb(userdata, request):
                     goal = samplereturn_msg.GeneralExecutiveGoal()
-                    goal.name = userdata.detected_sample.name
+                    goal.input_point = userdata.detected_sample
+                    goal.input_string = "level_one_pursuit_request"
                     return goal
                                 
                 smach.StateMachine.add('PURSUE_SAMPLE',
@@ -113,7 +127,7 @@ class LevelOne(object):
                                       goal_cb = get_pursuit_goal_cb),
                                       transitions = {'succeeded':'START_RETURN_HOME',
                                                      'preempted':'PURSUE_SAMPLE',
-                                                     'aborted':'LEVEL_ONE_ABORTED'})               
+                                                     'aborted':'START_RETURN_HOME'})               
                
                 smach.StateMachine.add('START_RETURN_HOME',
                                        StartReturnHome(self.announcer),
@@ -125,15 +139,18 @@ class LevelOne(object):
                                        transitions = {'complete':'APPROACH_BEACON',
                                                       'timeout':'START_RETURN_HOME',
                                                       'sample_detected':'LEVEL_ONE_ABORTED'})
+
+                approach_beacon = GetPursueDetectedPointState(self.move_base,
+                                                              self.tf_listener)
                 
                 smach.StateMachine.add('APPROACH_BEACON',
-                       PursueDetectedPoint(self.announcer,
-                                           self.move_base,
-                                           self.tf_listener,
-                                           within_min_msg = 'Reverse ing on to platform'),
-                       transitions = {'min_distance':'MOUNT_PLATFORM',
-                                      'point_lost':'START_RETURN_HOME'},
-                       remapping = {'target_point':'beacon_target'})
+                                       approach_beacon,
+                                       transitions = {'min_distance':'MOUNT_PLATFORM',
+                                                      'point_lost':'START_RETURN_HOME',
+                                                      'complete':'START_RETURN_HOME',
+                                                      'timeout':'START_RETURN_HOME',
+                                                      'aborted':'LEVEL_ONE_ABORTED'},
+                                       remapping = {'pursue_samples':'false'})                
 
                 smach.StateMachine.add('MOUNT_PLATFORM',
                                        DriveToPoseState(self.move_base,
@@ -174,19 +191,26 @@ class LevelOne(object):
         sls = smach_ros.IntrospectionServer('smach_grab_introspection',
                                             self.state_machine,
                                             '/START_LEVEL_ONE')
+       
+        #subscribers, need to go after state_machine
+        rospy.Subscriber('detected_sample_search',
+                         samplereturn_msg.NamedPoint,
+                         self.sample_update)
+        
+        rospy.Subscriber("beacon_pose",
+                        geometry_msg.PoseStamped,
+                        self.beacon_update)
+        
+        rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
 
         #start action servers and services
         sls.start()
         level_one_server.run_server()
+        rospy.spin()
+        sls.stop()
         
-        #subscribers, need to go after state_machine
-        self.sample_listener = rospy.Subscriber('detected_sample_search',
-                                        samplereturn_msg.NamedPoint,
-                                        self.sample_update)
-        
-        self.beacon_listener = rospy.Subscriber("beacon_pose",
-                                                geometry_msg.PoseStamped,
-                                                self.beacon_update)
+    def pause_state_update(self, msg):
+        self.state_machine.userdata.paused = msg.data
         
     def sample_update(self, sample):
         if sample.name == 'none':
@@ -199,8 +223,14 @@ class LevelOne(object):
         map_beacon_pose = self.tf_listener.transformPose('/map', beacon_pose)
         header = map_beacon_pose.header
         point = map_beacon_pose.pose.position
+        point.x += 1.5 #start point is 1.5 meters in front of beacon
         beacon_target = geometry_msg.PointStamped(header, point)
         self.state_machine.userdata.beacon_target = beacon_target
+        
+    def shutdown_cb(self):
+        self.state_machine.request_preempt()
+        while self.state_machine.is_running():
+            rospy.sleep(0.1)
     
 #drives to the expected sample location    
 class StartLevelOne(smach.State):
@@ -236,7 +266,8 @@ class StartLevelOne(smach.State):
         userdata.pose_list = path_pose_list        
         userdata.stop_on_sample = False
         
-        result = samplereturn_msg.GeneralExecutiveResult('initialized')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'initialized'
         userdata.action_result = result
         
         return 'next'
@@ -318,10 +349,11 @@ class LevelOnePreempted(smach.State):
     def execute(self, userdata):
         
         self.CAN_interface.select_mode(
-            platform_srv.SelectMotionModeRequest.MODE_ENABLE )
+            platform_srv.SelectMotionModeRequest.MODE_ENABLE)
         self.CAN_interface.publish_zero()        
         
-        result = samplereturn_msg.GeneralExecutiveResult('preempted')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'preempted'
         userdata.action_result = result
                 
         #shutdown all internal processes to level_one
@@ -336,7 +368,8 @@ class LevelOneAborted(smach.State):
         
     def execute(self, userdata):
         
-        result = samplereturn_msg.GeneralExecutiveResult('aborted')
+        result = samplereturn_msg.GeneralExecutiveResult()
+        result.result_string = 'aborted'
         userdata.action_result = result
         
         return 'fail'

@@ -1,13 +1,28 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <!-- DSLR Camera Service Server --> 
-    <node machine="search" 
-          pkg="photo" 
-          type="photo_node" 
+    <!-- DSLR Camera Service Server -->
+    <node machine="search"
+          pkg="photo"
+          type="photo_node"
           name="photo_node"
           ns="/cameras/search">
         <remap from="cam_img" to="image"/>
         <remap from="cam_info" to="info"/>
+    </node>
+
+    <node
+        machine="search"
+        pkg="samplereturn"
+        type="camlogger.py"
+        name="camlogger"
+        ns="/cameras/search">
+        <param name="rate" value="1.0"/>
+        <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
+        <param name="frame_id" value="search_camera_lens"/>
+        <remap from="pause_state" to="/io/pause_state"/>
+        <remap from="cam_img" to="image"/>
+        <remap from="cam_info" to="info"/>
+        <remap from="cam_status" to="status"/>
     </node>
 </launch>
