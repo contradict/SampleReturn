@@ -23,6 +23,8 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
 
+    <remap from="pause_state" to="/io/pause_state"/>
+
     <node
         pkg="executive"
         type="executive_master_node.py"
@@ -46,7 +48,6 @@
         <remap from="manual_control" to="/motion/manual_control"/>
 
         <remap from="gpio_read" to="/io/gpio_read"/>
-        <remap from="pause_state" to="/io/pause_state"/>
     </node>
 
     <node
