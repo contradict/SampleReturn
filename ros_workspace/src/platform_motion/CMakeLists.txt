@@ -36,7 +36,6 @@ pkg_check_modules(BFL REQUIRED orocos-bfl)
 message("BFL include dirs:" ${BFL_INCLUDE_DIRS})
 message("BFL library dirs:" ${BFL_LIBRARY_DIRS})
 link_directories(${BFL_LIBRARY_DIRS})
-include_directories(${BFL_INCLUDE_DIRS})
 
 ## This plugin includes Qt widgets, so we must include Qt like so:
 find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
@@ -71,6 +70,7 @@ include_directories(
     ${Eigen_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${catkin_INCLUDE_DIRS}
+    ${BFL_INCLUDE_DIRS}
     )
 
 #common commands for building c++ executables and libraries
@@ -126,6 +126,7 @@ add_executable(test_path
 target_link_libraries(test_path
     ${catkin_LIBRARIES}
     )
+add_dependencies(test_path platform_motion_msgs_generate_messages)
 
 add_library(path_viz
   src/path_display.cpp
