@@ -26,6 +26,7 @@ class KalmanDetectionFilter
   ros::Subscriber sub_cam_info;
   ros::Publisher pub_detection;
   ros::Publisher pub_img_detection;
+  ros::Publisher pub_debug_img;
 
   ros::Subscriber sub_ack;
 
@@ -35,6 +36,7 @@ class KalmanDetectionFilter
   std::string filtered_detection_topic;
   std::string filtered_img_detection_topic;
   std::string ack_topic;
+  std::string debug_img_topic;
 
   std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
   std::vector<std::shared_ptr<cv::KalmanFilter> > latched_filter_list_;
@@ -53,29 +55,40 @@ class KalmanDetectionFilter
   double pos_exclusion_radius_;
   double neg_exclusion_radius_;
 
+  double process_noise_cov_;
+  double measurement_noise_cov_;
+  double error_cov_post_;
+  double period_;
+
   image_geometry::PinholeCameraModel cam_model_;
 
   public:
   KalmanDetectionFilter()
   {
-    //cam_info_topic = "camera_info";
-    cam_info_topic = "/cameras/manipulator/left/camera_info";
+    cam_info_topic = "camera_info";
+    //cam_info_topic = "/cameras/manipulator/left/camera_info";
     detection_topic = "point";
     img_detection_topic = "img_point";
     filtered_detection_topic = "filtered_point";
     filtered_img_detection_topic = "filtered_img_point";
+    debug_img_topic = "debug_img";
 
     ack_topic = "ack";
 
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("max_dist", max_dist_, double(0.1));
-    private_node_handle_.param("max_cov", max_cov_, double(1.0));
+    private_node_handle_.param("max_cov", max_cov_, double(10.0));
     private_node_handle_.param("max_pub_cov", max_pub_cov_, double(0.1));
     private_node_handle_.param("max_pub_vel", max_pub_vel_, double(0.02));
 
     private_node_handle_.param("accumulate", accumulate_, false);
     private_node_handle_.param("positive_exclusion_radius", pos_exclusion_radius_, double(10.0));
     private_node_handle_.param("negative_exclusion_radius", neg_exclusion_radius_, double(1.5));
+
+    private_node_handle_.param("process_noise_cov", process_noise_cov_, double(0.05));
+    private_node_handle_.param("measurement_noise_cov", measurement_noise_cov_, double(0.5));
+    private_node_handle_.param("error_cov_post", error_cov_post_, double(0.5));
+    private_node_handle_.param("period", period_, double(2));
 
     sub_cam_info =
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
@@ -91,6 +104,9 @@ class KalmanDetectionFilter
 
     pub_img_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_img_detection_topic.c_str(), 3);
+
+    pub_debug_img =
+      nh.advertise<sensor_msgs::Image>(debug_img_topic.c_str(), 3);
 
     if(accumulate_) {
       sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
@@ -193,14 +209,14 @@ class KalmanDetectionFilter
     cv::Mat state(4, 1, CV_32F); /* x, y, vx, vy */
     cv::Mat processNoise(4, 1, CV_32F);
 
-    KF->transitionMatrix = (cv::Mat_<float>(4,4) << 1, 0, 0.03, 0,
-                                                    0, 1, 0, 0.03,
+    KF->transitionMatrix = (cv::Mat_<float>(4,4) << 1, 0, period_, 0,
+                                                    0, 1, 0, period_,
                                                     0, 0, 1, 0,
                                                     0, 0, 0, 1);
     cv::setIdentity(KF->measurementMatrix);
-    cv::setIdentity(KF->processNoiseCov, cv::Scalar(1e-3));
-    cv::setIdentity(KF->measurementNoiseCov, cv::Scalar(2e-2));
-    cv::setIdentity(KF->errorCovPost, cv::Scalar(1e-1));
+    cv::setIdentity(KF->processNoiseCov, cv::Scalar(process_noise_cov_));
+    cv::setIdentity(KF->measurementNoiseCov, cv::Scalar(measurement_noise_cov_));
+    cv::setIdentity(KF->errorCovPost, cv::Scalar(error_cov_post_));
 
     KF->statePost.at<float>(0) = msg.point.x;
     KF->statePost.at<float>(1) = msg.point.y;
@@ -334,21 +350,22 @@ class KalmanDetectionFilter
     }
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
     float px_per_meter = 50.0;
+    float offset = 250;
     for (auto filter_ptr : filter_list_){
       cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
           filter_ptr->statePost.at<float>(1) * px_per_meter);
       float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
       float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
-      cv::circle(img, mean, 5, cv::Scalar(255,0,0));
-      cv::ellipse(img, mean, cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
+      cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
+      cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
     }
     for (auto filter_ptr : latched_filter_list_) {
       cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
           filter_ptr->statePost.at<float>(1) * px_per_meter);
       float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
       float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
-      cv::circle(img, mean, 5, cv::Scalar(255,255,0));
-      cv::ellipse(img, mean, cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
+      cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,255,0));
+      cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
     }
 
     for (int i=0; i<exclusion_list_.size(); i++) {
@@ -358,8 +375,12 @@ class KalmanDetectionFilter
     }
 
     printFilterState();
-    cv::imshow("Filter States", img);
-    cv::waitKey(10);
+    //cv::imshow("Filter States", img);
+    //cv::waitKey(10);
+    std_msgs::Header header;
+    sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",img).toImageMsg();
+    pub_debug_img.publish(debug_img_msg);
+
   }
 
   void printFilterState() {

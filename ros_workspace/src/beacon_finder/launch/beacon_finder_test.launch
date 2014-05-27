@@ -4,8 +4,8 @@
 
 <launch>
 	<machine name="search"
-			 address="TheSmooth"
-			 user="brandon"/>
+			 address="Linux-Smooth"
+			 user="smooth"/>
 
 	<node
 		machine="search"
@@ -22,14 +22,16 @@
 		name="beacon_finder"
 		pkg="beacon_finder"
 		type="beacon_finder.py"
+		ns="beacon_finder"
 		output="log">
 	<param name="num_rows" type="int" value="3"/>
 	<param name="num_columns" type="int" value="9"/>
 	<param name="vertical_distance_between_circles" type="double" value="0.3048"/>
 	<param name="is_first_column_shifted_down" type="bool" value="False"/>
 	<param name="blob_color" type="double" value="0"/>
+	<param name="blob_color_alt" type="double" value="255"/>
 	<param name="blob_min_area" type="double" value="50"/>
-	<param name="blob_max_area" type="double" value="5000"/>
+	<param name="blob_max_area" type="double" value="500000"/>
 	<param name="blob_min_threshold" type="double" value="20"/>
 	<param name="blob_max_threshold" type="double" value="220"/>
 	<param name="blob_threshold_step" type="double" value="10"/>
@@ -37,17 +39,22 @@
 	<param name="blob_repeatability" type="int" value="3"/>
 	<param name="do_histogram_equalization" type="bool" value="False"/>
 	<!--<remap from="camera_image" to="image_rect"/>-->
-	<remap from="camera_image" to="cam_img"/>
-	<remap from="camera_info" to="cam_info"/>
+	<remap from="camera_image" to="/cameras/search/image"/>
+	<remap from="camera_info" to="/cameras/search/info"/>
+	<!--
+	<remap from="camera_image" to="/cameras/navigation/center/right/image_color"/>
+	<remap from="camera_info" to="/cameras/navigation/center/right/camera_info"/>
+	-->
 	</node>
 
-	<!--<node
-		pkg="nodelet"
-		type="nodelet"
-		name="rect"
-		args="load image_proc/rectify /manager"
-		output="log">
-	<remap from="image_mono" to="cam_img"/>
-	<remap from="camera_info" to="cam_info"/>
-	</node>-->
+	<!-- Debayer -->
+	<!--
+	<node pkg="nodelet"
+	  type="nodelet"
+	  name="debayer_center"
+	  args="load image_proc/debayer /manager"
+	  ns="/cameras/navigation/center/right"
+	  output="log">
+	</node>
+	-->
 </launch>

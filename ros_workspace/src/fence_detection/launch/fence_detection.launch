@@ -39,8 +39,8 @@
         name="fence_detection"
         ns="fence"
         output="log">
-        <remap from "input_image" to="/cameras/navigation/center/left/image_rect_color"/>
-        <remap from "input_disparity" to="/cameras/navigation/center/disparity"/>
+        <remap from="input_image" to="/cameras/navigation/center/left/image_rect_color"/>
+        <remap from="input_disparity" to="/cameras/navigation/center/disparity"/>
     </node>
 
 </launch>
