@@ -105,8 +105,6 @@ def pose_rotate(start_pose, angle):
     new_orientation = geometry_msg.Quaternion(*new_quat)
     new_pose = geometry_msg.Pose(start_pose.pose.position, new_orientation)
     header = std_msg.Header(0, rospy.Time(0), '/map')
-    #rospy.loginfo('rotate %f', angle)
-    #rospy.loginfo('new pose: %s', new_pose)
     return geometry_msg.PoseStamped(header, new_pose)    
 
 def get_current_robot_pose(tf_listener):

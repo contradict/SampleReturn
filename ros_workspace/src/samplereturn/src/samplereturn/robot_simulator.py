@@ -49,6 +49,7 @@ class RobotSimulator(object):
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = False
+        self.publish_beacon = False
         self.fake_sample = {'x':11, 'y':-11, 'id':1}
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
@@ -320,10 +321,11 @@ class RobotSimulator(object):
             self.manipulator_sample_pub.publish(msg)
             
     def publish_beacon_pose(self, event):
-        msg = geometry_msg.PoseStamped()
-        msg.header = std_msg.Header(0, rospy.Time.now(), '/beacon')
-        msg.pose = self.fake_beacon_pose
-        self.beacon_pose_pub.publish(msg)
+        if self.publish_beacon:
+            msg = geometry_msg.PoseStamped()
+            msg.header = std_msg.Header(0, rospy.Time.now(), '/beacon')
+            msg.pose = self.fake_beacon_pose
+            self.beacon_pose_pub.publish(msg)
 
     def publish_GPIO(self, event):
         msg = platform_msg.GPIO()
@@ -397,6 +399,12 @@ class RobotSimulator(object):
     def show_samples(self):
         self.publish_samples = True
         
+    def hide_beacon(self):
+        self.publish_beacon = False
+        
+    def show_beacon(self):
+        self.publish_beacon = True
+            
     def shift_sample(self):
         shifts = [1,-1]
         self.fake_sample['x'] += random.choice(shifts)
