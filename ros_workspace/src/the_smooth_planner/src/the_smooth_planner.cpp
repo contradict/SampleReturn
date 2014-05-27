@@ -109,10 +109,16 @@ bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& pl
     return true;
 }
 
-double yawFromKnot(platform_motion_msgs::Knot &knot)
+double yawFromKnot(const platform_motion_msgs::Knot &knot)
 {
     return 2.0*atan2(knot.pose.orientation.z, knot.pose.orientation.w);
 }
+
+double yawFromMsgQuat(const geometry_msgs::Quaternion& quat)
+{
+    return 2.0*atan2(quat.z, quat.w);
+}
+
 void yawToKnot(platform_motion_msgs::Knot &knot, double yaw)
 {
     knot.pose.orientation.w = cos(yaw/2.0);
@@ -387,8 +393,33 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         nextVelocityVector *= nextVelocityMagnitude;
 
         // Compute the next angular velocity
-        double curvature = splines[i].ComputeCurvature(1.00);
-        double angularVelocity = nextVelocityMagnitude * curvature;
+        //double curvature = splines[i].ComputeCurvature(1.00);
+        //double angularVelocity = nextVelocityMagnitude * curvature;
+        double curvatureIndex = i;
+        if (curvatureIndex > path.poses.size()-3)
+        {
+            curvatureIndex = path.poses.size()-3;
+        }
+        double deltaX = path.poses[curvatureIndex+1].pose.position.x - path.poses[curvatureIndex].pose.position.x;
+        double deltaY = path.poses[curvatureIndex+1].pose.position.y - path.poses[curvatureIndex].pose.position.y;
+        double deltaSquaredX = path.poses[curvatureIndex+2].pose.position.x - path.poses[curvatureIndex+1].pose.position.x - deltaX;
+        double deltaSquaredY = path.poses[curvatureIndex+2].pose.position.y - path.poses[curvatureIndex+1].pose.position.y - deltaY;
+        double startYaw = yawFromMsgQuat(path.poses[curvatureIndex].pose.orientation);
+        double endYaw = yawFromMsgQuat(path.poses[curvatureIndex+1].pose.orientation);
+        double curvature = 0.00;
+        double angularVelocity = 0.00;
+        if (deltaX != 0.00 || deltaY != 0.00)
+        {
+            curvature = (deltaX*deltaSquaredY - deltaY*deltaSquaredX)/pow(deltaX*deltaX + deltaY*deltaY, 3.0/2.0);
+        }
+        if (minimumPathTime > 0.00)
+        {
+            angularVelocity = (endYaw - startYaw)/minimumPathTime;
+        }
+        if (fabs(curvature*nextVelocityMagnitude) > fabs(angularVelocity))
+        {
+            angularVelocity = curvature*nextVelocityMagnitude;
+        }
 
         // Update path velocity
         pathVelocityMagnitude = nextVelocityMagnitude;
@@ -435,6 +466,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.y *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.z = 0.00;
+            path_msg.knots[i+1].twist.angular.z *= previousVelocityScale;
         }
 
     }
@@ -501,7 +533,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // add the new knots to the path remembering that insert inserts BEFORE the given element!
             path_msg.knots.insert(path_msg.knots.begin()+i+1, turnKnots.begin(), turnKnots.end());
 
-            ROS_ERROR("Adding turn-in-place at index %d with %d segments", i, turnKnots.size());
+            ROS_ERROR("Adding turn-in-place at index %d with %d segments", i, (int)(turnKnots.size()));
 
             // since the turn in place path will probably pass the test in this if statement, we
             // need to advance i by enough places so the new points will be skipped and we'll end up
