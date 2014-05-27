@@ -107,7 +107,7 @@ class LevelTwoRandom(object):
                                                      'Enter ing level two mode'),
                                        transitions = {'next':'SELECT_PLANNER'})
                 
-                MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
+                MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_PVT
                 smach.StateMachine.add('SELECT_PLANNER',
                                         SelectMotionMode(self.CAN_interface,
                                                          self.announcer,
