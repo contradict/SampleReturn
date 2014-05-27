@@ -486,37 +486,36 @@ def closePrimitivesFile(primdata):
 
 def generateMotionPrimitives(showplots=False):
     gridspacing = 0.1
-    pathspacing = 0.2
     numangles = 8
     deltayaw = 2*pi/numangles
-    forwards = [10.0, 8.0]
-    shortforwards = [gridspacing, 1.0,5.0]
+    longrangeprims = [[8, 0.2]]#[10.0, 8.0] # List of [forward dist, path spacing]
+    shortrangeprims = [[gridspacing, 0.05], [1.0, 0.1]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
     primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
     for i in xrange(0,numangles):
         initialyaw = 2*pi*i/numangles
         pathdata = []
-        for forwarddist in forwards:
+        for longrangeprim in longrangeprims:
             # Forward and right turn
-            path = smoothhook(forwarddist, initialyaw, -deltayaw, gridspacing, pathspacing)
-            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
-            if showplots:
-                plotPath(path)
+            #path = smoothhook(longrangeprim[0], initialyaw, -deltayaw, gridspacing, longrangeprim[1])
+            #pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i-1})
+            #if showplots:
+            #    plotPath(path)
 
             # Forward
-            path = forward(forwarddist, initialyaw, gridspacing, pathspacing)
+            path = forward(longrangeprim[0], initialyaw, gridspacing, longrangeprim[1])
             pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
             if showplots:
                 plotPath(path)
 
             # Forward and left turn
-            path = smoothhook(forwarddist, initialyaw, deltayaw, gridspacing, pathspacing)
-            pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
-            if showplots:
-                plotPath(path)
+            #path = smoothhook(longrangeprim[0], initialyaw, deltayaw, gridspacing, longrangeprim[1])
+            #pathdata.append({'path' : path, 'cost' : 2, 'endpose_c' : i+1})
+            #if showplots:
+            #    plotPath(path)
 
-        for shortforward in shortforwards:
+        for shortrangeprim in shortrangeprims:
             # Short forward
-            path = forward(shortforward, initialyaw, gridspacing, pathspacing)
+            path = forward(shortrangeprim[0], initialyaw, gridspacing, shortrangeprim[1])
             pathdata.append({'path' : path, 'cost' : 1, 'endpose_c' : i})
             if showplots:
                 plotPath(path)
