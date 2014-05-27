@@ -105,7 +105,7 @@ class WaitForFlagState(smach.State):
                  start_message=None):
     
         smach.State.__init__(self,
-                             outcomes=['next', 'timeout'],
+                             outcomes=['next', 'timeout', 'aborted'],
                              input_keys=[flag_name])
         
         self.flag_name = flag_name
@@ -122,14 +122,14 @@ class WaitForFlagState(smach.State):
             self.announcer.say(self.start_message)
     
         start_time = rospy.get_time()
-        while True:
+        while not rospy.is_shutdown():
             if getattr(userdata, self.flag_name) == self.flag_trigger_value:
                 return 'next'
             rospy.sleep(0.1)
             if (self.timeout > 0) and ((rospy.get_time() - start_time) > self.timeout):
                 return 'timeout'
                 
-        return 'paused'                
+        return 'aborted'                
         
 
 #general class for using the robot's planner to drive to a point
@@ -148,7 +148,8 @@ class DriveToPoseState(smach.State):
                                          'stop_on_sample',
                                          'detected_sample',
                                          'motion_check_interval',
-                                         'min_motion'],
+                                         'min_motion',
+                                         'paused'],
                              output_keys=['last_pose',
                                           'detected_sample'])
         
@@ -202,7 +203,17 @@ class DriveToPoseState(smach.State):
                 if (distance < ud.min_motion):
                     self.move_client.cancel_all_goals()
                     return 'timeout'
-
+            #if we are paused, cancel goal and wait, then resend
+            #last goal and reset timeout timer
+            if ud.paused:
+                self.move_client.cancel_all_goals()
+                while not rospy.is_shutdown():
+                    rospy.sleep(0.2)
+                    if not ud.paused:
+                        break
+                self.move_client.send_goal(goal)
+                self.last_motion_check_time = rospy.get_time()
+                    
         if move_state == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
         
@@ -296,7 +307,8 @@ class PursueDetectedPoint(smach.Concurrence):
                         'max_pursuit_error',
                         'max_point_lost_time',
                         'motion_check_interval',
-                        'min_motion'],
+                        'min_motion',
+                        'paused'],
             output_keys=['target_pose',
                          'last_pose'],
             child_termination_cb = lambda preempt: True,
@@ -325,10 +337,6 @@ class PursueDetectedPoint(smach.Concurrence):
         rospy.logdebug("PURSUIT initial target point: %s", point_on_map)
         
         return smach.Concurrence.execute(self, userdata)
-        
-    def set_pursuit_point(self, new_pursuit_point):
-        if 'PURSUIT_MANAGER' in self.get_active_states():
-            self.userdata.pursuit_point = new_pursuit_point
 
 def GetPursueDetectedPointState(move_client, listener):
     

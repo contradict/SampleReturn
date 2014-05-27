@@ -88,6 +88,7 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.beacon_point = None
         
         #use these
+        self.state_machine.userdata.paused = False
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
     
@@ -136,6 +137,7 @@ class LevelTwoRandom(object):
                                               'detected_sample',
                                               'motion_check_interval',
                                               'min_motion',
+                                              'paused',
                                               'true', 'false'],
                                 output_keys = ['next_line_pose',
                                                'last_line_pose'],
@@ -286,20 +288,25 @@ class LevelTwoRandom(object):
                                             self.state_machine,
                                             '/START_LEVEL_TWO')
 
-        self.sample_listener = rospy.Subscriber('detected_sample_search',
-                                        samplereturn_msg.NamedPoint,
-                                        self.sample_update)
+        rospy.Subscriber('detected_sample_search',
+                        samplereturn_msg.NamedPoint,
+                        self.sample_update)
         
-        self.beacon_listener = rospy.Subscriber("beacon_pose",
-                                                geometry_msg.PoseStamped,
-                                                self.beacon_update)
+        rospy.Subscriber("beacon_pose",
+                        geometry_msg.PoseStamped,
+                        self.beacon_update)
+        
+        rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
         #start action servers and services
         sls.start()
         level_two_server.run_server()
         rospy.spin()
         sls.stop()
-        
+
+    def pause_state_update(self, msg):
+        self.state_machine.userdata.paused = msg.data
+        self.line_manager.userdata.paused = msg.data
 
     def sample_update(self, sample):
         self.state_machine.userdata.detected_sample = sample

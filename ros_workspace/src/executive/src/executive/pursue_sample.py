@@ -48,7 +48,6 @@ class PursueSample(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
         
-        self.state_machine.userdata.paused = False
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.target_point = None
@@ -64,6 +63,7 @@ class PursueSample(object):
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
         
         #use these
+        self.state_machine.userdata.paused = False
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
 
@@ -129,7 +129,7 @@ class PursueSample(object):
                                    VisualServo(self.announcer),
                                    transitions = {'complete':'GRAB_SAMPLE',
                                                   'sample_lost':'LOAD_SEARCH_PATH',
-                                                  'preempted':'PURSUE_SAMPLE_ABORTED',
+                                                  'preempted':'CHECK_PAUSE_STATE',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'})  
 
             @smach.cb_interface(input_keys=['latched_sample'])
@@ -142,22 +142,30 @@ class PursueSample(object):
                 return goal
     
             #if Steve pauses the robot during this action, it returns preempted,
-            #try again after unpause
+            #return to visual servo after pause, in case robot moved
             smach.StateMachine.add('GRAB_SAMPLE',
                                    smach_ros.SimpleActionState('manipulator_action',
                                    manipulator_msg.ManipulatorAction,
                                    goal_cb = grab_goal_cb),
                                    transitions = {'succeeded':'CONFIRM_SAMPLE_ACQUIRED',
-                                                  'preempted':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'CHECK_PAUSE_STATE',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'})
+            
+            #if the grab action is preempted by shutdown (or other non-pause reason),
+            #exit pursue sample.  If paused, wait for unpause
+            smach.StateMachine.add('CHECK_PAUSE_STATE',
+                                   WaitForFlagState('paused',
+                                                    flag_trigger_value = True),
+                                   transitions = {'next':'WAIT_FOR_UNPAUSE',
+                                                  'timeout':'PURSUE_SAMPLE_ABORTED'})
     
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = False,
                                                     timeout = 10,
                                                     announcer = self.announcer,
-                                                    start_message ='Waiting for system enable'),
-                                   transitions = {'next':'GRAB_SAMPLE',
+                                                    start_message ='Pursuit paused, waiting for un pause'),
+                                   transitions = {'next':'VISUAL_SERVO',
                                                   'timeout':'WAIT_FOR_UNPAUSE'})        
     
             smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
@@ -196,13 +204,13 @@ class PursueSample(object):
                                             '/START_SAMPLE_PURSUIT')
         
         #subscribers, need to go after state_machine
-        self.sample_sub_search = rospy.Subscriber('detected_sample_search',
-                                                  samplereturn_msg.NamedPoint,
-                                                  self.sample_detection_search)
+        rospy.Subscriber('detected_sample_search',
+                        samplereturn_msg.NamedPoint,
+                        self.sample_detection_search)
         
-        self.sample_sub_manipulator = rospy.Subscriber('detected_sample_manipulator',
-                                                        samplereturn_msg.NamedPoint,
-                                                        self.sample_detection_manipulator)
+        rospy.Subscriber('detected_sample_manipulator',
+                        samplereturn_msg.NamedPoint,
+                        self.sample_detection_manipulator)
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
 
@@ -214,13 +222,14 @@ class PursueSample(object):
 
     def sample_detection_search(self, sample):
             self.state_machine.userdata.target_sample = sample
-            self.pursue_detected_point.set_pursuit_point(sample)
+            self.pursue_detected_point.userdata.pursuit_point = sample
 
     def sample_detection_manipulator(self, sample):
             self.state_machine.userdata.detected_sample = sample
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
+        self.pursue_detected_point.userdata.paused = msg.data
             
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -321,8 +330,12 @@ class VisualServo(smach.State):
     def __init__(self, announcer):
         smach.State.__init__(self,
                              output_keys = ['latched_sample'],
-                             input_keys = ['detected_sample'],
-                             outcomes=['complete', 'sample_lost', 'preempted', 'aborted'])
+                             input_keys = ['detected_sample',
+                                           'paused'],
+                             outcomes=['complete',
+                                       'sample_lost',
+                                       'preempted',
+                                       'aborted'])
     
         self.announcer = announcer
 
@@ -343,7 +356,8 @@ class VisualServo(smach.State):
     
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
-            if self.preempt_requested():    
+            #if we are paused or preempted exit with preempted
+            if self.preempt_requested() or userdata.paused:    
                 self.servo.cancel_all_goals()
                 self.service_preempt()
                 return 'preempted' 

@@ -68,6 +68,7 @@ class LevelOne(object):
         self.state_machine.userdata.detected_sample = None
 
         #use these
+        self.state_machine.userdata.paused = False
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
         
@@ -192,19 +193,24 @@ class LevelOne(object):
                                             '/START_LEVEL_ONE')
        
         #subscribers, need to go after state_machine
-        self.sample_listener = rospy.Subscriber('detected_sample_search',
-                                        samplereturn_msg.NamedPoint,
-                                        self.sample_update)
+        rospy.Subscriber('detected_sample_search',
+                         samplereturn_msg.NamedPoint,
+                         self.sample_update)
         
-        self.beacon_listener = rospy.Subscriber("beacon_pose",
-                                                geometry_msg.PoseStamped,
-                                                self.beacon_update)
+        rospy.Subscriber("beacon_pose",
+                        geometry_msg.PoseStamped,
+                        self.beacon_update)
+        
+        rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
 
         #start action servers and services
         sls.start()
         level_one_server.run_server()
         rospy.spin()
         sls.stop()
+        
+    def pause_state_update(self, msg):
+        self.state_machine.userdata.paused = msg.data
         
     def sample_update(self, sample):
         if sample.name == 'none':
