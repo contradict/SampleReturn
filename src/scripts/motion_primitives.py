@@ -550,4 +550,4 @@ def generateMotionPrimitives(showplots=False):
     
 
 if __name__ == "__main__":
-    generateMotionPrimitives(False)
+    generateMotionPrimitives(True)
