@@ -219,7 +219,7 @@ class DriveToPoseState(smach.State):
         return 'aborted'
 
 #pursues a detected point, changing the move_base goal if the detection point
-#changes too much.  Detection and movement all specified in /map.
+#changes too much.  Detection and movement all specified in executive_frame.
 #exits if pose is within min_pursuit_distance, and sets target_pose to the current
 #detection point with current robot orientation
 class PursuePointManager(smach.State):
@@ -235,7 +235,8 @@ class PursuePointManager(smach.State):
                                          'last_pose',
                                          'min_pursuit_distance',
                                          'max_pursuit_error',
-                                         'max_point_lost_time'],
+                                         'max_point_lost_time',
+                                         'executive_frame'],
                              output_keys=['target_pose'])
 
         self.listener = listener
@@ -258,17 +259,17 @@ class PursuePointManager(smach.State):
             if pursuit_point is not None and \
              (pursuit_point.header.stamp != last_point_detection):
                 last_point_detection = pursuit_point.header.stamp
-                point_on_map = self.listener.transformPoint('/map', pursuit_point)
+                point_stamped = deepcopy(userdata.pursuit_point)
 
                 #if so, has it moved more the max pursuit error?
                 #compare the transformed input point to the point in target_pose
                 point_delta = util.point_distance_2d(userdata.target_pose.pose.position,
-                                                     point_on_map.point)
+                                                     point_stamped.point)
                 if point_delta > userdata.max_pursuit_error:
                     rospy.loginfo("POINT_DELTA: " + str(point_delta))
-                    rospy.logdebug("PURSUE point updated: %s", point_on_map)
+                    rospy.logdebug("PURSUE point updated: %s", point_stamped)
                     new_pose = deepcopy(userdata.target_pose)
-                    new_pose.pose.position = point_on_map.point
+                    new_pose.pose.position = point_stamped.point
                     userdata.target_pose = new_pose
 
             if (rospy.Time.now() - last_point_detection) > \
@@ -307,7 +308,8 @@ class PursueDetectedPoint(smach.Concurrence):
                         'max_point_lost_time',
                         'motion_check_interval',
                         'min_motion',
-                        'paused'],
+                        'paused',
+                        'executive_frame'],
             output_keys=['target_pose',
                          'last_pose'],
             child_termination_cb = lambda preempt: True,
@@ -323,17 +325,16 @@ class PursueDetectedPoint(smach.Concurrence):
         #Get start pose and pursuit point, calculate the first target_pose
         #and put it in the userdata.  Put start_pose into last_pose as well
         #Then, execute concurrence as normal.
-        header = std_msg.Header(0, rospy.Time(0), '/map')
+        goal_header = std_msg.Header(0, rospy.Time(0), userdata.executive_frame)
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.logdebug("PURSUIT start pose: " + str(start_pose))
-        point_on_map = self.listener.transformPoint('/map', userdata.pursuit_point)
-        goal_pose = geometry_msg.Pose()
-        goal_pose.position = point_on_map.point
-        goal_pose.orientation = util.pointing_quaternion_2d(start_pose.pose.position,
-                                                            point_on_map.point)
-        userdata.target_pose = geometry_msg.PoseStamped(header, goal_pose)
+        point_stamped = userdata.pursuit_point
+        goal_pose = geometry_msg.Pose(point_stamped.point,
+                    util.pointing_quaternion_2d(start_pose.pose.position,
+                                                point_stamped.point))
+        userdata.target_pose = geometry_msg.PoseStamped(goal_header, goal_pose)
         userdata.last_pose = start_pose
-        rospy.logdebug("PURSUIT initial target point: %s", point_on_map)
+        rospy.logdebug("PURSUIT initial target point: %s", point_stamped)
 
         return smach.Concurrence.execute(self, userdata)
 
