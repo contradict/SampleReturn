@@ -8,7 +8,10 @@
     <machine name="navigate"
              address="localhost"/>
     <!-- end test arguments -->
-     
+
+    <!-- IMPORTANT! For tf, this is the frame that the executive works in -->
+    <arg name="executive_frame" value="/odom"/>
+    
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
     <remap from="servo_command" to="/motion/servo_command"/>
@@ -62,8 +65,13 @@
         name="level_one"
         output="log"
         ns="/processes/executive">
-        
+
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
         <!-- for DriveToPose states and approach to sample-->
+        <param name="velocity" type="double" value="1.5"/>
+        <param name="search_velocity" type="double" value="0.5"/>
         <param name="motion_check_interval" type="double" value="60"/>
         <param name="min_motion" type="double" value="0.5"/>
         <rosparam>
@@ -92,8 +100,11 @@
         output="log"
         ns="/processes/executive">
 
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
         <!-- for search  behaviour --> 
-        <param name="return_time_minutes" type="double" value="20"/>
+        <param name="return_time_minutes" type="double" value="2"/>
         <param name="line_plan_step" type="double" value="8"/>
         <param name="line_replan_distance" type="double" value="1"/>
         <param name="line_velocity" type="double" value="1.5"/>
@@ -120,7 +131,10 @@
         name="pursue_sample"
         output="log"
         ns="/processes/executive">
-    
+
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
         <param name="min_pursuit_distance" type="double" value="4.0"/>
         <param name="max_pursuit_error" type="double" value="0.3"/>
         <param name="max_sample_lost_time" type="double" value="30"/>

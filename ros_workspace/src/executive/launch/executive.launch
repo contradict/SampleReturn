@@ -2,6 +2,9 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
+    <!-- IMPORTANT! For tf, this is the frame that the executive works in -->
+    <arg name="executive_frame" value="/odom"/>
+
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
     <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
@@ -58,7 +61,12 @@
         output="log"
         ns="/processes/executive">
         
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+        
         <!-- for DriveToPose states and approach to sample-->
+        <param name="velocity" type="double" value="1.5"/>
+        <param name="search_velocity" type="double" value="0.5"/>
         <param name="motion_check_interval" type="double" value="60"/>
         <param name="min_motion" type="double" value="0.5"/>
         <rosparam>
@@ -87,6 +95,9 @@
         output="log"
         ns="/processes/executive">
 
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+        
         <!-- for search  behaviour --> 
         <param name="return_time_minutes" type="double" value="20"/>
         <param name="line_plan_step" type="double" value="8"/>
@@ -116,7 +127,10 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
-    
+        
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+       
         <param name="min_pursuit_distance" type="double" value="2.0"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
         <param name="max_sample_lost_time" type="double" value="60"/>
