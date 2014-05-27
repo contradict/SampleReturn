@@ -32,10 +32,12 @@ class PursueSample(object):
     def __init__(self):
         
         rospy.on_shutdown(self.shutdown_cb)
-        
-        self.announcer = util.AnnouncerInterface("audio_navigate")
+        self.node_params = util.get_node_params()        
         self.tf_listener = tf.TransformListener()
-        self.node_params = util.get_node_params()
+        self.executive_frame = self.node_params.executive_frame
+        
+        #interfaces
+        self.announcer = util.AnnouncerInterface("audio_navigate")
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                                                        move_base_msg.MoveBaseAction)
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
@@ -48,6 +50,8 @@ class PursueSample(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
         
+        self.state_machine.userdata.executive_frame = self.executive_frame
+        self.state_machine.userdata.paused = False        
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.target_point = None
@@ -63,7 +67,6 @@ class PursueSample(object):
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
         
         #use these
-        self.state_machine.userdata.paused = False
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
 
@@ -221,8 +224,18 @@ class PursueSample(object):
         sls.stop()
 
     def sample_detection_search(self, sample):
-            self.state_machine.userdata.target_sample = sample
-            self.pursue_detected_point.userdata.pursuit_point = sample
+            try:
+                self.tf_listener.waitForTransform(self.executive_frame,
+                                                  sample.header.frame_id,
+                                                  sample.header.stamp,
+                                                  rospy.Duration(1.0))
+                point_in_frame = self.tf_listener.transformPoint(self.executive_frame, sample)
+                sample.header = point_in_frame.header
+                sample.point = point_in_frame.point
+                self.state_machine.userdata.target_sample = sample
+                self.pursue_detected_point.userdata.pursuit_point = sample
+            except tf.Exception:
+                rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
 
     def sample_detection_manipulator(self, sample):
             self.state_machine.userdata.detected_sample = sample
