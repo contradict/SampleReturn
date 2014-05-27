@@ -114,7 +114,7 @@ Motion::Motion() :
             &Motion::selectMotionModeCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
     joystick_sub = nh_.subscribe("joystick_command", 2, &Motion::joystickTwistCallback, this);
-    servo_sub = nh_.subscribe("CAN_servo_command", 2, &Motion::servoTwistCallback, this);
+    servo_sub = nh_.subscribe("servo_command", 2, &Motion::servoTwistCallback, this);
 
     carousel_sub = nh_.subscribe("carousel_angle", 2, &Motion::carouselCallback,
             this);
@@ -496,18 +496,24 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
         case platform_motion_msgs::SelectMotionMode::Request::MODE_SERVO:
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
             // make sure PVT buffers are all cleared.
-            port->wheel.clearPvtBuffer();
-            port->steering.clearPvtBuffer();
-            starboard->wheel.clearPvtBuffer();
-            starboard->steering.clearPvtBuffer();
-            stern->wheel.clearPvtBuffer();
-            stern->steering.clearPvtBuffer();
+            // if we're going to something other than pause or planner pvt mode.
+            if((req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT) &&
+                (req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE))
+            {
+                port->wheel.clearPvtBuffer();
+                port->steering.clearPvtBuffer();
+                starboard->wheel.clearPvtBuffer();
+                starboard->steering.clearPvtBuffer();
+                stern->wheel.clearPvtBuffer();
+                stern->steering.clearPvtBuffer();
+            }
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
+                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE &&
                 req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK)
             {
-                ROS_ERROR("Attempted mode transition other than RESUME or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
+                ROS_ERROR("Attempted mode transition other than RESUME, ENABLE or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
                 return false;
             }
             break;
@@ -672,6 +678,10 @@ void Motion::handlePause( void )
             planToZeroTwist();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT:
+            // clear first and second segment's time so they don't cause problems on restart.
+            // this fixes a "second is 7 months from now" bug.
+            firstSegment_.time = ros::Time(0);
+            secondSegment_.time = ros::Time(0);
             primePVT();
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:

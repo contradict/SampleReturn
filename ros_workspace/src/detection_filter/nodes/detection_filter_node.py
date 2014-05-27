@@ -3,7 +3,7 @@ import rospy
 import numpy as np
 
 from detection_filter import Filter, Hypothesis
-from linemod_detector.msg import NamedPoint
+from samplereturn_msgs.msg import NamedPoint
 
 class SampleDetectionFilter(object):
     def __init__(self):

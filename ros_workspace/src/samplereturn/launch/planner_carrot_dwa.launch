@@ -12,19 +12,16 @@
         <!--
         launch-prefix="screen -d -m gdb - -args"
         -->
-        <remap from="odom" to="odometry"/>
-        <remap from="cmd_vel" to="command"/>
+        <remap from="odom" to="/motion/odometry"/>
+        <remap from="cmd_vel" to="/motion/planner_command"/>
 
 
         <rosparam file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
-        <rosparam file="$(find samplereturn)/config/costmap_local_params.yaml" command="load"/>
+        <rosparam file="$(find samplereturn)/config/costmap_local_params.yaml" command="load"  ns="local_costmap"/>
         <rosparam file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
-        <rosparam file="$(find samplereturn)/config/costmap_global_params.yaml" command="load"/>
+        <rosparam file="$(find samplereturn)/config/costmap_global_params.yaml" command="load" ns="global_costmap"/>
 
-        <param name="planner_frequency" type="double" value="0.5"/>
-        <param name="base_global_planner" type="string" value="carrot_planner/CarrotPlanner"/>
-        <param name="base_local_planner" type="string" value="dwa_local_planner/DWAPlannerROS"/>
-        <rosparam file="$(find samplereturn)/config/base_local_planner_params.yaml" command="load"/>
+        <rosparam file="$(find samplereturn)/config/planner_params.yaml" command="load"/>
     </node>
 
     <node
@@ -33,9 +30,11 @@
         type="costmap_2d_cloud"
         name="voxel_visualizer_cloud"
         ns="/processes/planner/mover/local_costmap">
+        <remap from="voxel_grid" to="obstacle_layer/voxel_grid"/>
     </node>
 
 
+    <arg name="map_config" default="config/map_server.yaml"/>
     <node
         machine="navigate"
         name="map_server"
@@ -43,7 +42,7 @@
         type="map_server"
         ns="/processes/planner"
         output="log"
-        args="$(find samplereturn)/config/map_server.yaml"
+        args="$(find samplereturn)/$(arg map_config)"
         >
     </node>
 

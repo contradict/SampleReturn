@@ -21,21 +21,6 @@
     <node
         machine="search"
         pkg="sample_detection"
-        type="color_name_sample_detection.py"
-        name="color_name_sample_detection"
-        ns="/processes/sample_detection">
-        <param name="color_file" type="string" value="$(find sample_detection)/config/w2c.mat"/>
-        <param name="delta" type="double" value="15.0"/>
-        <param name="max_area" type="double" value="80000.0"/>
-        <param name="min_area" type="double" value="100.0"/>
-        <param name="max_size" type="double" value="0.4"/>
-        <param name="min_size" type="double" value="0.05"/>
-        <remap from="monocular_img" to="/cameras/search/image"/>
-        <remap from="cam_info" to="/cameras/search/info"/>
-    </node>
-    <node
-        machine="search"
-        pkg="sample_detection"
         type="ray_to_points.py"
         name="search_ray_to_points"
         ns="/processes/sample_detection">

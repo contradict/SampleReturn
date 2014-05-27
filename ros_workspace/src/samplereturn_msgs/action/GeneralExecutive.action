@@ -1,0 +1,10 @@
+# Goal
+string name
+float32 input_value
+---
+# Result
+string result
+---
+# Feedback
+string state
+float32 output_value
