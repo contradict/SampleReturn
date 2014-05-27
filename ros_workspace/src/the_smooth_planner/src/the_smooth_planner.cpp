@@ -361,7 +361,16 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // Compute the minimum about of time necessary for the robot to traverse the
         // spline with starting and ending velocities.  This accounts for the specific
         // kinematic constraints, such as the wheel angle rotation rate limit
-        double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
+        //double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
+        double minimumPathTime = this->ComputeMinimumPathTime(path, i);
+        if (nextVelocityMagnitude < maximum_linear_velocity)
+        {
+            minimumPathTime = max((nextVelocityMagnitude-pathVelocityMagnitude)/linear_acceleration, minimumPathTime);
+        }
+        else
+        {
+            minimumPathTime = max(distanceTraveled/maximum_linear_velocity, minimumPathTime);
+        }
 
         // Update the timestamp
         timestamp += ros::Duration(minimumPathTime);
@@ -395,23 +404,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // Compute the next angular velocity
         //double curvature = splines[i].ComputeCurvature(1.00);
         //double angularVelocity = nextVelocityMagnitude * curvature;
-        double curvatureIndex = i;
-        if (curvatureIndex > path.poses.size()-3)
-        {
-            curvatureIndex = path.poses.size()-3;
-        }
-        double deltaX = path.poses[curvatureIndex+1].pose.position.x - path.poses[curvatureIndex].pose.position.x;
-        double deltaY = path.poses[curvatureIndex+1].pose.position.y - path.poses[curvatureIndex].pose.position.y;
-        double deltaSquaredX = path.poses[curvatureIndex+2].pose.position.x - path.poses[curvatureIndex+1].pose.position.x - deltaX;
-        double deltaSquaredY = path.poses[curvatureIndex+2].pose.position.y - path.poses[curvatureIndex+1].pose.position.y - deltaY;
-        double startYaw = yawFromMsgQuat(path.poses[curvatureIndex].pose.orientation);
-        double endYaw = yawFromMsgQuat(path.poses[curvatureIndex+1].pose.orientation);
-        double curvature = 0.00;
+        double curvature = ComputeCurvature(path, i);
+        double startYaw = yawFromMsgQuat(path.poses[i].pose.orientation);
+        double endYaw = yawFromMsgQuat(path.poses[i+1].pose.orientation);
         double angularVelocity = 0.00;
-        if (deltaX != 0.00 || deltaY != 0.00)
-        {
-            curvature = (deltaX*deltaSquaredY - deltaY*deltaSquaredX)/pow(deltaX*deltaX + deltaY*deltaY, 3.0/2.0);
-        }
         if (minimumPathTime > 0.00)
         {
             angularVelocity = (endYaw - startYaw)/minimumPathTime;
@@ -626,6 +622,20 @@ bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
     return true;
 }
 
+double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path, unsigned int i)
+{
+    const double phiDotMax = M_PI/4.00;
+
+    double curvature = this->ComputeCurvature(path, i);
+    double deltaCurvature = this->ComputeCurvature(path, i+1) - curvature;
+    double deltaPhi = -deltaCurvature*sternPodVector(0)*cos( -atan(curvature*sternPodVector(0))*atan(curvature*sternPodVector(0)) );
+    if (deltaCurvature == numeric_limits<double>::infinity())
+    {
+        deltaPhi = M_PI/2.00;
+    }
+    double minimumDeltaTime = fabs(deltaPhi)/phiDotMax;
+}
+
 double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector3d>& spline,
                                                 double initialVelocity,
                                                 double finalVelocity)
@@ -638,6 +648,7 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
         return 0.0;
     }
     double minimumDeltaTime = distanceTraveled / averageVelocity;
+
     // This formula comes from a lengthy derivation in my notes. The important relation is:
     // dR/dt = -dPhi_j/dt * P_jy * csc^2(Phi_j)
     // The math here assumes the the sternPodVector is located directly
@@ -662,6 +673,25 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
     //double minimumDeltaTime = fabs(requiredDeltaSternAngle) / maximum_slew_radians_per_second;
 
     return minimumDeltaTime;
+}
+
+double TheSmoothPlanner::ComputeCurvature(const nav_msgs::Path& path, unsigned int i)
+{
+    if (i > path.poses.size()-3)
+    {
+        i = path.poses.size()-3;
+    }
+    double deltaX = path.poses[i+1].pose.position.x - path.poses[i].pose.position.x;
+    double deltaY = path.poses[i+1].pose.position.y - path.poses[i].pose.position.y;
+    double deltaSquaredX = path.poses[i+2].pose.position.x - path.poses[i+1].pose.position.x - deltaX;
+    double deltaSquaredY = path.poses[i+2].pose.position.y - path.poses[i+1].pose.position.y - deltaY;
+    double curvature = 0.00;
+    if (deltaX != 0.00 || deltaY != 0.00)
+    {
+        curvature = (deltaX*deltaSquaredY - deltaY*deltaSquaredX)/pow(deltaX*deltaX + deltaY*deltaY, 3.0/2.0);
+    }
+
+    return curvature;
 }
 
 void TheSmoothPlanner::PopulateSplineVisualizationMarkerArray(const BezierCubicSpline<Eigen::Vector3d>& spline,

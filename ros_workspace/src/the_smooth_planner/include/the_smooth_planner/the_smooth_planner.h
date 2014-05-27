@@ -49,7 +49,11 @@ private:
                         double initialVelocityMagnitude,
                         double finalVelocityMagnitude,
                         BezierCubicSpline<Eigen::Vector3d>& outCubicSpline);
-    
+
+double ComputeCurvature(const nav_msgs::Path& path, unsigned int i);
+
+    double ComputeMinimumPathTime(const nav_msgs::Path& path, unsigned int i);   
+
     double ComputeMinimumPathTime(const BezierCubicSpline<Eigen::Vector3d>& spline,
                                   double initialVelocity,
                                   double finalVelocity);
