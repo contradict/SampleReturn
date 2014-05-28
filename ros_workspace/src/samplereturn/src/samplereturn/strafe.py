@@ -45,6 +45,9 @@ class Strafe(object):
     self.got_joint_state = True
 
   def execute(self, angle, distance, time_limit=20.0):
+    self.current_twist = None
+    self.starting_position = None
+
     shutdown_time = rospy.Time.now()
     shutdown_time.secs += time_limit
 
