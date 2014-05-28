@@ -57,7 +57,7 @@ class Strafe(object):
       self.target_angle = angle
     elif (np.pi/2<angle<np.pi*1.5):
       self.target_angle = angle - np.pi
-    elif (np.pi*1.5<angle<2*np.pi):
+    elif (np.pi*1.5<=angle<2*np.pi):
       self.target_angle = angle - 2*np.pi
 
     self.target_x = np.cos(self.target_angle)
@@ -101,7 +101,14 @@ class Strafe(object):
 
       # Accelerate until max_vel reached
       elif (np.sqrt(self.current_twist.linear.x**2+self.current_twist.linear.y**2) < self.max_velocity):
-        twist = self.current_twist
+        if self.current_twist is None:
+          twist = Twist()
+          twist.linear.z = 0.0
+          twist.angular.x = 0.0
+          twist.angular.y = 0.0
+          twist.angular.z = 0.0
+        else:
+          twist = self.current_twist
         twist.linear.x += self.accel_per_loop*self.target_x
         twist.linear.y += self.accel_per_loop*self.target_y
         self.publisher.publish(twist)
