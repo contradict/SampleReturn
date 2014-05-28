@@ -59,6 +59,8 @@ class Strafe(object):
 
     self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
 
+    self.shutdown = False
+
     while not self.shutdown and rospy.Time.now()<shutdown_time:
       # Run at some rate, ~10Hz
       rate.sleep()
