@@ -86,8 +86,8 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.line_velocity = self.node_params.line_velocity
         self.state_machine.userdata.blocked_check_distance = self.node_params.blocked_check_distance
         self.state_machine.userdata.blocked_check_width = self.node_params.blocked_check_width        
-        self.state_machine.userdata.blocked_rotation = self.node_params.blocked_rotation
-        self.state_machine.userdata.blocked_rotation_step = self.node_params.blocked_rotation_step
+        self.state_machine.userdata.blocked_rotation_min = self.node_params.blocked_rotation_min
+        self.state_machine.userdata.blocked_rotation_max = self.node_params.blocked_rotation_max
         self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
         self.state_machine.userdata.min_motion = self.node_params.min_motion
 
@@ -200,14 +200,19 @@ class LevelTwoRandom(object):
                                   smach_ros.SimpleActionState('pursue_sample',
                                   samplereturn_msg.GeneralExecutiveAction,
                                   goal_cb = get_pursuit_goal_cb),
-                                  transitions = {'succeeded':'RETURN_TO_SEARCH_LINE',
-                                                 'aborted':'RETURN_TO_SEARCH_LINE'})
+                                  transitions = {'succeeded':'ANNOUNCE_RETURN_TO_SEARCH',
+                                                 'aborted':'ANNOUNCE_RETURN_TO_SEARCH'})
+
+            smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
+                                   AnnounceState(self.announcer,
+                                                 'Return ing to search line'),
+                                   transitions = {'next':'RETURN_TO_SEARCH_LINE'})   
 
             smach.StateMachine.add('RETURN_TO_SEARCH_LINE',
                                    DriveToPoseState(self.move_base,
                                                     self.tf_listener),
                                    transitions = {'complete':'SEARCH_LINE',
-                                                  'timeout':'ANNOUNCE_RETURN_HOME',
+                                                  'timeout':'ANNOUNCE_RETURN_TO_SEARCH',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED'},
                                    remapping = {'target_pose':'last_line_pose',
@@ -217,7 +222,6 @@ class LevelTwoRandom(object):
             
             smach.StateMachine.add('CHOOSE_NEW_LINE',
                                    ChooseNewLine(self.tf_listener),
-
                                    transitions = {'next':'ROTATE_TO_NEW_LINE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -430,6 +434,7 @@ class SearchLineManager(smach.State):
     def execute(self, userdata):
     
         self.last_line_blocked = False
+        self.announcer.say("On search line, Yaw " + str(int(math.degrees(userdata.line_yaw))))
         
         while not rospy.is_shutdown():  
             
@@ -524,7 +529,8 @@ class ChooseNewLine(smach.State):
                              input_keys=['line_yaw',
                                          'last_line_pose',
                                          'line_plan_step',
-                                         'blocked_rotation'],
+                                         'blocked_rotation_min',
+                                         'blocked_rotation_max'],
                              output_keys=['line_yaw',
                                           'next_line_pose',
                                           'rotate_pose']),  
@@ -538,11 +544,14 @@ class ChooseNewLine(smach.State):
         #stupid planner may not have the robot oriented along the search line,
         #set orientation to that value anyway
         current_pose.pose.orientation = geometry_msg.Quaternion(*yaw_quat)
-        yaw_changes = [math.radians(userdata.blocked_rotation),
-                      math.radians(-1*userdata.blocked_rotation)]
+        yaw_changes = np.array(range(userdata.blocked_rotation_min,
+                                     userdata.blocked_rotation_max,
+                                     10))
+        yaw_changes = np.radians(yaw_changes)                        
+        yaw_changes = np.r_[yaw_changes, -yaw_changes]
+        rospy.loginfo(str(yaw_changes))
         yaw_change = random.choice(yaw_changes)
         line_yaw = userdata.line_yaw + yaw_change
-        
         rotate_pose = util.pose_rotate(current_pose, yaw_change)
         next_line_pose = util.pose_translate_by_yaw(rotate_pose,
                                                     userdata.line_plan_step,

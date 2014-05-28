@@ -100,7 +100,7 @@ def pose_translate_by_yaw(start_pose, distance, yaw):
 #rotates a stamped pose, returns in same frame  
 def pose_rotate(start_pose, angle):
     #rospy.loginfo('start pose: %s', start_pose)
-    goal_quat = tf.transformations.quaternion_from_euler(0,0, angle)
+    goal_quat = tf.transformations.quaternion_from_euler(0, 0, angle)
     start_quat = (start_pose.pose.orientation.x,
                   start_pose.pose.orientation.y,
                   start_pose.pose.orientation.z,

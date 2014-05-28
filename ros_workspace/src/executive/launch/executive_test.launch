@@ -110,8 +110,8 @@
         <param name="line_velocity" type="double" value="1.5"/>
         <param name="blocked_check_distance" type="double" value="10"/>
         <param name="blocked_check_width" type = "double" value="3"/>
-        <param name="blocked_rotation" type="double" value="120"/>
-        <param name="blocked_rotation_step" type="double" value="15"/>
+        <param name="blocked_rotation_min" type="int" value="100"/>
+        <param name="blocked_rotation_max" type="int" value="150"/>
         <param name="motion_check_interval" type="double" value="20"/>
         <param name="min_motion" type="double" value="0.5"/>
 
