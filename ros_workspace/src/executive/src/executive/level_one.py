@@ -22,7 +22,7 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import GetPursueDetectedPointState
 
-import samplereturn.simple_moton as simple_motion
+import samplereturn.simple_motion as simple_motion
 
 import samplereturn.util as util
 
