@@ -73,9 +73,9 @@ class Strafe(object):
       # Run at some rate, ~10Hz
       rate.sleep()
       # Issue slow twists until wheels are pointed at angle
-      if (np.abs(self.stern_pos-self.target_pos)<np.wheel_pos_epsilon or
-          np.abs(self.port-self.target_pos)<np.wheel_pos_epsilon or
-          np.abs(self.starboard-self.target_pos)<np.wheel_pos_epsilon):
+      if (np.abs(self.stern_pos-self.target_angle)<np.wheel_pos_epsilon or
+          np.abs(self.port-self.target_angle)<np.wheel_pos_epsilon or
+          np.abs(self.starboard-self.target_angle)<np.wheel_pos_epsilon):
         twist = Twist()
         twist.angular.x = 0.0
         twist.angular.y = 0.0
