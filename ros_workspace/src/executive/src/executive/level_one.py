@@ -303,7 +303,7 @@ class StrafeTest(smach.State):
         #simple_mover = simple_motion.SimpleMotion()
         rospy.loginfo("STARTING MOTION TEST")
         while not rospy.is_shutdown():
-            if self.preempt_requested:
+            if self.preempt_requested():
                 return 'preempted'
             rospy.sleep(0.5)
         #simple_mover.execute_strafe(math.pi/2, 4.0, 20)
