@@ -25,6 +25,7 @@ class SimpleMotion(object):
 
     self.current_twist = None
     self.starting_position = None
+    self.starting_yaw = None
 
   def odometry_callback(self, msg):
     if self.starting_position == None:
