@@ -87,8 +87,17 @@ class SimpleMotion(object):
     self.got_odom = False
     self.got_joint_state = False
 
+    twist = Twist()
+    twist.linear.x = 0.0
+    twist.linear.y = 0.0
+    twist.linear.z = 0.0
+    twist.angular.x = 0.0
+    twist.angular.y = 0.0
+    twist.angular.z = 0.0
+    self.current_twist = twist
+
     while not self.shutdown and rospy.Time.now()<shutdown_time:
-      if not self.got_odom or not self.got_joint_state or self.current_twist is None:
+      if not self.got_odom or not self.got_joint_state:
         continue
 
       if self.starting_yaw is None:
@@ -169,6 +178,15 @@ class SimpleMotion(object):
     self.shutdown = False
     self.got_odom = False
     self.got_joint_state = False
+
+    twist = Twist()
+    twist.linear.x = 0.0
+    twist.linear.y = 0.0
+    twist.linear.z = 0.0
+    twist.angular.x = 0.0
+    twist.angular.y = 0.0
+    twist.angular.z = 0.0
+    self.current_twist = twist
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
       if not self.got_odom or not self.got_joint_state or self.current_twist is None:
