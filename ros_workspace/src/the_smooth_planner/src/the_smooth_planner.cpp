@@ -407,6 +407,14 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         double curvature = ComputeCurvature(path, i);
         double startYaw = yawFromMsgQuat(path.poses[i].pose.orientation);
         double endYaw = yawFromMsgQuat(path.poses[i+1].pose.orientation);
+        if ((endYaw - startYaw) > M_PI)
+        {
+            startYaw += 2.0*M_PI;
+        }
+        else if ((endYaw - startYaw) < -M_PI)
+        {
+            startYaw -= 2.0*M_PI;
+        }
         double angularVelocity = 0.00;
         if (minimumPathTime > 0.00)
         {
