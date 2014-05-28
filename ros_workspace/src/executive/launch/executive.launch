@@ -5,7 +5,7 @@
     <!-- IMPORTANT! For tf, this is the frame that the executive works in -->
     <arg name="executive_frame" value="/odom"/>
 
-    <remap from="strafe_command" to="/motion/servo_command"/>
+    <remap from="simple_motion_command" to="/motion/servo_command"/>
     
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
