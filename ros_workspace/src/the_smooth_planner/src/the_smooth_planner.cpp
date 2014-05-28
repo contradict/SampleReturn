@@ -2,7 +2,6 @@
 #include <the_smooth_planner/bezier_cubic_spline.h>
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/inflation_layer.h>
-#include <platform_motion_msgs/Path.h>
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
 #include <eigen_conversions/eigen_msg.h>
@@ -39,10 +38,19 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
     localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
     localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
+    localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 1.0);
+    localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 2.0);
 
     this->odometry = nav_msgs::Odometry();
-    path_end_sequence_id = 0;
-    completed_knot_header = std_msgs::Header();
+    this->path_end_sequence_id = 0;
+    this->completed_knot_header = std_msgs::Header();
+    this->replan_ahead_pose.position.x = 0;
+    this->replan_ahead_pose.position.y = 0;
+    this->replan_ahead_pose.position.z = 0;
+    this->replan_ahead_pose.orientation.x = 0;
+    this->replan_ahead_pose.orientation.y = 0;
+    this->replan_ahead_pose.orientation.z = 0;
+    this->replan_ahead_pose.orientation.w = 0;
 
     pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
     odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
@@ -84,6 +92,53 @@ bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
     // This is handled in the pvt_segment code instead of this local planner
     return true;
+}
+
+bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose)
+{
+    if (path_msg.knots.size() == 0 || this->isGoalReached())
+    {
+        return false;
+    }
+    else
+    {
+        auto currentKnotIter = path_msg.knots.begin();
+        for (; currentKnotIter != path_msg.knots.end(); ++currentKnotIter)
+        {
+            if ((*currentKnotIter).header.seq == completed_knot_header.seq &&
+                (*currentKnotIter).header.stamp == completed_knot_header.stamp)
+            {
+                break;
+            }
+        }
+        if (currentKnotIter != path_msg.knots.end())
+        {
+            // See how much time until the expected end of the current plan
+            ros::Duration timeUntilPlanEnd = path_msg.knots.back().header.stamp - (*currentKnotIter).header.stamp;
+            if (timeUntilPlanEnd < ros::Duration(replan_look_ahead_time))
+            {
+                return false; // Finish the current plan
+            }
+            else
+            {
+                // Request a plan from a point ahead in the current path to
+                // the same goal
+                for (auto searchAheadIter = currentKnotIter; searchAheadIter != path_msg.knots.end(); ++searchAheadIter)
+                {
+                    ros::Duration aheadTime = (*searchAheadIter).header.stamp - (*currentKnotIter).header.stamp;
+                    if (aheadTime > ros::Duration(replan_look_ahead_time))
+                    {
+                        sourcePose->pose = (*searchAheadIter).pose;
+                        sourcePose->header = (*searchAheadIter).header;
+                        this->replan_ahead_pose = (*searchAheadIter).pose;
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
 }
 
 bool TheSmoothPlanner::isGoalReached()
@@ -251,6 +306,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
     ROS_DEBUG("RECEIVED PATH");
 
+    Time timestamp = Time::now();
+
     // make a path copy to deal with stupid const stupid
     nav_msgs::Path pathCopy(path);
 
@@ -258,6 +315,72 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
     {
         ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+    }
+
+    // Check if the path is the one we requested as a replan
+    platform_motion_msgs::Knot initialKnot;
+    initialKnot.pose = pathCopy.poses[0].pose;
+    initialKnot.twist = odometry.twist.twist;
+
+    Eigen::Vector3d replanAheadPos;
+    tf::pointMsgToEigen(replan_ahead_pose.position, replanAheadPos);
+    Eigen::Quaterniond replanAheadQuat(replan_ahead_pose.orientation.w,
+                                       replan_ahead_pose.orientation.x,
+                                       replan_ahead_pose.orientation.y,
+                                       replan_ahead_pose.orientation.z);
+    Eigen::Vector3d newPathFirstPos;
+    tf::pointMsgToEigen(pathCopy.poses[0].pose.position, newPathFirstPos);
+    Eigen::Quaterniond newPathFirstQuat(pathCopy.poses[0].pose.orientation.w,
+                                        pathCopy.poses[0].pose.orientation.x,
+                                        pathCopy.poses[0].pose.orientation.y,
+                                        pathCopy.poses[0].pose.orientation.z);
+    if (pathCopy.poses.size() > 0 && replanAheadPos.isApprox(newPathFirstPos) && replanAheadQuat.isApprox(newPathFirstQuat))
+    {
+        // Find the point in the last path that we want to stitch
+        // the new path to
+        bool foundFirstLookAheadBufferPose = false;
+        std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnot = path_msg.knots.begin();
+        for (auto prevPathIter = path_msg.knots.begin(); prevPathIter != path_msg.knots.end(); ++prevPathIter)
+        {
+            if (!foundFirstLookAheadBufferPose)
+            {
+                if (((*prevPathIter).header.stamp - timestamp) > ros::Duration(replan_look_ahead_buffer_time))
+                {
+                    lookAheadBufferKnot = prevPathIter;
+                    foundFirstLookAheadBufferPose = true;
+                }
+            }
+            Eigen::Vector3d prevPathPos;
+            Eigen::Quaterniond prevPathQuat((*prevPathIter).pose.orientation.w,
+                                            (*prevPathIter).pose.orientation.x,
+                                            (*prevPathIter).pose.orientation.y,
+                                            (*prevPathIter).pose.orientation.z);
+            tf::pointMsgToEigen((*prevPathIter).pose.position, prevPathPos);
+            if (prevPathPos.isApprox(replanAheadPos) && replanAheadQuat.isApprox(prevPathQuat))
+            {
+                if (foundFirstLookAheadBufferPose)
+                {
+                    std::vector<geometry_msgs::PoseStamped> insertPoses;
+                    for (auto insertKnotIter = lookAheadBufferKnot; insertKnotIter != prevPathIter; ++insertKnotIter)
+                    {
+                        geometry_msgs::PoseStamped insertPose;
+                        insertPose.pose = (*insertKnotIter).pose;
+                        insertPoses.push_back(insertPose);
+                    }
+                    pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
+
+                    // Set the initial knot to the first one in the spliced path
+                    initialKnot = (*lookAheadBufferKnot);
+
+                    // Set the timestamp to the time of the first point of
+                    // new path we are computing and also the time we want
+                    // platform_motion to splice this path into whatever
+                    // the robot is doing
+                    timestamp = (*lookAheadBufferKnot).header.stamp;
+                    break;
+                }
+            }
+        }
     }
 
     // keep track of special case turn in place motions so we can remove the intermediate ones
@@ -295,11 +418,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
 
     // What direction is the robot going and what is the linear/angular vel?
-    Time timestamp = Time::now();
-    //timestamp.sec = 0;
-    //timestamp.nsec = 0;
-
-    platform_motion_msgs::Path path_msg;
+    path_msg.knots.clear();
     path_msg.knots.resize(pathCopy.poses.size());
     path_msg.header.stamp = timestamp;
     path_msg.header.seq = 0;
@@ -314,8 +433,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         path_msg.knots[0].header.seq = 0;
         path_msg.knots[0].header.stamp = timestamp;
         path_msg.knots[0].header.frame_id = "map";
-        path_msg.knots[0].pose = pathCopy.poses[0].pose;
-        path_msg.knots[0].twist = odometry.twist.twist;
+        path_msg.knots[0] = initialKnot;
     }
 
     // Store minimum time stamps for all poses in the path ensuring that there is enough
@@ -509,10 +627,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     // keep track of accumulated turn segment time offset to we can make sure all the
     // timestamps work out still..
     ros::Duration totalTurnTime(0);
+    unsigned int totalNumTurnKnots = 0;
     for(unsigned int i = 0; i < path_msg.knots.size()-1; i++)
     {
         // add the turn time to the time stamp to keep all the timestamps accurate
         path_msg.knots[i].header.stamp += totalTurnTime;
+        path_msg.knots[i].header.seq += totalNumTurnKnots;
 
         Eigen::Vector3d currentPoint, nextPoint;
         tf::pointMsgToEigen(path_msg.knots[i].pose.position, currentPoint);
@@ -543,6 +663,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // need to advance i by enough places so the new points will be skipped and we'll end up
             // at what was i+1 before we did the above insert.
             i+=turnKnots.size();
+            totalNumTurnKnots += turnKnots.size();
         }
     }
 
@@ -554,6 +675,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     // the last point is never examined in the loop, so add the turn duration to it here.
     path_msg.knots.back().header.stamp += totalTurnTime;
+    path_msg.knots.back().header.seq += totalNumTurnKnots;
 
     // Store the maximum sequence ID of the path
     path_end_sequence_id = pathCopy.poses.size();

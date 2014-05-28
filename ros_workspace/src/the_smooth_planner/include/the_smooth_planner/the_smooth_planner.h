@@ -10,6 +10,7 @@
 #include <nav_core/base_local_planner.h>
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
+#include <platform_motion_msgs/Path.h>
 #include <std_msgs/Float64.h>
 #include <tf/transform_listener.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -29,6 +30,8 @@ public:
     virtual void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros);
 
     virtual bool computeVelocityCommands(geometry_msgs::Twist& cmd_vel);
+
+    virtual bool requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose);
 
     virtual bool isGoalReached();
 
@@ -50,7 +53,7 @@ private:
                         double finalVelocityMagnitude,
                         BezierCubicSpline<Eigen::Vector3d>& outCubicSpline);
 
-double ComputeCurvature(const nav_msgs::Path& path, unsigned int i);
+    double ComputeCurvature(const nav_msgs::Path& path, unsigned int i);
 
     double ComputeMinimumPathTime(const nav_msgs::Path& path, unsigned int i);   
 
@@ -73,9 +76,13 @@ double ComputeCurvature(const nav_msgs::Path& path, unsigned int i);
     double maximum_linear_velocity;
     double linear_acceleration;
     double maximum_slew_radians_per_second;
+    double replan_look_ahead_buffer_time;
+    double replan_look_ahead_time;
     uint32_t path_end_sequence_id;
     std_msgs::Header completed_knot_header;
     nav_msgs::Odometry odometry;
     Eigen::Vector3d sternPodVector;
+    platform_motion_msgs::Path path_msg;
+    geometry_msgs::Pose replan_ahead_pose;
 };
 };
