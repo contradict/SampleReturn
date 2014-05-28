@@ -314,7 +314,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     // debug print! print all the points, something is strange about them!
     for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+        ROS_DEBUG_STREAM(i << ": " << pathCopy.poses[i]);
     }
 
     // Check if the path is the one we requested as a replan
@@ -344,10 +344,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         {
             if (!foundFirstLookAheadBufferPose)
             {
-                ROS_ERROR("found first look ahead buffer pose!!");
+                ROS_DEBUG("found first look ahead buffer pose!!");
                 if (((*prevPathIter).header.stamp - timestamp) > ros::Duration(replan_look_ahead_buffer_time))
                 {
-                    ROS_ERROR("timestamp for first lookahead buffer pose ok!");
+                    ROS_DEBUG("timestamp for first lookahead buffer pose ok!");
                     lookAheadBufferKnot = prevPathIter;
                     foundFirstLookAheadBufferPose = true;
                 }
@@ -360,10 +360,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             tf::pointMsgToEigen((*prevPathIter).pose.position, prevPathPos);
             if (prevPathPos.isApprox(replanAheadPos) && replanAheadQuat.isApprox(prevPathQuat))
             {
-                ROS_ERROR("prevPathPos is approx replanAheadPose!");
+                ROS_DEBUG("prevPathPos is approx replanAheadPose!");
                 if (foundFirstLookAheadBufferPose)
                 {
-                    ROS_ERROR("and we already found first lookahead buffer pose!");
+                    ROS_DEBUG("and we already found first lookahead buffer pose!");
                     std::vector<geometry_msgs::PoseStamped> insertPoses;
                     for (auto insertKnotIter = lookAheadBufferKnot; insertKnotIter != prevPathIter; ++insertKnotIter)
                     {
@@ -381,7 +381,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                     // platform_motion to splice this path into whatever
                     // the robot is doing
                     timestamp = (*lookAheadBufferKnot).header.stamp;
-                    ROS_ERROR_STREAM("timestamp now " << timestamp);
+                    ROS_DEBUG_STREAM("timestamp now " << timestamp);
                     break;
                 }
             }
@@ -415,11 +415,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         pathCopy.poses.erase(pathCopy.poses.begin()+(*iter));
     }
 
-    ROS_ERROR("pathCopy post erasing:");
+    ROS_DEBUG("pathCopy post erasing:");
 
     for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+        ROS_DEBUG_STREAM(i << ": " << pathCopy.poses[i]);
     }
 
     // What direction is the robot going and what is the linear/angular vel?
@@ -457,7 +457,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         bool success = this->FitCubicSpline(pathCopy, i, pathVelocityMagnitude, maximum_linear_velocity, splines[i]);
         if (!success)
         {
-            ROS_ERROR("Failed to fit a cubic spline to the path. FIX ME!");
+            ROS_DEBUG("Failed to fit a cubic spline to the path. FIX ME!");
         }
 
         double distanceTraveled = splines[i].ComputeArcLength();
@@ -466,7 +466,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
         if(distanceTraveled < 0.0)
         {
-            ROS_ERROR("distanceTraveled is %f for point %d!!!", distanceTraveled, i);
+            ROS_DEBUG("distanceTraveled is %f for point %d!!!", distanceTraveled, i);
         }
 
         // Account for acceleration rate and compute the actual velocity at the next point
@@ -486,21 +486,21 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // kinematic constraints, such as the wheel angle rotation rate limit
         //double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
         double minimumPathTime = this->ComputeMinimumPathTime(path, i);
-        ROS_ERROR_STREAM("minimumPathTime: " << minimumPathTime);
+        ROS_DEBUG_STREAM("minimumPathTime: " << minimumPathTime);
         if (nextVelocityMagnitude < maximum_linear_velocity)
         {
-            ROS_ERROR_STREAM("nextVelocityMagnitude < maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
+            ROS_DEBUG_STREAM("nextVelocityMagnitude < maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
             minimumPathTime = max((nextVelocityMagnitude-pathVelocityMagnitude)/linear_acceleration, minimumPathTime);
         }
         else
         {
-            ROS_ERROR_STREAM("nextVelocityMagnitude >= maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
+            ROS_DEBUG_STREAM("nextVelocityMagnitude >= maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
             minimumPathTime = max(distanceTraveled/maximum_linear_velocity, minimumPathTime);
         }
 
         // Update the timestamp
         timestamp += ros::Duration(minimumPathTime);
-        ROS_ERROR_STREAM("timestamp now " << timestamp);
+        ROS_DEBUG_STREAM("timestamp now " << timestamp);
 
         // Update the rviz visualization marker array
         visualizationMarkerArray.markers[3*i].header.seq = 3*i;
@@ -560,8 +560,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         path_msg.knots[i+1].header.stamp = timestamp;
         path_msg.knots[i+1].header.frame_id = "map";
         path_msg.knots[i+1].pose = pathCopy.poses[i+1].pose;
-        ROS_ERROR_STREAM("timestamp now " << timestamp);
-        ROS_ERROR_STREAM("timestamp in knot itself is " << path_msg.knots[i+1].header.stamp);
+        ROS_DEBUG_STREAM("timestamp now " << timestamp);
+        ROS_DEBUG_STREAM("timestamp in knot itself is " << path_msg.knots[i+1].header.stamp);
 
         path_msg.knots[i+1].twist.linear.x = nextVelocityVector.x();
         path_msg.knots[i+1].twist.linear.y = nextVelocityVector.y();
@@ -576,10 +576,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.y = 0.00;
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.z = 0.00;
 
-    ROS_ERROR("\n\npath_msg.knots:");
+    ROS_DEBUG("\n\npath_msg.knots:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+        ROS_DEBUG_STREAM(i << ": " << path_msg.knots[i]);
     }
     
     // Compute and store smooth decelerations
@@ -626,10 +626,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         }
     }
 
-    ROS_ERROR("\n\npath_msg.knots post decel:");
+    ROS_DEBUG("\n\npath_msg.knots post decel:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+        ROS_DEBUG_STREAM(i << ": " << path_msg.knots[i]);
     }
     
 
@@ -668,7 +668,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // add the new knots to the path remembering that insert inserts BEFORE the given element!
             path_msg.knots.insert(path_msg.knots.begin()+i+1, turnKnots.begin(), turnKnots.end());
 
-            ROS_ERROR("Adding turn-in-place at index %d with %d segments", i, (int)(turnKnots.size()));
+            ROS_DEBUG("Adding turn-in-place at index %d with %d segments", i, (int)(turnKnots.size()));
 
             // since the turn in place path will probably pass the test in this if statement, we
             // need to advance i by enough places so the new points will be skipped and we'll end up
@@ -678,10 +678,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         }
     }
 
-    ROS_ERROR("\n\npath_msg.knots post turn in place inflation:");
+    ROS_DEBUG("\n\npath_msg.knots post turn in place inflation:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+        ROS_DEBUG_STREAM(i << ": " << path_msg.knots[i]);
     }
 
     // the last point is never examined in the loop, so add the turn duration to it here.
