@@ -31,7 +31,7 @@ class SimpleMotion(object):
       self.starting_position = msg.pose.pose.position
 
     if self.starting_yaw == None:
-      self.starting_yaw = euler_from_quaternion(msg.pose.pose.quaternion)[-1]
+      self.starting_yaw = euler_from_quaternion(msg.pose.pose.orientation)[-1]
 
     self.current_position = msg.pose.pose.position
 
