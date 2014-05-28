@@ -32,7 +32,7 @@ class PursueSample(object):
     def __init__(self):
         
         rospy.on_shutdown(self.shutdown_cb)
-        self.node_params = util.get_node_params()        
+        self.node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
         self.executive_frame = self.node_params.executive_frame
         
@@ -296,19 +296,23 @@ class LoadSearchPath(smach.State):
         square_step = userdata.square_search_size
         start_pose = util.get_current_robot_pose(self.listener)
         rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
-        next_pose = util.pose_translate(self.listener, start_pose, square_step, 0 )
-        next_pose = util.pose_rotate(next_pose, math.pi/2)
-        pose_list.append(next_pose)
-        next_pose = util.pose_translate(self.listener, start_pose, square_step, square_step )
-        next_pose = util.pose_rotate(next_pose, math.pi)        
-        pose_list.append(next_pose)
-        next_pose = util.pose_translate(self.listener, start_pose, -1*square_step, square_step )
-        next_pose = util.pose_rotate(next_pose, math.pi*3/2)                
-        pose_list.append(next_pose)
-        next_pose = util.pose_translate(self.listener, start_pose, -1*square_step, -1*square_step )
-        pose_list.append(next_pose)
-        next_pose = util.pose_translate(self.listener, start_pose, square_step, -1*square_step)
-        next_pose = util.pose_rotate(next_pose, math.pi/2)   
+        try:
+            next_pose = util.translate_base_link(self.listener, start_pose, square_step, 0 )
+            next_pose = util.pose_rotate(next_pose, math.pi/2)
+            pose_list.append(next_pose)
+            next_pose = util.translate_base_link(self.listener, start_pose, square_step, square_step )
+            next_pose = util.pose_rotate(next_pose, math.pi)        
+            pose_list.append(next_pose)
+            next_pose = util.translate_base_link(self.listener, start_pose, -1*square_step, square_step )
+            next_pose = util.pose_rotate(next_pose, math.pi*3/2)                
+            pose_list.append(next_pose)
+            next_pose = util.translate_base_link(self.listener, start_pose, -1*square_step, -1*square_step )
+            pose_list.append(next_pose)
+            next_pose = util.translate_base_link(self.listener, start_pose, square_step, -1*square_step)
+            next_pose = util.pose_rotate(next_pose, math.pi/2)
+        except tf.Exception:
+            rospy.logwarn("PURSUE_SAMPLE failed to transform robot pose in LoadSearchPath")
+            return 'aborted'
         pose_list.append(next_pose)
         userdata.pose_list = pose_list
                 
