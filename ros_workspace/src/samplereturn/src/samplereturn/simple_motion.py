@@ -30,13 +30,22 @@ class SimpleMotion(object):
     if self.starting_position == None:
       self.starting_position = msg.pose.pose.position
 
+    quaternion = np.zeros(4)
+    quaternion[0] = msg.pose.pose.orientation.x
+    quaternion[1] = msg.pose.pose.orientation.y
+    quaternion[2] = msg.pose.pose.orientation.z
+    quaternion[3] = msg.pose.pose.orientation.w
+
     if self.starting_yaw == None:
-      self.starting_yaw = euler_from_quaternion(msg.pose.pose.orientation)[-1]
+      self.starting_yaw = euler_from_quaternion(quaternion)[-1]
+
+    self.current_yaw = euler_from_quaternion(quaternion)[-1]
 
     self.current_position = msg.pose.pose.position
 
     self.distance_traveled = np.sqrt((self.current_position.x-self.starting_position.x)**2 +
                                      (self.current_position.y-self.starting_position.y)**2)
+
     self.got_odom = True
 
   def joint_state_callback(self, msg):
