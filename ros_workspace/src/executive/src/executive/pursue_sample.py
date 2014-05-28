@@ -14,6 +14,7 @@ import actionlib_msgs.msg as action_msg
 import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import platform_motion_msgs.msg as platform_msg
+import platform_motion_msgs.srv as platform_srv
 import manipulator_msgs.msg as manipulator_msg
 import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
@@ -22,10 +23,11 @@ import samplereturn_msgs.srv as samplereturn_srv
 import samplereturn.util as util
 
 from executive.executive_states import DriveToPoseState
-from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import WaitForFlagState
 from executive.executive_states import AnnounceState
 from executive.executive_states import GetPursueDetectedPointState
+from executive.executive_states import SelectMotionMode
+
 
 class PursueSample(object):
     
@@ -41,6 +43,7 @@ class PursueSample(object):
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                                                        move_base_msg.MoveBaseAction)
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
+        self.CAN_interface = util.CANInterface()        
         
         #for this state machine, there is no preempt path.  It either finshes successfully and
         #reports success on the PursuitResult topic, or in case of any interupption or failure, it
@@ -71,6 +74,9 @@ class PursueSample(object):
         self.state_machine.userdata.false = False
 
         with self.state_machine:
+            
+            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST            
+            MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO            
             
             smach.StateMachine.add('START_SAMPLE_PURSUIT',
                                    StartSamplePursuit(self.announcer),
@@ -125,15 +131,22 @@ class PursueSample(object):
                                    DriveToPoseState(self.move_base, self.tf_listener),
                                    transitions = {'complete':'DRIVE_SEARCH_PATH',
                                                   'timeout':'DRIVE_SEARCH_PATH',
-                                                  'sample_detected':'VISUAL_SERVO'},
+                                                  'sample_detected':'SELECT_SERVO'},
                                    remapping = {'pursue_samples':'true'})
+            
+            smach.StateMachine.add('SELECT_SERVO',
+                                    SelectMotionMode(self.CAN_interface,
+                                                     self.announcer,
+                                                     MODE_SERVO),
+                                    transitions = {'next':'VISUAL_SERVO',
+                                                  'failed':'PURSUE_SAMPLE_ABORTED'})    
 
             smach.StateMachine.add('VISUAL_SERVO',
                                    VisualServo(self.announcer),
                                    transitions = {'complete':'GRAB_SAMPLE',
                                                   'sample_lost':'LOAD_SEARCH_PATH',
                                                   'preempted':'CHECK_PAUSE_STATE',
-                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})  
+                                                  'aborted':'ABORT_SERVO'})  
 
             @smach.cb_interface(input_keys=['latched_sample'])
             def grab_goal_cb(userdata, request):
@@ -152,7 +165,7 @@ class PursueSample(object):
                                    goal_cb = grab_goal_cb),
                                    transitions = {'succeeded':'CONFIRM_SAMPLE_ACQUIRED',
                                                   'preempted':'CHECK_PAUSE_STATE',
-                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
+                                                  'aborted':'ABORT_SERVO'})
             
             #if the grab action is preempted by shutdown (or other non-pause reason),
             #exit pursue sample.  If paused, wait for unpause
@@ -160,7 +173,7 @@ class PursueSample(object):
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = True),
                                    transitions = {'next':'WAIT_FOR_UNPAUSE',
-                                                  'timeout':'PURSUE_SAMPLE_ABORTED'})
+                                                  'timeout':'ABORT_SERVO'})
     
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
@@ -169,11 +182,18 @@ class PursueSample(object):
                                                     announcer = self.announcer,
                                                     start_message ='Pursuit paused, waiting for un pause'),
                                    transitions = {'next':'VISUAL_SERVO',
-                                                  'timeout':'WAIT_FOR_UNPAUSE'})        
+                                                  'timeout':'WAIT_FOR_UNPAUSE'})
+
+            smach.StateMachine.add('ABORT_SERVO',
+                                    SelectMotionMode(self.CAN_interface,
+                                                     self.announcer,
+                                                     MODE_PLANNER),
+                                    transitions = {'next':'PURSUE_SAMPLE_ABORTED',
+                                                   'failed':'PURSUE_SAMPLE_ABORTED'})                
     
             smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
                                    ConfirmSampleAcquired(self.announcer, self.result_pub),
-                                   transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
+                                   transitions = {'sample_gone':'DESELECT_SERVO',
                                                   'sample_present':'VISUAL_SERVO',
                                                   'preempted':'PURSUE_SAMPLE_ABORTED',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'})
@@ -182,8 +202,15 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
-                                     transitions = {'succeeded':'complete',
+                                     transitions = {'succeeded':'DESELECT_SERVO',
                                                     'aborted':'PURSUE_SAMPLE_ABORTED'})
+
+            smach.StateMachine.add('DESELECT_SERVO',
+                                    SelectMotionMode(self.CAN_interface,
+                                                     self.announcer,
+                                                     MODE_PLANNER),
+                                    transitions = {'next':'complete',
+                                                  'failed':'PURSUE_SAMPLE_ABORTED'})      
 
             smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
                                    PursueSampleAborted(self.result_pub),
