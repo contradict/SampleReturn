@@ -53,8 +53,8 @@ class ExecutiveMaster(object):
         self.announcer = util.AnnouncerInterface("audio_navigate")
   
         self.state_machine = smach.StateMachine(outcomes=['shutdown', 'aborted'],
-                                                    input_keys = [],
-                                                    output_keys = [])
+                                                input_keys = [],
+                                                output_keys = [])
         
         #create initial userdata states in this state machine
         self.state_machine.userdata.paused = None

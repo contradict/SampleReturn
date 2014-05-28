@@ -321,8 +321,7 @@ class DriveSearchPath(smach.State):
         smach.State.__init__(self,
                              input_keys=['pose_list'],
                              output_keys=['target_pose',
-                                          'pursue_samples',
-                                          'pose_list'],
+s                                          'pose_list'],
                              outcomes=['next_point',
                                        'complete',
                                        'aborted'])
@@ -333,7 +332,6 @@ class DriveSearchPath(smach.State):
         
         if (len(userdata.pose_list) > 0):
             userdata.target_pose = userdata.pose_list.pop(0)
-            userdata.pursue_samples = True
             return 'next_point'
         else:
             self.announcer.say("No sample found, abort ing pursuit")
