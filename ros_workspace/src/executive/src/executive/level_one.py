@@ -302,9 +302,9 @@ class StrafeTest(smach.State):
         
         simple_mover = simple_motion.SimpleMotion()
         rospy.loginfo("STARTING MOTION TEST")
-        simple_mover.execute_strafe(math.pi/2, 2.0, 20)
-        simple_mover.execute_strafe(math.pi/4, 2.0, 20)
-        simple_mover.execute_strafe(math.pi*1.5, 2.0, 20)
+        simple_mover.execute_strafe(math.pi/2, 4.0, 20)
+        simple_mover.execute_strafe(math.pi/4, 4.0, 20)
+        simple_mover.execute_strafe(math.pi*1.5, 4.0, 20)
         simple_mover.execute_spin(-math.pi, 20)
         rospy.loginfo("STRAFE RETURNED")
 
