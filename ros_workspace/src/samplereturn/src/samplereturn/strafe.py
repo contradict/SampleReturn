@@ -73,8 +73,8 @@ class Strafe(object):
       # Run at some rate, ~10Hz
       rate.sleep()
       # Issue slow twists until wheels are pointed at angle
-      if (np.abs(self.stern_pos-self.target_angle)<self.wheel_pos_epsilon or
-          np.abs(self.port_pos-self.target_angle)<self.wheel_pos_epsilon or
+      if (np.abs(self.stern_pos-self.target_angle)<self.wheel_pos_epsilon and
+          np.abs(self.port_pos-self.target_angle)<self.wheel_pos_epsilon and
           np.abs(self.starboard_pos-self.target_angle)<self.wheel_pos_epsilon):
         twist = Twist()
         twist.angular.x = 0.0
@@ -88,7 +88,7 @@ class Strafe(object):
         continue
 
       # Accelerate until max_vel reached
-      elif (np.sqrt(twist.linear.x**2+twist.linear.y**2) < self.max_velocity):
+      elif (np.sqrt(self.current_twist.linear.x**2+self.current_twist.linear.y**2) < self.max_velocity):
         twist = self.current_twist
         twist.linear.x += self.accel_per_loop*self.target_x
         twist.linear.y += self.accel_per_loop*self.target_y
