@@ -103,7 +103,7 @@ class LevelOne(object):
                                                  'Enter ing level one mode'),
                                    transitions = {'next':'SELECT_PLANNER'})
             
-            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
+            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_SERVO
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      self.announcer,
