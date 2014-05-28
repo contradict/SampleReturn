@@ -79,7 +79,7 @@ class SimpleMotion(object):
 
     self.target_angle = np.pi/2
 
-    pos, quat = self.tf.lookupTransform("/base_link","/stern_wheel_module",rospy.Time.now())
+    pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time.now())
     self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration*np.abs(pos.x))
 
     self.shutdown = False
