@@ -82,7 +82,7 @@ private:
     std_msgs::Header completed_knot_header;
     nav_msgs::Odometry odometry;
     Eigen::Vector3d sternPodVector;
-    platform_motion_msgs::Path path_msg;
+    platform_motion_msgs::Path last_path_msg;
     geometry_msgs::Pose replan_ahead_pose;
 };
 };

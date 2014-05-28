@@ -38,8 +38,8 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
     localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
     localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
-    localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 1.0);
-    localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 2.0);
+    localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 10.0);
+    localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 15.0);
 
     this->odometry = nav_msgs::Odometry();
     this->path_end_sequence_id = 0;
@@ -96,14 +96,14 @@ bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
 bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose)
 {
-    if (path_msg.knots.size() == 0 || this->isGoalReached())
+    if (last_path_msg.knots.size() == 0 || this->isGoalReached())
     {
         return false;
     }
     else
     {
-        auto currentKnotIter = path_msg.knots.begin();
-        for (; currentKnotIter != path_msg.knots.end(); ++currentKnotIter)
+        auto currentKnotIter = last_path_msg.knots.begin();
+        for (; currentKnotIter != last_path_msg.knots.end(); ++currentKnotIter)
         {
             if ((*currentKnotIter).header.seq == completed_knot_header.seq &&
                 (*currentKnotIter).header.stamp == completed_knot_header.stamp)
@@ -111,10 +111,10 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                 break;
             }
         }
-        if (currentKnotIter != path_msg.knots.end())
+        if (currentKnotIter != last_path_msg.knots.end())
         {
             // See how much time until the expected end of the current plan
-            ros::Duration timeUntilPlanEnd = path_msg.knots.back().header.stamp - (*currentKnotIter).header.stamp;
+            ros::Duration timeUntilPlanEnd = last_path_msg.knots.back().header.stamp - (*currentKnotIter).header.stamp;
             if (timeUntilPlanEnd < ros::Duration(replan_look_ahead_time))
             {
                 return false; // Finish the current plan
@@ -123,7 +123,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
             {
                 // Request a plan from a point ahead in the current path to
                 // the same goal
-                for (auto searchAheadIter = currentKnotIter; searchAheadIter != path_msg.knots.end(); ++searchAheadIter)
+                for (auto searchAheadIter = currentKnotIter; searchAheadIter != last_path_msg.knots.end(); ++searchAheadIter)
                 {
                     ros::Duration aheadTime = (*searchAheadIter).header.stamp - (*currentKnotIter).header.stamp;
                     if (aheadTime > ros::Duration(replan_look_ahead_time))
@@ -339,13 +339,15 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // Find the point in the last path that we want to stitch
         // the new path to
         bool foundFirstLookAheadBufferPose = false;
-        std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnot = path_msg.knots.begin();
-        for (auto prevPathIter = path_msg.knots.begin(); prevPathIter != path_msg.knots.end(); ++prevPathIter)
+        std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnot = last_path_msg.knots.begin();
+        for (auto prevPathIter = last_path_msg.knots.begin(); prevPathIter != last_path_msg.knots.end(); ++prevPathIter)
         {
             if (!foundFirstLookAheadBufferPose)
             {
+                ROS_ERROR("found first look ahead buffer pose!!");
                 if (((*prevPathIter).header.stamp - timestamp) > ros::Duration(replan_look_ahead_buffer_time))
                 {
+                    ROS_ERROR("timestamp for first lookahead buffer pose ok!");
                     lookAheadBufferKnot = prevPathIter;
                     foundFirstLookAheadBufferPose = true;
                 }
@@ -358,8 +360,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             tf::pointMsgToEigen((*prevPathIter).pose.position, prevPathPos);
             if (prevPathPos.isApprox(replanAheadPos) && replanAheadQuat.isApprox(prevPathQuat))
             {
+                ROS_ERROR("prevPathPos is approx replanAheadPose!");
                 if (foundFirstLookAheadBufferPose)
                 {
+                    ROS_ERROR("and we already found first lookahead buffer pose!");
                     std::vector<geometry_msgs::PoseStamped> insertPoses;
                     for (auto insertKnotIter = lookAheadBufferKnot; insertKnotIter != prevPathIter; ++insertKnotIter)
                     {
@@ -377,6 +381,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                     // platform_motion to splice this path into whatever
                     // the robot is doing
                     timestamp = (*lookAheadBufferKnot).header.stamp;
+                    ROS_ERROR_STREAM("timestamp now " << timestamp);
                     break;
                 }
             }
@@ -418,7 +423,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
 
     // What direction is the robot going and what is the linear/angular vel?
-    path_msg.knots.clear();
+    platform_motion_msgs::Path path_msg;
     path_msg.knots.resize(pathCopy.poses.size());
     path_msg.header.stamp = timestamp;
     path_msg.header.seq = 0;
@@ -430,10 +435,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     // Populate the first entry with the current kinematic data.
     if (pathCopy.poses.size() > 0)
     {
+        path_msg.knots[0] = initialKnot;
         path_msg.knots[0].header.seq = 0;
         path_msg.knots[0].header.stamp = timestamp;
         path_msg.knots[0].header.frame_id = "map";
-        path_msg.knots[0] = initialKnot;
     }
 
     // Store minimum time stamps for all poses in the path ensuring that there is enough
@@ -481,17 +486,21 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // kinematic constraints, such as the wheel angle rotation rate limit
         //double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
         double minimumPathTime = this->ComputeMinimumPathTime(path, i);
+        ROS_ERROR_STREAM("minimumPathTime: " << minimumPathTime);
         if (nextVelocityMagnitude < maximum_linear_velocity)
         {
+            ROS_ERROR_STREAM("nextVelocityMagnitude < maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
             minimumPathTime = max((nextVelocityMagnitude-pathVelocityMagnitude)/linear_acceleration, minimumPathTime);
         }
         else
         {
+            ROS_ERROR_STREAM("nextVelocityMagnitude >= maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
             minimumPathTime = max(distanceTraveled/maximum_linear_velocity, minimumPathTime);
         }
 
         // Update the timestamp
         timestamp += ros::Duration(minimumPathTime);
+        ROS_ERROR_STREAM("timestamp now " << timestamp);
 
         // Update the rviz visualization marker array
         visualizationMarkerArray.markers[3*i].header.seq = 3*i;
@@ -551,6 +560,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         path_msg.knots[i+1].header.stamp = timestamp;
         path_msg.knots[i+1].header.frame_id = "map";
         path_msg.knots[i+1].pose = pathCopy.poses[i+1].pose;
+        ROS_ERROR_STREAM("timestamp now " << timestamp);
+        ROS_ERROR_STREAM("timestamp in knot itself is " << path_msg.knots[i+1].header.stamp);
 
         path_msg.knots[i+1].twist.linear.x = nextVelocityVector.x();
         path_msg.knots[i+1].twist.linear.y = nextVelocityVector.y();
@@ -682,6 +693,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     // Publish path
     smooth_path_publisher.publish(path_msg);
+    last_path_msg = path_msg;
     visualization_publisher.publish(visualizationMarkerArray);
 
     return;
