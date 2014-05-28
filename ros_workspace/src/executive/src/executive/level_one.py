@@ -300,12 +300,16 @@ class StrafeTest(smach.State):
     
     def execute(self, userdata):
         
-        simple_mover = simple_motion.SimpleMotion()
+        #simple_mover = simple_motion.SimpleMotion()
         rospy.loginfo("STARTING MOTION TEST")
-        simple_mover.execute_strafe(math.pi/2, 4.0, 20)
-        simple_mover.execute_strafe(math.pi/4, 4.0, 20)
-        simple_mover.execute_strafe(math.pi*1.5, 4.0, 20)
-        simple_mover.execute_spin(-math.pi, 20)
+        while not rospy.is_shutdown():
+            if self.preempt_requested:
+                return 'preempted'
+            rospy.sleep(0.5)
+        #simple_mover.execute_strafe(math.pi/2, 4.0, 20)
+        #simple_mover.execute_strafe(math.pi/4, 4.0, 20)
+        #simple_mover.execute_strafe(math.pi*1.5, 4.0, 20)
+        #simple_mover.execute_spin(-math.pi, 20)
         rospy.loginfo("STRAFE RETURNED")
 
         return 'next'
