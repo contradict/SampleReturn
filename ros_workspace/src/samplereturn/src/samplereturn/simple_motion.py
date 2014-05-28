@@ -4,7 +4,8 @@ import numpy as np
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from tf import TransformListener, euler_from_quaternion
+from tf import TransformListener
+from tf.transformations import euler_from_quaternion
 
 class SimpleMotion(object):
   def __init__(self, param_string=""):
