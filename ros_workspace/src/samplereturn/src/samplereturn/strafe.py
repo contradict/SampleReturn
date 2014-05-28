@@ -87,6 +87,15 @@ class Strafe(object):
         self.publisher.publish(twist)
         continue
 
+      # Decelerate to stop at distance (velocity**2)/(2*accel_limit)
+      elif (distance-self.distance_traveled) < self.stopping_distance:
+        break
+        #twist = self.current_twist
+        #twist.linear.x -= self.accel_per_loop*self.target_x
+        #twist.linear.y -= self.accel_per_loop*self.target_y
+        #self.publisher.publish(twist)
+        #self.current_twist = twist
+
       # Accelerate until max_vel reached
       elif (np.sqrt(self.current_twist.linear.x**2+self.current_twist.linear.y**2) < self.max_velocity):
         twist = self.current_twist
@@ -96,16 +105,15 @@ class Strafe(object):
         self.current_twist = twist
         continue
 
-      # Decelerate to stop at distance (velocity**2)/(2*accel_limit)
-      elif (distance-self.distance_traveled) < self.stopping_distance:
-        twist = self.current_twist
-        twist.linear.x -= self.accel_per_loop*self.target_x
-        twist.linear.y -= self.accel_per_loop*self.target_y
-        self.publisher.publish(twist)
-        self.current_twist = twist
-
       else:
         self.publisher.publish(self.current_twist)
+
+    velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
+    for i in range(int(velocity/self.accel_per_loop),-1,-1):
+      twist = self.current_twist
+      twist.linear.x = self.accel_per_loop*self.target_x*i
+      twist.linear.y = self.accel_per_loop*self.target_y*i
+      self.publisher.publish(twist)
 
   def shutdown(self):
     self.shutdown = True
