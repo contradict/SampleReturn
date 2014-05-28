@@ -30,6 +30,7 @@ class Strafe(object):
 
     self.distance_traveled = np.sqrt((self.current_position.x-self.starting_position.x)**2 +
                                      (self.current_position.y-self.starting_position.y)**2)
+    self.got_odom = True
 
   def joint_state_callback(self, msg):
     pos_dict = dict(zip(msg.name,msg.position))
@@ -40,6 +41,8 @@ class Strafe(object):
     self.stern_vel      = vel_dict["stern_steering_joint"]
     self.port_vel       = vel_dict["port_steering_joint"]
     self.starboard_vel  = vel_dict["starboard_steering_joint"]
+
+    self.got_joint_state = True
 
   def execute(self, angle, distance, time_limit=20.0):
     shutdown_time = rospy.Time.now()
@@ -60,8 +63,13 @@ class Strafe(object):
     self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
 
     self.shutdown = False
+    self.got_odom = False
+    self.got_joint_state = False
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
+      if not self.got_odom or not self.got_joint_state:
+        continue
+
       # Run at some rate, ~10Hz
       rate.sleep()
       # Issue slow twists until wheels are pointed at angle
