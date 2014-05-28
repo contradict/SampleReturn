@@ -22,6 +22,8 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import GetPursueDetectedPointState
 
+import samplereturn.strafe as strafe
+
 import samplereturn.util as util
 
 class LevelOne(object):    
@@ -106,8 +108,14 @@ class LevelOne(object):
                                     SelectMotionMode(self.CAN_interface,
                                                      self.announcer,
                                                      MODE_PLANNER),
-                                    transitions = {'next':'DRIVE_TO_SEARCH_START',
+                                    transitions = {'next':'STRAFE_TEST',
                                                   'failed':'LEVEL_ONE_ABORTED'})                
+            
+            smach.StateMachine.add("STRAFE_TEST",
+                                   StrafeTest(output_keys=[],
+                                                 input_keys=[],
+                                                 outcomes=['next']),
+                                   transitions = {"next":"DRIVE_TO_SEARCH_START"})
             
             smach.StateMachine.add('DRIVE_TO_SEARCH_START',
                                    DriveToSearch(self.announcer),
@@ -287,7 +295,18 @@ class LevelOne(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+
+class StrafeTest(smach.State):
     
+    def execute(self, userdata):
+        
+        strafer = strafe.Strafe()
+        rospy.loginfo("STARTING STRAFE TEST")
+        strafer.execute(math.pi/2, 2.0, 20)
+        rospy.loginfo("STRAFE RETURNED")
+
+        return 'next'
+            
 #drives to the expected sample location    
 class StartLevelOne(smach.State):
 
