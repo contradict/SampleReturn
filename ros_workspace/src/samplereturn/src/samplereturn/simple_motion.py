@@ -81,7 +81,7 @@ class SimpleMotion(object):
     self.target_angle = np.pi/2
 
     pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
-    self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration*np.abs(pos.x))
+    self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration*np.abs(pos[0]))
 
     self.shutdown = False
     self.got_odom = False
@@ -99,7 +99,7 @@ class SimpleMotion(object):
       rate.sleep()
 
       if self.current_twist is not None:
-        self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration*np.abs(pos.x))
+        self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration*np.abs(pos[0]))
 
       if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon and
           np.abs(self.port_pos)>self.wheel_pos_epsilon and
@@ -118,7 +118,7 @@ class SimpleMotion(object):
       elif self.unwind(self.target_yaw - self.current_yaw) < self.stopping_yaw:
         break
 
-      elif (self.current_twist.angular.z*np.abs(pos.x)) < self.max_velocity:
+      elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
         if self.current_twist is None:
           twist = Twist()
           twist.linear.x = 0.0
@@ -128,7 +128,7 @@ class SimpleMotion(object):
           twist.angular.y = 0.0
         else:
           twist = self.current_twist
-        twist.angular.z += np.sign(rot)*np.abs(pos.x)*self.max_acceleration
+        twist.angular.z += np.sign(rot)*np.abs(pos[0])*self.max_acceleration
         self.publisher.publish(twist)
         self.current_twist = twist
         continue
@@ -136,11 +136,11 @@ class SimpleMotion(object):
       else:
         self.publisher.publish(self.current_twist)
 
-    velocity = np.abs(self.current_twist.angular.z)*np.abs(pos.x)
+    velocity = np.abs(self.current_twist.angular.z)*np.abs(pos[0])
     for i in range(int(velocity/self.accel_per_loop),-1,-1):
       rate.sleep()
       twist = self.current_twist
-      twist.angular.z = np.sign(rot)*self.accel_per_loop*i/np.abs(pos.x)
+      twist.angular.z = np.sign(rot)*self.accel_per_loop*i/np.abs(pos[0])
       self.publisher.publish(twist)
 
 
