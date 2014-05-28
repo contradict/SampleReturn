@@ -22,7 +22,7 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import GetPursueDetectedPointState
 
-import samplereturn.strafe as strafe
+import samplereturn.simple_moton as simple_motion
 
 import samplereturn.util as util
 
@@ -300,12 +300,12 @@ class StrafeTest(smach.State):
     
     def execute(self, userdata):
         
-        strafer = strafe.Strafe()
-        rospy.loginfo("STARTING STRAFE TEST")
-        strafer.execute(math.pi/2, 4.0, 20)
-        strafer.execute(math.pi/4, 4.0, 20)
-        strafer.execute(math.pi, 4.0, 20)        
-        strafer.execute(math.pi*1.5, 4.0, 20)        
+        simple_mover = simple_motion.SimpleMotion()
+        rospy.loginfo("STARTING MOTION TEST")
+        simple_mover.execute_strafe(math.pi/2, 2.0, 20)
+        simple_mover.execute_strafe(math.pi/4, 2.0, 20)
+        simple_mover.execute_strafe(math.pi*1.5, 2.0, 20)
+        simple_mover.execute_spin(-pi, 20)
         rospy.loginfo("STRAFE RETURNED")
 
         return 'next'
