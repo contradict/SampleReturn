@@ -99,7 +99,7 @@ class Strafe(object):
       # Decelerate to stop at distance (velocity**2)/(2*accel_limit)
       elif (distance-self.distance_traveled) < self.stopping_distance:
         twist = self.current_twist
-        twist.linear.x -= self.accel_per_loop*self.target_y
+        twist.linear.x -= self.accel_per_loop*self.target_x
         twist.linear.y -= self.accel_per_loop*self.target_y
         self.publisher.publish(twist)
         self.current_twist = twist
