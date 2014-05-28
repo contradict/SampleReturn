@@ -108,7 +108,7 @@ class SimpleMotion(object):
       rate.sleep()
 
       if self.current_twist is not None:
-        self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration*np.abs(pos[0]))
+        self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
 
       if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon and
           np.abs(self.port_pos)>self.wheel_pos_epsilon and
@@ -124,7 +124,7 @@ class SimpleMotion(object):
         self.publisher.publish(twist)
         continue
 
-      elif self.unwind(self.target_yaw - self.current_yaw) < self.stopping_yaw:
+      elif np.abs(self.unwind(self.target_yaw - self.current_yaw)) < self.stopping_yaw:
         break
 
       elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
