@@ -321,7 +321,7 @@ class DriveSearchPath(smach.State):
         smach.State.__init__(self,
                              input_keys=['pose_list'],
                              output_keys=['target_pose',
-s                                          'pose_list'],
+                                          'pose_list'],
                              outcomes=['next_point',
                                        'complete',
                                        'aborted'])
