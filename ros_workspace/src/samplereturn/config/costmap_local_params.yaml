@@ -3,9 +3,6 @@ width: 30.0
 height: 30.0
 resolution: 0.10
 
-inscribed_radius: 0.4
-circumscribed_radius: 0.75
-
 plugins:
     -
         name: footprint_layer
@@ -20,7 +17,7 @@ plugins:
 obstacle_layer:
     origin_z: 0.0
     z_resolution: 0.10
-    z_voxels: 14
+    z_voxels: 16
     unknown_threshold: 1
     mark_threshold: 4
     #set if you want the voxel map published
@@ -68,7 +65,8 @@ obstacle_layer:
         }
 
 inflation_layer:
-    cost_scaling_factor: 2.0
-    inflation_radius: 5.0
+    cost_scaling_factor: 2.5
+    inflation_radius: 3.0
+
 
 

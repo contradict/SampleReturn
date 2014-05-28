@@ -15,17 +15,19 @@
         <remap from="completed_knot" to="/motion/completed_knot"/>
         <!-- <remap from="plan" to="~/SBPLLatticePlanner/plan"/> -->
 
-        <rosparam ns="local_costmap" file="$(find samplereturn)/config/sbpl/costmap_common_params.yaml" command="load" />
-        <rosparam ns="local_costmap" file="$(find samplereturn)/config/sbpl/costmap_local_params.yaml" command="load" />
+        <!--
+        -->
+        <rosparam ns="local_costmap" file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" />
+        <rosparam ns="local_costmap" file="$(find samplereturn)/config/costmap_local_params.yaml" command="load" />
 
-        <rosparam ns="global_costmap" file="$(find samplereturn)/config/sbpl/costmap_common_params.yaml" command="load" />
-        <rosparam ns="global_costmap" file="$(find samplereturn)/config/sbpl/costmap_global_params.yaml" command="load" />
+        <rosparam ns="global_costmap" file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" />
+        <rosparam ns="global_costmap" file="$(find samplereturn)/config/costmap_local_params.yaml" command="load" />
 
         <rosparam file="$(find samplereturn)/config/sbpl/sbpl_common_params.yaml" command="load"/>
         <rosparam file="$(find samplereturn)/config/sbpl/the_smooth_params.yaml" command="load"/>
 
         <param name="SBPLLatticePlanner/primitive_filename" type="string" value="$(find samplereturn)/config/sbpl/motion_primitives.mprim"/>
-        <param name="planner_frequency" type="double" value="0.0"/>
+
         <param name="base_global_planner" type="string" value="SBPLLatticePlanner"/>
         <param name="base_local_planner" type="string" value="TheSmoothPlanner"/>
     </node>
@@ -38,6 +40,15 @@
         name="voxel_visualizer_cloud"
         ns="/processes/planner/mover/local_costmap">
     </node>
+
+    <node
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_cloud"
+        name="voxel_visualizer_cloud"
+        ns="/processes/planner/mover/global_costmap">
+    </node>
+
 
 	<!-- For testing with a static map loaded from an image -->
 <!--
