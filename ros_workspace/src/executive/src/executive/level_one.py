@@ -302,7 +302,7 @@ class StrafeTest(smach.State):
         
         strafer = strafe.Strafe()
         rospy.loginfo("STARTING STRAFE TEST")
-        strafer.execute(math.pi/2, 2.0, 20)
+        strafer.execute(math.pi/2, 4.0, 20)
         rospy.loginfo("STRAFE RETURNED")
 
         return 'next'
