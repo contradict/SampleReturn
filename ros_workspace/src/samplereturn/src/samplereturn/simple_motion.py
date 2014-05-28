@@ -11,7 +11,7 @@ class SimpleMotion(object):
   def __init__(self, param_string=""):
     rospy.Subscriber("/motion/odometry", Odometry, self.odometry_callback, None, 1)
     rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
-    self.publisher = rospy.Publisher("simple_motion_command", Twist)
+    self.publisher = rospy.Publisher("/motion/servo_command", Twist)
 
     self.tf = TransformListener()
 
@@ -80,7 +80,7 @@ class SimpleMotion(object):
     self.target_angle = np.pi/2
 
     pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
-    #self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration*np.abs(pos.x))
+    self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration*np.abs(pos.x))
 
     self.shutdown = False
     self.got_odom = False
@@ -100,7 +100,9 @@ class SimpleMotion(object):
       if self.current_twist is not None:
         self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration*np.abs(pos.x))
 
-      if np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon:
+      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon and
+          np.abs(self.port_pos)>self.wheel_pos_epsilon and
+          np.abs(self.starboard_pos)>self.wheel_pos_epsilon):
         twist = Twist()
         twist.linear.x = 0.0
         twist.linear.y = 0.0
@@ -161,7 +163,7 @@ class SimpleMotion(object):
     self.target_x = np.cos(self.target_angle)
     self.target_y = np.sin(self.target_angle)
 
-    #self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
+    self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
 
     self.shutdown = False
     self.got_odom = False
