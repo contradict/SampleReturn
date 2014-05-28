@@ -110,6 +110,7 @@ class Strafe(object):
 
     velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
     for i in range(int(velocity/self.accel_per_loop),-1,-1):
+      rate.sleep()
       twist = self.current_twist
       twist.linear.x = self.accel_per_loop*self.target_x*i
       twist.linear.y = self.accel_per_loop*self.target_y*i
@@ -118,13 +119,20 @@ class Strafe(object):
   def shutdown(self):
     self.shutdown = True
     rate = rospy.Rate(self.loop_rate)
-    while np.abs(self.current_twist.linear.x+self.current_twist.linear.y) > self.accel_per_loop:
-      twist = self.current_twist
-      twist.linear.x -= self.accel_per_loop*self.target_x
-      twist.linear.y -= self.accel_per_loop*self.target_y
-      self.current_twist = twist
-      self.publisher.publish(twist)
+    velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
+    for i in range(int(velocity/self.accel_per_loop),-1,-1):
       rate.sleep()
+      twist = self.current_twist
+      twist.linear.x = self.accel_per_loop*self.target_x*i
+      twist.linear.y = self.accel_per_loop*self.target_y*i
+      self.publisher.publish(twist)
+    #while np.abs(self.current_twist.linear.x+self.current_twist.linear.y) > self.accel_per_loop:
+    #  twist = self.current_twist
+    #  twist.linear.x -= self.accel_per_loop*self.target_x
+    #  twist.linear.y -= self.accel_per_loop*self.target_y
+    #  self.current_twist = twist
+    #  self.publisher.publish(twist)
+    #  rate.sleep()
 
     twist = Twist()
     twist.linear.x = 0.0
