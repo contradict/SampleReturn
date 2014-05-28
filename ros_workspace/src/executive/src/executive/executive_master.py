@@ -1,25 +1,24 @@
 #!/usr/bin/env python
 import sys
 import math
+import threading
+
 import rospy
 import rosnode
 import smach
 import smach_ros
 import actionlib
-import actionlib_msgs.msg as action_msg
 import tf
-import threading
-sys.path.append('/opt/ros/groovy/stacks/audio_common/sound_play/src/')
 
 import samplereturn.util as util
 
+import actionlib_msgs.msg as action_msg
 import std_msgs.msg as std_msg
 import sensor_msgs.msg as sensor_msgs
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import manipulator_msgs.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
-import move_base_msgs.msg as move_base_msg
 import visual_servo_msgs.msg as visual_servo_msg
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
@@ -43,7 +42,7 @@ class ExecutiveMaster(object):
         self.last_selected_mode = None
         self.selected_mode = None 
         self.preempt_modes = ('LEVEL_ONE_MODE', 'LEVEL_TWO_MODE', 'MANUAL_MODE')
-        self.preemptCV = threading.Condition()
+        
 
         #load all private node parameters
         self.node_params = util.get_node_params()
@@ -54,8 +53,8 @@ class ExecutiveMaster(object):
         self.announcer = util.AnnouncerInterface("audio_navigate")
   
         self.state_machine = smach.StateMachine(outcomes=['shutdown', 'aborted'],
-                                                    input_keys = [],
-                                                    output_keys = [])
+                                                input_keys = [],
+                                                output_keys = [])
         
         #create initial userdata states in this state machine
         self.state_machine.userdata.paused = None
@@ -207,7 +206,7 @@ class ExecutiveMaster(object):
                                                   'aborted':'TOP_ABORTED'})    
 
             smach.StateMachine.add('TOP_PREEMPTED',
-                                   TopPreempted(self.preemptCV),
+                                   TopPreempted(),
                                    transitions = {'next':'CHECK_MODE'})
             
             smach.StateMachine.add('TOP_ABORTED',
@@ -218,14 +217,27 @@ class ExecutiveMaster(object):
         sls = smach_ros.IntrospectionServer('top_introspection',
                                             self.state_machine,
                                             '/START_MASTER_EXECUTIVE')
-        sls.start()
-        
         # subscribe to topics
         rospy.Subscriber("gpio_read", platform_msg.GPIO, self.gpio_update)
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
+        
+        sls.start()
+        
+        smach_thread = threading.Thread(target=self.state_machine.execute)
+        smach_thread.start()
+        
+        # Wait for ctrl-c
+        rospy.spin()
+        sls.stop()
+        
+        # Request the container to preempt
+        self.state_machine.request_preempt()
+        
+        smach_thread.join()
 
     def start_state_machine(self):
         self.state_machine.execute()
+        rospy.spin()
 
     #topic handlers
 
@@ -267,11 +279,11 @@ class ExecutiveMaster(object):
                 #if we are in one of the sub state machines, preempt
                 rospy.loginfo("MASTER EXECUTIVE requesting preempt on: " + active_state)
                 self.state_machine.request_preempt()
-                self.preemptCV.acquire()
-                #wait until state machine succesfully preempts the current mode
-                self.preemptCV.wait()
-                self.preemptCV.release    
-                self.state_machine.service_preempt()
+                while not rospy.is_shutdown():
+                    rospy.sleep(0.1)
+                    #wait here and not listen to the mode switch
+                    if not self.state_machine.preempt_requested():
+                        break
                 
 #state classes for the top level machine
 class StartState(smach.State):
@@ -301,30 +313,6 @@ class StartState(smach.State):
       
         userdata.camera_status = 'unknown'
         return 'next'
-        
-class WaitForUnpause(smach.State):
-    def __init__(self, announcer):
-        smach.State.__init__(self,
-                             input_keys = ['paused'],
-                             outcomes=['unpaused', 'paused', 'aborted'])
-
-        self.announcer = announcer
-                
-    def execute(self, userdata):
-        
-        if userdata.paused:
-            words = "Waiting for system enable"
-            self.announcer.say(words)
-        
-        start_time = rospy.get_time()
-        while not rospy.is_shutdown():
-            if not userdata.paused:
-                return 'unpaused'
-            rospy.sleep(0.1)
-            if (rospy.get_time() - start_time) > timeout:
-                return 'timeout'
-                
-        return 'paused'
         
 #this state homes all mechanisms on the robot platform
 class HomePlatform(smach.State):
@@ -449,16 +437,12 @@ class CameraSuccess(smach.State):
         return 'next'
     
 class TopPreempted(smach.State):
-    def __init__(self, preemptCV):
+    def __init__(self):
         smach.State.__init__(self, outcomes=['next'])
-        
-        self.preemptCV = preemptCV
         
     def execute(self, userdata):
         
-        self.preemptCV.acquire()
-        self.preemptCV.notifyAll()
-        self.preemptCV.release()
+        self.service_preempt()
         
         return 'next'
 
