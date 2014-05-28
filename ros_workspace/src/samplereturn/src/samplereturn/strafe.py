@@ -7,9 +7,9 @@ from nav_msgs.msg import Odometry
 
 class Strafe(object):
   def __init__(self, param_string=""):
-    rospy.Subscriber('odometry', Odometry, self.odometry_callback, None, 1)
-    rospy.Subscriber('platform_joint_states', JointState, self.joint_state_callback, None, 1)
-    self.publisher = rospy.Publisher('strafe_command', Twist)
+    rospy.Subscriber("/motion/odometry", Odometry, self.odometry_callback, None, 1)
+    rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
+    self.publisher = rospy.Publisher("strafe_command", Twist)
 
     self.loop_rate = rospy.get_param('~loop_rate',10.0)
     self.max_velocity = rospy.get_param('~max_velocity',2.0)
