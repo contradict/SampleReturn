@@ -599,7 +599,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.y *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.z = 0.00;
-            path_msg.knots[i+1].twist.angular.z *= previousVelocityScale;
+            path_msg.knots[i-1].twist.angular.z *= previousVelocityScale;
         }
 
     }
