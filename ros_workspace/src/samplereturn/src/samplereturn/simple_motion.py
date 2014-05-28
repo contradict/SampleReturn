@@ -88,7 +88,7 @@ class SimpleMotion(object):
     self.got_joint_state = False
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
-      if not self.got_odom or not self.got_joint_state:
+      if not self.got_odom or not self.got_joint_state or self.current_twist is None:
         continue
 
       if self.starting_yaw is None:
@@ -171,7 +171,7 @@ class SimpleMotion(object):
     self.got_joint_state = False
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
-      if not self.got_odom or not self.got_joint_state:
+      if not self.got_odom or not self.got_joint_state or self.current_twist is None:
         continue
 
       # Run at some rate, ~10Hz
