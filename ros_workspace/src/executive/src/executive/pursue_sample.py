@@ -136,7 +136,6 @@ class PursueSample(object):
             
             smach.StateMachine.add('SELECT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
-                                                     self.announcer,
                                                      MODE_SERVO),
                                     transitions = {'next':'VISUAL_SERVO',
                                                   'failed':'PURSUE_SAMPLE_ABORTED'})    
@@ -186,7 +185,6 @@ class PursueSample(object):
 
             smach.StateMachine.add('ABORT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
-                                                     self.announcer,
                                                      MODE_PLANNER),
                                     transitions = {'next':'PURSUE_SAMPLE_ABORTED',
                                                    'failed':'PURSUE_SAMPLE_ABORTED'})                
