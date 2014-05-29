@@ -175,10 +175,10 @@ class SimpleMotion(object):
 
     if (-np.pi/2<=angle<=np.pi/2):
       self.target_angle = angle
-    elif (np.pi/2<angle<np.pi*1.5):
+    elif (np.pi/2 < angle):
       self.target_angle = angle - np.pi
-    elif (np.pi*1.5<=angle<2*np.pi):
-      self.target_angle = angle - 2*np.pi
+    elif (angle < -np.pi/2):
+      self.target_angle = angle + np.pi
 
     self.target_x = np.cos(self.target_angle)
     self.target_y = np.sin(self.target_angle)
