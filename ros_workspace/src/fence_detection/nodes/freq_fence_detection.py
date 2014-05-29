@@ -25,7 +25,7 @@ class freq_fence_detection(object):
 
     #self.mat = scipy.io.loadmat('/home/zlizer/Downloads/ColorNaming/w2c.mat')
     rospack = rospkg.RosPack()
-    self.mat = scipy.io.loadmat(rospack.get_path('fence_detection')+'/w2c.mat')
+    self.mat = scipy.io.loadmat(rospack.get_path('fence_detection')+'/config/w2c.mat')
 
   def detect_fence(self,Image):
     img = np.asarray(self.bridge.imgmsg_to_cv(Image,'rgb8'))
