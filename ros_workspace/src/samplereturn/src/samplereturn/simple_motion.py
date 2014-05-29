@@ -210,8 +210,9 @@ class SimpleMotion(object):
       rate.sleep()
 
       if self.current_twist is not None:
-        self.stopping_distance = (np.sqrt(self.current_twist.linear.x**2 +self.current_twist.linear.y**2)**2/
-                                (2*self.max_acceleration))
+        self.stopping_distance = (np.sqrt(self.current_twist.linear.x**2 +
+                                          self.current_twist.linear.y**2)**2 /
+                                          (2*self.max_acceleration))
 
       # Issue slow twists until wheels are pointed at angle
       print "target_angle: %s" % (str(self.target_angle))
@@ -228,6 +229,7 @@ class SimpleMotion(object):
         twist.linear.z = 0.0
         self.current_twist = twist
         self.publisher.publish(twist)
+        print ("Outgoing twist, waiting for wheel angles: " + str(twist))
         continue
 
       # Decelerate to stop at distance (velocity**2)/(2*accel_limit)
@@ -240,7 +242,8 @@ class SimpleMotion(object):
         #self.current_twist = twist
 
       # Accelerate until max_vel reached
-      elif (np.sqrt(self.current_twist.linear.x**2+self.current_twist.linear.y**2) < self.max_velocity):
+      elif (np.sqrt(self.current_twist.linear.x**2+self.current_twist.linear.y**2)
+                    < self.max_velocity):
         if self.current_twist is None:
           twist = Twist()
           twist.linear.z = 0.0
@@ -252,10 +255,12 @@ class SimpleMotion(object):
         twist.linear.x += self.accel_per_loop*self.x
         twist.linear.y += self.accel_per_loop*self.y
         self.publisher.publish(twist)
+        print ("Outgoing twist, accel: " + str(twist))
         self.current_twist = twist
         continue
 
       else:
+        print ("Outgoing twist, max_vel: " + str(twist))
         self.publisher.publish(self.current_twist)
 
     velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
@@ -264,6 +269,7 @@ class SimpleMotion(object):
       twist = self.current_twist
       twist.linear.x = self.accel_per_loop*self.x*i
       twist.linear.y = self.accel_per_loop*self.y*i
+      print ("Outgoing twist, decel: " + str(twist))
       self.publisher.publish(twist)
 
   def shutdown(self):
