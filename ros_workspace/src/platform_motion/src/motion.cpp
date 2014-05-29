@@ -820,25 +820,18 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     double stern_wheel_speed, starboard_wheel_speed, port_wheel_speed;
     double stern_steering_angle, starboard_steering_angle, port_steering_angle;
 
-
     stern->getPosition(&stern_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, stern_pos_.head(2),
-                &stern_steering_angle, &stern_wheel_speed)) {
-        return;
-    }
+    computePod(body_vel, body_omega, body_pt, stern_pos_.head(2),
+                &stern_steering_angle, &stern_wheel_speed);
 
     port->getPosition(&port_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, port_pos_.head(2),
-                &port_steering_angle, &port_wheel_speed)) {
-        return;
-    }
+    computePod(body_vel, body_omega, body_pt, port_pos_.head(2),
+                &port_steering_angle, &port_wheel_speed);
 
     starboard->getPosition(&starboard_steering_angle, NULL, NULL, NULL);
-    if(0>computePod(body_vel, body_omega, body_pt, starboard_pos_.head(2),
-                &starboard_steering_angle, &starboard_wheel_speed)){
-        return;
-    }
-
+    computePod(body_vel, body_omega, body_pt, starboard_pos_.head(2),
+                &starboard_steering_angle, &starboard_wheel_speed);
+    
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     port->drive(port_steering_angle, port_wheel_speed);
     starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
