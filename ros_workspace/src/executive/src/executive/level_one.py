@@ -22,8 +22,6 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import GetPursueDetectedPointState
 
-import samplereturn.simple_motion as simple_motion
-
 import samplereturn.util as util
 
 class LevelOne(object):    
@@ -108,14 +106,8 @@ class LevelOne(object):
                                     SelectMotionMode(self.CAN_interface,
                                                      self.announcer,
                                                      MODE_PLANNER),
-                                    transitions = {'next':'STRAFE_TEST',
+                                    transitions = {'next':'DRIVE_TO_SEARCH_START',
                                                   'failed':'LEVEL_ONE_ABORTED'})                
-            
-            smach.StateMachine.add("STRAFE_TEST",
-                                   StrafeTest(output_keys=[],
-                                                 input_keys=[],
-                                                 outcomes=['next']),
-                                   transitions = {"next":"DRIVE_TO_SEARCH_START"})
             
             smach.StateMachine.add('DRIVE_TO_SEARCH_START',
                                    DriveToSearch(self.announcer),
@@ -295,25 +287,7 @@ class LevelOne(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
-
-class StrafeTest(smach.State):
     
-    def execute(self, userdata):
-        
-        #simple_mover = simple_motion.SimpleMotion()
-        rospy.loginfo("STARTING MOTION TEST")
-        while not rospy.is_shutdown():
-            if self.preempt_requested():
-                return 'preempted'
-            rospy.sleep(0.5)
-        #simple_mover.execute_strafe(math.pi/2, 4.0, 20)
-        #simple_mover.execute_strafe(math.pi/4, 4.0, 20)
-        #simple_mover.execute_strafe(math.pi*1.5, 4.0, 20)
-        #simple_mover.execute_spin(-math.pi, 20)
-        rospy.loginfo("STRAFE RETURNED")
-
-        return 'next'
-            
 #drives to the expected sample location    
 class StartLevelOne(smach.State):
 
