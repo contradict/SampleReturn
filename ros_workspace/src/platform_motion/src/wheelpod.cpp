@@ -39,7 +39,6 @@ void WheelPod::drive(double angle, double omega)
 {
     _setMode(PodDrive);
 
-    desired_steering_position = angle-steering_offset;
     if(desired_steering_position>steering_max) {
         desired_steering_position -= M_PI;
         omega *= -1.0;
@@ -48,6 +47,10 @@ void WheelPod::drive(double angle, double omega)
         desired_steering_position += M_PI;
         omega *= -1.0;
     }
+
+    //apply steering offset after mirror
+    desired_steering_position = angle-steering_offset;
+        
     desired_omega = omega;
     int position = round(steering_encoder_counts*desired_steering_position/2./M_PI);
     /*
