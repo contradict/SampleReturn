@@ -813,6 +813,14 @@ void Motion::driveToUnLock( void )
     motion_mode=platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE;
 }
 
+static double clamp(double angle, double min, double max)
+{
+    if ( angle > max ) { angle = max; }
+    if ( angle < min ) { angle = min; }
+    return angle;
+}
+
+
 void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
 {
     Eigen::Vector2d body_vel( twist->linear.x, twist->linear.y );
@@ -821,16 +829,21 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     double stern_steering_angle, starboard_steering_angle, port_steering_angle;
 
     ROS_INFO("Twist linear.x: %2.5f , linear.y: %2.5f, angular.z: %2.5f", twist->linear.x, twist->linear.y, twist->angular.z);
-    
+    //get wheel angles, if they are outside allowable limits, clamp those values,
+    //to return wheelpod to proper limits, otherwise wheelpod drive will flip the wheel
+    //angles and you will be sad
     stern->getPosition(&stern_steering_angle, NULL, NULL, NULL);
+    stern_steering_angle = clamp(stern_steering_angle, -M_PI_2, M_PI_2);
     computePod(body_vel, body_omega, body_pt, stern_pos_.head(2),
                 &stern_steering_angle, &stern_wheel_speed);
 
     port->getPosition(&port_steering_angle, NULL, NULL, NULL);
+    port_steering_angle = clamp(port_steering_angle, -M_PI_2, M_PI_2);
     computePod(body_vel, body_omega, body_pt, port_pos_.head(2),
                 &port_steering_angle, &port_wheel_speed);
 
     starboard->getPosition(&starboard_steering_angle, NULL, NULL, NULL);
+    starboard_steering_angle = clamp(starboard_steering_angle, -M_PI_2, M_PI_2);
     computePod(body_vel, body_omega, body_pt, starboard_pos_.head(2),
                 &starboard_steering_angle, &starboard_wheel_speed);
     
