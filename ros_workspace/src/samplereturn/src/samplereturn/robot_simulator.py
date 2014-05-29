@@ -51,6 +51,7 @@ class RobotSimulator(object):
         self.publish_samples = False
         self.publish_beacon = False
         self.fake_sample = {'x':11, 'y':-11, 'id':1}
+        self.joint_state_seq = 0
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
 
@@ -64,6 +65,12 @@ class RobotSimulator(object):
         enable_manipulator_detector_name = "/processes/sample_detection/manipulator/enable"
         
         select_motion_name = "/motion/CAN/select_motion_mode"
+        
+        joint_state_name = "/motion/platform_joint_state"
+        odometry_name = '/motion/odometry'
+
+        planner_command_name = '/motion/planner_command'
+        servo_command_name = '/motion/servo_command'
 
         cam_status_list = ["/cameras/navigation/port/status",
                                 "/cameras/navigation/center/status",
@@ -156,17 +163,25 @@ class RobotSimulator(object):
         
         self.home_carousel_server.start()
         self.home_wheelpods_server.start()
-
+        
+        self.joint_state_pub = rospy.Publisher(joint_state_name,
+                                               sensor_msg.JointState)
+        
         #planner, odom and tf
-        self.planner_sub = rospy.Subscriber('/motion/planner_command',
+        self.planner_sub = rospy.Subscriber(planner_command_name,
                                             geometry_msg.Twist,
                                             self.handle_planner)
         
-        self.odometry_pub = rospy.Publisher('/motion/odometry',
+        self.servo_sub = rospy.Subscriber(servo_command_name,
+                                            geometry_msg.Twist,
+                                            self.handle_servo)
+        
+        self.odometry_pub = rospy.Publisher(odometry_name,
                                             nav_msg.Odometry)
-        
-        rospy.Timer(rospy.Duration(0.1), self.broadcast_tf)        
-        
+
+        self.joint_transforms_available = False
+        rospy.Timer(rospy.Duration(0.05), self.broadcast_tf_and_motion)
+
         #sample and beacon detection stuff
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
@@ -211,9 +226,37 @@ class RobotSimulator(object):
         self.global_map = self.get_map().map
         print("map info: " + str(self.global_map.info))
 
+        #wait for robot_state publisher
+        while not rospy.is_shutdown():
+            try:
+                self.tf_listener.waitForTransform('base_link',
+                                                  "port_suspension",
+                                                  rospy.Time(0),
+                                                  rospy.Duration(1.0))
+                print "Waiting for transforms"
+                break
+            except (tf.Exception):
+                pass
+        
+        (x, y,_),_ =  self.tf_listener.lookupTransform('base_link', 'port_suspension', rospy.Time(0))
+        self.port_vector = np.array([x,y,0])
+        (x, y,_),_ =  self.tf_listener.lookupTransform('base_link', 'starboard_suspension', rospy.Time(0))
+        self.starboard_vector = np.array([x,y,0])
+        (x, y,_),_ =  self.tf_listener.lookupTransform('base_link', 'stern_suspension', rospy.Time(0))
+        self.stern_vector = np.array([x,y,0])
+
+        self.joint_transforms_available = True
+           
         #rospy.spin()
         
     def handle_planner(self, twist):
+        
+        self.fake_robot_pose, self.fake_odometry = \
+            self.integrate_odometry(self.fake_robot_pose,
+                                    self.fake_odometry,
+                                    twist)
+        
+    def handle_servo(self, twist):
         
         self.fake_robot_pose, self.fake_odometry = \
             self.integrate_odometry(self.fake_robot_pose,
@@ -244,10 +287,10 @@ class RobotSimulator(object):
             self.points_port_pub.publish(empty_cloud)
             empty_cloud.header.frame_id = 'navigation_starboard_left_camera'
             self.points_starboard_pub.publish(empty_cloud)
-        except ( tf.Exception, tf.LookupException, tf.ConnectivityException):
+        except ( tf.Exception ):
             pass
         
-    def broadcast_tf(self, event):
+    def broadcast_tf_and_motion(self, event):
         now = rospy.Time.now()
         
         self.tf_broadcaster.sendTransform(self.zero_translation,
@@ -290,6 +333,9 @@ class RobotSimulator(object):
         
         #also publish odometry
         self.odometry_pub.publish(self.fake_odometry)
+        
+        #publish joint states
+        self.publish_joint_states(self.fake_odometry)
 
     def publish_cam_status(self, event):
         if self.cameras_ready:
@@ -469,7 +515,7 @@ class RobotSimulator(object):
             twist = geometry_msg.Twist()
             twist.angular.z = current_odometry.twist.twist.angular.z
             twist.linear.x = current_odometry.twist.twist.linear.x
-            twist.linear.y = current_odometry.twist.twist.linear.z
+            twist.linear.y = current_odometry.twist.twist.linear.y
         now = rospy.Time.now();
         dt = (now - current_pose.header.stamp).to_sec()
         yaw = 2*arctan2(current_pose.pose.orientation.z,
@@ -487,7 +533,94 @@ class RobotSimulator(object):
         current_odometry.pose.pose = deepcopy(current_pose.pose)
         current_odometry.twist.twist = deepcopy(twist)
         current_odometry.header.stamp = now
-        return current_pose, current_odometry        
+        return current_pose, current_odometry
+    
+    def publish_joint_states(self, current_odometry):
+
+        self.joint_state_seq += 1
+        joints = sensor_msg.JointState()
+        header = std_msg.Header(self.joint_state_seq,
+                                current_odometry.header.stamp,
+                                '/base_link')
+
+        if self.joint_transforms_available:
+            
+            current_vel = np.array([current_odometry.twist.twist.linear.x,
+                                   current_odometry.twist.twist.linear.y, 0])
+            current_w = np.array([0, 0, current_odometry.twist.twist.angular.z])
+            
+            port_vel = current_vel + np.cross(current_w, self.port_vector)
+            port_angle = np.arctan2(port_vel[1], port_vel[0])
+            port_wheel_vel = np.linalg.norm(port_vel)
+            
+            starboard_vel = current_vel + np.cross(current_w, self.starboard_vector)
+            starboard_angle = np.arctan2(starboard_vel[1], starboard_vel[0])
+            starboard_wheel_vel = np.linalg.norm(starboard_vel)
+        
+            stern_vel = current_vel + np.cross(current_w, self.stern_vector)
+            stern_angle = np.arctan2(stern_vel[1], stern_vel[0])
+            stern_wheel_vel = np.linalg.norm(stern_vel)
+
+            port_angle, port_wheel_vel = self.mirror_pod(port_angle, port_wheel_vel)
+            starboard_angle, starboard_wheel_vel = self.mirror_pod(starboard_angle, starboard_wheel_vel)
+            stern_angle, stern_wheel_vel = self.mirror_pod(stern_angle, stern_wheel_vel)
+            
+        else:
+            
+            port_angle = 0
+            port_wheel_vel = 0
+            
+            starboard_angle = 0
+            starboard_wheel_vel = 0
+            
+            stern_angle = 0
+            stern_wheel_vel = 0
+            
+        joints.header = header
+            
+        joints.name.append("port_steering_joint")
+        joints.position.append(port_angle)
+        joints.velocity.append(0)
+
+        joints.name.append("port_axle")
+        joints.position.append(0)
+        joints.velocity.append(port_wheel_vel)
+
+        joints.name.append("starboard_steering_joint")
+        joints.position.append(starboard_angle)
+        joints.velocity.append(0)
+
+        joints.name.append("starboard_axle")
+        joints.position.append(0)
+        joints.velocity.append(starboard_wheel_vel)
+
+        joints.name.append("stern_steering_joint")
+        joints.position.append(stern_angle)
+        joints.velocity.append(0)
+
+        joints.name.append("stern_axle")
+        joints.position.append(0)
+        joints.velocity.append(stern_wheel_vel)
+
+        joints.name.append("carousel_joint")
+        joints.position.append(0);
+        joints.velocity.append(0);
+
+        self.joint_state_pub.publish(joints)
+    
+    def mirror_pod(self, angle, velocity):
+        steering_max = math.pi/2
+        steering_min = -math.pi/2
+        
+        if (angle>steering_max):
+            angle -= math.pi
+            velocity *= -1.0
+            
+        if (angle<steering_min):
+            angle += math.pi
+            velocity *= -1.0    
+        
+        return angle, velocity
    
 #dummy manipulator state, waits 10 seconds and
 #exits with success unless preempted
