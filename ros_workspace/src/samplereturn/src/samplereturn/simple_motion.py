@@ -52,8 +52,8 @@ class SimpleMotion(object):
   def joint_state_callback(self, msg):
     pos_dict = dict(zip(msg.name,msg.position))
     vel_dict = dict(zip(msg.name,msg.velocity))
-    self.stern_pos      = pos_dict["stern_steering_joint"]
-    self.port_pos       = pos_dict["port_steering_joint"]
+    self.stern_pos      = -pos_dict["stern_steering_joint"]
+    self.port_pos       = -pos_dict["port_steering_joint"]
     self.starboard_pos  = pos_dict["starboard_steering_joint"]
     self.stern_vel      = vel_dict["stern_steering_joint"]
     self.port_vel       = vel_dict["port_steering_joint"]
