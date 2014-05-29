@@ -68,6 +68,16 @@ class SimpleMotion(object):
       ang += 2*np.pi
     return ang
 
+  def unwind_90(self, ang):
+      if -np.pi/2 <= ang <= np.pi/2:
+          return ang
+      elif ang > np.pi/2:
+          ang -= np.pi
+          return ang
+      elif ang < -np.pi/2:
+          ang += np.pi
+          return ang
+
   def execute_spin(self, rot, time_limit=20.0):
     self.current_twist = None
     self.starting_position = None
@@ -210,8 +220,8 @@ class SimpleMotion(object):
         twist.angular.x = 0.0
         twist.angular.y = 0.0
         twist.angular.z = 0.0
-        twist.linear.x = self.target_x*0.001
-        twist.linear.y = self.target_y*0.001
+        twist.linear.x = self.x*0.001
+        twist.linear.y = self.y*0.001
         twist.linear.z = 0.0
         self.current_twist = twist
         self.publisher.publish(twist)
