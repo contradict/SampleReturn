@@ -199,7 +199,7 @@ std::tuple<double, std::function<double(double)>, std::function<double(double)> 
     double T = fabs(final-initial)*3.0/2.0/dotmax;
     auto x = [=](double s) -> double {return initial+(final-initial)*3/2.0*s*s*(.5-s/3)*4.0;};
     auto xdot = [=](double s) -> double {return (final-initial)*3.0/2.0*s*(1.0-s)*4.0/T;};
-    std::make_tuple(T, x, xdot);
+    return std::make_tuple(T, x, xdot);
 }
 
 void moveR(std::vector<platform_motion_msgs::Knot> &path, platform_motion_msgs::Knot knot, int N, double R0, double R1, double phidot, double omegasmall, double vsmall, double wheelbase)
