@@ -75,6 +75,7 @@ class PursueSample(object):
             smach.StateMachine.add('START_SAMPLE_PURSUIT',
                                    StartSamplePursuit(self.announcer),
                                    transitions = {'next':'APPROACH_SAMPLE'})
+            
 
             self.pursue_detected_point = GetPursueDetectedPointState(self.move_base,
                                                                      self.tf_listener)
