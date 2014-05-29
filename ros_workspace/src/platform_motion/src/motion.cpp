@@ -820,6 +820,8 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     double stern_wheel_speed, starboard_wheel_speed, port_wheel_speed;
     double stern_steering_angle, starboard_steering_angle, port_steering_angle;
 
+    ROS_INFO("Twist linear.x: %2.5f , linear.y: %2.5f, angular.z: %2.5f", twist->linear.x, twist->linear.y, twist->angular.z);
+    
     stern->getPosition(&stern_steering_angle, NULL, NULL, NULL);
     computePod(body_vel, body_omega, body_pt, stern_pos_.head(2),
                 &stern_steering_angle, &stern_wheel_speed);
@@ -831,6 +833,10 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     starboard->getPosition(&starboard_steering_angle, NULL, NULL, NULL);
     computePod(body_vel, body_omega, body_pt, starboard_pos_.head(2),
                 &starboard_steering_angle, &starboard_wheel_speed);
+    
+    ROS_INFO("Drive port to angle, vel: %2.5f , %2.5f", port_steering_angle, port_wheel_speed);
+    ROS_INFO("Drive starboard to angle, vel: %2.5f , %2.5f", starboard_steering_angle, starboard_wheel_speed);
+    ROS_INFO("Drive stern to angle, vel: %2.5f , %2.5f", stern_steering_angle, stern_wheel_speed);
     
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
     port->drive(port_steering_angle, port_wheel_speed);
