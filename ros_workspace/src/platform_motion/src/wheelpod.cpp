@@ -239,7 +239,7 @@ void WheelPod::computeSteeringAndVelocity(
         ROS_ERROR( "Steering angle too small: %f < %f", steeringAngle, steering_min);
         steeringAngle = steering_min;
     }
-
+    
     // account for the steering angle offset
     steeringAngle -= steering_offset;
 
