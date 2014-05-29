@@ -120,8 +120,8 @@ class SimpleMotion(object):
       if self.current_twist is not None:
         self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
 
-      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon and
-          np.abs(self.port_pos)>self.wheel_pos_epsilon and
+      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
+          np.abs(self.port_pos)>self.wheel_pos_epsilon or
           np.abs(self.starboard_pos)>self.wheel_pos_epsilon):
         twist = Twist()
         twist.linear.x = 0.0
