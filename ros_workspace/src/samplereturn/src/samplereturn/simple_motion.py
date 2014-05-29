@@ -16,8 +16,8 @@ class SimpleMotion(object):
     self.tf = TransformListener()
 
     self.loop_rate = rospy.get_param('~loop_rate',10.0)
-    self.max_velocity = rospy.get_param('~max_velocity',2.0)
-    self.max_acceleration = rospy.get_param('~max_acceleration',1.0)
+    self.max_velocity = rospy.get_param('~max_velocity',0.5)
+    self.max_acceleration = rospy.get_param('~max_acceleration',0.5)
     self.time_limit = rospy.get_param('~time_limit',20.0)
     self.wheel_pos_epsilon = rospy.get_param('~wheel_pos_epsilon',0.01)
 
@@ -91,7 +91,7 @@ class SimpleMotion(object):
     self.target_angle = np.pi/2
 
     pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
-    self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration*np.abs(pos[0]))
+    self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration/np.abs(pos[0]))
 
     self.shutdown = False
     self.got_odom = False
@@ -147,7 +147,7 @@ class SimpleMotion(object):
           twist.angular.y = 0.0
         else:
           twist = self.current_twist
-        twist.angular.z += np.sign(rot)*np.abs(pos[0])*self.max_acceleration
+        twist.angular.z += np.sign(rot)*self.max_acceleration/np.abs(pos[0])
         self.publisher.publish(twist)
         self.current_twist = twist
         continue
