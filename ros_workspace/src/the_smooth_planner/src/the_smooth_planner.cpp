@@ -91,6 +91,13 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 {
     // This is handled in the pvt_segment code instead of this local planner
+    // Just putzeros here so the value is sensible
+    cmd_vel.linear.x = 0;
+    cmd_vel.linear.y = 0;
+    cmd_vel.linear.z = 0;
+    cmd_vel.angular.x = 0;
+    cmd_vel.angular.y = 0;
+    cmd_vel.angular.z = 0;
     return true;
 }
 
