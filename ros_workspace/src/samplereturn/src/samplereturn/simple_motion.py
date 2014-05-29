@@ -213,8 +213,8 @@ class SimpleMotion(object):
                                 (2*self.max_acceleration))
 
       # Issue slow twists until wheels are pointed at angle
-      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon and
-          np.abs(self.port_pos-self.target_angle)>self.wheel_pos_epsilon and
+      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
+          np.abs(self.port_pos-self.target_angle)>self.wheel_pos_epsilon or
           np.abs(self.starboard_pos-self.target_angle)>self.wheel_pos_epsilon):
         twist = Twist()
         twist.angular.x = 0.0
