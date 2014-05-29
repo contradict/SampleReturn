@@ -80,7 +80,6 @@ class SimpleMotion(object):
           return ang
 
   def execute_spin(self, rot, time_limit=20.0):
-    self.current_twist = None
     self.starting_position = None
     self.starting_yaw = None
 
@@ -112,6 +111,7 @@ class SimpleMotion(object):
         continue
 
       if self.starting_yaw is None:
+        rospy.logwarn("SIMPLE_MOTION: No odometry available at execute_spin")
         return
 
       self.target_yaw = self.unwind(self.starting_yaw + rot)
@@ -121,41 +121,36 @@ class SimpleMotion(object):
       if self.current_twist is not None:
         self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
 
+      print "target_angle: %s" % (str(self.target_angle))
+      print("stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos)))
+      
+      #wait until correct steering angles are achieved
       if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
           np.abs(self.port_pos)>self.wheel_pos_epsilon or
           np.abs(self.starboard_pos)>self.wheel_pos_epsilon):
         twist = Twist()
-        twist.linear.x = 0.0
-        twist.linear.y = 0.0
-        twist.linear.z = 0.0
-        twist.angular.x = 0.0
-        twist.angular.y = 0.0
         twist.angular.z = 0.001*np.sign(rot)
         self.current_twist = twist
         self.publisher.publish(twist)
         continue
-
+      
+      #check if we are at decel point      
       elif np.abs(self.unwind(self.target_yaw - self.current_yaw)) < self.stopping_yaw:
         break
 
+      #if we are under max_vel keep accelerating      
       elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
-        if self.current_twist is None:
-          twist = Twist()
-          twist.linear.x = 0.0
-          twist.linear.y = 0.0
-          twist.linear.z = 0.0
-          twist.angular.x = 0.0
-          twist.angular.y = 0.0
-        else:
-          twist = self.current_twist
+        twist = self.current_twist
         twist.angular.z += np.sign(rot)*self.max_acceleration/np.abs(pos[0])
         self.publisher.publish(twist)
         self.current_twist = twist
         continue
 
+      #at max_vel and before decel point, keep publishing current twist
       else:
         self.publisher.publish(self.current_twist)
 
+    #decel to zero
     velocity = np.abs(self.current_twist.angular.z)*np.abs(pos[0])
     for i in range(int(velocity/self.accel_per_loop),-1,-1):
       rate.sleep()
@@ -192,7 +187,6 @@ class SimpleMotion(object):
     self.shutdown = False
     self.got_odom = False
     self.got_joint_state = False
-
     #empty twist message constructed with all zeroes
     twist = Twist()
     self.current_twist = twist
@@ -208,9 +202,11 @@ class SimpleMotion(object):
                                         self.current_twist.linear.y**2)**2 /
                                         (2*self.max_acceleration))
 
+      #very useful debug messages
+      #print "target_angle: %s" % (str(self.target_angle))
+      #print("stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos)))
+
       # Issue slow twists until wheels are pointed at angle
-      print "target_angle: %s" % (str(self.target_angle))
-      print("stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos)))
       if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
           np.abs(self.port_pos-self.target_angle)>self.wheel_pos_epsilon or
           np.abs(self.starboard_pos-self.target_angle)>self.wheel_pos_epsilon):
@@ -219,10 +215,10 @@ class SimpleMotion(object):
         twist.linear.y = self.y*0.001
         self.publisher.publish(twist)
         self.current_twist = twist
-        print ("Outgoing twist, waiting for wheel angles: " + str(twist))
         continue
 
-      # Decelerate to stop at distance (velocity**2)/(2*accel_limit)
+      # check if we are must decelerate to stop now
+      # distance = (velocity**2)/(2*accel_limit)
       elif (distance-self.distance_traveled) < self.stopping_distance:
         break
 
@@ -233,12 +229,11 @@ class SimpleMotion(object):
         twist.linear.x += self.accel_per_loop*self.x
         twist.linear.y += self.accel_per_loop*self.y
         self.publisher.publish(twist)
-        print ("Outgoing twist, accel: " + str(twist))
         self.current_twist = twist
         continue
 
+      #at max_vel, keep publishing until decel point is hit
       else:
-        print ("Outgoing twist, max_vel: " + str(twist))
         self.publisher.publish(self.current_twist)
 
     velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
