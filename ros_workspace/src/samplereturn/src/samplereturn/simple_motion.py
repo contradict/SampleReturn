@@ -170,8 +170,8 @@ class SimpleMotion(object):
     elif (np.pi*1.5<=angle<2*np.pi):
       self.target_angle = angle - 2*np.pi
 
-    self.target_x = np.cos(self.target_angle)
-    self.target_y = np.sin(self.target_angle)
+    self.target_x = np.cos(angle)
+    self.target_y = np.sin(angle)
 
     self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
 
