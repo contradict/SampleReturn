@@ -353,7 +353,7 @@ class SelectMotionMode(smach.State):
     def __init__(self, CAN_interface, motion_mode):
         smach.State.__init__(self, outcomes = ['next', 'failed'])
         self.CAN_interface = CAN_interface
-        self.failannounce = failannounce
+        self.motion_mode = motion_mode
 
     def execute(self, userdata):
         try:
