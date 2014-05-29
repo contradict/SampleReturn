@@ -12,4 +12,4 @@
 	url = https://github.com/zaclizer/camera1394.git
 [submodule "ros_workspace/src/navigation"]
 	path = ros_workspace/src/navigation
-	url = https://github.com/ros-planning/navigation.git
+	url = https://github.com/contradict/navigation.git
