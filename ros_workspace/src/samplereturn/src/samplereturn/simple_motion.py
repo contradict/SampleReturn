@@ -170,8 +170,11 @@ class SimpleMotion(object):
     elif (np.pi*1.5<=angle<2*np.pi):
       self.target_angle = angle - 2*np.pi
 
-    self.target_x = np.cos(angle)
-    self.target_y = np.sin(angle)
+    self.target_x = np.cos(self.target_angle)
+    self.target_y = np.sin(self.target_angle)
+
+    self.x = np.cos(angle)
+    self.y = np.sin(angle)
 
     self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
 
@@ -233,8 +236,8 @@ class SimpleMotion(object):
           twist.angular.z = 0.0
         else:
           twist = self.current_twist
-        twist.linear.x += self.accel_per_loop*self.target_x
-        twist.linear.y += self.accel_per_loop*self.target_y
+        twist.linear.x += self.accel_per_loop*self.x
+        twist.linear.y += self.accel_per_loop*self.y
         self.publisher.publish(twist)
         self.current_twist = twist
         continue
@@ -246,8 +249,8 @@ class SimpleMotion(object):
     for i in range(int(velocity/self.accel_per_loop),-1,-1):
       rate.sleep()
       twist = self.current_twist
-      twist.linear.x = self.accel_per_loop*self.target_x*i
-      twist.linear.y = self.accel_per_loop*self.target_y*i
+      twist.linear.x = self.accel_per_loop*self.x*i
+      twist.linear.y = self.accel_per_loop*self.y*i
       self.publisher.publish(twist)
 
   def shutdown(self):
