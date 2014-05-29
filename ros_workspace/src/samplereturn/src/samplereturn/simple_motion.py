@@ -129,7 +129,7 @@ class SimpleMotion(object):
         twist.linear.z = 0.0
         twist.angular.x = 0.0
         twist.angular.y = 0.0
-        twist.angular.z = 0.001
+        twist.angular.z = 0.001*np.sign(rot)
         self.current_twist = twist
         self.publisher.publish(twist)
         continue
