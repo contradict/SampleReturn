@@ -78,6 +78,7 @@ private:
     double maximum_slew_radians_per_second;
     double replan_look_ahead_buffer_time;
     double replan_look_ahead_time;
+    double yaw_epsilon;
     uint32_t path_end_sequence_id;
     std_msgs::Header completed_knot_header;
     nav_msgs::Odometry odometry;

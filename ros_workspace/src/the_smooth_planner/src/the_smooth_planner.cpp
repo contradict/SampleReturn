@@ -40,6 +40,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
     localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 10.0);
     localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 15.0);
+    localNodeHandle.param("yaw_epsilon", yaw_epsilon, 1e-4);
 
     this->odometry = nav_msgs::Odometry();
     this->path_end_sequence_id = 0;
@@ -133,7 +134,11 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                 for (auto searchAheadIter = currentKnotIter; searchAheadIter != last_path_msg.knots.end(); ++searchAheadIter)
                 {
                     ros::Duration aheadTime = (*searchAheadIter).header.stamp - (*currentKnotIter).header.stamp;
-                    if (aheadTime > ros::Duration(replan_look_ahead_time))
+                    double yaw_prev, yaw;
+                    yaw_prev = tf::getYaw((currentKnotIter-1)->pose.orientation);
+                    yaw = tf::getYaw(currentKnotIter->pose.orientation);
+                    if ((aheadTime > ros::Duration(replan_look_ahead_time)) &&
+                        (fabs(yaw-yaw_prev)<yaw_epsilon))
                     {
                         sourcePose->pose = (*searchAheadIter).pose;
                         sourcePose->header = (*searchAheadIter).header;
