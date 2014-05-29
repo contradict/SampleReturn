@@ -124,7 +124,6 @@ class LevelTwoRandom(object):
             MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
-                                                     self.announcer,
                                                      MODE_PLANNER),
                                     transitions = {'next':'SEARCH_LINE',
                                                   'failed':'LEVEL_TWO_ABORTED'})    
@@ -299,7 +298,6 @@ class LevelTwoRandom(object):
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
             smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
-                                                     self.announcer,
                                                      MODE_ENABLE),
                                     transitions = {'next':'complete',
                                                   'failed':'LEVEL_TWO_ABORTED'})   

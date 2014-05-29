@@ -350,12 +350,10 @@ def GetPursueDetectedPointState(move_client, listener):
     return pursue
 
 class SelectMotionMode(smach.State):
-    def __init__(self, CAN_interface, announcer, motion_mode, failannounce=None):
+    def __init__(self, CAN_interface, motion_mode):
         smach.State.__init__(self, outcomes = ['next', 'failed'])
         self.CAN_interface = CAN_interface
-        self.announcer = announcer
         self.motion_mode = motion_mode
-        self.failannounce = failannounce
 
     def execute(self, userdata):
         try:
@@ -364,14 +362,10 @@ class SelectMotionMode(smach.State):
                 return 'next'
         except rospy.ServiceException:
             rospy.logerr( "Unable to query present motion mode")
-            self.announcer.say( "Unable to query present motion mode." )
         try:
             self.CAN_interface.select_mode(self.motion_mode)
         except rospy.ServiceException:
             rospy.logerr( "Unable to select mode %d", self.motion_mode )
-            if self.failannounce is not None:
-                rospy.logerr( self.failannounce )
-                self.announcer.say(self.failannounce)
             return 'failed'
         self.CAN_interface.publish_zero()
         return 'next'
