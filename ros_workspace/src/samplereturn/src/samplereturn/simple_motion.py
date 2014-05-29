@@ -9,10 +9,8 @@ from tf.transformations import euler_from_quaternion
 
 class SimpleMotion(object):
   def __init__(self, param_string=""):
-    rospy.Subscriber("/motion/odometry", Odometry, self.odometry_callback, None, 1)
-    rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
-    self.publisher = rospy.Publisher("/motion/servo_command", Twist)
 
+    self.publisher = rospy.Publisher("/motion/servo_command", Twist)
     self.tf = TransformListener()
 
     self.loop_rate = rospy.get_param('~loop_rate',10.0)
@@ -26,6 +24,9 @@ class SimpleMotion(object):
     self.current_twist = None
     self.starting_position = None
     self.starting_yaw = None
+
+    rospy.Subscriber("/motion/odometry", Odometry, self.odometry_callback, None, 1)
+    rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
 
   def odometry_callback(self, msg):
     if self.starting_position == None:
