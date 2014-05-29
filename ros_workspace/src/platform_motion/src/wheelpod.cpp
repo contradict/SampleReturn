@@ -38,13 +38,13 @@ void WheelPod::setCallbacks(CANOpen::DS301CallbackObject wheelcb,
 void WheelPod::drive(double angle, double omega)
 {
     _setMode(PodDrive);
-
-    if(desired_steering_position>steering_max) {
-        desired_steering_position -= M_PI;
+    
+    if(angle>steering_max) {
+        angle -= M_PI;
         omega *= -1.0;
     }
-    if(desired_steering_position<steering_min) {
-        desired_steering_position += M_PI;
+    if(angle<steering_min) {
+        angle += M_PI;
         omega *= -1.0;
     }
 
