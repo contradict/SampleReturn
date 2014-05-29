@@ -84,6 +84,6 @@ private:
     nav_msgs::Odometry odometry;
     Eigen::Vector3d sternPodVector;
     platform_motion_msgs::Path last_path_msg;
-    geometry_msgs::Pose replan_ahead_pose;
+    std::vector<platform_motion_msgs::Knot>::iterator replan_ahead_iter;
 };
 };

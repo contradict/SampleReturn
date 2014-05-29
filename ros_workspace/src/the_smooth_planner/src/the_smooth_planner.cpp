@@ -45,6 +45,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     this->odometry = nav_msgs::Odometry();
     this->path_end_sequence_id = 0;
     this->completed_knot_header = std_msgs::Header();
+    /*
     this->replan_ahead_pose.position.x = 0;
     this->replan_ahead_pose.position.y = 0;
     this->replan_ahead_pose.position.z = 0;
@@ -52,6 +53,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     this->replan_ahead_pose.orientation.y = 0;
     this->replan_ahead_pose.orientation.z = 0;
     this->replan_ahead_pose.orientation.w = 0;
+    */
 
     pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
     odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
@@ -142,7 +144,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     {
                         sourcePose->pose = (*searchAheadIter).pose;
                         sourcePose->header = (*searchAheadIter).header;
-                        this->replan_ahead_pose = (*searchAheadIter).pose;
+                        this->replan_ahead_iter = searchAheadIter;
                         return true;
                     }
                 }
@@ -335,69 +337,53 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     initialKnot.twist = odometry.twist.twist;
 
     Eigen::Vector3d replanAheadPos;
-    tf::pointMsgToEigen(replan_ahead_pose.position, replanAheadPos);
-    Eigen::Quaterniond replanAheadQuat(replan_ahead_pose.orientation.w,
-                                       replan_ahead_pose.orientation.x,
-                                       replan_ahead_pose.orientation.y,
-                                       replan_ahead_pose.orientation.z);
+    tf::pointMsgToEigen(replan_ahead_iter->pose.position, replanAheadPos);
+    Eigen::Quaterniond replanAheadQuat;
+    tf::quaternionMsgToEigen(replan_ahead_iter->pose.orientation, replanAheadQuat);
+
     Eigen::Vector3d newPathFirstPos;
     tf::pointMsgToEigen(pathCopy.poses[0].pose.position, newPathFirstPos);
-    Eigen::Quaterniond newPathFirstQuat(pathCopy.poses[0].pose.orientation.w,
-                                        pathCopy.poses[0].pose.orientation.x,
-                                        pathCopy.poses[0].pose.orientation.y,
-                                        pathCopy.poses[0].pose.orientation.z);
+    Eigen::Quaterniond newPathFirstQuat;
+    tf::quaternionMsgToEigen(pathCopy.poses[0].pose.orientation, newPathFirstQuat);
+
     if (pathCopy.poses.size() > 0 && replanAheadPos.isApprox(newPathFirstPos) && replanAheadQuat.isApprox(newPathFirstQuat))
     {
         // Find the point in the last path that we want to stitch
         // the new path to
-        bool foundFirstLookAheadBufferPose = false;
         std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnot = last_path_msg.knots.begin();
         for (auto prevPathIter = last_path_msg.knots.begin(); prevPathIter != last_path_msg.knots.end(); ++prevPathIter)
         {
-            if (!foundFirstLookAheadBufferPose)
+            if (((*prevPathIter).header.stamp - completed_knot_header.stamp) > ros::Duration(replan_look_ahead_buffer_time))
             {
-                ROS_DEBUG("found first look ahead buffer pose!!");
-                if (((*prevPathIter).header.stamp - timestamp) > ros::Duration(replan_look_ahead_buffer_time))
-                {
-                    ROS_DEBUG("timestamp for first lookahead buffer pose ok!");
-                    lookAheadBufferKnot = prevPathIter;
-                    foundFirstLookAheadBufferPose = true;
-                }
-            }
-            Eigen::Vector3d prevPathPos;
-            Eigen::Quaterniond prevPathQuat((*prevPathIter).pose.orientation.w,
-                                            (*prevPathIter).pose.orientation.x,
-                                            (*prevPathIter).pose.orientation.y,
-                                            (*prevPathIter).pose.orientation.z);
-            tf::pointMsgToEigen((*prevPathIter).pose.position, prevPathPos);
-            if (prevPathPos.isApprox(replanAheadPos) && replanAheadQuat.isApprox(prevPathQuat))
-            {
-                ROS_DEBUG("prevPathPos is approx replanAheadPose!");
-                if (foundFirstLookAheadBufferPose)
-                {
-                    ROS_DEBUG("and we already found first lookahead buffer pose!");
-                    std::vector<geometry_msgs::PoseStamped> insertPoses;
-                    for (auto insertKnotIter = lookAheadBufferKnot; insertKnotIter != prevPathIter; ++insertKnotIter)
-                    {
-                        geometry_msgs::PoseStamped insertPose;
-                        insertPose.pose = (*insertKnotIter).pose;
-                        insertPoses.push_back(insertPose);
-                    }
-                    pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
-
-                    // Set the initial knot to the first one in the spliced path
-                    initialKnot = (*lookAheadBufferKnot);
-
-                    // Set the timestamp to the time of the first point of
-                    // new path we are computing and also the time we want
-                    // platform_motion to splice this path into whatever
-                    // the robot is doing
-                    timestamp = (*lookAheadBufferKnot).header.stamp;
-                    ROS_DEBUG_STREAM("timestamp now " << timestamp);
-                    break;
-                }
+                ROS_DEBUG("timestamp for first lookahead buffer pose ok!");
+                lookAheadBufferKnot = prevPathIter;
+                break;
             }
         }
+        if(lookAheadBufferKnot > replan_ahead_iter)
+        {
+            ROS_ERROR("Planner go behind servos, cannot stitch new plan");
+            return;
+        }
+        std::vector<geometry_msgs::PoseStamped> insertPoses;
+        auto insertKnotIter = lookAheadBufferKnot;
+        for (; insertKnotIter != replan_ahead_iter; ++insertKnotIter)
+        {
+            geometry_msgs::PoseStamped insertPose;
+            insertPose.pose = (*insertKnotIter).pose;
+            insertPoses.push_back(insertPose);
+        }
+        pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
+
+        // Set the initial knot to the first one in the spliced path
+        initialKnot = (*lookAheadBufferKnot);
+
+        // Set the timestamp to the time of the first point of
+        // new path we are computing and also the time we want
+        // platform_motion to splice this path into whatever
+        // the robot is doing
+        timestamp = (*lookAheadBufferKnot).header.stamp;
+        ROS_DEBUG_STREAM("timestamp now " << timestamp);
     }
 
     // keep track of special case turn in place motions so we can remove the intermediate ones
