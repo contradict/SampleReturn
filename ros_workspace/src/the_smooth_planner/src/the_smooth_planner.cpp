@@ -38,8 +38,8 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
     localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
     localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
-    localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 10.0);
-    localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 15.0);
+    localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 1.0);
+    localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 4.0);
     localNodeHandle.param("yaw_epsilon", yaw_epsilon, 1e-4);
 
     this->odometry = nav_msgs::Odometry();
@@ -574,6 +574,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         {
             angularVelocity = curvature*nextVelocityMagnitude;
         }
+        ROS_ERROR("curvature: %f. angular velocity: %f", curvature, angularVelocity);
 
         // Update path velocity
         pathVelocityMagnitude = nextVelocityMagnitude;
@@ -845,20 +846,28 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const BezierCubicSpline<Eigen::V
     return minimumDeltaTime;
 }
 
-double TheSmoothPlanner::ComputeCurvature(const nav_msgs::Path& path, unsigned int i)
+double TheSmoothPlanner::ComputeCurvature(const nav_msgs::Path& path, const unsigned int i)
 {
-    if (i > path.poses.size()-3)
-    {
-        i = path.poses.size()-3;
-    }
-    double deltaX = path.poses[i+1].pose.position.x - path.poses[i].pose.position.x;
-    double deltaY = path.poses[i+1].pose.position.y - path.poses[i].pose.position.y;
-    double deltaSquaredX = path.poses[i+2].pose.position.x - path.poses[i+1].pose.position.x - deltaX;
-    double deltaSquaredY = path.poses[i+2].pose.position.y - path.poses[i+1].pose.position.y - deltaY;
+    unsigned int im1 = (i >= 1) ? i-1 : 0;
+    unsigned int ip1 = (i < path.poses.size()-1) ? i+1 : path.poses.size()-1;
+    double im1iLength = (i >= 1) ? sqrt(pow(path.poses[i].pose.position.x-path.poses[im1].pose.position.x,2) + pow(path.poses[i].pose.position.y-path.poses[im1].pose.position.y,2)) : 0.0;
+    double iip1Length = (i < path.poses.size()-1) ? sqrt(pow(path.poses[ip1].pose.position.x-path.poses[i].pose.position.x,2) + pow(path.poses[ip1].pose.position.y-path.poses[i].pose.position.y,2)) : 0.0;
+    double deltaLength = im1iLength + iip1Length;
+
     double curvature = 0.00;
-    if (deltaX != 0.00 || deltaY != 0.00)
+    double deltaX = 0.00;
+    double deltaY = 0.00;
+    if (deltaLength > 0.0001)
     {
-        curvature = (deltaX*deltaSquaredY - deltaY*deltaSquaredX)/pow(deltaX*deltaX + deltaY*deltaY, 3.0/2.0);
+        deltaX = (path.poses[ip1].pose.position.x - path.poses[im1].pose.position.x)/deltaLength;
+        deltaY = (path.poses[ip1].pose.position.y - path.poses[im1].pose.position.y)/deltaLength;
+
+        double deltaSquaredX = (path.poses[ip1].pose.position.x - 2.0*path.poses[i].pose.position.x + path.poses[im1].pose.position.x)/deltaLength;
+        double deltaSquaredY = (path.poses[ip1].pose.position.y - 2.0*path.poses[i].pose.position.y + path.poses[im1].pose.position.y)/deltaLength;
+        if (deltaX != 0.00 || deltaY != 0.00)
+        {
+            curvature = (deltaX*deltaSquaredY - deltaY*deltaSquaredX)/pow(deltaX*deltaX + deltaY*deltaY, 3.0/2.0);
+        }
     }
 
     return curvature;
