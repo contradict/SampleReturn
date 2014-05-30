@@ -1,25 +1,17 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(detection_filter)
-
-set(CMAKE_BUILD_TYPE Debug)
+project(fence_detection)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS tf rospy
-  roscpp
-  sensor_msgs
-  samplereturn_msgs
-  cv_bridge
-  image_geometry
-  samplereturn_msgs)
+find_package(catkin REQUIRED COMPONENTS cv_bridge rospy sensor_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and scripts declared therein get installed
-catkin_python_setup()
+# catkin_python_setup()
 
 #######################################
 ## Declare ROS messages and services ##
@@ -53,9 +45,10 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS roscpp roslib
-  DEPENDS opencv2
-  )
+  LIBRARIES fence_detection
+  CATKIN_DEPENDS cv_bridge rospy sensor_msgs
+  DEPENDS system_lib
+)
 
 ###########
 ## Build ##
@@ -64,27 +57,21 @@ catkin_package(
 ## Specify additional locations of header files
 # include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
- include_directories(include
-   ${catkin_INCLUDE_DIRS}
-)
-
-add_definitions( -std=gnu++0x )
-
 ## Declare a cpp library
-# add_library(sample_detection
-#   src/${PROJECT_NAME}/sample_detection.cpp
+# add_library(fence_detection
+#   src/${PROJECT_NAME}/fence_detection.cpp
 # )
 
 ## Declare a cpp executable
- add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
+# add_executable(fence_detection_node src/fence_detection_node.cpp)
 
 ## Add dependencies to the executable
-# add_dependencies(sample_detection_node ${PROJECT_NAME})
+# add_dependencies(fence_detection_node ${PROJECT_NAME})
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(kalman_filter_node
-   ${catkin_LIBRARIES}
- )
+# target_link_libraries(fence_detection_node
+#   ${catkin_LIBRARIES}
+# )
 
 #############
 ## Install ##
@@ -92,22 +79,18 @@ add_definitions( -std=gnu++0x )
 
 ## Mark executable scripts (Python etc.) for installation
 ## not required for python when using catkin_python_setup()
-install(PROGRAMS
-		nodes/detection_filter_node.py
-		DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-#install(DIRECTORY launch config
-#		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-#		USE_SOURCE_PERMISSIONS
-#)
+ install(PROGRAMS
+   nodes/fence_detection.py
+   nodes/freq_fence_detection.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS kalman_filter_node
-   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+# install(TARGETS fence_detection fence_detection_node
+#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/
@@ -115,6 +98,15 @@ install(TARGETS kalman_filter_node
 #   FILES_MATCHING PATTERN "*.h"
 #   PATTERN ".svn" EXCLUDE
 # )
+install(DIRECTORY launch
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    USE_SOURCE_PERMISSIONS
+    )
+install(DIRECTORY config
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    USE_SOURCE_PERMISSIONS
+    )
+
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
@@ -128,7 +120,7 @@ install(TARGETS kalman_filter_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_sample_detection.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_fence_detection.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

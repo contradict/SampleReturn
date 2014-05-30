@@ -9,15 +9,24 @@ set(CMAKE_BUILD_TYPE Debug)
 set(THIS_PACKAGE_ROS_DEPS roscpp costmap_2d nav_core pluginlib 
   geometry_msgs nav_msgs ecl_geometry platform_motion_msgs visualization_msgs tf tf_conversions eigen_conversions)
 add_definitions("-std=c++0x")
+
 find_package(catkin REQUIRED COMPONENTS
-  ${THIS_PACKAGE_ROS_DEPS} message_generation)
+                costmap_2d
+                nav_core
+                pluginlib 
+                geometry_msgs
+                nav_msgs
+                ecl_geometry
+                platform_motion_msgs
+                visualization_msgs
+                tf)
 
 # Find SBPL
 #find_package(PkgConfig REQUIRED)
 #pkg_check_modules(SBPL REQUIRED sbpl)
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${THE_SMOOTH_INCLUDE_DIRS})
-link_directories(${catkin_LIBRARY_DIRS} ${THE_SMOOTH_LIBRARY_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS})
+link_directories(${catkin_LIBRARY_DIRS})
 
 ##############################################################################
 # Generate messages
@@ -30,10 +39,9 @@ link_directories(${catkin_LIBRARY_DIRS} ${THE_SMOOTH_LIBRARY_DIRS})
 # Since TheSmooth is found through pkg-config, we need to manually add its
 # libraries and include directories into catkin_package
 catkin_package(
-  INCLUDE_DIRS include ${THE_SMOOTH_INCLUDE_DIRS}
-  LIBRARIES ${THE_SMOOTH_LIBRARIES}
-  CATKIN_DEPENDS ${THIS_PACKAGE_ROS_DEPS} message_runtime
-  DEPENDS
+  INCLUDE_DIRS include
+  LIBRARIES ${PROJECT_NAME}
+  CATKIN_DEPENDS message_runtime
 )
 
 ##############################################################################
@@ -41,8 +49,8 @@ catkin_package(
 ##############################################################################
 
 add_library(${PROJECT_NAME} src/the_smooth_planner.cpp src/circle.cpp src/bezier_cubic_spline.hpp)
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${THE_SMOOTH_LIBRARIES})
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_generated_messages_cpp)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} )
+add_dependencies(${PROJECT_NAME} ${platform_motion_msgs_EXPORTED_TARGETS})
 
 ##############################################################################
 # Install
@@ -52,4 +60,8 @@ install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(FILES bgp_plugin.xml
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )

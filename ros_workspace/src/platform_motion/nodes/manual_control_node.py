@@ -30,13 +30,13 @@ class ManualController(object):
     
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        
         #stuff namedtuple with joystick parameters
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_navigate")
-            
-
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],
@@ -274,6 +274,11 @@ class ManualController(object):
             self.state_machine.userdata.detected_sample = None
         else:
             self.state_machine.userdata.detected_sample = sample
+
+    def shutdown_cb(self):
+        self.state_machine.request_preempt()
+        while self.state_machine.is_running():
+            rospy.sleep(0.1)
    
 class ProcessGoal(smach.State):
     def __init__(self, announcer):
@@ -292,7 +297,7 @@ class ProcessGoal(smach.State):
         
         fb = platform_msg.ManualControlFeedback()
         fb.state = "PROCESS_GOAL"
-        result = samplereturn_msg.GeneralExecutiveResult('initialized')
+        result = platform_msg.ManualControlResult('initialized')
         userdata.action_result = result        
 
         self.announcer.say("Entering manual mode.")
@@ -543,10 +548,12 @@ class ManualPreempted(smach.State):
         #we are preempted by the top state machine
         #set motion mode to None and exit
         self.CAN_interface.select_mode(
-                platform_srv.SelectMotionModeRequest.MODE_PAUSE )
-        self.CAN_interface.publish_zero()
+                platform_srv.SelectMotionModeRequest.MODE_PAUSE)
+
+        self.CAN_interface.select_mode(
+                platform_srv.SelectMotionModeRequest.MODE_ENABLE)
         
-        result = samplereturn_msg.GeneralExecutiveResult('preempted')
+        result = platform_msg.ManualControlResult('preempted')
         userdata.action_result = result
         
         return 'complete'
@@ -559,7 +566,7 @@ class ManualAborted(smach.State):
         self.CAN_interface = CAN_interface
         
     def execute(self, userdata):
-        result = samplereturn_msg.GeneralExecutiveResult('aborted')
+        result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
         
         return 'fail'

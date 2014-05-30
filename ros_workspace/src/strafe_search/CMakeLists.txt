@@ -1,17 +1,10 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(samplereturn_msgs)
+project(strafe_search)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  std_msgs
-  actionlib_msgs
-  geometry_msgs
-  message_generation
-)
+find_package(catkin REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -70,46 +63,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   actionlib_msgs#   std_msgs
+#   std_msgs  # Or other packages containing msgs
 # )
-
-## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  VoiceAnnouncement.msg
-  CameraParams.msg
-  NamedPoint.msg
-  PursuitResult.msg
-)
-
-add_service_files(
-    DIRECTORY srv
-    FILES
-        Enable.srv
-)
-
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
-
-## Generate actions
-add_action_files(
-	DIRECTORY action
-	FILES
-    GeneralExecutive.action
-)
-
-## Generate added messages and services with any dependencies listed here
-generate_messages(
-    DEPENDENCIES
-        geometry_msgs
-        actionlib_msgs
-        std_msgs
-)
-
 
 ###################################
 ## catkin specific configuration ##
@@ -122,8 +77,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES visual_servo_msgs
-  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
+#  LIBRARIES strafe_search
+#  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
 
@@ -134,24 +89,21 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
 
 ## Declare a cpp library
-# add_library(visual_servo_msgs
-#   src/${PROJECT_NAME}/visual_servo_msgs.cpp
+# add_library(strafe_search
+#   src/${PROJECT_NAME}/strafe_search.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(visual_servo_msgs_node src/visual_servo_msgs_node.cpp)
+# add_executable(strafe_search_node src/strafe_search_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(visual_servo_msgs_node visual_servo_msgs_generate_messages_cpp)
+# add_dependencies(strafe_search_node strafe_search_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(visual_servo_msgs_node
+# target_link_libraries(strafe_search_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -170,7 +122,7 @@ include_directories(
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS visual_servo_msgs visual_servo_msgs_node
+# install(TARGETS strafe_search strafe_search_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -195,10 +147,10 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_visual_servo_msgs.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_strafe_search.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
 
 ## Add folders to be run by python nosetests
-# catkin_add_nosetestsatest)
+# catkin_add_nosetests(test)

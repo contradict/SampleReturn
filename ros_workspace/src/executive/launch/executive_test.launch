@@ -1,17 +1,23 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    
+
+    <!-- begin test arguments -->
     <machine name="search"
              address="localhost"/>
     <machine name="navigate"
              address="localhost"/>
-     
+    <!-- end test arguments -->
+
+    <!-- IMPORTANT! For tf, this is the frame that the executive works in -->
+    <arg name="executive_frame" value="/odom"/>
+    
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
     <remap from="servo_command" to="/motion/servo_command"/>
     <remap from="joystick_command" to="/motion/joystick_command"/>
-    
+    <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
+        
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
@@ -27,6 +33,8 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
 
+    <remap from="pause_state" to="/io/pause_state"/>
+    
     <node
         pkg="executive"
         type="executive_master_node.py"
@@ -49,7 +57,6 @@
         <remap from="manual_control" to="/motion/manual_control"/>
 
         <remap from="gpio_read" to="/io/gpio_read"/>
-        <remap from="pause_state" to="/io/pause_state"/>
     </node>
 
     <node
@@ -59,22 +66,29 @@
         output="log"
         ns="/processes/executive">
 
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.3"/>
-        <param name="max_point_lost_time" type="double" value="60"/>
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
+        <!-- for DriveToPose states and approach to sample-->
+        <param name="velocity" type="double" value="1.5"/>
+        <param name="search_velocity" type="double" value="0.5"/>
         <param name="motion_check_interval" type="double" value="60"/>
         <param name="min_motion" type="double" value="0.5"/>
-        
         <rosparam>
             <!-- Specify x and y.  If yaw is unspecified, robot will point towards
                  the next point in the path list -->
             search_poses_2d:
-                - {x: 5.0, y: 0.0}
+                - {x: 2.0, y: 0.0}
+                - {x: 4.0, y: -2.0}
                 - {x: 10.0, y: -10.0}
-                - {x: 12.0, y: -15.0}
-                - {x: 8.0, y: -25.0}
+        </rosparam>        
+        <!-- for Beacon approach -->
+        <param name="min_pursuit_distance" type="double" value="3.0"/>
+        <param name="max_pursuit_error" type="double" value="0.3"/>
+        <param name="max_point_lost_time" type="double" value="60"/>
+        <rosparam>
             beacon_approach_point:
-                {x: 5.0, y: 0, yaw: 180}
+                {x: 8.0, y: 0, yaw: 180}
         </rosparam>
     
     </node>
@@ -86,19 +100,25 @@
         output="log"
         ns="/processes/executive">
 
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.3"/>
-        <param name="max_sample_lost_time" type="double" value="30"/>
-        <param name="return_time_minutes" type="double" value="20"/>
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
+        <!-- for search  behaviour --> 
+        <param name="return_time_minutes" type="double" value="90"/>
         <param name="line_plan_step" type="double" value="8"/>
         <param name="line_replan_distance" type="double" value="1"/>
         <param name="line_velocity" type="double" value="1.5"/>
-        <param name="block_check_distance" type="double" value="12"/>
-        <param name="blocked_rotation" type="double" value="110"/>
-        <param name="blocked_rotation_step" type="double" value="30"/>
+        <param name="blocked_check_distance" type="double" value="10"/>
+        <param name="blocked_check_width" type = "double" value="3"/>
+        <param name="blocked_rotation_min" type="int" value="100"/>
+        <param name="blocked_rotation_max" type="int" value="150"/>
         <param name="motion_check_interval" type="double" value="20"/>
         <param name="min_motion" type="double" value="0.5"/>
 
+        <!-- for Beacon approach -->
+        <param name="min_pursuit_distance" type="double" value="3.0"/>
+        <param name="max_pursuit_error" type="double" value="0.3"/>
+        <param name="max_point_lost_time" type="double" value="60"/>
         <rosparam>
             beacon_approach_point:
                 {x: 5.0, y: 0, yaw: 180}
@@ -111,9 +131,22 @@
         name="pursue_sample"
         output="log"
         ns="/processes/executive">
-    
-        <param name="sample_list" value="fill this out"/>
+
+        <!-- executive tf frame -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
+        <param name="min_pursuit_distance" type="double" value="2.0"/>
+        <param name="max_pursuit_error" type="double" value="0.2"/>
+        <param name="max_sample_lost_time" type="double" value="30"/>
+        <param name="motion_check_interval" type="double" value="60"/>
+        <param name="min_motion" type="double" value="0.5"/>
+        <param name="square_search_size" type="double" value="0.3"/> 
+        <param name="pursuit_velocity" type="double" value="0.5"/>
+        <param name="search_velocity" type="double" value=".25"/>
+
     </node>
+
+    <!-- crap below here is for test only -->
 
     <node
         name="navigate_audio"
