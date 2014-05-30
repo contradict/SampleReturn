@@ -80,6 +80,7 @@ class SimpleMotion(object):
           return ang
 
   def execute_spin(self, rot, time_limit=10.0):
+    
     self.starting_position = None
     self.starting_yaw = None
 
@@ -90,6 +91,9 @@ class SimpleMotion(object):
 
     #for positive omega, the stern wheel is at -pi/2
     self.target_angle = -np.pi/2 * np.sign(rot)
+    
+    #limit stern wheel pod to a linear velocity 
+    max_stern_vel = self.max_velocity * np.sign(rot)
 
     try:
       pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
@@ -106,15 +110,18 @@ class SimpleMotion(object):
     twist = Twist()
     self.current_twist = twist
 
+    if self.starting_yaw is None:
+      rospy.logwarn("SIMPLE_MOTION: No odometry available at execute_spin")
+      return
+
+    self.target_yaw = self.unwind(self.starting_yaw + rot)
+
     while not self.shutdown and rospy.Time.now()<shutdown_time:
       if not self.got_odom or not self.got_joint_state:
         continue
-
-      if self.starting_yaw is None:
-        rospy.logwarn("SIMPLE_MOTION: No odometry available at execute_spin")
-        return
-
-      self.target_yaw = self.unwind(self.starting_yaw + rot)
+      
+      #calculate linear vel of stern wheel pod
+      current_vel = self.current_twist.angular.z*np.abs(pos[0])
 
       print "target_angle: %s" % (str(self.target_angle))
       print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
@@ -139,7 +146,7 @@ class SimpleMotion(object):
         break
 
       #if we are under max_vel keep accelerating      
-      elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
+      elif (current_vel < max_stern_vel):
         twist = self.current_twist
         twist.angular.z += np.sign(rot)*self.accel_per_loop/np.abs(pos[0])
         rospy.loginfo("Current vel: %s, Max vel: %s " % (self.current_twist.angular.z*np.abs(pos[0]), self.max_velocity))
