@@ -44,7 +44,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 
     this->odometry = nav_msgs::Odometry();
     this->completed_knot_header = std_msgs::Header();
-    this->replan_ahead_iter = this->stitched_path.begin();
+    this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
 
     /*
@@ -149,7 +149,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     yaw = tf::getYaw(currentKnotIter->pose.orientation);
                     if (currentKnotIter != stitched_path.knots.begin())
                     {
-                        yaw_prev = tf::getYaw(*(currentKnotIter-1).pose.orientation);
+                        yaw_prev = tf::getYaw((*(currentKnotIter-1)).pose.orientation);
                     }
                     else
                     {
@@ -380,13 +380,13 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                     break;
                 }
             }
-            if(lookAheadBufferKnotIter == stitched_path.knots.end() || lookAheadBufferKnot > replan_ahead_iter)
+            if(lookAheadBufferKnotIter == stitched_path.knots.end() || lookAheadBufferKnotIter > replan_ahead_iter)
             {
                 ROS_ERROR("Planner go behind servos, cannot stitch new plan");
                 return;
             }
             std::vector<geometry_msgs::PoseStamped> insertPoses;
-            auto insertKnotIter = lookAheadBufferKnot;
+            auto insertKnotIter = lookAheadBufferKnotIter;
             for (; insertKnotIter != replan_ahead_iter; ++insertKnotIter)
             {
                 geometry_msgs::PoseStamped insertPose;
@@ -396,17 +396,17 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
 
             // Set the initial knot to the first one in the spliced path
-            initialKnot = (*lookAheadBufferKnot);
+            initialKnot = (*lookAheadBufferKnotIter);
 
             // Set the timestamp to the time of the first point of
             // new path we are computing and also the time we want
             // platform_motion to splice this path into whatever
             // the robot is doing
-            timestamp = (*lookAheadBufferKnot).header.stamp;
+            timestamp = (*lookAheadBufferKnotIter).header.stamp;
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
     }
-    else if (!IsGoalReached())
+    else if (!isGoalReached())
     {
         return;
     }
@@ -739,10 +739,10 @@ void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velo
     this->maximum_linear_velocity = velocity->data;
 }
 
-void TheSmoothPlanner:setStitchedPath(const platform_motion_msgs::Path& stitchedPath)
+void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitchedPath)
 {
     this->stitched_path = stitchedPath;
-    this->replan_ahead_iter = this->stitched_path.begin();
+    this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
 }
 
