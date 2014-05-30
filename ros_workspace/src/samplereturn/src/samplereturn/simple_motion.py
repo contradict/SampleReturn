@@ -111,10 +111,10 @@ class SimpleMotion(object):
       #wait here for odom callback to clear flag, 
       #this means starting_yaw is now initialized
       rate.sleep()
-      rospy.loginfo("Waiting for odom and joint_states")
       if self.got_odom and self.got_joint_state:
         break
-
+      rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")
+      
     self.target_yaw = self.unwind(self.starting_yaw + rot)
     twist = Twist()
     self.current_twist = twist
