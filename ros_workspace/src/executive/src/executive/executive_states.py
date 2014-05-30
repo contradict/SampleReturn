@@ -130,6 +130,109 @@ class WaitForFlagState(smach.State):
                 return 'timeout'
 
         return 'paused'
+    
+#general class for using simple_motion
+class SimpleMoveExecuteState(smach.State):
+    
+    def __init__(self, simple_mover):
+        
+        smach.State.__init__(self,
+                             outcomes=['complete',
+                                       'timeout',
+                                       'sample_detected',
+                                       'preempted', 'aborted'],
+                             input_keys=['detected_sample',
+                                         'paused',
+                                         'move_list'])
+     
+        self.simple_mover = simple_mover
+        
+    def execute(self, userdata):
+        
+        while not rospy.is_shutdown() and (len(userdata.move_list) > 0):
+            move = userdata.move_list.pop(0)
+            if move['type'] == 'spin':
+                self.simple_mover.execute_spin(move['angle'])
+                continue
+            if move['type'] == 'strafe':
+                self.simple_mover.execute_strafe(move['angle'], move['distance'])
+                continue
+
+class SimpleMoveManager(smach.State):
+    
+    def __init__(self, simple_mover):
+        
+        smach.State.__init__(self,
+                             outcomes=['sample_detected',
+                                       'preempted', 'aborted'],
+                             input_keys=['detected_sample',
+                                         'paused'])
+
+        self.simple_mover = simple_mover
+        
+    def execute(self, userdata):
+        
+        while not rospy.is_shutdown():
+            rospy.sleep(0.05)
+            if self.userdata.detected_sample is not None:
+                self.simple_mover.stop()
+                return 'sample_detected'
+            if self.preempt_requested():
+                self.simple_mover.stop()
+                return 'preempted'
+            if userdata.paused:
+                self.simple_mover.stop()
+        
+        return 'aborted'
+
+class SimpleMotionState(smach.Concurrence):
+
+    def __init__(self, listener):
+
+        smach.Concurrence.__init__(self,
+            outcomes=['complete',
+                      'timeout',
+                      'sample_detected',
+                      'preempted', 'aborted'],
+            default_outcome = 'aborted',
+            input_keys=['simple_move_list',
+                        'pursue_samples',
+                        'detected_sample',
+                        'paused',
+                        'executive_frame'],
+            output_keys=['detected_sample'],
+            child_termination_cb = lambda preempt: True,
+            outcome_map = {'complete':{'SIMPLE_MOVER':'complete'},
+                           'timeout':{'SIMPLE_MOVER':'timeout'},
+                           'sample_detected':{'SIMPLE_MOVE_MANAGER':'sample_detected'},
+                           'preempted':{'SIMPLE_MOVER':'preempted',
+                                        'SIMPLE_MOVE_MANAGER':'preempted'}})
+
+        self.listener = listener
+
+    def execute(self, userdata):
+        
+        #Execute a simple motion based on userdata inputs
+        #Then, execute concurrence as normal.
+        try:
+            start_pose = util.get_current_robot_pose(self.listener)
+        except(tf.Exception):
+            rospy.logwarn("SIMPLE MOVE STATE failed to get current pose")
+            return 'aborted'
+        userdata.detected_sample = None
+        
+        return smach.Concurrence.execute(self, userdata)
+
+def GetSimpleMotionState(simple_mover, listener):
+
+    simple_move_state = SimpleMoveState(listener)
+    with simple_move_state:
+        smach.Concurrence.add('SIMPLE_MOVE_MANAGER',
+                              SimpleMoveManager(simple_mover))
+        smach.Concurrence.add('SIMPLE_MOVER',
+                              SimpleMoveExecuteState(simple_mover))
+
+    return simple_move_state
 
 #general class for using the robot's planner to drive to a point
 class DriveToPoseState(smach.State):
@@ -160,7 +263,11 @@ class DriveToPoseState(smach.State):
     def execute(self, ud):
         #on entry to Drive To Pose clear old sample_detections!
         ud.detected_sample = None
-        last_pose = util.get_current_robot_pose(self.listener)
+        try:        
+            last_pose = util.get_current_robot_pose(self.listener)
+        except(tf.Exception):
+            rospy.logwarn("DriveToPose failed to get current pose")
+            return 'aborted'
         velocity = ud.velocity
         goal = move_base_msg.MoveBaseGoal()
         goal.target_pose=ud.target_pose
@@ -171,7 +278,11 @@ class DriveToPoseState(smach.State):
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
             #log current pose for use in other states
-            current_pose = util.get_current_robot_pose(self.listener)
+            try:
+                current_pose = util.get_current_robot_pose(self.listener)
+            except(tf.Exception):
+                rospy.logwarn("DriveToPose failed to get current pose")
+                return 'aborted'
             ud.last_pose = current_pose
             #is action server still working?
             move_state = self.move_client.get_state()
@@ -326,7 +437,11 @@ class PursueDetectedPoint(smach.Concurrence):
         #and put it in the userdata.  Put start_pose into last_pose as well
         #Then, execute concurrence as normal.
         goal_header = std_msg.Header(0, rospy.Time(0), userdata.executive_frame)
-        start_pose = util.get_current_robot_pose(self.listener)
+        try:
+            start_pose = util.get_current_robot_pose(self.listener)
+        except (tf.Exception):
+            rospy.logwarn("PursueDetectedPoint failed to get current pose")
+            return 'aborted'
         rospy.logdebug("PURSUIT start pose: " + str(start_pose))
         point_stamped = userdata.pursuit_point
         goal_pose = geometry_msg.Pose(point_stamped.point,
