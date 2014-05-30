@@ -258,10 +258,7 @@ class ManualController(object):
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         
     def sample_detection_manipulator(self, sample):
-        if sample.name == 'none':
-            self.state_machine.userdata.detected_sample = None
-        else:
-            self.state_machine.userdata.detected_sample = sample
+        self.state_machine.userdata.detected_sample = sample
 
     def shutdown_cb(self):
         self.state_machine.request_preempt()
