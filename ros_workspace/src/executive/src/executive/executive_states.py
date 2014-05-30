@@ -427,7 +427,9 @@ class PursueDetectedPoint(smach.Concurrence):
             outcome_map = {'min_distance':{'PURSUIT_MANAGER':'min_distance'},
                            'point_lost':{'PURSUIT_MANAGER':'point_lost'},
                            'complete':{'DRIVE_TO_POSE':'complete'},
-                           'timeout':{'DRIVE_TO_POSE':'timeout'}})
+                           'timeout':{'DRIVE_TO_POSE':'timeout'},
+                           'preempted':{'PURSUIT_MANAGER':'preempted',
+                                        'DRIVE_TO_POSE':'preempted'}})
 
         self.listener = listener
 
