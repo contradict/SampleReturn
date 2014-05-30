@@ -18,8 +18,8 @@
     <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
-    <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/point"/>
-    <remap from="detected_sample_search" to="/processes/sample_detection/search/point"/>
+    <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
+    <remap from="detected_sample_search" to="/processes/sample_detection/search/filtered_point"/>
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
