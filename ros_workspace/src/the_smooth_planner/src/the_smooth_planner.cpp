@@ -603,6 +603,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.x = 0.00;
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.y = 0.00;
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.z = 0.00;
+    path_msg.knots[pathCopy.poses.size()-1].twist.angular.z = 0.00;
 
     ROS_DEBUG("\n\npath_msg.knots:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
