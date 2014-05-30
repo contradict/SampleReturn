@@ -30,7 +30,7 @@ obstacle_layer:
     port_point_cloud: {
         topic: /cameras/navigation/port/points2,
         data_type: PointCloud2,
-        expected_update_rate: 0.2,
+        expected_update_rate: 0.3,
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
@@ -42,7 +42,7 @@ obstacle_layer:
     center_point_cloud: {
         topic: /cameras/navigation/center/points2,
         data_type: PointCloud2,
-        expected_update_rate: 0.2,
+        expected_update_rate: 0.3,
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
@@ -54,7 +54,7 @@ obstacle_layer:
     starboard_point_cloud: {
         topic: /cameras/navigation/starboard/points2,
         data_type: PointCloud2,
-        expected_update_rate: 0.2,
+        expected_update_rate: 0.3,
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
