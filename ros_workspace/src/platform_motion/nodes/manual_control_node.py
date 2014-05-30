@@ -535,9 +535,9 @@ class ManualPreempted(smach.State):
         
         #we are preempted by the top state machine
         #set motion mode to None and exit
-        self.CAN_interface.select_mode(MODE_PAUSE)
+        self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_PAUSE)
 
-        self.CAN_interface.select_mode(MODE_ENABLE)
+        self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_ENABLE)
         
         result = platform_msg.ManualControlResult('preempted')
         userdata.action_result = result
