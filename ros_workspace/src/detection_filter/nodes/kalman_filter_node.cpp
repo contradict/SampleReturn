@@ -180,8 +180,8 @@ class KalmanDetectionFilter
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
         xyz_point.x = double(latched_filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(latched_filter_list_[1]->statePost.at<float>(1));
-        xyz_point.z = double(latched_filter_list_[2]->statePost.at<float>(2));
+        xyz_point.y = double(latched_filter_list_[0]->statePost.at<float>(1));
+        xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
         cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         point_msg.header.frame_id = "";
@@ -203,8 +203,8 @@ class KalmanDetectionFilter
           break;
         }
       }
-      if (filter_ptr->statePost.at<float>(2) < max_pub_vel_ ||
-          filter_ptr->statePost.at<float>(3) < max_pub_vel_) {
+      if (filter_ptr->statePost.at<float>(3) < max_pub_vel_ ||
+          filter_ptr->statePost.at<float>(4) < max_pub_vel_) {
         samplereturn_msgs::NamedPoint point_msg;
         point_msg.header.frame_id = "/odom";
         point_msg.header.stamp = ros::Time::now();
