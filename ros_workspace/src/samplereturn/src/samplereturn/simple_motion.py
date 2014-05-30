@@ -79,7 +79,7 @@ class SimpleMotion(object):
           ang += np.pi
           return ang
 
-  def execute_spin(self, rot, time_limit=20.0):
+  def execute_spin(self, rot, time_limit=10.0):
     self.starting_position = None
     self.starting_yaw = None
 
@@ -88,9 +88,15 @@ class SimpleMotion(object):
 
     rate = rospy.Rate(self.loop_rate)
 
-    self.target_angle = np.pi/2
+    #for positive omega, the stern wheel is at -pi/2
+    self.target_angle = -np.pi/2 * np.sign(rot)
 
-    pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
+    try:
+      pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
+    except (tf.Exception):
+      rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
+      return
+      
     self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration/np.abs(pos[0]))
 
     self.shutdown = False
@@ -98,12 +104,6 @@ class SimpleMotion(object):
     self.got_joint_state = False
 
     twist = Twist()
-    twist.linear.x = 0.0
-    twist.linear.y = 0.0
-    twist.linear.z = 0.0
-    twist.angular.x = 0.0
-    twist.angular.y = 0.0
-    twist.angular.z = 0.0
     self.current_twist = twist
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
@@ -133,6 +133,7 @@ class SimpleMotion(object):
         twist = Twist()
         twist.angular.z = 0.001*np.sign(rot)
         self.current_twist = twist
+        rospy.loginfo("Outgoing twist to set angles: " + str(twist))
         self.publisher.publish(twist)
         continue
       
@@ -144,12 +145,14 @@ class SimpleMotion(object):
       elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
         twist = self.current_twist
         twist.angular.z += np.sign(rot)*self.max_acceleration/np.abs(pos[0])
+        rospy.loginfo("Outgoing twist to accel: " + str(twist))
         self.publisher.publish(twist)
         self.current_twist = twist
         continue
 
       #at max_vel and before decel point, keep publishing current twist
       else:
+        rospy.loginfo("Outgoing twist at max_vel: " + str(twist))
         self.publisher.publish(self.current_twist)
 
     #decel to zero
@@ -158,6 +161,7 @@ class SimpleMotion(object):
       rate.sleep()
       twist = self.current_twist
       twist.angular.z = np.sign(rot)*self.accel_per_loop*i/np.abs(pos[0])
+      rospy.loginfo("Outgoing twist to decel: " + str(twist))
       self.publisher.publish(twist)
 
 
