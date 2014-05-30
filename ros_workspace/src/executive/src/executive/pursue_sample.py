@@ -63,6 +63,7 @@ class PursueSample(object):
         self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.target_point = None
         self.state_machine.latched_sample = None
+        self.state_machine.manipulator_search_angle = math.pi/4
         
         self.state_machine.userdata.square_search_size = self.node_params.square_search_size
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
@@ -156,8 +157,8 @@ class PursueSample(object):
                 goal = manipulator_msg.ManipulatorGoal()
                 goal.type = goal.GRAB
                 goal.wrist_angle = userdata.latched_sample.grip_angle                    
+                goal.target_bin = userdata.latched_sample.sample_id
                 goal.grip_torque = 0.7
-                goal.target_bin = 1
                 return goal
     
             #if Steve pauses the robot during this action, it returns preempted,
@@ -266,7 +267,7 @@ class PursueSample(object):
                 rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
 
     def sample_detection_manipulator(self, sample):
-            self.state_machine.userdata.detected_sample = sample
+        self.state_machine.userdata.detected_sample = sample
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -322,9 +323,10 @@ class LoadSearchPath(smach.State):
 
         pose_list = []
         square_step = userdata.square_search_size
-        start_pose = util.get_current_robot_pose(self.listener)
-        rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
+
         try:
+            start_pose = util.get_current_robot_pose(self.listener)
+            rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
             next_pose = util.translate_base_link(self.listener, start_pose, square_step, 0 )
             next_pose = util.pose_rotate(next_pose, math.pi/2)
             pose_list.append(next_pose)
