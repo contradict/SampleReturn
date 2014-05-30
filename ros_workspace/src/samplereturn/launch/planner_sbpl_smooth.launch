@@ -16,9 +16,9 @@
         <remap from="mover/stitched_path" to="/motion/stitched_path"/>
 
         <!--
-        -->
         <rosparam ns="local_costmap" file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" />
         <rosparam ns="local_costmap" file="$(find samplereturn)/config/costmap_local_params.yaml" command="load" />
+        -->
 
         <rosparam ns="global_costmap" file="$(find samplereturn)/config/costmap_common_params.yaml" command="load" />
         <rosparam ns="global_costmap" file="$(find samplereturn)/config/costmap_local_params.yaml" command="load" />
