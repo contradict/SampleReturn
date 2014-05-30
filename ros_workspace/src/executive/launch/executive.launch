@@ -146,7 +146,8 @@
         <rosparam>
             pursue_sample_params:
                 max_velocity: 0.4
-                max_acceleration: 0.4
+                acceleration: 0.4
+                stop_deceleration: 1.5
                 timeout: 20
                 loop_rate: 10
                 steering_angle_epsilon: 0.01
