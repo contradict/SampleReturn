@@ -20,9 +20,6 @@ class SimpleMover(object):
     self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
     self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
 
-    self.accel_per_loop = self.acceleration/self.loop_rate
-
-    self.current_twist = None
     self.starting_position = None
     self.starting_yaw = None
     self.running = False
@@ -92,6 +89,7 @@ class SimpleMover(object):
   
   def execute_spin(self, rot, time_limit=10.0):
     
+    self.stop_requested = False
     self.running = True
     
     try:
@@ -111,7 +109,8 @@ class SimpleMover(object):
     #limit stern wheel pod to a linear velocity 
     max_stern_vel = self.max_velocity
       
-    self.stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(pos[0]))
+    stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(pos[0]))
+    accel_per_loop = self.acceleration/self.loop_rate
 
     self.starting_yaw = None
     self.got_odom = False
@@ -126,15 +125,15 @@ class SimpleMover(object):
       rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")
       
     self.target_yaw = self.unwind(self.starting_yaw + rot)
-    twist = Twist()
-    self.current_twist = twist
+    #start current twist at 0
+    current_twist = Twist()
     current_vel = 0
 
     while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()      
       #calculate linear vel of stern wheel pod
-      current_vel = np.abs(self.current_twist.angular.z*np.abs(pos[0]))
+      current_vel = np.abs(current_twist.angular.z*np.abs(pos[0]))
 
       #print "target_angle: %s" % (str(self.target_angle))
       #print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
@@ -147,37 +146,40 @@ class SimpleMover(object):
           np.abs(self.starboard_pos)>self.steering_angle_epsilon):
         twist = Twist()
         twist.angular.z = 0.001*np.sign(rot)
-        self.current_twist = twist
+        current_twist = twist
         #rospy.loginfo("Outgoing twist to set angles: " + str(twist))
         self.publisher.publish(twist)
         continue
 
-      self.stopping_yaw = self.current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
+      stopping_yaw = current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
       
       #check if we are at decel point      
-      if np.abs(self.unwind(self.target_yaw - self.current_yaw)) < self.stopping_yaw:
+      if np.abs(self.unwind(self.target_yaw - self.current_yaw)) < stopping_yaw:
         break
 
       #if we are under max_vel keep accelerating      
       elif (current_vel < max_stern_vel):
-        twist = self.current_twist
+        twist = current_twist
         twist.angular.z += np.sign(rot)*self.accel_per_loop/np.abs(pos[0])
-        #rospy.loginfo("Current vel: %s, Max vel: %s " % (self.current_twist.angular.z*np.abs(pos[0]), self.max_velocity))
+        #rospy.loginfo("Current vel: %s, Max vel: %s " % (current_twist.angular.z*np.abs(pos[0]), self.max_velocity))
         #rospy.loginfo("Outgoing twist to accel: " + str(twist))
         self.publisher.publish(twist)
-        self.current_twist = twist
+        current_twist = twist
         continue
 
       #at max_vel and before decel point, keep publishing current twist
       else:
         #rospy.loginfo("Outgoing twist at max_vel: " + str(twist))
-        self.publisher.publish(self.current_twist)
+        self.publisher.publish(current_twist)
+
+    if self.stop_requested:
+      accel_per_loop = self.stop_deceleration/self.loop_rate
 
     #decel to zero
-    for i in range(int(current_vel/self.accel_per_loop),-1,-1):
+    for i in range(int(current_vel/accel_per_loop),-1,-1):
       rate.sleep()
-      twist = self.current_twist
-      twist.angular.z = np.sign(rot)*self.accel_per_loop*i/np.abs(pos[0])
+      twist = current_twist
+      twist.angular.z = np.sign(rot)*accel_per_loop*i/np.abs(pos[0])
       #rospy.loginfo("Outgoing twist to decel: " + str(twist))
       self.publisher.publish(twist)
 
@@ -185,8 +187,10 @@ class SimpleMover(object):
     self.stop_requested = False
 
   def execute_strafe(self, angle, distance, time_limit=20.0):
+    self.stop_requested = False
+    self.running = True
+    
     self.starting_position = None
-    self.current_twist = None
 
     timeout_time = rospy.Time.now()
     timeout_time.secs += time_limit
@@ -206,13 +210,13 @@ class SimpleMover(object):
     self.x = np.cos(angle)
     self.y = np.sin(angle)
 
-    self.stopping_distance = self.max_velocity**2/(2*self.acceleration)
+    stopping_distance = self.max_velocity**2/(2*self.acceleration)
+    accel_per_loop = self.acceleration/self.loop_rate
 
     self.got_odom = False
     self.got_joint_state = False
     #empty twist message constructed with all zeroes
-    twist = Twist()
-    self.current_twist = twist
+    current_twist = Twist()
 
     while self.keep_runing(timeout_time):
       # Run at some rate, ~10Hz
@@ -223,8 +227,8 @@ class SimpleMover(object):
       if not self.got_odom or not self.got_joint_state:
         continue
 
-      self.stopping_distance = (np.sqrt(self.current_twist.linear.x**2 +
-                                        self.current_twist.linear.y**2)**2 /
+      stopping_distance = (np.sqrt(current_twist.linear.x**2 +
+                                        current_twist.linear.y**2)**2 /
                                         (2*self.acceleration))
 
       #very useful debug messages
@@ -239,34 +243,37 @@ class SimpleMover(object):
         twist.linear.x = self.x*0.001
         twist.linear.y = self.y*0.001
         self.publisher.publish(twist)
-        self.current_twist = twist
+        current_twist = twist
         continue
 
       # check if we are must decelerate to stop now
       # distance = (velocity**2)/(2*accel_limit)
-      elif (distance-self.distance_traveled) < self.stopping_distance:
+      elif (distance-self.distance_traveled) < stopping_distance:
         break
 
       # Accelerate until max_vel reached
-      elif (np.sqrt(self.current_twist.linear.x**2+self.current_twist.linear.y**2)
+      elif (np.sqrt(current_twist.linear.x**2+current_twist.linear.y**2)
                     < self.max_velocity):
-        twist = self.current_twist
-        twist.linear.x += self.accel_per_loop*self.x
-        twist.linear.y += self.accel_per_loop*self.y
+        twist = current_twist
+        twist.linear.x += accel_per_loop*self.x
+        twist.linear.y += accel_per_loop*self.y
         self.publisher.publish(twist)
-        self.current_twist = twist
+        current_twist = twist
         continue
 
       #at max_vel, keep publishing until decel point is hit
       else:
-        self.publisher.publish(self.current_twist)
+        self.publisher.publish(current_twist)
 
-    velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
-    for i in range(int(velocity/self.accel_per_loop),-1,-1):
+    if self.stop_requested:
+      accel_per_loop = self.stop_deceleration/self.loop_rate
+      
+    velocity = np.sqrt(current_twist.linear.x**2 + current_twist.linear.y**2)
+    for i in range(int(velocity/accel_per_loop),-1,-1):
       rate.sleep()
-      twist = self.current_twist
-      twist.linear.x = self.accel_per_loop*self.x*i
-      twist.linear.y = self.accel_per_loop*self.y*i
+      twist = current_twist
+      twist.linear.x = accel_per_loop*self.x*i
+      twist.linear.y = accel_per_loop*self.y*i
       self.publisher.publish(twist)
 
     self.running = False
