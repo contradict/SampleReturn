@@ -29,17 +29,18 @@ class SimpleMotion(object):
     rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
 
   def odometry_callback(self, msg):
-    if self.starting_position == None:
-      self.starting_position = msg.pose.pose.position
-
+   
     quaternion = np.zeros(4)
     quaternion[0] = msg.pose.pose.orientation.x
     quaternion[1] = msg.pose.pose.orientation.y
     quaternion[2] = msg.pose.pose.orientation.z
     quaternion[3] = msg.pose.pose.orientation.w
 
-    if self.starting_yaw == None:
+    if self.starting_yaw is None:
       self.starting_yaw = euler_from_quaternion(quaternion)[-1]
+
+    if self.starting_position is None:
+      self.starting_position = msg.pose.pose.position
 
     self.current_yaw = euler_from_quaternion(quaternion)[-1]
 
@@ -48,9 +49,10 @@ class SimpleMotion(object):
     self.distance_traveled = np.sqrt((self.current_position.x-self.starting_position.x)**2 +
                                      (self.current_position.y-self.starting_position.y)**2)
 
-    self.got_odom = True
+    self.got_odom = True    
 
   def joint_state_callback(self, msg):
+
     pos_dict = dict(zip(msg.name,msg.position))
     vel_dict = dict(zip(msg.name,msg.velocity))
     self.stern_pos      = pos_dict["stern_steering_joint"]
@@ -81,7 +83,12 @@ class SimpleMotion(object):
 
   def execute_spin(self, rot, time_limit=10.0):
     
-    self.starting_position = None
+    try:
+      pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
+    except (tf.Exception):
+      rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
+      return
+
     self.starting_yaw = None
 
     shutdown_time = rospy.Time.now()
@@ -94,12 +101,6 @@ class SimpleMotion(object):
     
     #limit stern wheel pod to a linear velocity 
     max_stern_vel = self.max_velocity * np.sign(rot)
-
-    try:
-      pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
-    except (tf.Exception):
-      rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
-      return
       
     self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration/np.abs(pos[0]))
 
@@ -109,17 +110,19 @@ class SimpleMotion(object):
 
     twist = Twist()
     self.current_twist = twist
-
-    if self.starting_yaw is None:
-      rospy.logwarn("SIMPLE_MOTION: No odometry available at execute_spin")
-      return
+ 
+    while rospy.Time.now()<shutdown_time:
+      #wait here for odom callback to clear flag, 
+      #this means starting_yaw is now initialized
+      rate.sleep()
+      if not self.got_odom or not self.got_joint_state:
+        continue
 
     self.target_yaw = self.unwind(self.starting_yaw + rot)
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
-      if not self.got_odom or not self.got_joint_state:
-        continue
-      
+      # Run at some rate, ~10Hz
+      rate.sleep()      
       #calculate linear vel of stern wheel pod
       current_vel = self.current_twist.angular.z*np.abs(pos[0])
 
@@ -160,9 +163,6 @@ class SimpleMotion(object):
         rospy.loginfo("Outgoing twist at max_vel: " + str(twist))
         self.publisher.publish(self.current_twist)
 
-      # Run at some rate, ~10Hz
-      rate.sleep()
-
     #decel to zero
     velocity = np.abs(self.current_twist.angular.z)*np.abs(pos[0])
     for i in range(int(velocity/self.accel_per_loop),-1,-1):
@@ -174,9 +174,8 @@ class SimpleMotion(object):
 
 
   def execute_strafe(self, angle, distance, time_limit=20.0):
-    self.current_twist = None
     self.starting_position = None
-    self.starting_yaw = None
+    self.current_twist = None
 
     shutdown_time = rospy.Time.now()
     shutdown_time.secs += time_limit
@@ -206,11 +205,13 @@ class SimpleMotion(object):
     self.current_twist = twist
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
-      if not self.got_odom or not self.got_joint_state:
-        continue
-
       # Run at some rate, ~10Hz
       rate.sleep()
+      
+      #wait here for odom callback to clear flag, 
+      #this means starting_position, is now initialized
+      if not self.got_odom or not self.got_joint_state:
+        continue
 
       self.stopping_distance = (np.sqrt(self.current_twist.linear.x**2 +
                                         self.current_twist.linear.y**2)**2 /
