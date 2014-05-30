@@ -11,6 +11,7 @@ set(THIS_PACKAGE_ROS_DEPS roscpp costmap_2d nav_core pluginlib
 add_definitions("-std=c++0x")
 
 find_package(catkin REQUIRED COMPONENTS
+                ${THIS_PACKAGE_ROS_DEPS}
                 costmap_2d
                 nav_core
                 pluginlib 
