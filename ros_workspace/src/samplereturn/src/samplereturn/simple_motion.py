@@ -89,8 +89,6 @@ class SimpleMotion(object):
       rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
       return
 
-    self.starting_yaw = None
-
     shutdown_time = rospy.Time.now()
     shutdown_time.secs += time_limit
 
@@ -104,21 +102,21 @@ class SimpleMotion(object):
       
     self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration/np.abs(pos[0]))
 
+    self.starting_yaw = None
     self.shutdown = False
     self.got_odom = False
     self.got_joint_state = False
-
-    twist = Twist()
-    self.current_twist = twist
  
     while rospy.Time.now()<shutdown_time:
       #wait here for odom callback to clear flag, 
       #this means starting_yaw is now initialized
       rate.sleep()
-      if not self.got_odom or not self.got_joint_state:
-        continue
+      if self.got_odom and self.got_joint_state:
+        break
 
     self.target_yaw = self.unwind(self.starting_yaw + rot)
+    twist = Twist()
+    self.current_twist = twist
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
       # Run at some rate, ~10Hz
