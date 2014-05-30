@@ -115,11 +115,6 @@ class SimpleMotion(object):
         return
 
       self.target_yaw = self.unwind(self.starting_yaw + rot)
-      # Run at some rate, ~10Hz
-      rate.sleep()
-
-      if self.current_twist is not None:
-        self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
 
       print "target_angle: %s" % (str(self.target_angle))
       print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
@@ -136,15 +131,17 @@ class SimpleMotion(object):
         rospy.loginfo("Outgoing twist to set angles: " + str(twist))
         self.publisher.publish(twist)
         continue
+
+      self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
       
       #check if we are at decel point      
-      elif np.abs(self.unwind(self.target_yaw - self.current_yaw)) < self.stopping_yaw:
+      if np.abs(self.unwind(self.target_yaw - self.current_yaw)) < self.stopping_yaw:
         break
 
       #if we are under max_vel keep accelerating      
       elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
         twist = self.current_twist
-        twist.angular.z += np.sign(rot)*self.max_acceleration/np.abs(pos[0])
+        twist.angular.z += np.sign(rot)*self.accel_per_loop/np.abs(pos[0])
         rospy.loginfo("Outgoing twist to accel: " + str(twist))
         self.publisher.publish(twist)
         self.current_twist = twist
@@ -154,6 +151,9 @@ class SimpleMotion(object):
       else:
         rospy.loginfo("Outgoing twist at max_vel: " + str(twist))
         self.publisher.publish(self.current_twist)
+
+      # Run at some rate, ~10Hz
+      rate.sleep()
 
     #decel to zero
     velocity = np.abs(self.current_twist.angular.z)*np.abs(pos[0])
