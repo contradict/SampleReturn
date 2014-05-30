@@ -5,30 +5,30 @@
     <!-- IMPORTANT! For tf, this is the frame that the executive works in -->
     <arg name="executive_frame" value="/odom"/>
 
-    <remap from="simple_motion_command" to="/motion/servo_command"/>
-    
+    <!-- motion remaps -->
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
-    <remap from="CAN_servo_command" to="/motion/CAN/servo_command"/>
     <remap from="joystick_command" to="/motion/joystick_command"/>
-    <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
+    <remap from="servo_command" to="/motion/servo_command"/>
+    <remap from="planner_command" to="/motion/planner_command"/>
+    <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
     
+    <!-- planning and detection remaps -->
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
+    <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/point"/>
     <remap from="detected_sample_search" to="/processes/sample_detection/search/point"/>
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
-
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
-    <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
 
+    <!-- io remaps -->
+    <remap from="pause_state" to="/io/pause_state"/>
     <remap from="announcer" to="/io/announcer"/>
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
-
-    <remap from="pause_state" to="/io/pause_state"/>
 
     <node
         pkg="executive"
@@ -141,6 +141,16 @@
         <param name="square_search_size" type="double" value="0.3"/> 
         <param name="pursuit_velocity" type="double" value="0.5"/>
         <param name="search_velocity" type="double" value=".25"/>
+        
+        <!-- simple motion parameters --> 
+        <rosparam>
+            pursue_sample_params:
+                max_velocity: 0.4
+                max_acceleration: 0.4
+                timeout: 20
+                loop_rate: 10
+                steering_angle_epsilon: 0.01
+        </rosparam>
     </node>
 
 </launch>

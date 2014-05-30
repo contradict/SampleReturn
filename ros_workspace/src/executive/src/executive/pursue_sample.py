@@ -21,6 +21,7 @@ import geometry_msgs.msg as geometry_msg
 import samplereturn_msgs.srv as samplereturn_srv
 
 import samplereturn.util as util
+import samplereturn.simple_motion as simple_motion
 
 from executive.executive_states import DriveToPoseState
 from executive.executive_states import WaitForFlagState
@@ -43,7 +44,10 @@ class PursueSample(object):
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                                                        move_base_msg.MoveBaseAction)
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
-        self.CAN_interface = util.CANInterface()        
+        self.CAN_interface = util.CANInterface()
+        
+        #get a simple_mover, it's parameters are inside a rosparam tag for this node
+        self.simple_mover = simple_motion.SimpleMover('~pursue_sample_params/')
         
         #for this state machine, there is no preempt path.  It either finshes successfully and
         #reports success on the PursuitResult topic, or in case of any interupption or failure, it

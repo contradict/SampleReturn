@@ -7,17 +7,17 @@ from nav_msgs.msg import Odometry
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion
 
-class SimpleMotion(object):
-  def __init__(self, param_string=""):
+class SimpleMover(object):
+  def __init__(self, param_ns=""):
 
-    self.publisher = rospy.Publisher("/motion/servo_command", Twist)
+    self.publisher = rospy.Publisher("servo_command", Twist)
     self.tf = TransformListener()
 
-    self.loop_rate = rospy.get_param('~loop_rate',10.0)
-    self.max_velocity = rospy.get_param('~max_velocity',0.5)
-    self.max_acceleration = rospy.get_param('~max_acceleration',0.5)
-    self.time_limit = rospy.get_param('~time_limit',20.0)
-    self.wheel_pos_epsilon = rospy.get_param('~wheel_pos_epsilon',0.01)
+    self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
+    self.max_acceleration = rospy.get_param(param_ns + 'max_acceleration', 0.5)
+    self.time_limit = rospy.get_param(param_ns + 'timeout', 20.0)
+    self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
+    self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
 
     self.accel_per_loop = self.max_acceleration/self.loop_rate
 
@@ -128,13 +128,13 @@ class SimpleMotion(object):
 
       #print "target_angle: %s" % (str(self.target_angle))
       #print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
-      #print "epsilon: %s" % (str(self.wheel_pos_epsilon))
+      #print "epsilon: %s" % (str(self.steering_angle_epsilon))
       #print "stern_eps: %s" % (str(np.abs(self.stern_pos-self.target_angle)))
 
       #wait until correct steering angles are achieved
-      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
-          np.abs(self.port_pos)>self.wheel_pos_epsilon or
-          np.abs(self.starboard_pos)>self.wheel_pos_epsilon):
+      if (np.abs(self.stern_pos-self.target_angle)>self.steering_angle_epsilon or
+          np.abs(self.port_pos)>self.steering_angle_epsilon or
+          np.abs(self.starboard_pos)>self.steering_angle_epsilon):
         twist = Twist()
         twist.angular.z = 0.001*np.sign(rot)
         self.current_twist = twist
@@ -221,9 +221,9 @@ class SimpleMotion(object):
       #print("stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos)))
 
       # Issue slow twists until wheels are pointed at angle
-      if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
-          np.abs(self.port_pos-self.target_angle)>self.wheel_pos_epsilon or
-          np.abs(self.starboard_pos-self.target_angle)>self.wheel_pos_epsilon):
+      if (np.abs(self.stern_pos-self.target_angle)>self.steering_angle_epsilon or
+          np.abs(self.port_pos-self.target_angle)>self.steering_angle_epsilon or
+          np.abs(self.starboard_pos-self.target_angle)>self.steering_angle_epsilon):
         twist = Twist()
         twist.linear.x = self.x*0.001
         twist.linear.y = self.y*0.001
