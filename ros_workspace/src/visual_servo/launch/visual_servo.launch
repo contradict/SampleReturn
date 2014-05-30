@@ -35,7 +35,7 @@
         <param name='max_angular_velocity' type='double' value='0.25'/>
         <param name='target_name' type='string' value='pre_cached'/>
 
-        <remap from="image_point" to="processes/sample_detection/manipulator/filtered_img_point"/>
+        <remap from="image_point" to="/processes/sample_detection/manipulator/filtered_img_point"/>
         <remap from="left_camera_info" to="/cameras/manipulator/left/camera_info"/>
         <remap from="right_camera_info" to="/cameras/manipulator/right/camera_info"/>
 
