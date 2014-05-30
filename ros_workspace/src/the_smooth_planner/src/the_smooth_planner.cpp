@@ -178,7 +178,7 @@ bool TheSmoothPlanner::isGoalReached()
     // The pvt_segment code in platform_motion knows how to answer this
     // question much better than the local planner.  The goal is reached
     // when all pvt segments have been executed to completion.
-    return (stitched_path.knots.size() == 0 || completed_knot_header.seq == stitched_path.knots.back().header.seq);
+    return (stitched_path.knots.size() > 0 && completed_knot_header.seq == stitched_path.knots.back().header.seq);
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
@@ -406,7 +406,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
     }
-    else if (!isGoalReached())
+    else if (!isGoalReached() && (stitched_path.knots.size()>0) )
     {
         return;
     }
