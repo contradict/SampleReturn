@@ -156,9 +156,9 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                         yaw_prev = yaw;
                     }
 
-                    if ( (aheadTime > ros::Duration(replan_look_ahead_time)) &&
-                        (fabs(yaw-yaw_prev) < yaw_epsilon) )
+                    if ( (aheadTime > ros::Duration(replan_look_ahead_time)) )
                     {
+                        ROS_WARN("Stitching with dyaw %f", fabs(yaw-yaw_prev) );
                         sourcePose->pose = (*searchAheadIter).pose;
                         sourcePose->header = (*searchAheadIter).header;
                         this->replan_ahead_iter = searchAheadIter;
