@@ -496,7 +496,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         double nextVelocityMagnitude = sqrt(initialPathVelocity*initialPathVelocity + 2.00*linear_acceleration*totalDistance);
         nextVelocityMagnitude = min(nextVelocityMagnitude, maximum_linear_velocity);
 
-        if(distanceTraveled < 0.0001)
+        if(distanceTraveled < 0.001)
         {
             // if we barely move, we are probably in a turn in place and want to be at zero velocity!
             nextVelocityMagnitude = 0.0;
@@ -508,7 +508,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // spline with starting and ending velocities.  This accounts for the specific
         // kinematic constraints, such as the wheel angle rotation rate limit
         //double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
-        double minimumPathTime = this->ComputeMinimumPathTime(path, i);
+        double minimumPathTime = this->ComputeMinimumPathTime(pathCopy, i);
         ROS_DEBUG_STREAM("minimumPathTime: " << minimumPathTime);
         if (nextVelocityMagnitude < maximum_linear_velocity)
         {
@@ -554,9 +554,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // Compute the next angular velocity
         //double curvature = splines[i].ComputeCurvature(1.00);
         //double angularVelocity = nextVelocityMagnitude * curvature;
-        double curvature = ComputeCurvature(path, i);
-        double startYaw = yawFromMsgQuat(path.poses[i].pose.orientation);
-        double endYaw = yawFromMsgQuat(path.poses[i+1].pose.orientation);
+        double curvature = ComputeCurvature(pathCopy, i);
+        double startYaw = yawFromMsgQuat(pathCopy.poses[i].pose.orientation);
+        double endYaw = yawFromMsgQuat(pathCopy.poses[i+1].pose.orientation);
         if ((endYaw - startYaw) > M_PI)
         {
             startYaw += 2.0*M_PI;
@@ -573,6 +573,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         if (fabs(curvature*nextVelocityMagnitude) > fabs(angularVelocity))
         {
             angularVelocity = curvature*nextVelocityMagnitude;
+        }
+        if (distanceTraveled < 0.001)
+        {
+            angularVelocity = 0.0; // Special case for turn-in-place
         }
         ROS_ERROR("curvature: %f. angular velocity: %f", curvature, angularVelocity);
 
@@ -857,7 +861,7 @@ double TheSmoothPlanner::ComputeCurvature(const nav_msgs::Path& path, const unsi
     double curvature = 0.00;
     double deltaX = 0.00;
     double deltaY = 0.00;
-    if (deltaLength > 0.0001)
+    if (deltaLength > 0.01)
     {
         deltaX = (path.poses[ip1].pose.position.x - path.poses[im1].pose.position.x)/deltaLength;
         deltaY = (path.poses[ip1].pose.position.y - path.poses[im1].pose.position.y)/deltaLength;
