@@ -180,9 +180,9 @@ class SimpleMoveManager(smach.State):
             if self.preempt_requested():
                 self.simple_mover.stop()
                 return 'preempted'
-            if userdata.paused:
+            if userdata.paused and self.simple_mover.is_running():
                 self.simple_mover.stop()
-        
+                        
         return 'aborted'
 
 class SimpleMotionState(smach.Concurrence):
