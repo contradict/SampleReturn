@@ -98,7 +98,7 @@ class SimpleMotion(object):
     self.target_angle = -np.pi/2 * np.sign(rot)
     
     #limit stern wheel pod to a linear velocity 
-    max_stern_vel = self.max_velocity * np.sign(rot)
+    max_stern_vel = self.max_velocity
       
     self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration/np.abs(pos[0]))
 
@@ -111,18 +111,20 @@ class SimpleMotion(object):
       #wait here for odom callback to clear flag, 
       #this means starting_yaw is now initialized
       rate.sleep()
+      rospy.loginfo("Waiting for odom and joint_states")
       if self.got_odom and self.got_joint_state:
         break
 
     self.target_yaw = self.unwind(self.starting_yaw + rot)
     twist = Twist()
     self.current_twist = twist
+    current_vel = 0
 
     while not self.shutdown and rospy.Time.now()<shutdown_time:
       # Run at some rate, ~10Hz
       rate.sleep()      
       #calculate linear vel of stern wheel pod
-      current_vel = self.current_twist.angular.z*np.abs(pos[0])
+      current_vel = np.abs(self.current_twist.angular.z*np.abs(pos[0]))
 
       print "target_angle: %s" % (str(self.target_angle))
       print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
@@ -162,8 +164,7 @@ class SimpleMotion(object):
         self.publisher.publish(self.current_twist)
 
     #decel to zero
-    velocity = np.abs(self.current_twist.angular.z)*np.abs(pos[0])
-    for i in range(int(velocity/self.accel_per_loop),-1,-1):
+    for i in range(int(current_vel/self.accel_per_loop),-1,-1):
       rate.sleep()
       twist = self.current_twist
       twist.angular.z = np.sign(rot)*self.accel_per_loop*i/np.abs(pos[0])
@@ -255,7 +256,6 @@ class SimpleMotion(object):
       twist = self.current_twist
       twist.linear.x = self.accel_per_loop*self.x*i
       twist.linear.y = self.accel_per_loop*self.y*i
-      print ("Outgoing twist, decel: " + str(twist))
       self.publisher.publish(twist)
 
   def shutdown(self):
