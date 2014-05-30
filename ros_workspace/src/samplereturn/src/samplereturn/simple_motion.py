@@ -14,16 +14,19 @@ class SimpleMover(object):
     self.tf = TransformListener()
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
-    self.max_acceleration = rospy.get_param(param_ns + 'max_acceleration', 0.5)
+    self.acceleration = rospy.get_param(param_ns + 'acceleration', 0.5)
+    self.stop_deceleration = rospy.get_param(param_ns + 'stop_deceleration', 1.5)
     self.time_limit = rospy.get_param(param_ns + 'timeout', 20.0)
     self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
     self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
 
-    self.accel_per_loop = self.max_acceleration/self.loop_rate
+    self.accel_per_loop = self.acceleration/self.loop_rate
 
     self.current_twist = None
     self.starting_position = None
     self.starting_yaw = None
+    self.running = False
+    self.stop_requested = False
 
     rospy.Subscriber("/motion/odometry", Odometry, self.odometry_callback, None, 1)
     rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
@@ -81,7 +84,15 @@ class SimpleMover(object):
           ang += np.pi
           return ang
 
+  #method to check if the movement loop should keep running, or bail out
+  def keep_running(self, timeout_time):
+    return (not rospy.is_shutdown() and 
+           rospy.time.now() < timeout_time and
+           not self.stop_requested)
+  
   def execute_spin(self, rot, time_limit=10.0):
+    
+    self.running = True
     
     try:
       pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
@@ -89,8 +100,8 @@ class SimpleMover(object):
       rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
       return
 
-    shutdown_time = rospy.Time.now()
-    shutdown_time.secs += time_limit
+    timeout_time = rospy.Time.now()
+    timeout_time.secs += time_limit
 
     rate = rospy.Rate(self.loop_rate)
 
@@ -100,14 +111,13 @@ class SimpleMover(object):
     #limit stern wheel pod to a linear velocity 
     max_stern_vel = self.max_velocity
       
-    self.stopping_yaw = self.max_velocity**2/(2*self.max_acceleration/np.abs(pos[0]))
+    self.stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(pos[0]))
 
     self.starting_yaw = None
-    self.shutdown = False
     self.got_odom = False
     self.got_joint_state = False
  
-    while rospy.Time.now()<shutdown_time:
+    while self.keep_running(timeout_time):
       #wait here for odom callback to clear flag, 
       #this means starting_yaw is now initialized
       rate.sleep()
@@ -120,7 +130,7 @@ class SimpleMover(object):
     self.current_twist = twist
     current_vel = 0
 
-    while not self.shutdown and rospy.Time.now()<shutdown_time:
+    while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()      
       #calculate linear vel of stern wheel pod
@@ -142,7 +152,7 @@ class SimpleMover(object):
         self.publisher.publish(twist)
         continue
 
-      self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
+      self.stopping_yaw = self.current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
       
       #check if we are at decel point      
       if np.abs(self.unwind(self.target_yaw - self.current_yaw)) < self.stopping_yaw:
@@ -171,13 +181,15 @@ class SimpleMover(object):
       #rospy.loginfo("Outgoing twist to decel: " + str(twist))
       self.publisher.publish(twist)
 
+    self.running = False
+    self.stop_requested = False
 
   def execute_strafe(self, angle, distance, time_limit=20.0):
     self.starting_position = None
     self.current_twist = None
 
-    shutdown_time = rospy.Time.now()
-    shutdown_time.secs += time_limit
+    timeout_time = rospy.Time.now()
+    timeout_time.secs += time_limit
 
     rate = rospy.Rate(self.loop_rate)
 
@@ -194,16 +206,15 @@ class SimpleMover(object):
     self.x = np.cos(angle)
     self.y = np.sin(angle)
 
-    self.stopping_distance = self.max_velocity**2/(2*self.max_acceleration)
+    self.stopping_distance = self.max_velocity**2/(2*self.acceleration)
 
-    self.shutdown = False
     self.got_odom = False
     self.got_joint_state = False
     #empty twist message constructed with all zeroes
     twist = Twist()
     self.current_twist = twist
 
-    while not self.shutdown and rospy.Time.now()<shutdown_time:
+    while self.keep_runing(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()
       
@@ -214,7 +225,7 @@ class SimpleMover(object):
 
       self.stopping_distance = (np.sqrt(self.current_twist.linear.x**2 +
                                         self.current_twist.linear.y**2)**2 /
-                                        (2*self.max_acceleration))
+                                        (2*self.acceleration))
 
       #very useful debug messages
       #print "target_angle: %s" % (str(self.target_angle))
@@ -258,19 +269,15 @@ class SimpleMover(object):
       twist.linear.y = self.accel_per_loop*self.y*i
       self.publisher.publish(twist)
 
-  def shutdown(self):
-    self.shutdown = True
-    rate = rospy.Rate(self.loop_rate)
-    velocity = np.sqrt(self.current_twist.linear.x**2 + self.current_twist.linear.y**2)
-    for i in range(int(velocity/self.accel_per_loop),-1,-1):
-      rate.sleep()
-      twist = self.current_twist
-      twist.linear.x = self.accel_per_loop*self.target_x*i
-      twist.linear.y = self.accel_per_loop*self.target_y*i
-      self.publisher.publish(twist)
+    self.running = False
+    self.stop_requested = False
 
-    twist = Twist()
-    self.publisher.publish(twist)
+  def is_running(self):
+    return self.running
+      
+  def stop(self):
+    self.stop_requested = True
+
 
 if __name__ == "__main__":
   rospy.init_node('simple_motion')
