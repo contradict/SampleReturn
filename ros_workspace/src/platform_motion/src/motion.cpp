@@ -61,7 +61,8 @@ Motion::Motion() :
     newPathReady(false),
     lastValidSternSteeringAngle(0.0),
     lastValidPortSteeringAngle(0.0),
-    lastValidStarboardSteeringAngle(0.0)
+    lastValidStarboardSteeringAngle(0.0),
+    stitched_counter_(0)
 {
     lastSegmentSent_.port.steeringAngle = 0.0;
     lastSegmentSent_.port.steeringVelocity = 0.0;
@@ -1372,6 +1373,20 @@ transformKnot( Eigen::Quaterniond rotation,
     return k;
 }
 
+void Motion::publishStitchedPath(void)
+{
+    // publish stitched path for visualization
+    if( stitchedPath_pub_.getNumSubscribers() > 0 )
+    {
+        platform_motion_msgs::Path stitched;
+        stitched.knots.insert(stitched.knots.end(), plannedPath.begin(), plannedPath.end());
+        stitched.header.frame_id="odom";
+        stitched.header.stamp = ros::Time::now();
+        stitched.header.seq = stitched_counter_++;
+        stitchedPath_pub_.publish( stitched );
+    }
+}
+
 void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path)
 {
     if(motion_mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT)
@@ -1515,21 +1530,12 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     }
     lck.unlock();
 
-    // publish stitched path for visualization
-    if( stitchedPath_pub_.getNumSubscribers() > 0 )
-    {
-        platform_motion_msgs::Path stitched;
-        stitched.knots.insert(stitched.knots.end(), plannedPath.begin(), plannedPath.end());
-        stitched.header.frame_id="odom";
-        stitched.header.stamp = ros::Time::now();
-        stitched.header.seq = path->header.seq;
-        stitchedPath_pub_.publish( stitched );
-    }
-
     if( plannedPath.size()>0 && firstSegment_.time >= secondSegment_.time)
     {
         newPathReady = true;
     }
+
+    publishStitchedPath();
 
     primePVT();
 }
@@ -1622,6 +1628,7 @@ bool Motion::pathToBody()
            || !pathToPod(previous, current, next, stern_pos_, lastValidSternSteeringAngle, &secondSegment_.stern) )
         {
             plannedPath.clear();
+            publishStitchedPath();
             return false;
         }
         else
@@ -1637,6 +1644,7 @@ bool Motion::pathToBody()
     {
         sendCompletedKnot(plannedPath.back().header);
         plannedPath.clear();
+        publishStitchedPath();
         ROS_DEBUG("Finished path");
     }
     checkSegmentAcceleration();
@@ -2002,6 +2010,7 @@ void Motion::sendPvtSegment()
             {
                 ROS_ERROR("past second");
                 plannedPath.clear();
+                publishStitchedPath();
                 firstSegment_ = secondSegment_;
                 pvtToZero();
             }
@@ -2089,6 +2098,7 @@ void Motion::sendPvtSegment()
         {
             ROS_INFO( "Clearing path in pause" );
             plannedPath.clear();
+            publishStitchedPath();
         }
         pvtToZero();
     }
