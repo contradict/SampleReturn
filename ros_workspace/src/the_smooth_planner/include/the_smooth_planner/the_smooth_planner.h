@@ -41,6 +41,7 @@ public:
     void setOdometry(const nav_msgs::Odometry& odometry);
     void setCompletedKnot(const std_msgs::Header& completedKnot);
     void setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity);
+    void setStitchedPath(const platform_motion_msgs::Path& stitchedPath);
   
 private:
     static double EigenVectorNorm(const Eigen::Vector3d& vec) { return vec.norm(); }
@@ -67,23 +68,29 @@ private:
                                                 visualization_msgs::Marker& circleMarker);
 
 
+    // Publishers and subscribers
     ros::Publisher smooth_path_publisher;
     ros::Publisher visualization_publisher;
     ros::Subscriber pose_subscriber;
     ros::Subscriber odom_subscriber;
     ros::Subscriber completed_knot_subscriber;
+    ros::Subscriber stitched_path_subscriber;
     ros::Subscriber max_velocity_subscriber;
+
+    // Parameters
     double maximum_linear_velocity;
     double linear_acceleration;
     double maximum_slew_radians_per_second;
     double replan_look_ahead_buffer_time;
     double replan_look_ahead_time;
     double yaw_epsilon;
-    uint32_t path_end_sequence_id;
+
+    // Message data
     std_msgs::Header completed_knot_header;
     nav_msgs::Odometry odometry;
     Eigen::Vector3d sternPodVector;
-    platform_motion_msgs::Path last_path_msg;
+    platform_motion_msgs::Path stitched_path;
     std::vector<platform_motion_msgs::Knot>::iterator replan_ahead_iter;
+    bool is_replan_ahead_iter_valid;
 };
 };
