@@ -122,8 +122,10 @@ class SimpleMotion(object):
         self.stopping_yaw = self.current_twist.angular.z**2/(2*self.max_acceleration/np.abs(pos[0]))
 
       print "target_angle: %s" % (str(self.target_angle))
-      print("stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos)))
-      
+      print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
+      print "epsilon: %s" % (str(self.wheel_pos_epsilon))
+      print "stern_eps: %s" % (str(np.abs(self.stern_pos-self.target_angle)))
+
       #wait until correct steering angles are achieved
       if (np.abs(self.stern_pos-self.target_angle)>self.wheel_pos_epsilon or
           np.abs(self.port_pos)>self.wheel_pos_epsilon or
