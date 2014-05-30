@@ -142,6 +142,7 @@ class SimpleMotion(object):
       elif (self.current_twist.angular.z*np.abs(pos[0])) < self.max_velocity:
         twist = self.current_twist
         twist.angular.z += np.sign(rot)*self.accel_per_loop/np.abs(pos[0])
+        rospy.loginfo("Current vel: %s, Max vel: %s " % (self.current_twist.angular.z*np.abs(pos[0]), self.max_velocity))
         rospy.loginfo("Outgoing twist to accel: " + str(twist))
         self.publisher.publish(twist)
         self.current_twist = twist
