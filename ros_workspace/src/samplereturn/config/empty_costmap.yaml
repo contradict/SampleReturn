@@ -1,0 +1,7 @@
+rolling_window: true
+plugins:
+    -
+        name: footprint_layer
+        type: "costmap_2d::FootprintLayer"
+
+
