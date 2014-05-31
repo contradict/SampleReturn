@@ -124,15 +124,13 @@ class VisualServo:
 	def object_point_callback(self, data):
 		# This function receives a centroid location of an object in pixel space
 		if self._camera_left_image_width > 0 and \
-                self._camera_left_image_height > 0 and \
-                self._camera_right_image_width > 0 and \
-                self._camera_right_image_height > 0 and \
-                data.name==self._target_name:
-			rospy.loginfo(rospy.get_name() + ": received point for %s: %s" % (data.name, data.point))
+		self._camera_left_image_height > 0 and \
+		self._camera_right_image_width > 0 and \
+		self._camera_right_image_height > 0 and \
 
-			self._previous_point = data.point
-			self._previous_time = data.header.stamp
-			self._stop_wait_timer = 0.0
+		self._previous_point = data.point
+		self._previous_time = data.header.stamp
+		self._stop_wait_timer = 0.0
 
 		# If we were stopped and waiting for input, restart!
 		if self._visual_servo_state == VisualServoStates.STOP_AND_WAIT:
