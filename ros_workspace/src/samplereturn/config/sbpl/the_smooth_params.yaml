@@ -1,3 +1,8 @@
 TheSmoothPlanner:
     maximum_linear_velocity: 0.5
     linear_acceleration: 0.5
+    replan_look_ahead_buffer_time: 5.0
+    replan_look_ahead_time: 10.0
+    maximum_slew_radians_per_second: 0.3
+    yaw_epsilon: 0.0001
+    delta_time_after_goal_drop_path: 20.0
