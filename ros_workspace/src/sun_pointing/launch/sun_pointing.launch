@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+  <node
+    machine="navigate"
+    name="compute_sun_angle"
+    pkg="sun_pointing"
+    type="compute_angle_server.py"
+    ns="/processes/compute_sun_angle">
+    <rosparam>
+      compute_sun_angle_params:
+        max_velocity: 0.4
+        acceleration: 0.4
+        stop_deceleration: 1.5
+        timeout: 20
+        loop_rate: 10
+        steering_angle_epsilon: 0.01
+    </rosparam>
+    <remap from="image" to="/cameras/manipulator/left/image_rect_color"/>
+    <remap from="odometry" to="/motion/odometry"/>
+  </node>
+</launch>
