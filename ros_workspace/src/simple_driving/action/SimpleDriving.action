@@ -1,0 +1,12 @@
+#goal
+geometry_msgs/PoseStamped pose
+---
+#result
+bool success
+geometry_msgs/Point position_error
+std_msgs/Float64 yaw_error
+---
+#feedback
+geometry_msgs/Point position_error
+std_msgs/Float64 yaw_error
+
