@@ -127,7 +127,7 @@ class SimpleMover(object):
 
       #do not pass here until odom callback fires, 
       #passing means starting_yaw is now initialized
-      if self.got_odom and self.got_joint_state:
+      if not self.got_odom or not self.got_joint_state:
         rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")      
         continue
       
