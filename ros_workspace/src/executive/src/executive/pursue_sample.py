@@ -393,6 +393,8 @@ class VisualServo(smach.State):
         
     def execute(self, userdata):
         
+        rospy.loginfo("VISUAL_SERVO_STATE entry detected sample: " + str(userdata.detected_sample))
+        
         self.sample_lost = False
         self.last_sample_detected = rospy.get_time()
         self.last_servo_feedback = rospy.get_time()
