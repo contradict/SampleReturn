@@ -88,7 +88,7 @@ class ManualController(object):
                 delta_time = (this_time - visual_servo_feedback.last_servo_feedback)
                 if delta_time > 5.0:
                     if feedback.state == feedback.STOP_AND_WAIT:
-                        visual_servo_feedback.announcer.say("No sample detected")
+                        announcer.say("No sample detected")
                     else:
                         announcer.say("range %d"%(10*int(feedback.error/10)))
                     visual_servo_feedback.last_servo_feedback = this_time
