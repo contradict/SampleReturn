@@ -5,9 +5,6 @@ resolution: 0.10
 
 plugins:
     -
-        name: footprint_layer
-        type: "costmap_2d::FootprintLayer"
-    -
         name: obstacle_layer
         type: "costmap_2d::VoxelLayer"
     -
@@ -19,7 +16,7 @@ obstacle_layer:
     z_resolution: 0.10
     z_voxels: 16
     unknown_threshold: 1
-    mark_threshold: 4
+    mark_threshold: 5
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true

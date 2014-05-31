@@ -156,9 +156,9 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                         yaw_prev = yaw;
                     }
 
-                    if ( (aheadTime > ros::Duration(replan_look_ahead_time)) &&
-                        (fabs(yaw-yaw_prev) < yaw_epsilon) )
+                    if ( (aheadTime > ros::Duration(replan_look_ahead_time)) )
                     {
+                        ROS_WARN("Stitching with dyaw %f", fabs(yaw-yaw_prev) );
                         sourcePose->pose = (*searchAheadIter).pose;
                         sourcePose->header = (*searchAheadIter).header;
                         this->replan_ahead_iter = searchAheadIter;
@@ -178,7 +178,7 @@ bool TheSmoothPlanner::isGoalReached()
     // The pvt_segment code in platform_motion knows how to answer this
     // question much better than the local planner.  The goal is reached
     // when all pvt segments have been executed to completion.
-    return (stitched_path.knots.size() == 0 || completed_knot_header.seq == stitched_path.knots.back().header.seq);
+    return (stitched_path.knots.size() > 0 && completed_knot_header.seq == stitched_path.knots.back().header.seq);
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
@@ -405,9 +405,15 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             timestamp = (*lookAheadBufferKnotIter).header.stamp;
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
+        else
+        {
+            ROS_DEBUG("Got unexpected plan, incorrect first point position, ignoring.");
+            return;
+        }
     }
-    else if (!isGoalReached())
+    else if (!isGoalReached() && (stitched_path.knots.size()>0) )
     {
+        ROS_DEBUG("Recieved unexpected path, no iter, ignoring.");
         return;
     }
 
@@ -747,6 +753,7 @@ void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velo
 
 void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitchedPath)
 {
+    ROS_DEBUG("RECEIVED STITCHED PATH");
     this->stitched_path = stitchedPath;
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;

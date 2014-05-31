@@ -35,6 +35,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         void plannerTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void joystickTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
         void servoTwistCallback(const geometry_msgs::Twist::ConstPtr twist);
+        void publishStitchedPath(void);
         void plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path);
         void handleTwist(const geometry_msgs::Twist::ConstPtr twist);
         int computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
@@ -196,6 +197,8 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         // to avoid flipping steering angle all the damn time!
         double lastValidSternSteeringAngle, lastValidPortSteeringAngle, lastValidStarboardSteeringAngle;
         std::mutex path_mutex_;
+
+        int stitched_counter_;
 };
 
 }

@@ -44,6 +44,8 @@ def integrate_pose_cubic(L, b, c, initial_yaw=0, N=100):
 def optimize(dx, dy, dyaw, initial_yaw=0):
     error = lambda x : integrate_pose_cubic(x[0], x[1], x[2], initial_yaw=initial_yaw)[-1]-np.r_[dx,dy,dyaw+initial_yaw]
     L = math.sqrt(dx*dx+dy*dy)
+    if L == 0:
+        return [0, 0, 0]
     b = 12*dyaw/L/3.
     c = dyaw/L/12.
     x0 = np.r_[L, b, c]
@@ -359,7 +361,10 @@ def smoothhook(arcdist, initialyaw, deltayaw, gridSpacing=0.1, pathSpacing=0.1):
     dy = round(dy/gridSpacing)*gridSpacing # clamp dx, dy to the grid
     xopt = optimize(dx, dy, deltayaw, initialyaw)
     poses = integrate_pose_cubic(xopt[0], xopt[1], xopt[2], initialyaw)
-    N = int(len(poses)*pathSpacing / arcdist)
+    if arcdist == 0:
+        N = 0
+    else:
+        N = int(len(poses)*pathSpacing / arcdist)
     for pose in poses[0::N+1]:
         yawtoknot(knot, pose[2])
         knot.pose.position.x = pose[0]
@@ -486,10 +491,11 @@ def closePrimitivesFile(primdata):
 
 def generateMotionPrimitives(showplots=False):
     gridspacing = 0.1
-    numangles = 8
+    numangles = 16
     deltayaw = 2*pi/numangles
-    longrangeprims = [[8, 0.1],[3.0, 0.1]] # List of [forward dist, path spacing]
-    shortrangeprims = [[gridspacing, 0.05], [0.3, gridspacing], [1.0, gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
+    longrangeprims = [[8, gridspacing],[3.0, gridspacing]] # List of [forward dist, path spacing]
+    shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, gridspacing], [1.0, gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
+    turninplacecost = 4.0*max(longrangeprim[0] for longrangeprim in longrangeprims)
     primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
     for i in xrange(0,numangles):
         initialyaw = 2*pi*i/numangles
@@ -502,8 +508,13 @@ def generateMotionPrimitives(showplots=False):
                 plotPath(path)
 
             # Forward
-            path = forward(longrangeprim[0], initialyaw, gridspacing, longrangeprim[1])
-            pathdata.append({'path' : path, 'cost' : int(longrangeprim[0]), 'endpose_c' : i})
+            forwarddist = longrangeprim[0]
+            forwardcost = int(longrangeprim[0])
+            if (i % 2) != 0:
+                forwarddist = 0
+                forwardcost = 99999999999999
+            path = smoothhook(forwarddist, initialyaw, 0.0, gridspacing, longrangeprim[1])
+            pathdata.append({'path' : path, 'cost' : forwardcost, 'endpose_c' : i})
             if showplots:
                 plotPath(path)
 
@@ -513,36 +524,42 @@ def generateMotionPrimitives(showplots=False):
             if showplots:
                 plotPath(path)
 
+        # Only generate short-range primitives at 45 degree angle increments
         for shortrangeprim in shortrangeprims:
             # Short forward
-            path = forward(shortrangeprim[0], initialyaw, gridspacing, shortrangeprim[1])
-            pathdata.append({'path' : path, 'cost' : int(shortrangeprim[0]), 'endpose_c' : i})
+            forwarddist = shortrangeprim[0]
+            forwardcost = int(shortrangeprim[0])
+            if (i % 2) != 0:
+                forwarddist = 0
+                forwardcost = 99999999999999
+            path = smoothhook(forwarddist, initialyaw, 0.0, gridspacing, shortrangeprim[1])
+            pathdata.append({'path' : path, 'cost' : forwardcost, 'endpose_c' : i})
             if showplots:
                 plotPath(path)
 
-            # Turn in place to the right
-            #path = turnInPlace(initialyaw, -deltayaw)
-            #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
-            #if showplots:
-            #   plotPath(path)
+        # Turn in place to the right
+        #path = turnInPlace(initialyaw, -deltayaw)
+        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i-1})
+        #if showplots:
+        #   plotPath(path)
 
-            # Turn in place to the left 
-            #path = turnInPlace(initialyaw, deltayaw)
-            #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
-            #if showplots:
-            #   plotPath(path)
+        # Turn in place to the left 
+        #path = turnInPlace(initialyaw, deltayaw)
+        #pathdata.append({'path' : path, 'cost' : 3, 'endpose_c' : i+1})
+        #if showplots:
+        #   plotPath(path)
 
-            # Turn in place to the right
-            path = fakeTurnInPlace(initialyaw, -deltayaw)
-            pathdata.append({'path' : path, 'cost' : 16, 'endpose_c' : i-1})
-            if showplots:
-                plotPath(path)
+        # Turn in place to the right
+        path = fakeTurnInPlace(initialyaw, -deltayaw)
+        pathdata.append({'path' : path, 'cost' : turninplacecost, 'endpose_c' : i-1})
+        if showplots:
+            plotPath(path)
 
-            # Turn in place to the left 
-            path = fakeTurnInPlace(initialyaw, deltayaw)
-            pathdata.append({'path' : path, 'cost' : 16, 'endpose_c' : i+1})
-            if showplots:
-                plotPath(path)
+        # Turn in place to the left 
+        path = fakeTurnInPlace(initialyaw, deltayaw)
+        pathdata.append({'path' : path, 'cost' : turninplacecost, 'endpose_c' : i+1})
+        if showplots:
+            plotPath(path)
 
         addToPrimitivesFile(primfile, pathdata)
 
