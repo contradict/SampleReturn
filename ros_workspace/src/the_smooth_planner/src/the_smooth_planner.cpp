@@ -67,6 +67,9 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     smooth_path_publisher = localNodeHandle.advertise<platform_motion_msgs::Path>("/motion/planned_path", 1);
     visualization_publisher = localNodeHandle.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
+    desired_stitch_point_publisher = localNodeHandle.advertise<geometry_msgs::PoseStamped>("/motion/desired_stitch_point", 1);
+    buffer_point_publisher = localNodeHandle.advertise<geometry_msgs::PoseStamped>("/motion/buffer_point", 1);
+
     // Wait for and look up the transform for the stern wheel pod
     ROS_INFO("Waiting for stern wheel transform");
     ros::Time now(0);
@@ -164,6 +167,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                         sourcePose->header = (*searchAheadIter).header;
                         this->replan_ahead_iter = searchAheadIter;
                         this->is_replan_ahead_iter_valid = true;
+                        desired_stitch_point_publisher.publish(*sourcePose);
                         return true;
                     }
                 }
@@ -377,6 +381,14 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 {
                     ROS_DEBUG("timestamp for first lookahead buffer pose ok!");
                     lookAheadBufferKnotIter = prevPathIter;
+                    geometry_msgs::PoseStamped bufferStamped;
+                    bufferStamped.pose = (*lookAheadBufferKnotIter).pose;
+                    bufferStamped.header = (*lookAheadBufferKnotIter).header;
+                    buffer_point_publisher.publish(bufferStamped);
+                    geometry_msgs::PoseStamped stitchedStamped;
+                    stitchedStamped.pose = (*replan_ahead_iter).pose;
+                    stitchedStamped.header = (*replan_ahead_iter).header;
+                    desired_stitch_point_publisher.publish(stitchedStamped);
                     break;
                 }
             }
@@ -393,8 +405,12 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 geometry_msgs::PoseStamped insertPose;
                 insertPose.pose = (*insertKnotIter).pose;
                 insertPoses.push_back(insertPose);
+                ROS_ERROR_STREAM("adding pose to front of replanned path: " << insertPose);
             }
+            ROS_ERROR("pathCopy.poses size before prepend: %d", pathCopy.poses.size());
             pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
+            ROS_ERROR("pathCopy.poses size after prepend: %d", pathCopy.poses.size());
+            ROS_ERROR("inserted %d poses at front of replan path", insertPoses.size());
 
             // Set the initial knot to the first one in the spliced path
             initialKnot = (*lookAheadBufferKnotIter);

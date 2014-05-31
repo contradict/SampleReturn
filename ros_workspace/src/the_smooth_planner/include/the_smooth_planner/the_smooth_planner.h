@@ -77,6 +77,10 @@ private:
     ros::Subscriber stitched_path_subscriber;
     ros::Subscriber max_velocity_subscriber;
 
+    // debug publishers
+    ros::Publisher desired_stitch_point_publisher;;
+    ros::Publisher buffer_point_publisher;;
+
     // Parameters
     double maximum_linear_velocity;
     double linear_acceleration;
