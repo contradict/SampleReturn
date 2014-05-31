@@ -98,7 +98,7 @@ class ManualController(object):
                 return None
             visual_servo_feedback.last_sample_detected = rospy.get_time()
             visual_servo_feedback.last_servo_feedback = rospy.get_time()
-            
+
             smach.StateMachine.add('VISUAL_SERVO',
                                     InterruptibleActionClientState(
                                         "visual_servo_action",
@@ -107,8 +107,8 @@ class ManualController(object):
                                         None,
                                         visual_servo_feedback,
                                         self.announcer,
-                                        "Visual servo unavailable."
-                                        "Aligning to sample.",
+                                        "Visual servo unavailable",
+                                        "Aligning to sample",
                                         120.0,
                                         "Visual servo timed out"
                                         ),
