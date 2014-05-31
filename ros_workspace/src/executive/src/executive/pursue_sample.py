@@ -183,7 +183,7 @@ class PursueSample(object):
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = False,
-                                                    timeout = 10,
+                                                    timeout = 20,
                                                     announcer = self.announcer,
                                                     start_message ='Pursuit paused, waiting for un pause'),
                                    transitions = {'next':'VISUAL_SERVO',
@@ -269,7 +269,6 @@ class PursueSample(object):
                 rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
 
     def sample_detection_manipulator(self, sample):
-        rospy.loginfo("PURSUE_SAMPLE manipulator detection callback: " + str(sample))
         self.state_machine.userdata.detected_sample = sample
 
     def pause_state_update(self, msg):
