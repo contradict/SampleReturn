@@ -54,7 +54,7 @@ class RobotSimulator(object):
         
         self.active_sample_id = None
         self.collected_ids = []
-        self.fake_samples = [{'point':geometry_msg.Point(11, -11, 0),'id':1},
+        self.fake_samples = [{'point':geometry_msg.Point(12, -12, 0),'id':1},
                              {'point':geometry_msg.Point(25, -20, 0),'id':5},
                              {'point':geometry_msg.Point(-15, 2, 0), 'id':3},
                              {'point':geometry_msg.Point(-55, 5, 0), 'id':7},
@@ -63,7 +63,7 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-40, -20, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
                              {'point':geometry_msg.Point(15, -42, 0), 'id':4},
-                             {'point':geometry_msg.Point(155, 20, 0), 'id':8}]
+                             {'point':geometry_msg.Point(14, 3, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
         self.sample_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
