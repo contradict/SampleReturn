@@ -233,6 +233,9 @@ class KalmanDetectionFilter
         cam_xyz_point.x = temp_point.point.x;
         cam_xyz_point.y = temp_point.point.y;
         cam_xyz_point.z = temp_point.point.z;
+        cam_xyz_point.x /= cam_xyz_point.z
+        cam_xyz_point.y /= cam_xyz_point.z
+        cam_xyz_point.z /= cam_xyz_point.z
         cv::Point2d uv_point = cam_model_.project3dToPixel(cam_xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         img_point_msg.header.frame_id = "";
