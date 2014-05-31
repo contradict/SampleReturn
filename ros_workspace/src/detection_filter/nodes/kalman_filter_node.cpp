@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <image_geometry/pinhole_camera_model.h>
+#include <tf/transform_listener.h>
 
 #include <ros/ros.h>
 #include <ros/time.h>
@@ -61,6 +62,7 @@ class KalmanDetectionFilter
   double period_;
 
   image_geometry::PinholeCameraModel cam_model_;
+  tf::TransformListener listener_;
 
   public:
   KalmanDetectionFilter()
@@ -188,7 +190,7 @@ class KalmanDetectionFilter
         img_point_msg.header.stamp = ros::Time::now();
         img_point_msg.point.x = uv_point.x;
         img_point_msg.point.y = uv_point.y;
-        img_point_msg.point.y = 0;
+        img_point_msg.point.z = 0;
         pub_img_detection.publish(img_point_msg);
       }
     }
@@ -220,13 +222,24 @@ class KalmanDetectionFilter
         xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
         xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
         xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
-        cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
+        geometry_msgs::PointStamped odom_point;
+        odom_point.header = msg.header;
+        odom_point.point.x = xyz_point.x;
+        odom_point.point.y = xyz_point.y;
+        odom_point.point.z = xyz_point.z;
+        geometry_msgs::PointStamped temp_point;
+        listener_.transformPoint("manipulator_left_camera", odom_point, temp_point);
+        cv::Point3d cam_xyz_point;
+        cam_xyz_point.x = temp_point.point.x;
+        cam_xyz_point.y = temp_point.point.y;
+        cam_xyz_point.z = temp_point.point.z;
+        cv::Point2d uv_point = cam_model_.project3dToPixel(cam_xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         img_point_msg.header.frame_id = "";
         img_point_msg.header.stamp = ros::Time::now();
         img_point_msg.point.x = uv_point.x;
         img_point_msg.point.y = uv_point.y;
-        img_point_msg.point.y = 0;
+        img_point_msg.point.z = 0;
         pub_img_detection.publish(img_point_msg);
       }
     }
