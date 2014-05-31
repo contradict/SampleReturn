@@ -83,8 +83,8 @@ class RobotSimulator(object):
         
         visual_servo_name = "/processes/visual_servo/servo_action"
         
-        detected_sample_search_name = "/processes/sample_detection/search/point"
-        detected_sample_manipulator_name = "/processes/sample_detection/manipulator/point"
+        detected_sample_search_name = "/processes/sample_detection/search/filtered_point"
+        detected_sample_manipulator_name = "/processes/sample_detection/manipulator/filtered_point"
         beacon_pose_name = "/processes/beacon_finder/beacon_pose"
 
         point_cloud_center_name = "/cameras/navigation/center/points2"
