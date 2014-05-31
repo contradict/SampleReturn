@@ -269,6 +269,7 @@ class PursueSample(object):
                 rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
 
     def sample_detection_manipulator(self, sample):
+        rospy.loginfo("PURSUE_SAMPLE manipulator detection callback: " + str(sample))
         self.state_machine.userdata.detected_sample = sample
 
     def pause_state_update(self, msg):
