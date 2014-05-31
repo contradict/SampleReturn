@@ -153,8 +153,8 @@ class ManualController(object):
                                        "Grabbing",
                                        30.0,
                                        "Manipulator grab timed out"),
-                                    transitions = {'complete':'RESUME_JOYSTICK',
-                                                   'canceled':'RESUME_JOYSTICK',
+                                    transitions = {'complete':'JOYSTICK_LISTEN',
+                                                   'canceled':'JOYSTICK_LISTEN',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
 
