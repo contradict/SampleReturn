@@ -102,7 +102,7 @@ class PursueSample(object):
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'},
                                    remapping = {'velocity':'pursuit_velocity',                
                                                 'max_point_lost_time':'max_sample_lost_time',
-                                                'pursue_samples':'false'})                
+                                                'pursue_samples':'false'})
             
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
