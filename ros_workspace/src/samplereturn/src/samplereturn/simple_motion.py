@@ -20,8 +20,6 @@ class SimpleMover(object):
     self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
     self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
 
-    self.starting_position = None
-    self.starting_yaw = None
     self.running = False
     self.stop_requested = False
 
@@ -38,20 +36,16 @@ class SimpleMover(object):
     quaternion[2] = msg.pose.pose.orientation.z
     quaternion[3] = msg.pose.pose.orientation.w
 
-    if self.starting_yaw is None:
-      self.starting_yaw = euler_from_quaternion(quaternion)[-1]
-
-    if self.starting_position is None:
-      self.starting_position = msg.pose.pose.position
-
     self.current_yaw = euler_from_quaternion(quaternion)[-1]
 
     self.current_position = msg.pose.pose.position
 
-    self.distance_traveled = np.sqrt((self.current_position.x-self.starting_position.x)**2 +
-                                     (self.current_position.y-self.starting_position.y)**2)
 
     self.got_odom = True    
+
+  def distance_traveled(self, goal):
+      return np.hypot(self.current_position.x-goal.x,
+                      self.current_position.y-goal.y)
 
   def joint_state_callback(self, msg):
 
@@ -114,11 +108,11 @@ class SimpleMover(object):
     stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(pos[0]))
     accel_per_loop = self.acceleration/self.loop_rate
 
-    self.starting_yaw = None
+    starting_yaw = self.current_yaw
     self.got_odom = False
     self.got_joint_state = False
  
-    self.target_yaw = self.unwind(self.starting_yaw + rot)
+    target_yaw = self.unwind(starting_yaw + rot)
     #start current twist at 0
     current_twist = Twist()
     current_vel = 0
@@ -159,7 +153,7 @@ class SimpleMover(object):
       stopping_yaw = current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
       
       #check if we are at decel point      
-      if np.abs(self.unwind(self.target_yaw - self.current_yaw)) < stopping_yaw:
+      if np.abs(self.unwind(target_yaw - self.current_yaw)) < stopping_yaw:
         break
 
       #if we are under max_vel keep accelerating      
@@ -200,8 +194,8 @@ class SimpleMover(object):
   def execute_strafe(self, angle, distance, time_limit=20.0, stop_function = None):
     self.stop_requested = False
     self.running = True
-    
-    self.starting_position = None
+
+    starting_position = self.current_position
 
     timeout_time = rospy.Time.now()
     timeout_time.secs += time_limit
@@ -264,7 +258,7 @@ class SimpleMover(object):
 
       # check if we are must decelerate to stop now
       # distance = (velocity**2)/(2*accel_limit)
-      elif (distance-self.distance_traveled) < stopping_distance:
+      elif (distance-self.distance_traveled(starting_position) < stopping_distance):
         break
 
       # Accelerate until max_vel reached
