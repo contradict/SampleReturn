@@ -493,9 +493,12 @@ def generateMotionPrimitives(showplots=False):
     gridspacing = 0.1
     numangles = 16
     deltayaw = 2*pi/numangles
-    longrangeprims = [[8, gridspacing],[3.0, gridspacing]] # List of [forward dist, path spacing]
+    longrangeprims = []#[8, gridspacing],[3.0, gridspacing]] # List of [forward dist, path spacing]
     shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, gridspacing], [1.0, gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
-    turninplacecost = 4.0*max(longrangeprim[0] for longrangeprim in longrangeprims)
+    if len(longrangeprims):
+        turninplacecost = 3.0*max(longrangeprim[0] for longrangeprim in longrangeprims)
+    else:
+        turninplacecost = 4.0*max(shortrangeprim[0] for shortrangeprim in shortrangeprims)
     primfile = openPrimitivesFile("motion_primitives.mprim", gridspacing)
     for i in xrange(0,numangles):
         initialyaw = 2*pi*i/numangles
