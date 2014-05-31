@@ -172,13 +172,21 @@ class PursueSample(object):
                                                   'preempted':'CHECK_PAUSE_STATE',
                                                   'aborted':'ABORT_SERVO'})
 
+            smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
+                                   ConfirmSampleAcquired(self.announcer, self.result_pub),
+                                   transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
+                                                  'sample_present':'VISUAL_SERVO',
+                                                  'preempted':'DISABLE_MANIPULATOR_DETECTOR',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
+
             #if the grab action is preempted by shutdown (or other non-pause reason),
             #exit pursue sample.  If paused, wait for unpause
             smach.StateMachine.add('CHECK_PAUSE_STATE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = True),
                                    transitions = {'next':'WAIT_FOR_UNPAUSE',
-                                                  'timeout':'ABORT_SERVO'})
+                                                  'timeout':'ABORT_SERVO',
+                                                  'preempted':'ABORT_SERVO'})
             
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
@@ -195,14 +203,8 @@ class PursueSample(object):
                                                      MODE_PLANNER),
                                     transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR',
                                                    'failed':'DISABLE_MANIPULATOR_DETECTOR'})                
-    
-            smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
-                                   ConfirmSampleAcquired(self.announcer, self.result_pub),
-                                   transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
-                                                  'sample_present':'VISUAL_SERVO',
-                                                  'preempted':'DISABLE_MANIPULATOR_DETECTOR',
-                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
-            
+   
+
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
