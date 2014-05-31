@@ -116,6 +116,16 @@ class ManualController(object):
                                                    'canceled':'SELECT_JOYSTICK',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('ANNOUNCE_SERVO_COMPLETE',
+                                   AnnounceState(self.announcer,
+                                                 'Servo complete'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})   
+            
+            smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
+                                   AnnounceState(self.announcer,
+                                                 'Servo canceled'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})   
             
             smach.StateMachine.add('SELECT_PAUSE',
                                    SelectMotionMode(self.CAN_interface,
@@ -147,12 +157,16 @@ class ManualController(object):
                                                    'canceled':'RESUME_JOYSTICK',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
-             
-            smach.StateMachine.add('RESUME_JOYSTICK',
-                                   SelectMotionMode(self.CAN_interface,
-                                                    MODE_RESUME),
-                                   transitions = {'next':'JOYSTICK_LISTEN',
-                                                  'failed':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
+                                   AnnounceState(self.announcer,
+                                                 'Servo complete'),
+                                   transitions = {'next':'JOYSTICK_LISTEN'})   
+            
+            smach.StateMachine.add('ANNOUNCE_GRAB_CANCELED',
+                                   AnnounceState(self.announcer,
+                                                 'Servo canceled'),
+                                   transitions = {'next':'JOYSTICK_LISTEN'})   
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
                                      ManualPreempted(self.CAN_interface),
