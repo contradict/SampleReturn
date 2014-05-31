@@ -1,6 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #manual control node
-
 import math
 import smach
 import smach_ros
@@ -48,6 +47,13 @@ class ManualController(object):
         
         with self.state_machine:
             
+            MODE_JOYSTICK = platform_srv.SelectMotionModeRequest.MODE_JOYSTICK
+            MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
+            MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
+            MODE_RESUME = platform_srv.SelectMotionModeRequest.MODE_RESUME
+            MODE_HOME = platform_srv.SelectMotionModeRequest.MODE_HOME
+            MODE_UNLOCK = platform_srv.SelectMotionModeRequest.MODE_UNLOCK
+            MODE_LOCK = platform_srv.SelectMotionModeRequest.MODE_LOCK
            
             smach.StateMachine.add('START_MANUAL_CONTROL',
                                    ProcessGoal(self.announcer),
@@ -56,8 +62,7 @@ class ManualController(object):
             
             smach.StateMachine.add('SELECT_JOYSTICK',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_JOYSTICK),
+                                                    MODE_JOYSTICK),
                                    transitions = {'next':'JOYSTICK_LISTEN',
                                                   'failed':'MANUAL_ABORTED'})
             
@@ -72,9 +77,7 @@ class ManualController(object):
             
             smach.StateMachine.add('SELECT_SERVO',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_SERVO,
-                                       failannounce="Unable to select visual servo."),
+                                                    MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'failed':'SELECT_JOYSTICK'})
              
@@ -85,7 +88,7 @@ class ManualController(object):
                 delta_time = (this_time - visual_servo_feedback.last_servo_feedback)
                 if delta_time > 5.0:
                     if feedback.state == feedback.STOP_AND_WAIT:
-                        visual_servo_feedback.announcer.say("No sample detected")
+                        announcer.say("No sample detected")
                     else:
                         announcer.say("range %d"%(10*int(feedback.error/10)))
                     visual_servo_feedback.last_servo_feedback = this_time
@@ -95,7 +98,7 @@ class ManualController(object):
                 return None
             visual_servo_feedback.last_sample_detected = rospy.get_time()
             visual_servo_feedback.last_servo_feedback = rospy.get_time()
-            
+
             smach.StateMachine.add('VISUAL_SERVO',
                                     InterruptibleActionClientState(
                                         "visual_servo_action",
@@ -104,31 +107,40 @@ class ManualController(object):
                                         None,
                                         visual_servo_feedback,
                                         self.announcer,
-                                        "Visual servo unavailable."
-                                        "Aligning to sample.",
-                                        120.0,
+                                        "Visual servo unavailable",
+                                        "Aligning to sample",
+                                        60.0,
                                         "Visual servo timed out"
                                         ),
                                     transitions = {'complete':'SELECT_JOYSTICK',
                                                    'canceled':'SELECT_JOYSTICK',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('ANNOUNCE_SERVO_COMPLETE',
+                                   AnnounceState(self.announcer,
+                                                 'Servo complete'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})   
+            
+            smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
+                                   AnnounceState(self.announcer,
+                                                 'Servo canceled'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})   
             
             smach.StateMachine.add('SELECT_PAUSE',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE,
-                                       failannounce="Unable to pause for grab."
-                                       ),
+                                                    MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
                                                   'failed':'SELECT_JOYSTICK'})
  
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
                 grab_msg.type = grab_msg.GRAB
-                grab_msg.wrist_angle = userdata.detected_sample.grip_angle
                 grab_msg.grip_torque = 0.7
                 grab_msg.target_bin = 1
+                grab_msg.wrist_angle = 0
+                if userdata.detected_sample is not None:
+                    grab_msg.wrist_angle = userdata.detected_sample.grip_angle
                 return grab_msg
             
             smach.StateMachine.add('MANIPULATOR_GRAB',
@@ -143,18 +155,20 @@ class ManualController(object):
                                        "Grabbing",
                                        30.0,
                                        "Manipulator grab timed out"),
-                                    transitions = {'complete':'RESUME_JOYSTICK',
-                                                   'canceled':'RESUME_JOYSTICK',
+                                    transitions = {'complete':'JOYSTICK_LISTEN',
+                                                   'canceled':'JOYSTICK_LISTEN',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
-             
-            smach.StateMachine.add('RESUME_JOYSTICK',
-                                   SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_RESUME,
-                                       failannounce="Unable to resume from grab."),
-                                   transitions = {'next':'JOYSTICK_LISTEN',
-                                                  'failed':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
+                                   AnnounceState(self.announcer,
+                                                 'Servo complete'),
+                                   transitions = {'next':'JOYSTICK_LISTEN'})   
+            
+            smach.StateMachine.add('ANNOUNCE_GRAB_CANCELED',
+                                   AnnounceState(self.announcer,
+                                                 'Servo canceled'),
+                                   transitions = {'next':'JOYSTICK_LISTEN'})   
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
                                      ManualPreempted(self.CAN_interface),
@@ -168,9 +182,7 @@ class ManualController(object):
 
             smach.StateMachine.add('SELECT_HOME',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_HOME,
-                                       failannounce="Unable to select home ing mode."),
+                                                    MODE_HOME),
                                    transitions = {'next':'PERFORM_HOME',
                                                   'failed':'SELECT_JOYSTICK'})
 
@@ -195,17 +207,13 @@ class ManualController(object):
 
             smach.StateMachine.add('SELECT_PAUSE_FOR_LOCK',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_PAUSE,
-                                       failannounce="Unable to pause for lock, attempting lock anyway."),
+                                                    MODE_PAUSE),
                                    transitions = {'next':'SELECT_LOCK',
                                                   'failed':'SELECT_LOCK'})
 
             smach.StateMachine.add('SELECT_LOCK',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_LOCK,
-                                       failannounce="Unable to lock."),
+                                                    MODE_LOCK),
                                    transitions = {'next':'ANNOUNCE_LOCK',
                                                   'failed':'RESUME_FROM_LOCK'})
 
@@ -224,17 +232,13 @@ class ManualController(object):
 
             smach.StateMachine.add('SELECT_UNLOCK',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_UNLOCK,
-                                       failannounce="Unable to unlock."),
+                                                    MODE_UNLOCK),
                                    transitions = {'next':'RESUME_FROM_LOCK',
                                                   'failed':'RESUME_FROM_LOCK'})
 
             smach.StateMachine.add('RESUME_FROM_LOCK',
                                    SelectMotionMode(self.CAN_interface,
-                                       self.announcer,
-                                       platform_srv.SelectMotionModeRequest.MODE_RESUME,
-                                       failannounce="Resume from unlock failed."),
+                                                    MODE_RESUME),
                                    transitions = {'next':'JOYSTICK_LISTEN',
                                                   'failed':'SELECT_JOYSTICK'})
 
@@ -270,10 +274,7 @@ class ManualController(object):
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         
     def sample_detection_manipulator(self, sample):
-        if sample.name == 'none':
-            self.state_machine.userdata.detected_sample = None
-        else:
-            self.state_machine.userdata.detected_sample = sample
+        self.state_machine.userdata.detected_sample = sample
 
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -547,11 +548,9 @@ class ManualPreempted(smach.State):
         
         #we are preempted by the top state machine
         #set motion mode to None and exit
-        self.CAN_interface.select_mode(
-                platform_srv.SelectMotionModeRequest.MODE_PAUSE)
+        self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_PAUSE)
 
-        self.CAN_interface.select_mode(
-                platform_srv.SelectMotionModeRequest.MODE_ENABLE)
+        self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_ENABLE)
         
         result = platform_msg.ManualControlResult('preempted')
         userdata.action_result = result

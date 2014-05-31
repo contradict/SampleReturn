@@ -38,16 +38,19 @@ void WheelPod::setCallbacks(CANOpen::DS301CallbackObject wheelcb,
 void WheelPod::drive(double angle, double omega)
 {
     _setMode(PodDrive);
+    
+    if(angle>steering_max) {
+        angle -= M_PI;
+        omega *= -1.0;
+    }
+    if(angle<steering_min) {
+        angle += M_PI;
+        omega *= -1.0;
+    }
 
+    //apply steering offset after mirror
     desired_steering_position = angle-steering_offset;
-    if(desired_steering_position>steering_max) {
-        desired_steering_position -= M_PI;
-        omega *= -1.0;
-    }
-    if(desired_steering_position<steering_min) {
-        desired_steering_position += M_PI;
-        omega *= -1.0;
-    }
+        
     desired_omega = omega;
     int position = round(steering_encoder_counts*desired_steering_position/2./M_PI);
     /*
@@ -239,7 +242,7 @@ void WheelPod::computeSteeringAndVelocity(
         ROS_ERROR( "Steering angle too small: %f < %f", steeringAngle, steering_min);
         steeringAngle = steering_min;
     }
-
+    
     // account for the steering angle offset
     steeringAngle -= steering_offset;
 

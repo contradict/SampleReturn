@@ -20,7 +20,7 @@ class VoltageAnnouncer(object):
 
     def gpio(self, gpio):
         if gpio.servo_id == self.servo_id:
-            if ((gpio.previous_pin_states ^ gpio.new_pin_states) &
+            if ((gpio.previous_pin_states & ~gpio.new_pin_states) &
                     self.button_mask):
                 self.sayVoltage()
 
