@@ -126,11 +126,11 @@ class VisualServo:
 		if self._camera_left_image_width > 0 and \
 		self._camera_left_image_height > 0 and \
 		self._camera_right_image_width > 0 and \
-		self._camera_right_image_height > 0 and \
+		self._camera_right_image_height > 0:
 
-		self._previous_point = data.point
-		self._previous_time = data.header.stamp
-		self._stop_wait_timer = 0.0
+			self._previous_point = data.point
+			self._previous_time = data.header.stamp
+			self._stop_wait_timer = 0.0
 
 		# If we were stopped and waiting for input, restart!
 		if self._visual_servo_state == VisualServoStates.STOP_AND_WAIT:
