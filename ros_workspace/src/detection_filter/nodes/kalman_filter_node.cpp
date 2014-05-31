@@ -217,9 +217,9 @@ class KalmanDetectionFilter
       }
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
-        xyz_point.x = double(latched_filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(latched_filter_list_[0]->statePost.at<float>(1));
-        xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
+        xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
         cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         img_point_msg.header.frame_id = "";
