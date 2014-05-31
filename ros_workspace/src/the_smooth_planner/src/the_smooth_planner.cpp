@@ -413,6 +413,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
     else if (!isGoalReached() && (stitched_path.knots.size()>0) )
     {
+        ROS_DEBUG("Recieved unexpected path, no iter, ignoring.");
         return;
     }
 
@@ -752,6 +753,7 @@ void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velo
 
 void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitchedPath)
 {
+    ROS_DEBUG("RECEIVED STITCHED PATH");
     this->stitched_path = stitchedPath;
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
