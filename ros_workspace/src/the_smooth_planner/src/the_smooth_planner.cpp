@@ -41,6 +41,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 1.0);
     localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 4.0);
     localNodeHandle.param("yaw_epsilon", yaw_epsilon, 1e-4);
+    localNodeHandle.param("delta_time_after_goal_drop_path", delta_time_after_goal_drop_path, 20.0);
 
     this->odometry = nav_msgs::Odometry();
     this->completed_knot_header = std_msgs::Header();
@@ -406,7 +407,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
     }
-    else if (!isGoalReached() && (stitched_path.knots.size()>0) )
+    else if (!isGoalReached() && (stitched_path.knots.size()>0) && (timestamp - stitched_path.knots.back().header.stamp) < ros::Duration(delta_time_after_goal_drop_path) )
     {
         return;
     }

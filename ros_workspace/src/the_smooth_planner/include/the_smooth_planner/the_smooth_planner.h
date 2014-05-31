@@ -84,6 +84,7 @@ private:
     double replan_look_ahead_buffer_time;
     double replan_look_ahead_time;
     double yaw_epsilon;
+    double delta_time_after_goal_drop_path;
 
     // Message data
     std_msgs::Header completed_knot_header;
