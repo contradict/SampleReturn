@@ -136,9 +136,11 @@ class ManualController(object):
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
                 grab_msg.type = grab_msg.GRAB
-                grab_msg.wrist_angle = userdata.detected_sample.grip_angle
                 grab_msg.grip_torque = 0.7
                 grab_msg.target_bin = 1
+                grab_msg.wrist_angle = 0
+                if userdata.detected_sample is not None:
+                    grab_msg.wrist_angle = userdata.detected_sample.grip_angle
                 return grab_msg
             
             smach.StateMachine.add('MANIPULATOR_GRAB',
