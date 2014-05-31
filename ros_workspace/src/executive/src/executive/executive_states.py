@@ -50,7 +50,7 @@ class MonitorTopicState(smach.State):
 
         self._trigger_cond = threading.Condition()
 
-    def execute(self, ud):
+    def execute(self, userdata):
 
         self._sub = rospy.Subscriber(self._topic, self._msg_type, self._sub_cb)
 
@@ -264,17 +264,17 @@ class DriveToPoseState(smach.State):
         self.listener = listener
         self.sample_detected = False
 
-    def execute(self, ud):
+    def execute(self, userdata):
         #on entry to Drive To Pose clear old sample_detections!
-        ud.detected_sample = None
+        userdata.detected_sample = None
         try:        
             last_pose = util.get_current_robot_pose(self.listener)
         except(tf.Exception):
             rospy.logwarn("DriveToPose failed to get current pose")
             return 'aborted'
-        velocity = ud.velocity
+        velocity = userdata.velocity
         goal = move_base_msg.MoveBaseGoal()
-        goal.target_pose=ud.target_pose
+        goal.target_pose=userdata.target_pose
         self.move_client.send_goal(goal)
         rospy.loginfo("DriveToPose initial goal: %s" % (goal))
         move_state = self.move_client.get_state()
@@ -287,7 +287,7 @@ class DriveToPoseState(smach.State):
             except(tf.Exception):
                 rospy.logwarn("DriveToPose failed to get current pose")
                 return 'aborted'
-            ud.last_pose = current_pose
+            userdata.last_pose = current_pose
             #is action server still working?
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
@@ -299,32 +299,32 @@ class DriveToPoseState(smach.State):
                 self.service_preempt()
                 return 'preempted'
             #handle sample detection
-            if (ud.detected_sample is not None) and ud.pursue_samples:
+            if (userdata.detected_sample is not None) and userdata.pursue_samples:
                 rospy.loginfo("DriveToPose detected sample: " + str(userdata.detected_sample))
-                if ud.stop_on_sample:
+                if userdata.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
             #handle target_pose changes
-            if ud.target_pose != goal.target_pose:
+            if userdata.target_pose != goal.target_pose:
                 rospy.loginfo("DriveToPose replanning")
-                goal.target_pose = ud.target_pose
+                goal.target_pose = userdata.target_pose
                 self.move_client.send_goal(goal)
             #check if we are stuck and move_base isn't handling it
             now = rospy.get_time()
-            if (now - last_motion_check_time) > ud.motion_check_interval:
+            if (now - last_motion_check_time) > userdata.motion_check_interval:
                 distance = util.pose_distance_2d(current_pose, last_pose)
                 last_pose = current_pose
                 last_motion_check_time = now
-                if (distance < ud.min_motion):
+                if (distance < userdata.min_motion):
                     self.move_client.cancel_all_goals()
                     return 'timeout'
             #if we are paused, cancel goal and wait, then resend
             #last goal and reset timeout timer
-            if ud.paused:
+            if userdata.paused:
                 self.move_client.cancel_all_goals()
                 while not rospy.is_shutdown():
                     rospy.sleep(0.2)
-                    if not ud.paused:
+                    if not userdata.paused:
                         break
                 self.move_client.send_goal(goal)
                 self.last_motion_check_time = rospy.get_time()
