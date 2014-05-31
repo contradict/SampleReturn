@@ -300,7 +300,7 @@ class DriveToPoseState(smach.State):
                 return 'preempted'
             #handle sample detection
             if (ud.detected_sample is not None) and ud.pursue_samples:
-                ropsy.loginfo("DriveToPose detected sample: " + str(userdata.detected_sample))
+                rospy.loginfo("DriveToPose detected sample: " + str(userdata.detected_sample))
                 if ud.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
