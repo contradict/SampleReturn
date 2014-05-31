@@ -9,8 +9,7 @@ from tf.transformations import euler_from_quaternion
 
 class SimpleMover(object):
   def __init__(self, param_ns=""):
-
-    self.publisher = rospy.Publisher("servo_command", Twist)
+ 
     self.tf = TransformListener()
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
@@ -25,8 +24,10 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
 
-    rospy.Subscriber("/motion/odometry", Odometry, self.odometry_callback, None, 1)
-    rospy.Subscriber("/motion/platform_joint_state", JointState, self.joint_state_callback, None, 1)
+    #publishers and subscribers
+    self.publisher = rospy.Publisher("servo_command", Twist)
+    rospy.Subscriber("odometry", Odometry, self.odometry_callback, None, 1)
+    rospy.Subscriber("platform_joint_state", JointState, self.joint_state_callback, None, 1)
 
   def odometry_callback(self, msg):
    
@@ -84,7 +85,7 @@ class SimpleMover(object):
   #method to check if the movement loop should keep running, or bail out
   def keep_running(self, timeout_time):
     return (not rospy.is_shutdown() and 
-           rospy.time.now() < timeout_time and
+           rospy.Time.now() < timeout_time and
            not self.stop_requested)
   
   def execute_spin(self, rot, time_limit=10.0):
@@ -160,7 +161,7 @@ class SimpleMover(object):
       #if we are under max_vel keep accelerating      
       elif (current_vel < max_stern_vel):
         twist = current_twist
-        twist.angular.z += np.sign(rot)*self.accel_per_loop/np.abs(pos[0])
+        twist.angular.z += np.sign(rot)*accel_per_loop/np.abs(pos[0])
         #rospy.loginfo("Current vel: %s, Max vel: %s " % (current_twist.angular.z*np.abs(pos[0]), self.max_velocity))
         #rospy.loginfo("Outgoing twist to accel: " + str(twist))
         self.publisher.publish(twist)
@@ -218,7 +219,7 @@ class SimpleMover(object):
     #empty twist message constructed with all zeroes
     current_twist = Twist()
 
-    while self.keep_runing(timeout_time):
+    while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()
       

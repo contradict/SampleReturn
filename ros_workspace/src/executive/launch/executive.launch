@@ -12,7 +12,9 @@
     <remap from="servo_command" to="/motion/servo_command"/>
     <remap from="planner_command" to="/motion/planner_command"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
-    
+    <remap from="odometry" to="/motion/odometry"/>
+    <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+
     <!-- planning and detection remaps -->
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
     <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
