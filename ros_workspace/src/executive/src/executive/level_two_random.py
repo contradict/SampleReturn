@@ -508,7 +508,7 @@ class SearchLineManager(smach.State):
         
         #rospy.loginfo("BLOCKED COUNT: " + str(blocked_count) + "/" + str(len(max_vals)))
         #rospy.loginfo("MAX_VALS: " + str(max_vals))
-        if (blocked_count/float(total_count)) > 0.70:        
+        if (blocked_count/float(total_count)) > 0.30:        
             return True
                     
         return False
@@ -547,7 +547,6 @@ class ChooseNewLine(smach.State):
                                      10))
         yaw_changes = np.radians(yaw_changes)                        
         yaw_changes = np.r_[yaw_changes, -yaw_changes]
-        rospy.loginfo(str(yaw_changes))
         yaw_change = random.choice(yaw_changes)
         line_yaw = userdata.line_yaw + yaw_change
         rotate_pose = util.pose_rotate(current_pose, yaw_change)
