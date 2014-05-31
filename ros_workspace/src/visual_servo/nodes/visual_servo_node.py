@@ -24,7 +24,6 @@ class VisualServo:
 	"""A class to position the robot so that it can pick up an object with the manipulator"""
 	
 	def __init__(self):
-		rospy.loginfo("VISUAL_SERVO namespace: " + rospy.get_namespace())
 		self._safe_region_percentage = rospy.get_param('~safe_region_percentage', 0.1)
 		self._camera_left_image_width = -1
 		self._camera_left_image_height = -1
