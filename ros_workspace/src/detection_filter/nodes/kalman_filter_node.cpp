@@ -184,11 +184,11 @@ class KalmanDetectionFilter
         xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
         cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
-        point_msg.header.frame_id = "";
-        point_msg.header.stamp = ros::Time::now();
-        point_msg.point.x = uv_point.x;
-        point_msg.point.y = uv_point.y;
-        point_msg.point.y = 0;
+        img_point_msg.header.frame_id = "";
+        img_point_msg.header.stamp = ros::Time::now();
+        img_point_msg.point.x = uv_point.x;
+        img_point_msg.point.y = uv_point.y;
+        img_point_msg.point.y = 0;
         pub_img_detection.publish(img_point_msg);
       }
     }
@@ -214,6 +214,20 @@ class KalmanDetectionFilter
         point_msg.point.y = filter_ptr->statePost.at<float>(1);
         point_msg.point.z = 0;
         pub_detection.publish(point_msg);
+      }
+      if (cam_model_.initialized()) {
+        cv::Point3d xyz_point;
+        xyz_point.x = double(latched_filter_list_[0]->statePost.at<float>(0));
+        xyz_point.y = double(latched_filter_list_[0]->statePost.at<float>(1));
+        xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
+        cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
+        samplereturn_msgs::NamedPoint img_point_msg;
+        img_point_msg.header.frame_id = "";
+        img_point_msg.header.stamp = ros::Time::now();
+        img_point_msg.point.x = uv_point.x;
+        img_point_msg.point.y = uv_point.y;
+        img_point_msg.point.y = 0;
+        pub_img_detection.publish(img_point_msg);
       }
     }
   }
