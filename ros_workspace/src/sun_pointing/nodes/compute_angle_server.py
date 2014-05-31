@@ -26,7 +26,7 @@ class ComputeAngle(object):
     self.turning = False
     self.starting_yaw = None
 
-    self.mover = simple_motion.SimpleMotion('~compute_sun_angle_params/')
+    self.mover = simple_motion.SimpleMover('~compute_sun_angle_params/')
 
     self.action_server.start()
 
