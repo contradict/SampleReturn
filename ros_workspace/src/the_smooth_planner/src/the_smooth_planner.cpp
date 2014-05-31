@@ -109,7 +109,7 @@ bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
 bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose)
 {
-    if (stitched_path.knots.size() == 0 || this->isGoalReached())
+    if (stitched_path.knots.size() == 0 || this->isGoalReached() || is_replan_ahead_iter_valid)
     {
         ROS_ERROR("last path has no knots or we reached the goal");
         return false;
@@ -368,8 +368,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
         if (replanAheadPos.isApprox(newPathFirstPos) && replanAheadQuat.isApprox(newPathFirstQuat))
         {
-            // Find the point in the last path that we want to stitch
-            // the new path to
+            // Find the point in the stitched path that we want to stitch the new path to
             std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnotIter = stitched_path.knots.begin();
             for (auto prevPathIter = stitched_path.knots.begin(); prevPathIter != stitched_path.knots.end(); ++prevPathIter)
             {
@@ -383,6 +382,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             if(lookAheadBufferKnotIter == stitched_path.knots.end() || lookAheadBufferKnotIter > replan_ahead_iter)
             {
                 ROS_ERROR("Planner go behind servos, cannot stitch new plan");
+                is_replan_ahead_iter_valid = false;
                 return;
             }
             std::vector<geometry_msgs::PoseStamped> insertPoses;
@@ -405,15 +405,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             timestamp = (*lookAheadBufferKnotIter).header.stamp;
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
-        else
-        {
-            ROS_DEBUG("Got unexpected plan, incorrect first point position, ignoring.");
-            return;
-        }
     }
     else if (!isGoalReached() && (stitched_path.knots.size()>0) )
     {
-        ROS_DEBUG("Recieved unexpected path, no iter, ignoring.");
         return;
     }
 
@@ -743,6 +737,14 @@ void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHea
 {
     ROS_DEBUG("RECEIVED COMPLETED KNOT");
     this->completed_knot_header = completedKnotHeader;
+
+    // Invalide the replan ahead iter if we have completed the knot past the buffer time
+    if ( is_replan_ahead_iter_valid &&
+         (completedKnotHeader.stamp >= ((*replan_ahead_iter).header.stamp - ros::Duration(replan_look_ahead_buffer_time))) ||
+         (completedKnotHeader.seq == stitched_path.knots.back().header.seq && completedKnotHeader.stamp == stitched_path.knots.back().header.stamp) )
+    {
+        this->is_replan_ahead_iter_valid = false;
+    }
     return;
 }
 
@@ -753,7 +755,6 @@ void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velo
 
 void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitchedPath)
 {
-    ROS_DEBUG("RECEIVED STITCHED PATH");
     this->stitched_path = stitchedPath;
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
