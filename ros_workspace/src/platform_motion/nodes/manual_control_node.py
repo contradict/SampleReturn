@@ -109,7 +109,7 @@ class ManualController(object):
                                         self.announcer,
                                         "Visual servo unavailable",
                                         "Aligning to sample",
-                                        120.0,
+                                        60.0,
                                         "Visual servo timed out"
                                         ),
                                     transitions = {'complete':'SELECT_JOYSTICK',
