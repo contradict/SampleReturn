@@ -40,6 +40,8 @@
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
     <include file="$(find executive)/launch/executive.launch"/>
 
+    <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
+
 <!-- Nodes -->
     <node machine="navigate"
           pkg="fake_localization"
