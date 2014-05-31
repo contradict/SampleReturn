@@ -405,6 +405,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             timestamp = (*lookAheadBufferKnotIter).header.stamp;
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
+        else
+        {
+            ROS_DEBUG("Got unexpected plan, incorrect first point position, ignoring.");
+            return;
+        }
     }
     else if (!isGoalReached() && (stitched_path.knots.size()>0) )
     {
