@@ -105,7 +105,7 @@ class WaitForFlagState(smach.State):
                  start_message=None):
 
         smach.State.__init__(self,
-                             outcomes=['next', 'timeout', 'aborted'],
+                             outcomes=['next', 'timeout', 'preempted', 'aborted'],
                              input_keys=[flag_name])
 
         self.flag_name = flag_name
@@ -116,6 +116,10 @@ class WaitForFlagState(smach.State):
 
     def execute(self, userdata):
 
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        
         if getattr(userdata, self.flag_name) != self.flag_trigger_value and \
            (self.announcer is not None) and \
            (self.start_message is not None):
@@ -296,6 +300,7 @@ class DriveToPoseState(smach.State):
                 return 'preempted'
             #handle sample detection
             if (ud.detected_sample is not None) and ud.pursue_samples:
+                ropsy.loginfo("DriveToPose detected sample: " + str(userdata.detected_sample))
                 if ud.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'

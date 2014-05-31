@@ -125,12 +125,12 @@ class PursueSample(object):
             smach.StateMachine.add('LOAD_SEARCH_PATH',
                                    LoadSearchPath(self.tf_listener, self.announcer),
                                    transitions = {'next':'DRIVE_SEARCH_PATH',
-                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
+                                                  'aborted':'DISABLE_MANIPULATOR_DETECTOR'})
 
             smach.StateMachine.add('DRIVE_SEARCH_PATH',
                                    DriveSearchPath(self.announcer),
                                    transitions = {'next_point':'DRIVE_TO_SEARCH_POSE',
-                                                  'complete':'PURSUE_SAMPLE_ABORTED'})
+                                                  'complete':'DISABLE_MANIPULATOR_DETECTOR'})
             
             smach.StateMachine.add('DRIVE_TO_SEARCH_POSE',
                                    DriveToPoseState(self.move_base, self.tf_listener),
@@ -143,13 +143,14 @@ class PursueSample(object):
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_SERVO),
                                     transitions = {'next':'VISUAL_SERVO',
-                                                  'failed':'PURSUE_SAMPLE_ABORTED'})    
+                                                  'failed':'DISABLE_MANIPULATOR_DETECTOR'})    
 
             smach.StateMachine.add('VISUAL_SERVO',
                                    VisualServo(self.announcer),
                                    transitions = {'complete':'GRAB_SAMPLE',
                                                   'sample_lost':'LOAD_SEARCH_PATH',
-                                                  'preempted':'CHECK_PAUSE_STATE',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'ABORT_SERVO',
                                                   'aborted':'ABORT_SERVO'})  
 
             @smach.cb_interface(input_keys=['latched_sample'])
@@ -170,7 +171,7 @@ class PursueSample(object):
                                    transitions = {'succeeded':'CONFIRM_SAMPLE_ACQUIRED',
                                                   'preempted':'CHECK_PAUSE_STATE',
                                                   'aborted':'ABORT_SERVO'})
-            
+
             #if the grab action is preempted by shutdown (or other non-pause reason),
             #exit pursue sample.  If paused, wait for unpause
             smach.StateMachine.add('CHECK_PAUSE_STATE',
@@ -178,7 +179,7 @@ class PursueSample(object):
                                                     flag_trigger_value = True),
                                    transitions = {'next':'WAIT_FOR_UNPAUSE',
                                                   'timeout':'ABORT_SERVO'})
-    
+            
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = False,
@@ -186,19 +187,20 @@ class PursueSample(object):
                                                     announcer = self.announcer,
                                                     start_message ='Pursuit paused, waiting for un pause'),
                                    transitions = {'next':'VISUAL_SERVO',
-                                                  'timeout':'WAIT_FOR_UNPAUSE'})
+                                                  'timeout':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'ABORT_SERVO'})
 
             smach.StateMachine.add('ABORT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
-                                    transitions = {'next':'PURSUE_SAMPLE_ABORTED',
-                                                   'failed':'PURSUE_SAMPLE_ABORTED'})                
+                                    transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR',
+                                                   'failed':'DISABLE_MANIPULATOR_DETECTOR'})                
     
             smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
                                    ConfirmSampleAcquired(self.announcer, self.result_pub),
-                                   transitions = {'sample_gone':'DESELECT_SERVO',
+                                   transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
                                                   'sample_present':'VISUAL_SERVO',
-                                                  'preempted':'PURSUE_SAMPLE_ABORTED',
+                                                  'preempted':'DISABLE_MANIPULATOR_DETECTOR',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'})
             
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
@@ -379,6 +381,7 @@ class VisualServo(smach.State):
                                            'paused'],
                              outcomes=['complete',
                                        'sample_lost',
+                                       'paused',
                                        'preempted',
                                        'aborted'])
     
@@ -402,10 +405,13 @@ class VisualServo(smach.State):
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
             #if we are paused or preempted exit with preempted
-            if self.preempt_requested() or userdata.paused:    
+            if self.preempt_requested():
                 self.servo.cancel_all_goals()
                 self.service_preempt()
-                return 'preempted' 
+                return 'preempted'
+            if userdata.paused:
+                self.servo.cancel_all_goals()
+                return 'paused'
             servo_state = self.servo.get_state()
             if servo_state not in util.actionlib_working_states:
                 break

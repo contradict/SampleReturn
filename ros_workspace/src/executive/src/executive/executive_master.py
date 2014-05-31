@@ -152,7 +152,8 @@ class ExecutiveMaster(object):
                                                     announcer = self.announcer,
                                                     start_message ='Waiting for system enable'),
                                    transitions = {'next':'HOME_PLATFORM',
-                                                  'timeout':'WAIT_FOR_UNPAUSE'})
+                                                  'timeout':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'TOP_PREEMPTED'})
             
             smach.StateMachine.add('HOME_PLATFORM',
                                    HomePlatform(self.announcer),
@@ -193,7 +194,8 @@ class ExecutiveMaster(object):
                                                     announcer = self.announcer,
                                                     start_message ='Mode complete, switch to manual'),
                                    transitions = {'next':'CHECK_MODE',
-                                                  'timeout':'WAIT_FOR_MODE_CHANGE'})
+                                                  'timeout':'WAIT_FOR_MODE_CHANGE',
+                                                  'preempted':'TOP_PREEMPTED'})
             
             mcg = platform_msg.ManualControlGoal()
             mcg.mode = mcg.FULL_CONTROL
