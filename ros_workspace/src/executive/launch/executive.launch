@@ -136,7 +136,7 @@
         <!-- executive tf frame -->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
        
-        <param name="min_pursuit_distance" type="double" value="2.0"/>
+        <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
         <param name="max_sample_lost_time" type="double" value="60"/>
         <param name="motion_check_interval" type="double" value="60"/>
