@@ -143,24 +143,31 @@ class SimpleMoveExecuteState(smach.State):
         smach.State.__init__(self,
                              outcomes=['complete',
                                        'timeout',
-                                       'sample_detected',
                                        'preempted', 'aborted'],
                              input_keys=['detected_sample',
                                          'paused',
-                                         'move_list'])
-     
+                                         'simple_move'])
         self.simple_mover = simple_mover
         
     def execute(self, userdata):
-        
-        while not rospy.is_shutdown() and (len(userdata.move_list) > 0):
-            move = userdata.move_list.pop(0)
-            if move['type'] == 'spin':
-                self.simple_mover.execute_spin(move['angle'])
-                continue
-            if move['type'] == 'strafe':
-                self.simple_mover.execute_strafe(move['angle'], move['distance'])
-                continue
+                
+        move = userdata.simple_move
+        if move['type'] == 'spin':
+            if self.simple_mover.execute_spin(move['angle']):
+                return 'complete'
+            else:
+                return 'timeout'
+        if move['type'] == 'strafe':
+            if self.simple_mover.execute_strafe(move['yaw'], move['distance']):
+                return 'complete'
+            else:
+                return 'timeout'
+            
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+
+        return 'aborted'
 
 class SimpleMoveManager(smach.State):
     
@@ -170,6 +177,7 @@ class SimpleMoveManager(smach.State):
                              outcomes=['sample_detected',
                                        'preempted', 'aborted'],
                              input_keys=['detected_sample',
+                                         'pursue_samples',
                                          'paused'])
 
         self.simple_mover = simple_mover
@@ -178,10 +186,12 @@ class SimpleMoveManager(smach.State):
         
         while not rospy.is_shutdown():
             rospy.sleep(0.05)
-            if self.userdata.detected_sample is not None:
+            if userdata.detected_sample is not None and \
+               userdata.pursue_samples == True:
                 self.simple_mover.stop()
                 return 'sample_detected'
             if self.preempt_requested():
+                self.service_preempt()
                 self.simple_mover.stop()
                 return 'preempted'
             if userdata.paused and self.simple_mover.is_running():
@@ -189,7 +199,7 @@ class SimpleMoveManager(smach.State):
                         
         return 'aborted'
 
-class SimpleMotionState(smach.Concurrence):
+class SimpleMoveState(smach.Concurrence):
 
     def __init__(self, listener):
 
@@ -199,16 +209,18 @@ class SimpleMotionState(smach.Concurrence):
                       'sample_detected',
                       'preempted', 'aborted'],
             default_outcome = 'aborted',
-            input_keys=['simple_move_list',
+            input_keys=['simple_move',
                         'pursue_samples',
                         'detected_sample',
                         'paused',
                         'executive_frame'],
             output_keys=['detected_sample'],
             child_termination_cb = lambda preempt: True,
-            outcome_map = {'complete':{'SIMPLE_MOVER':'complete'},
+            outcome_map = {'complete':{'SIMPLE_MOVER':'complete',
+                                       'SIMPLE_MOVE_MANAGER':'preempted'},
                            'timeout':{'SIMPLE_MOVER':'timeout'},
-                           'sample_detected':{'SIMPLE_MOVE_MANAGER':'sample_detected'},
+                           'sample_detected':{'SIMPLE_MOVER':'complete',
+                                              'SIMPLE_MOVE_MANAGER':'sample_detected'},
                            'preempted':{'SIMPLE_MOVER':'preempted',
                                         'SIMPLE_MOVE_MANAGER':'preempted'}})
 
@@ -224,10 +236,11 @@ class SimpleMotionState(smach.Concurrence):
             rospy.logwarn("SIMPLE MOVE STATE failed to get current pose")
             return 'aborted'
         userdata.detected_sample = None
+        rospy.loginfo("SIMPLE_MOVE: " + str(userdata.simple_move))
         
         return smach.Concurrence.execute(self, userdata)
 
-def GetSimpleMotionState(simple_mover, listener):
+def GetSimpleMoveState(simple_mover, listener):
 
     simple_move_state = SimpleMoveState(listener)
     with simple_move_state:

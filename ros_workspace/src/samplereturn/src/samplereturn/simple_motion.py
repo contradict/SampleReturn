@@ -88,7 +88,7 @@ class SimpleMover(object):
            rospy.Time.now() < timeout_time and
            not self.stop_requested)
   
-  def execute_spin(self, rot, time_limit=10.0):
+  def execute_spin(self, rot, time_limit=10.0, stop_function = None):
     
     self.stop_requested = False
     self.running = True
@@ -117,14 +117,6 @@ class SimpleMover(object):
     self.got_odom = False
     self.got_joint_state = False
  
-    while self.keep_running(timeout_time):
-      #wait here for odom callback to clear flag, 
-      #this means starting_yaw is now initialized
-      rate.sleep()
-      if self.got_odom and self.got_joint_state:
-        break
-      rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")
-      
     self.target_yaw = self.unwind(self.starting_yaw + rot)
     #start current twist at 0
     current_twist = Twist()
@@ -133,6 +125,17 @@ class SimpleMover(object):
     while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()      
+      
+      if self.stop_requested or (callable(stop_function) and stop_function()):
+        self.stop_requested = True
+        accel_per_loop = self.stop_deceleration/self.loop_rate      
+
+      #do not pass here until odom callback fires, 
+      #passing means starting_yaw is now initialized
+      if self.got_odom and self.got_joint_state:
+        rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")      
+        continue
+      
       #calculate linear vel of stern wheel pod
       current_vel = np.abs(current_twist.angular.z*np.abs(pos[0]))
 
@@ -186,8 +189,14 @@ class SimpleMover(object):
 
     self.running = False
     self.stop_requested = False
+    
+    #check if we are exiting because of timeout
+    if rospy.Time.now() > timeout_time:
+      return False
+    else:
+      return True
 
-  def execute_strafe(self, angle, distance, time_limit=20.0):
+  def execute_strafe(self, angle, distance, time_limit=20.0, stop_function = None):
     self.stop_requested = False
     self.running = True
     
@@ -222,6 +231,11 @@ class SimpleMover(object):
     while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()
+
+      if self.stop_requested or (callable(stop_function) and stop_function()):
+        rospy.loginfo("STOP REQUESTED IN EXECUTE STRAFE")
+        self.stop_requested = True
+        accel_per_loop = self.stop_deceleration/self.loop_rate
       
       #wait here for odom callback to clear flag, 
       #this means starting_position, is now initialized
@@ -265,9 +279,6 @@ class SimpleMover(object):
       #at max_vel, keep publishing until decel point is hit
       else:
         self.publisher.publish(current_twist)
-
-    if self.stop_requested:
-      accel_per_loop = self.stop_deceleration/self.loop_rate
       
     velocity = np.sqrt(current_twist.linear.x**2 + current_twist.linear.y**2)
     for i in range(int(velocity/accel_per_loop),-1,-1):
@@ -279,6 +290,12 @@ class SimpleMover(object):
 
     self.running = False
     self.stop_requested = False
+
+    #check if we are exiting because of timeout
+    if rospy.Time.now() > timeout_time:
+      return False
+    else:
+      return True
 
   def is_running(self):
     return self.running
