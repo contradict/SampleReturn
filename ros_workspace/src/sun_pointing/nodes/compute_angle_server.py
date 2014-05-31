@@ -31,13 +31,19 @@ class ComputeAngle(object):
     self.action_server.start()
 
   def odometry_callback(self, msg):
-    if self.starting_yaw == None:
-      self.starting_yaw = euler_from_quaternion(msg.pose.pose.quaternion)[-1]
+    quaternion = np.zeros(4)
+    quaternion[0] = msg.pose.pose.orientation.x
+    quaternion[1] = msg.pose.pose.orientation.y
+    quaternion[2] = msg.pose.pose.orientation.z
+    quaternion[3] = msg.pose.pose.orientation.w
 
-    self.current_yaw = euler_from_quaternion(msg.pose.pose.quaternion)[-1]
+    if self.starting_yaw == None:
+      self.starting_yaw = euler_from_quaternion(quaternion)[-1]
+
+    self.current_yaw = euler_from_quaternion(quaternion)[-1]
 
     if self.turning:
-      self.action_server.set_feedback(ComputeAngleFeedback(self.current_yaw))
+      self.action_server.publish_feedback(ComputeAngleFeedback(self.current_yaw))
 
   def image_callback(self, msg):
     if self.turning:
