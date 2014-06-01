@@ -84,10 +84,8 @@ private:
     // Parameters
     double maximum_linear_velocity;
     double linear_acceleration;
-    double maximum_slew_radians_per_second;
     double replan_look_ahead_buffer_time;
     double replan_look_ahead_time;
-    double yaw_epsilon;
     double delta_time_after_goal_drop_path;
     double wait_on_stitched_path_duration;
 

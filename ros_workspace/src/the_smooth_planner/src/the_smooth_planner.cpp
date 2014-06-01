@@ -37,10 +37,8 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 
     localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
     localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
-    localNodeHandle.param("maximum_slew_radians_per_second", maximum_slew_radians_per_second, 0.3);
     localNodeHandle.param("replan_look_ahead_buffer_time", replan_look_ahead_buffer_time, 1.0);
     localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 4.0);
-    localNodeHandle.param("yaw_epsilon", yaw_epsilon, 1e-4);
     localNodeHandle.param("delta_time_after_goal_drop_path", delta_time_after_goal_drop_path, 20.0);
     localNodeHandle.param("wait_on_stitched_path_duration", wait_on_stitched_path_duration, 20.0);
 
