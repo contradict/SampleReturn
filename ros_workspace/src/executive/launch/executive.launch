@@ -47,6 +47,10 @@
         <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
         <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
 
+        <!-- camera ignore params, to allow testing without certain cameras -->
+        <param name="ignore_search_camera" value="True"/>
+        <param name="ignore_manipulator_camera" value="True"/>
+        
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
         <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
         <remap from="navigation_starboard_camera_status" to="/cameras/navigation/starboard/status"/>

@@ -74,12 +74,16 @@ class ExecutiveMaster(object):
                                     transitions = { 'next':'WAIT_FOR_UNPAUSE',
                                                     'preempted':'TOP_PREEMPTED',
                                                     'aborted':'TOP_ABORTED'})
+
+            rospy.loginfo("NODE PARAMS in with self.sm: " + str(self.node_params))
                         
             cam_dict = {'NAV_CENTER' : 'camera_started',
                         'NAV_PORT' : 'camera_started',
-                        'NAV_STARBOARD' : 'camera_started',
-                        'MANIPULATOR' : 'camera_started',
-                        'SEARCH' : 'camera_started'}
+                        'NAV_STARBOARD' : 'camera_started'}
+            if not self.node_params.ignore_manipulator_camera:
+                cam_dict['MANIPULATOR'] = 'camera_started'
+            if not self.node_params.ignore_search_camera:
+                cam_dict['SEARCH'] = 'camera_started'
             
             #concurrency container to allow waiting for cameras in parallel
             wait_for_cams = smach.Concurrence(outcomes = ['all_started',
@@ -115,19 +119,21 @@ class ExecutiveMaster(object):
                                                         camera_wait_outcomes,
                                                         timeout = 10.0))
                 
-                smach.Concurrence.add('MANIPULATOR',
-                                      MonitorTopicState('manipulator_camera_status',
-                                                        'data',
-                                                        std_msg.String,
-                                                        camera_wait_outcomes,
-                                                        timeout = 10.0))
+                if not self.node_params.ignore_manipulator_camera:
+                    smach.Concurrence.add('MANIPULATOR',
+                                          MonitorTopicState('manipulator_camera_status',
+                                                            'data',
+                                                            std_msg.String,
+                                                            camera_wait_outcomes,
+                                                            timeout = 10.0))
                 
-                smach.Concurrence.add('SEARCH',
-                                      MonitorTopicState('search_camera_status',
-                                                        'data',
-                                                        std_msg.String,
-                                                        camera_wait_outcomes,
-                                                        timeout = 10.0))
+                if not self.node_params.ignore_search_camera:    
+                    smach.Concurrence.add('SEARCH',
+                                          MonitorTopicState('search_camera_status',
+                                                            'data',
+                                                            std_msg.String,
+                                                            camera_wait_outcomes,
+                                                            timeout = 10.0))
                 
             smach.StateMachine.add('CHECK_CAMERAS',
                                    wait_for_cams,
