@@ -63,7 +63,7 @@ class SimpleMover(object):
   def unwind(self, ang):
     if ang > np.pi:
       ang -= 2*np.pi
-    elif ang < np.pi:
+    elif ang < -np.pi:
       ang += 2*np.pi
     return ang
 
@@ -152,6 +152,11 @@ class SimpleMover(object):
         continue
 
       stopping_yaw = current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
+      
+      #print "self.current_yaw: " + str(self.current_yaw)
+      #print "target_yaw: " + str(target_yaw)
+      #print "stopping_yaw: " + str(stopping_yaw)
+      #print "np.abs(self.unwind(target_yaw - self.current_yaw)): " + str(np.abs(self.unwind(target_yaw - self.current_yaw)))
       
       #check if we are at decel point      
       if np.abs(self.unwind(target_yaw - self.current_yaw)) < stopping_yaw:
