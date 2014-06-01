@@ -1389,6 +1389,7 @@ void Motion::publishStitchedPath(void)
 
 void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path)
 {
+    ROS_WARN("Got planned path.");
     if(motion_mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT)
     {
         // if the planner hasn't been put in charge, don't listen to it
@@ -1535,6 +1536,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         newPathReady = true;
     }
 
+    ROS_WARN("Publish stitched path.");
     publishStitchedPath();
 
     primePVT();
@@ -1607,7 +1609,6 @@ bool Motion::pathToBody()
     int first_seq, second_seq;
     if( plannedPath.size() > 1 )
     {
-        ROS_DEBUG("move to next segment");
         std::unique_lock<std::mutex> lck(path_mutex_);
         auto knots = plannedPath.begin();
         platform_motion_msgs::Knot previous = *knots++;
@@ -1620,6 +1621,8 @@ bool Motion::pathToBody()
             next = current;
             next.header.stamp += ros::Duration(0.25);
         }
+
+        ROS_DEBUG("move to next segment %d", next.header.seq);
         sendCompletedKnot(previous.header);
         plannedPath.pop_front();
         lck.unlock();
