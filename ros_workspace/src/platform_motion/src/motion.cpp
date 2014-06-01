@@ -1399,6 +1399,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     if( path->knots.size() < 2 )
     {
         ROS_ERROR( "Path too short: %ld", path->knots.size() );
+        publishStitchedPath();
         return;
     }
 
@@ -2096,7 +2097,9 @@ void Motion::sendPvtSegment()
             //ROS_ERROR_STREAM("firstSegment.time: " << firstSegment_.time << " second segment time: " << secondSegment_.time);
             //ROS_ERROR_STREAM("length of planned path: " << plannedPath.size());
             ROS_DEBUG("out of path segments, sending zeros");
+            plannedPath.clear();
             pvtToZero();
+            publishStitchedPath();
         }
 
     }
