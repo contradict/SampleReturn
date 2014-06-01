@@ -73,10 +73,13 @@ class PursueSample(object):
         self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
         self.state_machine.userdata.min_motion = self.node_params.min_motion
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
-        self.state_machine.userdata.search_velocity = self.node_params.search_velocity
+        
+        self.state_machine.userdata.visual_servo_timeout = self.node_params.visual_servo_timeout
+        self.state_machine.userdata.visual_servo_lost_timeout = self.node_params.visual_servo_lost_timeout
         
         #strafe search settings
         self.state_machine.userdata.settle_time = 5
+        self.state_machine.userdata.simple_move_tolerance = self.node_params.simple_move_tolerance
         
         #use these
         self.state_machine.userdata.true = True
@@ -288,11 +291,13 @@ class PursueSample(object):
 
     def sample_detection_manipulator(self, sample):
         self.state_machine.userdata.detected_sample = sample
+        self.manipulator_approach.userdata.detected_sample = sample
         self.manipulator_search.userdata.detected_sample = sample
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
         self.pursue_detected_point.userdata.paused = msg.data
+        self.manipulator_approach.userdata.paused = msg.data
         self.manipulator_search.userdata.paused = msg.data
             
     def shutdown_cb(self):
@@ -306,7 +311,7 @@ class StartSamplePursuit(smach.State):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys=['target_sample',
-                                         'search_velocity',
+                                         'pursuit_velocity',
                                          'action_goal'],
                              output_keys=['velocity',
                                           'pursuit_point',
@@ -323,7 +328,7 @@ class StartSamplePursuit(smach.State):
         userdata.stop_on_sample = True
         #default velocity for all moves is search velocity,
         #initial approach pursuit done at pursuit_velocity
-        userdata.velocity = userdata.search_velocity
+        userdata.velocity = userdata.pursuit_velocity
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))
         userdata.pursuit_point = userdata.action_goal.input_point
             
@@ -465,6 +470,8 @@ class VisualServo(smach.State):
         smach.State.__init__(self,
                              output_keys = ['latched_sample'],
                              input_keys = ['detected_sample',
+                                           'visual_servo_timeout',
+                                           'visual_servo_lost_timeout',
                                            'paused'],
                              outcomes=['complete',
                                        'sample_lost',
@@ -480,8 +487,10 @@ class VisualServo(smach.State):
         
     def execute(self, userdata):
         
-        rospy.loginfo("VISUAL_SERVO_STATE entry detected sample: " + str(userdata.detected_sample))
+        rospy.loginfo("VISUAL_SERVO entry detected sample: " + str(userdata.detected_sample))
         
+        self.visual_servo_timeout = userdata.visual_servo_timeout
+        self.visual_servo_lost_timeout = userdata.visual_servo_lost_timeout
         self.sample_lost = False
         self.last_sample_detected = rospy.get_time()
         self.last_servo_feedback = rospy.get_time()
@@ -491,7 +500,8 @@ class VisualServo(smach.State):
 
         self.announcer.say("Sample in manipulator view, servo ing")
     
-        while not rospy.is_shutdown():
+        timeout = rospy.get_time() + self.visual_servo_timeout
+        while not rospy.is_shutdown() and (rospy.get_time()<timeout):
             rospy.sleep(0.1)
             #if we are paused or preempted exit with preempted
             if self.preempt_requested():
@@ -523,13 +533,13 @@ class VisualServo(smach.State):
          if feedback.state != feedback.STOP_AND_WAIT:
              self.last_sample_detected = this_time
          delta_time = (this_time - self.last_servo_feedback)
-         if delta_time > 4.0:
+         if delta_time > 5.0:
              if feedback.state == feedback.STOP_AND_WAIT:
                  self.announcer.say("Sample lost")
              else:
                  self.announcer.say("range %d"%(10*int(feedback.error/10)))
              self.last_servo_feedback = this_time
-         if (this_time - self.last_sample_detected) > 15.0:
+         if (this_time - self.last_sample_detected) > self.visual_servo_lost_timeout:
              self.servo.cancel_all_goals()
              self.announcer.say('Canceling visual servo')
              self.sample_lost = True

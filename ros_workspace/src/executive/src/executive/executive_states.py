@@ -17,6 +17,7 @@ import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 
 import samplereturn.util as util
+from samplereturn.simple_motion import TimeoutException
 
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
@@ -145,6 +146,7 @@ class SimpleMoveExecuteState(smach.State):
                                        'timeout',
                                        'preempted', 'aborted'],
                              input_keys=['detected_sample',
+                                         'simple_move_tolerance',
                                          'paused',
                                          'simple_move'])
         self.simple_mover = simple_mover
@@ -152,20 +154,34 @@ class SimpleMoveExecuteState(smach.State):
     def execute(self, userdata):
                 
         move = userdata.simple_move
-        if move['type'] == 'spin':
-            if self.simple_mover.execute_spin(move['angle']):
-                return 'complete'
-            else:
+        remaining = None
+        try_count = 0
+        
+        while not rospy.is_shutdown():
+            if self.preempt_requested():
+                self.service_preempt()
+                return 'preempted'
+            #if we are paused just keep looping slowly and checking preempt
+            if userdata.paused:
+                rospy.sleep(0.1)
+                continue
+            try:
+                if move['type'] == 'spin':
+                    angle = move['angle'] if (remaining is None) else remaining
+                    remaining = self.simple_mover.execute_spin(move['angle'])
+                elif move['type'] == 'strafe':
+                    distance = move['distance'] if (remaining is None) else remaining
+                    remaining = self.simple_mover.execute_strafe(move['yaw'], move['distance'])
+                else:
+                    rospy.logwarn('SIMPLE MOTION invalid move type')
+                    return 'aborted'
+                if remaining < userdata.simple_move_tolerance:
+                    return 'complete'
+                else:
+                    rospy.loginfo("SIMPLE MOTION returned with remaining: " + str(remaining))
+            except(TimeoutException):
+                rospy.logwarn("TIMEOUT during simple_motion.")
                 return 'timeout'
-        if move['type'] == 'strafe':
-            if self.simple_mover.execute_strafe(move['yaw'], move['distance']):
-                return 'complete'
-            else:
-                return 'timeout'
-            
-        if self.preempt_requested():
-            self.service_preempt()
-            return 'preempted'
 
         return 'aborted'
 
@@ -212,6 +228,7 @@ class SimpleMoveState(smach.Concurrence):
             input_keys=['simple_move',
                         'pursue_samples',
                         'detected_sample',
+                        'simple_move_tolerance',
                         'paused',
                         'executive_frame'],
             output_keys=['detected_sample'],
@@ -219,8 +236,7 @@ class SimpleMoveState(smach.Concurrence):
             outcome_map = {'complete':{'SIMPLE_MOVER':'complete',
                                        'SIMPLE_MOVE_MANAGER':'preempted'},
                            'timeout':{'SIMPLE_MOVER':'timeout'},
-                           'sample_detected':{'SIMPLE_MOVER':'complete',
-                                              'SIMPLE_MOVE_MANAGER':'sample_detected'},
+                           'sample_detected':{'SIMPLE_MOVE_MANAGER':'sample_detected'},
                            'preempted':{'SIMPLE_MOVER':'preempted',
                                         'SIMPLE_MOVE_MANAGER':'preempted'}})
 
