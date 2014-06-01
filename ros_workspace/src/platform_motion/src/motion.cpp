@@ -1528,6 +1528,16 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         k = transformKnot( rotation, translation, k);
         k.header.stamp += dt;
         k.header.frame_id = "odom";
+        if(plannedPath.size()>0)
+        {
+            double timestep = (k.header.stamp - plannedPath.back().header.stamp).toSec();
+            if( timestep<0.050 )
+            {
+                ROS_ERROR("seq %d - %d", plannedPath.back().header.seq, k.header.seq);
+                ROS_ERROR_STREAM("Tiny dt: " << timestep );
+                continue;
+            }
+        }
         plannedPath.push_back(k);
     }
     lck.unlock();
