@@ -373,8 +373,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         tf::pointMsgToEigen(pathCopy.poses[0].pose.position, newPathFirstPos);
         tf::quaternionMsgToEigen(pathCopy.poses[0].pose.orientation, newPathFirstQuat);
         ROS_ERROR("Is replan ahead iter valid");
+        ROS_ERROR_STREAM("newPathFirst: " << pathCopy.poses[0] << " replanAheadPos: " << (*replan_ahead_iter));
 
-        if (replanAheadPos.isApprox(newPathFirstPos, 0.05) && replanAheadQuat.isApprox(newPathFirstQuat, 0.01))
+        if (replanAheadPos.isApprox(newPathFirstPos, 0.05) )
+            //&& replanAheadQuat.isApprox(newPathFirstQuat, 0.01))
+            //warning! we're not checking orientation, that's probalby not so good!
         {
             // Find the point in the stitched path that we want to stitch the new path to
             std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnotIter = stitched_path.knots.begin();
