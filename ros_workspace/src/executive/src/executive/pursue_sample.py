@@ -102,7 +102,7 @@ class PursueSample(object):
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'},
                                    remapping = {'velocity':'pursuit_velocity',                
                                                 'max_point_lost_time':'max_sample_lost_time',
-                                                'pursue_samples':'false'})                
+                                                'pursue_samples':'false'})
             
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
@@ -383,18 +383,14 @@ class GetSearchPoints(smach.State):
             start_pose = util.get_current_robot_pose(self.listener)
             rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
             next_pose = util.translate_base_link(self.listener, start_pose, square_step, 0 )
-            next_pose = util.pose_rotate(next_pose, math.pi/2)
             pose_list.append(next_pose)
             next_pose = util.translate_base_link(self.listener, start_pose, square_step, square_step )
-            next_pose = util.pose_rotate(next_pose, math.pi)        
             pose_list.append(next_pose)
-            next_pose = util.translate_base_link(self.listener, start_pose, -1*square_step, square_step )
-            next_pose = util.pose_rotate(next_pose, math.pi*3/2)                
+            next_pose = util.translate_base_link(self.listener, start_pose, -square_step, square_step )
             pose_list.append(next_pose)
-            next_pose = util.translate_base_link(self.listener, start_pose, -1*square_step, -1*square_step )
+            next_pose = util.translate_base_link(self.listener, start_pose, -square_step, -square_step )
             pose_list.append(next_pose)
-            next_pose = util.translate_base_link(self.listener, start_pose, square_step, -1*square_step)
-            next_pose = util.pose_rotate(next_pose, math.pi/2)
+            next_pose = util.translate_base_link(self.listener, start_pose, square_step, -square_step)
             pose_list.append(next_pose)
             userdata.pose_list = pose_list
             
