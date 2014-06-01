@@ -19,6 +19,7 @@ import manipulator_msgs.msg as manipulator_msg
 import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
 import samplereturn_msgs.srv as samplereturn_srv
+import visualization_msgs.msg as vis_msg
 
 import samplereturn.util as util
 import samplereturn.simple_motion as simple_motion
@@ -350,10 +351,11 @@ class GetSampleStrafeMove(smach.State):
             try:
                 sample_time = userdata.target_sample.header.stamp
                 self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
-                point_stamped = self.listener.transformPoint('base_link', userdata.target_sample)
+                point_in_base = self.listener.transformPoint('base_link',
+                                                             userdata.target_sample).point
                 origin = geometry_msg.Point(0.065,0,0)
-                distance = util.point_distance_2d(origin, point_stamped.point)
-                yaw = util.pointing_yaw(origin, point_stamped.point)
+                distance = util.point_distance_2d(origin, point_in_base)
+                yaw = util.pointing_yaw(origin, point_in_base)
                 userdata.simple_move = {'type':'strafe',
                                         'yaw':yaw,
                                         'distance':distance}
@@ -374,36 +376,52 @@ class GetSearchPoints(smach.State):
         self.listener = listener
         self.announcer = announcer
 
+        self.debug_marker = vis_msg.Marker()
+        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'odom')
+        self.debug_marker.type = vis_msg.Marker.CYLINDER
+        self.debug_marker.color = std_msg.ColorRGBA(0, 255, 0, 1)
+        self.debug_marker.scale = geometry_msg.Vector3(.1, .1, .5)
+        self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
+        self.debug_marker.lifetime = rospy.Duration(60)
+        
+        self.debug_marker_pub = rospy.Publisher('search_markers', vis_msg.Marker)
+
     def execute(self, userdata):
 
         pose_list = []
-        square_step = userdata.square_search_size
+        #square_step = userdata.square_search_size
+        square_step = 2.0
 
         try:
             start_pose = util.get_current_robot_pose(self.listener)
-            rospy.loginfo("SQUARE_SEARCH START POSE: " + str(start_pose))
-            next_pose = util.translate_base_link(self.listener, start_pose, square_step, 0 )
+            next_pose = util.translate_base_link(self.listener, start_pose, square_step, 0)
             pose_list.append(next_pose)
-            next_pose = util.translate_base_link(self.listener, start_pose, square_step, square_step )
+            next_pose = util.translate_base_link(self.listener, start_pose, square_step, square_step)
             pose_list.append(next_pose)
-            next_pose = util.translate_base_link(self.listener, start_pose, -square_step, square_step )
+            next_pose = util.translate_base_link(self.listener, start_pose, -square_step, square_step)
             pose_list.append(next_pose)
-            next_pose = util.translate_base_link(self.listener, start_pose, -square_step, -square_step )
+            next_pose = util.translate_base_link(self.listener, start_pose, -square_step, -square_step)
             pose_list.append(next_pose)
             next_pose = util.translate_base_link(self.listener, start_pose, square_step, -square_step)
             pose_list.append(next_pose)
             userdata.pose_list = pose_list
+ 
+            self.announcer.say("No sample found. Searching area")           
             
-            rospy.loginfo("POSE LIST: " + str(pose_list))
+            i = 0
+            header = std_msg.Header(0, rospy.Time.now(), 'odom')    
+            for pose in pose_list:
+                self.debug_marker.header = header
+                self.debug_marker.pose.position = pose.pose.position
+                self.debug_marker.id = i
+                self.debug_marker_pub.publish(self.debug_marker)        
+                i += 1            
 
+            return 'next'
+            
         except tf.Exception:
             rospy.logwarn("PURSUE_SAMPLE failed to transform robot pose in GetSearchMoves")
             return 'aborted'
-
-                
-        self.announcer.say("No sample found. Searching area")
-        
-        return 'next'
 
 class HandleSearchMoves(smach.State):
     def __init__(self, listener, announcer):
@@ -422,11 +440,14 @@ class HandleSearchMoves(smach.State):
         
         if (len(userdata.pose_list) > 0):
             target_pose = userdata.pose_list.pop(0)
-            target_point = target_pose.pose.position
+            target_point = geometry_msg.PointStamped(target_pose.header,
+                                                     target_pose.pose.position)
+            target_point.header.stamp = rospy.Time(0)            
             try:
-                origin = util.get_current_robot_pose(self.listener).pose.position
-                distance = util.point_distance_2d(origin, target_point)
-                yaw = util.pointing_yaw(origin, target_point)
+                point_in_base = self.listener.transformPoint('base_link', target_point).point                
+                origin = geometry_msg.Point(0.065,0,0)
+                distance = util.point_distance_2d(origin, point_in_base)
+                yaw = util.pointing_yaw(origin, point_in_base)
                 userdata.simple_move = {'type':'strafe',
                                         'yaw':yaw,
                                         'distance':distance}
