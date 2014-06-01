@@ -319,7 +319,7 @@ class DriveToPoseState(smach.State):
                 return 'sample_detected'
             #handle target_pose changes
             if userdata.target_pose != goal.target_pose:
-                rospy.loginfo("DriveToPose replanning")
+                rospy.loginfo("DriveToPose sending new goal")
                 goal.target_pose = userdata.target_pose
                 self.move_client.send_goal(goal)
             #check if we are stuck and move_base isn't handling it
