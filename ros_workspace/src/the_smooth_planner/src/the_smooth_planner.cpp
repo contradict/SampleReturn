@@ -47,6 +47,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     this->completed_knot_header = std_msgs::Header();
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
+    this->is_waiting_on_stitched_path = false;
 
     /*
     this->replan_ahead_pose.position.x = 0;
@@ -113,7 +114,12 @@ bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
 
 bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose)
 {
-    if (stitched_path.knots.size() == 0 || this->isGoalReached() || is_replan_ahead_iter_valid)
+    if (this->is_waiting_on_stitched_path)
+    {
+        ROS_ERROR("waiting on stitched path, ignoring replan request");
+        return false;
+    }
+    else if (stitched_path.knots.size() == 0 || this->isGoalReached() || is_replan_ahead_iter_valid)
     {
         ROS_ERROR("last path has no knots or we reached the goal");
         return false;
@@ -343,7 +349,13 @@ std::vector<platform_motion_msgs::Knot> computeTurnInPlace(platform_motion_msgs:
 
 void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
-    ROS_DEBUG("RECEIVED PATH");
+    ROS_ERROR("RECEIVED PATH");
+
+    if (is_waiting_on_stitched_path)
+    {
+        ROS_ERROR("WAITING ON STITCHED PATH, IGNORING NEW PLAN");
+        return;
+    }
 
     Time timestamp = Time::now();
 
@@ -750,6 +762,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     visualization_publisher.publish(visualizationMarkerArray);
 
     is_replan_ahead_iter_valid = false;
+    is_waiting_on_stitched_path = true;
 
     return;
 }
@@ -786,6 +799,7 @@ void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitche
     this->stitched_path = stitchedPath;
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
+    this->is_waiting_on_stitched_path = false;
     ROS_ERROR("Received stitched path");
 }
 
