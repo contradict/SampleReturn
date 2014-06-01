@@ -427,7 +427,7 @@ class SearchLineManager(smach.State):
         self.costmap = nav_msg.OccupancyGrid()
         self.new_costmap_available = True
         
-        self.test_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+        self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
         
     def execute(self, userdata):
     
@@ -471,7 +471,15 @@ class SearchLineManager(smach.State):
         self.costmap = costmap
         
     def line_blocked(self, userdata):
+        
+        if self.debug_map_pub.get_num_connections() > 0:
+            publish_debug = True
+        else:
+            publish_debug = False
+        
         costmap = self.costmap
+        lethal_threshold = 90
+        blocked_threshold = 0.30
         check_width = userdata.blocked_check_width/2
         check_dist = userdata.blocked_check_distance
         resolution = costmap.info.resolution
@@ -489,31 +497,30 @@ class SearchLineManager(smach.State):
         end_points = bresenham.points(lr, ur)
         total_count = len(start_points)
         
+        #check lines for lethal values
         blocked_count = 0
-        max_vals = []
         for start, end in zip(start_points, end_points):
             line = bresenham.points(start[None,:], end[None,:])
             line_vals = map_np[line[:,1], line[:,0]]
             max_val = (np.amax(line_vals))
-            max_vals.append(max_val)
-            map_np[line[:,1], line[:,0]] = max_val
-            if np.any(line_vals > 90):
-                blocked_count += 1   
-
-        map_np[start_points[:,1], start_points[:,0]] = 64
-        map_np[end_points[:,1], end_points[:,0]] = 64
-            
-        costmap.data = list(np.reshape(map_np, -1))
-        self.test_map_pub.publish(costmap)                        
+            if np.any(line_vals > lethal_threshold):
+                blocked_count += 1
+                #for debug, mark lethal lines
+                if publish_debug: map_np[line[:,1], line[:,0]] = 64
+                
+        #if anything is subscribing to the test map, publish it
+        if publish_debug:
+            map_np[start_points[:,1], start_points[:,0]] = 64
+            map_np[end_points[:,1], end_points[:,0]] = 64
+            costmap.data = list(np.reshape(map_np, -1))
+            self.debug_map_pub.publish(costmap)                        
         
-        #rospy.loginfo("BLOCKED COUNT: " + str(blocked_count) + "/" + str(len(max_vals)))
-        #rospy.loginfo("MAX_VALS: " + str(max_vals))
-        if (blocked_count/float(total_count)) > 0.30:        
+        if (blocked_count/float(total_count)) > blocked_threshold:        
             return True
                     
         return False
     
-    #array of array for bresenham implementation    
+    #returns array of array for bresenham implementation    
     def check_point(self, start, distance, yaw, res):
         x = np.trunc(start[0] + (distance * math.cos(yaw))/res).astype('i2')
         y = np.trunc(start[1] + (distance * math.sin(yaw))/res).astype('i2')
