@@ -2087,6 +2087,8 @@ void Motion::sendPvtSegment()
         }
         else
         {
+            //ROS_ERROR_STREAM("firstSegment.time: " << firstSegment_.time << " second segment time: " << secondSegment_.time);
+            //ROS_ERROR_STREAM("length of planned path: " << plannedPath.size());
             ROS_DEBUG("out of path segments, sending zeros");
             pvtToZero();
         }
