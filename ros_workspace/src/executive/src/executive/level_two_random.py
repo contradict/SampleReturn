@@ -180,11 +180,13 @@ class LevelTwoRandom(object):
                 smach.Concurrence.add('SEARCH_LINE_MANAGER',
                                       SearchLineManager(self.tf_listener, self.announcer))
                                         
-                                        
+            #must enter this concurrency with next_line_pose set to valid goal,  if it is
+            #at the current robot position, DriveToPose will return complete immediately
+            #this is seen as some kind of move_base error, and a new search line will be chosen
             smach.StateMachine.add('SEARCH_LINE',
                                    self.line_manager,
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
-                                                  'move_complete':'SEARCH_LINE',
+                                                  'move_complete':'CHOOSE_NEW_LINE',
                                                   'line_blocked':'CHOOSE_NEW_LINE',
                                                   'timeout':'CHOOSE_NEW_LINE',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
