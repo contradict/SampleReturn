@@ -428,6 +428,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             timestamp = (*lookAheadBufferKnotIter).header.stamp;
             ROS_DEBUG_STREAM("timestamp now " << timestamp);
         }
+        else
+        {
+            ROS_ERROR("We're waiting for a plan but didn't get the one we wanted. Still waiting...");
+            return;
+        }
     }
     else if (!isGoalReached() && (stitched_path.knots.size()>0) && (timestamp - stitched_path.knots.back().header.stamp) < ros::Duration(delta_time_after_goal_drop_path) )
     {
