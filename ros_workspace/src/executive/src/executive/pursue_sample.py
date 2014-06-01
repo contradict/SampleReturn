@@ -381,16 +381,6 @@ class GetSearchPoints(smach.State):
         self.listener = listener
         self.announcer = announcer
 
-        self.debug_marker = vis_msg.Marker()
-        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'odom')
-        self.debug_marker.type = vis_msg.Marker.CYLINDER
-        self.debug_marker.color = std_msg.ColorRGBA(0, 255, 0, 1)
-        self.debug_marker.scale = geometry_msg.Vector3(.1, .1, .5)
-        self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
-        self.debug_marker.lifetime = rospy.Duration(60)
-        
-        self.debug_marker_pub = rospy.Publisher('search_markers', vis_msg.Marker)
-
     def execute(self, userdata):
 
         pose_list = []
@@ -409,18 +399,7 @@ class GetSearchPoints(smach.State):
             next_pose = util.translate_base_link(self.listener, start_pose, square_step, -square_step)
             pose_list.append(next_pose)
             userdata.pose_list = pose_list
- 
             self.announcer.say("No sample found. Searching area")           
-            
-            i = 0
-            header = std_msg.Header(0, rospy.Time.now(), 'odom')    
-            for pose in pose_list:
-                self.debug_marker.header = header
-                self.debug_marker.pose.position = pose.pose.position
-                self.debug_marker.id = i
-                self.debug_marker_pub.publish(self.debug_marker)        
-                i += 1            
-
             return 'next'
             
         except tf.Exception:
