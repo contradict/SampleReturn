@@ -28,7 +28,7 @@
         <param name="base_global_planner" type="string" value="SBPLLatticePlanner"/>
         <param name="base_local_planner" type="string" value="TheSmoothPlanner"/>
 
-        <param name="controller_frequency" type="double" value="1.0"/>
+        <param name="controller_frequency" type="double" value="0.5"/>
 
     </node>
 
