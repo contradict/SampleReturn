@@ -47,6 +47,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
     this->is_waiting_on_stitched_path = false;
+    this->is_goal_reached = false;
     this->start_time_wait_on_stitched_path = Time::now();
 
     /*
@@ -198,9 +199,7 @@ bool TheSmoothPlanner::isGoalReached()
     // The pvt_segment code in platform_motion knows how to answer this
     // question much better than the local planner.  The goal is reached
     // when all pvt segments have been executed to completion.
-    return (stitched_path.knots.size() > 0 &&
-            completed_knot_header.seq == stitched_path.knots.back().header.seq &&
-            fabs((completed_knot_header.stamp - stitched_path.knots.back().header.stamp).toSec()) < 0.01);
+    return is_goal_reached;
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
@@ -778,6 +777,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     is_replan_ahead_iter_valid = false;
     is_waiting_on_stitched_path = true;
+    is_goal_reached = false;
     start_time_wait_on_stitched_path = Time::now();
 
     return;
@@ -802,7 +802,10 @@ void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHea
     {
         this->is_replan_ahead_iter_valid = false;
     }
-    return;
+
+    this->is_goal_reached = (stitched_path.knots.size() > 0 &&
+                            completed_knot_header.seq == stitched_path.knots.back().header.seq &&
+                            fabs((completed_knot_header.stamp - stitched_path.knots.back().header.stamp).toSec()) < 0.01);
 }
 
 void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity)
