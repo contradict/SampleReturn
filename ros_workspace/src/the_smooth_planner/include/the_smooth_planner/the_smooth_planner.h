@@ -97,5 +97,6 @@ private:
     platform_motion_msgs::Path stitched_path;
     std::vector<platform_motion_msgs::Knot>::iterator replan_ahead_iter;
     bool is_replan_ahead_iter_valid;
+    bool is_waiting_on_stitched_path;
 };
 };

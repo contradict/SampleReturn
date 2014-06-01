@@ -155,20 +155,29 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                 {
                     ros::Duration aheadTime = (*searchAheadIter).header.stamp - (*currentKnotIter).header.stamp;
                     ROS_ERROR_STREAM("Current seq: " << (*currentKnotIter).header.seq << ", Search seq: " << (*searchAheadIter).header.seq << ", Ahead time: " << aheadTime);
-                    double yaw_prev, yaw;
-                    yaw = tf::getYaw(currentKnotIter->pose.orientation);
+
+                    Eigen::Vector3d searchAheadPos, searchAheadPrevPos;
+                    Eigen::Quaterniond searchAheadQuat, searchAheadPrevQuat;
+
+                    tf::pointMsgToEigen((*searchAheadIter).pose.position, searchAheadPos);
+                    tf::quaternionMsgToEigen((*searchAheadIter).pose.orientation, searchAheadQuat);
                     if (currentKnotIter != stitched_path.knots.begin())
                     {
-                        yaw_prev = tf::getYaw((*(currentKnotIter-1)).pose.orientation);
+                        tf::pointMsgToEigen((*(searchAheadIter-1)).pose.position, searchAheadPrevPos);
+                        tf::quaternionMsgToEigen((*(searchAheadIter-1)).pose.orientation, searchAheadPrevQuat);
                     }
                     else
                     {
-                        yaw_prev = yaw;
+                        continue;
                     }
-
-                    if ( (aheadTime > ros::Duration(replan_look_ahead_time)) )
+                    
+                    bool isAheadEnough = aheadTime > ros::Duration(replan_look_ahead_time);
+                    bool isPosApproxPrev = (searchAheadPos - searchAheadPrevPos).squaredNorm() < 0.000001;
+                    bool isQuatApproxPrev = searchAheadQuat.dot(searchAheadPrevQuat) > 0.87; // 0.87 = cos(0.5 deg)
+                    ROS_ERROR_STREAM("IsAheadEnough: " << isAheadEnough << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
+                    if (isAheadEnough && !isPosApproxPrev && isQuatApproxPrev)
                     {
-                        ROS_ERROR("Stitching with dyaw %f", fabs(yaw-yaw_prev) );
+                        ROS_ERROR_STREAM("Choosing stitch point: \n" << (*searchAheadIter));
                         sourcePose->pose = (*searchAheadIter).pose;
                         sourcePose->header = (*searchAheadIter).header;
                         this->replan_ahead_iter = searchAheadIter;
@@ -387,9 +396,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         ROS_ERROR("Is replan ahead iter valid");
         ROS_ERROR_STREAM("newPathFirst: " << pathCopy.poses[0] << " replanAheadPos: " << (*replan_ahead_iter));
 
-        if (replanAheadPos.isApprox(newPathFirstPos, 0.05) )
-            //&& replanAheadQuat.isApprox(newPathFirstQuat, 0.01))
-            //warning! we're not checking orientation, that's probalby not so good!
+        if (((replanAheadPos - newPathFirstPos).squaredNorm() < 0.0022) &&
+            (replanAheadQuat.dot(newPathFirstQuat) > 0.87)) // 0.87 = cos(0.5 deg)
         {
             // Find the point in the stitched path that we want to stitch the new path to
             std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnotIter = stitched_path.knots.begin();
@@ -460,7 +468,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         Eigen::Vector3d nextPoint;
         tf::pointMsgToEigen(pathCopy.poses[i].pose.position, currentPoint);
         tf::pointMsgToEigen(pathCopy.poses[i+1].pose.position, nextPoint);
-        if((currentPoint - nextPoint).norm() < 0.001)
+        if((currentPoint - nextPoint).squaredNorm() < 0.0022)
         {
             if(lastPointWasTurnInPlace)
             {
@@ -665,6 +673,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         if (previousVelocityMagnitude > (expectedVelocityMagnitude+0.005))
         {
             double previousVelocityScale = expectedVelocityMagnitude/previousVelocityMagnitude;
+            if (previousVelocityScale < 0.01)
+            {
+                previousVelocityScale = 0.0; // Hack to handle numerical precision problems :(
+            }
             path_msg.knots[i-1].twist.linear.x *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.y *= previousVelocityScale;
             path_msg.knots[i-1].twist.linear.z = 0.00;
@@ -717,7 +729,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         Eigen::Vector3d currentPoint, nextPoint;
         tf::pointMsgToEigen(path_msg.knots[i].pose.position, currentPoint);
         tf::pointMsgToEigen(path_msg.knots[i+1].pose.position, nextPoint);
-        if((currentPoint - nextPoint).norm() < 0.001)
+        if((currentPoint - nextPoint).squaredNorm() < 0.0022)
         {
             ros::Duration turnTime;
             auto turnKnots = computeTurnInPlace(
@@ -744,6 +756,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             // at what was i+1 before we did the above insert.
             i+=turnKnots.size();
             totalNumTurnKnots += turnKnots.size();
+
+            ROS_ERROR("After adding turn in place, jumping to path index %d", (int)i+1);
         }
     }
 
@@ -800,7 +814,7 @@ void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitche
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
     this->is_waiting_on_stitched_path = false;
-    ROS_ERROR("Received stitched path");
+    ROS_ERROR("Received stitched path of size %d", stitchedPath.knots.size());
 }
 
 bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
