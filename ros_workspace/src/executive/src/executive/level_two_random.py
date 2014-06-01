@@ -73,6 +73,7 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(self.node_params.return_time_minutes*60)
+        self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #beacon approach
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
