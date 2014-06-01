@@ -101,7 +101,7 @@ class PursueSample(object):
             
             smach.StateMachine.add('APPROACH_SAMPLE',
                                    self.pursue_detected_point,
-                                   transitions = {'min_distance':'ENABLE_MANIPULATOR_DETECTOR',
+                                   transitions = {'min_distance':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'point_lost':'PURSUE_SAMPLE_ABORTED',
                                                   'complete':'PURSUE_SAMPLE_ABORTED',
                                                   'timeout':'PURSUE_SAMPLE_ABORTED',
@@ -109,18 +109,18 @@ class PursueSample(object):
                                    remapping = {'velocity':'pursuit_velocity',                
                                                 'max_point_lost_time':'max_sample_lost_time',
                                                 'pursue_samples':'false'})
-            
+           
+            smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
+                                   AnnounceState(self.announcer,
+                                                 'Calculate ing manipulator approach'),
+                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})                
+
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'ANNOUNCE_MANIPULATOR_APPROACH',
+                                     transitions = {'succeeded':'SELECT_SERVO',
                                                     'aborted':'PURSUE_SAMPLE_ABORTED'})
-            
-            smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
-                                   AnnounceState(self.announcer,
-                                                 'Calculate ing manipulator approach'),
-                                   transitions = {'next':'SELECT_SERVO'})                
             
             smach.StateMachine.add('SELECT_SERVO',
                                    SelectMotionMode(self.CAN_interface,
@@ -219,30 +219,38 @@ class PursueSample(object):
                                                   'timeout':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'ABORT_SERVO'})
 
-            smach.StateMachine.add('ABORT_SERVO',
-                                    SelectMotionMode(self.CAN_interface,
-                                                     MODE_PLANNER),
-                                    transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR',
-                                                   'failed':'DISABLE_MANIPULATOR_DETECTOR'})                
-   
-
+            #beginning of clean exit path
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'DESELECT_SERVO',
-                                                    'aborted':'PURSUE_SAMPLE_ABORTED'})
+                                                    'aborted':'DESELECT_SERVO'})
 
             smach.StateMachine.add('DESELECT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
                                     transitions = {'next':'complete',
-                                                  'failed':'PURSUE_SAMPLE_ABORTED'})      
+                                                  'failed':'complete'})      
+            
+            #beginning of abort path, failing above should enter here at appropriate point
+            #to return system to entry state
+            smach.StateMachine.add('ABORT_SERVO',
+                                    SelectMotionMode(self.CAN_interface,
+                                                     MODE_PLANNER),
+                                    transitions = {'next':'ABORT_MANIPULATOR_DETECTOR',
+                                                   'failed':'ABORT_MANIPULATOR_DETECTOR'})                
+
+            smach.StateMachine.add('ABORT_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'PURSUE_SAMPLE_ABORTED',
+                                                    'aborted':'PURSUE_SAMPLE_ABORTED'})
 
             smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
                                    PursueSampleAborted(self.result_pub),
-                                   transitions = {'recover':'START_SAMPLE_PURSUIT',
-                                                  'fail':'complete'})
+                                   transitions = {'next':'aborted'})
 
 
         #action server wrapper    
@@ -325,7 +333,8 @@ class StartSamplePursuit(smach.State):
     def execute(self, userdata):
         
         result = samplereturn_msg.GeneralExecutiveResult()
-        result.result_string = 'initialized'        
+        result.result_string = 'approach failed'
+        result.result_int = samplereturn_msg.NamedPoint.NONE
         userdata.action_result = result
         userdata.stop_on_sample = True
         #default velocity for all moves is search velocity,
@@ -449,10 +458,12 @@ class HandleSearchMoves(smach.State):
 class VisualServo(smach.State):
     def __init__(self, announcer):
         smach.State.__init__(self,
-                             output_keys = ['latched_sample'],
+                             output_keys = ['latched_sample',
+                                            'action_result'],
                              input_keys = ['detected_sample',
                                            'visual_servo_timeout',
                                            'visual_servo_lost_timeout',
+                                           'action_result',
                                            'paused'],
                              outcomes=['complete',
                                        'sample_lost',
@@ -461,7 +472,6 @@ class VisualServo(smach.State):
                                        'aborted'])
     
         self.announcer = announcer
-
         self.servo = actionlib.SimpleActionClient("visual_servo_action",
                                                    visual_servo_msg.VisualServoAction)
         self.sample_lost = False
@@ -475,7 +485,7 @@ class VisualServo(smach.State):
         self.sample_lost = False
         self.last_sample_detected = rospy.get_time()
         self.last_servo_feedback = rospy.get_time()
-        self.servo.wait_for_server(rospy.Duration(5))
+        self.servo.wait_for_server(rospy.Duration(1.0))
         self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
                              feedback_cb=self.servo_feedback_cb)
 
@@ -488,6 +498,7 @@ class VisualServo(smach.State):
             if self.preempt_requested():
                 self.servo.cancel_all_goals()
                 self.service_preempt()
+                userdata.action_result.result_string = 'servo preempted'
                 return 'preempted'
             if userdata.paused:
                 self.servo.cancel_all_goals()
@@ -497,6 +508,7 @@ class VisualServo(smach.State):
                 break
             
         if self.sample_lost:
+            userdata.action_result.result_string = 'servo lost'
             return 'sample_lost'
     
         if servo_state == action_msg.GoalStatus.SUCCEEDED:
@@ -505,25 +517,26 @@ class VisualServo(smach.State):
             return 'complete'
         else:
             self.announcer.say('Visual servo unexpected failure')
+            userdata.action_result.result_string = 'servo failure'
             return 'aborted'
                 
         return 'aborted'
     
     def servo_feedback_cb(self, feedback):
-         this_time = rospy.get_time()
-         if feedback.state != feedback.STOP_AND_WAIT:
-             self.last_sample_detected = this_time
-         delta_time = (this_time - self.last_servo_feedback)
-         if delta_time > 5.0:
-             if feedback.state == feedback.STOP_AND_WAIT:
-                 self.announcer.say("Sample lost")
-             else:
-                 self.announcer.say("range %d"%(10*int(feedback.error/10)))
-             self.last_servo_feedback = this_time
-         if (this_time - self.last_sample_detected) > self.visual_servo_lost_timeout:
-             self.servo.cancel_all_goals()
-             self.announcer.say('Canceling visual servo')
-             self.sample_lost = True
+        this_time = rospy.get_time()
+        if feedback.state != feedback.STOP_AND_WAIT:
+            self.last_sample_detected = this_time
+        delta_time = (this_time - self.last_servo_feedback)
+        if delta_time > 5.0:
+            if feedback.state == feedback.STOP_AND_WAIT:
+                self.announcer.say("Sample lost")
+            else:
+                self.announcer.say("range %d"%(10*int(feedback.error/10)))
+            self.last_servo_feedback = this_time
+        if (this_time - self.last_sample_detected) > self.visual_servo_lost_timeout:
+            self.servo.cancel_all_goals()
+            self.announcer.say('Canceling visual servo')
+            self.sample_lost = True
 
 class ConfirmSampleAcquired(smach.State):
     def __init__(self, announcer, result_pub):
@@ -533,8 +546,10 @@ class ConfirmSampleAcquired(smach.State):
                                        'preempted',
                                        'aborted'],
                              input_keys=['latched_sample',
-                                        'detected_sample'],
-                             output_keys=['detected_sample'])
+                                        'detected_sample',
+                                        'action_result'],
+                             output_keys=['detected_sample',
+                                          'action_result'])
 
         self.announcer = announcer
         self.result_pub = result_pub
@@ -545,8 +560,12 @@ class ConfirmSampleAcquired(smach.State):
         userdata.detected_sample = None
         rospy.sleep(1.0)
         if userdata.detected_sample is None:
+            #this is the path of great success, notify filter nodes about success
+            #and return the acquired sample ID in case the calling executive needs it
             self.announcer.say("Sample acquired")
             self.result_pub.publish(samplereturn_msg.PursuitResult(True))
+            userdata.action_result.result_string = ('sample acquired')
+            userdata.action_result.result_int = userdata.latched_sample.sample_id
             return 'sample_gone'
         else:
             if userdata.detected_sample.sample_id == userdata.latched_sample.sample_id:
@@ -558,7 +577,7 @@ class ConfirmSampleAcquired(smach.State):
 
 class PursueSampleAborted(smach.State):
     def __init__(self, result_pub):
-        smach.State.__init__(self, outcomes=['recover','fail'])
+        smach.State.__init__(self, outcomes=['next'])
 
         self.result_pub = result_pub
         
@@ -566,4 +585,4 @@ class PursueSampleAborted(smach.State):
 
         self.result_pub.publish(samplereturn_msg.PursuitResult(False))
         
-        return 'fail'
+        return 'next'
