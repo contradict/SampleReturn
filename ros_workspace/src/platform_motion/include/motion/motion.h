@@ -78,7 +78,7 @@ class Motion : public CANOpen::TransferCallbackReceiver {
         // pvt mode
         bool pathToBody( void );
         BodySegment interpolatePodSegments(const BodySegment &first, const BodySegment &second, const BodySegment &last, ros::Time now);
-        bool checkSegmentAcceleration();
+        bool checkSegmentAcceleration(int first_seq, int second_seq);
         double computeSafeInterval(double dt);
         Eigen::Vector2d podVelocity(const platform_motion_msgs::Knot &current, Eigen::Vector3d pod_pos);
         void sendCompletedKnot(std_msgs::Header& header);

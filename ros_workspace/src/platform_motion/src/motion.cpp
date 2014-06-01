@@ -1389,6 +1389,7 @@ void Motion::publishStitchedPath(void)
 
 void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path)
 {
+    ROS_WARN("Got planned path.");
     if(motion_mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PLANNER_PVT)
     {
         // if the planner hasn't been put in charge, don't listen to it
@@ -1398,6 +1399,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     if( path->knots.size() < 2 )
     {
         ROS_ERROR( "Path too short: %ld", path->knots.size() );
+        publishStitchedPath();
         return;
     }
 
@@ -1526,6 +1528,16 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         k = transformKnot( rotation, translation, k);
         k.header.stamp += dt;
         k.header.frame_id = "odom";
+        if(plannedPath.size()>0)
+        {
+            double timestep = (k.header.stamp - plannedPath.back().header.stamp).toSec();
+            if( timestep<0.050 )
+            {
+                ROS_ERROR("seq %d - %d", plannedPath.back().header.seq, k.header.seq);
+                ROS_ERROR_STREAM("Tiny dt: " << timestep );
+                continue;
+            }
+        }
         plannedPath.push_back(k);
     }
     lck.unlock();
@@ -1535,6 +1547,7 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
         newPathReady = true;
     }
 
+    ROS_WARN("Publish stitched path.");
     publishStitchedPath();
 
     primePVT();
@@ -1604,9 +1617,9 @@ bool Motion::pathToBody()
 
     firstSegment_ = secondSegment_;
 
+    int first_seq, second_seq;
     if( plannedPath.size() > 1 )
     {
-        ROS_DEBUG("move to next segment");
         std::unique_lock<std::mutex> lck(path_mutex_);
         auto knots = plannedPath.begin();
         platform_motion_msgs::Knot previous = *knots++;
@@ -1619,6 +1632,8 @@ bool Motion::pathToBody()
             next = current;
             next.header.stamp += ros::Duration(0.25);
         }
+
+        ROS_DEBUG("move to next segment %d", next.header.seq);
         sendCompletedKnot(previous.header);
         plannedPath.pop_front();
         lck.unlock();
@@ -1639,6 +1654,7 @@ bool Motion::pathToBody()
             ROS_DEBUG("%d: stern: \nsteeringAngle: %f, steeringSpeed: %f, wheelDistance: %f, wheelVelocity: %f, duration: %f", current.header.seq, secondSegment_.stern.steeringAngle, secondSegment_.stern.steeringVelocity, secondSegment_.stern.wheelDistance, secondSegment_.stern.wheelVelocity, secondSegment_.stern.duration);
             ROS_DEBUG("first: %f second: %f", firstSegment_.time.toSec(), secondSegment_.time.toSec());
         }
+        checkSegmentAcceleration(current.header.seq, next.header.seq);
     }
     else
     {
@@ -1647,12 +1663,11 @@ bool Motion::pathToBody()
         publishStitchedPath();
         ROS_DEBUG("Finished path");
     }
-    checkSegmentAcceleration();
     ROS_DEBUG("pathToBody exit");
     return true;
 }
 
-bool Motion::checkSegmentAcceleration()
+bool Motion::checkSegmentAcceleration(int first_seq, int second_seq)
 {
     double dt = (secondSegment_.time - firstSegment_.time).toSec();
     typedef std::tuple<std::string, PodSegment, PodSegment> segtuple;
@@ -1670,12 +1685,14 @@ bool Motion::checkSegmentAcceleration()
         std::tie( name, first, second )=seg;
         if( fabs(second.wheelVelocity - first.wheelVelocity) > maxWheelAcceleration_*dt )
         {
-            ROS_ERROR_STREAM("Excessive wheel acceleration for " << name << " :" << first << " - " << second);
+            ROS_ERROR("seq %d - %d", first_seq, second_seq);
+            ROS_ERROR_STREAM("Excessive wheel acceleration for " << name << "(dt=" << dt << "):" << first << " - " << second);
             ok=false;
         }
         if( fabs(second.steeringAngle - first.steeringAngle) > maxSteeringVelocity_*dt )
         {
-            ROS_ERROR_STREAM("Excessive steering change for " << name << " :" << first << " - " << second);
+            ROS_ERROR("seq %d - %d", first_seq, second_seq);
+            ROS_ERROR_STREAM("Excessive steering change for " << name << "(dt=" << dt << "):" << first << " - " << second);
             ok=false;
         }
     }
@@ -2090,7 +2107,9 @@ void Motion::sendPvtSegment()
             //ROS_ERROR_STREAM("firstSegment.time: " << firstSegment_.time << " second segment time: " << secondSegment_.time);
             //ROS_ERROR_STREAM("length of planned path: " << plannedPath.size());
             ROS_DEBUG("out of path segments, sending zeros");
+            plannedPath.clear();
             pvtToZero();
+            publishStitchedPath();
         }
 
     }
