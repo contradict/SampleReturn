@@ -29,6 +29,7 @@ import move_base_msgs.msg as move_base_msg
 import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn_msgs.srv as samplereturn_srv
+import visualization_msgs.msg as vis_msg
 
 import sensor_msgs.point_cloud2 as pc2
 
@@ -48,9 +49,45 @@ class RobotSimulator(object):
         self.mode = mode
         self.cameras_ready = True
         self.paused = False
-        self.publish_samples = False
+        self.publish_samples = True
         self.publish_beacon = False
-        self.fake_sample = {'x':11, 'y':-11, 'id':1}
+        
+        self.active_sample_id = None
+        self.collected_ids = []
+        self.fake_samples = [{'point':geometry_msg.Point(12, -12, 0),'id':1},
+                             {'point':geometry_msg.Point(25, -60, 0),'id':5},
+                             {'point':geometry_msg.Point(-15, 2, 0), 'id':3},
+                             {'point':geometry_msg.Point(-55, 5, 0), 'id':7},
+                             {'point':geometry_msg.Point(150,-15, 0), 'id':9},
+                             {'point':geometry_msg.Point(70, -52, 0), 'id':10},
+                             {'point':geometry_msg.Point(-40, -20, 0), 'id':2},
+                             {'point':geometry_msg.Point(93, -72, 0), 'id':6},
+                             {'point':geometry_msg.Point(15, -42, 0), 'id':4},
+                             {'point':geometry_msg.Point(14, 4, 0), 'id':8}]
+
+        self.sample_marker = vis_msg.Marker()
+        self.sample_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
+        self.sample_marker.type = vis_msg.Marker.CYLINDER
+        self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
+        self.sample_marker.scale = geometry_msg.Vector3(.3, .3, .1)
+        self.sample_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
+        self.sample_marker.lifetime = rospy.Duration(1.5)
+        
+        self.debug_marker = vis_msg.Marker()
+        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'odom')
+        self.debug_marker.type = vis_msg.Marker.CYLINDER
+        self.debug_marker.color = std_msg.ColorRGBA(0, 254, 0, 1)
+        self.debug_marker.scale = geometry_msg.Vector3(.05, .05, .5)
+        self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
+        self.debug_marker.lifetime = rospy.Duration(1.5)
+        
+        self.path_marker = vis_msg.Marker()
+        self.path_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
+        self.path_marker.type = vis_msg.Marker.ARROW
+        self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
+        self.path_marker.scale = geometry_msg.Vector3(.4, .02, .02)
+        self.path_marker.lifetime = rospy.Duration(0)
+                                                        
         self.joint_state_seq = 0
         
         self.motion_mode = platform_srv.SelectMotionModeRequest.MODE_ENABLE
@@ -82,7 +119,7 @@ class RobotSimulator(object):
         pause_state_name = "/io/pause_state"
         
         visual_servo_name = "/processes/visual_servo/servo_action"
-        
+        pursuit_result_name = "/processes/executive/pursuit_result"
         detected_sample_search_name = "/processes/sample_detection/search/filtered_point"
         detected_sample_manipulator_name = "/processes/sample_detection/manipulator/filtered_point"
         beacon_pose_name = "/processes/beacon_finder/beacon_pose"
@@ -187,7 +224,12 @@ class RobotSimulator(object):
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
 
         self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name, samplereturn_msg.NamedPoint)
-        rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_manipulator)         
+        rospy.Timer(rospy.Duration(0.1), self.publish_sample_detection_manipulator)         
+        
+        self.sample_marker_pub = rospy.Publisher('fake_samples', vis_msg.Marker)
+        self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
+                                                   samplereturn_msg.PursuitResult,
+                                                   self.handle_pursuit_result)
         
         beacon_rot = tf.transformations.quaternion_from_euler(0.0,
                                                               0.0,
@@ -233,7 +275,7 @@ class RobotSimulator(object):
                                                   "port_suspension",
                                                   rospy.Time(0),
                                                   rospy.Duration(1.0))
-                print "Waiting for transforms"
+                print "Waiting for robot_state_publisher transforms"
                 break
             except (tf.Exception):
                 pass
@@ -246,18 +288,53 @@ class RobotSimulator(object):
         self.stern_vector = np.array([x,y,0])
 
         self.joint_transforms_available = True
+        
+        self.debug_marker_pub = rospy.Publisher('debug_markers', vis_msg.Marker)
+        rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
+        
+        self.path_counter = 0
+        self.path_marker_pub = rospy.Publisher('path_markers', vis_msg.Marker)
+        rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
            
         #rospy.spin()
         
-    def handle_planner(self, twist):
+    def publish_path_markers(self, event):
+        self.path_marker.pose = util.get_current_robot_pose(self.tf_listener).pose
+        self.path_marker.id = self.path_counter
+        self.path_counter += 1
+        self.path_marker_pub.publish(self.path_marker)
         
+    def publish_debug_markers(self, event):
+
+        pose_list = []
+        square_step = 2.0
+
+        start_pose = util.get_current_robot_pose(self.tf_listener)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5, 0.2)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5, -0.2)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0, 0.2)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0, -.2)
+        pose_list.append(next_pose)
+        
+        i = 0
+        header = std_msg.Header(0, rospy.Time.now(), 'odom')    
+        for pose in pose_list:
+            self.debug_marker.header = header
+            self.debug_marker.pose.position = pose.pose.position
+            self.debug_marker.id = i
+            self.debug_marker_pub.publish(self.debug_marker)        
+            i += 1
+        
+    def handle_planner(self, twist):
         self.fake_robot_pose, self.fake_odometry = \
             self.integrate_odometry(self.fake_robot_pose,
                                     self.fake_odometry,
                                     twist)
         
     def handle_servo(self, twist):
-        
         self.fake_robot_pose, self.fake_odometry = \
             self.integrate_odometry(self.fake_robot_pose,
                                     self.fake_odometry,
@@ -265,7 +342,6 @@ class RobotSimulator(object):
 
     def publish_point_cloud(self, event):
         now = event.current_real
-
         header = std_msg.Header(0, now, '/map')
         target_frame = '/navigation_center_left_camera'
         try:
@@ -279,9 +355,7 @@ class RobotSimulator(object):
                                                 current_pose.pose.position,
                                                 target_frame,
                                                 transform)
-            
             self.points_center_pub.publish(center_cloud)        
- 
             header = std_msg.Header(0, now, '/navigation_port_left_camera')
             empty_cloud = pc2.create_cloud_xyz32(header,[])
             self.points_port_pub.publish(empty_cloud)
@@ -292,7 +366,6 @@ class RobotSimulator(object):
         
     def broadcast_tf_and_motion(self, event):
         now = rospy.Time.now()
-        
         self.tf_broadcaster.sendTransform(self.zero_translation,
                                           self.zero_rotation,
                                           now,
@@ -348,24 +421,48 @@ class RobotSimulator(object):
 
     def publish_sample_detection_search(self, event):
         if self.publish_samples:
-            msg = samplereturn_msg.NamedPoint()
-            msg.header = std_msg.Header(0, rospy.Time.now(), '/map')
-            msg.point = geometry_msg.Point(self.fake_sample['x'],
-                                                   self.fake_sample['y'],
-                                                   0.0)
-            msg.sample_id = self.fake_sample['id']
-            self.search_sample_pub.publish(msg)
-            
+            for sample in self.fake_samples:
+                if not sample['id'] in self.collected_ids:
+                    header = std_msg.Header(0, rospy.Time.now(), '/map')    
+                    self.sample_marker.header = header
+                    self.sample_marker.pose.position = sample['point']
+                    self.sample_marker.id = sample['id']
+                    self.sample_marker.text = 'sample: ' + str(sample['id'])
+                    self.sample_marker_pub.publish(self.sample_marker)
+                    if self.sample_in_view(sample['point'], 10, 5):
+                        msg = samplereturn_msg.NamedPoint()
+                        msg.header = header
+                        msg.point = sample['point']
+                        msg.sample_id = sample['id']
+                        self.search_sample_pub.publish(msg)
+                        self.active_sample_id = sample['id']
+                
     def publish_sample_detection_manipulator(self, event):
         if self.publish_samples:
-            msg = samplereturn_msg.NamedPoint()
-            msg.header = std_msg.Header(0, rospy.Time.now(), '/map')
-            msg.point = geometry_msg.Point(self.fake_sample['x'],
-                                                   self.fake_sample['y'],
-                                                   0.0)
-            msg.sample_id = self.fake_sample['id']
-            self.manipulator_sample_pub.publish(msg)
+            for sample in self.fake_samples:
+                if not sample['id'] in self.collected_ids:
+                     if self.sample_in_view(sample['point'], 0.5, 0.2):
+                        header = std_msg.Header(0, rospy.Time.now(), 'odom')
+                        msg = samplereturn_msg.NamedPoint()
+                        msg.header = header
+                        msg.point = sample['point']
+                        msg.sample_id = sample['id']
+                        self.manipulator_sample_pub.publish(msg)
             
+    def sample_in_view(self, point, max_x, max_y):
+        header = std_msg.Header(0, rospy.Time(0), 'odom')
+        point_stamped = geometry_msg.PointStamped(header, point)
+        base_relative = self.tf_listener.transformPoint('base_link',
+                                                        point_stamped)
+        x = base_relative.point.x
+        y = base_relative.point.y
+        return ( ((x > -0.1) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
+
+    def handle_pursuit_result(self, msg):
+        if msg.success:
+            print "Received success message for sample: " + str(self.active_sample_id)
+            print "Collected IDs: " + str(self.collected_ids)
+ 
     def publish_beacon_pose(self, event):
         if self.publish_beacon:
             msg = geometry_msg.PoseStamped()
@@ -420,6 +517,8 @@ class RobotSimulator(object):
             if fake_distance <= 0:
                 servo_result.success = True
                 self.visual_servo_server.set_succeeded(result=servo_result)
+                #mark the servoed sample off the list
+                self.collected_ids.append(self.active_sample_id)
                 break
             else:
                 servo_feedback.state = visual_servo_msg.VisualServoFeedback.MOVE_FORWARD
@@ -451,10 +550,11 @@ class RobotSimulator(object):
     def show_beacon(self):
         self.publish_beacon = True
             
-    def shift_sample(self):
-        shifts = [1,-1]
-        self.fake_sample['x'] += random.choice(shifts)
-        self.fake_sample['y'] += random.choice(shifts)
+    def shift_samples(self):
+        shifts = [0.5,-0.5]
+        for sample in self.fake_samples:
+            sample['point'].x += random.choice(shifts)
+            sample['point'].y += random.choice(shifts)
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")

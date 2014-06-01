@@ -4,6 +4,7 @@ import numpy as np
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+import tf
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion
 
@@ -19,8 +20,6 @@ class SimpleMover(object):
     self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
     self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
 
-    self.starting_position = None
-    self.starting_yaw = None
     self.running = False
     self.stop_requested = False
 
@@ -37,20 +36,16 @@ class SimpleMover(object):
     quaternion[2] = msg.pose.pose.orientation.z
     quaternion[3] = msg.pose.pose.orientation.w
 
-    if self.starting_yaw is None:
-      self.starting_yaw = euler_from_quaternion(quaternion)[-1]
-
-    if self.starting_position is None:
-      self.starting_position = msg.pose.pose.position
-
     self.current_yaw = euler_from_quaternion(quaternion)[-1]
 
     self.current_position = msg.pose.pose.position
 
-    self.distance_traveled = np.sqrt((self.current_position.x-self.starting_position.x)**2 +
-                                     (self.current_position.y-self.starting_position.y)**2)
 
     self.got_odom = True    
+
+  def distance_traveled(self, goal):
+      return np.hypot(self.current_position.x-goal.x,
+                      self.current_position.y-goal.y)
 
   def joint_state_callback(self, msg):
 
@@ -68,7 +63,7 @@ class SimpleMover(object):
   def unwind(self, ang):
     if ang > np.pi:
       ang -= 2*np.pi
-    elif ang < np.pi:
+    elif ang < -np.pi:
       ang += 2*np.pi
     return ang
 
@@ -88,21 +83,22 @@ class SimpleMover(object):
            rospy.Time.now() < timeout_time and
            not self.stop_requested)
   
-  def execute_spin(self, rot, time_limit=10.0):
-    
+  def execute_spin(self, rot, time_limit = None, stop_function = None):
     self.stop_requested = False
     self.running = True
+
+    if time_limit is None:
+      time_limit = self.time_limit
+    timeout_time = rospy.Time.now()
+    timeout_time.secs += time_limit
+
+    rate = rospy.Rate(self.loop_rate)
     
     try:
       pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
     except (tf.Exception):
       rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
       return
-
-    timeout_time = rospy.Time.now()
-    timeout_time.secs += time_limit
-
-    rate = rospy.Rate(self.loop_rate)
 
     #for positive omega, the stern wheel is at -pi/2
     self.target_angle = -np.pi/2 * np.sign(rot)
@@ -113,19 +109,11 @@ class SimpleMover(object):
     stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(pos[0]))
     accel_per_loop = self.acceleration/self.loop_rate
 
-    self.starting_yaw = None
+    starting_yaw = self.current_yaw
     self.got_odom = False
     self.got_joint_state = False
  
-    while self.keep_running(timeout_time):
-      #wait here for odom callback to clear flag, 
-      #this means starting_yaw is now initialized
-      rate.sleep()
-      if self.got_odom and self.got_joint_state:
-        break
-      rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")
-      
-    self.target_yaw = self.unwind(self.starting_yaw + rot)
+    target_yaw = self.unwind(starting_yaw + rot)
     #start current twist at 0
     current_twist = Twist()
     current_vel = 0
@@ -133,6 +121,17 @@ class SimpleMover(object):
     while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()      
+      
+      if self.stop_requested or (callable(stop_function) and stop_function()):
+        accel_per_loop = self.stop_deceleration/self.loop_rate
+        break
+
+      #do not pass here until odom callback fires, 
+      #passing means starting_yaw is now initialized
+      if not self.got_odom or not self.got_joint_state:
+        rospy.logwarn("SIMPLE_MOTION waiting for odom and joint_states")      
+        continue
+      
       #calculate linear vel of stern wheel pod
       current_vel = np.abs(current_twist.angular.z*np.abs(pos[0]))
 
@@ -154,8 +153,13 @@ class SimpleMover(object):
 
       stopping_yaw = current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
       
+      #print "self.current_yaw: " + str(self.current_yaw)
+      #print "target_yaw: " + str(target_yaw)
+      #print "stopping_yaw: " + str(stopping_yaw)
+      #print "np.abs(self.unwind(target_yaw - self.current_yaw)): " + str(np.abs(self.unwind(target_yaw - self.current_yaw)))
+      
       #check if we are at decel point      
-      if np.abs(self.unwind(self.target_yaw - self.current_yaw)) < stopping_yaw:
+      if np.abs(self.unwind(target_yaw - self.current_yaw)) < stopping_yaw:
         break
 
       #if we are under max_vel keep accelerating      
@@ -173,9 +177,6 @@ class SimpleMover(object):
         #rospy.loginfo("Outgoing twist at max_vel: " + str(twist))
         self.publisher.publish(current_twist)
 
-    if self.stop_requested:
-      accel_per_loop = self.stop_deceleration/self.loop_rate
-
     #decel to zero
     for i in range(int(current_vel/accel_per_loop),-1,-1):
       rate.sleep()
@@ -186,17 +187,26 @@ class SimpleMover(object):
 
     self.running = False
     self.stop_requested = False
+    
+    #check if we are exiting because of timeout    
+    if rospy.Time.now() > timeout_time:
+      raise TimeoutException('execute_spin failed to complete before timeout')
+    else:
+      #if not return the distance remaining (hopefully zero!)
+      return (self.unwind(target_yaw - self.current_yaw))
 
-  def execute_strafe(self, angle, distance, time_limit=20.0):
+
+  def execute_strafe(self, angle, distance, time_limit = None, stop_function = None):
     self.stop_requested = False
     self.running = True
-    
-    self.starting_position = None
 
+    if time_limit is None:
+      time_limit = self.time_limit
     timeout_time = rospy.Time.now()
     timeout_time.secs += time_limit
-
     rate = rospy.Rate(self.loop_rate)
+
+    starting_position = self.current_position
 
     if (-np.pi/2<=angle<=np.pi/2):
       self.target_angle = angle
@@ -222,6 +232,11 @@ class SimpleMover(object):
     while self.keep_running(timeout_time):
       # Run at some rate, ~10Hz
       rate.sleep()
+
+      if self.stop_requested or (callable(stop_function) and stop_function()):
+        rospy.loginfo("STOP REQUESTED IN EXECUTE STRAFE")
+        accel_per_loop = self.stop_deceleration/self.loop_rate
+        break
       
       #wait here for odom callback to clear flag, 
       #this means starting_position, is now initialized
@@ -249,7 +264,7 @@ class SimpleMover(object):
 
       # check if we are must decelerate to stop now
       # distance = (velocity**2)/(2*accel_limit)
-      elif (distance-self.distance_traveled) < stopping_distance:
+      elif (distance-self.distance_traveled(starting_position) < stopping_distance):
         break
 
       # Accelerate until max_vel reached
@@ -265,9 +280,6 @@ class SimpleMover(object):
       #at max_vel, keep publishing until decel point is hit
       else:
         self.publisher.publish(current_twist)
-
-    if self.stop_requested:
-      accel_per_loop = self.stop_deceleration/self.loop_rate
       
     velocity = np.sqrt(current_twist.linear.x**2 + current_twist.linear.y**2)
     for i in range(int(velocity/accel_per_loop),-1,-1):
@@ -280,12 +292,23 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
 
+    #check if we are exiting because of timeout    
+    if rospy.Time.now() > timeout_time:
+      raise TimeoutException('execute_strafe failed to complete before timeout')
+    else:
+      #if not return the distance remaining (hopefully zero!)
+      return (distance-self.distance_traveled(starting_position))
+
   def is_running(self):
     return self.running
       
   def stop(self):
     self.stop_requested = True
 
+#these execute functions should return this exception if they timeout
+#timeout should indicate catastrophic failure of drive system, use accordingly
+class TimeoutException(BaseException):
+  pass
 
 if __name__ == "__main__":
   rospy.init_node('simple_motion')
