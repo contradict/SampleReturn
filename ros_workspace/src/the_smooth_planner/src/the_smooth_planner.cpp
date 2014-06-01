@@ -42,12 +42,14 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 4.0);
     localNodeHandle.param("yaw_epsilon", yaw_epsilon, 1e-4);
     localNodeHandle.param("delta_time_after_goal_drop_path", delta_time_after_goal_drop_path, 20.0);
+    localNodeHandle.param("wait_on_stitched_path_duration", wait_on_stitched_path_duration, 20.0);
 
     this->odometry = nav_msgs::Odometry();
     this->completed_knot_header = std_msgs::Header();
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
     this->is_waiting_on_stitched_path = false;
+    this->start_time_wait_on_stitched_path = Time::now();
 
     /*
     this->replan_ahead_pose.position.x = 0;
@@ -121,7 +123,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
     }
     else if (stitched_path.knots.size() == 0 || this->isGoalReached() || is_replan_ahead_iter_valid)
     {
-        ROS_ERROR("last path has no knots or we reached the goal");
+        ROS_ERROR("last path has no knots or we reached the goal or replan iter is valid");
         return false;
     }
     else
@@ -360,13 +362,13 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
     ROS_ERROR("RECEIVED PATH");
 
-    if (is_waiting_on_stitched_path)
+    Time timestamp = Time::now();
+
+    if (is_waiting_on_stitched_path && (timestamp-start_time_wait_on_stitched_path) < ros::Duration(wait_on_stitched_path_duration)) 
     {
         ROS_ERROR("WAITING ON STITCHED PATH, IGNORING NEW PLAN");
         return;
     }
-
-    Time timestamp = Time::now();
 
     // make a path copy to deal with stupid const stupid
     nav_msgs::Path pathCopy(path);
@@ -382,7 +384,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     initialKnot.pose = pathCopy.poses[0].pose;
     initialKnot.twist = odometry.twist.twist;
 
-    if (is_replan_ahead_iter_valid) // If we requested this path previously
+    // If we have not timed out waiting on a stitched path and we requested this path previously...
+    if (((timestamp-start_time_wait_on_stitched_path) < ros::Duration(wait_on_stitched_path_duration)) && is_replan_ahead_iter_valid)
     {
         Eigen::Vector3d replanAheadPos;
         Eigen::Quaterniond replanAheadQuat;
@@ -777,6 +780,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     is_replan_ahead_iter_valid = false;
     is_waiting_on_stitched_path = true;
+    start_time_wait_on_stitched_path = Time::now();
 
     return;
 }

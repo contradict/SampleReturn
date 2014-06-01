@@ -89,6 +89,7 @@ private:
     double replan_look_ahead_time;
     double yaw_epsilon;
     double delta_time_after_goal_drop_path;
+    double wait_on_stitched_path_duration;
 
     // Message data
     std_msgs::Header completed_knot_header;
@@ -98,5 +99,6 @@ private:
     std::vector<platform_motion_msgs::Knot>::iterator replan_ahead_iter;
     bool is_replan_ahead_iter_valid;
     bool is_waiting_on_stitched_path;
+    ros::Time start_time_wait_on_stitched_path;
 };
 };
