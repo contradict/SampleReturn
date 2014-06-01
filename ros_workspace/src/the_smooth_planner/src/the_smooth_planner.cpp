@@ -842,7 +842,8 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path, unsi
     double curvature = this->ComputeCurvature(path, i);
     double deltaCurvature = this->ComputeCurvature(path, i+1) - curvature;
     double deltaPhi = -deltaCurvature*sternPodVector(0)*cos( -atan(curvature*sternPodVector(0))*atan(curvature*sternPodVector(0)) );
-    if (deltaCurvature == numeric_limits<double>::infinity())
+    // anything more curvy than 1.8 is turn in place...
+    if (deltaCurvature > 1.8 ) // 1.8 is approximately equal to infinity for small values of infinity
     {
         deltaPhi = M_PI/2.00;
     }
