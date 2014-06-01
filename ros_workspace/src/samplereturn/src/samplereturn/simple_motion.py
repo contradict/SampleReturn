@@ -123,8 +123,8 @@ class SimpleMover(object):
       rate.sleep()      
       
       if self.stop_requested or (callable(stop_function) and stop_function()):
-        self.stop_requested = True
-        accel_per_loop = self.stop_deceleration/self.loop_rate      
+        accel_per_loop = self.stop_deceleration/self.loop_rate
+        break
 
       #do not pass here until odom callback fires, 
       #passing means starting_yaw is now initialized
@@ -177,9 +177,6 @@ class SimpleMover(object):
         #rospy.loginfo("Outgoing twist at max_vel: " + str(twist))
         self.publisher.publish(current_twist)
 
-    if self.stop_requested:
-      accel_per_loop = self.stop_deceleration/self.loop_rate
-
     #decel to zero
     for i in range(int(current_vel/accel_per_loop),-1,-1):
       rate.sleep()
@@ -191,11 +188,13 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
     
-    #check if we are exiting because of timeout
+    #check if we are exiting because of timeout    
     if rospy.Time.now() > timeout_time:
-      return False
+      raise TimeoutException('execute_spin failed to complete before timeout')
     else:
-      return True
+      #if not return the distance remaining (hopefully zero!)
+      return (self.unwind(target_yaw - self.current_yaw))
+
 
   def execute_strafe(self, angle, distance, time_limit = None, stop_function = None):
     self.stop_requested = False
@@ -236,8 +235,8 @@ class SimpleMover(object):
 
       if self.stop_requested or (callable(stop_function) and stop_function()):
         rospy.loginfo("STOP REQUESTED IN EXECUTE STRAFE")
-        self.stop_requested = True
         accel_per_loop = self.stop_deceleration/self.loop_rate
+        break
       
       #wait here for odom callback to clear flag, 
       #this means starting_position, is now initialized
@@ -293,11 +292,12 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
 
-    #check if we are exiting because of timeout
+    #check if we are exiting because of timeout    
     if rospy.Time.now() > timeout_time:
-      return False
+      raise TimeoutException('execute_strafe failed to complete before timeout')
     else:
-      return True
+      #if not return the distance remaining (hopefully zero!)
+      return (distance-self.distance_traveled(starting_position))
 
   def is_running(self):
     return self.running
@@ -305,6 +305,10 @@ class SimpleMover(object):
   def stop(self):
     self.stop_requested = True
 
+#these execute functions should return this exception if they timeout
+#timeout should indicate catastrophic failure of drive system, use accordingly
+class TimeoutException(BaseException):
+  pass
 
 if __name__ == "__main__":
   rospy.init_node('simple_motion')
