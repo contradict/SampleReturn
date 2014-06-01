@@ -83,21 +83,22 @@ class SimpleMover(object):
            rospy.Time.now() < timeout_time and
            not self.stop_requested)
   
-  def execute_spin(self, rot, time_limit=10.0, stop_function = None):
-    
+  def execute_spin(self, rot, time_limit = None, stop_function = None):
     self.stop_requested = False
     self.running = True
+
+    if time_limit is None:
+      time_limit = self.time_limit
+    timeout_time = rospy.Time.now()
+    timeout_time.secs += time_limit
+
+    rate = rospy.Rate(self.loop_rate)
     
     try:
       pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
     except (tf.Exception):
       rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
       return
-
-    timeout_time = rospy.Time.now()
-    timeout_time.secs += time_limit
-
-    rate = rospy.Rate(self.loop_rate)
 
     #for positive omega, the stern wheel is at -pi/2
     self.target_angle = -np.pi/2 * np.sign(rot)
@@ -191,16 +192,17 @@ class SimpleMover(object):
     else:
       return True
 
-  def execute_strafe(self, angle, distance, time_limit=20.0, stop_function = None):
+  def execute_strafe(self, angle, distance, time_limit = None, stop_function = None):
     self.stop_requested = False
     self.running = True
 
-    starting_position = self.current_position
-
+    if time_limit is None:
+      time_limit = self.time_limit
     timeout_time = rospy.Time.now()
     timeout_time.secs += time_limit
-
     rate = rospy.Rate(self.loop_rate)
+
+    starting_position = self.current_position
 
     if (-np.pi/2<=angle<=np.pi/2):
       self.target_angle = angle
