@@ -185,7 +185,7 @@ bool TheSmoothPlanner::isGoalReached()
     // when all pvt segments have been executed to completion.
     return (stitched_path.knots.size() > 0 &&
             completed_knot_header.seq == stitched_path.knots.back().header.seq &&
-            fabs(completed_knot_header.stamp - stitched_path.knots.back().header.stamp.toSec()) < 0.01);
+            fabs((completed_knot_header.stamp - stitched_path.knots.back().header.stamp).toSec()) < 0.01);
 }
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
