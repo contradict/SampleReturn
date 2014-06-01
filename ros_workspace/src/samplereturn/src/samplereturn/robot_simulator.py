@@ -63,7 +63,7 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-40, -20, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
                              {'point':geometry_msg.Point(15, -42, 0), 'id':4},
-                             {'point':geometry_msg.Point(14, 3, 0), 'id':8}]
+                             {'point':geometry_msg.Point(14, 4, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
         self.sample_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
@@ -72,6 +72,14 @@ class RobotSimulator(object):
         self.sample_marker.scale = geometry_msg.Vector3(.3, .3, .1)
         self.sample_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
         self.sample_marker.lifetime = rospy.Duration(1.5)
+        
+        self.debug_marker = vis_msg.Marker()
+        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'odom')
+        self.debug_marker.type = vis_msg.Marker.CYLINDER
+        self.debug_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
+        self.debug_marker.scale = geometry_msg.Vector3(.1, .1, .5)
+        self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
+        self.debug_marker.lifetime = rospy.Duration(1.5)
                                                         
         self.joint_state_seq = 0
         
@@ -273,18 +281,45 @@ class RobotSimulator(object):
         self.stern_vector = np.array([x,y,0])
 
         self.joint_transforms_available = True
+        
+        self.debug_marker_pub = rospy.Publisher('debug_markers', vis_msg.Marker)
+        rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
            
         #rospy.spin()
+    
+    def publish_debug_markers(self, event):
+
+        pose_list = []
+        square_step = 2.0
+
+        start_pose = util.get_current_robot_pose(self.tf_listener)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, 0)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, square_step)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, -square_step, square_step)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, -square_step, -square_step)
+        pose_list.append(next_pose)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, -square_step)
+        pose_list.append(next_pose)
+        
+        i = 0
+        header = std_msg.Header(0, rospy.Time.now(), 'odom')    
+        for pose in pose_list:
+            self.debug_marker.header = header
+            self.debug_marker.pose.position = pose.pose.position
+            self.debug_marker.id = i
+            self.debug_marker_pub.publish(self.debug_marker)        
+            i += 1
         
     def handle_planner(self, twist):
-        
         self.fake_robot_pose, self.fake_odometry = \
             self.integrate_odometry(self.fake_robot_pose,
                                     self.fake_odometry,
                                     twist)
         
     def handle_servo(self, twist):
-        
         self.fake_robot_pose, self.fake_odometry = \
             self.integrate_odometry(self.fake_robot_pose,
                                     self.fake_odometry,
@@ -292,7 +327,6 @@ class RobotSimulator(object):
 
     def publish_point_cloud(self, event):
         now = event.current_real
-
         header = std_msg.Header(0, now, '/map')
         target_frame = '/navigation_center_left_camera'
         try:
@@ -306,9 +340,7 @@ class RobotSimulator(object):
                                                 current_pose.pose.position,
                                                 target_frame,
                                                 transform)
-            
             self.points_center_pub.publish(center_cloud)        
- 
             header = std_msg.Header(0, now, '/navigation_port_left_camera')
             empty_cloud = pc2.create_cloud_xyz32(header,[])
             self.points_port_pub.publish(empty_cloud)
@@ -319,7 +351,6 @@ class RobotSimulator(object):
         
     def broadcast_tf_and_motion(self, event):
         now = rospy.Time.now()
-        
         self.tf_broadcaster.sendTransform(self.zero_translation,
                                           self.zero_rotation,
                                           now,
@@ -396,7 +427,7 @@ class RobotSimulator(object):
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], 0.5, 0.2):
-                        header = std_msg.Header(0, rospy.Time.now(), '/map')
+                        header = std_msg.Header(0, rospy.Time.now(), 'odom')
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
                         msg.point = sample['point']
@@ -404,13 +435,13 @@ class RobotSimulator(object):
                         self.manipulator_sample_pub.publish(msg)
             
     def sample_in_view(self, point, max_x, max_y):
-        header = std_msg.Header(0, rospy.Time(0), 'map')
+        header = std_msg.Header(0, rospy.Time(0), 'odom')
         point_stamped = geometry_msg.PointStamped(header, point)
         base_relative = self.tf_listener.transformPoint('base_link',
                                                         point_stamped)
         x = base_relative.point.x
         y = base_relative.point.y
-        return ( ((x > 0) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
+        return ( ((x > -0.1) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
 
     def handle_pursuit_result(self, msg):
         if msg.success:
