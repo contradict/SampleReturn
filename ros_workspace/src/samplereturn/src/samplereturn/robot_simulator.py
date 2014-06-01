@@ -55,7 +55,7 @@ class RobotSimulator(object):
         self.active_sample_id = None
         self.collected_ids = []
         self.fake_samples = [{'point':geometry_msg.Point(12, -12, 0),'id':1},
-                             {'point':geometry_msg.Point(25, -20, 0),'id':5},
+                             {'point':geometry_msg.Point(25, -60, 0),'id':5},
                              {'point':geometry_msg.Point(-15, 2, 0), 'id':3},
                              {'point':geometry_msg.Point(-55, 5, 0), 'id':7},
                              {'point':geometry_msg.Point(150,-15, 0), 'id':9},
@@ -76,10 +76,17 @@ class RobotSimulator(object):
         self.debug_marker = vis_msg.Marker()
         self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'odom')
         self.debug_marker.type = vis_msg.Marker.CYLINDER
-        self.debug_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
-        self.debug_marker.scale = geometry_msg.Vector3(.1, .1, .5)
+        self.debug_marker.color = std_msg.ColorRGBA(0, 254, 0, 1)
+        self.debug_marker.scale = geometry_msg.Vector3(.05, .05, .5)
         self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
         self.debug_marker.lifetime = rospy.Duration(1.5)
+        
+        self.path_marker = vis_msg.Marker()
+        self.path_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
+        self.path_marker.type = vis_msg.Marker.ARROW
+        self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
+        self.path_marker.scale = geometry_msg.Vector3(.4, .02, .02)
+        self.path_marker.lifetime = rospy.Duration(0)
                                                         
         self.joint_state_seq = 0
         
@@ -284,24 +291,32 @@ class RobotSimulator(object):
         
         self.debug_marker_pub = rospy.Publisher('debug_markers', vis_msg.Marker)
         rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
+        
+        self.path_counter = 0
+        self.path_marker_pub = rospy.Publisher('path_markers', vis_msg.Marker)
+        rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
            
         #rospy.spin()
-    
+        
+    def publish_path_markers(self, event):
+        self.path_marker.pose = util.get_current_robot_pose(self.tf_listener).pose
+        self.path_marker.id = self.path_counter
+        self.path_counter += 1
+        self.path_marker_pub.publish(self.path_marker)
+        
     def publish_debug_markers(self, event):
 
         pose_list = []
         square_step = 2.0
 
         start_pose = util.get_current_robot_pose(self.tf_listener)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, 0)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5, 0.2)
         pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, square_step)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5, -0.2)
         pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, -square_step, square_step)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0, 0.2)
         pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, -square_step, -square_step)
-        pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, -square_step)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0, -.2)
         pose_list.append(next_pose)
         
         i = 0
