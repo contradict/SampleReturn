@@ -1,4 +1,4 @@
-controller_frequency: 10.0
+controller_frequency: 1.0
 DWAPlannerROS:
     holonomic_robot: false
     # rad/s^2
