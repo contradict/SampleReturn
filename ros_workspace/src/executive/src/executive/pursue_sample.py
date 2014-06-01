@@ -389,8 +389,7 @@ class GetSearchPoints(smach.State):
     def execute(self, userdata):
 
         pose_list = []
-        #square_step = userdata.square_search_size
-        square_step = 2.0
+        square_step = userdata.square_search_size
 
         try:
             start_pose = util.get_current_robot_pose(self.listener)
