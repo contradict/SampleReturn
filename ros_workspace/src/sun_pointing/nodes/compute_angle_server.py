@@ -69,7 +69,18 @@ class ComputeAngle(object):
     best_angle_index = np.argmax(self.max_indices)
     best_angle = self.img_angles[best_angle_index]
     # Return best angle
-    self.mover.execute_spin(best_angle-self.starting_yaw)
+    # Turn to it in sub-180 degree moves
+    final_spin = best_angle-self.starting_yaw
+    if final_spin > np.pi:
+      self.mover.execute_spin(np.pi)
+      self.mover.execute_spin(final_spin-np.pi)
+    elif final_spin < -np.pi:
+      self.mover.execute_spin(-np.pi)
+      self.mover.execute_spin(final_spin+np.pi)
+    else:
+      self.mover.execute_spin(final_spin)
+    self.max_indices = []
+    self.img_angles = []
     self.action_server.set_succeeded(ComputeAngleResult(best_angle))
 
 
