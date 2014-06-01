@@ -81,14 +81,16 @@ class PursueSample(object):
         self.state_machine.userdata.settle_time = 5
         self.state_machine.userdata.simple_move_tolerance = self.node_params.simple_move_tolerance
         
-        #use these
+        #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
 
+        #motion mode stuff
+        planner_mode = self.node_params.planner_mode
+        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
+        MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO            
+
         with self.state_machine:
-            
-            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST            
-            MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO            
             
             smach.StateMachine.add('START_SAMPLE_PURSUIT',
                                    StartSamplePursuit(self.announcer),

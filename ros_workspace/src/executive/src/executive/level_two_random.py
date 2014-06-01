@@ -101,9 +101,13 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.beacon_point = None
         
-        #use these
+        #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
+    
+        #motion mode stuff
+        planner_mode = self.node_params.planner_mode
+        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)    
     
         with self.state_machine:
             
@@ -121,7 +125,6 @@ class LevelTwoRandom(object):
                                                  'Enter ing level two mode'),
                                    transitions = {'next':'SELECT_PLANNER'})
             
-            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),

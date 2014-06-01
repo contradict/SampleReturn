@@ -82,9 +82,14 @@ class LevelOne(object):
         self.state_machine.userdata.beacon_point = None
         self.state_machine.userdata.detected_sample = None
 
-        #use these
+        #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
+
+        #motion mode stuff
+        planner_mode = self.node_params.planner_mode
+        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)    
+        MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE    
         
         with self.state_machine:
             
@@ -101,7 +106,6 @@ class LevelOne(object):
                                                  'Enter ing level one mode'),
                                    transitions = {'next':'SELECT_PLANNER'})
             
-            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
@@ -199,8 +203,6 @@ class LevelOne(object):
                                                  'Beacon not in view, searching'),
                                    transitions = {'next':'LEVEL_ONE_ABORTED'})  
 
-
-            MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
             smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_ENABLE),
