@@ -96,7 +96,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     }
     tf::vectorTFToEigen(sternPodStampedTf.getOrigin(), sternPodVector);
 
-    ROS_ERROR("sternPodVector.norm: %f", sternPodVector[0]);
+    ROS_DEBUG("sternPodVector.norm: %f", sternPodVector[0]);
 }
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
@@ -154,7 +154,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                 for (auto searchAheadIter = currentKnotIter; searchAheadIter != stitched_path.knots.end(); ++searchAheadIter)
                 {
                     ros::Duration aheadTime = (*searchAheadIter).header.stamp - (*currentKnotIter).header.stamp;
-                    ROS_ERROR_STREAM("Current seq: " << (*currentKnotIter).header.seq << ", Search seq: " << (*searchAheadIter).header.seq << ", Ahead time: " << aheadTime);
+                    ROS_DEBUG_STREAM("Current seq: " << (*currentKnotIter).header.seq << ", Search seq: " << (*searchAheadIter).header.seq << ", Ahead time: " << aheadTime);
 
                     Eigen::Vector3d searchAheadPos, searchAheadPrevPos;
                     Eigen::Quaterniond searchAheadQuat, searchAheadPrevQuat;
@@ -174,7 +174,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     bool isAheadEnough = aheadTime > ros::Duration(replan_look_ahead_time);
                     bool isPosApproxPrev = (searchAheadPos - searchAheadPrevPos).squaredNorm() < 0.000001;
                     bool isQuatApproxPrev = searchAheadQuat.dot(searchAheadPrevQuat) > 0.87; // 0.87 = cos(0.5 deg)
-                    ROS_ERROR_STREAM("IsAheadEnough: " << isAheadEnough << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
+                    ROS_DEBUG_STREAM("IsAheadEnough: " << isAheadEnough << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
                     if (isAheadEnough && !isPosApproxPrev && isQuatApproxPrev)
                     {
                         ROS_ERROR_STREAM("Choosing stitch point: \n" << (*searchAheadIter));
@@ -374,7 +374,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     // debug print! print all the points, something is strange about them!
     for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+        ROS_DEBUG_STREAM(i << ": " << pathCopy.poses[i]);
     }
 
     // Check if the path is the one we requested as a replan
@@ -421,7 +421,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             }
             if(lookAheadBufferKnotIter == stitched_path.knots.end() || lookAheadBufferKnotIter > replan_ahead_iter)
             {
-                ROS_ERROR("Planner go behind servos, cannot stitch new plan");
+                ROS_WARN("Planner got behind servos, cannot stitch new plan");
                 is_replan_ahead_iter_valid = false;
                 return;
             }
@@ -432,7 +432,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 geometry_msgs::PoseStamped insertPose;
                 insertPose.pose = (*insertKnotIter).pose;
                 insertPoses.push_back(insertPose);
-                ROS_ERROR_STREAM("adding pose to front of replanned path: " << insertPose);
+                ROS_DEBUG_STREAM("adding pose to front of replanned path: " << insertPose);
             }
             ROS_ERROR("pathCopy.poses size before prepend: %d", pathCopy.poses.size());
             pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
@@ -487,11 +487,11 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         pathCopy.poses.erase(pathCopy.poses.begin()+(*iter));
     }
 
-    ROS_ERROR("pathCopy post erasing:");
+    ROS_DEBUG("pathCopy post erasing:");
 
     for(unsigned int i = 0; i < pathCopy.poses.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << pathCopy.poses[i]);
+        ROS_DEBUG_STREAM(i << ": " << pathCopy.poses[i]);
     }
 
     // What direction is the robot going and what is the linear/angular vel?
@@ -558,21 +558,21 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         // kinematic constraints, such as the wheel angle rotation rate limit
         //double minimumPathTime = this->ComputeMinimumPathTime(splines[i], pathVelocityMagnitude, nextVelocityMagnitude);
         double minimumPathTime = this->ComputeMinimumPathTime(pathCopy, i);
-        ROS_ERROR_STREAM("minimumPathTime: " << minimumPathTime);
+        ROS_DEBUG_STREAM("minimumPathTime: " << minimumPathTime);
         if (nextVelocityMagnitude < maximum_linear_velocity)
         {
-            ROS_ERROR_STREAM("nextVelocityMagnitude < maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
+            ROS_DEBUG_STREAM("nextVelocityMagnitude < maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
             minimumPathTime = max((nextVelocityMagnitude-pathVelocityMagnitude)/linear_acceleration, minimumPathTime);
         }
         else
         {
-            ROS_ERROR_STREAM("nextVelocityMagnitude >= maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
+            ROS_DEBUG_STREAM("nextVelocityMagnitude >= maximum_linear_velocity. minimumPathTime: " << minimumPathTime);
             minimumPathTime = max(distanceTraveled/maximum_linear_velocity, minimumPathTime);
         }
 
         // Update the timestamp
         timestamp += ros::Duration(minimumPathTime);
-        ROS_ERROR_STREAM("timestamp now " << timestamp);
+        ROS_DEBUG_STREAM("timestamp now " << timestamp);
 
         // Update the rviz visualization marker array
         visualizationMarkerArray.markers[3*i].header.seq = 3*i;
@@ -627,7 +627,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         {
             angularVelocity = 0.0; // Special case for turn-in-place
         }
-        ROS_ERROR("curvature: %f. angular velocity: %f", curvature, angularVelocity);
+        ROS_DEBUG("curvature: %f. angular velocity: %f", curvature, angularVelocity);
 
         // Update path velocity
         pathVelocityMagnitude = nextVelocityMagnitude;
@@ -637,8 +637,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         path_msg.knots[i+1].header.stamp = timestamp;
         path_msg.knots[i+1].header.frame_id = "map";
         path_msg.knots[i+1].pose = pathCopy.poses[i+1].pose;
-        ROS_ERROR_STREAM("timestamp now " << timestamp);
-        ROS_ERROR_STREAM("timestamp in knot itself is " << path_msg.knots[i+1].header.stamp);
+        ROS_DEBUG_STREAM("timestamp now " << timestamp);
+        ROS_DEBUG_STREAM("timestamp in knot itself is " << path_msg.knots[i+1].header.stamp);
 
         path_msg.knots[i+1].twist.linear.x = nextVelocityVector.x();
         path_msg.knots[i+1].twist.linear.y = nextVelocityVector.y();
@@ -654,10 +654,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     path_msg.knots[pathCopy.poses.size()-1].twist.linear.z = 0.00;
     path_msg.knots[pathCopy.poses.size()-1].twist.angular.z = 0.00;
 
-    ROS_ERROR("\n\npath_msg.knots:");
+    ROS_DEBUG("\n\npath_msg.knots:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+        ROS_DEBUG_STREAM(i << ": " << path_msg.knots[i]);
     }
     
     // Compute and store smooth decelerations
@@ -708,10 +708,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         }
     }
 
-    ROS_ERROR("\n\npath_msg.knots post decel:");
+    ROS_DEBUG("\n\npath_msg.knots post decel:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+        ROS_DEBUG_STREAM(i << ": " << path_msg.knots[i]);
     }
     
 
@@ -762,10 +762,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         }
     }
 
-    ROS_ERROR("\n\npath_msg.knots post turn in place inflation:");
+    ROS_DEBUG("\n\npath_msg.knots post turn in place inflation:");
     for(unsigned int i = 0; i < path_msg.knots.size(); i++)
     {
-        ROS_ERROR_STREAM(i << ": " << path_msg.knots[i]);
+        ROS_DEBUG_STREAM(i << ": " << path_msg.knots[i]);
     }
 
     // the last point is never examined in the loop, so add the turn duration to it here.
