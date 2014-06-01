@@ -75,8 +75,6 @@ class ExecutiveMaster(object):
                                                     'preempted':'TOP_PREEMPTED',
                                                     'aborted':'TOP_ABORTED'})
 
-            rospy.loginfo("NODE PARAMS in with self.sm: " + str(self.node_params))
-                        
             cam_dict = {'NAV_CENTER' : 'camera_started',
                         'NAV_PORT' : 'camera_started',
                         'NAV_STARBOARD' : 'camera_started'}
