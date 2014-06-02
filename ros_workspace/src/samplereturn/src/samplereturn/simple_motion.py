@@ -19,7 +19,6 @@ class SimpleMover(object):
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
     self.acceleration = rospy.get_param(param_ns + 'acceleration', 0.5)
     self.stop_deceleration = rospy.get_param(param_ns + 'stop_deceleration', 1.5)
-    self.time_limit = rospy.get_param(param_ns + 'timeout', 20.0)
     self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
     self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
 
