@@ -37,7 +37,7 @@ public:
 
     virtual bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
 
-    void setPath(const nav_msgs::Path& path);
+    bool setPath(const nav_msgs::Path& path);
     void setOdometry(const nav_msgs::Odometry& odometry);
     void setCompletedKnot(const std_msgs::Header& completedKnot);
     void setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity);

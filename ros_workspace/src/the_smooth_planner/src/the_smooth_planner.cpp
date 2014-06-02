@@ -229,6 +229,7 @@ bool TheSmoothPlanner::isGoalReached()
 
 bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
 {
+    bool retVal = true;
     // The global planner emits a nav_msgs::Path instead of this message type.
     // We reuse the nav_msgs::Path handler here
     if (plan.size() > 0)
@@ -236,10 +237,10 @@ bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& pl
         nav_msgs::Path path;
         path.poses = plan;
         path.header = plan[0].header;
-        this->setPath(path);
+        retVal = this->setPath(path);
     }
     ROS_DEBUG("RECEIVED PLAN");
-    return true;
+    return retVal;
 }
 
 double yawFromKnot(const platform_motion_msgs::Knot &knot)
@@ -380,7 +381,8 @@ std::vector<platform_motion_msgs::Knot> computeTurnInPlace(platform_motion_msgs:
     return retval;
 }
 
-void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
+// Returns false when it rejects the plans and wants it to be republished later
+bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 {
     ROS_ERROR("RECEIVED PATH");
 
@@ -389,7 +391,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     if (is_waiting_on_stitched_path && (timestamp-start_time_wait_on_stitched_path) < ros::Duration(wait_on_stitched_path_duration)) 
     {
         ROS_ERROR("WAITING ON STITCHED PATH, IGNORING NEW PLAN");
-        return;
+        return true;
     }
 
     // Poses to remove for turn-in-place
@@ -450,7 +452,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             {
                 ROS_WARN("Planner got behind servos, cannot stitch new plan");
                 is_replan_ahead_iter_valid = false;
-                return;
+                return true;
             }
 
             std::vector<geometry_msgs::PoseStamped> insertPoses;
@@ -503,12 +505,13 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         else
         {
             ROS_ERROR("We're waiting for a plan but didn't get the one we wanted. Still waiting...");
-            return;
+            return true;
         }
     }
     else if (!isGoalReached() && (stitched_path.knots.size()>0) && (timestamp - stitched_path.knots.back().header.stamp) < ros::Duration(delta_time_after_goal_drop_path) )
     {
-        return;
+        // TODO - Send PVT to zero twist path
+        return false;
     }
 
     // keep track of special case turn in place motions so we can remove the intermediate ones
@@ -837,7 +840,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     have_goal = true;
     start_time_wait_on_stitched_path = Time::now();
 
-    return;
+    return true;
 }
 
 void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
