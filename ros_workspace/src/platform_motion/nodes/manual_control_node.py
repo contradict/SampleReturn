@@ -99,7 +99,7 @@ class ManualController(object):
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'SELECT_SERVO',
-                                                  'manipulator_grab_requested':'SELECT_PAUSE',
+                                                  'manipulator_grab_requested':'PAUSE_FOR_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
@@ -173,7 +173,7 @@ class ManualController(object):
                                                  'Servo canceled'),
                                    transitions = {'next':'SELECT_JOYSTICK'})   
             
-            smach.StateMachine.add('SELECT_PAUSE',
+            smach.StateMachine.add('PAUSE_FOR_GRAB',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
@@ -201,20 +201,26 @@ class ManualController(object):
                                        "Grabbing",
                                        30.0,
                                        "Manipulator grab timed out"),
-                                    transitions = {'complete':'JOYSTICK_LISTEN',
-                                                   'canceled':'JOYSTICK_LISTEN',
+                                    transitions = {'complete':'ANNOUNCE_GRAB_COMPLETE',
+                                                   'canceled':'ANNOUNCE_GRAB_CANCELED',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
                                    AnnounceState(self.announcer,
                                                  'Servo complete'),
-                                   transitions = {'next':'JOYSTICK_LISTEN'})   
+                                   transitions = {'next':'UNPAUSE_AFTER_GRAB'})   
             
             smach.StateMachine.add('ANNOUNCE_GRAB_CANCELED',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled'),
-                                   transitions = {'next':'JOYSTICK_LISTEN'})   
+                                   transitions = {'next':'UNPAUSE_AFTER_GRAB'})
+            
+            smach.StateMachine.add('UNPAUSE_AFTER_GRAB',
+                                   SelectMotionMode(self.CAN_interface,
+                                                    MODE_PAUSE),
+                                   transitions = {'next':'SELECT_JOYSTICK',
+                                                  'failed':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
                                      ManualPreempted(self.CAN_interface),
