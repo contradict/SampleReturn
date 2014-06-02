@@ -497,7 +497,7 @@ def generateMotionPrimitives(showplots=False):
     numangles = 8
     deltayaw = 2*pi/numangles
     longrangeprims = [[1, 2*gridspacing]]#,[3.0, gridspacing]] # List of [forward dist, path spacing]
-    shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
+    shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, 2*gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
     if len(longrangeprims):
         turninplacecost = 3.0*max(longrangeprim[0] for longrangeprim in longrangeprims)
     else:
@@ -509,7 +509,7 @@ def generateMotionPrimitives(showplots=False):
         for longrangeprim in longrangeprims:
             # Forward and right turn
             path = smoothhook(longrangeprim[0], initialyaw, -deltayaw, gridspacing, longrangeprim[1])
-            pathdata.append({'path' : path, 'cost' : int(longrangeprim[0]/gridspacing * 1.5), 'endpose_c' : i-1})
+            pathdata.append({'path' : path, 'cost' : int(longrangeprim[0]/gridspacing), 'endpose_c' : i-1})
             if showplots:
                 plotPath(path)
 
@@ -527,15 +527,15 @@ def generateMotionPrimitives(showplots=False):
 
             # Forward and left turn
             path = smoothhook(longrangeprim[0], initialyaw, deltayaw, gridspacing, longrangeprim[1])
-            pathdata.append({'path' : path, 'cost' : int(longrangeprim[0]/gridspacing * 1.5), 'endpose_c' : i+1})
+            pathdata.append({'path' : path, 'cost' : int(longrangeprim[0]/gridspacing), 'endpose_c' : i+1})
             if showplots:
                 plotPath(path)
 
-        # Only generate short-range primitives at 45 degree angle increments
+        # Generate short-range primitives
         for shortrangeprim in shortrangeprims:
             # Short forward
             forwarddist = shortrangeprim[0]
-            forwardcost = int(shortrangeprim[0]/gridspacing)
+            forwardcost = int(shortrangeprim[0]/gridspacing) * 2
             #if (i % 2) != 0:
             #    forwarddist = 0
             #    forwardcost = 99999999999999
