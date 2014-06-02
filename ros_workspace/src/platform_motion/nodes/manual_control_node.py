@@ -438,15 +438,14 @@ class ServoStrafe(smach.State):
                                         'distance':distance,
                                         'velocity':velocity}
                 rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
-                try_count += 1
+                self.try_count += 1
                 return 'strafe'
-            except tf.Exception, e:
-                rospy.logwarn(str(e))
+            except tf.Exception:
                 rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> odom transform in 1.0 seconds")
-                try_count = 0
+                self.try_count = 0
                 return 'aborted'
         
-        try_count = 0
+        self.try_count = 0
         return 'aborted'
                 
 class JoystickListen(smach.State):
