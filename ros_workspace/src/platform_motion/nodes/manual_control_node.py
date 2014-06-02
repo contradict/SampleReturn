@@ -155,8 +155,8 @@ class ManualController(object):
             
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
-                                                 'No sample in view, cancel in',
-                                   transitions = {'next':'SELECT_JOYSTICK'}))
+                                                 'No sample in view, cancel in'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})
 
             self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.tf)
             
