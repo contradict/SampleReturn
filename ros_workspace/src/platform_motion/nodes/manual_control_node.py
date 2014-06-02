@@ -41,19 +41,20 @@ class ManualController(object):
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf = tf.TransformListener()
     
+        while not rospy.is_shutdown():
+            try:
+                self.tf.waitForTransform('base_link',
+                                                  'manipulator_arm',
+                                                  rospy.Time(0),
+                                                  rospy.Time(5.0))
+                manipulator_offset, quat = self.tf.lookupTransform('base_link', 'manipulator_arm',
+                                                                  rospy.Time(0))
+                break
+            except(tf.Exception):
+                rospy.logwarn("MANUAL_CONTROL: Failed to get manipulator arm transform")
+ 
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
-
-        try:
-            self.tf.waitForTransform('base_link',
-                                              'manipulator_arm',
-                                              rospy.Time(0),
-                                              rospy.Time(5.0))
-            manipulator_offset, quat = self.tf.lookupTransform('base_link', 'manipulator_arm',
-                                                              rospy.Time(0))
-        except(tf.Exception):
-            rospy.logwarn("MANUAL_CONTROL: Failed to get manipulator arm transform")
-            return     
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],

@@ -106,8 +106,6 @@ class SimpleMover(object):
     timeout_time.secs += time_limit
 
     rate = rospy.Rate(self.loop_rate)
-    
-
 
     #for positive omega, the stern wheel is at -pi/2
     self.target_angle = -np.pi/2 * np.sign(rot)
@@ -203,7 +201,6 @@ class SimpleMover(object):
     else:
       #if not return the distance remaining (hopefully zero!)
       return (self.unwind(target_yaw - self.current_yaw))
-
 
   def execute_strafe(self, angle, distance, time_limit = None, stop_function = None):
     self.stop_requested = False

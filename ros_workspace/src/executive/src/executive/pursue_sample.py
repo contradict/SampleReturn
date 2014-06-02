@@ -47,20 +47,21 @@ class PursueSample(object):
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
         self.CAN_interface = util.CANInterface()
         
+        while not rospy.is_shutdown():
+            try:
+                self.tf_listener.waitForTransform('base_link',
+                                                  'manipulator_arm',
+                                                  rospy.Time(0),
+                                                  rospy.Time(5.0))
+                manipulator_offset, quat = self.tf_listener.lookupTransform('base_link',
+                                                                            'manipulator_arm',
+                                                                             rospy.Time(0))
+                break
+            except(tf.Exception):
+                rospy.logwarn("PURSUE_SAMPLE: Failed to get manipulator arm transform")
+ 
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~pursue_sample_params/', self.tf_listener)
-        
-        try:
-            self.tf_listener.waitForTransform('base_link',
-                                              'manipulator_arm',
-                                              rospy.Time(0),
-                                              rospy.Time(5.0))
-            manipulator_offset, quat = self.tf_listener.lookupTransform('base_link',
-                                                                        'manipulator_arm',
-                                                                         rospy.Time(0))
-        except(tf.Exception):
-            rospy.logwarn("PURSUE_SAMPLE: Failed to get manipulator arm transform")
-            return            
         
         #for this state machine, there is no preempt path.  It either finshes successfully and
         #reports success on the PursuitResult topic, or in case of any interupption or failure, it
