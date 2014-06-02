@@ -113,41 +113,6 @@ class ManualController(object):
                                                     MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'failed':'SELECT_JOYSTICK'})
-             
-            def visual_servo_feedback(feedback, announcer):
-                this_time = rospy.get_time()
-                if feedback.state != feedback.STOP_AND_WAIT:
-                    visual_servo_feedback.last_sample_detected = this_time
-                delta_time = (this_time - visual_servo_feedback.last_servo_feedback)
-                if delta_time > 5.0:
-                    if feedback.state == feedback.STOP_AND_WAIT:
-                        announcer.say("No sample detected")
-                    else:
-                        announcer.say("range %d"%(10*int(feedback.error/10)))
-                    visual_servo_feedback.last_servo_feedback = this_time
-                if (this_time - visual_servo_feedback.last_sample_detected) > 15.0:
-                    announcer.say('Canceling visual servo')
-                    return 'canceled'
-                return None
-            visual_servo_feedback.last_sample_detected = rospy.get_time()
-            visual_servo_feedback.last_servo_feedback = rospy.get_time()
-
-            smach.StateMachine.add('VISUAL_SERVO_OLD',
-                                    InterruptibleActionClientState(
-                                        "visual_servo_action",
-                                        visual_servo_msg.VisualServoAction,
-                                        visual_servo_msg.VisualServoGoal(),
-                                        None,
-                                        visual_servo_feedback,
-                                        self.announcer,
-                                        "Visual servo unavailable",
-                                        "Aligning to sample",
-                                        60.0,
-                                        "Visual servo timed out"),
-                                    transitions = {'complete':'SELECT_JOYSTICK',
-                                                   'canceled':'SELECT_JOYSTICK',
-                                                   'preempted':'MANUAL_PREEMPTED',
-                                                   'aborted':'MANUAL_ABORTED'})
 
             #calculate the strafe move to the sample
             smach.StateMachine.add('VISUAL_SERVO',
