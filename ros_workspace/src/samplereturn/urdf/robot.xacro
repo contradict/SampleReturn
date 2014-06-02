@@ -180,15 +180,28 @@
     </joint>
     <link name="top_triangle">
         <visual>
-            <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
+            <origin xyz="0 -0.645 0" rpy="0 0 1.57"/>
             <geometry>
                 <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.86 0.75 0.03"/>
             </geometry>
             <material name="plate"/>
         </visual>
     </link>
-
-
+    <joint name="manipulator_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="manipulator_arm"/>
+        <origin xyz="0.06666666 0 0" rpy="0 0 0"/>
+    </joint>    
+    <link name="manipulator_arm">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 1.57"/>
+            <geometry>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.05 0.05 10"/>
+            </geometry>
+            <material name="suspension"/>
+        </visual>
+    </link>
+        
     <!-- instantiate navigation pair -->
     <xacro:stereo_pair name="navigation_port" baseline="0.10" />
     <xacro:stereo_pair name="navigation_center" baseline="0.10" />
