@@ -519,8 +519,8 @@ def generateMotionPrimitives(showplots=False):
             #if (i % 2) != 0:
             #    forwarddist = 0
             #    forwardcost = 99999999999999
-            path = smoothhook(forwarddist, initialyaw, 0.0, gridspacing, longrangeprim[1])
-            #path = forward(forwarddist, initialyaw, gridspacing, longrangeprim[1])
+            #path = smoothhook(forwarddist, initialyaw, 0.0, gridspacing, longrangeprim[1])
+            path = forward(forwarddist, initialyaw, gridspacing, longrangeprim[1])
             pathdata.append({'path' : path, 'cost' : forwardcost, 'endpose_c' : i})
             if showplots:
                 plotPath(path)
@@ -539,8 +539,8 @@ def generateMotionPrimitives(showplots=False):
             #if (i % 2) != 0:
             #    forwarddist = 0
             #    forwardcost = 99999999999999
-            path = smoothhook(forwarddist, initialyaw, 0.0, gridspacing, shortrangeprim[1])
-            #path = forward(forwarddist, initialyaw, gridspacing, shortrangeprim[1])
+            #path = smoothhook(forwarddist, initialyaw, 0.0, gridspacing, shortrangeprim[1])
+            path = forward(forwarddist, initialyaw, gridspacing, shortrangeprim[1])
             pathdata.append({'path' : path, 'cost' : forwardcost, 'endpose_c' : i})
             if showplots:
                 plotPath(path)
