@@ -151,7 +151,12 @@ class ManualController(object):
             smach.StateMachine.add('VISUAL_SERVO',
                                    GetSampleStrafeMove(self.tf),
                                    transitions = {'strafe':'MANIPULATOR_APPROACH',
-                                                  'point_lost':'SELECT_JOYSTICK'})
+                                                  'point_lost':'ANNOUNCE_NO_SAMPLE'})
+            
+            smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
+                                   AnnounceState(self.announcer,
+                                                 'No sample in view, cancel in',
+                                   transitions = {'next':'SELECT_JOYSTICK'}))
 
             self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.tf)
             
@@ -162,7 +167,7 @@ class ManualController(object):
                                                   'sample_detected':'SELECT_JOYSTICK',
                                                   'preempted':'MANUAL_ABORTED',
                                                   'aborted':'MANUAL_ABORTED'},
-                                   remapping = {'pursue_samples':'false'})            
+                                   remapping = {'pursue_samples':'false'})
 
             smach.StateMachine.add('ANNOUNCE_SERVO_COMPLETE',
                                    AnnounceState(self.announcer,
