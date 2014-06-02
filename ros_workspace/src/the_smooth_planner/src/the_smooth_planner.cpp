@@ -497,7 +497,7 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
             std::vector<geometry_msgs::PoseStamped> insertPoses;
             auto insertKnotIter = lookAheadBufferKnotIter;
-            for (; insertKnotIter != replan_ahead_iter; ++insertKnotIter)
+            for (; insertKnotIter <= replan_ahead_iter; ++insertKnotIter)
             {
                 geometry_msgs::PoseStamped insertPose;
                 insertPose.pose = (*insertKnotIter).pose;
