@@ -163,7 +163,7 @@
         <origin xyz="0 0 ${wheel_diameter/2 + axle_offset + suspension_length - suspension_mounting_height}" rpy="0 0 0"/>
         <!--<origin xyz="0 0 0" rpy="0 0 0"/>-->
     </joint>
-    <!-- the big triangle -->
+    <!-- bottom plate of robot, upper surface -->
     <link name="body_triangle">
         <visual>
             <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
@@ -249,7 +249,7 @@
         <!-- rpy is pi/2 + T degrees down tilt -->
         <!-- note: year 3 manipulator is tilted down 70 degrees -->
         <!-- manipulators are .555m off dirt by Inventor model (no settling)-->
-        <origin xyz="-0.1147 0.0 0.0605" rpy="-2.79 0 -1.57"/>
+        <origin xyz="-0.1147 0.0 0.064" rpy="-2.792 0 -1.571"/>
     </joint>
 
     <link name="search_camera_body">
