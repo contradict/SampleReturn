@@ -224,7 +224,7 @@ class SimpleMover(object):
     timeout_time.secs += 1.5*self.total_time(distance, max_velocity, acceleration)
 
     start_time = rospy.get_time()
-    rospy.loginfo("Expected time: " + str(self.total_time(distance, max_velocity, acceleration)))
+    rospy.logdebug("SIMPLE MOTION expected time: " + str(self.total_time(distance, max_velocity, acceleration)))
 
     rate = rospy.Rate(self.loop_rate)
 
@@ -313,7 +313,7 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
 
-    rospy.loginfo("ACTUAL TIME: " + str(rospy.get_time() - start_time))
+    rospy.logdebug("SIMPLE MOTION actual time: " + str(rospy.get_time() - start_time))
 
     #check if we are exiting because of timeout    
     if rospy.Time.now() > timeout_time:
