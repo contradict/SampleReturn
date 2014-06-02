@@ -46,6 +46,13 @@
             steering_angle_epsilon: 0.01
     </rosparam>
 
+    <!-- manipulator correction for inaccuracy -->
+    <rosparam>
+        manipulator_correction:
+            x: 0.053
+            y: 0.022
+    </rosparam>
+
     <!-- Remaps -->
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>

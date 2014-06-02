@@ -157,6 +157,13 @@
         <param name="visual_servo_lost_timeout" type="double" value="10"/>
         <param name="simple_move_tolerance" type="double" value="0.1"/>
 
+        <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
+        <rosparam>
+            manipulator_correction:
+                x: 0.053
+                y: 0.022
+        </rosparam>
+
         <!-- simple motion parameters --> 
         <rosparam>
             pursue_sample_params:

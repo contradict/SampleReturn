@@ -70,6 +70,7 @@ class ManualController(object):
         self.state_machine.userdata.settle_time = 1
         self.state_machine.userdata.simple_move_tolerance = 1.0
         self.state_machine.userdata.manipulator_offset = manipulator_offset
+        self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
@@ -380,7 +381,8 @@ class GetSampleStrafeMove(smach.State):
                              outcomes=['strafe', 'point_lost', 'preempted', 'aborted'],
                              input_keys=['detected_sample',
                                          'settle_time',
-                                         'manipulator_offset'],
+                                         'manipulator_offset',
+                                         'manipulator_correction'],
                              output_keys=['simple_move',
                                           'detected_sample'])
         
@@ -398,13 +400,15 @@ class GetSampleStrafeMove(smach.State):
                 self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
                 point_in_base = self.listener.transformPoint('base_link',
                                                              userdata.detected_sample).point
+                point_in_base.x -= userdata.manipulator_correction['x']
+                point_in_base.y -= userdata.manipulator_correction['y']
                 origin = geometry_msg.Point(*userdata.manipulator_offset)
                 distance = util.point_distance_2d(origin, point_in_base)
                 yaw = util.pointing_yaw(origin, point_in_base)
                 userdata.simple_move = {'type':'strafe',
                                         'yaw':yaw,
                                         'distance':distance}
-                rospy.loginfo("DETECTED SAMPLE IN base_link?: " + str(point_in_base))
+                rospy.loginfo("DETECTED SAMPLE IN base_link (corrected): " + str(point_in_base))
                 return 'strafe'
             except(tf.Exception):
                 rospy.logwarn("MANUAL_CONTROL failed to get base_link -> odom transform in 1.0 seconds")
