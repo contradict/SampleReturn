@@ -496,8 +496,8 @@ def generateMotionPrimitives(showplots=False):
     gridspacing = 0.1
     numangles = 8
     deltayaw = 2*pi/numangles
-    longrangeprims = [[1, 2*gridspacing]]#,[3.0, gridspacing]] # List of [forward dist, path spacing]
-    shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, 2*gridspacing], [0.5, 2*gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
+    longrangeprims = [[3, 2*gridspacing]]#,[3.0, gridspacing]] # List of [forward dist, path spacing]
+    shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, 2*gridspacing], [0.5, 2*gridspacing], [1.0, 2*gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
     if len(longrangeprims):
         turninplacecost = 3.0*max(longrangeprim[0] for longrangeprim in longrangeprims)
     else:
