@@ -442,11 +442,6 @@ class SearchLineManager(smach.State):
         
         while not rospy.is_shutdown():  
             
-            if self.preempt_requested():
-                rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
-                self.service_preempt()
-                return 'preempted'
-
             current_pose = util.get_current_robot_pose(self.listener)
             distance = util.pose_distance_2d(current_pose, userdata.next_line_pose)
             if distance < userdata.line_replan_distance:
@@ -467,6 +462,12 @@ class SearchLineManager(smach.State):
                 if self.line_blocked(userdata):
                     self.announcer.say("Line is blocked, rotate ing to new line")
                     return 'line_blocked'   
+            
+            #check preempt after deciding whether or not to calculate next line pose
+            if self.preempt_requested():
+                rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
+                self.service_preempt()
+                return 'preempted'
         
             rospy.sleep(0.2)
         
