@@ -130,7 +130,7 @@ class ManualController(object):
             visual_servo_feedback.last_sample_detected = rospy.get_time()
             visual_servo_feedback.last_servo_feedback = rospy.get_time()
 
-            smach.StateMachine.add('VISUAL_SERVO_X',
+            smach.StateMachine.add('VISUAL_SERVO_OLD',
                                     InterruptibleActionClientState(
                                         "visual_servo_action",
                                         visual_servo_msg.VisualServoAction,
@@ -219,7 +219,7 @@ class ManualController(object):
             
             smach.StateMachine.add('UNPAUSE_AFTER_GRAB',
                                    SelectMotionMode(self.CAN_interface,
-                                                    MODE_PAUSE),
+                                                    MODE_RESUME),
                                    transitions = {'next':'SELECT_JOYSTICK',
                                                   'failed':'MANUAL_ABORTED'})
 
