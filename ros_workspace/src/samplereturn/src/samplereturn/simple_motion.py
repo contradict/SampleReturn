@@ -202,6 +202,68 @@ class SimpleMover(object):
       #if not return the distance remaining (hopefully zero!)
       return (self.unwind(target_yaw - self.current_yaw))
 
+  def total_time(self, total_distance):
+    if( self.max_velocity**2/2./self.acceleration > total_distance/2. ):
+      vmax = np.sqrt(2*(total_distance/2.)*self.acceleration)
+      total = 2*vmax/self.acceleration
+    else:
+      taccel = self.max_velocity/self.acceleration
+      daccel = self.max_velocity**2/2./self.acceleration
+      dconst = total_distance-2*daccel
+      tconst = dconst/self.max_velocity
+      total = 2*taccel + tconst
+    return total
+
+  def velocity_of_time(self, total_distance, t):
+    if( self.max_velocity**2/2./self.acceleration > total_distance/2. ):
+      # cannot accel to max velocity, compute peak velocity
+      vmax = np.sqrt(2*total_distance*self.acceleration)
+      # and time of max velocity
+      taccel = vmax/self.acceleration
+      if t < taccel:
+        vel = t*self.acceleration
+      elif t < 2*taccel:
+        vel = vmax-t*self.acceleration
+      else:
+        vel = 0
+    else:
+      taccel = self.max_velocity/self.acceleration
+      daccel = self.max_velocity**2/2./self.acceleration
+      dconst = total_distance-2*daccel
+      tconst = dconst/self.max_velocity
+      if t < taccel:
+        vel = t*self.acceleration
+      elif t < taccel+tconst:
+        vel = self.max_velocity
+      elif t < 2*taccel+tconst:
+        vel = self.max_velocity - self.acceleration*(t-taccel-tconst)
+      else:
+        vel = 0
+    return vel
+
+  def velocity_of_distance(self, total_distance, current_distance):
+    if( self.max_velocity**2/2./self.acceleration > total_distance/2. ):
+      vmax = np.sqrt(2*(total_distance/2.)*self.acceleration)
+      daccel = vmax**2/2./self.acceleration
+      if current_distance < daccel:
+        vel = np.sqrt(2*current_distance*self.acceleration)
+      elif current_distance < total_distance:
+        vel = vmax - np.sqrt(2*(current_distance-total_distance/2.)*self.acceleration)
+      else:
+        vel = 0
+    else:
+      daccel = self.max_velocity**2/2./self.acceleration
+      dconst = total_distance - 2*daccel
+      if current_distance < daccel:
+        vel = np.sqrt(2*current_distance*self.acceleration)
+      elif current_distance < daccel + dconst:
+        vel = self.max_velocity
+      elif current_distance < total_distance:
+        vel = self.max_velocity - np.sqrt(2*(current_distance-daccel-dconst)*self.acceleration)
+      else:
+        vel = 0
+    return vel
+
   def execute_strafe(self, angle, distance, time_limit = None, stop_function = None):
     self.stop_requested = False
     self.running = True
