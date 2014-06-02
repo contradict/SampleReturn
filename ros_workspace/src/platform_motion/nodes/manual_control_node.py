@@ -392,7 +392,7 @@ class ProcessGoal(smach.State):
 class ServoStrafe(smach.State):
     def __init__(self, listener):
         smach.State.__init__(self,
-                             outcomes=['strafe', 'complete' 'point_lost', 'preempted', 'aborted'],
+                             outcomes=['strafe', 'complete', 'point_lost', 'preempted', 'aborted'],
                              input_keys=['detected_sample',
                                          'settle_time',
                                          'manipulator_offset',
