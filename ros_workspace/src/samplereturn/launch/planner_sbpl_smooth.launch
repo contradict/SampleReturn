@@ -10,8 +10,8 @@
         output="log"
         >
 
-        <remap from="odometry" to="/motion/odometry"/>
         <remap from="cmd_vel" to="command"/>
+        <remap from="mover/odometry" to="/motion/odometry"/>
         <remap from="mover/completed_knot" to="/motion/completed_knot"/>
         <remap from="mover/stitched_path" to="/motion/stitched_path"/>
 
