@@ -48,7 +48,19 @@ class PursueSample(object):
         self.CAN_interface = util.CANInterface()
         
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
-        self.simple_mover = simple_motion.SimpleMover('~pursue_sample_params/')
+        self.simple_mover = simple_motion.SimpleMover('~pursue_sample_params/', self.tf_listener)
+        
+        try:
+            self.tf_listener.waitForTransform('base_link',
+                                              'manipulator_arm',
+                                              rospy.Time(0),
+                                              rospy.Time(5.0))
+            manipulator_offset, quat = self.tf_listener.lookupTransform('base_link',
+                                                                        'manipulator_arm',
+                                                                         rospy.Time(0))
+        except(tf.Exception):
+            rospy.logwarn("PURSUE_SAMPLE: Failed to get manipulator arm transform")
+            return            
         
         #for this state machine, there is no preempt path.  It either finshes successfully and
         #reports success on the PursuitResult topic, or in case of any interupption or failure, it
@@ -64,7 +76,6 @@ class PursueSample(object):
         self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.target_point = None
         self.state_machine.latched_sample = None
-        self.state_machine.manipulator_search_angle = math.pi/4
         
         self.state_machine.userdata.square_search_size = self.node_params.square_search_size
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
@@ -80,6 +91,8 @@ class PursueSample(object):
         #strafe search settings
         self.state_machine.userdata.settle_time = 5
         self.state_machine.userdata.simple_move_tolerance = self.node_params.simple_move_tolerance
+        self.state_machine.userdata.manipulator_search_angle = math.pi/4
+        self.state_machine.userdata.manipulator_offset = manipulator_offset
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
@@ -351,7 +364,8 @@ class GetSampleStrafeMove(smach.State):
         smach.State.__init__(self,
                              outcomes=['strafe', 'point_lost', 'preempted', 'aborted'],
                              input_keys=['target_sample',
-                                         'settle_time'],
+                                         'settle_time',
+                                         'manipulator_offset'],
                              output_keys=['simple_move',
                                           'target_sample'])
         
@@ -369,7 +383,7 @@ class GetSampleStrafeMove(smach.State):
                 self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
                 point_in_base = self.listener.transformPoint('base_link',
                                                              userdata.target_sample).point
-                origin = geometry_msg.Point(0.065,0,0)
+                origin = geometry_msg.Point(*userdata.manipulator_offset)
                 distance = util.point_distance_2d(origin, point_in_base)
                 yaw = util.pointing_yaw(origin, point_in_base)
                 userdata.simple_move = {'type':'strafe',

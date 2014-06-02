@@ -39,10 +39,21 @@ class ManualController(object):
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_navigate")
-        self.listener = tf.TransformListener()
+        self.tf = tf.TransformListener()
     
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
-        self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.listener)
+        self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
+
+        try:
+            self.tf.waitForTransform('base_link',
+                                              'manipulator_arm',
+                                              rospy.Time(0),
+                                              rospy.Time(5.0))
+            manipulator_offset, quat = self.tf.lookupTransform('base_link', 'manipulator_arm',
+                                                              rospy.Time(0))
+        except(tf.Exception):
+            rospy.logwarn("MANUAL_CONTROL: Failed to get manipulator arm transform")
+            return     
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],
@@ -57,6 +68,7 @@ class ManualController(object):
         #strafe search settings
         self.state_machine.userdata.settle_time = 5
         self.state_machine.userdata.simple_move_tolerance = .02
+        self.state_machine.userdata.manipulator_offset = manipulator_offset
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
@@ -135,11 +147,11 @@ class ManualController(object):
 
             #calculate the strafe move to the sample
             smach.StateMachine.add('VISUAL_SERVO',
-                                   GetSampleStrafeMove(self.listener),
+                                   GetSampleStrafeMove(self.tf),
                                    transitions = {'strafe':'MANIPULATOR_APPROACH',
                                                   'point_lost':'SELECT_JOYSTICK'})
 
-            self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.listener)
+            self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.tf)
             
             smach.StateMachine.add('MANIPULATOR_APPROACH',
                                    self.manipulator_approach,
@@ -354,6 +366,43 @@ class ProcessGoal(smach.State):
             return 'invalid_goal'
                         
         return 'valid_goal'
+
+class GetSampleStrafeMove(smach.State):
+    def __init__(self, listener):
+        smach.State.__init__(self,
+                             outcomes=['strafe', 'point_lost', 'preempted', 'aborted'],
+                             input_keys=['detected_sample',
+                                         'settle_time',
+                                         'manipulator_offset'],
+                             output_keys=['simple_move',
+                                          'detected_sample'])
+        
+        self.listener = listener
+        
+    def execute(self, userdata):
+        
+        userdata.detected_sample = None
+        rospy.sleep(userdata.settle_time)
+        if userdata.detected_sample is None:
+            return 'point_lost'
+        else:
+            try:
+                sample_time = userdata.detected_sample.header.stamp
+                self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
+                point_in_base = self.listener.transformPoint('base_link',
+                                                             userdata.detected_sample).point
+                origin = geometry_msg.Point(*userdata.manipulator_offset)
+                distance = util.point_distance_2d(origin, point_in_base)
+                yaw = util.pointing_yaw(origin, point_in_base)
+                userdata.simple_move = {'type':'strafe',
+                                        'yaw':yaw,
+                                        'distance':distance}
+                return 'strafe'
+            except(tf.Exception):
+                rospy.logwarn("MANUAL_CONTROL failed to get base_link -> odom transform in 1.0 seconds")
+                return 'aborted'
+        
+        return 'aborted'
                 
 class JoystickListen(smach.State):
     def __init__(self, CAN_interface, joy_state):
@@ -643,42 +692,6 @@ class JoyState(object):
                                           self.msg.axes[self.joy_params.ANGULAR_Z])
         
         return twist
-    
-class GetSampleStrafeMove(smach.State):
-    def __init__(self, listener):
-        smach.State.__init__(self,
-                             outcomes=['strafe', 'point_lost', 'preempted', 'aborted'],
-                             input_keys=['detected_sample',
-                                         'settle_time'],
-                             output_keys=['simple_move',
-                                          'detected_sample'])
-        
-        self.listener = listener
-        
-    def execute(self, userdata):
-        
-        userdata.detected_sample = None
-        rospy.sleep(userdata.settle_time)
-        if userdata.detected_sample is None:
-            return 'point_lost'
-        else:
-            try:
-                sample_time = userdata.detected_sample.header.stamp
-                self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
-                point_in_base = self.listener.transformPoint('base_link',
-                                                             userdata.detected_sample).point
-                origin = geometry_msg.Point(0.065,0,0)
-                distance = util.point_distance_2d(origin, point_in_base)
-                yaw = util.pointing_yaw(origin, point_in_base)
-                userdata.simple_move = {'type':'strafe',
-                                        'yaw':yaw,
-                                        'distance':distance}
-                return 'strafe'
-            except(tf.Exception):
-                rospy.logwarn("MANUAL_CONTROL failed to get base_link -> odom transform in 1.0 seconds")
-                return 'aborted'
-        
-        return 'aborted'
         
 if __name__ == '__main__':
     rospy.init_node("manual_control_node")
