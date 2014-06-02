@@ -400,7 +400,7 @@ class GetSampleStrafeMove(smach.State):
                 self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
                 point_in_base = self.listener.transformPoint('base_link',
                                                              userdata.detected_sample).point
-                point_in_base.x -= userdata.manipulator_correction['x']
+                point_in_base.x -= (userdata.manipulator_correction['x'] - userdata.manipulator_offset[0])
                 point_in_base.y -= userdata.manipulator_correction['y']
                 origin = geometry_msg.Point(*userdata.manipulator_offset)
                 distance = util.point_distance_2d(origin, point_in_base)
