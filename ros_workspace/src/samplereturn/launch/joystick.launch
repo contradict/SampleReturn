@@ -41,15 +41,24 @@
             max_velocity: 0.01
             acceleration: 0.02
             stop_deceleration: 0.2
-            timeout: 60
             loop_rate: 10
             steering_angle_epsilon: 0.01
     </rosparam>
 
+   <!-- servo sample simple motion parameters -->
+        <rosparam>
+           servo_params:
+              initial_velocity: 0.1
+              initial_tolerance: 0.050
+              final_velocity: 0.005
+              final_tolerance:.010
+              acceleration: 0.02
+        </rosparam>
+
     <!-- manipulator correction for inaccuracy -->
     <rosparam>
         manipulator_correction:
-            x: 0.053
+            x: -0.012
             y: 0.022
     </rosparam>
 
