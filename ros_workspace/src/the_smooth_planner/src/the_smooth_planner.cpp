@@ -798,7 +798,7 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         double nextVelocityMagnitude = nextVelocityVec.norm();
         double distanceTraveled = splines[i].ComputeArcLength();
 
-        if((nextVelocityMagnitude+currentVelocityMagnitude) > 0.0)
+        if((nextVelocityMagnitude+currentVelocityMagnitude) > 0.0001)
         {
             path_msg.knots[i+1].header.stamp = path_msg.knots[i].header.stamp +
                 ros::Duration(distanceTraveled*2/(nextVelocityMagnitude+currentVelocityMagnitude));
@@ -989,7 +989,7 @@ double TheSmoothPlanner::ComputeMinimumPathTime(const nav_msgs::Path& path, unsi
     double deltaCurvature = this->ComputeCurvature(path, i+1) - curvature;
     double deltaPhi = -deltaCurvature*sternPodVector(0)*cos( -atan(curvature*sternPodVector(0))*atan(curvature*sternPodVector(0)) );
     // anything more curvy than 1.8 is turn in place...
-    if (deltaCurvature > 1.8 ) // 1.8 is approximately equal to infinity for small values of infinity
+    if (fabs(deltaCurvature) > 1.8 ) // 1.8 is approximately equal to infinity for small values of infinity
     {
         deltaPhi = M_PI/2.00;
     }
