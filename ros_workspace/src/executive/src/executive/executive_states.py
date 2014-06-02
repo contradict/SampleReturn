@@ -168,10 +168,13 @@ class SimpleMoveExecuteState(smach.State):
             try:
                 if move['type'] == 'spin':
                     angle = move['angle'] if (remaining is None) else remaining
-                    remaining = self.simple_mover.execute_spin(move['angle'])
+                    remaining = self.simple_mover.execute_spin(move['angle'],
+                                                               velocity = move.get('velocity'))
                 elif move['type'] == 'strafe':
                     distance = move['distance'] if (remaining is None) else remaining
-                    remaining = self.simple_mover.execute_strafe(move['yaw'], move['distance'])
+                    remaining = self.simple_mover.execute_strafe(move['yaw'],
+                                                                 move['distance'],
+                                                                 velocity = move.get('velocity'))
                 else:
                     rospy.logwarn('SIMPLE MOTION invalid move type')
                     return 'aborted'
@@ -180,6 +183,11 @@ class SimpleMoveExecuteState(smach.State):
                     return 'complete'
                 else:
                     rospy.loginfo("SIMPLE MOTION returned outside tolerance, remaining: " + str(remaining))
+                    if not userdata.paused:
+                        try_count += 1
+                    if try_count > 2:
+                        rospy.logwarn("SIMPLE MOTION third try failed to achieve tolerance:" + str(userdata.simple_move_tolerance))
+                        return 'aborted'
             except(TimeoutException):
                 rospy.logwarn("TIMEOUT during simple_motion.")
                 return 'timeout'
