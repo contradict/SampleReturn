@@ -48,6 +48,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     this->is_replan_ahead_iter_valid = false;
     this->is_waiting_on_stitched_path = false;
     this->is_goal_reached = false;
+    this->have_goal = false;
     this->start_time_wait_on_stitched_path = Time::now();
 
     /*
@@ -120,10 +121,22 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
         ROS_ERROR("waiting on stitched path, ignoring replan request");
         return false;
     }
-    else if (stitched_path.knots.size() == 0 || this->isGoalReached() || is_replan_ahead_iter_valid)
+    else if (this->isGoalReached() || is_replan_ahead_iter_valid)
     {
         ROS_ERROR("last path has no knots or we reached the goal or replan iter is valid");
         return false;
+    }
+    else if ( stitched_path.knots.size() == 0 && have_goal )
+    {
+        geometry_msgs::PoseStamped odometry_pose;
+        odometry_pose.header = odometry.header;
+        odometry_pose.pose = odometry.pose.pose;
+        try {
+            listener.transformPose("map", odometry_pose, *sourcePose );
+            return true;
+        } catch( tf::TransformException ex) {
+            ROS_ERROR("Error transforming request into map: %s", ex.what());
+        }
     }
     else
     {
@@ -778,6 +791,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     is_replan_ahead_iter_valid = false;
     is_waiting_on_stitched_path = true;
     is_goal_reached = false;
+    have_goal = true;
     start_time_wait_on_stitched_path = Time::now();
 
     return;
@@ -792,7 +806,6 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 
 void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHeader)
 {
-    ROS_DEBUG("RECEIVED COMPLETED KNOT");
     this->completed_knot_header = completedKnotHeader;
 
     // Invalide the replan ahead iter if we have completed the knot past the buffer time
@@ -806,6 +819,11 @@ void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHea
     this->is_goal_reached = (stitched_path.knots.size() > 0 &&
                             completed_knot_header.seq == stitched_path.knots.back().header.seq &&
                             fabs((completed_knot_header.stamp - stitched_path.knots.back().header.stamp).toSec()) < 0.01);
+    if( this->is_goal_reached )
+    {
+        have_goal = false;
+    }
+    ROS_ERROR_STREAM("RECEIVED COMPLETED KNOT, reached: " << this->is_goal_reached);
 }
 
 void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity)
