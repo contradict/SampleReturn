@@ -45,15 +45,15 @@
             steering_angle_epsilon: 0.01
     </rosparam>
 
-   <!-- servo sample simple motion parameters -->
-        <rosparam>
+    <!-- servo sample simple motion parameters -->
+    <rosparam>
            servo_params:
               initial_velocity: 0.1
               initial_tolerance: 0.050
               final_velocity: 0.005
-              final_tolerance:.010
+              final_tolerance: 0.010
               acceleration: 0.02
-        </rosparam>
+    </rosparam>
 
     <!-- manipulator correction for inaccuracy -->
     <rosparam>
