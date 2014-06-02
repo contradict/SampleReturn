@@ -89,6 +89,7 @@ private:
     double replan_look_ahead_time;
     double delta_time_after_goal_drop_path;
     double wait_on_stitched_path_duration;
+    double xy_goal_tolerance;
 
     // Message data
     std_msgs::Header completed_knot_header;

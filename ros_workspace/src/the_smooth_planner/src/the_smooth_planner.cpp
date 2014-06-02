@@ -32,8 +32,7 @@ TheSmoothPlanner::TheSmoothPlanner(std::string name, tf::TransformListener* tf, 
 void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros)
 {
     ros::NodeHandle localNodeHandle("~/" + name);
-    ros::NodeHandle parentNodeHandle("~/");
-    ros::NodeHandle rootNodeHandle("/");
+    ros::NodeHandle parentNodeHandle("~");
 
     localNodeHandle.param("maximum_linear_velocity", maximum_linear_velocity, 1.0);
     localNodeHandle.param("linear_acceleration", linear_acceleration, 1.0);
@@ -41,6 +40,8 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     localNodeHandle.param("replan_look_ahead_time", replan_look_ahead_time, 4.0);
     localNodeHandle.param("delta_time_after_goal_drop_path", delta_time_after_goal_drop_path, 20.0);
     localNodeHandle.param("wait_on_stitched_path_duration", wait_on_stitched_path_duration, 20.0);
+    localNodeHandle.param("xy_goal_tolerance", xy_goal_tolerance, 0.4);
+
 
     this->odometry = nav_msgs::Odometry();
     this->completed_knot_header = std_msgs::Header();
@@ -138,7 +139,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
             ROS_ERROR("Error transforming request into map: %s", ex.what());
         }
     }
-    else
+    else if( stitched_path.knots.size() != 0 )
     {
         ROS_ERROR("last path has knots and we haven't reached the goal");
         auto currentKnotIter = stitched_path.knots.begin();
@@ -155,10 +156,17 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
             ROS_ERROR("current knot is not the end of last path");
             // See how much time until the expected end of the current plan
             ros::Duration timeUntilPlanEnd = stitched_path.knots.back().header.stamp - (*currentKnotIter).header.stamp;
+            double distanceUntilPlanEnd = hypot((stitched_path.knots.back().pose.position.x - (*currentKnotIter).pose.position.x),
+                    (stitched_path.knots.back().pose.position.y - (*currentKnotIter).pose.position.y));
             if (timeUntilPlanEnd < ros::Duration(replan_look_ahead_time))
             {
                 ROS_ERROR("time until plan end is too short");
-                return false; // Finish the current plan
+                return false // Finish the current plan
+            }
+            else if( distanceUntilPlanEnd < xy_goal_tolerance )
+            {
+                ROS_ERROR("distance until plan end is too short");
+                return false;
             }
             else
             {
