@@ -399,7 +399,6 @@ class GetSampleStrafeMove(smach.State):
                                         'yaw':yaw,
                                         'distance':distance}
                 rospy.loginfo("DETECTED SAMPLE IN base_link?: " + str(point_in_base))
-                rospy.loginfo("SIMPLE_MOVE to detected_sample: " + str(yaw) + ", " + str(distance))
                 return 'strafe'
             except(tf.Exception):
                 rospy.logwarn("MANUAL_CONTROL failed to get base_link -> odom transform in 1.0 seconds")

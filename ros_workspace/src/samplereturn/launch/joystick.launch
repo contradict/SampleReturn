@@ -38,7 +38,7 @@
 
     <rosparam>
         simple_move_params:
-            max_velocity: 0.02
+            max_velocity: 0.01
             acceleration: 0.02
             stop_deceleration: 0.2
             timeout: 60

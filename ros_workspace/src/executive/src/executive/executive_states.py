@@ -176,8 +176,8 @@ class SimpleMoveExecuteState(smach.State):
                     rospy.logwarn('SIMPLE MOTION invalid move type')
                     return 'aborted'
                 if remaining < userdata.simple_move_tolerance:
-                    return 'complete'
                     rospy.loginfo("SIMPLE MOTION within tolerance, remaining: " + str(remaining))
+                    return 'complete'
                 else:
                     rospy.loginfo("SIMPLE MOTION returned outside tolerance, remaining: " + str(remaining))
             except(TimeoutException):
