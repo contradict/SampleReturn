@@ -359,7 +359,7 @@ std::vector<platform_motion_msgs::Knot> computeTurnInPlace(platform_motion_msgs:
     double startingYaw = yawFromKnot(start);
     double endingYaw = yawFromKnot(end);
 
-    if((startingYaw - endingYaw) == 0.0)
+    if(fabs(startingYaw - endingYaw) <= M_PI/360.0)
     {
         // if we're not actually turning, that's bad. just return
         turnDuration = ros::Duration(0.0);
@@ -497,12 +497,21 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
             std::vector<geometry_msgs::PoseStamped> insertPoses;
             auto insertKnotIter = lookAheadBufferKnotIter;
-            for (; insertKnotIter <= replan_ahead_iter; ++insertKnotIter)
+            for (; insertKnotIter < replan_ahead_iter; ++insertKnotIter)
             {
                 geometry_msgs::PoseStamped insertPose;
                 insertPose.pose = (*insertKnotIter).pose;
                 insertPoses.push_back(insertPose);
                 ROS_DEBUG_STREAM("adding pose to front of replanned path: " << insertPose);
+            }
+
+            // Don't add the stitch point itself if it overlaps with the new path's first pose nearly identically
+            if (replanAheadQuat.dot(newPathFirstQuat) <= 0.9999) // 0.9999 = cos(PI/180.0/2.0 rad)
+            {
+                geometry_msgs::PoseStamped insertPose;
+                insertPose.pose = (*replan_ahead_iter).pose;
+                insertPoses.push_back(insertPose);
+                ROS_DEBUG("Adding stitch point because yaw is different enough. This should yield a turn-in-place");
             }
 
             if (insertPoses.size() > 0)
