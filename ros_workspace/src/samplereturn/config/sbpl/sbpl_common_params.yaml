@@ -8,3 +8,24 @@ SBPLLatticePlanner:
     timetoturn45degsinplace_secs: 2.0
     lethal_obstacle: 20
     planner_frequency: 0
+
+recovery_behaviors:
+    -
+       name: "conservative_reset"
+       type: "clear_costmap_recovery/ClearCostmapRecovery"
+    -
+       name: "rotate_recovery"
+       type: "rotate_recovery/RotateRecovery"
+    -
+       name: "aggressive_reset"
+       type: "clear_costmap_recovery/ClearCostmapRecovery"
+
+recovery_behavior_enabled: false
+clearing_rotation_allowed: false
+controller_patience: 15.0
+clearing_radius: 0.75
+conservative_reset_dist: 3.0
+shutdown_costmaps: false
+oscillation_timeout: 0.0
+oscillation_distance: 0.5
+planner_frequency: 0
