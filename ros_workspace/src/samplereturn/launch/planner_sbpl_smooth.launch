@@ -29,6 +29,7 @@
         <param name="base_local_planner" type="string" value="TheSmoothPlanner"/>
 
         <param name="controller_frequency" type="double" value="0.5"/>
+        <param name="planner_frequency" type="double" value="0.0"/>
 
     </node>
 
