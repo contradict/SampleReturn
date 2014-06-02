@@ -362,14 +362,13 @@ def smoothhook(arcdist, initialyaw, deltayaw, gridSpacing=0.1, pathSpacing=0.1):
     xopt = optimize(dx, dy, deltayaw, initialyaw)
     N = math.ceil(arcdist / pathSpacing)
     M = N*10
-    print ("Arcdist: " + str(arcdist) + " pathSpacing: " + str(pathSpacing))
-    print ("M: " + str(M) + " N: " + str(N))
+    #print ("Arcdist: " + str(arcdist) + " pathSpacing: " + str(pathSpacing))
+    #print ("M: " + str(M) + " N: " + str(N))
     if arcdist == 0:
         poses=np.r_[[[0, 0, initialyaw]], [[0, 0, initialyaw]]]
     else:
         poses = integrate_pose_cubic(xopt[0], xopt[1], xopt[2], initialyaw, M)
     for pose in poses[0:M+1:10]:
-        print("insert pose")
         yawtoknot(knot, pose[2])
         knot.pose.position.x = pose[0]
         knot.pose.position.y = pose[1]
@@ -495,7 +494,7 @@ def closePrimitivesFile(primdata):
 
 def generateMotionPrimitives(showplots=False):
     gridspacing = 0.1
-    numangles = 16
+    numangles = 8
     deltayaw = 2*pi/numangles
     longrangeprims = [[1, 2*gridspacing]]#,[3.0, gridspacing]] # List of [forward dist, path spacing]
     shortrangeprims = [[gridspacing, gridspacing/2.0], [0.3, gridspacing]]#, [5.0, 0.1]] # List of [short forward dist, path spacing]
@@ -576,4 +575,4 @@ def generateMotionPrimitives(showplots=False):
     
 
 if __name__ == "__main__":
-    generateMotionPrimitives(True)
+    generateMotionPrimitives(False)
