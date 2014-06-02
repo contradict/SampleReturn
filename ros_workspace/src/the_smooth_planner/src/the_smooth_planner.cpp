@@ -199,7 +199,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     bool isAheadEnoughInTime = aheadTime > ros::Duration(replan_look_ahead_time);
                     bool isAheadEnoughInDistance = (searchAheadPos - currentPos).norm() >= (replan_look_ahead_time * maximum_linear_velocity);
                     bool isPosApproxPrev = (searchAheadPos - searchAheadPrevPos).squaredNorm() < 0.000001;
-                    bool isQuatApproxPrev = searchAheadQuat.dot(searchAheadPrevQuat) > 0.87; // 0.87 = cos(0.5 deg)
+                    bool isQuatApproxPrev = searchAheadQuat.dot(searchAheadPrevQuat) > 0.9952; // 0.9952 = cos(11.25/2.0 deg)
                     ROS_DEBUG_STREAM("isAheadEnoughInTime: " << isAheadEnoughInTime << "isAheadEnoughInDistance: " << isAheadEnoughInDistance << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
                     if (isAheadEnoughInTime &&  isAheadEnoughInDistance && !isPosApproxPrev && isQuatApproxPrev)
                     {
@@ -392,6 +392,9 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         return;
     }
 
+    // Poses to remove for turn-in-place
+    std::vector<int> posesToRemove;
+
     // make a path copy to deal with stupid const stupid
     nav_msgs::Path pathCopy(path);
 
@@ -421,8 +424,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         ROS_ERROR("Is replan ahead iter valid");
         ROS_ERROR_STREAM("newPathFirst: " << pathCopy.poses[0] << " replanAheadPos: " << (*replan_ahead_iter));
 
-        if (((replanAheadPos - newPathFirstPos).squaredNorm() < 0.0022) &&
-            (replanAheadQuat.dot(newPathFirstQuat) > 0.87)) // 0.87 = cos(0.5 deg)
+        if (((replanAheadPos - newPathFirstPos).squaredNorm() <= 0.0025) &&
+            (replanAheadQuat.dot(newPathFirstQuat) > 0.9952)) // 0.9952 = cos(11.25/2.0 deg) to account for sbpl's 16 known angles
         {
             // Find the point in the stitched path that we want to stitch the new path to
             std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnotIter = stitched_path.knots.begin();
@@ -449,6 +452,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 is_replan_ahead_iter_valid = false;
                 return;
             }
+
             std::vector<geometry_msgs::PoseStamped> insertPoses;
             auto insertKnotIter = lookAheadBufferKnotIter;
             for (; insertKnotIter != replan_ahead_iter; ++insertKnotIter)
@@ -458,6 +462,29 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 insertPoses.push_back(insertPose);
                 ROS_DEBUG_STREAM("adding pose to front of replanned path: " << insertPose);
             }
+
+            ROS_ERROR("Removing turn-in-place intermediate points");
+            bool lastPointWasTurnInPlace = false;
+            for (unsigned int i = 0; i < insertPoses.size()-1; ++i)
+            {
+                Eigen::Vector3d currentPoint;
+                Eigen::Vector3d nextPoint;
+                tf::pointMsgToEigen(insertPoses.pose.position, currentPoint);
+                tf::pointMsgToEigen(insertPoses.pose.position, nextPoint);
+                if((currentPoint - nextPoint).squaredNorm() < 0.00001)
+                {
+                    if(lastPointWasTurnInPlace)
+                    {
+                        posesToRemove.push_back(i);
+                    }
+                    lastPointWasTurnInPlace = true;
+                }
+                else
+                {
+                    lastPointWasTurnInPlace = false;
+                }
+            }
+
             ROS_ERROR("pathCopy.poses size before prepend: %ld", pathCopy.poses.size());
             pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
             ROS_ERROR("pathCopy.poses size after prepend: %ld", pathCopy.poses.size());
@@ -485,15 +512,19 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     }
 
     // keep track of special case turn in place motions so we can remove the intermediate ones
-    std::vector<int> posesToRemove;
     bool lastPointWasTurnInPlace = false;
+    unsigned int i = 0;
+    if (posesToRemove.size() > 0)
+    {
+        i = posesToRemove.back();
+    }
     for (unsigned int i = 0; i < pathCopy.poses.size()-1; ++i)
     {
         Eigen::Vector3d currentPoint;
         Eigen::Vector3d nextPoint;
         tf::pointMsgToEigen(pathCopy.poses[i].pose.position, currentPoint);
         tf::pointMsgToEigen(pathCopy.poses[i+1].pose.position, nextPoint);
-        if((currentPoint - nextPoint).squaredNorm() < 0.0022)
+        if((currentPoint - nextPoint).squaredNorm() < 0.00001)
         {
             if(lastPointWasTurnInPlace)
             {
@@ -740,7 +771,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
     
 
     // now it is time to add the turn in place segments!
-    // loop back over the path, and add a bunch of magical turn in place segements!
+    // loop back over the path, and add a bunch of magical turn in place segments!
     // keep track of accumulated turn segment time offset to we can make sure all the
     // timestamps work out still..
     ros::Duration totalTurnTime(0);
@@ -754,7 +785,7 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         Eigen::Vector3d currentPoint, nextPoint;
         tf::pointMsgToEigen(path_msg.knots[i].pose.position, currentPoint);
         tf::pointMsgToEigen(path_msg.knots[i+1].pose.position, nextPoint);
-        if((currentPoint - nextPoint).squaredNorm() < 0.0022)
+        if((currentPoint - nextPoint).squaredNorm() < 0.00001)
         {
             ros::Duration turnTime;
             auto turnKnots = computeTurnInPlace(
