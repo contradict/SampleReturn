@@ -388,7 +388,8 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
 
     Time timestamp = Time::now();
 
-    if (is_waiting_on_stitched_path && (timestamp-start_time_wait_on_stitched_path) < ros::Duration(wait_on_stitched_path_duration)) 
+    if ( (is_waiting_on_stitched_path && (timestamp-start_time_wait_on_stitched_path) < ros::Duration(wait_on_stitched_path_duration)) ||
+          path.poses.size() == 0 ) 
     {
         ROS_ERROR("WAITING ON STITCHED PATH, IGNORING NEW PLAN");
         return true;
@@ -465,25 +466,28 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 ROS_DEBUG_STREAM("adding pose to front of replanned path: " << insertPose);
             }
 
-            ROS_ERROR("Removing turn-in-place intermediate points");
-            bool lastPointWasTurnInPlace = false;
-            for (unsigned int i = 0; i < insertPoses.size()-1; ++i)
+            if (insertPoses.size() > 0)
             {
-                Eigen::Vector3d currentPoint;
-                Eigen::Vector3d nextPoint;
-                tf::pointMsgToEigen(insertPoses[i].pose.position, currentPoint);
-                tf::pointMsgToEigen(insertPoses[i+1].pose.position, nextPoint);
-                if((currentPoint - nextPoint).squaredNorm() < 0.00001)
+                ROS_ERROR("Removing turn-in-place intermediate points");
+                bool lastPointWasTurnInPlace = false;
+                for (unsigned int i = 0; i < insertPoses.size()-1; ++i)
                 {
-                    if(lastPointWasTurnInPlace)
+                    Eigen::Vector3d currentPoint;
+                    Eigen::Vector3d nextPoint;
+                    tf::pointMsgToEigen(insertPoses[i].pose.position, currentPoint);
+                    tf::pointMsgToEigen(insertPoses[i+1].pose.position, nextPoint);
+                    if((currentPoint - nextPoint).squaredNorm() < 0.00001)
                     {
-                        posesToRemove.push_back(i);
+                        if(lastPointWasTurnInPlace)
+                        {
+                            posesToRemove.push_back(i);
+                        }
+                        lastPointWasTurnInPlace = true;
                     }
-                    lastPointWasTurnInPlace = true;
-                }
-                else
-                {
-                    lastPointWasTurnInPlace = false;
+                    else
+                    {
+                        lastPointWasTurnInPlace = false;
+                    }
                 }
             }
 
