@@ -36,6 +36,16 @@
     <param name="ANGULAR_SCALE" value="3.14" type="double"/>
     <param name="ANGULAR_EXP" value="2" type="double"/>
 
+    <rosparam>
+        simple_move_params:
+            max_velocity: 0.02
+            acceleration: 0.02
+            stop_deceleration: 0.2
+            timeout: 60
+            loop_rate: 10
+            steering_angle_epsilon: 0.01
+    </rosparam>
+
     <!-- Remaps -->
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>

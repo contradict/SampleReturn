@@ -9,9 +9,12 @@ from tf import TransformListener
 from tf.transformations import euler_from_quaternion
 
 class SimpleMover(object):
-  def __init__(self, param_ns=""):
+  def __init__(self, param_ns="", listener=None):
  
-    self.tf = TransformListener()
+    if listener is not None:
+      self.tf = listener
+    else:
+      self.tf = TransformListener()
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
     self.acceleration = rospy.get_param(param_ns + 'acceleration', 0.5)
