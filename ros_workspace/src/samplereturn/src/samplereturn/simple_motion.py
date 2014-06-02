@@ -26,6 +26,16 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
 
+    #get stern wheel transform
+    try:
+      self.tf.waitForTransform('base_link', 'stern_suspension',
+                               rospy.Time(0), rospy.Duration(5.0))
+      pos, quat = self.tf.lookupTransform("base_link","stern_suspension",rospy.Time(0))
+      self.stern_offset = pos[0]
+    except (tf.Exception):
+      rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
+      return
+
     #publishers and subscribers
     self.publisher = rospy.Publisher("servo_command", Twist)
     rospy.Subscriber("odometry", Odometry, self.odometry_callback, None, 1)
@@ -97,11 +107,7 @@ class SimpleMover(object):
 
     rate = rospy.Rate(self.loop_rate)
     
-    try:
-      pos, quat = self.tf.lookupTransform("/base_link","/stern_suspension",rospy.Time(0))
-    except (tf.Exception):
-      rospy.logwarn("SIMPLE_MOTION: Failed to get stern_suspension transform")
-      return
+
 
     #for positive omega, the stern wheel is at -pi/2
     self.target_angle = -np.pi/2 * np.sign(rot)
@@ -109,7 +115,7 @@ class SimpleMover(object):
     #limit stern wheel pod to a linear velocity 
     max_stern_vel = self.max_velocity
       
-    stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(pos[0]))
+    stopping_yaw = self.max_velocity**2/(2*self.acceleration/np.abs(self.stern_offset))
     accel_per_loop = self.acceleration/self.loop_rate
 
     starting_yaw = self.current_yaw
@@ -136,7 +142,7 @@ class SimpleMover(object):
         continue
       
       #calculate linear vel of stern wheel pod
-      current_vel = np.abs(current_twist.angular.z*np.abs(pos[0]))
+      current_vel = np.abs(current_twist.angular.z*np.abs(self.stern_offset))
 
       #print "target_angle: %s" % (str(self.target_angle))
       #print "stern_pos: %s, port_pos: %s, star_pos: %s" % (str(self.stern_pos), str(self.port_pos), str(self.starboard_pos))
@@ -154,7 +160,7 @@ class SimpleMover(object):
         self.publisher.publish(twist)
         continue
 
-      stopping_yaw = current_twist.angular.z**2/(2*self.acceleration/np.abs(pos[0]))
+      stopping_yaw = current_twist.angular.z**2/(2*self.acceleration/np.abs(self.stern_offset))
       
       #print "self.current_yaw: " + str(self.current_yaw)
       #print "target_yaw: " + str(target_yaw)
@@ -168,8 +174,8 @@ class SimpleMover(object):
       #if we are under max_vel keep accelerating      
       elif (current_vel < max_stern_vel):
         twist = current_twist
-        twist.angular.z += np.sign(rot)*accel_per_loop/np.abs(pos[0])
-        #rospy.loginfo("Current vel: %s, Max vel: %s " % (current_twist.angular.z*np.abs(pos[0]), self.max_velocity))
+        twist.angular.z += np.sign(rot)*accel_per_loop/np.abs(self.stern_offset)
+        #rospy.loginfo("Current vel: %s, Max vel: %s " % (current_twist.angular.z*np.abs(self.stern_offset), self.max_velocity))
         #rospy.loginfo("Outgoing twist to accel: " + str(twist))
         self.publisher.publish(twist)
         current_twist = twist
@@ -184,7 +190,7 @@ class SimpleMover(object):
     for i in range(int(current_vel/accel_per_loop),-1,-1):
       rate.sleep()
       twist = current_twist
-      twist.angular.z = np.sign(rot)*accel_per_loop*i/np.abs(pos[0])
+      twist.angular.z = np.sign(rot)*accel_per_loop*i/np.abs(self.stern_offset)
       #rospy.loginfo("Outgoing twist to decel: " + str(twist))
       self.publisher.publish(twist)
 
