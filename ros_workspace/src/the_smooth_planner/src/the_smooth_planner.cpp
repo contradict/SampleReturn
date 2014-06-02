@@ -160,7 +160,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
             if (timeUntilPlanEnd < ros::Duration(replan_look_ahead_time))
             {
                 ROS_ERROR("time until plan end is too short");
-                return false // Finish the current plan
+                return false; // Finish the current plan
             }
             else if( distanceUntilPlanEnd < xy_goal_tolerance )
             {
@@ -469,8 +469,8 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
             {
                 Eigen::Vector3d currentPoint;
                 Eigen::Vector3d nextPoint;
-                tf::pointMsgToEigen(insertPoses.pose.position, currentPoint);
-                tf::pointMsgToEigen(insertPoses.pose.position, nextPoint);
+                tf::pointMsgToEigen(insertPoses[i].pose.position, currentPoint);
+                tf::pointMsgToEigen(insertPoses[i+1].pose.position, nextPoint);
                 if((currentPoint - nextPoint).squaredNorm() < 0.00001)
                 {
                     if(lastPointWasTurnInPlace)
