@@ -446,10 +446,10 @@ void TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                 insertPoses.push_back(insertPose);
                 ROS_DEBUG_STREAM("adding pose to front of replanned path: " << insertPose);
             }
-            ROS_ERROR("pathCopy.poses size before prepend: %d", pathCopy.poses.size());
+            ROS_ERROR("pathCopy.poses size before prepend: %ld", pathCopy.poses.size());
             pathCopy.poses.insert(pathCopy.poses.begin(), insertPoses.begin(), insertPoses.end());
-            ROS_ERROR("pathCopy.poses size after prepend: %d", pathCopy.poses.size());
-            ROS_ERROR("inserted %d poses at front of replan path", insertPoses.size());
+            ROS_ERROR("pathCopy.poses size after prepend: %ld", pathCopy.poses.size());
+            ROS_ERROR("inserted %ld poses at front of replan path", insertPoses.size());
 
             // Set the initial knot to the first one in the spliced path
             initialKnot = (*lookAheadBufferKnotIter);
@@ -837,7 +837,7 @@ void TheSmoothPlanner::setStitchedPath(const platform_motion_msgs::Path& stitche
     this->replan_ahead_iter = this->stitched_path.knots.begin();
     this->is_replan_ahead_iter_valid = false;
     this->is_waiting_on_stitched_path = false;
-    ROS_ERROR("Received stitched path of size %d", stitchedPath.knots.size());
+    ROS_ERROR("Received stitched path of size %ld", stitchedPath.knots.size());
 }
 
 bool TheSmoothPlanner::FitCubicSpline(const nav_msgs::Path& path,
