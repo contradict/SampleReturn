@@ -62,7 +62,6 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     this->replan_ahead_pose.orientation.w = 0;
     */
 
-    pose_subscriber = parentNodeHandle.subscribe("plan", 1, &TheSmoothPlanner::setPath, this);
     odom_subscriber = parentNodeHandle.subscribe("odometry", 1, &TheSmoothPlanner::setOdometry, this);
     completed_knot_subscriber = parentNodeHandle.subscribe("completed_knot", 1, &TheSmoothPlanner::setCompletedKnot, this);
     stitched_path_subscriber = parentNodeHandle.subscribe("stitched_path", 1, &TheSmoothPlanner::setStitchedPath, this);
