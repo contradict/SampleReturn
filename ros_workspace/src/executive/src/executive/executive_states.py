@@ -169,12 +169,12 @@ class SimpleMoveExecuteState(smach.State):
                 if move['type'] == 'spin':
                     angle = move['angle'] if (remaining is None) else remaining
                     remaining = self.simple_mover.execute_spin(move['angle'],
-                                                               velocity = move.get('velocity'))
+                                                               max_velocity = move.get('velocity'))
                 elif move['type'] == 'strafe':
                     distance = move['distance'] if (remaining is None) else remaining
                     remaining = self.simple_mover.execute_strafe(move['yaw'],
                                                                  move['distance'],
-                                                                 velocity = move.get('velocity'))
+                                                                 max_velocity = move.get('velocity'))
                 else:
                     rospy.logwarn('SIMPLE MOTION invalid move type')
                     return 'aborted'
