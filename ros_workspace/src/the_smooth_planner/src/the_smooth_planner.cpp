@@ -170,6 +170,10 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
             else
             {
                 ROS_ERROR("time until plan end fine");
+                // get the position of the current knot and check the potential stitch point knots to make sure they're far enough away.
+                Eigen::Vector3d currentPos;
+                tf::pointMsgToEigen((*currentKnotIter).pose.position, currentPos);
+
                 // Request a plan from a point ahead in the current path to
                 // the same goal
                 for (auto searchAheadIter = currentKnotIter; searchAheadIter != stitched_path.knots.end(); ++searchAheadIter)
@@ -192,11 +196,12 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                         continue;
                     }
                     
-                    bool isAheadEnough = aheadTime > ros::Duration(replan_look_ahead_time);
+                    bool isAheadEnoughInTime = aheadTime > ros::Duration(replan_look_ahead_time);
+                    bool isAheadEnoughInDistance = (searchAheadPos - currentPos).norm() >= (replan_look_ahead_time * maximum_linear_velocity);
                     bool isPosApproxPrev = (searchAheadPos - searchAheadPrevPos).squaredNorm() < 0.000001;
                     bool isQuatApproxPrev = searchAheadQuat.dot(searchAheadPrevQuat) > 0.87; // 0.87 = cos(0.5 deg)
-                    ROS_DEBUG_STREAM("IsAheadEnough: " << isAheadEnough << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
-                    if (isAheadEnough && !isPosApproxPrev && isQuatApproxPrev)
+                    ROS_DEBUG_STREAM("isAheadEnoughInTime: " << isAheadEnoughInTime << "isAheadEnoughInDistance: " << isAheadEnoughInDistance << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
+                    if (isAheadEnoughInTime &&  isAheadEnoughInDistance && !isPosApproxPrev && isQuatApproxPrev)
                     {
                         ROS_ERROR_STREAM("Choosing stitch point: \n" << (*searchAheadIter));
                         sourcePose->pose = (*searchAheadIter).pose;
