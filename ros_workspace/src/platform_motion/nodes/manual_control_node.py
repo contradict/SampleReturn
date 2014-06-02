@@ -67,8 +67,8 @@ class ManualController(object):
         self.state_machine.userdata.paused = False
         
         #strafe search settings
-        self.state_machine.userdata.settle_time = 5
-        self.state_machine.userdata.simple_move_tolerance = .02
+        self.state_machine.userdata.settle_time = 1
+        self.state_machine.userdata.simple_move_tolerance = 1.0
         self.state_machine.userdata.manipulator_offset = manipulator_offset
         
         #use these as booleans in remaps
@@ -398,6 +398,8 @@ class GetSampleStrafeMove(smach.State):
                 userdata.simple_move = {'type':'strafe',
                                         'yaw':yaw,
                                         'distance':distance}
+                rospy.loginfo("DETECTED SAMPLE IN base_link?: " + str(point_in_base))
+                rospy.loginfo("SIMPLE_MOVE to detected_sample: " + str(simple_move))
                 return 'strafe'
             except(tf.Exception):
                 rospy.logwarn("MANUAL_CONTROL failed to get base_link -> odom transform in 1.0 seconds")

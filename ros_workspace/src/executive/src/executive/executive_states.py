@@ -177,8 +177,9 @@ class SimpleMoveExecuteState(smach.State):
                     return 'aborted'
                 if remaining < userdata.simple_move_tolerance:
                     return 'complete'
+                    rospy.loginfo("SIMPLE MOTION within tolerance, remaining: " + str(remaining))
                 else:
-                    rospy.loginfo("SIMPLE MOTION returned with remaining: " + str(remaining))
+                    rospy.loginfo("SIMPLE MOTION returned outside tolerance, remaining: " + str(remaining))
             except(TimeoutException):
                 rospy.logwarn("TIMEOUT during simple_motion.")
                 return 'timeout'
