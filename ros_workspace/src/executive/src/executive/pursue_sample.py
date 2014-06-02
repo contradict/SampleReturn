@@ -138,14 +138,14 @@ class PursueSample(object):
             
             smach.StateMachine.add('MANIPULATOR_APPROACH',
                                    self.manipulator_approach,
-                                   transitions = {'complete':'GET_SEARCH_MOVES',
+                                   transitions = {'complete':'GET_SEARCH_POINTS',
                                                   'timeout':'PURSUE_SAMPLE_ABORTED',
                                                   'sample_detected':'VISUAL_SERVO',
                                                   'preempted':'ABORT_SERVO',
                                                   'aborted':'ABORT_SERVO'},
                                    remapping = {'pursue_samples':'true'})
             
-            smach.StateMachine.add('GET_SEARCH_MOVES',
+            smach.StateMachine.add('GET_SEARCH_POINTS',
                                    GetSearchPoints(self.tf_listener, self.announcer),
                                    transitions = {'next':'HANDLE_SEARCH_MOVES',
                                                   'aborted':'ABORT_SERVO'})
@@ -169,7 +169,7 @@ class PursueSample(object):
             smach.StateMachine.add('VISUAL_SERVO',
                                    VisualServo(self.announcer),
                                    transitions = {'complete':'GRAB_SAMPLE',
-                                                  'sample_lost':'HANDLE_SEARCH_MOVES',
+                                                  'sample_lost':'GET_SEARCH_POINTS',
                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'ABORT_SERVO',
                                                   'aborted':'ABORT_SERVO'})  
