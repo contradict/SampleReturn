@@ -40,18 +40,6 @@ class ManualController(object):
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_navigate")
         self.tf = tf.TransformListener()
-    
-        while not rospy.is_shutdown():
-            try:
-                self.tf.waitForTransform('base_link',
-                                                  'manipulator_arm',
-                                                  rospy.Time(0),
-                                                  rospy.Time(5.0))
-                manipulator_offset, quat = self.tf.lookupTransform('base_link', 'manipulator_arm',
-                                                                  rospy.Time(0))
-                break
-            except(tf.Exception):
-                rospy.logwarn("MANUAL_CONTROL: Failed to get manipulator arm transform")
  
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
@@ -70,7 +58,6 @@ class ManualController(object):
         self.state_machine.userdata.settle_time = 1
         #set move tolerance huge, this prevent retrying by the simple mover
         self.state_machine.userdata.simple_move_tolerance = 1.0
-        self.state_machine.userdata.manipulator_offset = manipulator_offset
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
         
