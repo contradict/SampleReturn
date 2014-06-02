@@ -198,9 +198,9 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     
                     bool isAheadEnoughInTime = aheadTime > ros::Duration(replan_look_ahead_time);
                     bool isAheadEnoughInDistance = (searchAheadPos - currentPos).norm() >= (replan_look_ahead_time * maximum_linear_velocity);
-                    bool isPosApproxPrev = (searchAheadPos - searchAheadPrevPos).squaredNorm() < 0.000001;
+                    bool isPosApproxPrev = (searchAheadPos - searchAheadPrevPos).squaredNorm() < 0.0022;
                     bool isQuatApproxPrev = searchAheadQuat.dot(searchAheadPrevQuat) > 0.9952; // 0.9952 = cos(11.25/2.0 deg)
-                    ROS_DEBUG_STREAM("isAheadEnoughInTime: " << isAheadEnoughInTime << "isAheadEnoughInDistance: " << isAheadEnoughInDistance << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
+                    ROS_DEBUG_STREAM("DesiredPose - isAheadEnoughInTime: " << isAheadEnoughInTime << "isAheadEnoughInDistance: " << isAheadEnoughInDistance << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
                     if (isAheadEnoughInTime &&  isAheadEnoughInDistance && !isPosApproxPrev && isQuatApproxPrev)
                     {
                         ROS_ERROR_STREAM("Choosing stitch point: \n" << (*searchAheadIter));
@@ -430,11 +430,50 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         if (((replanAheadPos - newPathFirstPos).squaredNorm() <= 0.0025) &&
             (replanAheadQuat.dot(newPathFirstQuat) > 0.9952)) // 0.9952 = cos(11.25/2.0 deg) to account for sbpl's 16 known angles
         {
+            // Find the robot's current position in the stitched path
+            auto currentKnotIter = stitched_path.knots.begin();
+            for (; currentKnotIter != stitched_path.knots.end(); ++currentKnotIter)
+            {
+                if ((*currentKnotIter).header.seq == completed_knot_header.seq &&
+                    fabs(((*currentKnotIter).header.stamp - completed_knot_header.stamp).toSec()) < 0.01)
+                {
+                    break;
+                }
+            }
+            if (currentKnotIter == stitched_path.knots.end())
+            {
+                ROS_ERROR("Could not find current knot inside stitched path. Ignoring path request");
+                return true;
+            }
+
+            Eigen::Vector3d currentPos;
+            tf::pointMsgToEigen((*currentKnotIter).pose.position, currentPos);
+
             // Find the point in the stitched path that we want to stitch the new path to
             std::vector<platform_motion_msgs::Knot>::iterator lookAheadBufferKnotIter = stitched_path.knots.begin();
             for (auto prevPathIter = stitched_path.knots.begin(); prevPathIter != stitched_path.knots.end(); ++prevPathIter)
             {
-                if (((*prevPathIter).header.stamp - completed_knot_header.stamp) > ros::Duration(replan_look_ahead_buffer_time))
+                Eigen::Vector3d prevPathPos, prevPathPrevPos;
+                Eigen::Quaterniond prevPathQuat, prevPathPrevQuat;
+                tf::pointMsgToEigen((*prevPathIter).pose.position, prevPathPos);
+                tf::quaternionMsgToEigen((*prevPathIter).pose.orientation, prevPathQuat);
+
+                if (prevPathIter != stitched_path.knots.begin())
+                {
+                    tf::pointMsgToEigen((*(prevPathIter-1)).pose.position, prevPathPrevPos);
+                    tf::quaternionMsgToEigen((*(prevPathIter-1)).pose.orientation, prevPathPrevQuat);
+                }
+                else
+                {
+                    continue;
+                }
+
+                bool isAheadEnoughInTime = ((*prevPathIter).header.stamp - completed_knot_header.stamp) > ros::Duration(replan_look_ahead_buffer_time);
+                bool isAheadEnoughInDistance = (prevPathPos - currentPos).norm() >= (replan_look_ahead_time * maximum_linear_velocity);
+                bool isPosApproxPrev = (prevPathPos- prevPathPrevPos).squaredNorm() < 0.0022;
+                bool isQuatApproxPrev = prevPathQuat.dot(prevPathPrevQuat) > 0.9952; // 0.9952 = cos(11.25/2.0 deg)
+                ROS_DEBUG_STREAM("BufferPose - isAheadEnoughInTime: " << isAheadEnoughInTime << "isAheadEnoughInDistance: " << isAheadEnoughInDistance << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
+                if (isAheadEnoughInTime &&  isAheadEnoughInDistance && !isPosApproxPrev && isQuatApproxPrev)
                 {
                     ROS_ERROR("timestamp for first lookahead buffer pose ok!");
                     lookAheadBufferKnotIter = prevPathIter;
@@ -801,6 +840,12 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
                     turnTime,
                     sternPodVector
             );
+
+            if (turnKnots.size() == 0)
+            {
+                ROS_ERROR("Turn in place was between the same angles. Skipping...");
+                continue;
+            }
 
             // drop the last knot to make stitching a little easier...
             turnKnots.pop_back();
