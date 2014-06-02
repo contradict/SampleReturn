@@ -547,7 +547,7 @@ bool TheSmoothPlanner::setPath(const nav_msgs::Path& path)
         }
         else
         {
-            ROS_ERROR("We're waiting for a plan but didn't get the one we wanted. Still waiting...");
+            ROS_ERROR("We appear to have gotten a new plan while executing an old one. We're going to ignore it for now and pick it up in the next replan.");
             return true;
         }
     }
