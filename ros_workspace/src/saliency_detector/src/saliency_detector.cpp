@@ -159,6 +159,9 @@ class SaliencyDetectorNode
       int size = 2*kp[i].size;
       sub_img = small(Range(max(y-size,0), min(y+size,small.rows)), Range(max(x-size,0), min(x+size,small.cols)));
       sub_mask = debug_bms_img_(Range(max(y-size,0), min(y+size,small.rows)), Range(max(x-size,0), min(x+size,small.cols)));
+      if (cv::countNonZero(sub_mask) == 0) {
+        continue;
+      }
       Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
       Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
       exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
@@ -169,7 +172,7 @@ class SaliencyDetectorNode
       string dominant_exterior_color = cn_.getDominantColor(exteriorColor);
       std::cout << "Dominant exterior color " << dominant_exterior_color << std::endl;
 
-      if (cam_model_.initialized() && dominant_color != "black"
+      if (cam_model_.initialized()
           && dominant_color != "green" && dominant_color != "brown"
           && dominant_exterior_color == "green"
           && dominant_color != "gray") {

@@ -211,7 +211,11 @@ class LineMOD_Detector
     LineMOD_Detector::display = color_ptr->image.clone();
     LineMOD_Detector::color_img = lab_img;
 
-    LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
+    cv::Mat blur;
+    cv::medianBlur(lab_img, blur, 13);
+
+    //LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
+    LineMOD_Detector::sources.push_back(blur);
 
     // Perform matching
     std::vector<cv::linemod::Match> matches;
@@ -279,9 +283,44 @@ class LineMOD_Detector
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
         }
 
-        if (m.similarity > LineMOD_Detector::pub_threshold)
+        if (m.similarity > LineMOD_Detector::pub_threshold && dominant_color!="green")
         {
-          LineMOD_Detector::publishPoint(templates, m, color_ptr->header, angle);
+          if (m.class_id.c_str() == "red_puck" &&
+              (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::RED_PUCK);
+          }
+          if (m.class_id.c_str() == "orange_pipe" &&
+              (dominant_color=="orange" || dominant_color=="white"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
+          }
+          if (m.class_id.c_str() == "pre_cached" &&
+              (dominant_color=="white"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
+          }
+          if (m.class_id.c_str() == "wood_cube" &&
+              (dominant_color=="yellow" || dominant_color=="brown"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
+          }
+          if (m.class_id.c_str() == "pink_tennis_ball" &&
+              (dominant_color=="pink"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
+          }
+          if (m.class_id.c_str() == "colored_ball" &&
+              dominant_color!="brown" && dominant_color!="white" && dominant_color!="grey")
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::COLORED_BALL);
+          }
         }
 
       }
@@ -304,11 +343,12 @@ class LineMOD_Detector
 //
 
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
-      std_msgs::Header header, float grip_angle)
+      std_msgs::Header header, float grip_angle, int sample_id)
   {
     ROS_DEBUG("Publishing Img Point");
     samplereturn_msgs::NamedPoint img_point_msg;
     img_point_msg.name = m.class_id;
+    img_point_msg.sample_id = sample_id;
     img_point_msg.header = header;
     // We only care about the base pyramid level gradient modality
     img_point_msg.point.x = m.x + templates[1].width/2;
@@ -347,6 +387,7 @@ class LineMOD_Detector
 
       //std::cout << "Camera 3D point: " << temp_point << std::endl;
       point_msg.name = m.class_id;
+      point_msg.sample_id = sample_id;
       point_msg.header = header;
       point_msg.header.frame_id = "/odom";
       point_msg.grip_angle = grip_angle;

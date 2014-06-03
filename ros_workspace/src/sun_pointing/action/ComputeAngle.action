@@ -1,0 +1,8 @@
+# Goal
+bool do_compute_angle
+---
+# Result
+float32 result_angle
+---
+# Feedback
+float32 search_angle
