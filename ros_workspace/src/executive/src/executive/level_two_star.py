@@ -52,22 +52,10 @@ class LevelTwoStar(object):
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_navigate")
-        self.move_base = actionlib.SimpleActionClient("planner_move_base",
-                                                       move_base_msg.MoveBaseAction)
         self.CAN_interface = util.CANInterface()
        
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~simple_motion_params/', self.tf_listener)
-        
-        start_time = rospy.get_time()
-        while not rospy.is_shutdown():
-            if self.move_base.wait_for_server(rospy.Duration(0.1)):
-                break #all services up, exit this loop
-            if (rospy.get_time() - start_time) > 10.0:
-                start_time =  rospy.get_time()
-                self.announcer.say("Move base not available")
-                rospy.logwarn('Timeout waiting for move base')
-            rospy.sleep(0.1)
         
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
