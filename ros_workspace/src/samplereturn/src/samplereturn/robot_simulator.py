@@ -748,7 +748,8 @@ class ManipulatorState(smach.State):
                 return 'preempted'
             rospy.sleep(0.2)
         userdata.action_result = manipulator_msg.ManipulatorResult('fake_success', True)
-        self.set_success()
+        if userdata.action_goal.type != manipulator_msg.ManipulatorGoal.HOME:
+            self.set_success()
         return 'succeeded'
     
 
