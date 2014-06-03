@@ -527,7 +527,8 @@ class RobotSimulator(object):
             update_rate.sleep()
             
     def set_sample_success(self):
-        self.collected_ids.append(self.active_sample_id)
+        if self.active_sample_id is not None:
+            self.collected_ids.append(self.active_sample_id)
             
     def home_wheelpods(self, goal):
         fake_result = platform_msg.HomeResult([True,True,True])
