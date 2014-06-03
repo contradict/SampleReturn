@@ -347,12 +347,21 @@ class RotationManager(smach.State):
         self.mover = mover
     
     def execute(self, userdata):
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        rospy.loginfo("ROTATION MANAGER first move, actual_yaw, line_yaw: " +
+                      str(int(math.degrees(actual_yaw))) + " " +
+                      str(int(math.degrees(userdata.line_yaw))))
+        rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
+        rospy.loginfo("ROTATION MANAGER first move, rotate_yaw: " + str(int(math.degrees(userdata.line_yaw))))
+        self.mover.execute_spin(rotate_yaw, max_velocity=0.5, acceleration=.25)
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener)
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        self.mover.execute_spin(rotate_yaw, max_velocity=0.5, acceleration=.25)
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        rospy.loginfo("ROTATION MANAGER second move, actual_yaw, line_yaw: " +
+                      str(int(math.degrees(actual_yaw))) + " " +
+                      str(int(math.degrees(userdata.line_yaw))))
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
+        rospy.loginfo("ROTATION MANAGER second move, rotate_yaw: " + str(int(math.degrees(userdata.line_yaw))))
         self.mover.execute_spin(rotate_yaw, max_velocity=0.05, acceleration=.025)
                 
         return 'next'
@@ -413,7 +422,8 @@ class SearchLineManager(smach.State):
         
         self.line_yaw = userdata.line_yaw
         actual_yaw = util.get_current_robot_yaw(self.listener)
-        rospy.loginfo("SEARCH LINE MANAGER, entering with yaw: " + str(np.degrees(actual_yaw)))
+        rospy.loginfo("SEARCH LINE MANAGER, entering with actual_yaw: " + str(np.degrees(actual_yaw)))
+        rospy.loginfo("SEARCH LINE MANAGER, entering with line_yaw: " + str(np.degrees(self.line_yaw)))
         
         self.yaws['left']['angle'] = actual_yaw + self.strafe_angle
         self.yaws['center']['angle'] = actual_yaw
