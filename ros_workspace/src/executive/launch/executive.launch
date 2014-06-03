@@ -19,7 +19,7 @@
 
     <!-- planning and detection remaps -->
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
-    <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
+    <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>

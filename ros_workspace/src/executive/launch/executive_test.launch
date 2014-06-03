@@ -23,10 +23,19 @@
     
     <include file="$(find samplereturn)/launch/joystick.launch"/>
 
-    <include file="$(find samplereturn)/launch/planner.launch">
-        <arg name="map_config" value="maps/map_park_fake.yaml"/>
-    </include>
-        
+    <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
+
+    <arg name="map_config" value="maps/map_park_fake.yaml"/>
+    <node
+        name="map_server"
+        pkg="map_server"
+        type="map_server"
+        ns="/processes/planner"
+        output="log"
+        args="$(find samplereturn)/$(arg map_config)"
+        >
+    </node>
+
     <node
         name="navigate_announcer"
         pkg="samplereturn"
