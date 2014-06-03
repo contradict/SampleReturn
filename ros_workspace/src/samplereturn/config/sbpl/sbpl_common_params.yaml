@@ -6,7 +6,7 @@ SBPLLatticePlanner:
     #force_scratch_limit: 500
     nominalvel_mpersecs: 0.4
     timetoturn45degsinplace_secs: 2.0
-    lethal_obstacle: 20
+    lethal_obstacle: 200
     planner_frequency: 0
 
 recovery_behaviors:
