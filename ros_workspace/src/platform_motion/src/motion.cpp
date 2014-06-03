@@ -1399,7 +1399,13 @@ void Motion::plannedPathCallback(const platform_motion_msgs::Path::ConstPtr path
     if( path->knots.size() < 2 )
     {
         ROS_ERROR( "Path too short: %ld", path->knots.size() );
+        ROS_ERROR("Clearing existing path due to bad path inside of plannedPathCallback");
+        std::unique_lock<std::mutex> lck(path_mutex_);
+        plannedPath.clear();
+        lck.unlock();
         publishStitchedPath();
+        firstSegment_ = secondSegment_;
+        pvtToZero();
         return;
     }
 
