@@ -47,19 +47,6 @@ class PursueSample(object):
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
         self.CAN_interface = util.CANInterface()
         
-        while not rospy.is_shutdown():
-            try:
-                self.tf_listener.waitForTransform('base_link',
-                                                  'manipulator_arm',
-                                                  rospy.Time(0),
-                                                  rospy.Time(5.0))
-                manipulator_offset, quat = self.tf_listener.lookupTransform('base_link',
-                                                                            'manipulator_arm',
-                                                                             rospy.Time(0))
-                break
-            except(tf.Exception):
-                rospy.logwarn("PURSUE_SAMPLE: Failed to get manipulator arm transform")
- 
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~pursue_sample_params/', self.tf_listener)
         
@@ -85,15 +72,16 @@ class PursueSample(object):
         self.state_machine.userdata.motion_check_interval = self.node_params.motion_check_interval
         self.state_machine.userdata.min_motion = self.node_params.min_motion
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
-        
-        self.state_machine.userdata.visual_servo_timeout = self.node_params.visual_servo_timeout
-        self.state_machine.userdata.visual_servo_lost_timeout = self.node_params.visual_servo_lost_timeout
-        
-        #strafe search settings
+
+        #strafe search and servo settings, search_count limits the number of times we can enter the
+        #sample_lost search pattern
         self.state_machine.userdata.settle_time = 5
         self.state_machine.userdata.simple_move_tolerance = self.node_params.simple_move_tolerance
         self.state_machine.userdata.manipulator_search_angle = math.pi/4
-        self.state_machine.userdata.manipulator_offset = manipulator_offset
+        self.state_machine.userdata.search_count = 0
+        self.state_machine.userdata.search_try_limit = 2
+        self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
+        self.state_machine.userdata.servo_params = self.node_params.servo_params
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
@@ -146,7 +134,7 @@ class PursueSample(object):
             smach.StateMachine.add('GET_SAMPLE_STRAFE_MOVE',
                                    GetSampleStrafeMove(self.tf_listener),
                                    transitions = {'strafe':'MANIPULATOR_APPROACH',
-                                                  'point_lost':'ABORT_SERVO'})
+                                                  'point_lost':'ANNOUNCE_ABORT'})
             
             self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.tf_listener)
             
@@ -155,19 +143,19 @@ class PursueSample(object):
                                    transitions = {'complete':'GET_SEARCH_POINTS',
                                                   'timeout':'PURSUE_SAMPLE_ABORTED',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'preempted':'ABORT_SERVO',
-                                                  'aborted':'ABORT_SERVO'},
+                                                  'preempted':'ANNOUNCE_ABORT',
+                                                  'aborted':'ANNOUNCE_ABORT'},
                                    remapping = {'pursue_samples':'true'})
             
             smach.StateMachine.add('GET_SEARCH_POINTS',
                                    GetSearchPoints(self.tf_listener, self.announcer),
                                    transitions = {'next':'HANDLE_SEARCH_MOVES',
-                                                  'aborted':'ABORT_SERVO'})
+                                                  'aborted':'ANNOUNCE_ABORT'})
 
             smach.StateMachine.add('HANDLE_SEARCH_MOVES',
                                    HandleSearchMoves(self.tf_listener, self.announcer),
                                    transitions = {'next_point':'STRAFE_TO_SEARCH_POINT',
-                                                  'complete':'ABORT_SERVO'})
+                                                  'complete':'ANNOUNCE_ABORT'})
            
             self.manipulator_search = GetSimpleMoveState(self.simple_mover, self.tf_listener) 
             
@@ -176,18 +164,29 @@ class PursueSample(object):
                                    transitions = {'complete':'HANDLE_SEARCH_MOVES',
                                                   'timeout':'HANDLE_SEARCH_MOVES',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'preempted':'ABORT_SERVO',
-                                                  'aborted':'ABORT_SERVO'},
+                                                  'preempted':'ANNOUNCE_ABORT',
+                                                  'aborted':'ANNOUNCE_ABORT'},
                                    remapping = {'pursue_samples':'true'})
-            
-            smach.StateMachine.add('VISUAL_SERVO',
-                                   VisualServo(self.announcer),
-                                   transitions = {'complete':'GRAB_SAMPLE',
-                                                  'sample_lost':'GET_SEARCH_POINTS',
-                                                  'paused':'WAIT_FOR_UNPAUSE',
-                                                  'preempted':'ABORT_SERVO',
-                                                  'aborted':'ABORT_SERVO'})  
 
+            #calculate the strafe move to the sample
+            smach.StateMachine.add('VISUAL_SERVO',
+                                   ServoController(self.tf_listener, self.announcer),
+                                   transitions = {'move':'SERVO_MOVE',
+                                                  'complete':'GRAB_SAMPLE',
+                                                  'point_lost':'GET_SEARCH_POINTS',
+                                                  'aborted':'ANNOUNCE_ABORT'})
+
+            self.servo_move = GetSimpleMoveState(self.simple_mover, self.tf_listener)
+            
+            smach.StateMachine.add('SERVO_MOVE',
+                                   self.servo_move,
+                                   transitions = {'complete':'VISUAL_SERVO',
+                                                  'timeout':'VISUAL_SERVO',
+                                                  'sample_detected':'VISUAL_SERVO',
+                                                  'preempted':'ANNOUNCE_ABORT',
+                                                  'aborted':'ANNOUNCE_ABORT'},
+                                   remapping = {'pursue_samples':'false'})
+            
             @smach.cb_interface(input_keys=['latched_sample'])
             def grab_goal_cb(userdata, request):
                 goal = manipulator_msg.ManipulatorGoal()
@@ -205,7 +204,7 @@ class PursueSample(object):
                                    goal_cb = grab_goal_cb),
                                    transitions = {'succeeded':'CONFIRM_SAMPLE_ACQUIRED',
                                                   'preempted':'CHECK_PAUSE_STATE',
-                                                  'aborted':'ABORT_SERVO'})
+                                                  'aborted':'ANNOUNCE_ABORT'})
 
             smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
                                    ConfirmSampleAcquired(self.announcer, self.result_pub),
@@ -220,8 +219,8 @@ class PursueSample(object):
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = True),
                                    transitions = {'next':'WAIT_FOR_UNPAUSE',
-                                                  'timeout':'ABORT_SERVO',
-                                                  'preempted':'ABORT_SERVO'})
+                                                  'timeout':'ANNOUNCE_ABORT',
+                                                  'preempted':'ANNOUNCE_ABORT'})
             
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
@@ -231,7 +230,7 @@ class PursueSample(object):
                                                     start_message ='Pursuit paused, waiting for un pause'),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'timeout':'WAIT_FOR_UNPAUSE',
-                                                  'preempted':'ABORT_SERVO'})
+                                                  'preempted':'ANNOUNCE_ABORT'})
 
             #beginning of clean exit path
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
@@ -249,6 +248,11 @@ class PursueSample(object):
             
             #beginning of abort path, failing above should enter here at appropriate point
             #to return system to entry state
+            smach.StateMachine.add('ANNOUNCE_ABORT',
+                                   AnnounceState(self.announcer,
+                                                 'Abort ing pursuit'),
+                                   transitions = {'next':'ABORT_SERVO'})               
+
             smach.StateMachine.add('ABORT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
@@ -340,7 +344,8 @@ class StartSamplePursuit(smach.State):
                              output_keys=['velocity',
                                           'pursuit_point',
                                           'stop_on_sample',
-                                          'action_result'])
+                                          'action_result',
+                                          'search_count'])
     
         self.announcer = announcer
     
@@ -354,6 +359,7 @@ class StartSamplePursuit(smach.State):
         #default velocity for all moves is search velocity,
         #initial approach pursuit done at pursuit_velocity
         userdata.velocity = userdata.pursuit_velocity
+        userdata.search_count = 0
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))
         userdata.pursuit_point = userdata.action_goal.input_point
             
@@ -365,8 +371,7 @@ class GetSampleStrafeMove(smach.State):
         smach.State.__init__(self,
                              outcomes=['strafe', 'point_lost', 'preempted', 'aborted'],
                              input_keys=['target_sample',
-                                         'settle_time',
-                                         'manipulator_offset'],
+                                         'settle_time'],
                              output_keys=['simple_move',
                                           'target_sample'])
         
@@ -384,7 +389,7 @@ class GetSampleStrafeMove(smach.State):
                 self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
                 point_in_base = self.listener.transformPoint('base_link',
                                                              userdata.target_sample).point
-                origin = geometry_msg.Point(*userdata.manipulator_offset)
+                origin = geometry_msg.Point(0,0,0)
                 distance = util.point_distance_2d(origin, point_in_base)
                 yaw = util.pointing_yaw(origin, point_in_base)
                 userdata.simple_move = {'type':'strafe',
@@ -401,13 +406,19 @@ class GetSearchPoints(smach.State):
     def __init__(self, listener, announcer):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
-                             input_keys=['square_search_size'],
-                             output_keys=['pose_list'])
+                             input_keys=['square_search_size',
+                                         'search_count',
+                                         'search_try_limit'],
+                             output_keys=['pose_list',
+                                          'search_count'])
     
         self.listener = listener
         self.announcer = announcer
 
     def execute(self, userdata):
+
+        if userdata.search_count >= userdata.search_try_limit:
+            self.announcer.say("Search limit reached")
 
         pose_list = []
         square_step = userdata.square_search_size
@@ -425,7 +436,8 @@ class GetSearchPoints(smach.State):
             next_pose = util.translate_base_link(self.listener, start_pose, square_step, -square_step)
             pose_list.append(next_pose)
             userdata.pose_list = pose_list
-            self.announcer.say("No sample found. Searching area")           
+            self.announcer.say("Search ing area")           
+            userdata.search_count += 1
             return 'next'
             
         except tf.Exception:
@@ -465,93 +477,75 @@ class HandleSearchMoves(smach.State):
                 return 'aborted'
             return 'next_point'
         else:
-            self.announcer.say("No sample found, abort ing pursuit")
+            self.announcer.say("Search complete, no sample found")
             return 'complete'
         
         return 'aborted'
 
-class VisualServo(smach.State):
-    def __init__(self, announcer):
+class ServoController(smach.State):
+    def __init__(self, listener, announcer):
         smach.State.__init__(self,
-                             output_keys = ['latched_sample',
-                                            'action_result'],
-                             input_keys = ['detected_sample',
-                                           'visual_servo_timeout',
-                                           'visual_servo_lost_timeout',
-                                           'action_result',
-                                           'paused'],
-                             outcomes=['complete',
-                                       'sample_lost',
-                                       'paused',
-                                       'preempted',
-                                       'aborted'])
-    
+                             outcomes=['move', 'complete', 'point_lost', 'preempted', 'aborted'],
+                             input_keys=['detected_sample',
+                                         'settle_time',
+                                         'manipulator_correction',
+                                         'servo_params'],
+                             output_keys=['simple_move',
+                                          'detected_sample',
+                                          'latched_sample'])
+        
+        self.listener = listener
         self.announcer = announcer
-        self.servo = actionlib.SimpleActionClient("visual_servo_action",
-                                                   visual_servo_msg.VisualServoAction)
-        self.sample_lost = False
+        self.try_count = 0
         
     def execute(self, userdata):
         
-        rospy.loginfo("VISUAL_SERVO entry detected sample: " + str(userdata.detected_sample))
-        
-        self.visual_servo_timeout = userdata.visual_servo_timeout
-        self.visual_servo_lost_timeout = userdata.visual_servo_lost_timeout
-        self.sample_lost = False
-        self.last_sample_detected = rospy.get_time()
-        self.last_servo_feedback = rospy.get_time()
-        self.servo.wait_for_server(rospy.Duration(1.0))
-        self.servo.send_goal(visual_servo_msg.VisualServoGoal(),
-                             feedback_cb=self.servo_feedback_cb)
-
-        self.announcer.say("Sample in manipulator view, servo ing")
-    
-        timeout = rospy.get_time() + self.visual_servo_timeout
-        while not rospy.is_shutdown() and (rospy.get_time()<timeout):
-            rospy.sleep(0.1)
-            #if we are paused or preempted exit with preempted
-            if self.preempt_requested():
-                self.servo.cancel_all_goals()
-                self.service_preempt()
-                userdata.action_result.result_string = 'servo preempted'
-                return 'preempted'
-            if userdata.paused:
-                self.servo.cancel_all_goals()
-                return 'paused'
-            servo_state = self.servo.get_state()
-            if servo_state not in util.actionlib_working_states:
-                break
-            
-        if self.sample_lost:
-            userdata.action_result.result_string = 'servo lost'
-            return 'sample_lost'
-    
-        if servo_state == action_msg.GoalStatus.SUCCEEDED:
-            self.announcer.say('Servo complete, deploy ing gripper')
-            userdata.latched_sample = userdata.detected_sample
-            return 'complete'
-        else:
-            self.announcer.say('Visual servo unexpected failure')
-            userdata.action_result.result_string = 'servo failure'
+        userdata.detected_sample = None
+        rospy.sleep(userdata.settle_time)
+        if self.try_count > userdata.servo_params['try_limit']:
+            self.announcer.say("Servo exceeded try limit")
+            rospy.logwarn("SERVO STRAFE failed to hit tolerance before try_limit: " + userdata.servo_params['try_limit'])
             return 'aborted'
-                
+        
+        if userdata.detected_sample is None:
+            self.try_count = 0
+            self.announcer.say("Sample lost")
+            return 'point_lost'
+        else:
+            try:
+                sample_time = userdata.detected_sample.header.stamp
+                self.listener.waitForTransform('manipulator_arm', 'odom', sample_time, rospy.Duration(1.0))
+                point_in_manipulator = self.listener.transformPoint('manipulator_arm',
+                                                             userdata.detected_sample).point
+                point_in_manipulator.x -= userdata.manipulator_correction['x']
+                point_in_manipulator.y -= userdata.manipulator_correction['y']
+                origin = geometry_msg.Point(0,0,0)
+                distance = util.point_distance_2d(origin, point_in_manipulator)
+                if distance < userdata.servo_params['final_tolerance']:
+                    self.try_count = 0
+                    userdata.latched_sample = userdata.detected_sample
+                    self.announcer.say("Servo complete at %.1f millimeters. Deploying gripper" % (distance*1000))    
+                    return 'complete'
+                elif distance < userdata.servo_params['initial_tolerance']:
+                    velocity = userdata.servo_params['final_velocity']
+                else:
+                    velocity = userdata.servo_params['initial_velocity']
+                yaw = util.pointing_yaw(origin, point_in_manipulator)
+                userdata.simple_move = {'type':'strafe',
+                                        'yaw':yaw,
+                                        'distance':distance,
+                                        'velocity':velocity}
+                self.announcer.say("Servo ing, distance, %.1f centimeters" % (distance*100))
+                rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
+                self.try_count += 1
+                return 'move'
+            except tf.Exception:
+                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> odom transform in 1.0 seconds")
+                self.try_count = 0
+                return 'aborted'
+        
+        self.try_count = 0
         return 'aborted'
-    
-    def servo_feedback_cb(self, feedback):
-        this_time = rospy.get_time()
-        if feedback.state != feedback.STOP_AND_WAIT:
-            self.last_sample_detected = this_time
-        delta_time = (this_time - self.last_servo_feedback)
-        if delta_time > 5.0:
-            if feedback.state == feedback.STOP_AND_WAIT:
-                self.announcer.say("Sample lost")
-            else:
-                self.announcer.say("range %d"%(10*int(feedback.error/10)))
-            self.last_servo_feedback = this_time
-        if (this_time - self.last_sample_detected) > self.visual_servo_lost_timeout:
-            self.servo.cancel_all_goals()
-            self.announcer.say('Canceling visual servo')
-            self.sample_lost = True
 
 class ConfirmSampleAcquired(smach.State):
     def __init__(self, announcer, result_pub):
