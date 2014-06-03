@@ -103,6 +103,10 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     timeSinceLastPlanFromPlanner = Time::now();
     // NOTE: this should probably be a parameter, and smaller!
     plannerTimeoutDuration = ros::Duration(1.5);
+
+    // init the error members
+    angularPathError = 0.0;
+    linearPathError = Eigen::Vector3d::Zero();
 }
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
@@ -123,6 +127,33 @@ bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
         return false;
     }
     return true;
+}
+
+double yawFromKnot(const platform_motion_msgs::Knot &knot)
+{
+    return 2.0*atan2(knot.pose.orientation.z, knot.pose.orientation.w);
+}
+
+double yawFromPose(const geometry_msgs::PoseStamped &pose)
+{
+    return 2.0*atan2(pose.pose.orientation.z, pose.pose.orientation.w);
+}
+
+double yawFromMsgQuat(const geometry_msgs::Quaternion& quat)
+{
+    return 2.0*atan2(quat.z, quat.w);
+}
+
+void yawToKnot(platform_motion_msgs::Knot &knot, double yaw)
+{
+    knot.pose.orientation.w = cos(yaw/2.0);
+    knot.pose.orientation.z = sin(yaw/2.0);
+}
+
+void yawToPose(geometry_msgs::PoseStamped &pose, double yaw)
+{
+    pose.pose.orientation.w = cos(yaw/2.0);
+    pose.pose.orientation.z = sin(yaw/2.0);
 }
 
 bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose)
@@ -189,6 +220,9 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
 
                 // Request a plan from a point ahead in the current path to
                 // the same goal
+                // make sure it doesn't pick the point after a bad point, that point seems to be not
+                // good either.
+                bool wasLastPointBad = true;
                 for (auto searchAheadIter = currentKnotIter; searchAheadIter != stitched_path.knots.end(); ++searchAheadIter)
                 {
                     ros::Duration aheadTime = (*searchAheadIter).header.stamp - (*currentKnotIter).header.stamp;
@@ -206,6 +240,7 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     }
                     else
                     {
+                        wasLastPointBad = true;
                         continue;
                     }
                     
@@ -216,8 +251,27 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
                     ROS_DEBUG_STREAM("DesiredPose - isAheadEnoughInTime: " << isAheadEnoughInTime << "isAheadEnoughInDistance: " << isAheadEnoughInDistance << ", IsPosApproxPrev: " << isPosApproxPrev << ", IsQuatApproxPrev: " << isQuatApproxPrev);
                     if (isAheadEnoughInTime &&  isAheadEnoughInDistance && !isPosApproxPrev && isQuatApproxPrev)
                     {
+                        // don't choose this one if the last one was bad.
+                        // this should make stitching easier.
+                        if(wasLastPointBad)
+                        {
+                            wasLastPointBad = false;
+                            continue;
+                        }
                         ROS_ERROR_STREAM("Choosing stitch point: \n" << (*searchAheadIter));
                         sourcePose->pose = (*searchAheadIter).pose;
+
+                        // correct the pose for linear and angular error
+                        // this keeps the robot from drifting off into never never land
+                        // with accumulated error
+                        Eigen::Vector3d originalPos;
+                        tf::pointMsgToEigen(sourcePose->pose.position, originalPos);
+                        Eigen::Vector3d correctedPos = originalPos + linearPathError;
+                        tf::pointEigenToMsg(correctedPos, sourcePose->pose.position);
+
+                        yawToPose(*sourcePose,
+                                yawFromPose(*sourcePose) + angularPathError);
+
                         sourcePose->header = (*searchAheadIter).header;
                         this->replan_ahead_iter = searchAheadIter;
                         this->is_replan_ahead_iter_valid = true;
@@ -256,22 +310,6 @@ bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& pl
     }
     ROS_DEBUG("RECEIVED PLAN");
     return retVal;
-}
-
-double yawFromKnot(const platform_motion_msgs::Knot &knot)
-{
-    return 2.0*atan2(knot.pose.orientation.z, knot.pose.orientation.w);
-}
-
-double yawFromMsgQuat(const geometry_msgs::Quaternion& quat)
-{
-    return 2.0*atan2(quat.z, quat.w);
-}
-
-void yawToKnot(platform_motion_msgs::Knot &knot, double yaw)
-{
-    knot.pose.orientation.w = cos(yaw/2.0);
-    knot.pose.orientation.z = sin(yaw/2.0);
 }
 
 std::tuple<double, std::function<double(double)>, std::function<double(double)> > scurve(double initial, double final, double dotmax)
@@ -926,6 +964,34 @@ void TheSmoothPlanner::setOdometry(const nav_msgs::Odometry& odometry)
 void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHeader)
 {
     this->completed_knot_header = completedKnotHeader;
+
+    // find out which knot this was and compute error between where we are and
+    // where we were supposed to be
+    for(auto knot : stitched_path.knots)
+    {
+        if((completed_knot_header.seq == knot.header.seq) &&
+            (fabs((completed_knot_header.stamp - knot.header.stamp).toSec()) < 0.01))
+        {
+            Eigen::Vector3d expectedPos;
+            tf::pointMsgToEigen(knot.pose.position, expectedPos);
+
+            ROS_ERROR_STREAM("expectedPos: " << knot.pose);
+
+            Eigen::Vector3d currentPos;
+            tf::pointMsgToEigen(odometry.pose.pose.position, currentPos);
+
+            ROS_ERROR_STREAM("currentPos: " << odometry.pose.pose);
+
+            linearPathError = currentPos-expectedPos;
+
+            angularPathError = 2.0*atan2(odometry.pose.pose.orientation.z, odometry.pose.pose.orientation.w) - 
+                2.0*atan2(knot.pose.orientation.z, knot.pose.orientation.w);
+
+            ROS_ERROR_STREAM("linear path error: " << linearPathError << ", angular path error: " << angularPathError);
+
+            break;
+        }
+    }
 
     // Invalide the replan ahead iter if we have completed the knot past the buffer time
     if ( is_replan_ahead_iter_valid &&

@@ -104,5 +104,7 @@ private:
     ros::Time start_time_wait_on_stitched_path;
     ros::Time timeSinceLastPlanFromPlanner;
     ros::Duration plannerTimeoutDuration;
+    Eigen::Vector3d linearPathError;
+    double angularPathError;
 };
 };
