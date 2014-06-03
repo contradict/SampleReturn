@@ -110,7 +110,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(input_keys=[],
                                                  output_keys=['action_result',
-                                                              'line_direction'],
+                                                              'outbound'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -138,6 +138,7 @@ class LevelTwoStar(object):
                                                      self.announcer),
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
+                                                  'next_spoke':'STAR_MANAGER',
                                                   'return_home':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -173,6 +174,7 @@ class LevelTwoStar(object):
                                                      self.announcer),
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
+                                                  'next_spoke':'STAR_MANAGER',
                                                   'return_home':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -302,7 +304,7 @@ class StartLeveLTwo(smach.State):
         result.result_string = 'initialized'
         userdata.action_result = result
         
-        userdata.line_direction = 'in'
+        userdata.outbound = False
 
         return 'next'
 
@@ -310,9 +312,9 @@ class StarManager(smach.State):
     def __init__(self, listener, announcer):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
-                                           'line_direction'],
+                                           'outbound'],
                              output_keys = ['line_yaw',
-                                            'line_direction'],
+                                            'outbound'],
                              outcomes=['start_line',
                                        'rotate',
                                        'return_home',
@@ -321,21 +323,21 @@ class StarManager(smach.State):
         self.listener = listener
         self.announcer = announcer  
 
-        self.spokes = range(0, np.pi, np.pi/10)
+        self.spokes = list(np.linspace(-np.pi/2, 3*np.pi/2, 10, endpoint=False))
 
     def execute(self, userdata):
         
         #are we returning in?
-        if userdata.line_direction == 'in':
-            userdata.line_yaw = self.spokes.pop()
-            userdata.line_direction == 'out'
-            self.announcer.say("Start ing spoke, Yaw " + str(int(math.degrees(actual_yaw))))
+        if not userdata.outbound:
+            userdata.line_yaw = self.spokes.pop(0)
+            userdata.outbound = True
+            self.announcer.say("Start ing spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
             return 'rotate'        
         
-        if userdata.line_direction == 'out':
-            self.announcer.say("Return ing spoke, Yaw " + str(int(math.degrees(actual_yaw))))
-            userdata.line_yaw = userdata.line_yaw + np.pi
-            userdata.line_direction == 'in'
+        if userdata.outbound:
+            self.announcer.say("Return ing spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
+            userdata.line_yaw = util.get_yaw_to_origin(self.listener)
+            userdata.outbound = False
             return 'rotate'
         
         return 'start_line'    
@@ -346,9 +348,9 @@ class RotationManager(smach.State):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
-                                         'line_direction'],
+                                         'outbound'],
                              output_keys=['line_yaw',
-                                          'line_direction',
+                                          'outbound',
                                           'rotate_pose']),  
   
         self.tf_listener = tf_listener
@@ -356,11 +358,11 @@ class RotationManager(smach.State):
     
     def execute(self, userdata):
         
-        actual_yaw = util.get_current_robot_yaw()
-        rotate_yaw = util.line_yaw - actual_yaw
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
         self.mover.execute_spin(rotate_yaw, max_velocity=0.5, acceleration=.25)
-        actual_yaw = util.get_current_robot_yaw()
-        rotate_yaw = util.line_yaw - actual_yaw
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
         self.mover.execute_spin(rotate_yaw, max_velocity=0.05, acceleration=.025)
                 
         return 'next'
@@ -369,10 +371,9 @@ class RotationManager(smach.State):
 class SearchLineManager(smach.State):
     def __init__(self, listener, mover, announcer):
         smach.State.__init__(self,
-                             input_keys = ['next_line_pose',
-                                           'line_plan_step',
+                             input_keys = ['line_plan_step',
                                            'line_yaw',
-                                           'line_replan_distance',
+                                           'outbound',
                                            'blocked_check_distance',
                                            'blocked_check_width',
                                            'return_time',
@@ -380,6 +381,7 @@ class SearchLineManager(smach.State):
                              output_keys = ['next_line_pose'],
                              outcomes=['sample_detected',
                                        'line_blocked',
+                                       'next_spoke',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -420,7 +422,15 @@ class SearchLineManager(smach.State):
         self.yaws['center']['angle'] = actual_yaw
         self.yaws['right']['angle'] = actual_yaw - self.strafe_angle
         
+        if userdata.outbound:
+            self.offset_count_limit = 1
+        else:
+            self.offset_count_limit = 2
+        
         self.offset_count = 0
+        
+        #wait for costmaps to update
+        rospy.sleep(3.0)
         
         #giant stupid case loop
         while not rospy.is_shutdown():  
@@ -435,7 +445,12 @@ class SearchLineManager(smach.State):
                 rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
                 self.service_preempt()
                 return self.return_outcome('preempted')
-            
+ 
+            current_pose = util.get_current_robot_pose(self.listener)
+            origin_distance = np.sqrt(current_pose.pose.position.x**2 + current_pose.pose.position.y**2)
+            if not userdata.outbound and origin_distance < 10:
+                return self.return_outcome('next_spoke')        
+                   
             #first check if we are offset from line
             if (self.offset_count > 0) and not self.yaws['right']['blocked']:
                 #left of line
@@ -488,11 +503,13 @@ class SearchLineManager(smach.State):
     def strafe_right(self):
         self.offset_count -= 1
         self.active_yaw = 'right'
+        rospy.loginfo("STRAFING RIGHT to offset: " + self.strafe_offset)
         self.mover.execute_strafe(-self.strafe_angle, self.strafe_offset)   
     
     def strafe_left(self):
         self.offset_count += 1
         self.active_yaw = 'left'
+        rospy.loginfo("STRAFING LEFT to offset: " + self.strafe_offset)
         self.mover.execute_strafe(self.strafe_angle, self.strafe_offset)    
         
     def costmap_update(self, costmap):
@@ -513,6 +530,8 @@ class SearchLineManager(smach.State):
         
         blocked_count = 0
         total_count = 0
+        
+        rospy.loginf("LINE MANAGER yaws: " + str(self.yaws))
                 
         for name, yaw in self.yaws.iteritems():
             
