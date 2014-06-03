@@ -33,7 +33,7 @@
     <remap from="announcer" to="/io/announcer"/>
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
-
+    <remap from="gpio_read" to="/io/gpio_read"/>
     
     <node
         pkg="executive"
@@ -132,6 +132,17 @@
             beacon_approach_point:
                 {x: 5.0, y: 0, yaw: 180}
         </rosparam>
+
+        <!-- pursue sample simple motion parameters --> 
+        <rosparam>
+            simple_motion_params:
+                max_velocity: 1.5
+                acceleration: 1.0
+                stop_deceleration: 2.0
+                loop_rate: 20 
+                steering_angle_epsilon: 0.01
+        </rosparam>
+    
     </node>
         
     <node
@@ -142,8 +153,7 @@
         output="log"
         ns="/processes/executive">
 
-        <!-- remaps -->
-        <remap from="gpio_write" to="/io/gpio_write"/>
+        <remap from="search_lights" to="search_lights"/>
 
         <!-- executive tf frame and planner_mode -->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
