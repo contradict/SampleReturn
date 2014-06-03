@@ -114,7 +114,8 @@ class LevelTwoStar(object):
     
         #motion mode stuff
         planner_mode = self.node_params.planner_mode
-        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)    
+        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
+        MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
     
         with self.state_machine:
             
@@ -130,21 +131,34 @@ class LevelTwoStar(object):
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
                                                  'Enter ing level two mode'),
-                                   transitions = {'next':'SELECT_PLANNER'})
+                                   transitions = {'next':'SELECT_SERVO'})
             
-            smach.StateMachine.add('SELECT_PLANNER',
+            smach.StateMachine.add('SELECT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
-                                                     MODE_PLANNER),
-                                    transitions = {'next':'SEARCH_LINE',
-                                                  'failed':'LEVEL_TWO_ABORTED'})    
+                                                     MODE_SERVO),
+                                    transitions = {'next':'STAR_MANAGER',
+                                                  'failed':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('STAR_MANAGER',
+                                   StarManager(self.tf_listener,
+                                               self.announcer),
+                                   transitions = {'start_line':'LINE_MANAGER',
+                                                  'rotate':'ROTATION_MANAGER',
+                                                  'return_home':'ANNOUNCE_RETURN_HOME'})
 
-            smach.StateMachine.add('SEARCH_LINE',
+            smach.StateMachine.add('LINE_MANAGER',
                                    SearchLineManager(self.tf_listener,
                                                      self.simple_mover,
                                                      self.announcer),
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
-                                                  'line_blocked':'CHOOSE_NEW_LINE',
-                                                  'return_home':'ANNOUNCE_RETURN_HOME',
+                                                  'line_blocked':'STAR_MANAGER',
+                                                  'return_home':'STAR_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('ROTATION_MANAGER',
+                                   RotationManager(self.tf_listener, self.simple_mover),
+                                   transitions = {'next':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -168,86 +182,41 @@ class LevelTwoStar(object):
                                    transitions = {'next':'RETURN_TO_SEARCH_LINE'})   
 
             smach.StateMachine.add('RETURN_TO_SEARCH_LINE',
-                                   DriveToPoseState(self.move_base,
-                                                    self.tf_listener),
-                                   transitions = {'complete':'SEARCH_LINE',
-                                                  'timeout':'ANNOUNCE_RETURN_TO_SEARCH',
-                                                  'sample_detected':'PURSUE_SAMPLE',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED'},
-                                   remapping = {'target_pose':'last_line_pose',
-                                                'velocity':'line_velocity',
-                                                'pursue_samples':'true',
-                                                'stop_on_sample':'false'})
-            
-            smach.StateMachine.add('CHOOSE_NEW_LINE',
-                                   ChooseNewLine(self.tf_listener, self.simple_mover),
-                                   transitions = {'next':'SEARCH_LINE',
+                                   SearchLineManager(self.tf_listener,
+                                                     self.simple_mover,
+                                                     self.announcer),
+                                   transitions = {'sample_detected':'PURSUE_SAMPLE',
+                                                  'line_blocked':'STAR_MANAGER',
+                                                  'return_home':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
-            
-            smach.StateMachine.add('ROTATE_TO_NEW_LINE',
-                                   DriveToPoseState(self.move_base,
-                                                    self.tf_listener),
-                                   transitions = {'complete':'SEARCH_LINE',
-                                                  'timeout':'CHOOSE_NEW_LINE',
-                                                  'sample_detected':'LEVEL_TWO_ABORTED',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED'},
-                                   remapping = {'target_pose':'rotate_pose',
-                                                'velocity':'line_velocity',
-                                                'pursue_samples':'false'})
-
+  
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
                                                  'Moving to beacon approach point'),
-                                   transitions = {'next':'DRIVE_TO_BEACON_APPROACH_START'})           
-            
-            smach.StateMachine.add('DRIVE_TO_BEACON_APPROACH_START',
-                                   DriveToPoseState(self.move_base,
-                                                    self.tf_listener),
-                                   transitions = {'complete':'ANNOUNCE_SEARCH_FOR_BEACON',
-                                                  'timeout':'ANNOUNCE_RETURN_HOME',
-                                                  'sample_detected':'ANNOUNCE_APPROACH_BEACON'},
-                                   remapping = {'target_pose':'beacon_approach_pose',
-                                                'velocity':'line_velocity',
-                                                'detected_sample':'beacon_point',
-                                                'pursue_samples':'true',
-                                                'stop_on_sample':'false'})
+                                   transitions = {'next':'ANNOUNCE_APPROACH_BEACON'})           
 
             smach.StateMachine.add('ANNOUNCE_APPROACH_BEACON',
                                    AnnounceState(self.announcer,
                                                  'Beacon in view approach ing'),
-                                   transitions = {'next':'APPROACH_BEACON'})               
-
-            self.approach_beacon = GetPursueDetectedPointState(self.move_base,
-                                                               self.tf_listener)
-            
-            smach.StateMachine.add('APPROACH_BEACON',
-                                   self.approach_beacon,
-                                   transitions = {'min_distance':'ANNOUNCE_MOUNT_PLATFORM',
-                                                  'point_lost':'ANNOUNCE_RETURN_HOME',
-                                                  'complete':'ANNOUNCE_RETURN_HOME',
-                                                  'timeout':'ANNOUNCE_RETURN_HOME',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'velocity':'line_velocity',
-                                                'pursuit_point':'beacon_point',
-                                                'pursue_samples':'false',
-                                                'stop_on_sample':'false'})                
+                                   transitions = {'next':'ANNOUNCE_MOUNT_PLATFORM'})               
 
             smach.StateMachine.add('ANNOUNCE_MOUNT_PLATFORM',
                                    AnnounceState(self.announcer,
                                                  'Mount ing platform'),
                                    transitions = {'next':'MOUNT_PLATFORM'})  
 
-            smach.StateMachine.add('MOUNT_PLATFORM',
-                                   DriveToPoseState(self.move_base,
-                                                    self.tf_listener),
-                                   transitions = {'complete':'DESELECT_PLANNER',
-                                                  'timeout':'ANNOUNCE_RETURN_HOME',
-                                                  'sample_detected':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'velocity':'line_velocity',
-                                                'pursue_samples':'false',
-                                                'stop_on_sample':'false'})
+            self.mount_platform = GetSimpleMoveState(self.simple_mover, self.tf_listener)
             
+            smach.StateMachine.add('MOUNT_PLATFORM',
+                                   self.mount_platform,
+                                   transitions = {'complete':'DESELECT_SERVO',
+                                                  'timeout':'ANNOUNCE_RETURN_HOME',
+                                                  'sample_detected':'LEVEL_TWO_ABORTED',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'pursue_samples':'true'})
+
             #ADD BEACON SEARCH!
             smach.StateMachine.add('ANNOUNCE_SEARCH_FOR_BEACON',
                                    AnnounceState(self.announcer,
@@ -256,7 +225,7 @@ class LevelTwoStar(object):
             
 
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
-            smach.StateMachine.add('DESELECT_PLANNER',
+            smach.StateMachine.add('DESELECT_SERVO',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_ENABLE),
                                     transitions = {'next':'complete',
@@ -264,13 +233,11 @@ class LevelTwoStar(object):
     
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
-                                   transitions = {'complete':'preempted',
-                                                  'fail':'aborted'})
+                                   transitions = {'next':'preempted'})
             
             smach.StateMachine.add('LEVEL_TWO_ABORTED',
                                    LevelTwoAborted(),
-                                   transitions = {'recover':'ANNOUNCE_RETURN_HOME',
-                                                  'fail':'aborted'})
+                                   transitions = {'next':'aborted'})
             
         #action server wrapper    
         level_two_server = smach_ros.ActionServerWrapper(
@@ -305,7 +272,7 @@ class LevelTwoStar(object):
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
-        self.approach_beacon.userdata.paused = msg.data
+        self.mount_platform.userdata.paused = msg.data
 
     def sample_update(self, sample):
         try:
@@ -356,6 +323,66 @@ class StartLeveLTwo(smach.State):
         first_pose.orientation = geometry_msg.Quaternion(*quat_array)
         userdata.next_line_pose = geometry_msg.PoseStamped(header, first_pose)        
 
+        return 'next'
+
+class StarManager(smach.State):
+    def __init__(self, listener, announcer):
+        smach.State.__init__(self,
+                             input_keys = [],
+                             output_keys = [],
+                             outcomes=['start_line',
+                                       'rotate',
+                                       'return_home',
+                                       'preempted', 'aborted'])
+        
+        self.listener = listener
+        self.announcer = announcer  
+
+    def execute(self, userdata):
+        
+        return 'start_line'    
+
+class RotationManager(smach.State):
+
+    def __init__(self, tf_listener, mover):
+        smach.State.__init__(self,
+                             outcomes=['next', 'preempted', 'aborted'],
+                             input_keys=['line_yaw',
+                                         'last_line_pose',
+                                         'line_plan_step',
+                                         'blocked_rotation_min',
+                                         'blocked_rotation_max'],
+                             output_keys=['line_yaw',
+                                          'next_line_pose',
+                                          'rotate_pose']),  
+  
+        self.tf_listener = tf_listener
+        self.mover = mover
+    
+    def execute(self, userdata):
+        current_pose = util.get_current_robot_pose(self.tf_listener)
+        yaw_quat = tf.transformations.quaternion_from_euler(0, 0, userdata.line_yaw)
+        #stupid planner may not have the robot oriented along the search line,
+        #set orientation to that value anyway
+        current_pose.pose.orientation = geometry_msg.Quaternion(*yaw_quat)
+        yaw_changes = np.array(range(userdata.blocked_rotation_min,
+                                     userdata.blocked_rotation_max,
+                                     10))
+        yaw_changes = np.radians(yaw_changes)                        
+        yaw_changes = np.r_[yaw_changes, -yaw_changes]
+        yaw_change = random.choice(yaw_changes)
+        line_yaw = userdata.line_yaw + yaw_change
+        rotate_pose = util.pose_rotate(current_pose, yaw_change)
+        next_line_pose = util.pose_translate_by_yaw(rotate_pose,
+                                                    userdata.line_plan_step,
+                                                    line_yaw)
+        userdata.line_yaw = line_yaw
+        userdata.rotate_pose = rotate_pose
+        userdata.next_line_pose = next_line_pose
+        
+        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
+        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
+        
         return 'next'
 
 #drive to detected sample location        
@@ -552,49 +579,6 @@ class SearchLineManager(smach.State):
         x = np.trunc(start[0] + (distance * math.cos(angle))/res).astype('i2')
         y = np.trunc(start[1] + (distance * math.sin(angle))/res).astype('i2')
         return np.array([[x, y]])
-           
-class ChooseNewLine(smach.State):
-
-    def __init__(self, tf_listener, mover):
-        smach.State.__init__(self,
-                             outcomes=['next', 'preempted', 'aborted'],
-                             input_keys=['line_yaw',
-                                         'last_line_pose',
-                                         'line_plan_step',
-                                         'blocked_rotation_min',
-                                         'blocked_rotation_max'],
-                             output_keys=['line_yaw',
-                                          'next_line_pose',
-                                          'rotate_pose']),  
-  
-        self.tf_listener = tf_listener
-        self.mover = mover
-    
-    def execute(self, userdata):
-        current_pose = util.get_current_robot_pose(self.tf_listener)
-        yaw_quat = tf.transformations.quaternion_from_euler(0, 0, userdata.line_yaw)
-        #stupid planner may not have the robot oriented along the search line,
-        #set orientation to that value anyway
-        current_pose.pose.orientation = geometry_msg.Quaternion(*yaw_quat)
-        yaw_changes = np.array(range(userdata.blocked_rotation_min,
-                                     userdata.blocked_rotation_max,
-                                     10))
-        yaw_changes = np.radians(yaw_changes)                        
-        yaw_changes = np.r_[yaw_changes, -yaw_changes]
-        yaw_change = random.choice(yaw_changes)
-        line_yaw = userdata.line_yaw + yaw_change
-        rotate_pose = util.pose_rotate(current_pose, yaw_change)
-        next_line_pose = util.pose_translate_by_yaw(rotate_pose,
-                                                    userdata.line_plan_step,
-                                                    line_yaw)
-        userdata.line_yaw = line_yaw
-        userdata.rotate_pose = rotate_pose
-        userdata.next_line_pose = next_line_pose
-        
-        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
-        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
-        
-        return 'next'
   
 class StartReturnHome(smach.State):
  
@@ -620,16 +604,16 @@ class StartReturnHome(smach.State):
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['complete','fail'])
+        smach.State.__init__(self, outcomes=['next'])
         
     def execute(self, userdata):
         
-        return 'complete'
+        return 'next'
 
 class LevelTwoAborted(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['recover','fail'])
+        smach.State.__init__(self, outcomes=['next'])
         
     def execute(self, userdata):
         
-        return 'fail'
+        return 'next'
