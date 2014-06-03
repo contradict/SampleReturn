@@ -10,5 +10,5 @@ if __name__=="__main__":
     rospy.init_node('level_two')
     #to allow logging immediately, we must wait for the rosout node to be alive
     util.wait_for_rosout()
-    em = level_two_random.LevelTwoRandom()
+    em = level_two_star.LevelTwoStar()
     rospy.spin()

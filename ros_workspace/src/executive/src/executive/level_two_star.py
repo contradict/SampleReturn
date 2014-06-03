@@ -29,11 +29,10 @@ from executive.executive_states import AnnounceState
 from executive.executive_states import GetPursueDetectedPointState
 from executive.executive_states import GetSimpleMoveState
 
-
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
 
-class LevelTwoRandom(object):
+class LevelTwoStar(object):
     
     def __init__(self):
         
