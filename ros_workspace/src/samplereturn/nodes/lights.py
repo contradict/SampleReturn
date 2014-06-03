@@ -17,11 +17,7 @@ class LightController(object):
         self.pub = rospy.Publisher('gpio_write', GPIO)
         self.blink = False
         self.light_state = self._all_on
-        while not rospy.is_shutdown():
-            if self.pub.get_num_connections > 0:
-                break
-            rospy.sleep(0.1)
-        self.search_lights(False)
+        self.search_light_state = False
         self.cycle = rospy.Timer(rospy.Duration(1.0), self.set_lights)
 
     def set_lights(self, event): #rospy.Timer passes in an event object to this cb
@@ -30,7 +26,11 @@ class LightController(object):
                                else self._all_off
         else:
             self.light_state = self._all_on
-        self.pub.publish(GPIO(servo_id=1, pin_mask=7, new_pin_states=self.light_state))
+        pin_mask = 0x0f
+        new_pin_states = self.light_state | ((not self.search_light_state)<<3)
+        self.pub.publish(GPIO(servo_id=1,
+                              pin_mask=pin_mask,
+                              new_pin_states=new_pin_states))
         
     def handle_pause_state(self, msg):
         self.blink = not msg.data
@@ -39,6 +39,7 @@ class LightController(object):
         self.search_lights(msg.data)
         
     def search_lights(self, on):
+        self.search_light_state = on
         mask=8
         pin_states = 0 if on else mask
         self.pub.publish(GPIO(servo_id = 1,
