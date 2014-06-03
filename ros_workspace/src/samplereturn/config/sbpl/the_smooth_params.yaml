@@ -5,4 +5,4 @@ TheSmoothPlanner:
     replan_look_ahead_time: 5.0
     delta_time_after_goal_drop_path: 20.0
     wait_on_stitched_path_duration: 20.0
-    xy_goal_tolerance: 0.4
+    xy_goal_tolerance: 0.5
