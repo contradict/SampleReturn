@@ -572,13 +572,12 @@ class RobotSimulator(object):
         origin = np.array((grid.info.origin.position.x,
                            grid.info.origin.position.y,
                            grid.info.origin.position.z))
-        world2map = lambda x:trunc((x-origin)/grid.info.resolution)
+        world2map = lambda x:np.clip(trunc((x-origin)/grid.info.resolution),
+                           zeros((3,)),
+                           np.r_[grid.info.width-1, grid.info.height-1,0])       
+        
         ll = world2map(np.r_[position.x-range, position.y-range, 0])
-        ll = np.clip(ll, zeros((3,)), np.r_[grid.info.height-1,
-            grid.info.width-1,0])
         ur = world2map(np.r_[position.x+range, position.y+range, 0])
-        ur = np.clip(ur, zeros((3,)), np.r_[grid.info.height-1,
-            grid.info.width-1,0])
     
         submap = grid_np[ll[1]:ur[1],ll[0]:ur[0]]
         mappts = np.c_[np.where(submap==100)][:,::-1] + ll[:2]
