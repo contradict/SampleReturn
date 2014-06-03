@@ -102,7 +102,7 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
 
     timeSinceLastPlanFromPlanner = Time::now();
     // NOTE: this should probably be a parameter, and smaller!
-    plannerTimeoutDuration = ros::Duration(2.0);
+    plannerTimeoutDuration = ros::Duration(1.5);
 }
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
