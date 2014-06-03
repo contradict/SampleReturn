@@ -96,6 +96,8 @@ class SimpleMover(object):
            not self.stop_requested)
   
   def execute_spin(self, rotation, max_velocity=None, acceleration=None, stop_function=None):
+    if rotation < .005: return rotation
+
     rate = rospy.Rate(self.loop_rate)
     
     #load defaults if no kwargs present
@@ -105,13 +107,15 @@ class SimpleMover(object):
       acceleration = self.acceleration
     
     #set timeout time to 150% of the expected total time... seems safe right?
-    timeout_dt = rospy.Duration(self.total_time(np.abs(rotation*self.stern_offset),
-                                                      max_velocity,
-                                                      acceleration))
-    if timeout_dt < rate.sleep_dur:
-      return rotation
+    #timeout_dt = rospy.Duration(self.total_time(np.abs(rotation*self.stern_offset),
+    #                                                  max_velocity,
+    #                                                  acceleration))
+    #if timeout_dt <  rate.sleep_dur:
+    #  return rotation
     
-    timeout_time = rospy.Time.now() + rospy.Duration(timeout_dt.to_sec() * 1.5)
+    #timeout_time = rospy.Time.now() + rospy.Duration(timeout_dt.to_sec() * 1.5)
+    
+    timeout_time = rospy.Time.now() + rospy.Duration(60.0)
 
     self.stop_requested = False
     self.running = True
