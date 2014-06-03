@@ -135,7 +135,8 @@ class LevelTwoStar(object):
             smach.StateMachine.add('LINE_MANAGER',
                                    SearchLineManager(self.tf_listener,
                                                      self.simple_mover,
-                                                     self.announcer),
+                                                     self.announcer,
+                                                     self.executive_frame),
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
                                                   'next_spoke':'STAR_MANAGER',
@@ -312,7 +313,7 @@ class StarManager(smach.State):
         self.listener = listener
         self.announcer = announcer  
 
-        self.spokes = list(np.linspace(-np.pi/2-.1, 3*np.pi/2-.1, 10, endpoint=False))
+        self.spokes = list(np.linspace(0, 2*np.pi, 10, endpoint=False))
 
     def execute(self, userdata):
         
@@ -358,7 +359,7 @@ class RotationManager(smach.State):
 
 #drive to detected sample location        
 class SearchLineManager(smach.State):
-    def __init__(self, listener, mover, announcer):
+    def __init__(self, listener, mover, announcer, executive_frame):
         smach.State.__init__(self,
                              input_keys = ['line_plan_step',
                                            'line_yaw',
@@ -366,8 +367,10 @@ class SearchLineManager(smach.State):
                                            'blocked_check_distance',
                                            'blocked_check_width',
                                            'return_time',
-                                           'detected_sample'],
-                             output_keys = ['next_line_pose'],
+                                           'detected_sample',
+                                           'executive_frame'],
+                             output_keys = ['next_line_pose',
+                                            'detected_sample'],
                              outcomes=['sample_detected',
                                        'line_blocked',
                                        'next_spoke',
@@ -377,6 +380,7 @@ class SearchLineManager(smach.State):
         self.listener = listener
         self.mover = mover
         self.announcer = announcer
+        self.executive_frame = executive_frame
                 
         self.costmap_listener = rospy.Subscriber('local_costmap',
                                         nav_msg.OccupancyGrid,
@@ -397,11 +401,15 @@ class SearchLineManager(smach.State):
         
         self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
         
+        self.detected_sample = None
+        rospy.Subscriber('detected_sample_search',
+                        samplereturn_msg.NamedPoint,
+                        self.sample_update)
+        
     def execute(self, userdata):
     
         self.is_running = True
-        self.last_line_blocked = False
-        self.line_blocked = False
+        self.detected_sample = None
         
         self.line_yaw = userdata.line_yaw
         actual_yaw = util.get_current_robot_yaw(self.listener)
@@ -434,6 +442,9 @@ class SearchLineManager(smach.State):
                 rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
                 self.service_preempt()
                 return self.return_outcome('preempted')
+            
+            if self.detected_sample is not None:
+                return self.return_outcome("sample_detected")
  
             current_pose = util.get_current_robot_pose(self.listener)
             origin_distance = np.sqrt(current_pose.pose.position.x**2 + current_pose.pose.position.y**2)
@@ -501,6 +512,19 @@ class SearchLineManager(smach.State):
         self.active_yaw = 'left'
         rospy.loginfo("STRAFING LEFT to offset: %s" % (self.strafe_offset))
         self.mover.execute_strafe(self.strafe_angle, self.strafe_offset)    
+
+    def sample_update(self, sample):
+        try:
+            self.listener.waitForTransform('/odom',
+                                              sample.header.frame_id,
+                                              sample.header.stamp,
+                                              rospy.Duration(1.0))
+            point_in_frame = self.listener.transformPoint(self.executive_frame, sample)
+            sample.point = point_in_frame.point
+            self.detected_sample = sample
+            self.mover.stop()    
+        except tf.Exception:
+            rospy.logwarn("LEVEL_TWO failed to transform search detection point!")  
         
     def costmap_update(self, costmap):
         
@@ -524,7 +548,7 @@ class SearchLineManager(smach.State):
         blocked_count = 0
         total_count = 0
         
-        rospy.loginfo("LINE MANAGER yaws: " + str(self.yaws))
+        #rospy.loginfo("LINE MANAGER yaws: " + str(self.yaws))
                 
         for name, yaw in self.yaws.iteritems():
             
