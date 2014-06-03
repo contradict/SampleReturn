@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+    <node
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_node"
+        name="local_costmap"
+        ns="/processes/planner/dumb"
+        >
+
+        <rosparam file="$(find samplereturn)/config/costmap_dumb_params.yaml" ns="costmap" command="load"/>
+
+    </node>
+
+    <node
+        machine="navigate"
+        pkg="costmap_2d"
+        type="costmap_2d_cloud"
+        name="voxel_visualizer_cloud"
+        ns="/processes/planner/dumb/local_costmap/costmap/obstacle_layer">
+    </node>
+
+</launch>
