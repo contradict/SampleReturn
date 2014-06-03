@@ -120,11 +120,9 @@ class LevelTwoStar(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(input_keys=['line_yaw',
-                                                             'line_plan_step',
-                                                             'executive_frame'],
+                                   StartLeveLTwo(input_keys=[],
                                                  output_keys=['action_result',
-                                                              'next_line_pose'],
+                                                              'line_direction'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -158,7 +156,7 @@ class LevelTwoStar(object):
             
             smach.StateMachine.add('ROTATION_MANAGER',
                                    RotationManager(self.tf_listener, self.simple_mover),
-                                   transitions = {'next':'STAR_MANAGER',
+                                   transitions = {'next':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -316,20 +314,17 @@ class StartLeveLTwo(smach.State):
         result.result_string = 'initialized'
         userdata.action_result = result
         
-        header = std_msg.Header(0, rospy.Time(0), userdata.executive_frame)        
-        first_pose = geometry_msg.Pose()
-        first_pose.position = geometry_msg.Point(userdata.line_plan_step, 0, 0)
-        quat_array = tf.transformations.quaternion_from_euler(0, 0,  userdata.line_yaw)           
-        first_pose.orientation = geometry_msg.Quaternion(*quat_array)
-        userdata.next_line_pose = geometry_msg.PoseStamped(header, first_pose)        
+        userdata.line_direction = 'in'
 
         return 'next'
 
 class StarManager(smach.State):
     def __init__(self, listener, announcer):
         smach.State.__init__(self,
-                             input_keys = [],
-                             output_keys = [],
+                             input_keys = ['line_yaw',
+                                           'line_direction'],
+                             output_keys = ['line_yaw',
+                                            'line_direction'],
                              outcomes=['start_line',
                                        'rotate',
                                        'return_home',
@@ -338,7 +333,22 @@ class StarManager(smach.State):
         self.listener = listener
         self.announcer = announcer  
 
+        self.spokes = range(0, np.pi, np.pi/10)
+
     def execute(self, userdata):
+        
+        #are we returning in?
+        if userdata.line_direction == 'in':
+            userdata.line_yaw = self.spokes.pop()
+            userdata.line_direction == 'out'
+            self.announcer.say("Start ing spoke, Yaw " + str(int(math.degrees(actual_yaw))))
+            return 'rotate'        
+        
+        if userdata.line_direction == 'out':
+            self.announcer.say("Return ing spoke, Yaw " + str(int(math.degrees(actual_yaw))))
+            userdata.line_yaw = userdata.line_yaw + np.pi
+            userdata.line_direction == 'in'
+            return 'rotate'
         
         return 'start_line'    
 
@@ -348,41 +358,23 @@ class RotationManager(smach.State):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
-                                         'last_line_pose',
-                                         'line_plan_step',
-                                         'blocked_rotation_min',
-                                         'blocked_rotation_max'],
+                                         'line_direction'],
                              output_keys=['line_yaw',
-                                          'next_line_pose',
+                                          'line_direction',
                                           'rotate_pose']),  
   
         self.tf_listener = tf_listener
         self.mover = mover
     
     def execute(self, userdata):
-        current_pose = util.get_current_robot_pose(self.tf_listener)
-        yaw_quat = tf.transformations.quaternion_from_euler(0, 0, userdata.line_yaw)
-        #stupid planner may not have the robot oriented along the search line,
-        #set orientation to that value anyway
-        current_pose.pose.orientation = geometry_msg.Quaternion(*yaw_quat)
-        yaw_changes = np.array(range(userdata.blocked_rotation_min,
-                                     userdata.blocked_rotation_max,
-                                     10))
-        yaw_changes = np.radians(yaw_changes)                        
-        yaw_changes = np.r_[yaw_changes, -yaw_changes]
-        yaw_change = random.choice(yaw_changes)
-        line_yaw = userdata.line_yaw + yaw_change
-        rotate_pose = util.pose_rotate(current_pose, yaw_change)
-        next_line_pose = util.pose_translate_by_yaw(rotate_pose,
-                                                    userdata.line_plan_step,
-                                                    line_yaw)
-        userdata.line_yaw = line_yaw
-        userdata.rotate_pose = rotate_pose
-        userdata.next_line_pose = next_line_pose
         
-        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
-        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
-        
+        actual_yaw = util.get_current_robot_yaw()
+        rotate_yaw = util.line_yaw - actual_yaw
+        self.mover.execute_spin(rotate_yaw, max_velocity=0.5, acceleration=.25)
+        actual_yaw = util.get_current_robot_yaw()
+        rotate_yaw = util.line_yaw - actual_yaw
+        self.mover.execute_spin(rotate_yaw, max_velocity=0.05, acceleration=.025)
+                
         return 'next'
 
 #drive to detected sample location        
@@ -441,8 +433,6 @@ class SearchLineManager(smach.State):
         self.yaws['right']['angle'] = actual_yaw - self.strafe_angle
         
         self.offset_count = 0
-        self.announcer.say("Start ing search line, Yaw " + str(int(math.degrees(actual_yaw))))
-        rospy.sleep(3.0)
         
         #giant stupid case loop
         while not rospy.is_shutdown():  
