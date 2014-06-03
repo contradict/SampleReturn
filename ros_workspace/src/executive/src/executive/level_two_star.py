@@ -166,19 +166,8 @@ class LevelTwoStar(object):
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
                                                  'Return ing to search line'),
-                                   transitions = {'next':'RETURN_TO_SEARCH_LINE'})   
+                                   transitions = {'next':'STAR_MANAGER'})   
 
-            smach.StateMachine.add('RETURN_TO_SEARCH_LINE',
-                                   SearchLineManager(self.tf_listener,
-                                                     self.simple_mover,
-                                                     self.announcer),
-                                   transitions = {'sample_detected':'PURSUE_SAMPLE',
-                                                  'line_blocked':'STAR_MANAGER',
-                                                  'next_spoke':'STAR_MANAGER',
-                                                  'return_home':'STAR_MANAGER',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
-  
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
                                                  'Moving to beacon approach point'),
@@ -323,7 +312,7 @@ class StarManager(smach.State):
         self.listener = listener
         self.announcer = announcer  
 
-        self.spokes = list(np.linspace(-np.pi/2, 3*np.pi/2, 10, endpoint=False))
+        self.spokes = list(np.linspace(-np.pi/2-.1, 3*np.pi/2-.1, 10, endpoint=False))
 
     def execute(self, userdata):
         
@@ -498,21 +487,25 @@ class SearchLineManager(smach.State):
     def return_outcome(self, outcome):
         #set active yaw to sorta none out of here
         self.active_yaw = ''
+        self.is_running = False
         return outcome
     
     def strafe_right(self):
         self.offset_count -= 1
         self.active_yaw = 'right'
-        rospy.loginfo("STRAFING RIGHT to offset: " + self.strafe_offset)
+        rospy.loginfo("STRAFING RIGHT to offset: %s" % (self.strafe_offset))
         self.mover.execute_strafe(-self.strafe_angle, self.strafe_offset)   
     
     def strafe_left(self):
         self.offset_count += 1
         self.active_yaw = 'left'
-        rospy.loginfo("STRAFING LEFT to offset: " + self.strafe_offset)
+        rospy.loginfo("STRAFING LEFT to offset: %s" % (self.strafe_offset))
         self.mover.execute_strafe(self.strafe_angle, self.strafe_offset)    
         
     def costmap_update(self, costmap):
+        
+        if not self.is_running:
+            return
         
         if self.debug_map_pub.get_num_connections() > 0:
             publish_debug = True
@@ -531,7 +524,7 @@ class SearchLineManager(smach.State):
         blocked_count = 0
         total_count = 0
         
-        rospy.loginf("LINE MANAGER yaws: " + str(self.yaws))
+        rospy.loginfo("LINE MANAGER yaws: " + str(self.yaws))
                 
         for name, yaw in self.yaws.iteritems():
             
@@ -569,7 +562,7 @@ class SearchLineManager(smach.State):
             costmap.data = list(np.reshape(map_np, -1))
             self.debug_map_pub.publish(costmap)                        
                     
-        return False
+        return
     
     #returns array of array for bresenham implementation    
     def check_point(self, start, distance, angle, res):
