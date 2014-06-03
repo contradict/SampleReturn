@@ -136,8 +136,8 @@
         <!-- pursue sample simple motion parameters --> 
         <rosparam>
             simple_motion_params:
-                max_velocity: 1.5
-                acceleration: 1.0
+                max_velocity: 1.0
+                acceleration: 0.5
                 stop_deceleration: 2.0
                 loop_rate: 20 
                 steering_angle_epsilon: 0.01
