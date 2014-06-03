@@ -180,8 +180,8 @@ class LevelTwoStar(object):
                                                 'stop_on_sample':'false'})
             
             smach.StateMachine.add('CHOOSE_NEW_LINE',
-                                   ChooseNewLine(self.tf_listener),
-                                   transitions = {'next':'ROTATE_TO_NEW_LINE',
+                                   ChooseNewLine(self.tf_listener, self.simple_mover),
+                                   transitions = {'next':'SEARCH_LINE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -388,14 +388,14 @@ class SearchLineManager(smach.State):
         
         self.is_running = False
         self.line_yaw = 0
+        self.active_yaw = ''
         self.strafe_angle = np.pi/4
         self.strafe_offset = 4.0
-        self.offset_count = 0
-        self.offset_count_limit = 0
+        self.offset_count_limit = 1
  
-        self.yaws = {'left':{'yaw':0, 'blocked':False},
-                    'center':{'yaw':0, 'blocked':False},
-                    'right':{'yaw':0, 'blocked':False}}
+        self.yaws = {'left':{'angle':0, 'blocked':False},
+                    'center':{'angle':0, 'blocked':False},
+                    'right':{'angle':0, 'blocked':False}}
         
         self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
         
@@ -405,45 +405,90 @@ class SearchLineManager(smach.State):
         self.last_line_blocked = False
         self.line_blocked = False
         
-        self.yaws['left']['yaw'] = userdata.line_yaw + strafe_angle
-        self.yaws['center']['yaw'] = userdata.line_yaw
-        self.yaws['right']['yaw'] = userdata.line_yaw - strafe_angle
+        self.line_yaw = userdata.line_yaw
+        actual_yaw = util.get_current_robot_yaw(self.listener)
+        rospy.loginfo("SEARCH LINE MANAGER, entering with yaw: " + str(np.degrees(actual_yaw)))
         
-        self.announcer.say("On search line, Yaw " + str(int(math.degrees(userdata.line_yaw))))
+        self.yaws['left']['angle'] = actual_yaw + self.strafe_angle
+        self.yaws['center']['angle'] = actual_yaw
+        self.yaws['right']['angle'] = actual_yaw - self.strafe_angle
         
+        self.offset_count = 0
+        self.announcer.say("Start ing search line, Yaw " + str(int(math.degrees(actual_yaw))))
+        rospy.sleep(3.0)
+        
+        #giant stupid case loop
         while not rospy.is_shutdown():  
-            
-            self.announcer.say("Line is clear, continue ing")
-                
-            remaining = self.mover.execute_strafe(0, userdata.line_plan_step)
-            
-            if self.yaws['center']['blocked']:
-                if not self.yaws['left']['blocked']:
-                    self.announcer.say("Line is blocked, strafing left")
-                    self.mover.execute_strafe(self.yaws['left'], self.strafe_offset)
-                elif not self.yaws['right']['blocked']:
-                    self.announcer.say("Line is blocked, strafing right")
-                    self.mover.execute_strafe(self.yaws['right'], self.strafe_offset)
-                
 
-                
-                    return 'line_blocked'               
-            
-            
-            
             if rospy.Time.now() > userdata.return_time:
                 self.announcer.say("Search time expired")
-                return 'return_home'
+                self.active_yaw = ''
+                return self.return_outcome('return_home')
             
             #check preempt after deciding whether or not to calculate next line pose
             if self.preempt_requested():
                 rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
                 self.service_preempt()
-                return 'preempted'
-        
+                return self.return_outcome('preempted')
+            
+            #first check if we are offset from line
+            if (self.offset_count > 0) and not self.yaws['right']['blocked']:
+                #left of line
+                self.announcer.say('Right clear, strafe ing to line')
+                self.strafe_right()
+                continue
+            elif (self.offset_count < 0) and not self.yaws['left']['blocked']:
+                #right of line
+                self.announcer.say('Left clear, strafe ing to line')
+                self.strafe_left()
+                continue
+            
+            #if not offset or returning to line is blocked, going straight is next priority
+            if not self.yaws['center']['blocked']:
+                self.announcer.say("Line clear, continue ing")    
+                self.active_yaw = 'center'
+                remaining = self.mover.execute_strafe(0, userdata.line_plan_step)
+                continue         
+            
+            #if going straight and returning to the line are not possible,             
+            under_offset_limit = np.abs(self.offset_count) < self.offset_count_limit
+            if not self.yaws['left']['blocked'] and under_offset_limit:
+                self.announcer.say("Obstacle in line, strafe ing left")
+                self.strafe_left()
+                continue
+            elif not self.yaws['right']['blocked'] and under_offset_limit:
+                self.announcer.say("Obstacle in line, strafe ing right")
+                self.strafe_right()
+                continue
+            else:             
+                #lethal cells in all three yaw check lines
+                self.announcer.say("Line is blocked, rotate ing")
+                self.active_yaw = ''
+                return self.return_outcome('line_blocked')               
+                
+                #finished or stopped in offset move
+                if self.yaws[self.active_yaw]['blocked']:
+                    self.active_yaw = ''
+                    return self.return_outcome('line_blocked')
+       
             rospy.sleep(0.1)
         
         return 'aborted'
+    
+    def return_outcome(self, outcome):
+        #set active yaw to sorta none out of here
+        self.active_yaw = ''
+        return outcome
+    
+    def strafe_right(self):
+        self.offset_count -= 1
+        self.active_yaw = 'right'
+        self.mover.execute_strafe(-self.strafe_angle, self.strafe_offset)   
+    
+    def strafe_left(self):
+        self.offset_count += 1
+        self.active_yaw = 'left'
+        self.mover.execute_strafe(self.strafe_angle, self.strafe_offset)    
         
     def costmap_update(self, costmap):
         
@@ -453,27 +498,25 @@ class SearchLineManager(smach.State):
             publish_debug = False
         
         lethal_threshold = 90
-        blocked_threshold = 0.30
-        check_width = 1
-        check_dist = 5
+        check_width = 1.1
+        check_dist = 6
         resolution = costmap.info.resolution
         origin = (np.trunc(costmap.info.width/2),
                   np.trunc(costmap.info.height/2))
-        yaw = self.line_yaw
 
         map_np = np.array(costmap.data, dtype='i1').reshape((costmap.info.height,costmap.info.width))
         
         blocked_count = 0
         total_count = 0
-        
-        check_yaws = [(yaw + self.strafe_angle), yaw, (yaw - self.strafe_angle)]
-        
-        for yaw in self.check_yaws:
+                
+        for name, yaw in self.yaws.iteritems():
             
-            ll = self.check_point(origin, check_width, (yaw - math.pi/2), resolution)
-            ul = self.check_point(origin, check_width, (yaw + math.pi/2), resolution)
-            lr = self.check_point(ll[0], check_dist, yaw, resolution)
-            ur = self.check_point(ul[0], check_dist, yaw, resolution)
+            angle = yaw['angle']
+            
+            ll = self.check_point(origin, check_width, (angle - math.pi/2), resolution)
+            ul = self.check_point(origin, check_width, (angle + math.pi/2), resolution)
+            lr = self.check_point(ll[0], check_dist, angle, resolution)
+            ur = self.check_point(ul[0], check_dist, angle, resolution)
             
             start_points = bresenham.points(ll, ul)
             end_points = bresenham.points(lr, ur)
@@ -485,38 +528,34 @@ class SearchLineManager(smach.State):
                 line_vals = map_np[line[:,1], line[:,0]]
                 max_val = (np.amax(line_vals))
                 if np.any(line_vals > lethal_threshold):
-                    blocked_count += 1
                     #for debug, mark lethal lines
                     if publish_debug: map_np[line[:,1], line[:,0]] = 64
+                    yaw['blocked'] = True
+                    if name == self.active_yaw:
+                        self.mover.stop()
+                    break
+                yaw['blocked']=False    
                     
             #if anything is subscribing to the test map, publish it
             if publish_debug:
                 map_np[start_points[:,1], start_points[:,0]] = 64
                 map_np[end_points[:,1], end_points[:,0]] = 64
 
-
         if publish_debug:
             costmap.data = list(np.reshape(map_np, -1))
             self.debug_map_pub.publish(costmap)                        
-        
-        if (blocked_count/float(total_count)) > blocked_threshold:        
-            self.line_blocked = True
-            self.mover.stop()
-        else:
-            self.line_blocked = False
-            
                     
         return False
     
     #returns array of array for bresenham implementation    
-    def check_point(self, start, distance, yaw, res):
-        x = np.trunc(start[0] + (distance * math.cos(yaw))/res).astype('i2')
-        y = np.trunc(start[1] + (distance * math.sin(yaw))/res).astype('i2')
+    def check_point(self, start, distance, angle, res):
+        x = np.trunc(start[0] + (distance * math.cos(angle))/res).astype('i2')
+        y = np.trunc(start[1] + (distance * math.sin(angle))/res).astype('i2')
         return np.array([[x, y]])
            
 class ChooseNewLine(smach.State):
 
-    def __init__(self, tf_listener):
+    def __init__(self, tf_listener, mover):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
@@ -528,10 +567,10 @@ class ChooseNewLine(smach.State):
                                           'next_line_pose',
                                           'rotate_pose']),  
   
-        self.tf_listener = tf_listener        
+        self.tf_listener = tf_listener
+        self.mover = mover
     
     def execute(self, userdata):
-        rospy.sleep(1.0) #wait for robot to settle
         current_pose = util.get_current_robot_pose(self.tf_listener)
         yaw_quat = tf.transformations.quaternion_from_euler(0, 0, userdata.line_yaw)
         #stupid planner may not have the robot oriented along the search line,
@@ -548,10 +587,12 @@ class ChooseNewLine(smach.State):
         next_line_pose = util.pose_translate_by_yaw(rotate_pose,
                                                     userdata.line_plan_step,
                                                     line_yaw)
-
         userdata.line_yaw = line_yaw
         userdata.rotate_pose = rotate_pose
         userdata.next_line_pose = next_line_pose
+        
+        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
+        self.mover.execute_spin(np.pi/2, max_velocity=0.4, acceleration=.2)
         
         return 'next'
   
