@@ -162,8 +162,28 @@ bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose
     timeSinceLastPlanFromPlanner = Time::now();
     if (this->is_waiting_on_stitched_path)
     {
-        ROS_ERROR("waiting on stitched path, ignoring replan request");
-        return false;
+        if ( (Time::now()-start_time_wait_on_stitched_path) < ros::Duration(wait_on_stitched_path_duration) )
+        {
+            ROS_ERROR("waiting on stitched path, ignoring replan request");
+            return false;
+        }
+        else if (stitched_path.knots.size() > 0 && have_goal)
+        {
+            ROS_ERROR("Waiting on stitched path timeout. Planning to halt asap!");
+            // create a pathological path that will cause platform motion to stop
+            // everything and plan to a hard zero velocity.
+            platform_motion_msgs::Path path_msg;
+            path_msg.header.stamp = Time::now();
+            path_msg.header.seq = 0;
+            path_msg.header.frame_id = "map";
+            ROS_ERROR("Publishing crazy plan to cause stop!");
+            smooth_path_publisher.publish(path_msg);
+            is_waiting_on_stitched_path = true;
+
+            // reset the time so we don't have problems later
+            timeSinceLastPlanFromPlanner = Time::now();
+            start_time_wait_on_stitched_path = Time::now();
+        }
     }
     else if (this->isGoalReached() || is_replan_ahead_iter_valid)
     {
@@ -1029,6 +1049,7 @@ void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHea
 
         // reset the time so we don't have problems later
         timeSinceLastPlanFromPlanner = Time::now();
+        start_time_wait_on_stitched_path = Time::now();
     }
 }
 
