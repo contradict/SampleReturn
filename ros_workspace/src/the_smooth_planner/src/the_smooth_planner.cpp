@@ -99,6 +99,10 @@ void TheSmoothPlanner::initialize(std::string name, tf::TransformListener* tf, c
     tf::vectorTFToEigen(sternPodStampedTf.getOrigin(), sternPodVector);
 
     ROS_DEBUG("sternPodVector.norm: %f", sternPodVector[0]);
+
+    timeSinceLastPlanFromPlanner = Time::now();
+    // NOTE: this should probably be a parameter, and smaller!
+    plannerTimeoutDuration = ros::Duration(2.0);
 }
 
 bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
@@ -111,11 +115,20 @@ bool TheSmoothPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     cmd_vel.angular.x = 0;
     cmd_vel.angular.y = 0;
     cmd_vel.angular.z = 0;
+
+    // return false if we've not heard from the planner in a while, which is real bad!
+    if((Time::now() - timeSinceLastPlanFromPlanner) > plannerTimeoutDuration)
+    {
+        // return false, this should cause the goal to fail
+        return false;
+    }
     return true;
 }
 
 bool TheSmoothPlanner::requestNewPlanFrom(geometry_msgs::PoseStamped* sourcePose)
 {
+    // we heard from the planner. that's good.
+    timeSinceLastPlanFromPlanner = Time::now();
     if (this->is_waiting_on_stitched_path)
     {
         ROS_ERROR("waiting on stitched path, ignoring replan request");
@@ -237,6 +250,8 @@ bool TheSmoothPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& pl
         nav_msgs::Path path;
         path.poses = plan;
         path.header = plan[0].header;
+        // set this time here so we can use the setPath method later
+        timeSinceLastPlanFromPlanner = Time::now();
         retVal = this->setPath(path);
     }
     ROS_DEBUG("RECEIVED PLAN");
@@ -928,6 +943,27 @@ void TheSmoothPlanner::setCompletedKnot(const std_msgs::Header& completedKnotHea
         have_goal = false;
     }
     ROS_ERROR_STREAM("RECEIVED COMPLETED KNOT, reached: " << this->is_goal_reached);
+
+    // check to see if it has been too long since we've heard form the planner.
+    if(((Time::now() - timeSinceLastPlanFromPlanner) > plannerTimeoutDuration) &&
+        (stitched_path.knots.size() > 0))
+    {
+        ROS_ERROR_STREAM("Planner not responding with replans! this is bad! It has been " << (Time::now() - timeSinceLastPlanFromPlanner) << " since we heard form the planner!");
+
+        ROS_ERROR("Planning to halt asap!");
+        // create a pathological path that will cause platform motion to stop
+        // everything and plan to a hard zero velocity.
+        platform_motion_msgs::Path path_msg;
+        path_msg.header.stamp = Time::now();
+        path_msg.header.seq = 0;
+        path_msg.header.frame_id = "map";
+        ROS_ERROR("Publishing crazy plan to cause stop!");
+        smooth_path_publisher.publish(path_msg);
+        is_waiting_on_stitched_path = true;
+
+        // reset the time so we don't have problems later
+        timeSinceLastPlanFromPlanner = Time::now();
+    }
 }
 
 void TheSmoothPlanner::setMaximumVelocity(const std_msgs::Float64::ConstPtr velocity)

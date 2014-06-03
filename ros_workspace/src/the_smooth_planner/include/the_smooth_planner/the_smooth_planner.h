@@ -102,5 +102,7 @@ private:
     bool have_goal;
     bool is_goal_reached;
     ros::Time start_time_wait_on_stitched_path;
+    ros::Time timeSinceLastPlanFromPlanner;
+    ros::Duration plannerTimeoutDuration;
 };
 };
