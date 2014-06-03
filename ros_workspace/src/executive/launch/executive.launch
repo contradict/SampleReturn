@@ -61,7 +61,7 @@
         <remap from="home_carousel" to="/motion/carousel/home"/>
         <remap from="manual_control" to="/motion/manual_control"/>
 
-        <remap from="search_lights" to="/io/search_lights"/>
+        <remap from="gpio_read" to="/io/gpio_read"/>
     </node>
 
     <node
