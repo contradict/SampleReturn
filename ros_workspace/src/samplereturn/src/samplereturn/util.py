@@ -122,6 +122,13 @@ def get_current_robot_pose(tf_listener, frame_id = '/odom'):
                                     
     return geometry_msg.PoseStamped(header, pose)
 
+def get_current_robot_yaw(tf_listener, frame_id = '/odom'):
+    now = tf_listener.getLatestCommonTime(frame_id, '/base_link')
+    pos, quat = tf_listener.lookupTransform(frame_id,
+                                            '/base_link',
+                                            rospy.Time(0))
+    return tf.transformations.euler_from_quaternion(quat)[-1]
+
 class CANInterface(object):
     def __init__(self):
         self.CAN_select_motion_mode = \
