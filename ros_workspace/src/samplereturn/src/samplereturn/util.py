@@ -2,6 +2,7 @@ import rospy
 import math
 from copy import deepcopy
 import tf
+import numpy as np
 
 from collections import namedtuple
 
@@ -128,6 +129,18 @@ def get_current_robot_yaw(tf_listener, frame_id = '/odom'):
                                             '/base_link',
                                             rospy.Time(0))
     return tf.transformations.euler_from_quaternion(quat)[-1]
+
+def get_yaw_to_origin(tf_listener):
+    robot = get_current_robot_pose(tf_listener)
+    return pointing_yaw(robot.pose.position,
+                        geometry_msg.Point(0,0,0))
+
+def unwind(ang):
+    if ang > np.pi:
+      ang -= 2*np.pi
+    elif ang < -np.pi:
+      ang += 2*np.pi
+    return ang
 
 class CANInterface(object):
     def __init__(self):
