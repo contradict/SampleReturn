@@ -5,8 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Status1
+        - /Robot Outline1
         - /Navigation Center Left1/Status1
-        - /VoxelGrid1/Status1
       Splitter Ratio: 0.740947
     Tree Height: 674
   - Class: rviz/Selection
@@ -68,7 +68,7 @@ Visualization Manager:
       Color: 25; 255; 0
       Enabled: true
       Name: Robot Outline
-      Topic: /processes/planner/mover/local_costmap/obstacle_layer_footprint/footprint_stamped
+      Topic: /processes/planner/mover/global_costmap/obstacle_layer_footprint/footprint_stamped
       Value: true
     - Angle Tolerance: 0.1
       Class: rviz/Odometry
