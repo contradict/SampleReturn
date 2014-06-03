@@ -64,6 +64,7 @@
         <remap from="gpio_read" to="/io/gpio_read"/>
     </node>
 
+    <!--
     <node
         pkg="executive"
         type="level_one_node.py"
@@ -72,24 +73,24 @@
         output="log"
         ns="/processes/executive">
         
-        <!-- executive tf frame and planner_mode -->
+        <!- - executive tf frame and planner_mode - ->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
-        <!-- for DriveToPose states and approach to sample-->
+        <!- - for DriveToPose states and approach to sample- ->
         <param name="velocity" type="double" value="1.5"/>
         <param name="search_velocity" type="double" value="0.5"/>
         <param name="motion_check_interval" type="double" value="60"/>
         <param name="min_motion" type="double" value="0.5"/>
         <rosparam>
-            <!-- Specify x and y.  If yaw is unspecified, robot will point towards
-                 the next point in the path list -->
+            <!- - Specify x and y.  If yaw is unspecified, robot will point towards
+                 the next point in the path list - ->
             search_poses_2d:
                 - {x: 2.0, y: 0.0}
                 - {x: 4.0, y: -2.0}
                 - {x: 10.0, y: -10.0}
         </rosparam>        
-        <!-- for Beacon approach -->
+        <!- - for Beacon approach - ->
         <param name="min_pursuit_distance" type="double" value="3.0"/>
         <param name="max_pursuit_error" type="double" value="0.3"/>
         <param name="max_point_lost_time" type="double" value="60"/>
@@ -98,6 +99,7 @@
                 {x: 8.0, y: 0, yaw: 180}
         </rosparam>
     </node>
+    -->
 
     <node
         pkg="executive"
