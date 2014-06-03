@@ -2,9 +2,11 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
-    <!-- IMPORTANT! For tf, this is the frame that the executive works in -->
+    <!-- IMPORTANT! For tf, this is the frame that the executive works in, -->
+    <!-- and planner mode defines what all executive nodes use for planned motion -->
     <arg name="executive_frame" value="/odom"/>
-
+    <arg name="planner_mode" value="MODE_PLANNER_TWIST"/>
+    
     <!-- motion remaps -->
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
@@ -12,14 +14,16 @@
     <remap from="servo_command" to="/motion/servo_command"/>
     <remap from="planner_command" to="/motion/planner_command"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
-    
+    <remap from="odometry" to="/motion/odometry"/>
+    <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+
     <!-- planning and detection remaps -->
     <remap from="DWAPlanner_set_parameters" to="/planner/mover/DWAPlannerROS/set_parameters"/>
     <remap from="local_costmap" to="/processes/planner/mover/local_costmap/costmap"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
-    <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/point"/>
-    <remap from="detected_sample_search" to="/processes/sample_detection/search/point"/>
+    <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
+    <remap from="detected_sample_search" to="/processes/sample_detection/search/filtered_point"/>
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
@@ -30,6 +34,7 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
 
+    
     <node
         pkg="executive"
         type="executive_master_node.py"
@@ -42,6 +47,10 @@
         <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
         <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
 
+        <!-- camera ignore params, to allow testing without certain cameras -->
+        <param name="ignore_search_camera" value="True"/>
+        <param name="ignore_manipulator_camera" value="True"/>
+        
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
         <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
         <remap from="navigation_starboard_camera_status" to="/cameras/navigation/starboard/status"/>
@@ -52,7 +61,7 @@
         <remap from="home_carousel" to="/motion/carousel/home"/>
         <remap from="manual_control" to="/motion/manual_control"/>
 
-        <remap from="gpio_read" to="/io/gpio_read"/>
+        <remap from="search_lights" to="/io/search_lights"/>
     </node>
 
     <node
@@ -63,8 +72,9 @@
         output="log"
         ns="/processes/executive">
         
-        <!-- executive tf frame -->
+        <!-- executive tf frame and planner_mode -->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+        <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for DriveToPose states and approach to sample-->
         <param name="velocity" type="double" value="1.5"/>
@@ -97,16 +107,18 @@
         output="log"
         ns="/processes/executive">
 
-        <!-- executive tf frame -->
+        <!-- executive tf frame and planner_mode -->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+        <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour --> 
-        <param name="return_time_minutes" type="double" value="20"/>
+        <param name="return_time_minutes" type="double" value="100"/>
         <param name="line_plan_step" type="double" value="8"/>
         <param name="line_replan_distance" type="double" value="1"/>
         <param name="line_velocity" type="double" value="1.5"/>
         <param name="blocked_check_distance" type="double" value="10"/>
-        <param name="blocked_check_width" type = "double" value="3"/>
+        <param name="blocked_check_width" type="double" value="3"/>
+        <param name="blocked_check_percent" type="double" value="0.3"/>
         <param name="blocked_rotation_min" type="int" value="100"/>
         <param name="blocked_rotation_max" type="int" value="150"/>
         <param name="motion_check_interval" type="double" value="20"/>
@@ -129,28 +141,51 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
-        
-        <!-- executive tf frame -->
+
+        <!-- remaps -->
+        <remap from="gpio_write" to="/io/gpio_write"/>
+
+        <!-- executive tf frame and planner_mode -->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
-       
-        <param name="min_pursuit_distance" type="double" value="2.0"/>
+        <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
+        
+        <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
         <param name="max_sample_lost_time" type="double" value="60"/>
         <param name="motion_check_interval" type="double" value="60"/>
         <param name="min_motion" type="double" value="0.5"/>
         <param name="square_search_size" type="double" value="0.3"/> 
         <param name="pursuit_velocity" type="double" value="0.5"/>
-        <param name="search_velocity" type="double" value=".25"/>
-        
-        <!-- simple motion parameters --> 
+        <param name="simple_move_tolerance" type="double" value="0.1"/>
+
+        <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
+        <rosparam>
+            manipulator_correction:
+                x: -0.012
+                y: 0.022
+        </rosparam>
+
+        <!-- pursue sample simple motion parameters --> 
         <rosparam>
             pursue_sample_params:
-                max_velocity: 0.4
-                max_acceleration: 0.4
-                timeout: 20
+                max_velocity: 0.1
+                acceleration: 0.2
+                stop_deceleration: 0.5
                 loop_rate: 10
                 steering_angle_epsilon: 0.01
+         </rosparam>
+
+        <!-- servo sample simple motion parameters -->
+        <rosparam>
+           servo_params:
+              initial_velocity: 0.1
+              initial_tolerance: 0.050
+              final_velocity: 0.005
+              final_tolerance: 0.010
+              acceleration: 0.02
+              try_limit: 3
         </rosparam>
+
     </node>
 
 </launch>

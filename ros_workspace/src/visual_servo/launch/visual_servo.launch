@@ -14,8 +14,8 @@
 		<param name='target_window_halfwidth_rotate' type='double' value='6'/>
 		<param name='target_window_halfwidth_move_forward' type='double' value='6'/>
 		<param name='target_window_halfheight_move_forward' type='double' value='8'/>
-		<param name='camera_left_target_pixel_x' type='double' value='360'/>
-		<param name='camera_left_target_pixel_y' type='double' value='195'/>
+		<param name='camera_left_target_pixel_x' type='double' value='313'/>
+		<param name='camera_left_target_pixel_y' type='double' value='213'/>
 		<param name='camera_right_target_pixel_x' type='double' value='170'/>
 		<param name='camera_right_target_pixel_y' type='double' value='256'/>
 		<param name='camera_left_target_forward_vector_x' type='double' value='-16'/>
@@ -33,9 +33,8 @@
         <param name='derivative_constant_rotate' type='double' value='0.0'/>
         <param name='max_linear_velocity' type='double' value='0.10'/>
         <param name='max_angular_velocity' type='double' value='0.25'/>
-        <param name='target_name' type='string' value='pre_cached'/>
 
-        <remap from="image_point" to="processes/sample_detection/manipulator/named_point"/>
+        <remap from="image_point" to="/processes/sample_detection/manipulator/filtered_img_point"/>
         <remap from="left_camera_info" to="/cameras/manipulator/left/camera_info"/>
         <remap from="right_camera_info" to="/cameras/manipulator/right/camera_info"/>
 

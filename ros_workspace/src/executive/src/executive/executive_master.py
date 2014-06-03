@@ -74,12 +74,14 @@ class ExecutiveMaster(object):
                                     transitions = { 'next':'WAIT_FOR_UNPAUSE',
                                                     'preempted':'TOP_PREEMPTED',
                                                     'aborted':'TOP_ABORTED'})
-                        
+
             cam_dict = {'NAV_CENTER' : 'camera_started',
                         'NAV_PORT' : 'camera_started',
-                        'NAV_STARBOARD' : 'camera_started',
-                        'MANIPULATOR' : 'camera_started',
-                        'SEARCH' : 'camera_started'}
+                        'NAV_STARBOARD' : 'camera_started'}
+            if not self.node_params.ignore_manipulator_camera:
+                cam_dict['MANIPULATOR'] = 'camera_started'
+            if not self.node_params.ignore_search_camera:
+                cam_dict['SEARCH'] = 'camera_started'
             
             #concurrency container to allow waiting for cameras in parallel
             wait_for_cams = smach.Concurrence(outcomes = ['all_started',
@@ -115,19 +117,21 @@ class ExecutiveMaster(object):
                                                         camera_wait_outcomes,
                                                         timeout = 10.0))
                 
-                smach.Concurrence.add('MANIPULATOR',
-                                      MonitorTopicState('manipulator_camera_status',
-                                                        'data',
-                                                        std_msg.String,
-                                                        camera_wait_outcomes,
-                                                        timeout = 10.0))
+                if not self.node_params.ignore_manipulator_camera:
+                    smach.Concurrence.add('MANIPULATOR',
+                                          MonitorTopicState('manipulator_camera_status',
+                                                            'data',
+                                                            std_msg.String,
+                                                            camera_wait_outcomes,
+                                                            timeout = 10.0))
                 
-                smach.Concurrence.add('SEARCH',
-                                      MonitorTopicState('search_camera_status',
-                                                        'data',
-                                                        std_msg.String,
-                                                        camera_wait_outcomes,
-                                                        timeout = 10.0))
+                if not self.node_params.ignore_search_camera:    
+                    smach.Concurrence.add('SEARCH',
+                                          MonitorTopicState('search_camera_status',
+                                                            'data',
+                                                            std_msg.String,
+                                                            camera_wait_outcomes,
+                                                            timeout = 10.0))
                 
             smach.StateMachine.add('CHECK_CAMERAS',
                                    wait_for_cams,
@@ -152,7 +156,8 @@ class ExecutiveMaster(object):
                                                     announcer = self.announcer,
                                                     start_message ='Waiting for system enable'),
                                    transitions = {'next':'HOME_PLATFORM',
-                                                  'timeout':'WAIT_FOR_UNPAUSE'})
+                                                  'timeout':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'TOP_PREEMPTED'})
             
             smach.StateMachine.add('HOME_PLATFORM',
                                    HomePlatform(self.announcer),
@@ -193,7 +198,8 @@ class ExecutiveMaster(object):
                                                     announcer = self.announcer,
                                                     start_message ='Mode complete, switch to manual'),
                                    transitions = {'next':'CHECK_MODE',
-                                                  'timeout':'WAIT_FOR_MODE_CHANGE'})
+                                                  'timeout':'WAIT_FOR_MODE_CHANGE',
+                                                  'preempted':'TOP_PREEMPTED'})
             
             mcg = platform_msg.ManualControlGoal()
             mcg.mode = mcg.FULL_CONTROL

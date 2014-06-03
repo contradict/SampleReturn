@@ -163,7 +163,7 @@
         <origin xyz="0 0 ${wheel_diameter/2 + axle_offset + suspension_length - suspension_mounting_height}" rpy="0 0 0"/>
         <!--<origin xyz="0 0 0" rpy="0 0 0"/>-->
     </joint>
-    <!-- the big triangle -->
+    <!-- bottom plate of robot, upper surface -->
     <link name="body_triangle">
         <visual>
             <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
@@ -180,15 +180,28 @@
     </joint>
     <link name="top_triangle">
         <visual>
-            <origin xyz="0.0 -0.645 0" rpy="0 0 1.57"/>
+            <origin xyz="0 -0.645 0" rpy="0 0 1.57"/>
             <geometry>
                 <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.86 0.75 0.03"/>
             </geometry>
             <material name="plate"/>
         </visual>
     </link>
-
-
+    <joint name="manipulator_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="manipulator_arm"/>
+        <origin xyz="0.06666666 0 0" rpy="0 0 0"/>
+    </joint>    
+    <link name="manipulator_arm">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 1.57"/>
+            <geometry>
+                <mesh filename="package://samplereturn/Media/models/triangle.mesh.xml" scale="0.05 0.05 10"/>
+            </geometry>
+            <material name="suspension"/>
+        </visual>
+    </link>
+        
     <!-- instantiate navigation pair -->
     <xacro:stereo_pair name="navigation_port" baseline="0.10" />
     <xacro:stereo_pair name="navigation_center" baseline="0.10" />
@@ -236,7 +249,7 @@
         <!-- rpy is pi/2 + T degrees down tilt -->
         <!-- note: year 3 manipulator is tilted down 70 degrees -->
         <!-- manipulators are .555m off dirt by Inventor model (no settling)-->
-        <origin xyz="-0.1147 0.0 0.0605" rpy="-2.79 0 -1.57"/>
+        <origin xyz="-0.1147 0.0 0.064" rpy="-2.792 0 -1.571"/>
     </joint>
 
     <link name="search_camera_body">

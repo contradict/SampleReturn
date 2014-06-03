@@ -73,6 +73,7 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(self.node_params.return_time_minutes*60)
+        self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #beacon approach
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
@@ -101,9 +102,13 @@ class LevelTwoRandom(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.beacon_point = None
         
-        #use these
+        #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
+    
+        #motion mode stuff
+        planner_mode = self.node_params.planner_mode
+        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)    
     
         with self.state_machine:
             
@@ -121,7 +126,6 @@ class LevelTwoRandom(object):
                                                  'Enter ing level two mode'),
                                    transitions = {'next':'SELECT_PLANNER'})
             
-            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
@@ -176,11 +180,13 @@ class LevelTwoRandom(object):
                 smach.Concurrence.add('SEARCH_LINE_MANAGER',
                                       SearchLineManager(self.tf_listener, self.announcer))
                                         
-                                        
+            #must enter this concurrency with next_line_pose set to valid goal,  if it is
+            #at the current robot position, DriveToPose will return complete immediately
+            #this is seen as some kind of move_base error, and a new search line will be chosen
             smach.StateMachine.add('SEARCH_LINE',
                                    self.line_manager,
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
-                                                  'move_complete':'SEARCH_LINE',
+                                                  'move_complete':'CHOOSE_NEW_LINE',
                                                   'line_blocked':'CHOOSE_NEW_LINE',
                                                   'timeout':'CHOOSE_NEW_LINE',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
@@ -427,7 +433,7 @@ class SearchLineManager(smach.State):
         self.costmap = nav_msg.OccupancyGrid()
         self.new_costmap_available = True
         
-        self.test_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+        self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
         
     def execute(self, userdata):
     
@@ -436,11 +442,6 @@ class SearchLineManager(smach.State):
         
         while not rospy.is_shutdown():  
             
-            if self.preempt_requested():
-                rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
-                self.service_preempt()
-                return 'preempted'
-
             current_pose = util.get_current_robot_pose(self.listener)
             distance = util.pose_distance_2d(current_pose, userdata.next_line_pose)
             if distance < userdata.line_replan_distance:
@@ -461,6 +462,12 @@ class SearchLineManager(smach.State):
                 if self.line_blocked(userdata):
                     self.announcer.say("Line is blocked, rotate ing to new line")
                     return 'line_blocked'   
+            
+            #check preempt after deciding whether or not to calculate next line pose
+            if self.preempt_requested():
+                rospy.loginfo("PREEMPT REQUESTED IN LINE MANAGER")
+                self.service_preempt()
+                return 'preempted'
         
             rospy.sleep(0.2)
         
@@ -471,7 +478,15 @@ class SearchLineManager(smach.State):
         self.costmap = costmap
         
     def line_blocked(self, userdata):
+        
+        if self.debug_map_pub.get_num_connections() > 0:
+            publish_debug = True
+        else:
+            publish_debug = False
+        
         costmap = self.costmap
+        lethal_threshold = 90
+        blocked_threshold = 0.30
         check_width = userdata.blocked_check_width/2
         check_dist = userdata.blocked_check_distance
         resolution = costmap.info.resolution
@@ -489,31 +504,30 @@ class SearchLineManager(smach.State):
         end_points = bresenham.points(lr, ur)
         total_count = len(start_points)
         
+        #check lines for lethal values
         blocked_count = 0
-        max_vals = []
         for start, end in zip(start_points, end_points):
             line = bresenham.points(start[None,:], end[None,:])
             line_vals = map_np[line[:,1], line[:,0]]
             max_val = (np.amax(line_vals))
-            max_vals.append(max_val)
-            map_np[line[:,1], line[:,0]] = max_val
-            if np.any(line_vals > 90):
-                blocked_count += 1   
-
-        map_np[start_points[:,1], start_points[:,0]] = 64
-        map_np[end_points[:,1], end_points[:,0]] = 64
-            
-        costmap.data = list(np.reshape(map_np, -1))
-        self.test_map_pub.publish(costmap)                        
+            if np.any(line_vals > lethal_threshold):
+                blocked_count += 1
+                #for debug, mark lethal lines
+                if publish_debug: map_np[line[:,1], line[:,0]] = 64
+                
+        #if anything is subscribing to the test map, publish it
+        if publish_debug:
+            map_np[start_points[:,1], start_points[:,0]] = 64
+            map_np[end_points[:,1], end_points[:,0]] = 64
+            costmap.data = list(np.reshape(map_np, -1))
+            self.debug_map_pub.publish(costmap)                        
         
-        #rospy.loginfo("BLOCKED COUNT: " + str(blocked_count) + "/" + str(len(max_vals)))
-        #rospy.loginfo("MAX_VALS: " + str(max_vals))
-        if (blocked_count/float(total_count)) > 0.70:        
+        if (blocked_count/float(total_count)) > blocked_threshold:        
             return True
                     
         return False
     
-    #array of array for bresenham implementation    
+    #returns array of array for bresenham implementation    
     def check_point(self, start, distance, yaw, res):
         x = np.trunc(start[0] + (distance * math.cos(yaw))/res).astype('i2')
         y = np.trunc(start[1] + (distance * math.sin(yaw))/res).astype('i2')
@@ -547,7 +561,6 @@ class ChooseNewLine(smach.State):
                                      10))
         yaw_changes = np.radians(yaw_changes)                        
         yaw_changes = np.r_[yaw_changes, -yaw_changes]
-        rospy.loginfo(str(yaw_changes))
         yaw_change = random.choice(yaw_changes)
         line_yaw = userdata.line_yaw + yaw_change
         rotate_pose = util.pose_rotate(current_pose, yaw_change)

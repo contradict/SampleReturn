@@ -7,6 +7,7 @@ import rospy
 import collections
 import threading
 import actionlib
+import tf
 
 import actionlib_msgs.msg as action_msg
 import manipulator_msgs.msg as manipulator_msg
@@ -17,11 +18,13 @@ import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn.util as util
+import samplereturn.simple_motion as simple_motion
 
 from samplereturn_msgs.msg import VoiceAnnouncement
 
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
+from executive.executive_states import GetSimpleMoveState
 
 #this state machine provides manual control of the robot
 
@@ -36,14 +39,31 @@ class ManualController(object):
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_navigate")
+        self.tf = tf.TransformListener()
+ 
+        #get a simple_mover, it's parameters are inside a rosparam tag for this node
+        self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],
                   input_keys = ['action_goal'],
                   output_keys = ['action_result'])
         
+        self.state_machine.userdata.executive_frame = 'odom'
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         self.state_machine.userdata.detected_sample = None
+        self.state_machine.userdata.paused = False
+        
+        #strafe search settings
+        self.state_machine.userdata.settle_time = 1
+        #set move tolerance huge, this prevent retrying by the simple mover
+        self.state_machine.userdata.simple_move_tolerance = 1.0
+        self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
+        self.state_machine.userdata.servo_params = self.node_params.servo_params
+        
+        #use these as booleans in remaps
+        self.state_machine.userdata.true = True
+        self.state_machine.userdata.false = False
         
         with self.state_machine:
             
@@ -69,7 +89,7 @@ class ManualController(object):
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'SELECT_SERVO',
-                                                  'manipulator_grab_requested':'SELECT_PAUSE',
+                                                  'manipulator_grab_requested':'PAUSE_FOR_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
@@ -80,44 +100,47 @@ class ManualController(object):
                                                     MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'failed':'SELECT_JOYSTICK'})
-             
-            def visual_servo_feedback(feedback, announcer):
-                this_time = rospy.get_time()
-                if feedback.state != feedback.STOP_AND_WAIT:
-                    visual_servo_feedback.last_sample_detected = this_time
-                delta_time = (this_time - visual_servo_feedback.last_servo_feedback)
-                if delta_time > 5.0:
-                    if feedback.state == feedback.STOP_AND_WAIT:
-                        visual_servo_feedback.announcer.say("No sample detected")
-                    else:
-                        announcer.say("range %d"%(10*int(feedback.error/10)))
-                    visual_servo_feedback.last_servo_feedback = this_time
-                if (this_time - visual_servo_feedback.last_sample_detected) > 15.0:
-                    announcer.say('Canceling visual servo')
-                    return 'canceled'
-                return None
-            visual_servo_feedback.last_sample_detected = rospy.get_time()
-            visual_servo_feedback.last_servo_feedback = rospy.get_time()
-            
+
+            #calculate the strafe move to the sample
             smach.StateMachine.add('VISUAL_SERVO',
-                                    InterruptibleActionClientState(
-                                        "visual_servo_action",
-                                        visual_servo_msg.VisualServoAction,
-                                        visual_servo_msg.VisualServoGoal(),
-                                        None,
-                                        visual_servo_feedback,
-                                        self.announcer,
-                                        "Visual servo unavailable."
-                                        "Aligning to sample.",
-                                        120.0,
-                                        "Visual servo timed out"
-                                        ),
-                                    transitions = {'complete':'SELECT_JOYSTICK',
-                                                   'canceled':'SELECT_JOYSTICK',
-                                                   'preempted':'MANUAL_PREEMPTED',
-                                                   'aborted':'MANUAL_ABORTED'})
+                                   ServoStrafe(self.tf),
+                                   transitions = {'strafe':'MANIPULATOR_APPROACH',
+                                                  'complete':'ANNOUNCE_SERVO_COMPLETE',
+                                                  'point_lost':'ANNOUNCE_NO_SAMPLE',
+                                                  'aborted':'ANNOUNCE_FAILURE'})
+
+            self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.tf)
             
-            smach.StateMachine.add('SELECT_PAUSE',
+            smach.StateMachine.add('MANIPULATOR_APPROACH',
+                                   self.manipulator_approach,
+                                   transitions = {'complete':'VISUAL_SERVO',
+                                                  'timeout':'VISUAL_SERVO',
+                                                  'sample_detected':'VISUAL_SERVO',
+                                                  'preempted':'MANUAL_ABORTED',
+                                                  'aborted':'MANUAL_ABORTED'},
+                                   remapping = {'pursue_samples':'false'})
+
+            smach.StateMachine.add('ANNOUNCE_FAILURE',
+                                   AnnounceState(self.announcer,
+                                                 'Visual servo failure'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})
+
+            smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
+                                   AnnounceState(self.announcer,
+                                                 'No sample in view, cancel in'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})
+            
+            smach.StateMachine.add('ANNOUNCE_SERVO_COMPLETE',
+                                   AnnounceState(self.announcer,
+                                                 'Servo complete'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})   
+            
+            smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
+                                   AnnounceState(self.announcer,
+                                                 'Servo canceled'),
+                                   transitions = {'next':'SELECT_JOYSTICK'})   
+            
+            smach.StateMachine.add('PAUSE_FOR_GRAB',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
@@ -126,9 +149,11 @@ class ManualController(object):
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
                 grab_msg.type = grab_msg.GRAB
-                grab_msg.wrist_angle = userdata.detected_sample.grip_angle
                 grab_msg.grip_torque = 0.7
                 grab_msg.target_bin = 1
+                grab_msg.wrist_angle = 0
+                if userdata.detected_sample is not None:
+                    grab_msg.wrist_angle = userdata.detected_sample.grip_angle
                 return grab_msg
             
             smach.StateMachine.add('MANIPULATOR_GRAB',
@@ -143,15 +168,25 @@ class ManualController(object):
                                        "Grabbing",
                                        30.0,
                                        "Manipulator grab timed out"),
-                                    transitions = {'complete':'RESUME_JOYSTICK',
-                                                   'canceled':'RESUME_JOYSTICK',
+                                    transitions = {'complete':'ANNOUNCE_GRAB_COMPLETE',
+                                                   'canceled':'ANNOUNCE_GRAB_CANCELED',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
-             
-            smach.StateMachine.add('RESUME_JOYSTICK',
+
+            smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
+                                   AnnounceState(self.announcer,
+                                                 'Servo complete'),
+                                   transitions = {'next':'UNPAUSE_AFTER_GRAB'})   
+            
+            smach.StateMachine.add('ANNOUNCE_GRAB_CANCELED',
+                                   AnnounceState(self.announcer,
+                                                 'Servo canceled'),
+                                   transitions = {'next':'UNPAUSE_AFTER_GRAB'})
+            
+            smach.StateMachine.add('UNPAUSE_AFTER_GRAB',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_RESUME),
-                                   transitions = {'next':'JOYSTICK_LISTEN',
+                                   transitions = {'next':'SELECT_JOYSTICK',
                                                   'failed':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
@@ -258,10 +293,7 @@ class ManualController(object):
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         
     def sample_detection_manipulator(self, sample):
-        if sample.name == 'none':
-            self.state_machine.userdata.detected_sample = None
-        else:
-            self.state_machine.userdata.detected_sample = sample
+        self.state_machine.userdata.detected_sample = sample
 
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -308,6 +340,65 @@ class ProcessGoal(smach.State):
             return 'invalid_goal'
                         
         return 'valid_goal'
+
+class ServoStrafe(smach.State):
+    def __init__(self, listener):
+        smach.State.__init__(self,
+                             outcomes=['strafe', 'complete', 'point_lost', 'preempted', 'aborted'],
+                             input_keys=['detected_sample',
+                                         'settle_time',
+                                         'manipulator_offset',
+                                         'manipulator_correction',
+                                         'servo_params'],
+                             output_keys=['simple_move',
+                                          'detected_sample'])
+        
+        self.listener = listener
+        self.try_count = 0
+        
+    def execute(self, userdata):
+        
+        userdata.detected_sample = None
+        rospy.sleep(userdata.settle_time)
+        if self.try_count > 3:
+            rospy.logwarn("SERVO STRAFE failed to hit tolerance in 3 tries")
+            return 'aborted'
+        
+        if userdata.detected_sample is None:
+            self.try_count = 0
+            return 'point_lost'
+        else:
+            try:
+                sample_time = userdata.detected_sample.header.stamp
+                self.listener.waitForTransform('manipulator_arm', 'odom', sample_time, rospy.Duration(1.0))
+                point_in_manipulator = self.listener.transformPoint('manipulator_arm',
+                                                             userdata.detected_sample).point
+                point_in_manipulator.x -= userdata.manipulator_correction['x']
+                point_in_manipulator.y -= userdata.manipulator_correction['y']
+                origin = geometry_msg.Point(0,0,0)
+                distance = util.point_distance_2d(origin, point_in_manipulator)
+                if distance < userdata.servo_params['final_tolerance']:
+                    self.try_count = 0
+                    return 'complete'
+                elif distance < userdata.servo_params['initial_tolerance']:
+                    velocity = userdata.servo_params['final_velocity']
+                else:
+                    velocity = userdata.servo_params['initial_velocity']
+                yaw = util.pointing_yaw(origin, point_in_manipulator)
+                userdata.simple_move = {'type':'strafe',
+                                        'yaw':yaw,
+                                        'distance':distance,
+                                        'velocity':velocity}
+                rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
+                self.try_count += 1
+                return 'strafe'
+            except tf.Exception:
+                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> odom transform in 1.0 seconds")
+                self.try_count = 0
+                return 'aborted'
+        
+        self.try_count = 0
+        return 'aborted'
                 
 class JoystickListen(smach.State):
     def __init__(self, CAN_interface, joy_state):
@@ -597,7 +688,6 @@ class JoyState(object):
                                           self.msg.axes[self.joy_params.ANGULAR_Z])
         
         return twist
-
         
 if __name__ == '__main__':
     rospy.init_node("manual_control_node")

@@ -17,6 +17,7 @@ import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 
 import samplereturn.util as util
+from samplereturn.simple_motion import TimeoutException
 
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
@@ -50,7 +51,7 @@ class MonitorTopicState(smach.State):
 
         self._trigger_cond = threading.Condition()
 
-    def execute(self, ud):
+    def execute(self, userdata):
 
         self._sub = rospy.Subscriber(self._topic, self._msg_type, self._sub_cb)
 
@@ -105,7 +106,7 @@ class WaitForFlagState(smach.State):
                  start_message=None):
 
         smach.State.__init__(self,
-                             outcomes=['next', 'timeout', 'aborted'],
+                             outcomes=['next', 'timeout', 'preempted', 'aborted'],
                              input_keys=[flag_name])
 
         self.flag_name = flag_name
@@ -116,6 +117,10 @@ class WaitForFlagState(smach.State):
 
     def execute(self, userdata):
 
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        
         if getattr(userdata, self.flag_name) != self.flag_trigger_value and \
            (self.announcer is not None) and \
            (self.start_message is not None):
@@ -139,24 +144,55 @@ class SimpleMoveExecuteState(smach.State):
         smach.State.__init__(self,
                              outcomes=['complete',
                                        'timeout',
-                                       'sample_detected',
                                        'preempted', 'aborted'],
                              input_keys=['detected_sample',
+                                         'simple_move_tolerance',
                                          'paused',
-                                         'move_list'])
-     
+                                         'simple_move'])
         self.simple_mover = simple_mover
         
     def execute(self, userdata):
+                
+        move = userdata.simple_move
+        remaining = None
+        try_count = 0
         
-        while not rospy.is_shutdown() and (len(userdata.move_list) > 0):
-            move = userdata.move_list.pop(0)
-            if move['type'] == 'spin':
-                self.simple_mover.execute_spin(move['angle'])
+        while not rospy.is_shutdown():
+            if self.preempt_requested():
+                self.service_preempt()
+                return 'preempted'
+            #if we are paused just keep looping slowly and checking preempt
+            if userdata.paused:
+                rospy.sleep(0.1)
                 continue
-            if move['type'] == 'strafe':
-                self.simple_mover.execute_strafe(move['angle'], move['distance'])
-                continue
+            try:
+                if move['type'] == 'spin':
+                    angle = move['angle'] if (remaining is None) else remaining
+                    remaining = self.simple_mover.execute_spin(move['angle'],
+                                                               max_velocity = move.get('velocity'))
+                elif move['type'] == 'strafe':
+                    distance = move['distance'] if (remaining is None) else remaining
+                    remaining = self.simple_mover.execute_strafe(move['yaw'],
+                                                                 move['distance'],
+                                                                 max_velocity = move.get('velocity'))
+                else:
+                    rospy.logwarn('SIMPLE MOTION invalid move type')
+                    return 'aborted'
+                if remaining < userdata.simple_move_tolerance:
+                    rospy.loginfo("SIMPLE MOTION within tolerance, remaining: " + str(remaining))
+                    return 'complete'
+                else:
+                    rospy.loginfo("SIMPLE MOTION returned outside tolerance, remaining: " + str(remaining))
+                    if not userdata.paused:
+                        try_count += 1
+                    if try_count > 2:
+                        rospy.logwarn("SIMPLE MOTION third try failed to achieve tolerance:" + str(userdata.simple_move_tolerance))
+                        return 'aborted'
+            except(TimeoutException):
+                rospy.logwarn("TIMEOUT during simple_motion.")
+                return 'timeout'
+
+        return 'aborted'
 
 class SimpleMoveManager(smach.State):
     
@@ -166,6 +202,7 @@ class SimpleMoveManager(smach.State):
                              outcomes=['sample_detected',
                                        'preempted', 'aborted'],
                              input_keys=['detected_sample',
+                                         'pursue_samples',
                                          'paused'])
 
         self.simple_mover = simple_mover
@@ -174,18 +211,20 @@ class SimpleMoveManager(smach.State):
         
         while not rospy.is_shutdown():
             rospy.sleep(0.05)
-            if self.userdata.detected_sample is not None:
+            if userdata.detected_sample is not None and \
+               userdata.pursue_samples == True:
                 self.simple_mover.stop()
                 return 'sample_detected'
             if self.preempt_requested():
+                self.service_preempt()
                 self.simple_mover.stop()
                 return 'preempted'
-            if userdata.paused:
+            if userdata.paused and self.simple_mover.is_running():
                 self.simple_mover.stop()
-        
+                        
         return 'aborted'
 
-class SimpleMotionState(smach.Concurrence):
+class SimpleMoveState(smach.Concurrence):
 
     def __init__(self, listener):
 
@@ -195,14 +234,16 @@ class SimpleMotionState(smach.Concurrence):
                       'sample_detected',
                       'preempted', 'aborted'],
             default_outcome = 'aborted',
-            input_keys=['simple_move_list',
+            input_keys=['simple_move',
                         'pursue_samples',
                         'detected_sample',
+                        'simple_move_tolerance',
                         'paused',
                         'executive_frame'],
             output_keys=['detected_sample'],
             child_termination_cb = lambda preempt: True,
-            outcome_map = {'complete':{'SIMPLE_MOVER':'complete'},
+            outcome_map = {'complete':{'SIMPLE_MOVER':'complete',
+                                       'SIMPLE_MOVE_MANAGER':'preempted'},
                            'timeout':{'SIMPLE_MOVER':'timeout'},
                            'sample_detected':{'SIMPLE_MOVE_MANAGER':'sample_detected'},
                            'preempted':{'SIMPLE_MOVER':'preempted',
@@ -220,10 +261,11 @@ class SimpleMotionState(smach.Concurrence):
             rospy.logwarn("SIMPLE MOVE STATE failed to get current pose")
             return 'aborted'
         userdata.detected_sample = None
+        rospy.loginfo("SIMPLE_MOVE: " + str(userdata.simple_move))
         
         return smach.Concurrence.execute(self, userdata)
 
-def GetSimpleMotionState(simple_mover, listener):
+def GetSimpleMoveState(simple_mover, listener):
 
     simple_move_state = SimpleMoveState(listener)
     with simple_move_state:
@@ -260,17 +302,17 @@ class DriveToPoseState(smach.State):
         self.listener = listener
         self.sample_detected = False
 
-    def execute(self, ud):
+    def execute(self, userdata):
         #on entry to Drive To Pose clear old sample_detections!
-        ud.detected_sample = None
+        userdata.detected_sample = None
         try:        
             last_pose = util.get_current_robot_pose(self.listener)
         except(tf.Exception):
             rospy.logwarn("DriveToPose failed to get current pose")
             return 'aborted'
-        velocity = ud.velocity
+        velocity = userdata.velocity
         goal = move_base_msg.MoveBaseGoal()
-        goal.target_pose=ud.target_pose
+        goal.target_pose=userdata.target_pose
         self.move_client.send_goal(goal)
         rospy.loginfo("DriveToPose initial goal: %s" % (goal))
         move_state = self.move_client.get_state()
@@ -283,7 +325,7 @@ class DriveToPoseState(smach.State):
             except(tf.Exception):
                 rospy.logwarn("DriveToPose failed to get current pose")
                 return 'aborted'
-            ud.last_pose = current_pose
+            userdata.last_pose = current_pose
             #is action server still working?
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
@@ -295,31 +337,32 @@ class DriveToPoseState(smach.State):
                 self.service_preempt()
                 return 'preempted'
             #handle sample detection
-            if (ud.detected_sample is not None) and ud.pursue_samples:
-                if ud.stop_on_sample:
+            if (userdata.detected_sample is not None) and userdata.pursue_samples:
+                rospy.loginfo("DriveToPose detected sample: " + str(userdata.detected_sample))
+                if userdata.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
             #handle target_pose changes
-            if ud.target_pose != goal.target_pose:
-                rospy.loginfo("DriveToPose replanning")
-                goal.target_pose = ud.target_pose
+            if userdata.target_pose != goal.target_pose:
+                rospy.loginfo("DriveToPose sending new goal")
+                goal.target_pose = userdata.target_pose
                 self.move_client.send_goal(goal)
             #check if we are stuck and move_base isn't handling it
             now = rospy.get_time()
-            if (now - last_motion_check_time) > ud.motion_check_interval:
+            if (now - last_motion_check_time) > userdata.motion_check_interval:
                 distance = util.pose_distance_2d(current_pose, last_pose)
                 last_pose = current_pose
                 last_motion_check_time = now
-                if (distance < ud.min_motion):
+                if (distance < userdata.min_motion):
                     self.move_client.cancel_all_goals()
                     return 'timeout'
             #if we are paused, cancel goal and wait, then resend
             #last goal and reset timeout timer
-            if ud.paused:
+            if userdata.paused:
                 self.move_client.cancel_all_goals()
                 while not rospy.is_shutdown():
                     rospy.sleep(0.2)
-                    if not ud.paused:
+                    if not userdata.paused:
                         break
                 self.move_client.send_goal(goal)
                 self.last_motion_check_time = rospy.get_time()

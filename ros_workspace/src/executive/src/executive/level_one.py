@@ -82,9 +82,14 @@ class LevelOne(object):
         self.state_machine.userdata.beacon_point = None
         self.state_machine.userdata.detected_sample = None
 
-        #use these
+        #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
+
+        #motion mode stuff
+        planner_mode = self.node_params.planner_mode
+        MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)    
+        MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE    
         
         with self.state_machine:
             
@@ -101,7 +106,6 @@ class LevelOne(object):
                                                  'Enter ing level one mode'),
                                    transitions = {'next':'SELECT_PLANNER'})
             
-            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
@@ -199,8 +203,6 @@ class LevelOne(object):
                                                  'Beacon not in view, searching'),
                                    transitions = {'next':'LEVEL_ONE_ABORTED'})  
 
-
-            MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
             smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_ENABLE),
@@ -350,40 +352,6 @@ class DriveToSearch(smach.State):
             userdata.target_pose = userdata.pose_list.pop(0)
             return 'complete'
 
-   
-class StartReturnHome(smach.State):
- 
-    def __init__(self, announcer):
-
-        smach.State.__init__(self,
-                             outcomes=['next',
-                                       'preempted',
-                                       'aborted'],
-                             input_keys=['beacon_approach_point'],
-                             output_keys=['target_pose',
-                                          'velocity',
-                                          'pursue_samples'])
-        
-        self.announcer = announcer
-
-    def execute(self, userdata):
-        
-        self.announcer.say("Return ing to platform")
-
-        header = std_msg.Header(0, rospy.Time(0), '/map')
-        #the beacon is probably not in view, drive to a point probably in front of it
-        approach_point = userdata.beacon_approach_point
-        point = geometry_msg.Point(approach_point['x'],
-                                   approach_point['y'],
-                                   math.radians(approach_point['yaw']))
-        quat_array = tf.transformations.quaternion_from_euler(0, 0, math.pi)           
-        pose = geometry_msg.Pose(point, geometry_msg.Quaternion(*quat_array))
-                
-        userdata.target_pose = geometry_msg.PoseStamped(header, pose)
-        userdata.pursue_samples = False
-        
-        return 'next'
-   
 class LevelOnePreempted(smach.State):
     def __init__(self, CAN_interface):
         smach.State.__init__(self,
