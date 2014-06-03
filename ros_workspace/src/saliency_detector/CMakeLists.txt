@@ -168,7 +168,11 @@ install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
 install(DIRECTORY launch
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
     USE_SOURCE_PERMISSIONS
-    )
+)
+install(FILES src/w2c.txt
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
+)
+
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/
