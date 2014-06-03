@@ -4,57 +4,36 @@
 
 <launch>
 	<machine name="search"
-			 address="Linux-Smooth"
-			 user="smooth"/>
+			 address="localhost"
+			 />
 
-	<node
-		machine="search"
-		pkg="nodelet"
-		type="nodelet"
-		name="manager"
-		args="manager"
-		output="log"
-		respawn="true"
-		/>
+       <!--
+    <param name="robot_description"
+           command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
 
-	<node
-		machine="search"
-		name="beacon_finder"
-		pkg="beacon_finder"
-		type="beacon_finder.py"
-		ns="beacon_finder"
-		output="log">
-	<param name="num_rows" type="int" value="3"/>
-	<param name="num_columns" type="int" value="9"/>
-	<param name="vertical_distance_between_circles" type="double" value="0.3048"/>
-	<param name="is_first_column_shifted_down" type="bool" value="False"/>
-	<param name="blob_color" type="double" value="0"/>
-	<param name="blob_color_alt" type="double" value="255"/>
-	<param name="blob_min_area" type="double" value="50"/>
-	<param name="blob_max_area" type="double" value="500000"/>
-	<param name="blob_min_threshold" type="double" value="20"/>
-	<param name="blob_max_threshold" type="double" value="220"/>
-	<param name="blob_threshold_step" type="double" value="10"/>
-	<param name="blob_min_distance_between_blobs" type="double" value="3.0"/>
-	<param name="blob_repeatability" type="int" value="3"/>
-	<param name="do_histogram_equalization" type="bool" value="False"/>
-	<!--<remap from="camera_image" to="image_rect"/>-->
-	<remap from="camera_image" to="/cameras/search/image"/>
-	<remap from="camera_info" to="/cameras/search/info"/>
-	<!--
-	<remap from="camera_image" to="/cameras/navigation/center/right/image_color"/>
-	<remap from="camera_info" to="/cameras/navigation/center/right/camera_info"/>
-	-->
-	</node>
+    <node name="state_publisher"
+          pkg="robot_state_publisher" 
+          type="robot_state_publisher"
+          >
+        <param name="publish_frequency" type="double" value="10"/>
+    </node>
 
-	<!-- Debayer -->
-	<!--
-	<node pkg="nodelet"
-	  type="nodelet"
-	  name="debayer_center"
-	  args="load image_proc/debayer /manager"
-	  ns="/cameras/navigation/center/right"
-	  output="log">
-	</node>
-	-->
+    <node
+        name="joint_controller"
+        pkg="joint_state_publisher"
+        type="joint_state_publisher"
+        >
+        <param name="use_gui" type="bool" value="true"/>
+    </node>
+
+    <node
+          pkg="fake_localization"
+          type="fake_localization"
+          name="fake_localization"
+          >
+          <remap from="base_pose_ground_truth" to="/motion/odometry"/>
+    </node>
+    -->
+
+    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
 </launch>

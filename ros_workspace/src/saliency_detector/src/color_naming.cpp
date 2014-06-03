@@ -3,7 +3,8 @@
 ColorNaming::ColorNaming()
 {
   std::string path = ros::package::getPath("saliency_detector");
-  path = path + "/src/w2c.txt";
+  path = path + "/config/w2c.txt";
+  ROS_INFO("Loading color information from %s", path.c_str());
   std::ifstream infile(path.c_str());
   //For the full version, 32768*14=458752
   if(infile.is_open())
@@ -12,6 +13,10 @@ ColorNaming::ColorNaming()
     {
       infile >> color_index_array_[i];
     }
+  }
+  else
+  {
+      ROS_ERROR("Could not load color information.");
   }
 }
 
