@@ -42,8 +42,6 @@ class PursueSample(object):
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_navigate")
-        self.move_base = actionlib.SimpleActionClient("planner_move_base",
-                                                       move_base_msg.MoveBaseAction)
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
         self.light_pub = rospy.Publisher('search_lights', std_msg.Bool)
         self.CAN_interface = util.CANInterface()
@@ -96,22 +94,18 @@ class PursueSample(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_SAMPLE_PURSUIT',
-                                   StartSamplePursuit(self.announcer),
+                                   StartSamplePursuit(self.tf_listener, self.announcer),
                                    transitions = {'next':'APPROACH_SAMPLE'})
 
-            self.pursue_detected_point = GetPursueDetectedPointState(self.move_base,
-                                                                     self.tf_listener)
+            self.search_approach = GetSimpleMoveState(self.simple_mover, self.tf_listener)
             
             smach.StateMachine.add('APPROACH_SAMPLE',
-                                   self.pursue_detected_point,
-                                   transitions = {'min_distance':'ANNOUNCE_MANIPULATOR_APPROACH',
-                                                  'point_lost':'PURSUE_SAMPLE_ABORTED',
-                                                  'complete':'PURSUE_SAMPLE_ABORTED',
+                                   self.search_approach,
+                                   transitions = {'complete':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'timeout':'PURSUE_SAMPLE_ABORTED',
+                                                  'sample_detected':'PURSUE_SAMPLE_ABORTED',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'},
-                                   remapping = {'velocity':'pursuit_velocity',                
-                                                'max_point_lost_time':'max_sample_lost_time',
-                                                'pursue_samples':'false'})
+                                   remapping = {'pursue_samples':'false'})
            
             smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
                                    AnnounceState(self.announcer,
@@ -314,7 +308,6 @@ class PursueSample(object):
                 sample.header = point_in_frame.header
                 sample.point = point_in_frame.point
                 self.state_machine.userdata.target_sample = sample
-                self.pursue_detected_point.userdata.pursuit_point = sample
             except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
 
@@ -325,7 +318,7 @@ class PursueSample(object):
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
-        self.pursue_detected_point.userdata.paused = msg.data
+        self.search_approach.userdata.paused = msg.data
         self.manipulator_approach.userdata.paused = msg.data
         self.manipulator_search.userdata.paused = msg.data
             
@@ -336,18 +329,21 @@ class PursueSample(object):
     
 #searches the globe   
 class StartSamplePursuit(smach.State):
-    def __init__(self, announcer):
+    def __init__(self, listener, announcer):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys=['target_sample',
                                          'pursuit_velocity',
-                                         'action_goal'],
+                                         'action_goal',
+                                         'pursuit_point'],
                              output_keys=['velocity',
                                           'pursuit_point',
                                           'stop_on_sample',
                                           'action_result',
-                                          'search_count'])
+                                          'search_count',
+                                          'simple_move'])
     
+        self.listener = listener
         self.announcer = announcer
     
     def execute(self, userdata):
@@ -357,15 +353,31 @@ class StartSamplePursuit(smach.State):
         result.result_int = samplereturn_msg.NamedPoint.NONE
         userdata.action_result = result
         userdata.stop_on_sample = True
-        #default velocity for all moves is search velocity,
+        #default velocity for all moves is in simple_mover,
         #initial approach pursuit done at pursuit_velocity
-        userdata.velocity = userdata.pursuit_velocity
         userdata.search_count = 0
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))
         userdata.pursuit_point = userdata.action_goal.input_point
+        
+        try:
+            sample_time = userdata.pursuit_point.header.stamp
+            self.listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
+            point_in_base = self.listener.transformPoint('base_link',
+                                                         userdata.pursuit_point).point
+            origin = geometry_msg.Point(0,0,0)
+            distance = util.point_distance_2d(origin, point_in_base) - 3.0 #subtract 3 for no good reason
             
-        self.announcer.say("Sample detected, pursue ing")               
-        return 'next'
+            yaw = util.pointing_yaw(origin, point_in_base)
+            userdata.simple_move = {'type':'strafe',
+                                    'yaw':yaw,
+                                    'distance':distance,
+                                    'velocity':userdata.pursuit_velocity}
+            self.announcer.say("Sample detected, pursue ing")  
+            return 'next'
+        except(tf.Exception):
+            rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> odom transform in 1.0 seconds")
+            return 'aborted'
+         
 
 class GetSampleStrafeMove(smach.State):
     def __init__(self, listener):
