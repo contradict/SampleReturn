@@ -148,9 +148,7 @@ class RobotSimulator(object):
         with self.manipulator_sm:
 
             smach.StateMachine.add('START_MANIPULATOR',
-                                    ManipulatorState(outcomes=['succeeded','preempted'],
-                                                    input_keys=['action_goal','action_result'],
-                                                    output_keys=['action_goal','action_result']),
+                                    ManipulatorState(self.set_sample_success),
                                     transitions = {'preempted': 'success',
                                                    'succeeded': 'success'})
             
@@ -528,6 +526,9 @@ class RobotSimulator(object):
                     break
             update_rate.sleep()
             
+    def set_sample_success(self):
+        self.collected_ids.append(self.active_sample_id)
+            
     def home_wheelpods(self, goal):
         fake_result = platform_msg.HomeResult([True,True,True])
         rospy.sleep(3.0)
@@ -725,6 +726,14 @@ class RobotSimulator(object):
 #dummy manipulator state, waits 10 seconds and
 #exits with success unless preempted
 class ManipulatorState(smach.State):
+    def __init__(self, set_success):
+        smach.State.__init__(self,
+                             outcomes=['succeeded','preempted'],
+                             input_keys=['action_goal','action_result'],
+                             output_keys=['action_goal','action_result'])
+        
+        self.set_success = set_success
+    
     def execute(self, userdata):
         start_time = rospy.get_time()
         #wait then return success
@@ -739,6 +748,7 @@ class ManipulatorState(smach.State):
                 return 'preempted'
             rospy.sleep(0.2)
         userdata.action_result = manipulator_msg.ManipulatorResult('fake_success', True)
+        self.set_success()
         return 'succeeded'
     
 
