@@ -45,6 +45,7 @@ class PursueSample(object):
         self.move_base = actionlib.SimpleActionClient("planner_move_base",
                                                        move_base_msg.MoveBaseAction)
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
+        self.light_pub = rospy.Publisher('search_lights', std_msg.Bool)
         self.CAN_interface = util.CANInterface()
         
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
@@ -285,7 +286,7 @@ class PursueSample(object):
         sls = smach_ros.IntrospectionServer('smach_grab_introspection',
                                             self.state_machine,
                                             '/START_SAMPLE_PURSUIT')
-        
+      
         #subscribers, need to go after state_machine
         rospy.Subscriber('detected_sample_search',
                         samplereturn_msg.NamedPoint,
@@ -583,6 +584,15 @@ class ConfirmSampleAcquired(smach.State):
             else:
                 self.announcer.say("New sample in view, confuse ing")
                 return 'sample_gone'
+            
+class SearchLightSwitch(smach.State):
+    def __init__(self):
+        smach.State.__init__(self,
+                             outcomes=['next'],
+                             input_keys =['on'])
+        
+    def execute(self, userdata):
+        pass
 
 class PursueSampleAborted(smach.State):
     def __init__(self, result_pub):

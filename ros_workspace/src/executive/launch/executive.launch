@@ -61,7 +61,7 @@
         <remap from="home_carousel" to="/motion/carousel/home"/>
         <remap from="manual_control" to="/motion/manual_control"/>
 
-        <remap from="gpio_read" to="/io/gpio_read"/>
+        <remap from="search_lights" to="/io/search_lights"/>
     </node>
 
     <node
@@ -141,7 +141,10 @@
         machine="navigate"
         output="log"
         ns="/processes/executive">
-       
+
+        <!-- remaps -->
+        <remap from="gpio_write" to="/io/gpio_write"/>
+
         <!-- executive tf frame and planner_mode -->
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
