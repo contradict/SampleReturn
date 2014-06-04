@@ -86,6 +86,7 @@ add_service_files(
     DIRECTORY srv
     FILES
         Enable.srv
+        SimpleMotion.srv
 )
 
 ## Generate services in the 'srv' folder

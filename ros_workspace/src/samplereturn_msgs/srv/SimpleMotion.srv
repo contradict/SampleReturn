@@ -1,0 +1,12 @@
+float64 DEFAULT=0.0
+int8 STRAFE=1
+int8 SPIN=0
+
+int8 type
+float64 distance
+float64 angle
+float64 velocity
+float64 acceleration
+---
+bool success
+float64 error
