@@ -96,7 +96,11 @@ class SimpleMover(object):
            not self.stop_requested)
   
   def execute_spin(self, rotation, max_velocity=None, acceleration=None, stop_function=None):
-    if rotation < .005: return rotation
+    rospy.loginfo("ENTERING EXECUTING SPIN: " + str(rotation))
+    if rotation < .005:
+      rospy.loginfo("SPIN TOO SMALL")
+      return rotation
+    
 
     rate = rospy.Rate(self.loop_rate)
     
@@ -116,6 +120,8 @@ class SimpleMover(object):
     #timeout_time = rospy.Time.now() + rospy.Duration(timeout_dt.to_sec() * 1.5)
     
     timeout_time = rospy.Time.now() + rospy.Duration(60.0)
+
+    rospy.loginfo("SPIN TIMEOUT TIME: " + str(timeout_time))
 
     self.stop_requested = False
     self.running = True
@@ -207,6 +213,8 @@ class SimpleMover(object):
 
     self.running = False
     self.stop_requested = False
+    
+    rospy.loginfo("EXITING SPIN: " + str((self.unwind(target_yaw - self.current_yaw))))
     
     #check if we are exiting because of timeout    
     if rospy.Time.now() > timeout_time:

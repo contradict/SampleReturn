@@ -349,19 +349,19 @@ class RotationManager(smach.State):
     def execute(self, userdata):
         actual_yaw = util.get_current_robot_yaw(self.tf_listener)
         rospy.loginfo("ROTATION MANAGER first move, actual_yaw, line_yaw: " +
-                      str(int(math.degrees(actual_yaw))) + " " +
-                      str(int(math.degrees(userdata.line_yaw))))
+                      str(np.degrees(actual_yaw)) + " " +
+                      str(np.degrees(userdata.line_yaw)) )
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER first move, rotate_yaw: " + str(int(math.degrees(userdata.line_yaw))))
+        rospy.loginfo("ROTATION MANAGER first move, rotate_yaw: " + str(np.degrees(userdata.line_yaw)))
         self.mover.execute_spin(rotate_yaw, max_velocity=0.5, acceleration=.25)
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener)
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
         rospy.loginfo("ROTATION MANAGER second move, actual_yaw, line_yaw: " +
-                      str(int(math.degrees(actual_yaw))) + " " +
-                      str(int(math.degrees(userdata.line_yaw))))
+                      str(np.degrees(actual_yaw)) + " " +
+                      str(np.degrees(userdata.line_yaw)))
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER second move, rotate_yaw: " + str(int(math.degrees(userdata.line_yaw))))
+        rospy.loginfo("ROTATION MANAGER second move, rotate_yaw: " + str(np.math.degrees(userdata.line_yaw)))
         self.mover.execute_spin(rotate_yaw, max_velocity=0.05, acceleration=.025)
                 
         return 'next'
@@ -421,6 +421,7 @@ class SearchLineManager(smach.State):
         self.detected_sample = None
         
         self.line_yaw = userdata.line_yaw
+        #I think this gets the robot yaw in odom
         actual_yaw = util.get_current_robot_yaw(self.listener)
         rospy.loginfo("SEARCH LINE MANAGER, entering with actual_yaw: " + str(np.degrees(actual_yaw)))
         rospy.loginfo("SEARCH LINE MANAGER, entering with line_yaw: " + str(np.degrees(self.line_yaw)))
@@ -582,9 +583,12 @@ class SearchLineManager(smach.State):
                     #for debug, mark lethal lines
                     if publish_debug: map_np[line[:,1], line[:,0]] = 64
                     yaw['blocked'] = True
+                    rospy.logdebug("PROBE SWATHE %s BLOCKED " %(name))
                     if name == self.active_yaw:
+                        rospy.logdebug("PROBE SWATHE %s BLOCKED and ACTIVE")
                         self.mover.stop()
                     break
+                rospy.logdebug("PROBE SWATHE %s CLEAR " %(name))
                 yaw['blocked']=False    
                     
             #if anything is subscribing to the test map, publish it
