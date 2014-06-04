@@ -143,7 +143,7 @@
                 max_velocity: 1.0
                 acceleration: 0.5
                 stop_deceleration: 2.0
-                loop_rate: 20 
+                loop_rate: 10 
                 steering_angle_epsilon: 0.01
         </rosparam>
     
