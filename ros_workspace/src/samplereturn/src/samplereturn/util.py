@@ -135,6 +135,11 @@ def get_yaw_to_origin(tf_listener):
     return pointing_yaw(robot.pose.position,
                         geometry_msg.Point(0,0,0))
 
+def get_yaw_from_origin(tf_listener):
+    robot = get_current_robot_pose(tf_listener)
+    return pointing_yaw(geometry_msg.Point(0,0,0),
+                        robot.pose.position)
+
 def unwind(ang):
     if ang > np.pi:
       ang -= 2*np.pi
