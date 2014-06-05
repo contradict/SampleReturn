@@ -106,7 +106,7 @@
     <node
         pkg="executive"
         type="level_two_node.py"
-        name="level_two"
+        name="level_two_star"
         machine="navigate"
         output="log"
         ns="/processes/executive">
@@ -117,16 +117,10 @@
         
         <!-- for search  behaviour --> 
         <param name="return_time_minutes" type="double" value="100"/>
-        <param name="line_plan_step" type="double" value="8"/>
-        <param name="line_replan_distance" type="double" value="1"/>
-        <param name="line_velocity" type="double" value="1.5"/>
-        <param name="blocked_check_distance" type="double" value="10"/>
-        <param name="blocked_check_width" type="double" value="3"/>
-        <param name="blocked_check_percent" type="double" value="0.3"/>
-        <param name="blocked_rotation_min" type="int" value="100"/>
-        <param name="blocked_rotation_max" type="int" value="150"/>
-        <param name="motion_check_interval" type="double" value="20"/>
-        <param name="min_motion" type="double" value="0.5"/>
+        <param name="line_plan_step" type="double" value="10"/>
+        <param name="line_velocity" type="double" value="0.8"/>
+        <param name="obstacle_check_distance" type="double" value="5"/>
+        <param name="obstacle_check_width" type="double" value="2.2"/>
 
         <!-- for Beacon approach -->
         <param name="min_pursuit_distance" type="double" value="3.0"/>
