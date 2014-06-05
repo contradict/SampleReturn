@@ -307,19 +307,24 @@ class StarManager(smach.State):
         self.listener = listener
         self.announcer = announcer  
 
-        self.spokes = list(np.linspace(0, 2*np.pi, 10, endpoint=False))
+        self.spokes = list(np.linspace(0, 2*np.pi, 36, endpoint=False))
+        self.starting_spoke = 3*math.pi/2
 
     def execute(self, userdata):
         
-        #are we returning in?
+        #for now, just kill the state machine when done
+        if len(self.spokes) == 0:
+            return 'aborted'
+        
+        #are we returning to the center?
         if not userdata.outbound:
-            userdata.line_yaw = self.spokes.pop(0)
+            userdata.line_yaw = self.spokes.pop(0) + self.starting_spoke
             userdata.outbound = True
-            self.announcer.say("Start ing spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
+            self.announcer.say("Start ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
             return 'rotate'        
         
         if userdata.outbound:
-            self.announcer.say("Return ing spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
+            self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
             userdata.line_yaw = util.get_yaw_to_origin(self.listener)
             userdata.outbound = False
             return 'rotate'
@@ -453,8 +458,10 @@ class SearchLineManager(smach.State):
         #wait for costmaps to update
         rospy.sleep(3.0)
         
-        #useful condition lambdas
+        #useful condition lambdas and other flags for dumb planner behaviour
         under_offset_limit = lambda: np.abs(self.offset_count) < self.offset_count_limit
+        first_angle_choice = 'left' if userdata.outbound else 'right'
+        second_angle_choice = 'right' if userdata.outbound else 'left'
         
         #giant stupid case loop
         while not rospy.is_shutdown():  
@@ -496,13 +503,13 @@ class SearchLineManager(smach.State):
                
             #if returning to the line not possible or necessary,
             #and going straight isn't possible: offset from line             
-            elif not self.strafes['left']['blocked'] and under_offset_limit():
-                self.announcer.say("Obstacle in line, strafe ing left")
-                self.strafe('left')
+            elif not self.strafes[first_angle_choice]['blocked'] and under_offset_limit():
+                self.announcer.say("Obstacle in line, strafe ing %s" % (first_angle_choice))
+                self.strafe(first_angle_choice)
                 
-            elif not self.strafes['right']['blocked'] and under_offset_limit():
-                self.announcer.say("Obstacle in line, strafe ing right")
-                self.strafe('right')
+            elif not self.strafes[second_angle_choice]['blocked'] and under_offset_limit():
+                self.announcer.say("Obstacle in line, strafe ing %s" % (second_angle_choice))
+                self.strafe(second_angle_choice)
             
             #getting here means lethal cells in all three yaw check lines,
             #or that the only unblocked line takes us outside our allowable offset
