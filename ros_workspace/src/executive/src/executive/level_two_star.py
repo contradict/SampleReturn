@@ -102,7 +102,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         
         #search line parameters
-        self.state_machine.userdata.line_velocity = self.node_params.line_velocity
+        self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
         self.state_machine.userdata.obstacle_check_distance = self.node_params.obstacle_check_distance
         self.state_machine.userdata.obstacle_check_width = self.node_params.obstacle_check_width        
 
@@ -419,7 +419,7 @@ class StarManager(smach.State):
         
         #are we returning to the center?
         if not userdata.outbound:
-            userdata.line_yaw = self.spokes.pop(0) + self.starting_spoke
+            userdata.line_yaw = util.unwind(self.spokes.pop(0) + self.starting_spoke)
             userdata.outbound = True
             self.announcer.say("Start ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
             return 'rotate'        
@@ -438,6 +438,7 @@ class RotationManager(smach.State):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
+                                         'spin_velocity',
                                          'outbound'],
                              output_keys=['line_yaw',
                                           'outbound',
@@ -448,22 +449,17 @@ class RotationManager(smach.State):
     
     def execute(self, userdata):
         actual_yaw = util.get_current_robot_yaw(self.tf_listener)
-        rospy.loginfo("ROTATION MANAGER first move, actual_yaw, line_yaw: " +
-                      str(np.degrees(actual_yaw)) + " " +
-                      str(np.degrees(userdata.line_yaw)) )
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER first move, rotate_yaw: " + str(np.degrees(userdata.line_yaw)))
-        self.mover.execute_spin(rotate_yaw, max_velocity=0.5, acceleration=.25)
-        
+        rospy.loginfo("ROTATION MANAGER line_yaw: %.1f, actual_yaw: %.1f, rotate_yaw: %.1f" %(
+                      np.degrees(userdata.line_yaw),
+                      np.degrees(actual_yaw),
+                      np.degrees(rotate_yaw)))
+        #execute the actual spin!
+        error = self.mover.execute_spin(rotate_yaw, max_velocity=userdata.spin_velocity)
         actual_yaw = util.get_current_robot_yaw(self.tf_listener)
-        rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER second move, actual_yaw, line_yaw: " +
-                      str(np.degrees(actual_yaw)) + " " +
-                      str(np.degrees(userdata.line_yaw)))
-        rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER second move, rotate_yaw: " + str(np.math.degrees(userdata.line_yaw)))
-        self.mover.execute_spin(rotate_yaw, max_velocity=0.05, acceleration=.025)
-                
+        rospy.loginfo("ROTATION MANAGER returned actual_yaw: %.1f, error: %.4f" % (
+                      np.degrees(actual_yaw),
+                      error))
         return 'next'
 
 #drive to detected sample location        
@@ -509,9 +505,12 @@ class SearchLineManager(smach.State):
 
         #stuff for the obstacle checker, get yaw in odom frame and add the strafe angles
         #gotta have these for checking in the costmap correctly
+        #reset all blocked flags at beginning of any line
         actual_yaw = util.get_current_robot_yaw(self.listener)
         for strafe in self.strafes.itervalues():
             strafe['odom_yaw'] = actual_yaw + strafe['angle']
+            strafe['blocked'] = False
+            
         self.check_distance = userdata.obstacle_check_distance
         self.check_width = userdata.obstacle_check_width
 
@@ -519,15 +518,22 @@ class SearchLineManager(smach.State):
         userdata.active_strafe_key = 'center'
 
         #if on return line, allow a little more strafing, this will always work perfectly
+        self.offset_count = 0
+        self.offset_distance = 0
         if userdata.outbound:
+            #reset offset count on outbound moves
             self.offset_count_limit = 1
         else:
             self.offset_count_limit = 2
-        self.offset_count = 0
-        self.offset_distance = 0
 
-        rospy.loginfo("SEARCH LINE MANAGER, entering with actual_yaw: " + str(np.degrees(actual_yaw)))
-        rospy.loginfo("SEARCH LINE MANAGER, entering with line_yaw: " + str(np.degrees(self.line_yaw)))
+        current_pose = util.get_current_robot_pose(self.listener)
+        
+        rospy.loginfo("SEARCH LINE MANAGER, outbound: %s,  line_yaw: %.1f,  actual_yaw: %.1f,  position: (%.2f,%.2f) " % (
+                       userdata.outbound,
+                       np.degrees(userdata.line_yaw),
+                       np.degrees(actual_yaw),
+                       current_pose.pose.position.x,
+                       current_pose.pose.position.y))
         
         #let the block checker and sample detection listeners run
         self.is_running = True
