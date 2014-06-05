@@ -101,7 +101,7 @@ class SimpleMover(object):
             acceleration,
             stop_function)/self.stern_offset
 
-  def execute_strafe(self, distance, angle, max_velocity=None, acceleration=None, stop_function=None):
+  def execute_strafe(self, angle, distance, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
     if (-np.pi/2<=angle<=np.pi/2):
       target_angle = angle
@@ -257,8 +257,8 @@ def simple_motion_service( motion, request ):
         acceleration = request.acceleration
     try:
         if request.type == request.STRAFE:
-            err = motion.execute_strafe( request.distance,
-                    request.angle,
+            err = motion.execute_strafe( request.angle,
+                    request.distance,
                     velocity, acceleration)
         elif request.type == request.SPIN:
             err = motion.execute_spin( request.angle, velocity, acceleration )
