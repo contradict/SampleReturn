@@ -85,7 +85,7 @@ class RobotSimulator(object):
         self.path_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
         self.path_marker.type = vis_msg.Marker.ARROW
         self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
-        self.path_marker.scale = geometry_msg.Vector3(.4, .02, .02)
+        self.path_marker.scale = geometry_msg.Vector3(.5, .04, .04)
         self.path_marker.lifetime = rospy.Duration(0)
                                                         
         self.joint_state_seq = 0
@@ -532,12 +532,12 @@ class RobotSimulator(object):
             
     def home_wheelpods(self, goal):
         fake_result = platform_msg.HomeResult([True,True,True])
-        rospy.sleep(3.0)
+        rospy.sleep(1.0)
         self.home_wheelpods_server.set_succeeded(result=fake_result)
         
     def home_carousel(self, goal):
         fake_result = platform_msg.HomeResult([True])
-        rospy.sleep(3.0)
+        rospy.sleep(1.0)
         self.home_carousel_server.set_succeeded(result=fake_result)
         
     def hide_samples(self):
@@ -738,7 +738,7 @@ class ManipulatorState(smach.State):
         start_time = rospy.get_time()
         #wait then return success
         if userdata.action_goal.type == manipulator_msg.ManipulatorGoal.HOME:
-            wait_time = 2.0
+            wait_time = 1.0
         else:
             wait_time = 5.0
         
