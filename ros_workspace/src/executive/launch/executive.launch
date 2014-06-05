@@ -118,7 +118,6 @@
         <!-- for search  behaviour --> 
         <param name="return_time_minutes" type="double" value="100"/>
         <param name="line_plan_step" type="double" value="10"/>
-        <param name="line_velocity" type="double" value="0.8"/>
         <param name="obstacle_check_distance" type="double" value="5"/>
         <param name="obstacle_check_width" type="double" value="2.2"/>
 
@@ -131,7 +130,9 @@
                 {x: 5.0, y: 0, yaw: 180}
         </rosparam>
 
-        <!-- pursue sample simple motion parameters --> 
+        <!-- simple mover parameters --> 
+        <param name="spin_velocity" type="double" value="0.4"/>
+        <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
                 max_velocity: 1.0
