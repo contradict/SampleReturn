@@ -22,10 +22,8 @@
     <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
     <remap from="planner_command" to="/processes/planner/command"/>        
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
-    <!--
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
     <remap from="detected_sample_search" to="/processes/sample_detection/search/filtered_point"/>
-    -->
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
@@ -38,7 +36,9 @@
     <remap from="gpio_read" to="/io/gpio_read"/>
 
     <!-- dictionary for dumb planning, costmap_checker
-         also uses this to determine where to check for obstacles-->
+         also uses this to determine where to check for obstacles.
+         The angles must not be changed for proper block checking,
+         but the distances can be overridden by nodes-->
     <rosparam ns="/processes/executive">
         strafes:
             left:
@@ -177,11 +177,9 @@
         <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
         <param name="max_sample_lost_time" type="double" value="60"/>
-        <param name="motion_check_interval" type="double" value="60"/>
-        <param name="min_motion" type="double" value="0.5"/>
         <param name="square_search_size" type="double" value="0.3"/> 
+        <param name="pursuit_step" type="double" value="3.0"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>
-        <param name="simple_move_tolerance" type="double" value="0.1"/>
 
         <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
         <rosparam>
@@ -192,9 +190,9 @@
 
         <!-- pursue sample simple motion parameters --> 
         <rosparam>
-            pursue_sample_params:
+            sample_search_params:
                 max_velocity: 0.2
-                acceleration: 0.2
+                acceleration: 0.5
                 stop_deceleration: 1.0
                 loop_rate: 10
                 steering_angle_epsilon: 0.01
