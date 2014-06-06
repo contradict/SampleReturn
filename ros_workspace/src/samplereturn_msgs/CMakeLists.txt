@@ -80,6 +80,7 @@ add_message_files(
   CameraParams.msg
   NamedPoint.msg
   PursuitResult.msg
+  CostmapCheck.msg
 )
 
 add_service_files(
