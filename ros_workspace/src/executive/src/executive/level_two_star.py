@@ -303,7 +303,6 @@ class LevelTwoStar(object):
             point_in_frame.point.x += 1.5 #start point is 1.5 meters in front of beacon
             beacon_point.point = point_in_frame.point
             self.state_machine.userdata.beacon_point = beacon_point
-            self.approach_beacon.userdata.beacon_point = beacon_point
         except tf.Exception:
             rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose!")        
  
@@ -341,7 +340,7 @@ class StarManager(smach.State):
         self.announcer = announcer  
 
         self.spokes = list(np.linspace(0, 2*np.pi, 36, endpoint=False))
-        self.starting_spoke = 3*math.pi/2
+        self.starting_spoke = np.radians(10)
 
     def execute(self, userdata):
         
@@ -520,7 +519,6 @@ class SearchLineManager(smach.State):
     def strafe(self, key, userdata):
         strafe = self.strafes[key]
         self.offset_count += np.sign(strafe['angle'])
-        self.offset_distance += strafe['distance']*math.sin(strafe['angle'])
         rospy.loginfo("STRAFING %s to offset_count: %s" % (key, self.offset_count))
         userdata.active_strafe_key = key
         move_error = self.mover.execute_strafe(strafe['angle'], strafe['distance'])
