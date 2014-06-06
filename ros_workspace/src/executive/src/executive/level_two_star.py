@@ -56,30 +56,15 @@ class LevelTwoStar(object):
        
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~simple_motion_params/',
-                                                      self.tf_listener)
+                                                      self.tf_listener,
+                                                      stop_function = self.check_for_stop)
         
         #strafe definitions, offset is length along strafe line
         #the yaws have a static angle, which the direction from base_link the robot strafes
-        #and also the odom_yaws which are used in the costmap for obstacle checking
-        #None values in this dict must be set in execute()!
-        strafe_offset = 4.0
-        strafe_angle = np.pi/4 #angle 
-        self.strafes = {'left':{'angle':strafe_angle,
-                                'odom_yaw':None,
-                                'distance':strafe_offset,
-                                'blocked':False,
-                                'offset':1},
-                        'center':{'angle':0,
-                                  'odom_yaw':None,
-                                  'distance':self.node_params.line_plan_step,
-                                  'blocked':False,
-                                  'offset': 0},
-                        'right':{'angle':-strafe_angle,
-                                 'odom_yaw':None,
-                                 'distance':strafe_offset,
-                                 'blocked':False,
-                                 'offset':-1}}
+        self.strafes = rospy.get_param('strafes')
         
+        rospy.loginfo('STRAFES: %s' % (self.strafes))       
+               
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
@@ -259,11 +244,10 @@ class LevelTwoStar(object):
                         geometry_msg.PoseStamped,
                         self.beacon_update)
         
-        self.costmap_listener = rospy.Subscriber('local_costmap',
-                                nav_msg.OccupancyGrid,
-                                self.costmap_update)
-        
-        self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+        rospy.Subscriber('costmap_check',
+                                samplereturn_msg.CostmapCheck,
+                                self.handle_costmap_check)
+
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
@@ -272,6 +256,24 @@ class LevelTwoStar(object):
         level_two_server.run_server()
         rospy.spin()
         sls.stop()
+    
+    #this is the callback from simple_mover that sees if it should stop!    
+    def check_for_stop(self):
+        active_strafe_key = self.state_machine.userdata.active_strafe_key
+        
+        if active_strafe_key is not None and self.strafes[active_strafe_key]['blocked']:
+            return True
+        
+        if self.simple_mover.is_running() and \
+           self.state_machine.userdata.detected_sample is not None:
+            return True
+        
+        return False
+
+    def handle_costmap_check(self, costmap_check):
+        for strafe_key, blocked in zip(costmap_check.strafe_keys,
+                                       costmap_check.blocked):
+            self.strafes[strafe_key]['blocked'] = blocked                        
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -304,76 +306,6 @@ class LevelTwoStar(object):
             self.approach_beacon.userdata.beacon_point = beacon_point
         except tf.Exception:
             rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose!")        
-
-    def costmap_update(self, costmap):
-        if not self.simple_mover.is_running() or \
-           self.state_machine.userdata.active_strafe_key is None:
-            return
-        
-        if self.debug_map_pub.get_num_connections() > 0:
-            publish_debug = True
-        else:
-            publish_debug = False
-        
-        lethal_threshold = 90
-        check_width = 1.1
-        check_dist = 6
-        resolution = costmap.info.resolution
-        origin = (np.trunc(costmap.info.width/2),
-                  np.trunc(costmap.info.height/2))
-
-        map_np = np.array(costmap.data, dtype='i1').reshape((costmap.info.height,costmap.info.width))
-        
-        blocked_count = 0
-        total_count = 0
-                
-        for strafe_key, strafe in self.strafes.iteritems():
-            
-            odom_yaw = strafe['odom_yaw']
-            
-            ll = self.check_point(origin, check_width, (odom_yaw - math.pi/2), resolution)
-            ul = self.check_point(origin, check_width, (odom_yaw + math.pi/2), resolution)
-            lr = self.check_point(ll[0], check_dist, odom_yaw, resolution)
-            ur = self.check_point(ul[0], check_dist, odom_yaw, resolution)
-            
-            start_points = bresenham.points(ll, ul)
-            end_points = bresenham.points(lr, ur)
-            total_count += len(start_points)
-            
-            #check lines for lethal values
-            for start, end in zip(start_points, end_points):
-                line = bresenham.points(start[None,:], end[None,:])
-                line_vals = map_np[line[:,1], line[:,0]]
-                max_val = (np.amax(line_vals))
-                if np.any(line_vals > lethal_threshold):
-                    #for debug, mark lethal lines
-                    if publish_debug: map_np[line[:,1], line[:,0]] = 64
-                    strafe['blocked'] = True
-                    rospy.logdebug("PROBE SWATHE %s BLOCKED " %(strafe_key))
-                    if strafe_key == self.state_machine.userdata.active_strafe_key:
-                        rospy.logdebug("PROBE SWATHE %s BLOCKED and ACTIVE")
-                        self.simple_mover.stop()
-                    break
-                rospy.logdebug("PROBE SWATHE %s CLEAR " %(strafe_key))
-                strafe['blocked']=False    
-                    
-            #if anything is subscribing to the test map, publish it
-            if publish_debug:
-                map_np[start_points[:,1], start_points[:,0]] = 64
-                map_np[end_points[:,1], end_points[:,0]] = 64
-
-        if publish_debug:
-            costmap.data = list(np.reshape(map_np, -1))
-            self.debug_map_pub.publish(costmap)                        
-                    
-        return
-    
-    #returns array of array for bresenham implementation    
-    def check_point(self, start, distance, angle, res):
-        x = np.trunc(start[0] + (distance * math.cos(angle))/res).astype('i2')
-        y = np.trunc(start[1] + (distance * math.sin(angle))/res).astype('i2')
-        return np.array([[x, y]])
-
  
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -394,7 +326,7 @@ class StartLeveLTwo(smach.State):
         return 'next'
 
 class StarManager(smach.State):
-    def __init__(self, listener, announcer):
+    def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
                                            'outbound'],
@@ -405,7 +337,7 @@ class StarManager(smach.State):
                                        'return_home',
                                        'preempted', 'aborted'])
         
-        self.listener = listener
+        self.tf_listener = tf_listener
         self.announcer = announcer  
 
         self.spokes = list(np.linspace(0, 2*np.pi, 36, endpoint=False))
@@ -426,7 +358,7 @@ class StarManager(smach.State):
         
         if userdata.outbound:
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-            userdata.line_yaw = util.get_yaw_to_origin(self.listener)
+            userdata.line_yaw = util.get_yaw_to_origin(self.tf_listener)
             userdata.outbound = False
             return 'rotate'
         
@@ -464,7 +396,7 @@ class RotationManager(smach.State):
 
 #drive to detected sample location        
 class SearchLineManager(smach.State):
-    def __init__(self, listener, mover, announcer):
+    def __init__(self, tf_listener, mover, announcer):
         smach.State.__init__(self,
                              input_keys = ['strafes',
                                            'line_yaw',
@@ -483,40 +415,19 @@ class SearchLineManager(smach.State):
                                        'return_home',
                                        'preempted', 'aborted'])
         
-        self.listener = listener
+        self.tf_listener = tf_listener
         self.mover = mover
         self.announcer = announcer
-        self.is_running = False
-                
-
- 
-        rospy.Subscriber('detected_sample_search',
-                        samplereturn_msg.NamedPoint,
-                        self.sample_update)
 
     def execute(self, userdata):
     
         self.strafes = userdata.strafes
         self.executive_frame = userdata.executive_frame
-        self.detected_sample = None
+        userdata.detected_sample = None
         
         #the desired yaw of this line
         self.line_yaw = userdata.line_yaw
-
-        #stuff for the obstacle checker, get yaw in odom frame and add the strafe angles
-        #gotta have these for checking in the costmap correctly
-        #reset all blocked flags at beginning of any line
-        actual_yaw = util.get_current_robot_yaw(self.listener)
-        for strafe in self.strafes.itervalues():
-            strafe['odom_yaw'] = actual_yaw + strafe['angle']
-            strafe['blocked'] = False
-            
-        self.check_distance = userdata.obstacle_check_distance
-        self.check_width = userdata.obstacle_check_width
-
-        #always start forward in the line manager, load the plan distance
-        userdata.active_strafe_key = 'center'
-
+ 
         #if on return line, allow a little more strafing, this will always work perfectly
         self.offset_count = 0
         self.offset_distance = 0
@@ -525,8 +436,9 @@ class SearchLineManager(smach.State):
             self.offset_count_limit = 1
         else:
             self.offset_count_limit = 2
-
-        current_pose = util.get_current_robot_pose(self.listener)
+        
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        current_pose = util.get_current_robot_pose(self.tf_listener)
         
         rospy.loginfo("SEARCH LINE MANAGER, outbound: %s,  line_yaw: %.1f,  actual_yaw: %.1f,  position: (%.2f,%.2f) " % (
                        userdata.outbound,
@@ -535,8 +447,6 @@ class SearchLineManager(smach.State):
                        current_pose.pose.position.x,
                        current_pose.pose.position.y))
         
-        #let the block checker and sample detection listeners run
-        self.is_running = True
         #wait for costmaps to update
         rospy.sleep(3.0)
         
@@ -558,10 +468,10 @@ class SearchLineManager(smach.State):
                 self.service_preempt()
                 return self.with_outcome('preempted')
             
-            if self.detected_sample is not None:
+            if userdata.detected_sample is not None:
                 return self.with_outcome("sample_detected")
  
-            current_pose = util.get_current_robot_pose(self.listener)
+            current_pose = util.get_current_robot_pose(self.tf_listener)
             origin_distance = np.sqrt(current_pose.pose.position.x**2 + current_pose.pose.position.y**2)
             if not userdata.outbound and origin_distance < 10:
                 return self.with_outcome('next_spoke')        
@@ -605,40 +515,19 @@ class SearchLineManager(smach.State):
         return 'aborted'
     
     def with_outcome(self, outcome):
-        #set active yaw to sorta none out of here
-        self.is_running = False
         return outcome
     
     def strafe(self, key, userdata):
         strafe = self.strafes[key]
-        self.offset_count += strafe['offset']
-        
+        self.offset_count += np.sign(strafe['angle'])
         self.offset_distance += strafe['distance']*math.sin(strafe['angle'])
-        rospy.loginfo("STRAFING %s to offset_count: %s, total offset: %s" %
-                     (key, self.offset_count, self.offset_distance))
+        rospy.loginfo("STRAFING %s to offset_count: %s" % (key, self.offset_count))
         userdata.active_strafe_key = key
         move_error = self.mover.execute_strafe(strafe['angle'], strafe['distance'])
         userdata.active_strafe_key = None
         rospy.loginfo("STRAFING %s returned blocked:%s, with distance error: %s" %(
                         key, strafe['blocked'], move_error))
     
-    def sample_update(self, sample):
-        if not self.is_running:
-            return
-        
-        try:
-            self.listener.waitForTransform('/odom',
-                                              sample.header.frame_id,
-                                              sample.header.stamp,
-                                              rospy.Duration(1.0))
-            point_in_frame = self.listener.transformPoint(self.executive_frame, sample)
-            sample.point = point_in_frame.point
-            self.detected_sample = sample
-            self.mover.stop()    
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform search detection point!")  
-        
-
   
 class StartReturnHome(smach.State):
  
