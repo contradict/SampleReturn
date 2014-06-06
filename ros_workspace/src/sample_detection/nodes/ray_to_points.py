@@ -47,7 +47,7 @@ class ray_to_points(object):
     ground_named_point, odom_named_point = self.cast_ray(point_stamped,self.tf,point_in.name)
     rospy.logdebug("ground_named_point %s",ground_named_point)
     rospy.logdebug("odom_named_point %s",odom_named_point)
-    if ground_named_point.x > 30.0 or np.abs(ground_named_point.y) > 20.0:
+    if ground_named_point.x > 25.0 or np.abs(ground_named_point.y) > 15.0:
       return
     self.named_point_pub.publish(odom_named_point)
     self.send_marker(odom_named_point)
