@@ -13,11 +13,13 @@ from samplereturn_msgs.srv import SimpleMotionResponse, SimpleMotion
 class SimpleMover(object):
   # TODO: Actually calculate something for this
   steering_timeout = 5
-  def __init__(self, param_ns="", listener=None):
+  def __init__(self, param_ns="", listener=None, stop_function=None):
     if listener is not None:
       self.tf = listener
     else:
       self.tf = TransformListener()
+      
+    self.default_stop_function = stop_function
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
     self.acceleration = rospy.get_param(param_ns + 'acceleration', 0.5)
@@ -145,6 +147,9 @@ class SimpleMover(object):
     self.publisher.publish(Twist())
 
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
+    if stop_function is not callable:
+      stop_function = self.default_stop_function
+    
     rate = rospy.Rate(self.loop_rate)
 
     #load defaults if no kwargs present
