@@ -237,7 +237,7 @@ class RobotSimulator(object):
                                                   geometry_msg.Quaternion(*beacon_rot))
         
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name, geometry_msg.PoseStamped)
-        rospy.Timer(rospy.Duration(1.0), self.publish_beacon_pose)
+        rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
         
         self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
                                                          samplereturn_srv.Enable,
@@ -462,10 +462,33 @@ class RobotSimulator(object):
             print "Collected IDs: " + str(self.collected_ids)
  
     def publish_beacon_pose(self, event):
-        if self.publish_beacon:
+        if not self.publish_beacon:
+            return
+        dist_from_origin = np.hypot(self.fake_robot_pose.pose.position.x,
+                                    self.fake_robot_pose.pose.position.y)
+        # can't see beacon closer than 10 meters or farther than 40
+        if dist_from_origin < 10.0 or dist_from_origin > 40.0:
+            return
+        angle_to_robot = np.arctan2(self.fake_robot_pose.pose.position.y,
+                                    self.fake_robot_pose.pose.position.x)
+        # can't see beacon with pi/5 of edge
+        if (abs(angle_to_robot - np.pi/2) < pi/5 or
+            abs(angle_to_robot + np.pi/2) < pi/5):
+            return
+        robot_yaw = 2*np.arctan2(self.fake_robot_pose.pose.orientation.z,
+                                 self.fake_robot_pose.pose.orientation.w)
+        angle_to_origin = util.unwind(angle_to_robot+np.pi-robot_yaw)
+        # within +/- pi/4 of forward
+        if angle_to_origin > -pi/4 and angle_to_origin < pi/4:
             msg = geometry_msg.PoseStamped()
-            msg.header = std_msg.Header(0, rospy.Time.now(), '/beacon')
-            msg.pose = self.fake_beacon_pose
+            msg.header = std_msg.Header(0, rospy.Time(0),
+                                        '/map')
+            q=tf.transformations.quaternion_from_euler(-np.pi/2,-np.pi/2,0,'szyx')
+            msg.pose.orientation.x = q[0]
+            msg.pose.orientation.y = q[1]
+            msg.pose.orientation.z = q[2]
+            msg.pose.orientation.w = q[3]
+            msg = self.tf_listener.transformPose('/search_camera_lens', msg)
             self.beacon_pose_pub.publish(msg)
 
     def publish_GPIO(self, event):
