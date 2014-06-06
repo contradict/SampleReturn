@@ -36,7 +36,25 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="gpio_read" to="/io/gpio_read"/>
-    
+
+    <!-- dictionary for dumb planning, costmap_checker
+         also uses this to determine where to check for obstacles-->
+    <rosparam ns="/processes/executive">
+        strafes:
+            left:
+                angle: 0.7854
+                distance: 4.0
+                blocked: False
+            center:
+                angle: 0
+                distance: 10.0
+                blocked: False                
+            right:
+                angle: -0.7854
+                distance: 4.0
+                blocked: False
+    </rosparam>
+
     <node
         pkg="executive"
         type="executive_master_node.py"
@@ -117,9 +135,6 @@
         
         <!-- for search  behaviour --> 
         <param name="return_time_minutes" type="double" value="100"/>
-        <param name="line_plan_step" type="double" value="10"/>
-        <param name="obstacle_check_distance" type="double" value="5"/>
-        <param name="obstacle_check_width" type="double" value="2.2"/>
 
         <!-- for Beacon approach -->
         <param name="min_pursuit_distance" type="double" value="3.0"/>
@@ -152,6 +167,7 @@
         output="log"
         ns="/processes/executive">
 
+        <!-- remaps -->
         <remap from="search_lights" to="search_lights"/>
 
         <!-- executive tf frame and planner_mode -->
@@ -194,6 +210,23 @@
               acceleration: 0.02
               try_limit: 3
         </rosparam>
+
+    </node>
+
+    <node
+        pkg="executive"
+        type="costmap_checker_node.py"
+        name="costmap_checker"
+        machine="navigate"
+        output="log"
+        ns="/processes/executive">
+
+        <!-- executive tf frame and planner_mode -->
+        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
+
+        <param name="lethal_threshold" type="int" value="90"/>        
+        <param name="obstacle_check_distance" type="double" value="5"/>
+        <param name="obstacle_check_width" type="double" value="2.2"/>
 
     </node>
 
