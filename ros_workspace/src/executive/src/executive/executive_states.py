@@ -2,6 +2,7 @@ import threading
 import traceback
 import collections
 from copy import deepcopy
+import numpy as np
 
 import rospy
 import actionlib
@@ -546,4 +547,111 @@ class AnnounceState(smach.State):
         self.announcer.say(self.announcement)
         return 'next'
 
+class ServoController(smach.State):
+    def __init__(self, tf_listener, announcer):
+        smach.State.__init__(self,
+                             outcomes=['move', 'complete', 'point_lost', 'aborted'],
+                             input_keys=['detected_sample',
+                                         'settle_time',
+                                         'manipulator_correction',
+                                         'servo_params'],
+                             output_keys=['simple_move',
+                                          'detected_sample',
+                                          'latched_sample'])
+
+        self.tf_listener = tf_listener
+        self.announcer = announcer
+        self.try_count = 0
+
+    def execute(self, userdata):
+
+        userdata.detected_sample = None
+        rospy.sleep(userdata.settle_time)
+        if self.try_count > userdata.servo_params['try_limit']:
+            self.announcer.say("Servo exceeded try limit")
+            rospy.loginfo("SERVO STRAFE failed to hit tolerance before try_limit: %s" % (userdata.servo_params['try_limit']))
+            return 'aborted'
+
+        if userdata.detected_sample is None:
+            self.try_count = 0
+            self.announcer.say("Sample lost")
+            return 'point_lost'
+        else:
+            sample_time = userdata.detected_sample.header.stamp
+            sample_frame = userdata.detected_sample.header.frame_id
+            try:
+                self.tf_listener.waitForTransform('manipulator_arm', sample_frame, sample_time, rospy.Duration(1.0))
+                point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm', userdata.detected_sample).point
+            except tf.Exception:
+                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> %s transform in 1.0 seconds", sample_frame)
+                self.try_count = 0
+                return 'aborted'
+            point_in_manipulator.x -= userdata.manipulator_correction['x']
+            point_in_manipulator.y -= userdata.manipulator_correction['y']
+            origin = geometry_msg.Point(0, 0, 0)
+            distance = util.point_distance_2d(origin, point_in_manipulator)
+            if distance < userdata.servo_params['final_tolerance']:
+                self.try_count = 0
+                userdata.latched_sample = userdata.detected_sample
+                self.announcer.say("Servo complete at %.1f millimeters. Deploying gripper" % (distance*1000))
+                return 'complete'
+            elif distance < userdata.servo_params['initial_tolerance']:
+                velocity = userdata.servo_params['final_velocity']
+            else:
+                velocity = userdata.servo_params['initial_velocity']
+            yaw = util.pointing_yaw(origin, point_in_manipulator)
+            userdata.simple_move = {'type':'strafe',
+                                    'angle':yaw,
+                                    'distance':distance,
+                                    'velocity':velocity}
+            self.announcer.say("Servo ing, distance, %.1f centimeters" % (distance*100))
+            rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
+            self.try_count += 1
+            return 'move'
+
+        self.try_count = 0
+        return 'aborted'
+
+class ExecuteSimpleMove(smach.State):
+    def __init__(self, simple_mover):
+
+        smach.State.__init__(self,
+                             outcomes=['complete',
+                                       'timeout',
+                                       'aborted'],
+                             input_keys=['simple_move',
+                                         'detected_sample'])
+
+        self.simple_mover = simple_mover
+
+    def execute(self, userdata):
+
+        move = userdata.simple_move
+
+        try:
+            angle = move['angle']
+            if move['type'] == 'spin':
+                error = self.simple_mover.execute_spin(angle,
+                                                       max_velocity = move.get('velocity'))
+                rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
+                                                                   np.degrees(error)))
+            elif move['type'] == 'strafe':
+                distance = move['distance']
+                error = self.simple_mover.execute_strafe(angle,
+                                                         move['distance'],
+                                                         max_velocity = move.get('velocity'))
+                rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %( np.degrees(angle),
+                                                                                           distance,
+                                                                                           error))
+            else:
+                rospy.logwarn('SIMPLE MOTION invalid type')
+                return 'aborted'
+
+            return 'complete'
+
+        except(TimeoutException):
+                rospy.logwarn("TIMEOUT during simple_motion.")
+                return 'timeout'
+
+        return 'aborted'
 
