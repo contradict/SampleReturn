@@ -20,7 +20,6 @@ class ExecutiveCostmapChecker(object):
         
         self.node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
-        self.executive_frame = self.node_params.executive_frame
 
         self.strafes = rospy.get_param('strafes')
 
@@ -35,6 +34,17 @@ class ExecutiveCostmapChecker(object):
         
         rospy.spin()
 
+    def world2map(self, world, info):
+        origin = np.r_[info.origin.position.x,
+                       info.origin.position.y]
+        resolution = info.resolution
+        map_coords = np.trunc((world-origin)/resolution)[::-1]
+        valid = (map_coords[0]>=0 and
+                 map_coords[0]<info.height and
+                 map_coords[1]>=0 and
+                 map_coords[1]<info.width)
+        return valid, map_coords
+
     def handle_costmap(self, costmap):
         if self.debug_map_pub.get_num_connections() > 0:
             self.publish_debug = True
@@ -47,11 +57,20 @@ class ExecutiveCostmapChecker(object):
         check_dist = self.node_params.obstacle_check_distance
         
         #load up the costmap and its info into useful structure        
-        resolution = costmap.info.resolution
-        origin = (np.trunc(costmap.info.width/2),
-                  np.trunc(costmap.info.height/2))
+        pos, quat = self.tf_listener.lookupTransform(costmap.header.frame_id,
+                                                '/base_link',
+                                                rospy.Time(0))
+        actual_yaw = tf.transformations.euler_from_quaternion(quat)[-1]
+        valid, origin = self.world2map(pos[:2], costmap.info)
+        if not valid:
+            rospy.logerr("Robot off costmap, cannot check. Returning all blocked.")
+            msg_keys = self.strafes.keys()
+            msg_values = [True for _ in msg_keys]
+            costmap_check_msg = samplereturn_msg.CostmapCheck(msg_keys, msg_values)
+            self.check_publisher.publish(costmap_check_msg)
+            return
+
         map_np = np.array(costmap.data, dtype='i1').reshape((costmap.info.height,costmap.info.width))
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
         
         #create message lists
         msg_keys = []
@@ -63,10 +82,12 @@ class ExecutiveCostmapChecker(object):
                         
             odom_yaw = actual_yaw + strafe['angle']
             
-            ll = self.check_point(origin, check_width/2, (odom_yaw - math.pi/2), resolution)
-            ul = self.check_point(origin, check_width/2, (odom_yaw + math.pi/2), resolution)
-            lr = self.check_point(ll[0], check_dist, odom_yaw, resolution)
-            ur = self.check_point(ul[0], check_dist, odom_yaw, resolution)
+            ll = self.check_point(origin, check_width/2, (odom_yaw - math.pi/2),
+                    costmap.info.resolution)
+            ul = self.check_point(origin, check_width/2, (odom_yaw + math.pi/2),
+                    costmap.info.resolution)
+            lr = self.check_point(ll[0], check_dist, odom_yaw, costmap.info.resolution)
+            ur = self.check_point(ul[0], check_dist, odom_yaw, costmap.info.resolution)
             
             start_points = bresenham.points(ll, ul)
             end_points = bresenham.points(lr, ur)
