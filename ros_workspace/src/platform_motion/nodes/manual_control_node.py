@@ -170,7 +170,7 @@ class ManualController(object):
 
             smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
                                    AnnounceState(self.announcer,
-                                                 'Servo complete'),
+                                                 'Grab complete'),
                                    transitions = {'next':'UNPAUSE_AFTER_GRAB'})   
             
             smach.StateMachine.add('ANNOUNCE_GRAB_CANCELED',
