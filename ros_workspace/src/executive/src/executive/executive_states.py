@@ -426,7 +426,7 @@ class ServoController(smach.State):
         
         userdata.stop_on_sample = False
         userdata.detected_sample = None
-        rospy.sleep(userdata.settle_time)
+        rospy.sleep(userdata.servo_params['settle_time'])
         if self.try_count > userdata.servo_params['try_limit']:
             self.announcer.say("Servo exceeded try limit")
             rospy.loginfo("SERVO STRAFE failed to hit tolerance before try_limit: %s" % (userdata.servo_params['try_limit']))
@@ -525,5 +525,75 @@ class ExecuteSimpleMove(smach.State):
                 rospy.logwarn("TIMEOUT during simple_motion.")
                 return 'timeout'
 
+        return 'aborted'
+    
+class MoveToPoints(smach.State):
+    def __init__(self, tf_listener):
+        smach.State.__init__(self,
+                             input_keys=['point_list',
+                                         'detected_sample',
+                                         'odometry_frame',
+                                         'stop_on_sample',
+                                         'face_next_point',
+                                         'obstacle_check'],
+                             output_keys=['simple_move',
+                                          'point_list',
+                                          'active_strafe_key'],
+                             outcomes=['next_point',
+                                       'sample_detected',
+                                       'complete',
+                                       'aborted'])
+        
+        self.tf_listener = tf_listener
+        self.facing_next_point = False
+            
+    def execute(self, userdata):    
+        
+        #if we are looking for samples, mover will be stopped, check it here
+        if userdata.detected_sample is not None and userdata.stop_on_sample:
+            return 'sample_detected'
+        
+        if (len(userdata.point_list) > 0):
+
+            target_point = userdata.point_list[0]
+            header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
+            search_point = geometry_msg.PointStamped(header, target_point)
+            try:
+                point_in_base = self.tf_listener.transformPoint('base_link', search_point).point                
+            except(tf.Exception):
+                rospy.logwarn("PURSUE_SAMPLE failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
+                return 'aborted'
+
+            origin = geometry_msg.Point(0,0,0)
+            distance = util.point_distance_2d(origin, point_in_base)
+            pointing_yaw = util.pointing_yaw(origin, point_in_base)
+
+            if userdata.face_next_point and not self.facing_next_point:
+                userdata.simple_move = {'type':'spin',
+                                        'angle':pointing_yaw}
+                userdata.active_strafe_key = None
+                self.facing_next_point = True
+                return 'next_point'
+            else:
+                #check obstacles along center if we are facing next point
+                if userdata.obstacle_check and self.facing_next_point:
+                    userdata.active_strafe_key = 'center'
+                else:
+                    userdata.active_strafe_key = None
+                
+                #remove the point if we are heading to it
+                userdata.point_list.popleft()
+                userdata.simple_move = {'type':'strafe',
+                                        'angle':pointing_yaw,
+                                        'distance':distance}
+                
+                self.facing_next_point = False
+                return 'next_point'                
+                    
+            return 'next_point'
+        else:
+            self.facing_next_point = False
+            return 'complete'
+        
         return 'aborted'
 
