@@ -297,8 +297,9 @@ class LevelTwoStar(object):
             point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform search detection point!")        
+        except tf.Exception, e:
+            rospy.logwarn("LEVEL_TWO failed to transform search detection point %s->%s: %s",
+                    sample.header.frame_id, self.odometry_frame, e)
             
     def beacon_update(self, beacon_pose):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
