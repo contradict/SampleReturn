@@ -160,13 +160,13 @@ class PursueSample(object):
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
                                    transitions = {'sample_search':'HANDLE_SEARCH_MOVES',
-                                                  'detected':'VISUAL_SERVO',
+                                                  'sample_detected':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('HANDLE_SEARCH_MOVES',
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'SEARCH_MOVE',
-                                                  'detected':'VISUAL_SERVO',
+                                                  'sample_detected':'HANDLE_SEARCH',
                                                   'complete':'ANNOUNCE_SEARCH_FAILURE'},
                                    remapping = {'face_next_point':'false',
                                                 'obstacle_check':'false'})
@@ -183,6 +183,14 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  "Search complete, no sample found"),
                                    transitions = {'next':'PUBLISH_FAILURE'})
+
+            #calculate the strafe move to the sample
+            smach.StateMachine.add('VISUAL_SERVO',
+                                   ServoController(self.tf_listener, self.announcer),
+                                   transitions = {'move':'SERVO_MOVE',
+                                                  'complete':'GRAB_SAMPLE',
+                                                  'point_lost':'HANDLE_SEARCH',
+                                                  'aborted':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -258,7 +266,7 @@ class PursueSample(object):
             smach.StateMachine.add('RETURN_TO_START',
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'RETURN_MOVE',
-                                                  'detected':'RETURN_MOVE',
+                                                  'sample_detected':'RETURN_MOVE',
                                                   'complete':'complete'},
                                    remapping = {'point_list':'approach_points',
                                                 'face_next_point':'true',
@@ -582,7 +590,7 @@ class GetManipulatorApproachMove(smach.State):
 class HandleSearch(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
-                             outcomes=['sample_search', 'detected', 'aborted'],
+                             outcomes=['sample_search', 'sample_detected', 'aborted'],
                              input_keys=['square_search_size',
                                          'search_count',
                                          'search_try_limit',
@@ -601,7 +609,7 @@ class HandleSearch(smach.State):
 
         if userdata.detected_sample is not None:
             self.announcer.say("Sample in manipulator view")
-            return 'detected'
+            return 'sample_detected'
 
         if userdata.search_count >= userdata.search_try_limit:
             self.announcer.say("Search limit reached")
