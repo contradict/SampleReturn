@@ -447,7 +447,7 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if self.sample_in_view(sample['point'], 15, 7):
+                    if self.sample_in_view(sample['point'], 12, 7):
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
