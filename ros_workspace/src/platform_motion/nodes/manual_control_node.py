@@ -54,6 +54,9 @@ class ManualController(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.paused = False
         
+        # disable obstacle checking in ExecuteSimpleMove
+        self.state_machine.userdata.active_strafe_key = None
+
         #strafe search settings
         self.state_machine.userdata.settle_time = 1
         #set move tolerance huge, this prevent retrying by the simple mover
@@ -113,7 +116,9 @@ class ManualController(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
-                                                  'aborted':'ANNOUNCE_FAILURE'})
+                                                  'aborted':'ANNOUNCE_FAILURE',
+                                                  'blocked':'ANNOUNCE_FAILURE',
+                                                  })
 
             smach.StateMachine.add('ANNOUNCE_FAILURE',
                                    AnnounceState(self.announcer,
@@ -257,7 +262,8 @@ class ManualController(object):
                                                   'failed':'SELECT_JOYSTICK'})
 
              #end with state_machine
-  
+
+
         #action server wrapper    
         manual_control_server = smach_ros.ActionServerWrapper(
             'manual_control', platform_msg.ManualControlAction,

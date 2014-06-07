@@ -158,27 +158,33 @@ class LevelTwoStar(object):
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
             @smach.cb_interface(input_keys=['detected_sample'])
-            def get_pursuit_goal_cb(userdata, request):
+            def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
                 goal.input_point = userdata.detected_sample
                 goal.input_string = "level_two_pursuit_request"
                 return goal
+            
+            @smach.cb_interface(output_keys=['detected_sample'])
+            def pursuit_result_cb(userdata, status, result):
+                #clear samples after a pursue action
+                userdata.detected_sample = None
                             
             smach.StateMachine.add('PURSUE_SAMPLE',
                                   smach_ros.SimpleActionState('pursue_sample',
                                   samplereturn_msg.GeneralExecutiveAction,
-                                  goal_cb = get_pursuit_goal_cb),
+                                  goal_cb = pursuit_goal_cb,
+                                  result_cb = pursuit_result_cb),
                                   transitions = {'succeeded':'ANNOUNCE_RETURN_TO_SEARCH',
                                                  'aborted':'ANNOUNCE_RETURN_TO_SEARCH'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
-                                                 'Return ing to search line'),
-                                   transitions = {'next':'STAR_MANAGER'})   
+                                                 'Rotate ing to search line'),
+                                   transitions = {'next':'ROTATION_MANAGER'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
-                                                 'Moving to beacon approach point'),
+                                                 'Move ing to beacon approach point'),
                                    transitions = {'next':'ANNOUNCE_APPROACH_BEACON'})           
 
             smach.StateMachine.add('ANNOUNCE_APPROACH_BEACON',
@@ -267,8 +273,8 @@ class LevelTwoStar(object):
         if active_strafe_key is not None and self.strafes[active_strafe_key]['blocked']:
             return True
         
-        if self.simple_mover.is_running() and \
-           self.state_machine.userdata.detected_sample is not None:
+        if self.state_machine.userdata.detected_sample is not None:
+            rospy.loginfo("LEVEL_TWO stopping simple_move on sample detection")
             return True
         
         return False
@@ -342,17 +348,19 @@ class StarManager(smach.State):
         self.tf_listener = tf_listener
         self.announcer = announcer  
 
-        self.spokes = list(np.linspace(0, 2*np.pi, 36, endpoint=False))
-        self.starting_spoke = np.radians(10)
+        self.spokes = list(np.linspace(0, 2*np.pi, 4, endpoint=False))
+        self.starting_spoke = np.radians(-82)
 
     def execute(self, userdata):
         
-        #for now, just kill the state machine when done
-        if len(self.spokes) == 0:
-            return 'aborted'
+
         
         #are we returning to the center?
         if not userdata.outbound:
+            #for now, just kill the state machine when done
+            if len(self.spokes) == 0:
+                rospy.loginfo("STAR MANAGER finished inbound move, last spoke")
+                return 'return_home'
             userdata.line_yaw = util.unwind(self.spokes.pop(0) + self.starting_spoke)
             userdata.outbound = True
             self.announcer.say("Start ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))

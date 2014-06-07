@@ -557,43 +557,47 @@ class ServoController(smach.State):
                                          'servo_params'],
                              output_keys=['simple_move',
                                           'detected_sample',
-                                          'latched_sample'])
-
+                                          'latched_sample',
+                                          'stop_on_sample'])
+        
         self.tf_listener = tf_listener
         self.announcer = announcer
         self.try_count = 0
-
+        
     def execute(self, userdata):
-
+        
+        userdata.stop_on_sample = False
         userdata.detected_sample = None
         rospy.sleep(userdata.settle_time)
         if self.try_count > userdata.servo_params['try_limit']:
             self.announcer.say("Servo exceeded try limit")
             rospy.loginfo("SERVO STRAFE failed to hit tolerance before try_limit: %s" % (userdata.servo_params['try_limit']))
             return 'aborted'
-
+        
         if userdata.detected_sample is None:
             self.try_count = 0
             self.announcer.say("Sample lost")
             return 'point_lost'
         else:
             sample_time = userdata.detected_sample.header.stamp
-            sample_frame = userdata.detected_sample.header.frame_id
+            sample_frame = userdata.detected_sample.header.stamp
             try:
-                self.tf_listener.waitForTransform('manipulator_arm', sample_frame, sample_time, rospy.Duration(1.0))
-                point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm', userdata.detected_sample).point
+                self.tf_listener.waitForTransform('manipulator_arm',
+                        sample_frame, sample_time, rospy.Duration(1.0))
+                point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
+                                                             userdata.detected_sample).point
             except tf.Exception:
-                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> %s transform in 1.0 seconds", sample_frame)
+                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> odom transform in 1.0 seconds")
                 self.try_count = 0
                 return 'aborted'
             point_in_manipulator.x -= userdata.manipulator_correction['x']
             point_in_manipulator.y -= userdata.manipulator_correction['y']
-            origin = geometry_msg.Point(0, 0, 0)
+            origin = geometry_msg.Point(0,0,0)
             distance = util.point_distance_2d(origin, point_in_manipulator)
             if distance < userdata.servo_params['final_tolerance']:
                 self.try_count = 0
                 userdata.latched_sample = userdata.detected_sample
-                self.announcer.say("Servo complete at %.1f millimeters. Deploying gripper" % (distance*1000))
+                self.announcer.say("Servo complete at %.1f millimeters. Deploying gripper" % (distance*1000))    
                 return 'complete'
             elif distance < userdata.servo_params['initial_tolerance']:
                 velocity = userdata.servo_params['final_velocity']
@@ -608,47 +612,57 @@ class ServoController(smach.State):
             rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
             self.try_count += 1
             return 'move'
-
+        
         self.try_count = 0
         return 'aborted'
 
+
 class ExecuteSimpleMove(smach.State):
     def __init__(self, simple_mover):
-
+        
         smach.State.__init__(self,
                              outcomes=['complete',
+                                       'blocked',
                                        'timeout',
                                        'aborted'],
                              input_keys=['simple_move',
-                                         'detected_sample'])
-
+                                         'velocity',
+                                         'strafes',
+                                         'active_strafe_key'])
+        
         self.simple_mover = simple_mover
-
+        
     def execute(self, userdata):
-
+                
         move = userdata.simple_move
-
+        velocity = userdata.velocity
+        if velocity is None:
+            velocity = move.get('velocity')
+ 
         try:
             angle = move['angle']
             if move['type'] == 'spin':
-                error = self.simple_mover.execute_spin(angle,
-                                                       max_velocity = move.get('velocity'))
+                error = self.simple_mover.execute_spin(angle, max_velocity = userdata.velocity)
                 rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
                                                                    np.degrees(error)))
             elif move['type'] == 'strafe':
                 distance = move['distance']
                 error = self.simple_mover.execute_strafe(angle,
                                                          move['distance'],
-                                                         max_velocity = move.get('velocity'))
+                                                         max_velocity = userdata.velocity)
                 rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %( np.degrees(angle),
                                                                                            distance,
                                                                                            error))
             else:
                 rospy.logwarn('SIMPLE MOTION invalid type')
                 return 'aborted'
-
+            
+            if userdata.active_strafe_key is not None and \
+               userdata.strafes[userdata.active_strafe_key]['blocked']:
+                return 'blocked'
+        
             return 'complete'
-
+            
         except(TimeoutException):
                 rospy.logwarn("TIMEOUT during simple_motion.")
                 return 'timeout'

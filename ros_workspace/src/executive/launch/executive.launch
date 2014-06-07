@@ -45,6 +45,7 @@
                 angle: 0.7854
                 distance: 4.0
                 blocked: False
+                right_check_offset: 1.5     
             center:
                 angle: 0
                 distance: 10.0
@@ -52,7 +53,8 @@
             right:
                 angle: -0.7854
                 distance: 4.0
-                blocked: False
+                blocked: Falsei
+                left_check_offset: 1.5
     </rosparam>
 
     <node
@@ -180,6 +182,7 @@
         <param name="square_search_size" type="double" value="0.3"/> 
         <param name="pursuit_step" type="double" value="3.0"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>
+        <param name="search_velocity" type="double" value="0.25"/>
 
         <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
         <rosparam>
@@ -189,9 +192,10 @@
         </rosparam>
 
         <!-- pursue sample simple motion parameters --> 
+        <!-- these are defaults and should be overridden as necessary -->
         <rosparam>
-            sample_search_params:
-                max_velocity: 0.2
+           simple_motion_params:
+                max_velocity: 0.5
                 acceleration: 0.5
                 stop_deceleration: 1.0
                 loop_rate: 10
