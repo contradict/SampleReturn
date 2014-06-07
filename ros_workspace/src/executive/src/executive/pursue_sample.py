@@ -96,7 +96,7 @@ class PursueSample(object):
         self.state_machine.userdata.search_count = 0
         self.state_machine.userdata.search_try_limit = 2
         self.state_machine.userdata.grab_count = 0
-        self.state_machine.userdata.grab_count = 2
+        self.state_machine.userdata.grab_count_limit = 2
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
         
@@ -506,7 +506,7 @@ class ApproachPoint(smach.State):
                     #all blocked, get the hell out
                     else:
                         userdata.active_strafe_key = None
-                        self.announcer.say("Sample approach blocked, abort ing")
+                        self.announcer.say("Sample approach blocked. Abort ing")
                         return 'blocked'                    
             #center is clear, keep going
             else:
@@ -649,14 +649,19 @@ class ConfirmSampleAcquired(smach.State):
                                        'aborted'],
                              input_keys=['latched_sample',
                                         'detected_sample',
-                                        'action_result'],
+                                        'action_result',
+                                        'grab_count',
+                                        'grab_count_limit'],
                              output_keys=['detected_sample',
+                                          'grab_count',
                                           'action_result'])
 
         self.announcer = announcer
         self.result_pub = result_pub
     
     def execute(self, userdata):
+        
+        userdata.grab_count += 1
         
         #wait for 1 second, see if sample is present in view
         userdata.detected_sample = None
@@ -671,8 +676,12 @@ class ConfirmSampleAcquired(smach.State):
             return 'sample_gone'
         else:
             if userdata.detected_sample.sample_id == userdata.latched_sample.sample_id:
-                self.announcer.say("Sample acquisition failed, retry ing")
-                return 'sample_present'
+                if userdata.grab_count > userdata.grab_count_limit:
+                    self.announcer.say("Sample acquisition failed. Abort ing")
+                    return 'aborted'
+                else:
+                    self.announcer.say("Sample acquisition failed. Retry ing")
+                    return 'sample_present'
             else:
                 self.announcer.say("New sample in view, confuse ing")
                 return 'sample_gone'
