@@ -332,7 +332,7 @@ class PursueSample(object):
         #stop if we are blocked in strafe direction
         if active_strafe_key is not None:
             if self.strafes[active_strafe_key]['blocked']:
-                rospy.loginfo("PURSUE SAMPLE stopping simple_mover on strafe %s blocked" %(active_strafe_key))
+                rospy.loginfo("PURSUE SAMPLE STOP: on strafe %s blocked" %(active_strafe_key))
                 return True
 
             #stop if we are checking for min pursuit distance
@@ -343,14 +343,14 @@ class PursueSample(object):
                 distance_to_sample = util.point_distance_2d(robot_point, sample_point)
                 self.state_machine.userdata.distance_to_sample = distance_to_sample
                 if (distance_to_sample <= self.state_machine.userdata.min_pursuit_distance):
-                    rospy.loginfo("PURSUE SAMPLE stopping simple_move on pursuit distance = %.3f" %(distance_to_sample))
+                    rospy.loginfo("PURSUE SAMPLE STOP: on pursuit distance = %.3f" %(distance_to_sample))
                     return True
 
 
         #stop if we are moving and looking for manipulator detections
         if self.state_machine.userdata.stop_on_sample and \
            self.state_machine.userdata.detected_sample is not None:
-            rospy.loginfo("PURSUE SAMPLE stopping simple_mover on manipulator detection")
+            rospy.loginfo("PURSUE SAMPLE STOP: on manipulator detection")
             return True
                     
         return False
