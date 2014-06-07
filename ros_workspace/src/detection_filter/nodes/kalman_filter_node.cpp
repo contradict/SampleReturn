@@ -64,6 +64,8 @@ class KalmanDetectionFilter
   image_geometry::PinholeCameraModel cam_model_;
   tf::TransformListener listener_;
 
+  std::string _filter_frame_id;
+
   public:
   KalmanDetectionFilter()
   {
@@ -91,6 +93,7 @@ class KalmanDetectionFilter
     private_node_handle_.param("measurement_noise_cov", measurement_noise_cov_, double(0.5));
     private_node_handle_.param("error_cov_post", error_cov_post_, double(0.5));
     private_node_handle_.param("period", period_, double(2));
+    private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
 
     sub_cam_info =
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
@@ -172,7 +175,7 @@ class KalmanDetectionFilter
   void publishTop() {
     if (latched_filter_list_.size() > 0) {
       samplereturn_msgs::NamedPoint point_msg;
-      point_msg.header.frame_id = "/odom";
+      point_msg.header.frame_id = _filter_frame_id;
       point_msg.header.stamp = ros::Time::now();
       point_msg.point.x = latched_filter_list_[0]->statePost.at<float>(0);
       point_msg.point.y = latched_filter_list_[0]->statePost.at<float>(1);
@@ -208,7 +211,7 @@ class KalmanDetectionFilter
       if (filter_ptr->statePost.at<float>(3) < max_pub_vel_ ||
           filter_ptr->statePost.at<float>(4) < max_pub_vel_) {
         samplereturn_msgs::NamedPoint point_msg;
-        point_msg.header.frame_id = "/odom";
+        point_msg.header.frame_id = _filter_frame_id;
         point_msg.header.stamp = ros::Time::now();
         point_msg.grip_angle = msg.grip_angle;
         point_msg.sample_id = msg.sample_id;
