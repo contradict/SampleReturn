@@ -486,13 +486,15 @@ class ExecuteSimpleMove(smach.State):
                              input_keys=['simple_move',
                                          'velocity',
                                          'strafes',
-                                         'active_strafe_key'])
+                                         'active_strafe_key'],
+                             output_keys=['simple_move'])
         
         self.simple_mover = simple_mover
         
     def execute(self, userdata):
                 
-        move = userdata.simple_move
+        move = deepcopy(userdata.simple_move)
+        userdata.simple_move = None #consume simple move
         velocity = userdata.velocity
         if velocity is None:
             velocity = move.get('velocity')
@@ -554,6 +556,8 @@ class MoveToPoints(smach.State):
             return 'sample_detected'
         
         if (len(userdata.point_list) > 0):
+            
+            rospy.loginfo("MOVE TO POINTS list: %s" %(userdata.point_list))
 
             target_point = userdata.point_list[0]
             header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
