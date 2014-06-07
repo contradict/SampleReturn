@@ -45,7 +45,7 @@
                 angle: 0.7854
                 distance: 4.0
                 blocked: False
-                right_check_offset: 1.5     
+                right_check_offset: 1.0     
             center:
                 angle: 0
                 distance: 10.0
@@ -54,7 +54,7 @@
                 angle: -0.7854
                 distance: 4.0
                 blocked: Falsei
-                left_check_offset: 1.5
+                left_check_offset: 1.0
     </rosparam>
 
     <node
@@ -228,7 +228,7 @@
 
         <param name="lethal_threshold" type="int" value="90"/>        
         <param name="obstacle_check_distance" type="double" value="5"/>
-        <param name="obstacle_check_width" type="double" value="2.2"/>
+        <param name="obstacle_check_width" type="double" value="2.5"/>
 
     </node>
 
