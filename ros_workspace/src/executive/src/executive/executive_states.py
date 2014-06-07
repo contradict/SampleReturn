@@ -580,7 +580,7 @@ class ServoController(smach.State):
             return 'point_lost'
         else:
             sample_time = userdata.detected_sample.header.stamp
-            sample_frame = userdata.detected_sample.header.stamp
+            sample_frame = userdata.detected_sample.header.frame_id
             try:
                 self.tf_listener.waitForTransform('manipulator_arm',
                         sample_frame, sample_time, rospy.Duration(1.0))
