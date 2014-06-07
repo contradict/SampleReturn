@@ -54,8 +54,9 @@ class RobotSimulator(object):
         
         self.active_sample_id = None
         self.collected_ids = []
-        self.fake_samples = [{'point':geometry_msg.Point(12, -12, 0),'id':1},
-                             {'point':geometry_msg.Point(25, -60, 0),'id':5},
+        self.excluded_ids = []
+        self.fake_samples = [{'point':geometry_msg.Point(16, -12, 0),'id':1},
+                             {'point':geometry_msg.Point(5, -30, 0),'id':5},
                              {'point':geometry_msg.Point(-15, 2, 0), 'id':3},
                              {'point':geometry_msg.Point(-55, 5, 0), 'id':7},
                              {'point':geometry_msg.Point(150,-15, 0), 'id':9},
@@ -63,13 +64,12 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-40, -20, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
                              {'point':geometry_msg.Point(15, -42, 0), 'id':4},
-                             {'point':geometry_msg.Point(14, 4, 0), 'id':8}]
+                             {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
         self.sample_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
         self.sample_marker.type = vis_msg.Marker.CYLINDER
-        self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
-        self.sample_marker.scale = geometry_msg.Vector3(.3, .3, .1)
+        self.sample_marker.scale = geometry_msg.Vector3(.6, .6, .05)
         self.sample_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
         self.sample_marker.lifetime = rospy.Duration(1.5)
         
@@ -225,6 +225,7 @@ class RobotSimulator(object):
         rospy.Timer(rospy.Duration(0.1), self.publish_sample_detection_manipulator)         
         
         self.sample_marker_pub = rospy.Publisher('fake_samples', vis_msg.Marker)
+        
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    samplereturn_msg.PursuitResult,
                                                    self.handle_pursuit_result)
@@ -242,7 +243,7 @@ class RobotSimulator(object):
         self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
                                                          samplereturn_srv.Enable,
                                                          self.enable_manipulator_detector)
-                
+                                           
         #visual servo stuff
         self.visual_servo_server = actionlib.SimpleActionServer(visual_servo_name,
                                                            visual_servo_msg.VisualServoAction,
@@ -420,20 +421,28 @@ class RobotSimulator(object):
     def publish_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                if not sample['id'] in self.collected_ids:
-                    header = std_msg.Header(0, rospy.Time.now(), '/map')    
-                    self.sample_marker.header = header
-                    self.sample_marker.pose.position = sample['point']
-                    self.sample_marker.id = sample['id']
-                    self.sample_marker.text = 'sample: ' + str(sample['id'])
-                    self.sample_marker_pub.publish(self.sample_marker)
-                    if self.sample_in_view(sample['point'], 10, 5):
+                header = std_msg.Header(0, rospy.Time.now(), '/map')    
+                self.sample_marker.header = header
+                self.sample_marker.pose.position = sample['point']
+                self.sample_marker.id = sample['id']
+                self.sample_marker.text = 'sample: ' + str(sample['id'])                
+                self.sample_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
+                
+                if sample['id'] in self.collected_ids:
+                    self.sample_marker.color = std_msg.ColorRGBA(0, 254, 0, 1)
+                elif sample['id'] in self.excluded_ids:   
+                    self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
+                else:
+                    if self.sample_in_view(sample['point'], 15, 7):
+                        self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
                         msg.point = sample['point']
                         msg.sample_id = sample['id']
                         self.search_sample_pub.publish(msg)
                         self.active_sample_id = sample['id']
+                        
+                self.sample_marker_pub.publish(self.sample_marker)
                 
     def publish_sample_detection_manipulator(self, event):
         if self.publish_samples:
@@ -458,9 +467,14 @@ class RobotSimulator(object):
 
     def handle_pursuit_result(self, msg):
         if msg.success:
+            #collected samples are added by the manipulator grab action
             print "Received success message for sample: " + str(self.active_sample_id)
-            print "Collected IDs: " + str(self.collected_ids)
- 
+            print "Collected IDs: %s" % (self.collected_ids)
+        else:
+            self.excluded_ids.append(self.active_sample_id)
+            print "Received failure message for sample: " + str(self.active_sample_id)
+            print "Excluded IDs: %s" % (self.excluded_ids) 
+
     def publish_beacon_pose(self, event):
         if not self.publish_beacon:
             return
@@ -552,8 +566,12 @@ class RobotSimulator(object):
     def set_sample_success(self):
         if self.active_sample_id is not None:
             self.collected_ids.append(self.active_sample_id)
-            
+    
+    #homing request for wheelpods happens at beginning, zero useful sim values        
     def home_wheelpods(self, goal):
+        self.zero_robot()
+        self.collected_ids = []
+        self.excluded_ids = []
         fake_result = platform_msg.HomeResult([True,True,True])
         rospy.sleep(1.0)
         self.home_wheelpods_server.set_succeeded(result=fake_result)
