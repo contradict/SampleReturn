@@ -50,7 +50,7 @@ class RobotSimulator(object):
         self.cameras_ready = True
         self.paused = False
         self.publish_samples = True
-        self.publish_beacon = False
+        self.publish_beacon = True
         
         self.active_sample_id = None
         self.collected_ids = []
