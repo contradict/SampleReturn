@@ -108,6 +108,7 @@ class RobotSimulator(object):
 
         planner_command_name = '/motion/planner_command'
         servo_command_name = '/motion/servo_command'
+        joystick_command_name = '/motion/joystick_command'
 
         cam_status_list = ["/cameras/navigation/port/status",
                                 "/cameras/navigation/center/status",
@@ -211,6 +212,10 @@ class RobotSimulator(object):
                                             geometry_msg.Twist,
                                             self.handle_servo)
         
+        self.joystick_sub = rospy.Subscriber(joystick_command_name,
+                                            geometry_msg.Twist,
+                                            self.handle_joystick)
+
         self.odometry_pub = rospy.Publisher(odometry_name,
                                             nav_msg.Odometry)
 
@@ -327,16 +332,25 @@ class RobotSimulator(object):
             i += 1
         
     def handle_planner(self, twist):
-        self.fake_robot_pose, self.fake_odometry = \
-            self.integrate_odometry(self.fake_robot_pose,
-                                    self.fake_odometry,
-                                    twist)
+        if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST:
+            self.fake_robot_pose, self.fake_odometry = \
+                self.integrate_odometry(self.fake_robot_pose,
+                                        self.fake_odometry,
+                                        twist)
         
     def handle_servo(self, twist):
-        self.fake_robot_pose, self.fake_odometry = \
-            self.integrate_odometry(self.fake_robot_pose,
-                                    self.fake_odometry,
-                                    twist)
+        if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_SERVO:
+            self.fake_robot_pose, self.fake_odometry = \
+                self.integrate_odometry(self.fake_robot_pose,
+                                        self.fake_odometry,
+                                        twist)
+
+    def handle_joystick(self, twist):
+        if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_JOYSTICK:
+            self.fake_robot_pose, self.fake_odometry = \
+                self.integrate_odometry(self.fake_robot_pose,
+                                        self.fake_odometry,
+                                        twist)
 
     def publish_point_cloud(self, event):
         now = event.current_real
