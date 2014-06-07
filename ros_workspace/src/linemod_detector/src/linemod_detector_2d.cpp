@@ -94,6 +94,8 @@ class LineMOD_Detector
   ros::ServiceServer service_;
   bool enabled_;
 
+  std::string _detection_frame_id;
+
   public:
   LineMOD_Detector(): it(nh)
   {
@@ -117,6 +119,7 @@ class LineMOD_Detector
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
     ros::param::param<bool>("~publish_debug_img", _publish_debug_img, true);
+    ros::param::param<std::string>("~detection_frame_id", _detection_frame_id, "odom");
 
     ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
@@ -379,17 +382,17 @@ class LineMOD_Detector
       temp_point.point.y = xyz.y;
       temp_point.point.z = xyz.z;
       bool wait =
-        listener_.waitForTransform("/odom", header.frame_id, header.stamp, ros::Duration(0.03));
+        listener_.waitForTransform(_detection_frame_id, header.frame_id, header.stamp, ros::Duration(0.03));
       if (!wait) {
         return;
       }
-      listener_.transformPoint("/odom", temp_point, odom_point);
+      listener_.transformPoint(_detection_frame_id, temp_point, odom_point);
 
       //std::cout << "Camera 3D point: " << temp_point << std::endl;
       point_msg.name = m.class_id;
       point_msg.sample_id = sample_id;
       point_msg.header = header;
-      point_msg.header.frame_id = "/odom";
+      point_msg.header.frame_id = _detection_frame_id;
       point_msg.grip_angle = grip_angle;
       point_msg.point = odom_point.point;
       LineMOD_Detector::point_pub.publish(point_msg);
