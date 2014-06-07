@@ -82,7 +82,7 @@ def translate_base_link(listener, start_pose, dx, dy, frame_id = 'odom'):
     base_point = geometry_msg.PointStamped(base_header,
                                            geometry_msg.Point(dx, dy, 0))
     listener.waitForTransform(frame_id,
-                        '/base_link',
+                        'base_link',
                         start_pose.header.stamp,
                         rospy.Duration(1.0))
     new_point = listener.transformPoint(frame_id, base_point)
@@ -112,22 +112,22 @@ def pose_rotate(start_pose, angle):
     new_pose = geometry_msg.Pose(start_pose.pose.position, new_orientation)
     return geometry_msg.PoseStamped(start_pose.header, new_pose)    
 
-def get_current_robot_pose(tf_listener, frame_id = '/odom'):
-    now = tf_listener.getLatestCommonTime(frame_id, '/base_link')
+def get_current_robot_pose(tf_listener, frame_id = 'odom'):
+    now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
-                                            '/base_link',
-                                            rospy.Time(0))
+                                            'base_link',
+                                            now)
     header = std_msg.Header(0, now, frame_id)
     pose = geometry_msg.Pose(geometry_msg.Point(*pos),
                              geometry_msg.Quaternion(*quat))
                                     
     return geometry_msg.PoseStamped(header, pose)
 
-def get_current_robot_yaw(tf_listener, frame_id = '/odom'):
-    now = tf_listener.getLatestCommonTime(frame_id, '/base_link')
+def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
+    now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
-                                            '/base_link',
-                                            rospy.Time(0))
+                                            'base_link',
+                                            now)
     return tf.transformations.euler_from_quaternion(quat)[-1]
 
 def get_yaw_to_origin(tf_listener, frame_id = 'odom'):
