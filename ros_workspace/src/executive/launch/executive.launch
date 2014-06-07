@@ -10,9 +10,7 @@
     <!-- motion remaps -->
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
-    <remap from="joystick_command" to="/motion/joystick_command"/>
-    <remap from="servo_command" to="/motion/servo_command"/>
-    <remap from="planner_command" to="/motion/planner_command"/>
+    <remap from="twist" to="/motion/planner_command"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
     <remap from="odometry" to="/motion/odometry"/>
     <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
@@ -45,7 +43,7 @@
                 angle: 0.7854
                 distance: 4.0
                 blocked: False
-                right_check_offset: 1.0     
+                right_check_offset: 0.8     
             center:
                 angle: 0
                 distance: 10.0
@@ -54,7 +52,7 @@
                 angle: -0.7854
                 distance: 4.0
                 blocked: Falsei
-                left_check_offset: 1.0
+                left_check_offset: 0.8
     </rosparam>
 
     <node
@@ -135,7 +133,10 @@
         <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
-        <!-- for search  behaviour --> 
+        <!-- for search  behaviour, degrees and meters--> 
+        <param name="spoke_count" type="int" value="10"/>
+        <param name="first_spoke_offset" type="double" value="0"/>
+        <param name="star_hub_radius" type="int" value="15"/>
         <param name="return_time_minutes" type="double" value="100"/>
 
         <!-- for Beacon approach -->
@@ -144,7 +145,7 @@
         <param name="max_point_lost_time" type="double" value="60"/>
         <rosparam>
             beacon_approach_point:
-                {x: 5.0, y: 0, yaw: 180}
+                {x: 15.0, y: 0, yaw: 180}
         </rosparam>
 
         <!-- simple mover parameters --> 
@@ -210,6 +211,7 @@
               final_velocity: 0.005
               final_tolerance: 0.010
               acceleration: 0.02
+              settle_time: 1.0
               try_limit: 3
         </rosparam>
 
