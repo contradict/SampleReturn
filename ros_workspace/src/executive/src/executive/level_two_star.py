@@ -39,11 +39,13 @@ class LevelTwoStar(object):
         rospy.on_shutdown(self.shutdown_cb)
         self.node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
-        self.executive_frame = self.node_params.executive_frame
         self.beacon_approach_point = self.node_params.beacon_approach_point
+
+        self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
+        self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
         #calculate beacon approach pose now, in /map
-        header = std_msg.Header(0, rospy.Time(0), '/map')
+        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
         point = geometry_msg.Point(self.beacon_approach_point['x'],
                                    self.beacon_approach_point['y'], 0)
         quat_array = tf.transformations.quaternion_from_euler(0, 0, math.pi)           
@@ -74,7 +76,8 @@ class LevelTwoStar(object):
         self.state_machine.userdata.active_strafe_key = None
 
         #these are important values!  master frame id and return timing
-        self.state_machine.userdata.executive_frame = self.executive_frame
+        self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
+        self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(self.node_params.return_time_minutes*60)
@@ -281,11 +284,11 @@ class LevelTwoStar(object):
         
     def sample_update(self, sample):
         try:
-            self.tf_listener.waitForTransform(self.executive_frame,
+            self.tf_listener.waitForTransform(self.odometry_frame,
                                               sample.header.frame_id,
                                               sample.header.stamp,
                                               rospy.Duration(1.0))
-            point_in_frame = self.tf_listener.transformPoint(self.executive_frame, sample)
+            point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
         except tf.Exception:
@@ -295,11 +298,11 @@ class LevelTwoStar(object):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                  beacon_pose.pose.position)
         try:
-            self.tf_listener.waitForTransform(self.executive_frame,
+            self.tf_listener.waitForTransform(self.odometry_frame,
                                               beacon_point.header.frame_id,
                                               beacon_point.header.stamp,
                                               rospy.Duration(1.0))
-            point_in_frame = self.tf_listener.transformPoint(self.executive_frame, beacon_point)
+            point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, beacon_point)
             point_in_frame.point.x += 1.5 #start point is 1.5 meters in front of beacon
             beacon_point.point = point_in_frame.point
             self.state_machine.userdata.beacon_point = beacon_point
@@ -370,7 +373,8 @@ class RotationManager(smach.State):
                              outcomes=['next', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
                                          'spin_velocity',
-                                         'outbound'],
+                                         'outbound',
+                                         'world_fixed_frame'],
                              output_keys=['line_yaw',
                                           'outbound',
                                           'rotate_pose']),  
@@ -379,7 +383,8 @@ class RotationManager(smach.State):
         self.mover = mover
     
     def execute(self, userdata):
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
+                userdata.world_fixed_frame)
         rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
         rospy.loginfo("ROTATION MANAGER line_yaw: %.1f, actual_yaw: %.1f, rotate_yaw: %.1f" %(
                       np.degrees(userdata.line_yaw),
@@ -387,7 +392,8 @@ class RotationManager(smach.State):
                       np.degrees(rotate_yaw)))
         #execute the actual spin!
         error = self.mover.execute_spin(rotate_yaw, max_velocity=userdata.spin_velocity)
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
+                userdata.world_fixed_frame)
         rospy.loginfo("ROTATION MANAGER returned actual_yaw: %.1f, error: %.4f" % (
                       np.degrees(actual_yaw),
                       error))
@@ -404,7 +410,9 @@ class SearchLineManager(smach.State):
                                            'obstacle_check_width',
                                            'return_time',
                                            'detected_sample',
-                                           'executive_frame'],
+                                           'world_fixed_frame',
+                                           'odometry_frame',
+                                           ],
                              output_keys = ['next_line_pose',
                                             'detected_sample',
                                             'active_strafe_key'],
@@ -421,7 +429,6 @@ class SearchLineManager(smach.State):
     def execute(self, userdata):
     
         self.strafes = userdata.strafes
-        self.executive_frame = userdata.executive_frame
         userdata.detected_sample = None
         
         #the desired yaw of this line
@@ -436,8 +443,10 @@ class SearchLineManager(smach.State):
         else:
             self.offset_count_limit = 2
         
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
-        current_pose = util.get_current_robot_pose(self.tf_listener)
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
+                userdata.world_fixed_frame)
+        current_pose = util.get_current_robot_pose(self.tf_listener,
+                userdata.world_fixed_frame)
         
         rospy.loginfo("SEARCH LINE MANAGER, outbound: %s,  line_yaw: %.1f,  actual_yaw: %.1f,  position: (%.2f,%.2f) " % (
                        userdata.outbound,
@@ -470,7 +479,8 @@ class SearchLineManager(smach.State):
             if userdata.detected_sample is not None:
                 return self.with_outcome("sample_detected")
  
-            current_pose = util.get_current_robot_pose(self.tf_listener)
+            current_pose = util.get_current_robot_pose(self.tf_listener,
+                    userdata.world_fixed_frame)
             origin_distance = np.sqrt(current_pose.pose.position.x**2 + current_pose.pose.position.y**2)
             if not userdata.outbound and origin_distance < 10:
                 return self.with_outcome('next_spoke')        

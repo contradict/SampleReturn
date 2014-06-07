@@ -40,7 +40,9 @@ class PursueSample(object):
         rospy.on_shutdown(self.shutdown_cb)
         self.node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
-        self.executive_frame = self.node_params.executive_frame
+
+        self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
+        self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_navigate")
@@ -66,7 +68,9 @@ class PursueSample(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
         
-        self.state_machine.userdata.executive_frame = self.executive_frame
+        self.state_machine.userdata.odometry_frame = self.odometry_frame
+        self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
+
         self.state_machine.userdata.strafes = self.strafes
         self.state_machine.userdata.active_strafe_key = None
         
@@ -308,7 +312,8 @@ class PursueSample(object):
                 rospy.loginfo("PURSUE SAMPLE stopping simple_mover on strafe %s blocked" %(active_strafe_key))
                 return True
             #stop if we are using obstacle avoidance strafing and within min pursuit distance
-            robot_point = util.get_current_robot_pose(self.tf_listener).pose.position
+            robot_point = util.get_current_robot_pose(self.tf_listener,
+                    self.odometry_frame).pose.position
             sample_point = self.state_machine.userdata.target_sample.point
             distance_to_sample = util.point_distance_2d(robot_point, sample_point)
             self.state_machine.userdata.distance_to_sample = distance_to_sample
@@ -326,11 +331,11 @@ class PursueSample(object):
 
     def sample_detection_search(self, sample):
             try:
-                self.tf_listener.waitForTransform(self.executive_frame,
+                self.tf_listener.waitForTransform(self.odometry_frame,
                                                   sample.header.frame_id,
                                                   sample.header.stamp,
                                                   rospy.Duration(1.0))
-                point_in_frame = self.tf_listener.transformPoint(self.executive_frame, sample)
+                point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
                 sample.header = point_in_frame.header
                 sample.point = point_in_frame.point
                 self.state_machine.userdata.target_sample = sample
@@ -405,7 +410,9 @@ class ApproachPoint(smach.State):
                                          'min_pursuit_distance',
                                          'pursuit_step',
                                          'pursuit_velocity',
-                                         'distance_to_sample'],
+                                         'distance_to_sample',
+                                         'odometry_frame',
+                                         ],
                              output_keys=['simple_move',
                                           'approach_points',
                                           'offset_count',
@@ -416,11 +423,13 @@ class ApproachPoint(smach.State):
     def execute(self, userdata):
         
         #get all the relationships between robot and sample, angle, distance, etc.
-        current_pose = util.get_current_robot_pose(self.tf_listener)
+        current_pose = util.get_current_robot_pose(self.tf_listener,
+                userdata.odometry_frame)
         sample_point = userdata.target_sample.point
         robot_point = current_pose.pose.position
         yaw_to_sample = util.pointing_yaw(robot_point, sample_point)
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener)
+        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
+                userdata.odometry_frame)
         rotate_yaw = util.unwind(yaw_to_sample - actual_yaw)
  
         #this is the first move, which is always to point right at the sample
@@ -556,24 +565,26 @@ class GetSampleStrafeMove(smach.State):
         if userdata.target_sample is None:
             return 'point_lost'
         else:
+            sample_time = userdata.target_sample.header.stamp
+            sample_frame = userdata.target_sample.header.frame_id
             try:
-                sample_time = userdata.target_sample.header.stamp
-                self.tf_listener.waitForTransform('base_link', 'odom', sample_time, rospy.Duration(1.0))
+                self.tf_listener.waitForTransform('base_link',
+                        sample_frame, sample_time, rospy.Duration(1.0))
                 point_in_base = self.tf_listener.transformPoint('base_link',
                                                              userdata.target_sample).point
-                origin = geometry_msg.Point(0,0,0)
-                distance = util.point_distance_2d(origin, point_in_base)
-                yaw = util.pointing_yaw(origin, point_in_base)
-                userdata.detected_sample = None
-                #time to look for sample in manipulator view, stop when it is seen
-                userdata.stop_on_sample = True
-                userdata.simple_move = {'type':'strafe',
-                                        'angle':yaw,
-                                        'distance':distance}
-                return 'strafe'
             except(tf.Exception):
-                rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> odom transform in 1.0 seconds")
+                rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
+            origin = geometry_msg.Point(0,0,0)
+            distance = util.point_distance_2d(origin, point_in_base)
+            yaw = util.pointing_yaw(origin, point_in_base)
+            userdata.detected_sample = None
+            #time to look for sample in manipulator view, stop when it is seen
+            userdata.stop_on_sample = True
+            userdata.simple_move = {'type':'strafe',
+                                    'angle':yaw,
+                                    'distance':distance}
+            return 'strafe'
         
         return 'aborted'
 
@@ -583,7 +594,9 @@ class GetSearchPoints(smach.State):
                              outcomes=['next', 'aborted'],
                              input_keys=['square_search_size',
                                          'search_count',
-                                         'search_try_limit'],
+                                         'search_try_limit',
+                                         'odometry_frame',
+                                         ],
                              output_keys=['pose_list',
                                           'search_count'])
     
@@ -599,7 +612,8 @@ class GetSearchPoints(smach.State):
         square_step = userdata.square_search_size
 
         try:
-            start_pose = util.get_current_robot_pose(self.tf_listener)
+            start_pose = util.get_current_robot_pose(self.tf_listener,
+                    userdata.odometry_frame)
             next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, 0)
             pose_list.append(next_pose)
             next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, square_step)
@@ -656,7 +670,7 @@ class HandleSearchMoves(smach.State):
                                         'angle':yaw,
                                         'distance':distance}
             except(tf.Exception):
-                rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> odom transform in 1.0 seconds")
+                rospy.logwarn("PURSUE_SAMPLE failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
                 return 'aborted'
             return 'next_point'
         else:

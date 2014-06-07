@@ -239,7 +239,8 @@ class SimpleMoveState(smach.Concurrence):
                         'detected_sample',
                         'simple_move_tolerance',
                         'paused',
-                        'executive_frame'],
+                        'odometry_frame',
+                        ],
             output_keys=['detected_sample'],
             child_termination_cb = lambda preempt: True,
             outcome_map = {'complete':{'SIMPLE_MOVER':'complete',
@@ -256,7 +257,8 @@ class SimpleMoveState(smach.Concurrence):
         #Execute a simple motion based on userdata inputs
         #Then, execute concurrence as normal.
         try:
-            start_pose = util.get_current_robot_pose(self.listener)
+            start_pose = util.get_current_robot_pose(self.listener,
+                    userdata.odometry_frame)
         except(tf.Exception):
             rospy.logwarn("SIMPLE MOVE STATE failed to get current pose")
             return 'aborted'
@@ -293,7 +295,9 @@ class DriveToPoseState(smach.State):
                                          'detected_sample',
                                          'motion_check_interval',
                                          'min_motion',
-                                         'paused'],
+                                         'paused',
+                                         'world_fixed_frame',
+                                         ],
                              output_keys=['last_pose',
                                           'detected_sample'])
 
@@ -306,7 +310,8 @@ class DriveToPoseState(smach.State):
         #on entry to Drive To Pose clear old sample_detections!
         userdata.detected_sample = None
         try:        
-            last_pose = util.get_current_robot_pose(self.listener)
+            last_pose = util.get_current_robot_pose(self.listener,
+                    userdata.world_fixed_frame)
         except(tf.Exception):
             rospy.logwarn("DriveToPose failed to get current pose")
             return 'aborted'
@@ -321,7 +326,8 @@ class DriveToPoseState(smach.State):
             rospy.sleep(0.1)
             #log current pose for use in other states
             try:
-                current_pose = util.get_current_robot_pose(self.listener)
+                current_pose = util.get_current_robot_pose(self.listener,
+                        userdata.world_fixed_frame)
             except(tf.Exception):
                 rospy.logwarn("DriveToPose failed to get current pose")
                 return 'aborted'
@@ -373,7 +379,7 @@ class DriveToPoseState(smach.State):
         return 'aborted'
 
 #pursues a detected point, changing the move_base goal if the detection point
-#changes too much.  Detection and movement all specified in executive_frame.
+#changes too much.  Detection and movement all specified in odometry_frame.
 #exits if pose is within min_pursuit_distance, and sets target_pose to the current
 #detection point with current robot orientation
 class PursuePointManager(smach.State):
@@ -390,7 +396,7 @@ class PursuePointManager(smach.State):
                                          'min_pursuit_distance',
                                          'max_pursuit_error',
                                          'max_point_lost_time',
-                                         'executive_frame'],
+                                         'odometry_frame'],
                              output_keys=['target_pose'])
 
         self.listener = listener
@@ -463,7 +469,7 @@ class PursueDetectedPoint(smach.Concurrence):
                         'motion_check_interval',
                         'min_motion',
                         'paused',
-                        'executive_frame'],
+                        'odometry_frame'],
             output_keys=['target_pose',
                          'last_pose'],
             child_termination_cb = lambda preempt: True,
@@ -481,9 +487,10 @@ class PursueDetectedPoint(smach.Concurrence):
         #Get start pose and pursuit point, calculate the first target_pose
         #and put it in the userdata.  Put start_pose into last_pose as well
         #Then, execute concurrence as normal.
-        goal_header = std_msg.Header(0, rospy.Time(0), userdata.executive_frame)
+        goal_header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
         try:
-            start_pose = util.get_current_robot_pose(self.listener)
+            start_pose = util.get_current_robot_pose(self.listener,
+                    userdata.odometry_frame)
         except (tf.Exception):
             rospy.logwarn("PursueDetectedPoint failed to get current pose")
             return 'aborted'
