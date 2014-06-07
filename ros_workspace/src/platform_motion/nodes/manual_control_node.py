@@ -24,7 +24,8 @@ from samplereturn_msgs.msg import VoiceAnnouncement
 
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
-from executive.executive_states import GetSimpleMoveState
+from executive.executive_states import ExecuteSimpleMove
+from executive.executive_states import ServoController
 
 #this state machine provides manual control of the robot
 
@@ -49,7 +50,6 @@ class ManualController(object):
                   input_keys = ['action_goal'],
                   output_keys = ['action_result'])
         
-        self.state_machine.userdata.executive_frame = 'odom'
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.paused = False
@@ -103,22 +103,17 @@ class ManualController(object):
 
             #calculate the strafe move to the sample
             smach.StateMachine.add('VISUAL_SERVO',
-                                   ServoStrafe(self.tf),
-                                   transitions = {'strafe':'MANIPULATOR_APPROACH',
+                                   ServoController(self.tf, self.announcer),
+                                   transitions = {'move':'SERVO_MOVE',
                                                   'complete':'ANNOUNCE_SERVO_COMPLETE',
                                                   'point_lost':'ANNOUNCE_NO_SAMPLE',
                                                   'aborted':'ANNOUNCE_FAILURE'})
 
-            self.manipulator_approach = GetSimpleMoveState(self.simple_mover, self.tf)
-            
-            smach.StateMachine.add('MANIPULATOR_APPROACH',
-                                   self.manipulator_approach,
+            smach.StateMachine.add('SERVO_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
-                                                  'sample_detected':'VISUAL_SERVO',
-                                                  'preempted':'MANUAL_ABORTED',
-                                                  'aborted':'MANUAL_ABORTED'},
-                                   remapping = {'pursue_samples':'false'})
+                                                  'aborted':'ANNOUNCE_FAILURE'})
 
             smach.StateMachine.add('ANNOUNCE_FAILURE',
                                    AnnounceState(self.announcer,
@@ -341,65 +336,6 @@ class ProcessGoal(smach.State):
                         
         return 'valid_goal'
 
-class ServoStrafe(smach.State):
-    def __init__(self, listener):
-        smach.State.__init__(self,
-                             outcomes=['strafe', 'complete', 'point_lost', 'preempted', 'aborted'],
-                             input_keys=['detected_sample',
-                                         'settle_time',
-                                         'manipulator_offset',
-                                         'manipulator_correction',
-                                         'servo_params'],
-                             output_keys=['simple_move',
-                                          'detected_sample'])
-        
-        self.listener = listener
-        self.try_count = 0
-        
-    def execute(self, userdata):
-        
-        userdata.detected_sample = None
-        rospy.sleep(userdata.settle_time)
-        if self.try_count > 3:
-            rospy.logwarn("SERVO STRAFE failed to hit tolerance in 3 tries")
-            return 'aborted'
-        
-        if userdata.detected_sample is None:
-            self.try_count = 0
-            return 'point_lost'
-        else:
-            try:
-                sample_time = userdata.detected_sample.header.stamp
-                self.listener.waitForTransform('manipulator_arm', 'odom', sample_time, rospy.Duration(1.0))
-                point_in_manipulator = self.listener.transformPoint('manipulator_arm',
-                                                             userdata.detected_sample).point
-                point_in_manipulator.x -= userdata.manipulator_correction['x']
-                point_in_manipulator.y -= userdata.manipulator_correction['y']
-                origin = geometry_msg.Point(0,0,0)
-                distance = util.point_distance_2d(origin, point_in_manipulator)
-                if distance < userdata.servo_params['final_tolerance']:
-                    self.try_count = 0
-                    return 'complete'
-                elif distance < userdata.servo_params['initial_tolerance']:
-                    velocity = userdata.servo_params['final_velocity']
-                else:
-                    velocity = userdata.servo_params['initial_velocity']
-                yaw = util.pointing_yaw(origin, point_in_manipulator)
-                userdata.simple_move = {'type':'strafe',
-                                        'yaw':yaw,
-                                        'distance':distance,
-                                        'velocity':velocity}
-                rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
-                self.try_count += 1
-                return 'strafe'
-            except tf.Exception:
-                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> odom transform in 1.0 seconds")
-                self.try_count = 0
-                return 'aborted'
-        
-        self.try_count = 0
-        return 'aborted'
-                
 class JoystickListen(smach.State):
     def __init__(self, CAN_interface, joy_state):
         smach.State.__init__(self,

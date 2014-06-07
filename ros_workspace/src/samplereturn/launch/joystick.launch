@@ -53,6 +53,7 @@
               final_velocity: 0.005
               final_tolerance: 0.010
               acceleration: 0.02
+              try_limit: 1
     </rosparam>
 
     <!-- manipulator correction for inaccuracy -->
