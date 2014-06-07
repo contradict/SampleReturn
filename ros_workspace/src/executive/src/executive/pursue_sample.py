@@ -594,7 +594,8 @@ class HandleSearch(smach.State):
                                          'search_count',
                                          'search_try_limit',
                                          'odometry_frame',
-                                         ],
+                                         'detected_sample',
+                                        ],
                              output_keys=['point_list',
                                           'search_count'])
     
