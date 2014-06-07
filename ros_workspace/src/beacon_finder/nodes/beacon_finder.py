@@ -46,6 +46,10 @@ class BeaconFinder:
 	self._blob_repeatability = rospy.get_param("~blob_repeatability", 3L)
 	self._do_histogram_equalization = rospy.get_param("~do_histogram_equalization", False)
 
+        self._beacon_mounting_frame = rospy.get_param("~beacon_mounting_frame",
+                "platform")
+        self._world_fixed_frame = rospy.get_param("~world_fixed_frame", "map")
+
 	# Initialize member variables
 	self._blob_detector_params = cv2.SimpleBlobDetector_Params()
 	self._blob_detector_params.blobColor = self._blob_color
@@ -219,13 +223,14 @@ class BeaconFinder:
 		'/platform',
                 )
 
-	zero_translation = (0,0,0)
-	zero_rotation = (0,0,0,1)
-	self.tf_broadcaster.sendTransform(zero_translation,
-		zero_rotation,
-		now,
-		'/platform',
-		'/map')
+        if self._beacon_mounting_frame != self._world_fixed_frame:
+            zero_translation = (0,0,0)
+            zero_rotation = (0,0,0,1)
+            self.tf_broadcaster.sendTransform(zero_translation,
+                    zero_rotation,
+                    now,
+                    self._beacon_mounting_frame,
+                    self._world_fixed_frame)
 
 if __name__ == '__main__':
     rospy.init_node('beacon_finder')
