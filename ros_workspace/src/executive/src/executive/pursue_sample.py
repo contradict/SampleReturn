@@ -370,8 +370,9 @@ class PursueSample(object):
                 sample.header = point_in_frame.header
                 sample.point = point_in_frame.point
                 self.state_machine.userdata.target_sample = sample
-            except tf.Exception:
-                rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
+            except tf.Exception, e:
+                rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point %s->%s: %s",
+                    sample.header.frame_id, self.odometry_frame, e)
 
     def sample_detection_manipulator(self, sample):
         self.state_machine.userdata.detected_sample = sample
