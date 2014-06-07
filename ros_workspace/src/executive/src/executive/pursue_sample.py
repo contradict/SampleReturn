@@ -26,14 +26,12 @@ import samplereturn.util as util
 import samplereturn.simple_motion as simple_motion
 from samplereturn.simple_motion import TimeoutException
 
-from executive.executive_states import DriveToPoseState
 from executive.executive_states import WaitForFlagState
 from executive.executive_states import AnnounceState
-from executive.executive_states import GetPursueDetectedPointState
 from executive.executive_states import SelectMotionMode
-from executive.executive_states import GetSimpleMoveState
 from executive.executive_states import ServoController
 from executive.executive_states import ExecuteSimpleMove
+from executive.executive_states import MoveToPoints
 
 class PursueSample(object):
     
@@ -97,6 +95,8 @@ class PursueSample(object):
         self.state_machine.userdata.manipulator_search_angle = math.pi/4
         self.state_machine.userdata.search_count = 0
         self.state_machine.userdata.search_try_limit = 2
+        self.state_machine.userdata.grab_count = 0
+        self.state_machine.userdata.grab_count = 2
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
         
@@ -160,13 +160,13 @@ class PursueSample(object):
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
                                    transitions = {'sample_search':'HANDLE_SEARCH_MOVES',
-                                                  'sample_detected':'VISUAL_SERVO',
+                                                  'detected':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('HANDLE_SEARCH_MOVES',
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'SEARCH_MOVE',
-                                                  'sample_detected':'VISUAL_SERVO',
+                                                  'detected':'VISUAL_SERVO',
                                                   'complete':'ANNOUNCE_SEARCH_FAILURE'},
                                    remapping = {'face_next_point':'false',
                                                 'obstacle_check':'false'})
@@ -183,14 +183,6 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  "Search complete, no sample found"),
                                    transitions = {'next':'PUBLISH_FAILURE'})
-          
-            #calculate the strafe move to the sample
-            smach.StateMachine.add('VISUAL_SERVO',
-                                   ServoController(self.tf_listener, self.announcer),
-                                   transitions = {'move':'SERVO_MOVE',
-                                                  'complete':'GRAB_SAMPLE',
-                                                  'point_lost':'HANDLE_SEARCH',
-                                                  'aborted':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -266,7 +258,7 @@ class PursueSample(object):
             smach.StateMachine.add('RETURN_TO_START',
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'RETURN_MOVE',
-                                                  'sample_detected':'RETURN_MOVE',
+                                                  'detected':'RETURN_MOVE',
                                                   'complete':'complete'},
                                    remapping = {'point_list':'approach_points',
                                                 'face_next_point':'true',
@@ -399,7 +391,7 @@ class StartSamplePursuit(smach.State):
                                           'stop_on_sample',
                                           'action_result',
                                           'search_count',
-                                          'simple_move',
+                                          'grab_count',
                                           'distance_to_sample'])
   
     
@@ -415,6 +407,7 @@ class StartSamplePursuit(smach.State):
         #initial approach pursuit done at pursuit_velocity
         userdata.velocity = None
         userdata.search_count = 0
+        userdata.grab_count = 0
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))
         userdata.pursuit_point = userdata.action_goal.input_point
         userdata.approach_points = collections.deque([])
@@ -589,24 +582,26 @@ class GetManipulatorApproachMove(smach.State):
 class HandleSearch(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
-                             outcomes=['sample_search', 'sample_detected', 'aborted'],
+                             outcomes=['sample_search', 'detected', 'aborted'],
                              input_keys=['square_search_size',
                                          'search_count',
                                          'search_try_limit',
                                          'odometry_frame',
-                                         'detected_sample',
-                                        ],
+                                         'detected_sample'],
                              output_keys=['point_list',
-                                          'search_count'])
+                                          'search_count',
+                                          'stop_on_sample'])
     
         self.tf_listener = tf_listener
         self.announcer = announcer
 
     def execute(self, userdata):
 
+        userdata.stop_on_sample = True
+
         if userdata.detected_sample is not None:
             self.announcer.say("Sample in manipulator view")
-            return 'sample_detected'
+            return 'detected'
 
         if userdata.search_count >= userdata.search_try_limit:
             self.announcer.say("Search limit reached")
@@ -636,75 +631,7 @@ class HandleSearch(smach.State):
             rospy.logwarn("PURSUE_SAMPLE failed to transform robot pose in GetSearchMoves")
             return 'aborted'
 
-class MoveToPoints(smach.State):
-    def __init__(self, tf_listener):
-        smach.State.__init__(self,
-                             input_keys=['point_list',
-                                         'detected_sample',
-                                         'odometry_frame',
-                                         'stop_on_sample',
-                                         'face_next_point',
-                                         'obstacle_check'],
-                             output_keys=['simple_move',
-                                          'point_list',
-                                          'active_strafe_key'],
-                             outcomes=['next_point',
-                                       'sample_detected',
-                                       'complete',
-                                       'aborted'])
-        
-        self.tf_listener = tf_listener
-        self.facing_next_point = False
-            
-    def execute(self, userdata):    
-        
-        #if we are looking for samples, mover will be stopped, check it here
-        if userdata.detected_sample is not None and userdata.stop_on_sample:
-            return 'sample_detected'
-        
-        if (len(userdata.point_list) > 0):
 
-            target_point = userdata.point_list[0]
-            header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
-            search_point = geometry_msg.PointStamped(header, target_point)
-            try:
-                point_in_base = self.tf_listener.transformPoint('base_link', search_point).point                
-            except(tf.Exception):
-                rospy.logwarn("PURSUE_SAMPLE failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
-                return 'aborted'
-
-            origin = geometry_msg.Point(0,0,0)
-            distance = util.point_distance_2d(origin, point_in_base)
-            pointing_yaw = util.pointing_yaw(origin, point_in_base)
-
-            if userdata.face_next_point and not self.facing_next_point:
-                userdata.simple_move = {'type':'spin',
-                                        'angle':pointing_yaw}
-                userdata.active_strafe_key = None
-                self.facing_next_point = True
-                return 'next_point'
-            else:
-                #check obstacles along center if we are facing next point
-                if userdata.obstacle_check and self.facing_next_point:
-                    userdata.active_strafe_key = 'center'
-                else:
-                    userdata.active_strafe_key = None
-                
-                #remove the point if we are heading to it
-                userdata.point_list.popleft()
-                userdata.simple_move = {'type':'strafe',
-                                        'angle':pointing_yaw,
-                                        'distance':distance}
-                
-                self.facing_next_point = False
-                return 'next_point'                
-                    
-            return 'next_point'
-        else:
-            self.facing_next_point = False
-            return 'complete'
-        
-        return 'aborted'
 
 class ConfirmSampleAcquired(smach.State):
     def __init__(self, announcer, result_pub):
@@ -753,9 +680,14 @@ class SearchLightSwitch(smach.State):
 
 class PublishFailure(smach.State):
     def __init__(self, result_pub):
-        smach.State.__init__(self, outcomes=['next'])
+        smach.State.__init__(self,
+                             outcomes=['next'],
+                             output_keys=['stop_on_sample',
+                                          'detected_sample'])
         self.result_pub = result_pub
     def execute(self, userdata):
+        userdata.stop_on_sample = False
+        userdata.detected_sample = None
         self.result_pub.publish(samplereturn_msg.PursuitResult(False))        
         return 'next'
 
