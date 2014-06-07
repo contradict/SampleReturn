@@ -354,9 +354,6 @@ class StarManager(smach.State):
         self.starting_spoke = np.radians(-82)
 
     def execute(self, userdata):
-        
-
-        
         #are we returning to the center?
         if not userdata.outbound:
             #for now, just kill the state machine when done

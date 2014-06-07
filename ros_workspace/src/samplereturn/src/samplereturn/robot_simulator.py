@@ -302,7 +302,7 @@ class RobotSimulator(object):
         self.path_marker_pub = rospy.Publisher('path_markers', vis_msg.Marker)
         rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
 
-        rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)
+        rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
         #rospy.spin()
         
@@ -332,7 +332,7 @@ class RobotSimulator(object):
         pose_list.append(next_pose)
         
         i = 0
-        header = std_msg.Header(0, rospy.Time.now(), 'fake_odom')
+        header = std_msg.Header(0, rospy.Time.now(), 'fake_odom')    
         for pose in pose_list:
             self.debug_marker.header = header
             self.debug_marker.pose.position = pose.pose.position
@@ -447,7 +447,7 @@ class RobotSimulator(object):
     def publish_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                header = std_msg.Header(0, rospy.Time.now(), 'map')
+                header = std_msg.Header(0, rospy.Time.now(), 'map')    
                 self.sample_marker.header = header
                 self.sample_marker.pose.position = sample['point']
                 self.sample_marker.id = sample['id']
