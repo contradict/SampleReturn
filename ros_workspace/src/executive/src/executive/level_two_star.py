@@ -338,7 +338,8 @@ class StarManager(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
-                                           'outbound'],
+                                           'outbound',
+                                           'world_fixed_frame'],
                              output_keys = ['line_yaw',
                                             'outbound'],
                              outcomes=['start_line',
@@ -369,7 +370,8 @@ class StarManager(smach.State):
         
         if userdata.outbound:
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-            userdata.line_yaw = util.get_yaw_to_origin(self.tf_listener)
+            userdata.line_yaw = util.get_yaw_to_origin(self.tf_listener,
+                    userdata.world_fixed_frame)
             userdata.outbound = False
             return 'rotate'
         
