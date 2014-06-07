@@ -318,8 +318,9 @@ class LevelTwoStar(object):
             point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform search detection point!")        
+        except tf.Exception, e:
+            rospy.logwarn("LEVEL_TWO failed to transform search detection point %s->%s: %s",
+                    sample.header.frame_id, self.odometry_frame, e)
             
     def beacon_update(self, beacon_pose):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
@@ -390,7 +391,6 @@ class StarManager(smach.State):
         self.announcer = announcer  
 
     def execute(self, userdata):
-        
         #are we returning to the center?
         if not userdata.outbound:
             userdata.outbound = True
@@ -406,7 +406,8 @@ class StarManager(smach.State):
             current_pose = util.get_current_robot_pose(self.tf_listener,
                                                        userdata.world_fixed_frame)
             userdata.line_yaw = util.pointing_yaw(current_pose.pose.position,
-                                                  userdata.spokes[0]['starting_point'])
+                                                  userdata.spokes[0]['starting_point'],
+                                                  userdata.world_fixed_frame)
             rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
             userdata.within_hub_radius = False
             userdata.outbound = False

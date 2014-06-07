@@ -64,6 +64,12 @@ class ExecutiveCostmapChecker(object):
         valid, origin = self.world2map(pos[:2], costmap.info)
         if not valid:
             rospy.logerr("Robot off costmap, cannot check. Returning all blocked.")
+            rospy.logerr("Frame: %s point: %s map: %s-%s",
+                    costmap.header.frame_id,
+                    pos[:2],
+                    (costmap.info.origin.x,costmap.info.origin.y),
+                    (costmap.info.origin.x+costmap.info.width*costmap.info.resolution,
+                     costmap.info.origin.y+costmap.info.height*costmap.info.resolution))
             msg_keys = self.strafes.keys()
             msg_values = [True for _ in msg_keys]
             costmap_check_msg = samplereturn_msg.CostmapCheck(msg_keys, msg_values)

@@ -74,7 +74,7 @@ class RobotSimulator(object):
         self.sample_marker.lifetime = rospy.Duration(1.5)
         
         self.debug_marker = vis_msg.Marker()
-        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'odom')
+        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'fake_odom')
         self.debug_marker.type = vis_msg.Marker.CYLINDER
         self.debug_marker.color = std_msg.ColorRGBA(0, 254, 0, 1)
         self.debug_marker.scale = geometry_msg.Vector3(.05, .05, .5)
@@ -130,6 +130,8 @@ class RobotSimulator(object):
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
 
+        self.odometry_noise_covariance = np.diag([1e-3, 1e-4, 1e-5])
+
         #tf stuff
         self.tf_broadcaster = tf.TransformBroadcaster()
         self.tf_listener = tf.TransformListener()
@@ -137,8 +139,10 @@ class RobotSimulator(object):
         self.zero_translation = (0,0,0)
         self.zero_rotation = (0,0,0,1)
                                                   
-        self.fake_robot_pose = self.initial_pose()
-        self.fake_odometry = self.initial_odometry()
+        self.robot_pose = self.initial_pose()
+        self.robot_odometry = self.initial_odometry()
+        self.noisy_robot_pose = self.initial_pose()
+        self.noisy_robot_odometry = self.initial_odometry()
        
         #manipulator stuff
         self.manipulator_sm = smach.StateMachine(
@@ -263,8 +267,6 @@ class RobotSimulator(object):
         self.points_starboard_pub = rospy.Publisher(point_cloud_starboard_name,
                                                  sensor_msg.PointCloud2)
         
-        rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
-
         #map stuff
         print "Waiting for map server"
         rospy.wait_for_service('/processes/planner/static_map')
@@ -299,11 +301,13 @@ class RobotSimulator(object):
         self.path_counter = 0
         self.path_marker_pub = rospy.Publisher('path_markers', vis_msg.Marker)
         rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
-           
+
+        rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
+
         #rospy.spin()
         
     def publish_path_markers(self, event):
-        self.path_marker.pose = util.get_current_robot_pose(self.tf_listener).pose
+        self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, 'map').pose
         self.path_marker.id = self.path_counter
         self.path_counter += 1
         self.path_marker_pub.publish(self.path_marker)
@@ -313,18 +317,22 @@ class RobotSimulator(object):
         pose_list = []
         square_step = 2.0
 
-        start_pose = util.get_current_robot_pose(self.tf_listener)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5, 0.2)
+        start_pose = util.get_current_robot_pose(self.tf_listener, 'fake_odom')
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5,
+                0.2, 'fake_odom')
         pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5, -0.2)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5,
+                -0.2, 'fake_odom')
         pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0, 0.2)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0,
+                0.2, 'fake_odom')
         pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0, -.2)
+        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0,
+                -.2, 'fake_odom')
         pose_list.append(next_pose)
         
         i = 0
-        header = std_msg.Header(0, rospy.Time.now(), 'odom')    
+        header = std_msg.Header(0, rospy.Time.now(), 'fake_odom')    
         for pose in pose_list:
             self.debug_marker.header = header
             self.debug_marker.pose.position = pose.pose.position
@@ -334,94 +342,98 @@ class RobotSimulator(object):
         
     def handle_planner(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST:
-            self.fake_robot_pose, self.fake_odometry = \
-                self.integrate_odometry(self.fake_robot_pose,
-                                        self.fake_odometry,
-                                        twist)
+            self.integrate_odometry( twist)
         
     def handle_servo(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_SERVO:
-            self.fake_robot_pose, self.fake_odometry = \
-                self.integrate_odometry(self.fake_robot_pose,
-                                        self.fake_odometry,
-                                        twist)
+            self.integrate_odometry( twist)
 
     def handle_joystick(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_JOYSTICK:
-            self.fake_robot_pose, self.fake_odometry = \
-                self.integrate_odometry(self.fake_robot_pose,
-                                        self.fake_odometry,
-                                        twist)
+            self.integrate_odometry( twist)
 
     def publish_point_cloud(self, event):
         now = event.current_real
-        header = std_msg.Header(0, now, '/map')
-        target_frame = '/navigation_center_left_camera'
+        header = std_msg.Header(0, now, 'map')
+        target_frame = 'navigation_center_left_camera'
         try:
-            self.tf_listener.waitForTransform('/map',
+            self.tf_listener.waitForTransform('map',
                                               target_frame,
                                               now,
                                               rospy.Duration(0.5))
-            current_pose = util.get_current_robot_pose(self.tf_listener)
+            current_pose = util.get_current_robot_pose(self.tf_listener,
+                    'map')
             transform = self.tf_listener.asMatrix(target_frame, header)
-            center_cloud = self.get_pointcloud2(self.global_map,
-                                                current_pose.pose.position,
-                                                target_frame,
-                                                transform)
-            self.points_center_pub.publish(center_cloud)        
-            header = std_msg.Header(0, now, '/navigation_port_left_camera')
-            empty_cloud = pc2.create_cloud_xyz32(header,[])
-            self.points_port_pub.publish(empty_cloud)
-            empty_cloud.header.frame_id = 'navigation_starboard_left_camera'
-            self.points_starboard_pub.publish(empty_cloud)
         except ( tf.Exception ):
-            pass
+            return
+        center_cloud = self.get_pointcloud2(self.global_map,
+                                            current_pose.pose.position,
+                                            target_frame,
+                                            transform)
+        self.points_center_pub.publish(center_cloud)
+        header = std_msg.Header(0, now, 'navigation_port_left_camera')
+        empty_cloud = pc2.create_cloud_xyz32(header,[])
+        self.points_port_pub.publish(empty_cloud)
+        empty_cloud.header.frame_id = 'navigation_starboard_left_camera'
+        self.points_starboard_pub.publish(empty_cloud)
         
     def broadcast_tf_and_motion(self, event):
         now = rospy.Time.now()
         self.tf_broadcaster.sendTransform(self.zero_translation,
                                           self.zero_rotation,
                                           now,
-                                          '/odom',
-                                          '/map')
+                                          'fake_odom',
+                                          'fake_map')
         
-        self.fake_robot_pose, self.fake_odometry = \
-            self.integrate_odometry(self.fake_robot_pose, self.fake_odometry)
+        self.integrate_odometry()
         
-        trans = (self.fake_robot_pose.pose.position.x,
-                       self.fake_robot_pose.pose.position.y,
-                       self.fake_robot_pose.pose.position.z)
+        trans = (self.robot_pose.pose.position.x,
+                       self.robot_pose.pose.position.y,
+                       self.robot_pose.pose.position.z)
         
-        rot = (self.fake_robot_pose.pose.orientation.x,
-                    self.fake_robot_pose.pose.orientation.y,
-                    self.fake_robot_pose.pose.orientation.z,
-                    self.fake_robot_pose.pose.orientation.w)
+        rot = (self.robot_pose.pose.orientation.x,
+                    self.robot_pose.pose.orientation.y,
+                    self.robot_pose.pose.orientation.z,
+                    self.robot_pose.pose.orientation.w)
         
-        self.tf_broadcaster.sendTransform(trans, rot, now, '/base_link', '/odom')
-        
+        self.tf_broadcaster.sendTransform(trans, rot, now, 'base_link', 'fake_odom')
 
-        beacon_trans = (-1.3, 0, 1.0)
-        beacon_rot = tf.transformations.quaternion_from_euler(0.0,
-                                                              math.pi/2,
-                                                              math.pi/2,
-                                                              'rxyz')
-        self.tf_broadcaster.sendTransform(beacon_trans,
-                                          beacon_rot,
-                                          now,
-                                          '/beacon',
-                                          '/map')
+        # noisy pose is transform from map->base_link
+        qn = (self.noisy_robot_pose.pose.orientation.x,
+              self.noisy_robot_pose.pose.orientation.y,
+              self.noisy_robot_pose.pose.orientation.z,
+              self.noisy_robot_pose.pose.orientation.w)
+        tn = (self.noisy_robot_pose.pose.position.x,
+              self.noisy_robot_pose.pose.position.y,
+              self.noisy_robot_pose.pose.position.z)
+        nrpt = tf.transformations.compose_matrix(
+                angles=tf.transformations.euler_from_quaternion(qn),
+                translate=tn)
+        # pose is transform from fake_odom->base_link
+        qp = (self.robot_pose.pose.orientation.x,
+              self.robot_pose.pose.orientation.y,
+              self.robot_pose.pose.orientation.z,
+              self.robot_pose.pose.orientation.w)
+        tp = (self.robot_pose.pose.position.x,
+              self.robot_pose.pose.position.y,
+              self.robot_pose.pose.position.z)
+        rpt = tf.transformations.compose_matrix(
+                angles=tf.transformations.euler_from_quaternion(qp),
+                translate=tp)
+        # map->base_link = fake_odom->base_link * fake_map->fake_odom * map->fake_map
 
-        self.tf_broadcaster.sendTransform((0,-1.0, 3.0),
-                                          tf.transformations.quaternion_inverse(beacon_rot),
-                                          now,
-                                          '/platform',
-                                          '/beacon')
-        
+        mfm = np.dot(rpt, np.linalg.inv(nrpt))
+
+        _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
+        mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
+
+        self.tf_broadcaster.sendTransform(mfm_translate, mfm_rot, now, 'fake_map', 'map')
+
         #also publish odometry
-        self.odometry_pub.publish(self.fake_odometry)
-        
+        self.odometry_pub.publish(self.robot_odometry)
+
         #publish joint states
-        self.publish_joint_states(self.fake_odometry)
+        self.publish_joint_states(self.robot_odometry)
 
     def publish_cam_status(self, event):
         if self.cameras_ready:
@@ -435,7 +447,7 @@ class RobotSimulator(object):
     def publish_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                header = std_msg.Header(0, rospy.Time.now(), '/map')    
+                header = std_msg.Header(0, rospy.Time.now(), 'map')    
                 self.sample_marker.header = header
                 self.sample_marker.pose.position = sample['point']
                 self.sample_marker.id = sample['id']
@@ -463,7 +475,7 @@ class RobotSimulator(object):
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], 0.5, 0.2):
-                        header = std_msg.Header(0, rospy.Time.now(), 'odom')
+                        header = std_msg.Header(0, rospy.Time.now(), 'map')
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
                         msg.point = sample['point']
@@ -471,7 +483,7 @@ class RobotSimulator(object):
                         self.manipulator_sample_pub.publish(msg)
             
     def sample_in_view(self, point, max_x, max_y):
-        header = std_msg.Header(0, rospy.Time(0), 'odom')
+        header = std_msg.Header(0, rospy.Time(0), 'map')
         point_stamped = geometry_msg.PointStamped(header, point)
         base_relative = self.tf_listener.transformPoint('base_link',
                                                         point_stamped)
@@ -492,31 +504,33 @@ class RobotSimulator(object):
     def publish_beacon_pose(self, event):
         if not self.publish_beacon:
             return
-        dist_from_origin = np.hypot(self.fake_robot_pose.pose.position.x,
-                                    self.fake_robot_pose.pose.position.y)
+        dist_from_origin = np.hypot(self.robot_pose.pose.position.x,
+                                    self.robot_pose.pose.position.y)
         # can't see beacon closer than 10 meters or farther than 40
         if dist_from_origin < 10.0 or dist_from_origin > 40.0:
             return
-        angle_to_robot = np.arctan2(self.fake_robot_pose.pose.position.y,
-                                    self.fake_robot_pose.pose.position.x)
+        angle_to_robot = np.arctan2(self.robot_pose.pose.position.y,
+                                    self.robot_pose.pose.position.x)
         # can't see beacon with pi/5 of edge
         if (abs(angle_to_robot - np.pi/2) < pi/5 or
             abs(angle_to_robot + np.pi/2) < pi/5):
             return
-        robot_yaw = 2*np.arctan2(self.fake_robot_pose.pose.orientation.z,
-                                 self.fake_robot_pose.pose.orientation.w)
+        robot_yaw = 2*np.arctan2(self.robot_pose.pose.orientation.z,
+                                 self.robot_pose.pose.orientation.w)
         angle_to_origin = util.unwind(angle_to_robot+np.pi-robot_yaw)
         # within +/- pi/4 of forward
         if angle_to_origin > -pi/4 and angle_to_origin < pi/4:
             msg = geometry_msg.PoseStamped()
             msg.header = std_msg.Header(0, rospy.Time(0),
-                                        '/map')
-            q=tf.transformations.quaternion_from_euler(-np.pi/2,-np.pi/2,0,'szyx')
+                                        'map')
+            q=tf.transformations.quaternion_from_euler(-np.pi/2,-np.pi/2,0,'rxyz')
             msg.pose.orientation.x = q[0]
             msg.pose.orientation.y = q[1]
             msg.pose.orientation.z = q[2]
             msg.pose.orientation.w = q[3]
-            msg = self.tf_listener.transformPose('/search_camera_lens', msg)
+            msg.pose.position.x = -1.22
+            msg.pose.position.z = 1.48
+            msg = self.tf_listener.transformPose('search_camera_lens', msg)
             self.beacon_pose_pub.publish(msg)
 
     def publish_GPIO(self, event):
@@ -617,8 +631,10 @@ class RobotSimulator(object):
         rospy.signal_shutdown("Probably closed from terminal")
         
     def zero_robot(self):
-        self.fake_robot_pose = self.initial_pose()
-        self.fake_odometry = self.initial_odometry()
+        self.robot_pose = self.initial_pose()
+        self.robot_odometry = self.initial_odometry()
+        self.noisy_robot_pose = self.initial_pose()
+        self.noisy_robot_odometry = self.initial_odometry()
 
     def get_pointcloud2(self, grid, position, target_frame, transform, range=12.0):
         header =  std_msg.Header(0, rospy.Time.now(), target_frame)
@@ -652,7 +668,7 @@ class RobotSimulator(object):
     def initial_odometry(self):
         odom = nav_msg.Odometry()
         odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = 'odom'
+        odom.header.frame_id = 'fake_odom'
         odom.child_frame_id = 'base_link'
         odom.pose.pose.orientation.w=1.0
         odom.pose.covariance = list(eye(6).reshape((36,)))
@@ -662,42 +678,86 @@ class RobotSimulator(object):
     def initial_pose(self):
         pose = geometry_msg.PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = "odom"
+        pose.header.frame_id = "fake_odom"
         pose.pose.orientation.w = 1.0
         return pose
     
-    def integrate_odometry(self, current_pose, current_odometry, twist=None):
-        if twist is None:
-            twist = geometry_msg.Twist()
-            twist.angular.z = current_odometry.twist.twist.angular.z
-            twist.linear.x = current_odometry.twist.twist.linear.x
-            twist.linear.y = current_odometry.twist.twist.linear.y
+    def integrate_odometry(self, twist=None):
         now = rospy.Time.now();
-        dt = (now - current_pose.header.stamp).to_sec()
-        yaw = 2*arctan2(current_pose.pose.orientation.z,
-                        current_pose.pose.orientation.w)
+        if twist is None:
+            itwist = geometry_msg.Twist()
+            itwist.angular.z = self.robot_odometry.twist.twist.angular.z
+            itwist.linear.x = self.robot_odometry.twist.twist.linear.x
+            itwist.linear.y = self.robot_odometry.twist.twist.linear.y
+        else:
+            itwist = twist
+        self.robot_pose, self.robot_odometry = \
+                self.integrate_twist(self.robot_pose,
+                        self.robot_odometry,
+                        itwist, now)
+
+        if twist is None:
+            itwist = geometry_msg.Twist()
+            itwist.angular.z = self.noisy_robot_odometry.twist.twist.angular.z
+            itwist.linear.x = self.noisy_robot_odometry.twist.twist.linear.x
+            itwist.linear.y = self.noisy_robot_odometry.twist.twist.linear.y
+        else:
+            itwist = twist
+        self.noisy_robot_pose, self.noisy_robot_odometry = \
+                self.integrate_twist(self.noisy_robot_pose,
+                        self.noisy_robot_odometry,
+                        self.odometry_noise(itwist), now)
+
+    def odometry_noise(self, twist):
+        if( np.hypot(twist.linear.x, twist.linear.y) > 1e-3 ):
+            strafe_dir = np.arctan2(twist.linear.y,
+                                    twist.linear.x)
+            noise = np.random.multivariate_normal(np.zeros((3,)),
+                    self.odometry_noise_covariance)
+            ss = np.sin(strafe_dir)
+            cs = np.cos(strafe_dir)
+            noise = np.r_[noise[0]*cs-noise[1]*ss,
+                          noise[0]*ss+noise[1]*cs,
+                          noise[2]]
+        elif np.abs(twist.angular.z)>1e-3:
+            noise = np.random.multivariate_normal(np.zeros((3,)),
+                    self.odometry_noise_covariance)
+            noise[0] = noise[1]
+        else:
+            noise = np.zeros((3,))
+        twist.linear.x += noise[0]
+        twist.linear.y += noise[1]
+        twist.angular.z += noise[2]
+        return twist
+
+
+    def integrate_twist(self, pose, odometry, twist, now):
+        dt = (now - pose.header.stamp).to_sec()
+        yaw = 2*arctan2(pose.pose.orientation.z,
+                        pose.pose.orientation.w)
         cy = cos(yaw)
         sy = sin(yaw)
-        current_pose.pose.position.x += (cy*current_odometry.twist.twist.linear.x*dt
-                                         -sy*current_odometry.twist.twist.linear.y*dt)
-        current_pose.pose.position.y += (sy*current_odometry.twist.twist.linear.x*dt
-                                         +cy*current_odometry.twist.twist.linear.y*dt)
-        yaw += current_odometry.twist.twist.angular.z*dt
-        current_pose.pose.orientation.w = cos(yaw/2)
-        current_pose.pose.orientation.z = sin(yaw/2)
-        current_pose.header.stamp = now
-        current_odometry.pose.pose = deepcopy(current_pose.pose)
-        current_odometry.twist.twist = deepcopy(twist)
-        current_odometry.header.stamp = now
-        return current_pose, current_odometry
-    
+        pose.pose.position.x += (cy*odometry.twist.twist.linear.x*dt
+                                -sy*odometry.twist.twist.linear.y*dt)
+        pose.pose.position.y += (sy*odometry.twist.twist.linear.x*dt
+                                +cy*odometry.twist.twist.linear.y*dt)
+        yaw += odometry.twist.twist.angular.z*dt
+        pose.pose.orientation.w = cos(yaw/2)
+        pose.pose.orientation.z = sin(yaw/2)
+        pose.header.stamp = now
+        odometry.pose.pose = deepcopy(pose.pose)
+        odometry.twist.twist = deepcopy(twist)
+        odometry.header.stamp = now
+        return pose, odometry
+
+
     def publish_joint_states(self, current_odometry):
 
         self.joint_state_seq += 1
         joints = sensor_msg.JointState()
         header = std_msg.Header(self.joint_state_seq,
                                 current_odometry.header.stamp,
-                                '/base_link')
+                                'base_link')
 
         if self.joint_transforms_available:
             

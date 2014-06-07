@@ -370,8 +370,9 @@ class PursueSample(object):
                 sample.header = point_in_frame.header
                 sample.point = point_in_frame.point
                 self.state_machine.userdata.target_sample = sample
-            except tf.Exception:
-                rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point!")
+            except tf.Exception, e:
+                rospy.logwarn("PURSUE_SAMPLE failed to transform search detection point %s->%s: %s",
+                    sample.header.frame_id, self.odometry_frame, e)
 
     def sample_detection_manipulator(self, sample):
         self.state_machine.userdata.detected_sample = sample
@@ -620,23 +621,29 @@ class HandleSearch(smach.State):
         try:
             start_pose = util.get_current_robot_pose(self.tf_listener,
                     userdata.odometry_frame)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, 0)
+            next_pose = util.translate_base_link(self.tf_listener, start_pose,
+                    square_step, 0, userdata.odometry_frame)
             point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, square_step)
+            next_pose = util.translate_base_link(self.tf_listener, start_pose,
+                    square_step, square_step, userdata.odometry_frame)
             point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose, -square_step, square_step)
+            next_pose = util.translate_base_link(self.tf_listener, start_pose,
+                    -square_step, square_step, userdata.odometry_frame)
             point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose, -square_step, -square_step)
+            next_pose = util.translate_base_link(self.tf_listener, start_pose,
+                    -square_step, -square_step, userdata.odometry_frame)
             point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose, square_step, -square_step)
+            next_pose = util.translate_base_link(self.tf_listener, start_pose,
+                    square_step, -square_step, userdata.odometry_frame)
             point_list.append(next_pose.pose.position)
             userdata.point_list = point_list
             self.announcer.say("No sample detected. Search ing area")           
             userdata.search_count += 1
             return 'sample_search'
             
-        except tf.Exception:
-            rospy.logwarn("PURSUE_SAMPLE failed to transform robot pose in GetSearchMoves")
+        except tf.Exception, e:
+            rospy.logwarn("PURSUE_SAMPLE failed to transform %s-%s in GetSearchMoves: %s",
+                    'base_link', userdata.odometry_frame, e)
             return 'aborted'
 
 

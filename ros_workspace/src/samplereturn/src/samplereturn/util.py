@@ -76,9 +76,9 @@ def pointing_yaw(pt1, pt2):
 #takes a stamped pose and returns a stamped pose translated by x and y
 #in the base_link frame, returns in /odom by default, useful for translating
 #the robot pose for making new goals
-def translate_base_link(listener, start_pose, dx, dy, frame_id = '/odom'):
+def translate_base_link(listener, start_pose, dx, dy, frame_id = 'odom'):
     rospy.logdebug('start pose: %s', start_pose)
-    base_header = std_msg.Header(0, rospy.Time(0), '/base_link')
+    base_header = std_msg.Header(0, rospy.Time(0), 'base_link')
     base_point = geometry_msg.PointStamped(base_header,
                                            geometry_msg.Point(dx, dy, 0))
     listener.waitForTransform(frame_id,
@@ -130,8 +130,8 @@ def get_current_robot_yaw(tf_listener, frame_id = '/odom'):
                                             rospy.Time(0))
     return tf.transformations.euler_from_quaternion(quat)[-1]
 
-def get_yaw_to_origin(tf_listener):
-    robot = get_current_robot_pose(tf_listener)
+def get_yaw_to_origin(tf_listener, frame_id = 'odom'):
+    robot = get_current_robot_pose(tf_listener, frame_id)
     return pointing_yaw(robot.pose.position,
                         geometry_msg.Point(0,0,0))
 
