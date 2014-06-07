@@ -4,9 +4,13 @@
 
     <!-- IMPORTANT! For tf, this is the frame that the executive works in, -->
     <!-- and planner mode defines what all executive nodes use for planned motion -->
-    <arg name="executive_frame" value="/odom"/>
+    <arg name="world_fixed_frame" default="map"/>
+    <arg name="odometry_frame" default="odom"/>
     <arg name="planner_mode" value="MODE_PLANNER_TWIST"/>
-    
+
+    <param name="/processes/executive/odometry_frame" value="$(arg odometry_frame)"/>
+    <param name="/processes/executive/world_fixed_frame" value="$(arg world_fixed_frame)"/>
+
     <!-- motion remaps -->
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
@@ -130,7 +134,6 @@
         ns="/processes/executive">
 
         <!-- executive tf frame and planner_mode -->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
@@ -174,7 +177,6 @@
         <remap from="search_lights" to="search_lights"/>
 
         <!-- executive tf frame and planner_mode -->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <param name="min_pursuit_distance" type="double" value="2.5"/>
@@ -226,7 +228,6 @@
         ns="/processes/executive">
 
         <!-- executive tf frame and planner_mode -->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
 
         <param name="lethal_threshold" type="int" value="90"/>        
         <param name="obstacle_check_distance" type="double" value="5"/>
