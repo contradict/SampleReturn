@@ -63,8 +63,17 @@ class ExecutiveCostmapChecker(object):
                         
             odom_yaw = actual_yaw + strafe['angle']
             
-            ll = self.check_point(origin, check_width/2, (odom_yaw - math.pi/2), resolution)
-            ul = self.check_point(origin, check_width/2, (odom_yaw + math.pi/2), resolution)
+            right_offset = strafe.get('right_check_offset', 0)
+            left_offset = strafe.get('left_check_offset', 0)
+            
+            ll = self.check_point(origin,
+                                  check_width/2 + right_offset,
+                                  (odom_yaw - math.pi/2),
+                                  resolution)
+            ul = self.check_point(origin,
+                                  check_width/2 + left_offset,
+                                  (odom_yaw + math.pi/2),
+                                  resolution)
             lr = self.check_point(ll[0], check_dist, odom_yaw, resolution)
             ur = self.check_point(ul[0], check_dist, odom_yaw, resolution)
             

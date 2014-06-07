@@ -45,6 +45,7 @@
                 angle: 0.7854
                 distance: 4.0
                 blocked: False
+                right_check_offset: 1.5     
             center:
                 angle: 0
                 distance: 10.0
@@ -52,7 +53,8 @@
             right:
                 angle: -0.7854
                 distance: 4.0
-                blocked: False
+                blocked: Falsei
+                left_check_offset: 1.5
     </rosparam>
 
     <node
