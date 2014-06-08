@@ -138,21 +138,18 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="10"/>
-        <param name="first_spoke_offset" type="double" value="110"/>
+        <param name="first_spoke_offset" type="double" value="20"/>
         <param name="star_hub_radius" type="int" value="15"/>
-       <param name="return_time_minutes" type="double" value="0.5"/>
+        <param name="return_time_minutes" type="double" value="0.7"/>
 
         <!-- for Beacon approach -->
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.3"/>
-        <param name="max_point_lost_time" type="double" value="60"/>
         <rosparam>
             beacon_approach_point:
-                {x: 15.0, y: 0, yaw: 180}
+                {x: 15.0, y: 0}
         </rosparam>
 
         <!-- simple mover parameters --> 
-        <param name="spin_velocity" type="double" value="0.4"/>
+        <param name="spin_velocity" type="double" value="0.5"/>
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
@@ -181,7 +178,7 @@
         
         <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
-        <param name="max_sample_lost_time" type="double" value="60"/>
+        <param name="max_sample_lost_time" type="double" value="20"/>
         <param name="square_search_size" type="double" value="0.4"/> 
         <param name="pursuit_step" type="double" value="3.0"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>
