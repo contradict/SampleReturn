@@ -123,6 +123,7 @@ def get_current_robot_pose(tf_listener, frame_id = 'odom'):
                                     
     return geometry_msg.PoseStamped(header, pose)
 
+#get robot yaw in the specified frame
 def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
     now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
@@ -130,20 +131,35 @@ def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
                                             now)
     return tf.transformations.euler_from_quaternion(quat)[-1]
 
-def get_yaw_to_origin(tf_listener, frame_id = 'odom'):
+#get robot yaw pointing to the specified frame origin
+def get_robot_yaw_to_origin(tf_listener, frame_id = 'odom'):
     robot = get_current_robot_pose(tf_listener, frame_id)
     return pointing_yaw(robot.pose.position,
                         geometry_msg.Point(0,0,0))
 
-def get_yaw_from_origin(tf_listener):
+#get robot yaw pointing from the specified frame origin
+def get_robot_yaw_from_origin(tf_listener):
     robot = get_current_robot_pose(tf_listener)
     return pointing_yaw(geometry_msg.Point(0,0,0),
                         robot.pose.position)
 
+# gets yaw and distance to point in base_link, for strafe moves to specific points
+def get_robot_strafe(tf_listener, point):
+    tf_listener.waitForTransform('base_link',
+                                point.header.frame_id,
+                                point.header.stamp,
+                                rospy.Duration(1.0))
+    point_in_base = tf_listener.transformPoint('base_link',
+                                               point).point
+    robot_origin = geometry_msg.Point(0,0,0)
+    yaw = pointing_yaw(robot_origin, point_in_base)        
+    distance = point_distance_2d(robot_origin, point_in_base)
+    return yaw, distance
+
 def unwind(ang):
-    if ang > np.pi:
+    while ang > np.pi:
       ang -= 2*np.pi
-    elif ang < -np.pi:
+    while ang < -np.pi:
       ang += 2*np.pi
     return ang
 
