@@ -117,7 +117,6 @@ class ManualController(object):
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
                                                   'aborted':'ANNOUNCE_FAILURE',
-                                                  'blocked':'ANNOUNCE_FAILURE',
                                                   })
 
             smach.StateMachine.add('ANNOUNCE_FAILURE',
