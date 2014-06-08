@@ -161,8 +161,14 @@ class LevelTwoStar(object):
             
             smach.StateMachine.add('ROTATION_MANAGER',
                                    RotationManager(self.tf_listener, self.simple_mover),
-                                   transitions = {'next':'LINE_MANAGER',
+                                   transitions = {'next':'ROTATE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('ROTATE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'LINE_MANAGER',
+                                                  'timeout':'LINE_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
             @smach.cb_interface(input_keys=['detected_sample'])
@@ -435,6 +441,7 @@ class RotationManager(smach.State):
                                          'outbound',
                                          'world_fixed_frame'],
                              output_keys=['line_yaw',
+                                          'simple_move',
                                           'outbound',
                                           'rotate_pose']),  
   
@@ -449,13 +456,10 @@ class RotationManager(smach.State):
                       np.degrees(userdata.line_yaw),
                       np.degrees(actual_yaw),
                       np.degrees(rotate_yaw)))
-        #execute the actual spin!
-        error = self.mover.execute_spin(rotate_yaw, max_velocity=userdata.spin_velocity)
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
-                userdata.world_fixed_frame)
-        rospy.loginfo("ROTATION MANAGER returned actual_yaw: %.1f, error: %.4f" % (
-                      np.degrees(actual_yaw),
-                      error))
+        #create the simple move command
+        userdata.simple_move = {'type':'spin',
+                                 'angle':rotate_yaw,
+                                 'velocity':userdata.spin_velocity}
         return 'next'
 
 #drive to detected sample location        
@@ -497,7 +501,6 @@ class SearchLineManager(smach.State):
         self.offset_count = 0
         self.offset_distance = 0
         if userdata.outbound:
-            #reset offset count on outbound moves
             self.offset_count_limit = 1
         else:
             self.offset_count_limit = 2
@@ -525,6 +528,14 @@ class SearchLineManager(smach.State):
         #giant stupid case loop
         while not rospy.is_shutdown():  
 
+            #if userdata.paused:
+            #    pause_start_time = rospy.Time.now()
+            #    while not rospy.is_shutdown():
+            #        if userdata.paused:
+            #            rospy.sleep(0.2)
+            #        else:
+            #            break
+            
             if rospy.Time.now() > userdata.return_time:
                 self.announcer.say("Search time expired")
                 return self.with_outcome('return_home')
