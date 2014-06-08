@@ -255,8 +255,13 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
-                                     transitions = {'succeeded':'ANNOUNCE_RETURN',
-                                                    'aborted':'ANNOUNCE_RETURN'})
+                                     transitions = {'succeeded':'ANNOUNCE_CONTINUE',
+                                                    'aborted':'ANNOUNCE_CONTINUE'})
+
+            smach.StateMachine.add('ANNOUNCE_CONTINUE',
+                                   AnnounceState(self.announcer,
+                                                 "Continue ing search line"),
+                                   transitions = {'next':'complete'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN',
                                    AnnounceState(self.announcer,
