@@ -57,7 +57,7 @@ class RobotSimulator(object):
         self.excluded_ids = []
         self.fake_samples = [{'point':geometry_msg.Point(16, -12, 0),'id':1},
                              {'point':geometry_msg.Point(5, -30, 0),'id':5},
-                             {'point':geometry_msg.Point(-15, 2, 0), 'id':3},
+                             {'point':geometry_msg.Point(-25, 2, 0), 'id':3},
                              {'point':geometry_msg.Point(-55, 5, 0), 'id':7},
                              {'point':geometry_msg.Point(150,-15, 0), 'id':9},
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
@@ -508,12 +508,14 @@ class RobotSimulator(object):
                                     self.robot_pose.pose.position.y)
         # can't see beacon closer than 10 meters or farther than 40
         if dist_from_origin < 10.0 or dist_from_origin > 40.0:
+            #print ("NO BEACON PUB: outside beacon view distance: %.2f" %(dist_from_origin))
             return
         angle_to_robot = np.arctan2(self.robot_pose.pose.position.y,
                                     self.robot_pose.pose.position.x)
         # can't see beacon with pi/5 of edge
         if (abs(angle_to_robot - np.pi/2) < pi/5 or
             abs(angle_to_robot + np.pi/2) < pi/5):
+            #print ("NO BEACON PUB: on edge, angle_to_robot: %.2f" %(angle_to_robot))
             return
         robot_yaw = 2*np.arctan2(self.robot_pose.pose.orientation.z,
                                  self.robot_pose.pose.orientation.w)
@@ -530,8 +532,14 @@ class RobotSimulator(object):
             msg.pose.orientation.w = q[3]
             msg.pose.position.x = -1.22
             msg.pose.position.z = 1.48
-            msg = self.tf_listener.transformPose('search_camera_lens', msg)
+            try:
+                msg = self.tf_listener.transformPose('search_camera_lens', msg)
+            except tf.Exception:
+                print("search_camera_lens transform not available")
+                return
             self.beacon_pose_pub.publish(msg)
+        #else:
+            #print ("NO BEACON PUB: not in search view, angle_to_origin: %.2f" %(angle_to_origin))
 
     def publish_GPIO(self, event):
         msg = platform_msg.GPIO()
