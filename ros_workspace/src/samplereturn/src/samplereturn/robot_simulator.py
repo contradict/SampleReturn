@@ -56,14 +56,14 @@ class RobotSimulator(object):
         self.collected_ids = []
         self.excluded_ids = []
         self.fake_samples = [{'point':geometry_msg.Point(16, -12, 0),'id':1},
-                             {'point':geometry_msg.Point(5, -30, 0),'id':5},
-                             {'point':geometry_msg.Point(-25, 2, 0), 'id':3},
-                             {'point':geometry_msg.Point(-55, 5, 0), 'id':7},
+                             {'point':geometry_msg.Point(6, -28, 0),'id':5},
+                             {'point':geometry_msg.Point(-38, -3, 0), 'id':3},
+                             {'point':geometry_msg.Point(-65, 20, 0), 'id':7},
                              {'point':geometry_msg.Point(150,-15, 0), 'id':9},
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
-                             {'point':geometry_msg.Point(-40, -20, 0), 'id':2},
+                             {'point':geometry_msg.Point(-38, -16, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
-                             {'point':geometry_msg.Point(15, -42, 0), 'id':4},
+                             {'point':geometry_msg.Point(25, -42, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
@@ -332,10 +332,31 @@ class RobotSimulator(object):
                 -.2, 'fake_odom')
         pose_list.append(next_pose)
         
+        fake_header = std_msg.Header(0, rospy.Time(0), 'fake_map')
+        header = std_msg.Header(0, rospy.Time(0), 'map')
+        quat = geometry_msg.Quaternion(0,0,0,1)
+        pose =  geometry_msg.PoseStamped(header,
+                geometry_msg.Pose(geometry_msg.Point(15,0,0), quat))
+        pose_list.append(pose)
+        pose =  geometry_msg.PoseStamped(fake_header,
+                geometry_msg.Pose(geometry_msg.Point(15,0,0), quat))        
+        pose_list.append(pose)        
+        pose =  geometry_msg.PoseStamped(header,
+                geometry_msg.Pose(geometry_msg.Point(15,5,0), quat))        
+        pose_list.append(pose)        
+        pose =  geometry_msg.PoseStamped(fake_header,
+                geometry_msg.Pose(geometry_msg.Point(15,5,0), quat))        
+        pose_list.append(pose)        
+        pose =  geometry_msg.PoseStamped(header,
+                geometry_msg.Pose(geometry_msg.Point(15,-5,0), quat))        
+        pose_list.append(pose)        
+        pose =  geometry_msg.PoseStamped(fake_header,
+                geometry_msg.Pose(geometry_msg.Point(15,-5,0), quat))        
+        pose_list.append(pose)        
+        
         i = 0
-        header = std_msg.Header(0, rospy.Time.now(), 'fake_odom')    
         for pose in pose_list:
-            self.debug_marker.header = header
+            self.debug_marker.header = pose.header
             self.debug_marker.pose.position = pose.pose.position
             self.debug_marker.id = i
             self.debug_marker_pub.publish(self.debug_marker)        
@@ -638,8 +659,8 @@ class RobotSimulator(object):
     def show_beacon(self):
         self.publish_beacon = True
             
-    def shift_samples(self):
-        shifts = [0.5,-0.5]
+    def shift_samples(self, shift=0.3):
+        shifts = [shift,-shift]
         for sample in self.fake_samples:
             sample['point'].x += random.choice(shifts)
             sample['point'].y += random.choice(shifts)
