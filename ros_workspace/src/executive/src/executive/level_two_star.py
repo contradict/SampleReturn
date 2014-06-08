@@ -297,6 +297,12 @@ class LevelTwoStar(object):
     
     #this is the callback from simple_mover that sees if it should stop!    
     def check_for_stop(self):
+        
+        #the pause switch stops the robot, but we must tell the simple_mover it is stopped
+        if self.state_machine.userdata.paused:
+            rospy.loginfo("LEVEL TWO STOP: on pause")
+            return True
+        
         active_strafe_key = self.state_machine.userdata.active_strafe_key
         
         if active_strafe_key is not None:

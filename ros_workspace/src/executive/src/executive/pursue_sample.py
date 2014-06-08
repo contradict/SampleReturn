@@ -328,6 +328,11 @@ class PursueSample(object):
         sls.stop()
         
     def check_for_stop(self):
+
+        #the pause switch stops the robot, but we must tell the simple_mover it is stopped
+        if self.state_machine.userdata.paused:
+            rospy.loginfo("PURSUE SAMPLE STOP: on pause")
+            return True
         
         active_strafe_key = self.state_machine.userdata.active_strafe_key
         
@@ -347,7 +352,6 @@ class PursueSample(object):
                 if (distance_to_sample <= self.state_machine.userdata.min_pursuit_distance):
                     rospy.loginfo("PURSUE SAMPLE STOP: on pursuit distance = %.3f" %(distance_to_sample))
                     return True
-
 
         #stop if we are moving and looking for manipulator detections
         if self.state_machine.userdata.stop_on_sample and \

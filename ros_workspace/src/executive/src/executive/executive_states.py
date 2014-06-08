@@ -496,32 +496,48 @@ class ExecuteSimpleMove(smach.State):
         move = deepcopy(userdata.simple_move)
         userdata.simple_move = None #consume simple move
         velocity = move.get('velocity', userdata.velocity)
+        angle = move.get('angle')
+        distance = move.get('distance')
  
-        try:
-            angle = move['angle']
-            if move['type'] == 'spin':
-                error = self.simple_mover.execute_spin(angle, max_velocity = velocity)
-                rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
-                                                                   np.degrees(error)))
-            elif move['type'] == 'strafe':
-                distance = move['distance']
-                error = self.simple_mover.execute_strafe(angle,
-                                                         move['distance'],
-                                                         max_velocity = velocity)
-                rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %( np.degrees(angle),
-                                                                                           distance,
-                                                                                           error))
-            else:
-                rospy.logwarn('SIMPLE MOTION invalid type')
-                return 'aborted'
-        
-            return 'complete'
-            
-        except(TimeoutException):
-                rospy.logwarn("TIMEOUT during simple_motion.")
-                return 'timeout'
+        while not rospy.is_shutdown():
+            try:
+                if move['type'] == 'spin':
+                    error = self.simple_mover.execute_spin(angle,
+                                                           max_velocity = velocity)
+                    rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
+                                                                       np.degrees(error)))
+                elif move['type'] == 'strafe':
+                    strafe_angle = move['angle']
+                    error = self.simple_mover.execute_strafe(strafe_angle,
+                                                             distance,
+                                                             max_velocity = velocity)
+                    rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %(
+                                   np.degrees(angle),
+                                   distance,
+                                   error))
+                else:
+                    rospy.logwarn('SIMPLE MOTION invalid type')
+                    return 'aborted'
+                
+                #did we exit the move execute because of a pause?
+                if userdata.paused:
+                    #wait here for unpause, as long as it takes
+                    paused_during_move = True
+                    rospy.loginfo("SIMPLE MOVE stopped by pause")
+                    while not rospy.is_shutdown() and userdata.paused:
+                        rospy.sleep(0.2)
+                    #unpaused, try again, changing both goal values to returned error
+                    distance = error
+                    angle = error
+                else:
+                    #made it through move without being paused, break out
+                    break
+                
+            except(TimeoutException):
+                    rospy.logwarn("TIMEOUT during simple_motion.")
+                    return 'timeout'
 
-        return 'aborted'
+        return 'complete'
 
 #scary class for going to list of points with no obstacle checking, good for searching area
 #with strafing.  obstacle_detection optional on 0 yaw strafes
@@ -689,7 +705,7 @@ class DriveToPoint(smach.State):
                     return 'blocked'                    
         else: #center is clear and we're pointing pretty well, try to drive to the point
             distance = min(distance_to_point, userdata.strafes['center']['distance'])
-            return self.strafe(center_key, userdata, distance)
+            return self.strafe('center', userdata, distance)
             return 'aborted'
  
     def strafe(self, key, userdata, distance=None):
