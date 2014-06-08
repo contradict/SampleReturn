@@ -84,7 +84,7 @@ def translate_base_link(listener, start_pose, dx, dy, frame_id = 'odom'):
     listener.waitForTransform(frame_id,
                         'base_link',
                         start_pose.header.stamp,
-                        rospy.Duration(1.0))
+                        rospy.Duration(2.0))
     new_point = listener.transformPoint(frame_id, base_point)
     rospy.logdebug('new point: %s %s', dx, dy)
     new_pose = geometry_msg.Pose(new_point.point, start_pose.pose.orientation)
@@ -148,7 +148,7 @@ def get_robot_strafe(tf_listener, point):
     tf_listener.waitForTransform('base_link',
                                 point.header.frame_id,
                                 point.header.stamp,
-                                rospy.Duration(1.0))
+                                rospy.Duration(2.0))
     point_in_base = tf_listener.transformPoint('base_link',
                                                point).point
     robot_origin = geometry_msg.Point(0,0,0)
