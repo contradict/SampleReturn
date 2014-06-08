@@ -13,7 +13,6 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import Vector3, Quaternion, PoseStamped
 from tf.transformations import quaternion_from_matrix, quaternion_inverse, quaternion_multiply
-from matplotlib import pyplot as plt
 from image_geometry import PinholeCameraModel
 
 class BeaconFinder:
@@ -49,6 +48,11 @@ class BeaconFinder:
         self._beacon_mounting_frame = rospy.get_param("~beacon_mounting_frame",
                 "platform")
         self._world_fixed_frame = rospy.get_param("~world_fixed_frame", "map")
+
+        # beacon side params
+        self.maxSizeError = rospy.get_param("~max_size_error", 0.1)
+        self.maxDistanceError = rospy.get_param("~max_distance_error", 0.05)
+        self.maxHorizontalError = rospy.get_param("~max_horizontal_error", 0.1)
 
         # Initialize member variables
         self._blob_detector_params = cv2.SimpleBlobDetector_Params()
@@ -125,6 +129,89 @@ class BeaconFinder:
             rospy.loginfo("Found %s", name)
             self._found_queue.put((name, centers, found))
 
+    def sideLook(self, name, image, detector):
+        rospy.logerr("Looking for %s", name)
+        foundSide = True
+        blobs = detector.detect(image)
+
+        # sort by size, largest first
+        sortedBlobs = sorted(blobs, key=lambda b:b.size, reverse=True)
+
+        # sometimes we see a huge blob that's not related, so loop until we're
+        # out of blobs to test
+        while(len(sortedBlobs) >= 3):
+            # reset the flag so we can look at the value at the end of the loop
+            foundSide = True
+
+            topThree = sortedBlobs[:3]
+            # sort by y coordinate to get them stacked (they should be vertical)
+            topThree = sorted(topThree, key=lambda b:b.pt[1])
+            avgSize = 0.0
+            for b in topThree:
+                avgSize += b.size
+            avgSize /= 3.0
+
+            for i in range(len(topThree)):
+                b = topThree[i]
+                if (b.size < avgSize * (1.0 - self.maxSizeError)) or\
+                        (b.size > avgSize * (1.0 + self.maxSizeError)):
+                    foundSide = False
+                    rospy.logerr('rejecting points for size inconsistencies')
+
+            horizontal0to1 = topThree[0].pt[0]-topThree[1].pt[0]
+            horizontal1to2 = topThree[1].pt[0]-topThree[2].pt[0]
+
+            distance0to1 = numpy.sqrt((topThree[0].pt[0]-topThree[1].pt[0])**2 + \
+                    (topThree[0].pt[1]-topThree[1].pt[1])**2)
+            distance1to2 = numpy.sqrt((topThree[1].pt[0]-topThree[2].pt[0])**2 + \
+                    (topThree[1].pt[1]-topThree[2].pt[1])**2)
+
+            avgDistance = (distance0to1 + distance1to2)/2.0
+
+            if abs(distance0to1 - distance1to2) > \
+                    min(distance0to1, distance1to2) * self.maxDistanceError:
+                foundSide = False
+                rospy.logerr('rejecting points for distance errors')
+
+            if abs(horizontal0to1 - horizontal1to2) > \
+                    abs(min(horizontal0to1, horizontal1to2)) * self.maxHorizontalError:
+                foundSide = False
+                rospy.logerr('rejecting points for horizontal error')
+
+            # sometimes we see the front or back and think it is a side.
+            # deal with this by not allowing there to be too many similar sized blobs
+            # in the image. hopefully this lowers detection rates.
+            if foundSide:
+                sameSizeCount = 0
+                for b in blobs:
+                    if not b in topThree:
+                        for c in topThree:
+                            distance = numpy.sqrt((c.pt[0]-b.pt[0])**2 + \
+                                    (c.pt[1]-b.pt[1])**2)
+                            if (distance > (1.0-self.maxDistanceError)*avgDistance) and\
+                                    (distance < (1.0+self.maxDistanceError)*avgDistance):
+                                sameSizeCount += 1
+
+                if sameSizeCount >= 2:
+                    rospy.logerr('found %d similar sized blobs, which is too many!', sameSizeCount)
+                    foundSide = False
+                        
+            # if we made it here and foundSide is still true, break,
+            # we must have found it
+            if(foundSide):
+                cv2.rectangle(image, (int(topThree[0].pt[0]-avgSize), int(topThree[0].pt[1]-avgSize)),
+                        (int(topThree[2].pt[0]+avgSize), int(topThree[2].pt[1]+avgSize)),
+                        (255,0,0),
+                        thickness=-1
+                )
+                self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(image, self._image_output_encoding))
+                rospy.logerr('found %s', name)
+                break
+            else:
+                # if we didn't find it, remove one element from sorted blobs and
+                # try again.
+                sortedBlobs = sortedBlobs[1:]
+
     def image_callback(self, image):
         # This function receives an image, attempts to locate the beacon
         # in it, then if successful outputs a vector towards it in the
@@ -146,6 +233,15 @@ class BeaconFinder:
             back_thread = threading.Thread( target=self.look,
                     args = ("Back", image_cv, self._blob_detector_alt))
             back_thread.start()
+            left_thread = threading.Thread( target=self.sideLook,
+                    args = ("Left", image_cv, self._blob_detector))
+            left_thread.start()
+            right_thread = threading.Thread( target=self.sideLook,
+                    args = ("Right", image_cv, self._blob_detector_alt))
+            right_thread.start()
+
+            left_thread.join()
+            right_thread.join()
             front_thread.join()
             back_thread.join()
 
