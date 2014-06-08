@@ -565,19 +565,11 @@ class GetManipulatorApproachMove(smach.State):
         if userdata.target_sample is None:
             return 'point_lost'
         else:
-            sample_time = userdata.target_sample.header.stamp
-            sample_frame = userdata.target_sample.header.frame_id
             try:
-                self.tf_listener.waitForTransform('base_link',
-                        sample_frame, sample_time, rospy.Duration(1.0))
-                point_in_base = self.tf_listener.transformPoint('base_link',
-                                                             userdata.target_sample).point
-            except(tf.Exception):
+                yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
+            except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
-            origin = geometry_msg.Point(0,0,0)
-            distance = util.point_distance_2d(origin, point_in_base)
-            yaw = util.pointing_yaw(origin, point_in_base)
             userdata.detected_sample = None
             #time to look for sample in manipulator view, stop when it is seen
             userdata.stop_on_sample = True
