@@ -474,19 +474,19 @@ class ServoController(smach.State):
         self.try_count = 0
         return 'aborted'
 
-
+#simple move executor, set up interrupts outside this.  If you want obstacle detection
+#to work, and this is strafing in a checked direction, set the active_strafe_key
 class ExecuteSimpleMove(smach.State):
     def __init__(self, simple_mover):
         
         smach.State.__init__(self,
                              outcomes=['complete',
-                                       'blocked',
                                        'timeout',
                                        'aborted'],
                              input_keys=['simple_move',
                                          'velocity',
                                          'strafes',
-                                         'active_strafe_key'],
+                                         'paused'],
                              output_keys=['simple_move'])
         
         self.simple_mover = simple_mover
@@ -514,10 +514,6 @@ class ExecuteSimpleMove(smach.State):
             else:
                 rospy.logwarn('SIMPLE MOTION invalid type')
                 return 'aborted'
-            
-            if userdata.active_strafe_key is not None and \
-               userdata.strafes[userdata.active_strafe_key]['blocked']:
-                return 'blocked'
         
             return 'complete'
             
@@ -526,7 +522,8 @@ class ExecuteSimpleMove(smach.State):
                 return 'timeout'
 
         return 'aborted'
-    
+
+#scary class for going to list of points with no obstacle checking, good for searching area
 class MoveToPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
@@ -534,11 +531,9 @@ class MoveToPoints(smach.State):
                                          'detected_sample',
                                          'odometry_frame',
                                          'stop_on_sample',
-                                         'face_next_point',
-                                         'obstacle_check'],
+                                         'face_next_point'],
                              output_keys=['simple_move',
-                                          'point_list',
-                                          'active_strafe_key'],
+                                          'point_list'],
                              outcomes=['next_point',
                                        'sample_detected',
                                        'complete',
@@ -569,16 +564,9 @@ class MoveToPoints(smach.State):
             if userdata.face_next_point and not self.facing_next_point:
                 userdata.simple_move = {'type':'spin',
                                         'angle':yaw}
-                userdata.active_strafe_key = None
                 self.facing_next_point = True
                 return 'next_point'
             else:
-                #check obstacles along center if we are facing next point
-                if userdata.obstacle_check and self.facing_next_point:
-                    userdata.active_strafe_key = 'center'
-                else:
-                    userdata.active_strafe_key = None
-                
                 #remove the point if we are heading to it
                 userdata.point_list.popleft()
                 userdata.simple_move = {'type':'strafe',
@@ -587,11 +575,129 @@ class MoveToPoints(smach.State):
                 
                 self.facing_next_point = False
                 return 'next_point'                
-                    
-            return 'next_point'
+
         else:
             self.facing_next_point = False
             return 'complete'
         
         return 'aborted'
+
+#drive to a target_point, stamped.  After getting there, rotate to target_yaw
+class DriveToPoint(smach.State):
+    def __init__(self, tf_listener, announcer):
+        smach.State.__init__(self,
+                             outcomes=['complete',
+                                       'move',
+                                       'detection_interrupt',
+                                       'blocked',
+                                       'aborted'],
+                             input_keys=['target_point',
+                                         'target_yaw',
+                                         'target_tolerance',
+                                         'strafes',
+                                         'detection_object',
+                                         'stop_on_detection',
+                                         'offset_count',
+                                         'offset_limit',
+                                         'active_strafe_key',                                         
+                                         'odometry_frame'],
+                             output_keys=['simple_move',
+                                          'offset_count',
+                                          'active_strafe_key'])
+        
+        self.tf_listener = tf_listener
+        self.announcer = announcer
+    
+    def execute(self, userdata):
+        #enter with target_point, transform it into odometry frame
+        #get all the relationships between robot and sample, angle, distance, etc.
+        try:
+            self.tf_listener.waitForTransform(userdata.odometry_frame,
+                                              userdata.target_point.header.frame_id,
+                                              rospy.Time(0),
+                                              rospy.Duration(1.0))
+            point_in_odom = self.tf_listener.transformPoint(userdata.odometry_frame,
+                                                            userdata.target_point)
+            yaw_to_point, distance_to_point = util.get_robot_strafe(self.tf_listener,
+                                                                    point_in_odom)
+            robot_yaw = util.get_current_robot_yaw(self.tf_listener,
+                                                    userdata.odometry_frame)
+        except tf.Exception:
+            rospy.logwarn("DRIVE TO POINT failed to transform point: %s->%s",
+                           sample.header.frame_id, self.odometry_frame)
+            return 'aborted'
+    
+        #incremental yaw angle to rotate robot to face sample
+        #rotate_yaw = util.unwind(yaw_to_point - robot_yaw)
+        
+        rospy.loginfo("DRIVE TO POINT entering with: distance_to_point: %.2f, yaw_to_point: %.1f, robot_yaw: %.1f, point_frame: %s" % (
+                      distance_to_point,
+                      np.degrees(yaw_to_point),
+                      np.degrees(robot_yaw),
+                      userdata.target_point.header.frame_id))
+        
+        #are we there yet?
+        if distance_to_point < userdata.target_tolerance:
+            
+            #position in tolerance, is there a target_yaw specified?
+            if userdata.target_yaw is not None:
+                rotate_yaw = util.unwind(userdata.target_yaw - robot_yaw)
+                if np.abs(rotate_yaw) >  userdata.target_tolerance:
+                    self.announcer.say("Rotate ing to target yaw")
+                    return self.spin(rotate_yaw, userdata)    
+            
+            #position and yaw in tolerance
+            return 'complete'
+    
+        #check if we were interrupted by a detection (sample... beacon maybe?)
+        if userdata.stop_on_detection and userdata.detection_object is not None:
+            return 'detection_interrupt'
+ 
+        if np.abs(yaw_to_point) > userdata.target_tolerance:
+            #if we are outside the angle tolerance to the target point, face it
+            self.announcer.say("Rotate ing towards point")
+            return self.spin(util.unwind(yaw_to_point), userdata)
+        elif userdata.strafes['center']['blocked']:
+            #pointing at target still, but center got blocked
+            #check offset limit
+            if userdata.offset_count >= userdata.offset_limit:
+                userdata.active_strafe_key = None
+                self.announcer.say("Approach blocked. Abort ing")
+                return 'blocked'
+            else: #under offset limit, try strafing
+                if not userdata.strafes['left']['blocked']:
+                    return self.strafe('left', userdata)
+                elif not userdata.strafes['right']['blocked']:
+                    return self.strafe('right', userdata)
+                else: #all blocked, get the hell out
+                    userdata.active_strafe_key = None
+                    self.announcer.say("Approach blocked. Abort ing")
+                    return 'blocked'                    
+        else: #center is clear and we're pointing pretty well, try to drive to the point
+            return self.strafe('center', userdata, distance_to_point)
+            return 'aborted'
+ 
+    def strafe(self, key, userdata, distance=None):
+        #check before any strafe move:
+        strafe = userdata.strafes[key]
+        if distance is None:
+            distance = strafe['distance']
+        userdata.offset_count += np.sign(strafe['angle'])
+        userdata.simple_move = {'type':'strafe',
+                                'angle':strafe['angle'],
+                                'distance': distance}
+        userdata.active_strafe_key = key
+        if key == 'center':
+            self.announcer.say("Moving to point")           
+        elif key == 'left':
+            self.announcer.say("Approach blocked, strafe ing left")
+        elif key == 'right':
+            self.announcer.say("Approach blocked, strafe ing right")
+        return 'move'
+    
+    def spin(self, angle, userdata):
+        userdata.simple_move = {'type':'spin',
+                                'angle':angle}
+        userdata.active_strafe_key = None
+        return 'move'
 
