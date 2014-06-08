@@ -93,7 +93,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.beacon_approach_point = self.beacon_approach_point
         self.state_machine.userdata.platform_point = self.platform_point
         self.state_machine.userdata.offset_count = 0
-        self.state_machine.userdata.offset_limit = 4
+        self.state_machine.userdata.offset_limit = 0
         self.state_machine.userdata.target_tolerance = 0.2 #both meters and radians for now!
         
         #search line parameters
@@ -152,11 +152,18 @@ class LevelTwoStar(object):
                                    SearchLineManager(self.tf_listener,
                                                      self.simple_mover,
                                                      self.announcer),
-                                   transitions = {'sample_detected':'PURSUE_SAMPLE',
+                                   transitions = {'move':'LINE_MOVE',
+                                                  'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
                                                   'next_spoke':'STAR_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
+            smach.StateMachine.add('LINE_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'LINE_MANAGER',
+                                                  'timeout':'LINE_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('ROTATION_MANAGER',
@@ -397,6 +404,8 @@ class StarManager(smach.State):
                              output_keys = ['line_yaw',
                                             'outbound',
                                             'spokes',
+                                            'offset_count',
+                                            'offset_limit',
                                             'within_hub_radius'],
                              outcomes=['start_line',
                                        'rotate',
@@ -409,24 +418,31 @@ class StarManager(smach.State):
     def execute(self, userdata):
         #are we returning to the center?
         if not userdata.outbound:
-            userdata.outbound = True
+            #just finished inbound spoke, turn around and head outwards again
             if len(userdata.spokes) == 1:
                 rospy.loginfo("STAR MANAGER finished inbound move, last spoke")
                 return 'return_home'
             userdata.line_yaw = userdata.spokes.pop(0)['yaw']
+            userdata.offset_count = 0
+            userdata.offset_limit = 1
+            userdata.outbound = True
+            rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
             return 'rotate'        
         
         if userdata.outbound:
-            self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-            rospy.loginfo
+            #just finished outbound spoke, turn around and head towards next star point
+            #flip by setting line yaw.  Also set offset limit higher
             current_pose = util.get_current_robot_pose(self.tf_listener,
                                                        userdata.world_fixed_frame)
             userdata.line_yaw = util.pointing_yaw(current_pose.pose.position,
                                                   userdata.spokes[0]['starting_point'])
-            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
             userdata.within_hub_radius = False
+            userdata.offset_count = 0
+            userdata.offset_limit = 2
             userdata.outbound = False
+            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
+            self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
             return 'rotate'
         
         return 'start_line'    
@@ -469,17 +485,18 @@ class SearchLineManager(smach.State):
                              input_keys = ['strafes',
                                            'line_yaw',
                                            'outbound',
-                                           'obstacle_check_distance',
-                                           'obstacle_check_width',
+                                           'offset_count',
+                                           'offset_limit',
                                            'return_time',
                                            'detected_sample',
                                            'world_fixed_frame',
                                            'odometry_frame',
                                            'within_hub_radius'],
-                             output_keys = ['next_line_pose',
-                                            'detected_sample',
+                             output_keys = ['simple_move',
+                                            'offset_count',
                                             'active_strafe_key'],
-                             outcomes=['sample_detected',
+                             outcomes=['move',
+                                       'sample_detected',
                                        'line_blocked',
                                        'next_spoke',
                                        'return_home',
@@ -491,19 +508,7 @@ class SearchLineManager(smach.State):
 
     def execute(self, userdata):
     
-        self.strafes = userdata.strafes
-        userdata.detected_sample = None
-        
-        #the desired yaw of this line
-        self.line_yaw = userdata.line_yaw
- 
-        #if on return line, allow a little more strafing, this will always work perfectly
-        self.offset_count = 0
-        self.offset_distance = 0
-        if userdata.outbound:
-            self.offset_count_limit = 1
-        else:
-            self.offset_count_limit = 2
+        userdata.active_strafe_key = None
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
                 userdata.world_fixed_frame)
@@ -517,11 +522,8 @@ class SearchLineManager(smach.State):
                        current_pose.pose.position.x,
                        current_pose.pose.position.y))
         
-        #wait for costmaps to update
-        rospy.sleep(3.0)
-        
         #useful condition lambdas and other flags for dumb planner behaviour
-        under_offset_limit = lambda: np.abs(self.offset_count) < self.offset_count_limit
+        under_offset_limit = lambda: np.abs(userdata.offset_count) < userdata.offset_limit
         first_angle_choice = 'left' if userdata.outbound else 'right'
         second_angle_choice = 'right' if userdata.outbound else 'left'
         
@@ -538,72 +540,65 @@ class SearchLineManager(smach.State):
             
             if rospy.Time.now() > userdata.return_time:
                 self.announcer.say("Search time expired")
-                return self.with_outcome('return_home')
+                return 'return_home'
             
             #check preempt after deciding whether or not to calculate next line pose
             if self.preempt_requested():
                 rospy.loginfo("LINE MANAGER: preempt requested")
                 self.service_preempt()
-                return self.with_outcome('preempted')
+                return 'preempted'
             
             if userdata.detected_sample is not None:
-                return self.with_outcome("sample_detected")
+                return "sample_detected"
  
             #are we within the star hub radius?
             if not userdata.outbound and userdata.within_hub_radius:
-                return self.with_outcome('next_spoke')        
+                return 'next_spoke'     
             
             #BEGINNING OF THE MIGHTY LINE MANAGER CASE LOOP       
             #first check if we are offset from line either direction, and if so, is the path
             #back the line clear.  If is is, strafe towards the line
-            if (self.offset_count > 0) and not self.strafes['right']['blocked']:
+            if (userdata.offset_count > 0) and not userdata.strafes['right']['blocked']:
                 #left of line
                 self.announcer.say('Right clear, strafe ing to line')
-                self.strafe('right', userdata)
-            elif (self.offset_count < 0) and not self.strafes['left']['blocked']:
+                return self.strafe('right', userdata)
+            elif (userdata.offset_count < 0) and not userdata.strafes['left']['blocked']:
                 #right of line
                 self.announcer.say('Left clear, strafe ing to line')
-                self.strafe('left', userdata)
+                return self.strafe('left', userdata)
             
             #if not offset or returning to line is blocked, going straight is next priority
-            elif not self.strafes['center']['blocked']:
+            elif not userdata.strafes['center']['blocked']:
                 self.announcer.say("Line clear, continue ing")    
-                self.strafe('center', userdata)
+                return self.strafe('center', userdata)
                
             #if returning to the line not possible or necessary,
             #and going straight isn't possible: offset from line             
-            elif not self.strafes[first_angle_choice]['blocked'] and under_offset_limit():
+            elif not userdata.strafes[first_angle_choice]['blocked'] and under_offset_limit():
                 self.announcer.say("Obstacle in line, strafe ing %s" % (first_angle_choice))
-                self.strafe(first_angle_choice, userdata)
+                return self.strafe(first_angle_choice, userdata)
                 
-            elif not self.strafes[second_angle_choice]['blocked'] and under_offset_limit():
+            elif not userdata.strafes[second_angle_choice]['blocked'] and under_offset_limit():
                 self.announcer.say("Obstacle in line, strafe ing %s" % (second_angle_choice))
-                self.strafe(second_angle_choice, userdata)
+                return self.strafe(second_angle_choice, userdata)
             
             #getting here means lethal cells in all three yaw check lines,
             #or that the only unblocked line takes us outside our allowable offset
             else:             
                 self.announcer.say("Line is blocked, rotate ing")
-                return self.with_outcome('line_blocked')               
-       
-            #a little delay to help make sure costmap are updated and such
-            rospy.sleep(0.5)
+                return 'line_blocked'
         
         return 'aborted'
     
-    def with_outcome(self, outcome):
-        return outcome
-    
     def strafe(self, key, userdata):
-        strafe = self.strafes[key]
-        self.offset_count += np.sign(strafe['angle'])
-        rospy.loginfo("STRAFING %s to offset_count: %s" % (key, self.offset_count))
+        strafe = userdata.strafes[key]
+        userdata.offset_count += np.sign(strafe['angle'])
+        rospy.loginfo("STRAFING %s to offset_count: %s" % (key, userdata.offset_count))
+        userdata.simple_move = {'type':'strafe',
+                                'angle':strafe['angle'],
+                                'distance': strafe['distance']}
         userdata.active_strafe_key = key
-        move_error = self.mover.execute_strafe(strafe['angle'], strafe['distance'])
-        userdata.active_strafe_key = None
-        rospy.loginfo("STRAFING %s returned blocked:%s, with distance error: %s" %(
-                        key, strafe['blocked'], move_error))
-    
+        return 'move'
   
 class BeaconApproach(smach.State):
  
@@ -623,6 +618,7 @@ class BeaconApproach(smach.State):
                                           'target_yaw',
                                           'target_tolerance',
                                           'offset_count',
+                                          'offset_limit',
                                           'simple_move',
                                           'stop_on_sample',
                                           'stop_on_beacon',
@@ -636,6 +632,7 @@ class BeaconApproach(smach.State):
         
         #reset offset counter for driving moves
         userdata.offset_count = 0
+        userdata.offset_limit = 3
         #ignore samples now
         userdata.stop_on_sample = False
         #by default, driving moves won't have a target_yaw
