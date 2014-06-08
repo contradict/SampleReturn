@@ -688,7 +688,8 @@ class DriveToPoint(smach.State):
                     self.announcer.say("Approach blocked. Abort ing")
                     return 'blocked'                    
         else: #center is clear and we're pointing pretty well, try to drive to the point
-            return self.strafe('center', userdata, distance_to_point)
+            distance = min(distance_to_point, userdata.strafe['center']['distance'])
+            return self.strafe(center_key, userdata, distance)
             return 'aborted'
  
     def strafe(self, key, userdata, distance=None):
