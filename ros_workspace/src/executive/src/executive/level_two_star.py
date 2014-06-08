@@ -23,12 +23,9 @@ import platform_motion_msgs.srv as platform_srv
 
 import samplereturn.simple_motion as simple_motion
 
-from executive.executive_states import DriveToPoseState
-from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
-from executive.executive_states import MoveToPoints
 from executive.executive_states import DriveToPoint
 
 import samplereturn.util as util
