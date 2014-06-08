@@ -9,7 +9,10 @@
              address="localhost"/>
     <!-- end test arguments -->
     
-    <include file="$(find executive)/launch/executive.launch"/>
+    <include file="$(find executive)/launch/executive.launch">
+        <arg name="odometry_frame" value="fake_odom"/>
+        <arg name="world_fixed_frame" value="fake_map"/>
+    </include>
 
     <!-- crap below here is for test only -->
 
@@ -23,7 +26,9 @@
     
     <include file="$(find samplereturn)/launch/joystick.launch"/>
 
-    <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
+    <include file="$(find samplereturn)/launch/planner_dumb.launch">
+        <arg name="odometry_frame" value="fake_odom"/>
+    </include>
 
     <arg name="map_config" value="maps/map_park_fake.yaml"/>
     <node
@@ -58,5 +63,8 @@
         <param name="publish_frequency" type="double" value="10"/>
 
     </node>
-    
+
+    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
+        <arg name="world_fixed_frame" value="fake_map"/>
+    </include>
 </launch>

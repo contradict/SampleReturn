@@ -4,9 +4,13 @@
 
     <!-- IMPORTANT! For tf, this is the frame that the executive works in, -->
     <!-- and planner mode defines what all executive nodes use for planned motion -->
-    <arg name="executive_frame" value="/odom"/>
+    <arg name="world_fixed_frame" default="map"/>
+    <arg name="odometry_frame" default="odom"/>
     <arg name="planner_mode" value="MODE_PLANNER_TWIST"/>
-    
+
+    <param name="/processes/executive/odometry_frame" value="$(arg odometry_frame)"/>
+    <param name="/processes/executive/world_fixed_frame" value="$(arg world_fixed_frame)"/>
+
     <!-- motion remaps -->
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="CAN_status_word" to="/motion/CAN/status_word"/>
@@ -130,26 +134,22 @@
         ns="/processes/executive">
 
         <!-- executive tf frame and planner_mode -->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="10"/>
-        <param name="first_spoke_offset" type="double" value="0"/>
+        <param name="first_spoke_offset" type="double" value="20"/>
         <param name="star_hub_radius" type="int" value="15"/>
-        <param name="return_time_minutes" type="double" value="100"/>
+        <param name="return_time_minutes" type="double" value="0.7"/>
 
         <!-- for Beacon approach -->
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.3"/>
-        <param name="max_point_lost_time" type="double" value="60"/>
         <rosparam>
             beacon_approach_point:
-                {x: 15.0, y: 0, yaw: 180}
+                {x: 15.0, y: 0}
         </rosparam>
 
         <!-- simple mover parameters --> 
-        <param name="spin_velocity" type="double" value="0.4"/>
+        <param name="spin_velocity" type="double" value="0.5"/>
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
@@ -174,13 +174,12 @@
         <remap from="search_lights" to="search_lights"/>
 
         <!-- executive tf frame and planner_mode -->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
-        <param name="max_sample_lost_time" type="double" value="60"/>
-        <param name="square_search_size" type="double" value="0.3"/> 
+        <param name="max_sample_lost_time" type="double" value="20"/>
+        <param name="square_search_size" type="double" value="0.4"/> 
         <param name="pursuit_step" type="double" value="3.0"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>
         <param name="search_velocity" type="double" value="0.25"/>
@@ -226,7 +225,6 @@
         ns="/processes/executive">
 
         <!-- executive tf frame and planner_mode -->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
 
         <param name="lethal_threshold" type="int" value="90"/>        
         <param name="obstacle_check_distance" type="double" value="5"/>

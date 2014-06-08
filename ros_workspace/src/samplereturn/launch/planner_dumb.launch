@@ -2,6 +2,7 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
+    <arg name="odometry_frame" default="odom"/>
     <node
         machine="navigate"
         pkg="costmap_2d"
@@ -10,6 +11,7 @@
         ns="/processes/planner/dumb"
         >
 
+        <param name="costmap/global_frame" type="string" value="$(arg odometry_frame)"/>
         <rosparam file="$(find samplereturn)/config/costmap_dumb_params.yaml" ns="costmap" command="load"/>
 
     </node>

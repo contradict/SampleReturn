@@ -76,13 +76,13 @@ def pointing_yaw(pt1, pt2):
 #takes a stamped pose and returns a stamped pose translated by x and y
 #in the base_link frame, returns in /odom by default, useful for translating
 #the robot pose for making new goals
-def translate_base_link(listener, start_pose, dx, dy, frame_id = '/odom'):
+def translate_base_link(listener, start_pose, dx, dy, frame_id = 'odom'):
     rospy.logdebug('start pose: %s', start_pose)
-    base_header = std_msg.Header(0, rospy.Time(0), '/base_link')
+    base_header = std_msg.Header(0, rospy.Time(0), 'base_link')
     base_point = geometry_msg.PointStamped(base_header,
                                            geometry_msg.Point(dx, dy, 0))
     listener.waitForTransform(frame_id,
-                        '/base_link',
+                        'base_link',
                         start_pose.header.stamp,
                         rospy.Duration(1.0))
     new_point = listener.transformPoint(frame_id, base_point)
@@ -112,38 +112,54 @@ def pose_rotate(start_pose, angle):
     new_pose = geometry_msg.Pose(start_pose.pose.position, new_orientation)
     return geometry_msg.PoseStamped(start_pose.header, new_pose)    
 
-def get_current_robot_pose(tf_listener, frame_id = '/odom'):
-    now = tf_listener.getLatestCommonTime(frame_id, '/base_link')
+def get_current_robot_pose(tf_listener, frame_id = 'odom'):
+    now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
-                                            '/base_link',
-                                            rospy.Time(0))
+                                            'base_link',
+                                            now)
     header = std_msg.Header(0, now, frame_id)
     pose = geometry_msg.Pose(geometry_msg.Point(*pos),
                              geometry_msg.Quaternion(*quat))
                                     
     return geometry_msg.PoseStamped(header, pose)
 
-def get_current_robot_yaw(tf_listener, frame_id = '/odom'):
-    now = tf_listener.getLatestCommonTime(frame_id, '/base_link')
+#get robot yaw in the specified frame
+def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
+    now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
-                                            '/base_link',
-                                            rospy.Time(0))
+                                            'base_link',
+                                            now)
     return tf.transformations.euler_from_quaternion(quat)[-1]
 
-def get_yaw_to_origin(tf_listener):
-    robot = get_current_robot_pose(tf_listener)
+#get robot yaw pointing to the specified frame origin
+def get_robot_yaw_to_origin(tf_listener, frame_id = 'odom'):
+    robot = get_current_robot_pose(tf_listener, frame_id)
     return pointing_yaw(robot.pose.position,
                         geometry_msg.Point(0,0,0))
 
-def get_yaw_from_origin(tf_listener):
+#get robot yaw pointing from the specified frame origin
+def get_robot_yaw_from_origin(tf_listener):
     robot = get_current_robot_pose(tf_listener)
     return pointing_yaw(geometry_msg.Point(0,0,0),
                         robot.pose.position)
 
+# gets yaw and distance to point in base_link, for strafe moves to specific points
+def get_robot_strafe(tf_listener, point):
+    tf_listener.waitForTransform('base_link',
+                                point.header.frame_id,
+                                point.header.stamp,
+                                rospy.Duration(1.0))
+    point_in_base = tf_listener.transformPoint('base_link',
+                                               point).point
+    robot_origin = geometry_msg.Point(0,0,0)
+    yaw = pointing_yaw(robot_origin, point_in_base)        
+    distance = point_distance_2d(robot_origin, point_in_base)
+    return yaw, distance
+
 def unwind(ang):
-    if ang > np.pi:
+    while ang > np.pi:
       ang -= 2*np.pi
-    elif ang < -np.pi:
+    while ang < -np.pi:
       ang += 2*np.pi
     return ang
 

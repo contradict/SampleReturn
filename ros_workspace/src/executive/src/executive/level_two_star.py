@@ -26,8 +26,8 @@ from executive.executive_states import DriveToPoseState
 from executive.executive_states import PursueDetectedPoint
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
-from executive.executive_states import GetPursueDetectedPointState
-from executive.executive_states import GetSimpleMoveState
+from executive.executive_states import ExecuteSimpleMove
+from executive.executive_states import MoveToPoints
 
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
@@ -44,13 +44,10 @@ class LevelTwoStar(object):
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
-        #calculate beacon approach pose now, in /map
-        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+        #make a Point msg out of beacon_approach_point
         point = geometry_msg.Point(self.beacon_approach_point['x'],
                                    self.beacon_approach_point['y'], 0)
-        quat_array = tf.transformations.quaternion_from_euler(0, 0, math.pi)           
-        pose = geometry_msg.Pose(point, geometry_msg.Quaternion(*quat_array))
-        self.beacon_approach_pose = geometry_msg.PoseStamped(header, pose)
+        self.beacon_approach_point = point
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_navigate")
@@ -64,16 +61,23 @@ class LevelTwoStar(object):
         #strafe definitions, offset is length along strafe line
         #the yaws have a static angle, which the direction from base_link the robot strafes
         self.strafes = rospy.get_param('strafes')
-        
-        rospy.loginfo('STRAFES: %s' % (self.strafes))       
-               
+
+        #get the star shape
+        self.spokes = self.get_hollow_star(self.node_params.spoke_count,
+                                           self.node_params.first_spoke_offset,
+                                           self.node_params.star_hub_radius)
+                       
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
     
+        self.state_machine.userdata.spokes = self.spokes
+        self.state_machine.userdata.star_hub_radius = self.node_params.star_hub_radius
         self.state_machine.userdata.strafes = self.strafes
         self.state_machine.userdata.active_strafe_key = None
+        #sets the default velocity used by ExecuteSimpleMove, if none, use simple_motion default
+        self.state_machine.userdata.velocity = None
 
         #these are important values!  master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
@@ -87,7 +91,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_point_lost_time = self.node_params.max_point_lost_time
-        self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
+        self.state_machine.userdata.beacon_approach_point = self.beacon_approach_point
         
         #search line parameters
         self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
@@ -97,7 +101,11 @@ class LevelTwoStar(object):
         #search line variables
         self.state_machine.userdata.next_line_pose = None
         self.state_machine.userdata.last_line_pose = None
-        self.state_machine.userdata.line_yaw = 0 #IN RADIANS!
+        self.state_machine.userdata.line_yaw = None #IN RADIANS!
+        self.state_machine.userdata.outbound = False
+        self.state_machine.userdata.distance_to_origin = 100
+        self.state_machine.userdata.stop_on_sample = True
+        self.state_machine.userdata.stop_on_beacon = False
 
         #subscriber controlled userdata
         self.state_machine.userdata.paused = False        
@@ -117,19 +125,18 @@ class LevelTwoStar(object):
             
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(input_keys=[],
-                                                 output_keys=['action_result',
-                                                              'outbound'],
+                                                 output_keys=['action_result'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
                                                  'Enter ing level two mode'),
-                                   transitions = {'next':'SELECT_SERVO'})
+                                   transitions = {'next':'SELECT_PLANNER'})
             
-            smach.StateMachine.add('SELECT_SERVO',
+            smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
-                                                     MODE_SERVO),
+                                                     MODE_PLANNER),
                                     transitions = {'next':'STAR_MANAGER',
                                                   'failed':'LEVEL_TWO_ABORTED'})
             
@@ -147,7 +154,7 @@ class LevelTwoStar(object):
                                    transitions = {'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
                                                   'next_spoke':'STAR_MANAGER',
-                                                  'return_home':'STAR_MANAGER',
+                                                  'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -184,41 +191,65 @@ class LevelTwoStar(object):
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
-                                                 'Move ing to beacon approach point'),
-                                   transitions = {'next':'ANNOUNCE_APPROACH_BEACON'})           
-
-            smach.StateMachine.add('ANNOUNCE_APPROACH_BEACON',
-                                   AnnounceState(self.announcer,
-                                                 'Beacon in view approach ing'),
-                                   transitions = {'next':'ANNOUNCE_MOUNT_PLATFORM'})               
-
-            smach.StateMachine.add('ANNOUNCE_MOUNT_PLATFORM',
-                                   AnnounceState(self.announcer,
-                                                 'Mount ing platform'),
-                                   transitions = {'next':'MOUNT_PLATFORM'})  
-
-            self.mount_platform = GetSimpleMoveState(self.simple_mover, self.tf_listener)
+                                                 'Return ing to home platform'),
+                                   transitions = {'next':'CLEAR_BEACON_POINT'})
             
-            smach.StateMachine.add('MOUNT_PLATFORM',
-                                   self.mount_platform,
-                                   transitions = {'complete':'DESELECT_SERVO',
-                                                  'timeout':'ANNOUNCE_RETURN_HOME',
-                                                  'sample_detected':'LEVEL_TWO_ABORTED',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'pursue_samples':'true'})
+            smach.StateMachine.add('CLEAR_BEACON_POINT',
+                                   ClearBeaconPoint(),
+                                   transitions = {'next':'BEACON_APPROACH'})
 
-            #ADD BEACON SEARCH!
-            smach.StateMachine.add('ANNOUNCE_SEARCH_FOR_BEACON',
-                                   AnnounceState(self.announcer,
-                                                 'Beacon not in view, searching'),
-                                   transitions = {'next':'LEVEL_TWO_ABORTED'})  
+            smach.StateMachine.add('BEACON_APPROACH',
+                                   BeaconApproach(self.tf_listener, self.announcer),
+                                   transitions = {'mount':'HANDLE_MOUNT_MOVES',
+                                                  'move':'HANDLE_BEACON_APPROACH_MOVES',
+                                                  'spin':'BEACON_APPROACH_SPIN',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
+            smach.StateMachine.add('BEACON_APPROACH_SPIN',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'BEACON_APPROACH',
+                                                  'blocked':'BEACON_APPROACH',
+                                                  'timeout':'BEACON_APPROACH',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
             
+            #return to start along the approach point
+            #if the path is ever blocked just give up and return to the level_two search
+            smach.StateMachine.add('HANDLE_BEACON_APPROACH_MOVES',
+                                   MoveToPoints(self.tf_listener),
+                                   transitions = {'next_point':'BEACON_APPROACH_MOVE',
+                                                  'sample_detected':'BEACON_APPROACH',
+                                                  'complete':'BEACON_APPROACH'},
+                                   remapping = {'detected_sample':'beacon_point',
+                                                'face_next_point':'true',
+                                                'obstacle_check':'true'})
+
+            smach.StateMachine.add('BEACON_APPROACH_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'HANDLE_BEACON_APPROACH_MOVES',
+                                                  'blocked':'HANDLE_BEACON_APPROACH_MOVES',
+                                                  'timeout':'HANDLE_BEACON_APPROACH_MOVES',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
+            smach.StateMachine.add('HANDLE_MOUNT_MOVES',
+                                   MoveToPoints(self.tf_listener),
+                                   transitions = {'next_point':'MOUNT_MOVE',
+                                                  'sample_detected':'BEACON_APPROACH',
+                                                  'complete':'DESELECT_PLANNER'},
+                                   remapping = {'detected_sample':'beacon_point',
+                                                'face_next_point':'true',
+                                                'obstacle_check':'false'})            
+            
+            smach.StateMachine.add('MOUNT_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'HANDLE_MOUNT_MOVES',
+                                                  'blocked':'HANDLE_MOUNT_MOVES',
+                                                  'timeout':'HANDLE_MOUNT_MOVES',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
 
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
-            smach.StateMachine.add('DESELECT_SERVO',
+            smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
-                                                     MODE_ENABLE),
+                                                     MODE_PLANNER),
                                     transitions = {'next':'complete',
                                                   'failed':'LEVEL_TWO_ABORTED'})   
     
@@ -270,11 +301,27 @@ class LevelTwoStar(object):
     def check_for_stop(self):
         active_strafe_key = self.state_machine.userdata.active_strafe_key
         
-        if active_strafe_key is not None and self.strafes[active_strafe_key]['blocked']:
+        if active_strafe_key is not None:
+            if self.strafes[active_strafe_key]['blocked']:
+                return True
+            if not self.state_machine.userdata.outbound:
+                current_pose = util.get_current_robot_pose(self.tf_listener,
+                                                           self.world_fixed_frame)
+                distance_to_origin = np.sqrt(current_pose.pose.position.x**2 +
+                                             current_pose.pose.position.y**2)                
+                if (distance_to_origin <= self.node_params.star_hub_radius):
+                    self.state_machine.userdata.within_hub_radius = True
+                    rospy.loginfo("LEVEL_TWO STOP simple_move on distance to origin = %.3f" %(distance_to_origin))
+                    return True                
+                                    
+        if self.state_machine.userdata.stop_on_sample and \
+                self.state_machine.userdata.detected_sample is not None:
+            rospy.loginfo("LEVEL_TWO STOP simple_move on sample detection")
             return True
         
-        if self.state_machine.userdata.detected_sample is not None:
-            rospy.loginfo("LEVEL_TWO stopping simple_move on sample detection")
+        if self.state_machine.userdata.stop_on_beacon and \
+                self.state_machine.userdata.beacon_point is not None:
+            rospy.loginfo("LEVEL_TWO STOP simple_move on beacon detection")
             return True
         
         return False
@@ -286,7 +333,6 @@ class LevelTwoStar(object):
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
-        self.mount_platform.userdata.paused = msg.data
         
     def sample_update(self, sample):
         try:
@@ -297,8 +343,9 @@ class LevelTwoStar(object):
             point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform search detection point!")        
+        except tf.Exception, e:
+            rospy.logwarn("LEVEL_TWO failed to transform search detection point %s->%s: %s",
+                    sample.header.frame_id, self.odometry_frame, e)
             
     def beacon_update(self, beacon_pose):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
@@ -313,7 +360,25 @@ class LevelTwoStar(object):
             beacon_point.point = point_in_frame.point
             self.state_machine.userdata.beacon_point = beacon_point
         except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose!")        
+            rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose!")
+            
+    def get_hollow_star(self, spoke_count, offset, hub_radius):
+
+        offset = np.radians(offset)
+        yaws = list(np.linspace(0 + offset, 2*np.pi + offset, spoke_count, endpoint=False))
+        spokes = []
+        
+        for yaw in yaws:
+            yaw = util.unwind(yaw)
+            starting_point = geometry_msg.Point(hub_radius*math.cos(yaw),
+                                                hub_radius*math.sin(yaw),
+                                                0)
+            spokes.append({'yaw':yaw,'starting_point':starting_point})
+        
+        #last star point is the beacon approach point    
+        spokes.append({'yaw':None, 'starting_point':geometry_msg.Point(hub_radius, 0, 0)})
+        
+        return spokes
  
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -328,8 +393,6 @@ class StartLeveLTwo(smach.State):
         result = samplereturn_msg.GeneralExecutiveResult()
         result.result_string = 'initialized'
         userdata.action_result = result
-        
-        userdata.outbound = False
 
         return 'next'
 
@@ -337,9 +400,13 @@ class StarManager(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
-                                           'outbound'],
+                                           'outbound',
+                                           'spokes',
+                                           'world_fixed_frame'],
                              output_keys = ['line_yaw',
-                                            'outbound'],
+                                            'outbound',
+                                            'spokes',
+                                            'within_hub_radius'],
                              outcomes=['start_line',
                                        'rotate',
                                        'return_home',
@@ -348,27 +415,26 @@ class StarManager(smach.State):
         self.tf_listener = tf_listener
         self.announcer = announcer  
 
-        self.spokes = list(np.linspace(0, 2*np.pi, 4, endpoint=False))
-        self.starting_spoke = np.radians(-82)
-
     def execute(self, userdata):
-        
-
-        
         #are we returning to the center?
         if not userdata.outbound:
-            #for now, just kill the state machine when done
-            if len(self.spokes) == 0:
+            userdata.outbound = True
+            if len(userdata.spokes) == 1:
                 rospy.loginfo("STAR MANAGER finished inbound move, last spoke")
                 return 'return_home'
-            userdata.line_yaw = util.unwind(self.spokes.pop(0) + self.starting_spoke)
-            userdata.outbound = True
-            self.announcer.say("Start ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
+            userdata.line_yaw = userdata.spokes.pop(0)['yaw']
+            self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
             return 'rotate'        
         
         if userdata.outbound:
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-            userdata.line_yaw = util.get_yaw_to_origin(self.tf_listener)
+            rospy.loginfo
+            current_pose = util.get_current_robot_pose(self.tf_listener,
+                                                       userdata.world_fixed_frame)
+            userdata.line_yaw = util.pointing_yaw(current_pose.pose.position,
+                                                  userdata.spokes[0]['starting_point'])
+            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
+            userdata.within_hub_radius = False
             userdata.outbound = False
             return 'rotate'
         
@@ -420,7 +486,7 @@ class SearchLineManager(smach.State):
                                            'detected_sample',
                                            'world_fixed_frame',
                                            'odometry_frame',
-                                           ],
+                                           'within_hub_radius'],
                              output_keys = ['next_line_pose',
                                             'detected_sample',
                                             'active_strafe_key'],
@@ -487,10 +553,8 @@ class SearchLineManager(smach.State):
             if userdata.detected_sample is not None:
                 return self.with_outcome("sample_detected")
  
-            current_pose = util.get_current_robot_pose(self.tf_listener,
-                    userdata.world_fixed_frame)
-            origin_distance = np.sqrt(current_pose.pose.position.x**2 + current_pose.pose.position.y**2)
-            if not userdata.outbound and origin_distance < 10:
+            #are we within the star hub radius?
+            if not userdata.outbound and userdata.within_hub_radius:
                 return self.with_outcome('next_spoke')        
             
             #BEGINNING OF THE MIGHTY LINE MANAGER CASE LOOP       
@@ -545,26 +609,95 @@ class SearchLineManager(smach.State):
                         key, strafe['blocked'], move_error))
     
   
-class StartReturnHome(smach.State):
+class BeaconApproach(smach.State):
  
-    def __init__(self, announcer):
+    def __init__(self, tf_listener, announcer):
 
         smach.State.__init__(self,
-                             outcomes=['next',
-                                       'preempted',
+                             outcomes=['move',
+                                       'spin',
+                                       'mount',
                                        'aborted'],
-                             input_keys=['beacon_approach_point'],
-                             output_keys=['target_pose',
-                                          'velocity',
-                                          'pursue_samples',
+                             input_keys=['beacon_approach_point',
+                                         'beacon_point',
+                                         'world_fixed_frame',
+                                         'point_list'],
+                             output_keys=['point_list',
+                                          'simple_move',
+                                          'stop_on_sample',
+                                          'stop_on_beacon',
                                           'beacon_point'])
         
+        self.tf_listener = tf_listener
         self.announcer = announcer
+        self.tried_spin = False
 
     def execute(self, userdata):
         
-        self.announcer.say("Return ing to platform")
+        userdata.point_list = collections.deque([])
+        userdata.stop_on_sample = False
+        userdata.stop_on_beacon = True
         
+        #wait for beacon return 
+        rospy.sleep(4.0)
+        
+        if userdata.beacon_point is None: #beacon not in view
+            
+            if not self.tried_spin:
+                self.announcer.say("Beacon not in view. Rotate ing")
+                userdata.simple_move = {'type':'spin',
+                                        'angle':math.pi*2,
+                                        'velocity':0.25}
+                self.tried_spin = True
+                return 'spin'    
+            else:
+                #gotta add some heroic shit here to search around for beacon       
+                self.announcer.say("Beacon not in view. Search ing")
+                next_point = geometry_msg.Point(userdata.beacon_approach_point.x + 1,
+                                                userdata.beacon_approach_point.y,
+                                                0)
+                userdata.point_list.append(next_point)
+                userdata.point_list.append(userdata.beacon_approach_point)
+                userdata.stop_on_beacon = True
+                self.tried_spin = True
+                return 'move' 
+        else: #beacon is in view
+            #need to add some stuff here to get to other side of beacon if viewing back
+            current_pose = util.get_current_robot_pose(self.tf_listener,
+                                                       userdata.world_fixed_frame)
+            #on the back side
+            if current_pose.pose.position.x < 0:
+                self.announcer.say("Back of beacon in view. Move ing to front")
+                y = 5 * np.sign(current_pose.pose.position.y)
+                userdata.point_list.append(geometry_msg.Point(-5.0, y, 0))
+                userdata.point_list.append(geometry_msg.Point(5.0, y, 0))
+                next_point = geometry_msg.Point(userdata.beacon_approach_point.x + 1,
+                                                userdata.beacon_approach_point.y,
+                                                0)
+                userdata.point_list.append(next_point)
+                userdata.point_list.append(userdata.beacon_approach_point)
+                userdata.stop_on_beacon = False
+                return 'move'   
+            else:
+                self.announcer.say("Beacon in view. Mount ing")
+                #make this a parameter probably
+                platform_point = geometry_msg.Point(0.4,0,0)
+                userdata.point_list.append(platform_point)
+                userdata.stop_on_beacon = False
+                return 'mount'
+        
+        return 'aborted'
+
+ 
+#clear beacon point, and pause long enough to reacquire if in frame
+class ClearBeaconPoint(smach.State):
+    def __init__(self):
+        smach.State.__init__(self,
+                             outcomes=['next'],
+                             output_keys=['beacon_point'])
+        
+    def execute(self, userdata):
+        userdata.beacon_point = None
         return 'next'
     
 class LevelTwoPreempted(smach.State):

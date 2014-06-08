@@ -93,15 +93,16 @@ class SimpleMover(object):
     self.publisher.publish(twist)
 
   def execute_spin(self, rotation, max_velocity=None, acceleration=None, stop_function=None):
-    return self.execute(
-            lambda start_yaw=self.current_yaw:util.unwind(self.current_yaw-start_yaw-rotation)*self.stern_offset,
+    return util.unwind(
+            self.execute(
+            lambda start_yaw=self.current_yaw:(self.current_yaw-start_yaw-rotation)*self.stern_offset,
             dict(stern=-np.pi/2*np.sign(rotation),
                  port=0.0,
                  starboard=0.0),
             lambda v, sign=np.sign(rotation) : self.spin_publisher(v, sign),
             max_velocity,
             acceleration,
-            stop_function)/self.stern_offset
+            stop_function)/self.stern_offset)
 
   def execute_strafe(self, angle, distance, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
