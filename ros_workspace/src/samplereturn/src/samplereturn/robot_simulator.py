@@ -659,11 +659,10 @@ class RobotSimulator(object):
     def show_beacon(self):
         self.publish_beacon = True
             
-    def shift_samples(self, shift=0.3):
-        shifts = [shift,-shift]
+    def shift_samples(self, x=0.3, y=0.3):
         for sample in self.fake_samples:
-            sample['point'].x += random.choice(shifts)
-            sample['point'].y += random.choice(shifts)
+            sample['point'].x += x
+            sample['point'].y += y
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
