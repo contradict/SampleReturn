@@ -535,14 +535,6 @@ class SearchLineManager(smach.State):
         
         #giant stupid case loop
         while not rospy.is_shutdown():  
-
-            #if userdata.paused:
-            #    pause_start_time = rospy.Time.now()
-            #    while not rospy.is_shutdown():
-            #        if userdata.paused:
-            #            rospy.sleep(0.2)
-            #        else:
-            #            break
             
             if rospy.Time.now() > userdata.return_time:
                 self.announcer.say("Search time expired")
