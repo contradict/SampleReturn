@@ -170,8 +170,10 @@ class PursueSample(object):
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'SEARCH_MOVE',
                                                   'sample_detected':'HANDLE_SEARCH',
+                                                  'blocked':'SEARCH_MOVE',
                                                   'complete':'ANNOUNCE_SEARCH_FAILURE'},
-                                   remapping = {'face_next_point':'false'})
+                                   remapping = {'face_next_point':'false',
+                                                'check_for_obstacles':'false'})
    
             smach.StateMachine.add('SEARCH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -267,9 +269,11 @@ class PursueSample(object):
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'RETURN_MOVE',
                                                   'sample_detected':'RETURN_MOVE',
+                                                  'blocked':'complete',
                                                   'complete':'complete'},
                                    remapping = {'point_list':'approach_points',
-                                                'face_next_point':'true'})
+                                                'face_next_point':'true',
+                                                'check_for_obstacles':'true'})
             
             smach.StateMachine.add('RETURN_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -400,7 +404,6 @@ class StartSamplePursuit(smach.State):
                                           'search_count',
                                           'grab_count',
                                           'distance_to_sample'])
-  
     
     def execute(self, userdata):
         
@@ -419,9 +422,9 @@ class StartSamplePursuit(smach.State):
         userdata.pursuit_point = userdata.action_goal.input_point
         userdata.approach_points = collections.deque([])
         userdata.distance_to_sample = 20 #maximum possible detection
- 
+        
         return 'next'
- 
+
 class ApproachSample(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,

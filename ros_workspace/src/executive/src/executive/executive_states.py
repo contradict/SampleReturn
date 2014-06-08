@@ -524,18 +524,24 @@ class ExecuteSimpleMove(smach.State):
         return 'aborted'
 
 #scary class for going to list of points with no obstacle checking, good for searching area
+#with strafing.  obstacle_detection optional on 0 yaw strafes
 class MoveToPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
                              input_keys=['point_list',
+                                         'strafes',
+                                         'active_strafe_key',
                                          'detected_sample',
                                          'odometry_frame',
                                          'stop_on_sample',
-                                         'face_next_point'],
+                                         'face_next_point',
+                                         'check_for_obstacles'],
                              output_keys=['simple_move',
+                                          'active_strafe_key',
                                           'point_list'],
                              outcomes=['next_point',
                                        'sample_detected',
+                                       'blocked',
                                        'complete',
                                        'aborted'])
         
@@ -543,15 +549,22 @@ class MoveToPoints(smach.State):
         self.facing_next_point = False
             
     def execute(self, userdata):    
+       
+        #check for obstacles if facing points and flag set
+        if userdata.check_for_obstacles \
+           and userdata.active_strafe_key is not None \
+           and userdata.strafes['center']['blocked']:
+                userdata.active_strafe_key = None
+                return 'blocked'
+
+        userdata.active_strafe_key = None
         
         #if we are looking for samples, mover will be stopped, check it here
         if userdata.detected_sample is not None and userdata.stop_on_sample:
             return 'sample_detected'
         
         if (len(userdata.point_list) > 0):
-            
             rospy.logdebug("MOVE TO POINTS list: %s" %(userdata.point_list))
-
             target_point = userdata.point_list[0]
             header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
             target_stamped = geometry_msg.PointStamped(header, target_point)
@@ -572,8 +585,9 @@ class MoveToPoints(smach.State):
                 userdata.simple_move = {'type':'strafe',
                                         'angle':yaw,
                                         'distance':distance}
-                
                 self.facing_next_point = False
+                if userdata.face_next_point and userdata.check_for_obstacles:
+                    userdata.active_strafe_key = 'center'
                 return 'next_point'                
 
         else:
