@@ -130,7 +130,8 @@ class RobotSimulator(object):
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
 
-        self.odometry_noise_covariance = np.diag([1e-3, 1e-4, 1e-5])
+        self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
+        self.odometry_is_noisy = False
 
         #tf stuff
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -398,36 +399,42 @@ class RobotSimulator(object):
         
         self.tf_broadcaster.sendTransform(trans, rot, now, 'base_link', 'fake_odom')
 
-        # noisy pose is transform from map->base_link
-        qn = (self.noisy_robot_pose.pose.orientation.x,
-              self.noisy_robot_pose.pose.orientation.y,
-              self.noisy_robot_pose.pose.orientation.z,
-              self.noisy_robot_pose.pose.orientation.w)
-        tn = (self.noisy_robot_pose.pose.position.x,
-              self.noisy_robot_pose.pose.position.y,
-              self.noisy_robot_pose.pose.position.z)
-        nrpt = tf.transformations.compose_matrix(
-                angles=tf.transformations.euler_from_quaternion(qn),
-                translate=tn)
-        # pose is transform from fake_odom->base_link
-        qp = (self.robot_pose.pose.orientation.x,
-              self.robot_pose.pose.orientation.y,
-              self.robot_pose.pose.orientation.z,
-              self.robot_pose.pose.orientation.w)
-        tp = (self.robot_pose.pose.position.x,
-              self.robot_pose.pose.position.y,
-              self.robot_pose.pose.position.z)
-        rpt = tf.transformations.compose_matrix(
-                angles=tf.transformations.euler_from_quaternion(qp),
-                translate=tp)
-        # map->base_link = fake_odom->base_link * fake_map->fake_odom * map->fake_map
+        if self.odometry_is_noisy:
+            qn = (self.noisy_robot_pose.pose.orientation.x,
+                  self.noisy_robot_pose.pose.orientation.y,
+                  self.noisy_robot_pose.pose.orientation.z,
+                  self.noisy_robot_pose.pose.orientation.w)
+            tn = (self.noisy_robot_pose.pose.position.x,
+                  self.noisy_robot_pose.pose.position.y,
+                  self.noisy_robot_pose.pose.position.z)
+            nrpt = tf.transformations.compose_matrix(
+                    angles=tf.transformations.euler_from_quaternion(qn),
+                    translate=tn)
 
-        mfm = np.dot(rpt, np.linalg.inv(nrpt))
+            qp = (self.robot_pose.pose.orientation.x,
+                  self.robot_pose.pose.orientation.y,
+                  self.robot_pose.pose.orientation.z,
+                  self.robot_pose.pose.orientation.w)
+            tp = (self.robot_pose.pose.position.x,
+                  self.robot_pose.pose.position.y,
+                  self.robot_pose.pose.position.z)
+            rpt = tf.transformations.compose_matrix(
+                    angles=tf.transformations.euler_from_quaternion(qp),
+                    translate=tp)
 
-        _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
-        mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
+            mfm = np.dot(rpt, np.linalg.inv(nrpt))
 
-        self.tf_broadcaster.sendTransform(mfm_translate, mfm_rot, now, 'fake_map', 'map')
+            _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
+            mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
+
+            self.tf_broadcaster.sendTransform(mfm_translate, mfm_rot, now,
+                    'fake_map', 'map')
+        else:
+            self.tf_broadcaster.sendTransform(
+                    self.zero_translation,
+                    self.zero_rotation,
+                    now,
+                    'fake_map', 'map')
 
         #also publish odometry
         self.odometry_pub.publish(self.robot_odometry)
@@ -709,20 +716,20 @@ class RobotSimulator(object):
                         self.odometry_noise(itwist), now)
 
     def odometry_noise(self, twist):
-        if( np.hypot(twist.linear.x, twist.linear.y) > 1e-3 ):
+        if( np.hypot(twist.linear.x, twist.linear.y) > 1e-2 ):
             strafe_dir = np.arctan2(twist.linear.y,
                                     twist.linear.x)
-            noise = np.random.multivariate_normal(np.zeros((3,)),
-                    self.odometry_noise_covariance)
+            noise = np.random.multivariate_normal(np.zeros((4,)),
+                    self.odometry_noise_covariance)[1:]
             ss = np.sin(strafe_dir)
             cs = np.cos(strafe_dir)
             noise = np.r_[noise[0]*cs-noise[1]*ss,
                           noise[0]*ss+noise[1]*cs,
                           noise[2]]
-        elif np.abs(twist.angular.z)>1e-3:
-            noise = np.random.multivariate_normal(np.zeros((3,)),
+        elif np.abs(twist.angular.z)>1e-2:
+            noise = np.random.multivariate_normal(np.zeros((4,)),
                     self.odometry_noise_covariance)
-            noise[0] = noise[1]
+            noise[2] = noise[3]
         else:
             noise = np.zeros((3,))
         twist.linear.x += noise[0]
