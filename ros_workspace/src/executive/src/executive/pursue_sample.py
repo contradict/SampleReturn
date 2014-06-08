@@ -2,6 +2,7 @@
 import math
 import collections
 import threading
+from copy import deepcopy
 import numpy as np
 
 import smach
@@ -80,8 +81,12 @@ class PursueSample(object):
         self.state_machine.userdata.search_point = None
         self.state_machine.latched_sample = None
         
+        self.state_machine.userdata.return_velocity = self.node_params.return_velocity
+        
+        #pursuit params
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
         self.state_machine.userdata.pursuit_step = self.node_params.pursuit_step
+        self.state_machine.userdata.pursuit_strafe = self.node_params.pursuit_strafe
         self.state_machine.userdata.check_pursuit_distance = False
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
@@ -116,7 +121,7 @@ class PursueSample(object):
                                    transitions = {'next':'APPROACH_SAMPLE'})
 
             smach.StateMachine.add('APPROACH_SAMPLE',
-                                   ApproachPoint(self.tf_listener, self.announcer),
+                                   ApproachSample(self.tf_listener, self.announcer),
                                    transitions = {'complete':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'move':'APPROACH_MOVE',
                                                   'blocked':'PUBLISH_FAILURE',
@@ -126,7 +131,6 @@ class PursueSample(object):
             smach.StateMachine.add('APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'APPROACH_SAMPLE',
-                                                  'blocked':'APPROACH_SAMPLE',
                                                   'timeout':'APPROACH_SAMPLE',
                                                   'aborted':'APPROACH_SAMPLE'},
                                    remapping = {'velocity':'pursuit_velocity'})
@@ -152,7 +156,6 @@ class PursueSample(object):
             smach.StateMachine.add('MANIPULATOR_APPROACH',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'HANDLE_SEARCH',
-                                                  'blocked':'HANDLE_SEARCH',
                                                   'timeout':'PURSUE_SAMPLE_ABORTED',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'velocity':'search_velocity'})
@@ -168,13 +171,11 @@ class PursueSample(object):
                                    transitions = {'next_point':'SEARCH_MOVE',
                                                   'sample_detected':'HANDLE_SEARCH',
                                                   'complete':'ANNOUNCE_SEARCH_FAILURE'},
-                                   remapping = {'face_next_point':'false',
-                                                'obstacle_check':'false'})
+                                   remapping = {'face_next_point':'false'})
    
             smach.StateMachine.add('SEARCH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'HANDLE_SEARCH_MOVES',
-                                                  'blocked':'HANDLE_SEARCH_MOVES',
                                                   'timeout':'HANDLE_SEARCH_MOVES',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'velocity':'search_velocity'})
@@ -195,7 +196,6 @@ class PursueSample(object):
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
-                                                  'blocked':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'})
 
@@ -269,16 +269,14 @@ class PursueSample(object):
                                                   'sample_detected':'RETURN_MOVE',
                                                   'complete':'complete'},
                                    remapping = {'point_list':'approach_points',
-                                                'face_next_point':'true',
-                                                'obstacle_check':'true'})
+                                                'face_next_point':'true'})
             
             smach.StateMachine.add('RETURN_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'RETURN_TO_START',
-                                                  'blocked':'ANNOUNCE_RETURN_BLOCKED',
                                                   'timeout':'RETURN_TO_START',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'},
-                                   remapping = {'velocity':'pursuit_velocity'})
+                                   remapping = {'velocity':'return_velocity'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN_BLOCKED',
                                     AnnounceState(self.announcer,
@@ -424,7 +422,7 @@ class StartSamplePursuit(smach.State):
  
         return 'next'
  
-class ApproachPoint(smach.State):
+class ApproachSample(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
                              outcomes=['complete',
@@ -439,6 +437,7 @@ class ApproachPoint(smach.State):
                                          'active_strafe_key',
                                          'min_pursuit_distance',
                                          'pursuit_step',
+                                         'pursuit_strafe',
                                          'odometry_frame',
                                          'distance_to_sample'],
                              output_keys=['simple_move',
@@ -459,7 +458,7 @@ class ApproachPoint(smach.State):
         robot_point = current_pose.pose.position
         yaw_to_sample = util.pointing_yaw(robot_point, sample_point)
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
-                userdata.odometry_frame)
+                                                userdata.odometry_frame)
         rotate_yaw = util.unwind(yaw_to_sample - actual_yaw)
         
         #check_for_stop needs this flag
@@ -522,7 +521,8 @@ class ApproachPoint(smach.State):
             userdata.active_strafe_key = None
             return 'complete'
         strafe = userdata.strafes[key]
-        distance = strafe['distance']
+        #distance = strafe['distance']
+        distance = userdata.pursuit_strafe
         userdata.offset_count += np.sign(strafe['angle'])
         userdata.simple_move = {'type':'strafe',
                                 'angle':strafe['angle'],
