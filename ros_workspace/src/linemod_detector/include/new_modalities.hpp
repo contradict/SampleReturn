@@ -48,5 +48,7 @@ protected:
 
 Ptr<Detector> getExpandedLINEMOD();
 
+Ptr<Detector> getInnerLINE();
+
 }
 }

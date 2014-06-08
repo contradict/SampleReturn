@@ -283,7 +283,8 @@ bool InnerColorGradientPyramid::extractTemplate(Template& templ) const
   Mat local_mask;
   if (!mask.empty())
   {
-    erode(mask, local_mask, Mat(), Point(-1,-1), 1, BORDER_REPLICATE);
+    Mat element = getStructuringElement(MORPH_RECT, Size(31,31));
+    erode(mask, local_mask, element, Point(-1,-1), 1, BORDER_REPLICATE);
   }
 
   // Create sorted list of all pixels with magnitude greater than a threshold
@@ -380,6 +381,13 @@ Ptr<Detector> getExpandedLINEMOD()
   std::vector< Ptr<Modality> > modalities;
   modalities.push_back(new ColorGradient);
   modalities.push_back(new DepthNormal);
+  modalities.push_back(new InnerColorGradient);
+  return new Detector(modalities, std::vector<int>(T_DEFAULTS, T_DEFAULTS + 2));
+}
+
+Ptr<Detector> getInnerLINE()
+{
+  std::vector< Ptr<Modality> > modalities;
   modalities.push_back(new InnerColorGradient);
   return new Detector(modalities, std::vector<int>(T_DEFAULTS, T_DEFAULTS + 2));
 }
