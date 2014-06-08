@@ -560,6 +560,8 @@ class RobotSimulator(object):
         
     def service_motion_mode_request(self, req):
         rospy.sleep(0.2)
+        #print "set mode %d %d %d"%(platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST,
+        #        self.motion_mode, req.mode)
         if req.mode == platform_srv.SelectMotionModeRequest.MODE_QUERY:
             return self.motion_mode
         else:
@@ -739,6 +741,7 @@ class RobotSimulator(object):
 
 
     def integrate_twist(self, pose, odometry, twist, now):
+        #print twist.linear.x, twist.linear.y, twist.angular.z
         dt = (now - pose.header.stamp).to_sec()
         yaw = 2*arctan2(pose.pose.orientation.z,
                         pose.pose.orientation.w)
