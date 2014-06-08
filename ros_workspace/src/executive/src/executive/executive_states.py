@@ -495,21 +495,19 @@ class ExecuteSimpleMove(smach.State):
                 
         move = deepcopy(userdata.simple_move)
         userdata.simple_move = None #consume simple move
-        velocity = userdata.velocity
-        if velocity is None:
-            velocity = move.get('velocity')
+        velocity = move.get('velocity', userdata.velocity)
  
         try:
             angle = move['angle']
             if move['type'] == 'spin':
-                error = self.simple_mover.execute_spin(angle, max_velocity = userdata.velocity)
+                error = self.simple_mover.execute_spin(angle, max_velocity = velocity)
                 rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
                                                                    np.degrees(error)))
             elif move['type'] == 'strafe':
                 distance = move['distance']
                 error = self.simple_mover.execute_strafe(angle,
                                                          move['distance'],
-                                                         max_velocity = userdata.velocity)
+                                                         max_velocity = velocity)
                 rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %( np.degrees(angle),
                                                                                            distance,
                                                                                            error))
@@ -557,24 +555,20 @@ class MoveToPoints(smach.State):
         
         if (len(userdata.point_list) > 0):
             
-            rospy.loginfo("MOVE TO POINTS list: %s" %(userdata.point_list))
+            rospy.logdebug("MOVE TO POINTS list: %s" %(userdata.point_list))
 
             target_point = userdata.point_list[0]
             header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
-            search_point = geometry_msg.PointStamped(header, target_point)
+            target_stamped = geometry_msg.PointStamped(header, target_point)
             try:
-                point_in_base = self.tf_listener.transformPoint('base_link', search_point).point                
+                yaw, distance = util.get_robot_strafe(self.tf_listener, target_stamped)
             except(tf.Exception):
-                rospy.logwarn("PURSUE_SAMPLE failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
+                rospy.logwarn("MOVE_TO_POINTS failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
                 return 'aborted'
-
-            origin = geometry_msg.Point(0,0,0)
-            distance = util.point_distance_2d(origin, point_in_base)
-            pointing_yaw = util.pointing_yaw(origin, point_in_base)
 
             if userdata.face_next_point and not self.facing_next_point:
                 userdata.simple_move = {'type':'spin',
-                                        'angle':pointing_yaw}
+                                        'angle':yaw}
                 userdata.active_strafe_key = None
                 self.facing_next_point = True
                 return 'next_point'
@@ -588,7 +582,7 @@ class MoveToPoints(smach.State):
                 #remove the point if we are heading to it
                 userdata.point_list.popleft()
                 userdata.simple_move = {'type':'strafe',
-                                        'angle':pointing_yaw,
+                                        'angle':yaw,
                                         'distance':distance}
                 
                 self.facing_next_point = False
