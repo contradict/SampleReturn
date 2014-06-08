@@ -47,16 +47,16 @@
                 angle: 0.7854
                 distance: 4.0
                 blocked: False
-                right_check_offset: 0.8     
+                right_check_offset: 0.6     
             center:
                 angle: 0
-                distance: 10.0
+                distance: 15.0
                 blocked: False                
             right:
                 angle: -0.7854
                 distance: 4.0
-                blocked: Falsei
-                left_check_offset: 0.8
+                blocked: False
+                left_check_offset: 0.6
     </rosparam>
 
     <node
@@ -88,43 +88,6 @@
         <remap from="gpio_read" to="/io/gpio_read"/>
     </node>
 
-    <!--
-    <node
-        pkg="executive"
-        type="level_one_node.py"
-        name="level_one"
-        machine="navigate"
-        output="log"
-        ns="/processes/executive">
-        
-        <!- - executive tf frame and planner_mode - ->
-        <param name="executive_frame" type="string" value="$(arg executive_frame)"/>
-        <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
-        
-        <!- - for DriveToPose states and approach to sample- ->
-        <param name="velocity" type="double" value="1.5"/>
-        <param name="search_velocity" type="double" value="0.5"/>
-        <param name="motion_check_interval" type="double" value="60"/>
-        <param name="min_motion" type="double" value="0.5"/>
-        <rosparam>
-            <!- - Specify x and y.  If yaw is unspecified, robot will point towards
-                 the next point in the path list - ->
-            search_poses_2d:
-                - {x: 2.0, y: 0.0}
-                - {x: 4.0, y: -2.0}
-                - {x: 10.0, y: -10.0}
-        </rosparam>        
-        <!- - for Beacon approach - ->
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.3"/>
-        <param name="max_point_lost_time" type="double" value="60"/>
-        <rosparam>
-            beacon_approach_point:
-                {x: 8.0, y: 0, yaw: 180}
-        </rosparam>
-    </node>
-    -->
-
     <node
         pkg="executive"
         type="level_two_node.py"
@@ -138,9 +101,9 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="10"/>
-        <param name="first_spoke_offset" type="double" value="20"/>
+        <param name="first_spoke_offset" type="double" value="175"/>
         <param name="star_hub_radius" type="int" value="15"/>
-        <param name="return_time_minutes" type="double" value="0.7"/>
+        <param name="return_time_minutes" type="double" value="1.0"/>
 
         <!-- for Beacon approach -->
         <rosparam>
@@ -153,7 +116,7 @@
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
-                max_velocity: 1.0
+                max_velocity: 2.0
                 acceleration: 0.5
                 stop_deceleration: 2.0
                 loop_rate: 10 
@@ -176,12 +139,14 @@
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
-        <param name="min_pursuit_distance" type="double" value="2.5"/>
+        <param name="min_pursuit_distance" type="double" value="3.0"/>
         <param name="max_pursuit_error" type="double" value="0.2"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
         <param name="square_search_size" type="double" value="0.4"/> 
-        <param name="pursuit_step" type="double" value="3.0"/>
+        <param name="pursuit_step" type="double" value="4.0"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>
+        <param name="return_velocity" type="double" value="1.0"/>
+        <param name="pursuit_strafe" type="double" value="5.0"/>
         <param name="search_velocity" type="double" value="0.25"/>
 
         <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
