@@ -366,6 +366,10 @@ Visualization Manager:
           Value: false
         fake_laser:
           Value: false
+        fake_map:
+          Value: true
+        fake_odom:
+          Value: true
         manipulator_arm:
           Value: false
         manipulator_baseline_bar:
@@ -379,7 +383,7 @@ Visualization Manager:
         manipulator_right_camera_lens:
           Value: false
         map:
-          Value: true
+          Value: false
         navigation_center_baseline_bar:
           Value: false
         navigation_center_left_camera:
@@ -409,8 +413,6 @@ Visualization Manager:
         navigation_starboard_right_camera:
           Value: false
         navigation_starboard_right_camera_lens:
-          Value: false
-        odom:
           Value: false
         platform:
           Value: false
@@ -445,63 +447,64 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
-          beacon:
-            platform:
-              {}
-          odom:
-            base_link:
-              body_triangle:
-                carousel:
-                  {}
-                fake_laser:
-                  {}
-                manipulator_arm:
-                  {}
-                manipulator_baseline_bar:
-                  manipulator_left_camera:
-                    manipulator_left_camera_lens:
-                      {}
-                  manipulator_right_camera:
-                    manipulator_right_camera_lens:
-                      {}
-                navigation_center_baseline_bar:
-                  navigation_center_left_camera:
-                    navigation_center_left_camera_lens:
-                      {}
-                  navigation_center_right_camera:
-                    navigation_center_right_camera_lens:
-                      {}
-                navigation_port_baseline_bar:
-                  navigation_port_left_camera:
-                    navigation_port_left_camera_lens:
-                      {}
-                  navigation_port_right_camera:
-                    navigation_port_right_camera_lens:
-                      {}
-                navigation_starboard_baseline_bar:
-                  navigation_starboard_left_camera:
-                    navigation_starboard_left_camera_lens:
-                      {}
-                  navigation_starboard_right_camera:
-                    navigation_starboard_right_camera_lens:
-                      {}
-                port_suspension:
-                  port_yoke:
-                    port_wheel:
-                      {}
-                search_camera_body:
-                  search_camera_lens:
+          fake_map:
+            fake_odom:
+              base_link:
+                body_triangle:
+                  carousel:
                     {}
-                starboard_suspension:
-                  starboard_yoke:
-                    starboard_wheel:
+                  fake_laser:
+                    {}
+                  manipulator_arm:
+                    {}
+                  manipulator_baseline_bar:
+                    manipulator_left_camera:
+                      manipulator_left_camera_lens:
+                        {}
+                    manipulator_right_camera:
+                      manipulator_right_camera_lens:
+                        {}
+                  navigation_center_baseline_bar:
+                    navigation_center_left_camera:
+                      navigation_center_left_camera_lens:
+                        {}
+                    navigation_center_right_camera:
+                      navigation_center_right_camera_lens:
+                        {}
+                  navigation_port_baseline_bar:
+                    navigation_port_left_camera:
+                      navigation_port_left_camera_lens:
+                        {}
+                    navigation_port_right_camera:
+                      navigation_port_right_camera_lens:
+                        {}
+                  navigation_starboard_baseline_bar:
+                    navigation_starboard_left_camera:
+                      navigation_starboard_left_camera_lens:
+                        {}
+                    navigation_starboard_right_camera:
+                      navigation_starboard_right_camera_lens:
+                        {}
+                  port_suspension:
+                    port_yoke:
+                      port_wheel:
+                        {}
+                  search_camera_body:
+                    search_camera_lens:
                       {}
-                stern_suspension:
-                  stern_yoke:
-                    stern_wheel:
-                      {}
-                top_triangle:
-                  {}
+                  starboard_suspension:
+                    starboard_yoke:
+                      starboard_wheel:
+                        {}
+                  stern_suspension:
+                    stern_yoke:
+                      stern_wheel:
+                        {}
+                  top_triangle:
+                    {}
+            platform:
+              beacon:
+                {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -542,22 +545,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 17.919
+      Distance: 1567.23
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -14.3046
-        Y: -2.12154
-        Z: -0.000122332
+        X: 42.0901
+        Y: -44.631
+        Z: -1.30975e-05
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.599797
+      Pitch: 1.2398
       Target Frame: base_link
       Value: XYOrbit (rviz)
-      Yaw: 4.87718
+      Yaw: 4.69217
     Saved: ~
 Window Geometry:
   Displays:
