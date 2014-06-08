@@ -3,6 +3,7 @@
 <!-- -*- mode: XML -*- -->
 
 <launch>
+    <arg name="bag"/>
 	<machine name="search"
 			 address="localhost"
 			 />
@@ -34,6 +35,8 @@
           <remap from="base_pose_ground_truth" to="/motion/odometry"/>
     </node>
     -->
+
+    <node pkg="rosbag" type="play" name="playback" output="screen" args="--clock --pause $(arg bag)"/>
 
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
 </launch>
