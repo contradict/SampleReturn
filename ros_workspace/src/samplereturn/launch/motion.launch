@@ -2,6 +2,8 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
+    <arg name="start_paused"/>
+
     <!-- Remaps - apply to all nodes in this launch file -->
     <remap from="platform_joint_state" to="/motion/platform_joint_state"/>`
     <remap from="enable_wheel_pods" to="/motion/wheel_pods/enable"/>
@@ -82,7 +84,7 @@
           type="pause_switch.py"
           output="log"
           ns="/io">
-        <param name="start_paused" type="bool" vale="$(arg start_pause)"/>
+        <param name="start_paused" type="bool" value="$(arg start_paused)"/>
     </node>
 
     <node name="lights" 
