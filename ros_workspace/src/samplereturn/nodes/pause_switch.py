@@ -11,6 +11,7 @@ from samplereturn.util import wait_for_rosout
 
 class PauseSwitch(object):
     def __init__(self):
+        self.start_paused = rospy.get_param("start_paused", False)
         self.gpio_servo_id = rospy.get_param("gpio_servo_id", 1)
         self.button_mask = rospy.get_param("button_mask", 2)
         self.carousel_servo_id = rospy.get_param("carousel_servo_id", 1)
@@ -47,15 +48,16 @@ class PauseSwitch(object):
         #pullup on pause input, 1->0 is transition edge
         self.pause_bit_state = self.button_mask
         self.guarded = False #this flag is set to true after a pause
+        
         ##### CAUTION ####
-        # Changed at NASA request, machine should start un paused.
-        # Yikes
-        #self.paused = False
-        #self.pause(False)
-        #################
-        # For testing, we will use the start on pause, as below
-        self.paused = True
-        self.pause(True)
+        # At NASA request, machine should start un paused.
+        #################        
+        if self.start_paused:
+            self.paused = True
+            self.pause(True)
+        else:        
+            self.paused = False
+            self.pause(False)
 
     def clear_guard(self, event):
         self.guarded = False

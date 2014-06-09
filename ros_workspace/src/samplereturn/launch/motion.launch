@@ -82,6 +82,7 @@
           type="pause_switch.py"
           output="log"
           ns="/io">
+        <param name="start_paused" type="bool" vale="$(arg start_pause)"/>
     </node>
 
     <node name="lights" 
