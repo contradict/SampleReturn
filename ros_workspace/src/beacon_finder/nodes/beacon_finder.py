@@ -54,7 +54,7 @@ class BeaconFinder:
         # beacon side params
         self.maxSizeError = rospy.get_param("~max_size_error", 0.1)
         self.maxDistanceError = rospy.get_param("~max_distance_error", 0.05)
-        self.maxHorizontalError = rospy.get_param("~max_horizontal_error", 0.1)
+        self.maxHorizontalRadians = rospy.get_param("~max_horizontal_radians", 0.1)
 
         # Initialize member variables
         self._blob_detector_params = cv2.SimpleBlobDetector_Params()
@@ -103,7 +103,7 @@ class BeaconFinder:
         self._blob_detector_side_params.filterByConvexity = True
 
         self._blob_detector_side_params_alt = cv2.SimpleBlobDetector_Params()
-        self._blob_detector_side_params_alt.blobColor = self._blob_color
+        self._blob_detector_side_params_alt.blobColor = self._blob_color_alt
         self._blob_detector_side_params_alt.minArea = self._blob_min_area
         self._blob_detector_side_params_alt.maxArea = self._blob_side_max_area
         self._blob_detector_side_params_alt.minThreshold = self._blob_min_threshold
@@ -179,6 +179,10 @@ class BeaconFinder:
             foundSide = True
 
             topThree = sortedBlobs[:3]
+
+            # draw blobs, for debugging
+            self.draw_debug_keypoints_image(topThree)
+
             # sort by y coordinate to get them stacked (they should be vertical)
             topThree = sorted(topThree, key=lambda b:b.pt[1])
             avgSize = 0.0
@@ -186,10 +190,8 @@ class BeaconFinder:
                 avgSize += b.size
             avgSize /= 3.0
 
-            for i in range(len(topThree)):
-                b = topThree[i]
-                if (b.size < avgSize * (1.0 - self.maxSizeError)) or\
-                        (b.size > avgSize * (1.0 + self.maxSizeError)):
+            for b in topThree:
+                if (abs(b.size - avgSize) > avgSize*self.maxSizeError):
                     foundSide = False
                     rospy.logerr('rejecting points for size inconsistencies')
 
@@ -204,12 +206,15 @@ class BeaconFinder:
             avgDistance = (distance0to1 + distance1to2)/2.0
 
             if abs(distance0to1 - distance1to2) > \
-                    min(distance0to1, distance1to2) * self.maxDistanceError:
+               min(distance0to1, distance1to2) * self.maxDistanceError:
                 foundSide = False
                 rospy.logerr('rejecting points for distance errors')
 
-            if abs(horizontal0to1 - horizontal1to2) > \
-                    abs(min(horizontal0to1, horizontal1to2)) * self.maxHorizontalError:
+            if distance0to1 < 0.00001 or\
+               distance1to2 < 0.00001 or\
+               math.asin(abs(horizontal0to1)/distance0to1) > self.maxHorizontalRadians or\
+               math.asin(abs(horizontal1to2)/distance1to2) > self.maxHorizontalRadians or\
+               numpy.sign(horizontal0to1) != numpy.sign(horizontal1to2):
                 foundSide = False
                 rospy.logerr('rejecting points for horizontal error')
 
@@ -223,11 +228,11 @@ class BeaconFinder:
                         for c in topThree:
                             distance = numpy.sqrt((c.pt[0]-b.pt[0])**2 + \
                                     (c.pt[1]-b.pt[1])**2)
-                            if (distance > (1.0-self.maxDistanceError)*avgDistance) and\
-                                    (distance < (1.0+self.maxDistanceError)*avgDistance):
+                            if (distance < avgDistance*(1.0+self.maxDistanceError)) and\
+                               (abs(b.size - avgSize) < avgSize*self.maxSizeError):
                                 sameSizeCount += 1
 
-                if sameSizeCount >= 2:
+                if sameSizeCount >= 1:
                     rospy.logerr('found %d similar sized blobs, which is too many!', sameSizeCount)
                     foundSide = False
                         
@@ -246,9 +251,6 @@ class BeaconFinder:
                 # if we didn't find it, remove one element from sorted blobs and
                 # try again.
                 sortedBlobs = sortedBlobs[1:]
-
-        # draw blobs, for debugging
-        self.draw_debug_keypoints_image(blobs)
 
     def image_callback(self, image):
         # This function receives an image, attempts to locate the beacon
