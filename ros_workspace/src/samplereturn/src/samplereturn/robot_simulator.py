@@ -55,15 +55,15 @@ class RobotSimulator(object):
         self.active_sample_id = None
         self.collected_ids = []
         self.excluded_ids = []
-        self.fake_samples = [{'point':geometry_msg.Point(16, -12, 0),'id':1},
+        self.fake_samples = [{'point':geometry_msg.Point(74, -3.0, 0),'id':1},
                              {'point':geometry_msg.Point(6, -28, 0),'id':5},
                              {'point':geometry_msg.Point(-42, 3, 0), 'id':3},
                              {'point':geometry_msg.Point(-65, 20, 0), 'id':7},
-                             {'point':geometry_msg.Point(150,-15, 0), 'id':9},
+                             {'point':geometry_msg.Point(-104, 45, 0), 'id':9},
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
                              {'point':geometry_msg.Point(-38, -16, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
-                             {'point':geometry_msg.Point(25, -42, 0), 'id':4},
+                             {'point':geometry_msg.Point(16, 25, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
