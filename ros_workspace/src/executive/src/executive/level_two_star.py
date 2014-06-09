@@ -437,12 +437,9 @@ class StarManager(smach.State):
             return 'rotate'        
         
         if userdata.outbound:
-            #just finished outbound spoke, turn around and head towards next star point
-            #flip by setting line yaw.  Also set offset limit higher
-            current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                       userdata.world_fixed_frame)
-            userdata.line_yaw = util.pointing_yaw(current_pose.pose.position,
-                                                  userdata.spokes[0]['starting_point'])
+            #just finished outbound spoke, head towards next star point and set offset limit higher.
+            #If inbound, rotation manager calculates the line yaw each time it is asked to make a
+            #rotation. userdata.line_yaw remains the yaw FROM the origin
             userdata.within_hub_radius = False
             userdata.offset_count = 0
             userdata.offset_limit = 2
@@ -459,6 +456,7 @@ class RotationManager(smach.State):
         smach.State.__init__(self,
                              outcomes=['next', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
+                                         'spokes',
                                          'spin_velocity',
                                          'outbound',
                                          'world_fixed_frame'],
@@ -471,11 +469,21 @@ class RotationManager(smach.State):
         self.mover = mover
     
     def execute(self, userdata):
+        #if heading out, always move parallel to line yaw
+        if userdata.outbound:
+            map_yaw = deepcopy(userdata.line_yaw)
+        #if inbound, always point to next starting point
+        else:
+            current_pose = util.get_current_robot_pose(self.tf_listener,
+                                                       userdata.world_fixed_frame)
+            map_yaw = util.pointing_yaw(current_pose.pose.position,
+                                                  userdata.spokes[0]['starting_point'])
+        
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
                 userdata.world_fixed_frame)
-        rotate_yaw = util.unwind(userdata.line_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER line_yaw: %.1f, actual_yaw: %.1f, rotate_yaw: %.1f" %(
-                      np.degrees(userdata.line_yaw),
+        rotate_yaw = util.unwind(map_yaw - actual_yaw)
+        rospy.loginfo("ROTATION MANAGER map_yaw: %.1f, robot_yaw: %.1f, rotate_yaw: %.1f" %(
+                      np.degrees(map_yaw),
                       np.degrees(actual_yaw),
                       np.degrees(rotate_yaw)))
         #create the simple move command
@@ -489,6 +497,7 @@ class SearchLineManager(smach.State):
     def __init__(self, tf_listener, mover, announcer):
         smach.State.__init__(self,
                              input_keys = ['strafes',
+                                           'active_strafe_key',
                                            'line_yaw',
                                            'outbound',
                                            'offset_count',
@@ -514,6 +523,10 @@ class SearchLineManager(smach.State):
 
     def execute(self, userdata):
     
+        #did we get here from a rotation, if so, pause to wait for costmaps
+        if userdata.active_strafe_key is None:
+            rospy.sleep(2.0)
+        
         userdata.active_strafe_key = None
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
@@ -533,58 +546,55 @@ class SearchLineManager(smach.State):
         first_angle_choice = 'left' if userdata.outbound else 'right'
         second_angle_choice = 'right' if userdata.outbound else 'left'
         
-        #giant stupid case loop
-        while not rospy.is_shutdown():  
+        if rospy.Time.now() > userdata.return_time:
+            self.announcer.say("Search time expired")
+            return 'return_home'
+        
+        #check preempt after deciding whether or not to calculate next line pose
+        if self.preempt_requested():
+            rospy.loginfo("LINE MANAGER: preempt requested")
+            self.service_preempt()
+            return 'preempted'
+        
+        if userdata.detected_sample is not None:
+            return "sample_detected"
+
+        #are we within the star hub radius?
+        if not userdata.outbound and userdata.within_hub_radius:
+            return 'next_spoke'     
+        
+        #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
+        #first check if we are offset from line either direction, and if so, is the path
+        #back the line clear.  If is is, strafe towards the line
+        if (userdata.offset_count > 0) and not userdata.strafes['right']['blocked']:
+            #left of line
+            self.announcer.say('Right clear, strafe ing to line')
+            return self.strafe('right', userdata)
+        elif (userdata.offset_count < 0) and not userdata.strafes['left']['blocked']:
+            #right of line
+            self.announcer.say('Left clear, strafe ing to line')
+            return self.strafe('left', userdata)
+        
+        #if not offset or returning to line is blocked, going straight is next priority
+        elif not userdata.strafes['center']['blocked']:
+            self.announcer.say("Line clear, continue ing")    
+            return self.strafe('center', userdata)
+           
+        #if returning to the line not possible or necessary,
+        #and going straight isn't possible: offset from line             
+        elif not userdata.strafes[first_angle_choice]['blocked'] and under_offset_limit():
+            self.announcer.say("Obstacle in line, strafe ing %s" % (first_angle_choice))
+            return self.strafe(first_angle_choice, userdata)
             
-            if rospy.Time.now() > userdata.return_time:
-                self.announcer.say("Search time expired")
-                return 'return_home'
-            
-            #check preempt after deciding whether or not to calculate next line pose
-            if self.preempt_requested():
-                rospy.loginfo("LINE MANAGER: preempt requested")
-                self.service_preempt()
-                return 'preempted'
-            
-            if userdata.detected_sample is not None:
-                return "sample_detected"
- 
-            #are we within the star hub radius?
-            if not userdata.outbound and userdata.within_hub_radius:
-                return 'next_spoke'     
-            
-            #BEGINNING OF THE MIGHTY LINE MANAGER CASE LOOP       
-            #first check if we are offset from line either direction, and if so, is the path
-            #back the line clear.  If is is, strafe towards the line
-            if (userdata.offset_count > 0) and not userdata.strafes['right']['blocked']:
-                #left of line
-                self.announcer.say('Right clear, strafe ing to line')
-                return self.strafe('right', userdata)
-            elif (userdata.offset_count < 0) and not userdata.strafes['left']['blocked']:
-                #right of line
-                self.announcer.say('Left clear, strafe ing to line')
-                return self.strafe('left', userdata)
-            
-            #if not offset or returning to line is blocked, going straight is next priority
-            elif not userdata.strafes['center']['blocked']:
-                self.announcer.say("Line clear, continue ing")    
-                return self.strafe('center', userdata)
-               
-            #if returning to the line not possible or necessary,
-            #and going straight isn't possible: offset from line             
-            elif not userdata.strafes[first_angle_choice]['blocked'] and under_offset_limit():
-                self.announcer.say("Obstacle in line, strafe ing %s" % (first_angle_choice))
-                return self.strafe(first_angle_choice, userdata)
-                
-            elif not userdata.strafes[second_angle_choice]['blocked'] and under_offset_limit():
-                self.announcer.say("Obstacle in line, strafe ing %s" % (second_angle_choice))
-                return self.strafe(second_angle_choice, userdata)
-            
-            #getting here means lethal cells in all three yaw check lines,
-            #or that the only unblocked line takes us outside our allowable offset
-            else:             
-                self.announcer.say("Line is blocked, rotate ing")
-                return 'line_blocked'
+        elif not userdata.strafes[second_angle_choice]['blocked'] and under_offset_limit():
+            self.announcer.say("Obstacle in line, strafe ing %s" % (second_angle_choice))
+            return self.strafe(second_angle_choice, userdata)
+        
+        #getting here means lethal cells in all three yaw check lines,
+        #or that the only unblocked line takes us outside our allowable offset
+        else:             
+            self.announcer.say("Line is blocked, rotate ing")
+            return 'line_blocked'
         
         return 'aborted'
     
