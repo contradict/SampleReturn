@@ -45,6 +45,12 @@ class ExecutiveCostmapChecker(object):
                  map_coords[1]<info.width)
         return valid, map_coords
 
+    def publish_all_blocked(self):
+        msg_keys = self.strafes.keys()
+        msg_values = [True for _ in msg_keys]
+        costmap_check_msg = samplereturn_msg.CostmapCheck(msg_keys, msg_values)
+        self.check_publisher.publish(costmap_check_msg)
+
     def handle_costmap(self, costmap):
         if self.debug_map_pub.get_num_connections() > 0:
             self.publish_debug = True
@@ -57,9 +63,15 @@ class ExecutiveCostmapChecker(object):
         check_dist = self.node_params.obstacle_check_distance
         
         #load up the costmap and its info into useful structure        
-        pos, quat = self.tf_listener.lookupTransform(costmap.header.frame_id,
-                                                '/base_link',
+        try:
+            pos, quat = self.tf_listener.lookupTransform(costmap.header.frame_id,
+                                                'base_link',
                                                 rospy.Time(0))
+        except tf.Exception, e:
+            rospy.logerr("Unable to look up transform base_link->%s, reporting all blocked",
+                    costmap.header.frame_id)
+            self.publish_all_blocked()
+            return
         actual_yaw = tf.transformations.euler_from_quaternion(quat)[-1]
         valid, origin = self.world2map(pos[:2], costmap.info)
         if not valid:
@@ -70,10 +82,7 @@ class ExecutiveCostmapChecker(object):
                     (costmap.info.origin.position.x,costmap.info.origin.position.y),
                     (costmap.info.origin.position.x+costmap.info.width*costmap.info.resolution,
                      costmap.info.origin.position.y+costmap.info.height*costmap.info.resolution))
-            msg_keys = self.strafes.keys()
-            msg_values = [True for _ in msg_keys]
-            costmap_check_msg = samplereturn_msg.CostmapCheck(msg_keys, msg_values)
-            self.check_publisher.publish(costmap_check_msg)
+            self.publish_all_blocked()
             return
 
         map_np = np.array(costmap.data, dtype='i1').reshape((costmap.info.height,costmap.info.width))
