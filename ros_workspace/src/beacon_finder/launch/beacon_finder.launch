@@ -21,6 +21,7 @@
 	<param name="blob_color" type="double" value="0"/>
 	<param name="blob_min_area" type="double" value="50"/>
 	<param name="blob_max_area" type="double" value="5000"/>
+	<param name="blob_side_max_area" type="double" value="10000"/>
 	<param name="blob_min_threshold" type="double" value="20"/>
 	<param name="blob_max_threshold" type="double" value="220"/>
 	<param name="blob_threshold_step" type="double" value="10"/>

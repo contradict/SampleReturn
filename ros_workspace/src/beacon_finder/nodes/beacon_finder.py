@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import copy
 import rospy
 import rosnode
 import math
@@ -38,6 +39,7 @@ class BeaconFinder:
         self._blob_color_alt = rospy.get_param("~blob_color_alt", 255)
         self._blob_min_area = rospy.get_param("~blob_min_area", 9)
         self._blob_max_area = rospy.get_param("~blob_max_area", 5000)
+        self._blob_side_max_area = rospy.get_param("~blob_side_max_area", 10000)
         self._blob_min_threshold = rospy.get_param("~blob_min_threshold", 20)
         self._blob_max_threshold = rospy.get_param("~blob_max_threshold", 220)
         self._blob_threshold_step = rospy.get_param("~blob_threshold_step", 10)
@@ -85,8 +87,41 @@ class BeaconFinder:
         self._blob_detector_params_alt.filterByInertia = False
         self._blob_detector_params_alt.filterByConvexity = True
 
+        self._blob_detector_side_params = cv2.SimpleBlobDetector_Params()
+        self._blob_detector_side_params.blobColor = self._blob_color
+        self._blob_detector_side_params.minArea = self._blob_min_area
+        self._blob_detector_side_params.maxArea = self._blob_side_max_area
+        self._blob_detector_side_params.minThreshold = self._blob_min_threshold
+        self._blob_detector_side_params.maxThreshold = self._blob_max_threshold
+        self._blob_detector_side_params.thresholdStep = self._blob_threshold_step
+        self._blob_detector_side_params.minDistBetweenBlobs = self._blob_min_distance_between_blobs
+        self._blob_detector_side_params.minRepeatability = self._blob_repeatability
+        self._blob_detector_side_params.filterByColor = True
+        self._blob_detector_side_params.filterByArea = True
+        self._blob_detector_side_params.filterByCircularity = False
+        self._blob_detector_side_params.filterByInertia = False
+        self._blob_detector_side_params.filterByConvexity = True
+
+        self._blob_detector_side_params_alt = cv2.SimpleBlobDetector_Params()
+        self._blob_detector_side_params_alt.blobColor = self._blob_color
+        self._blob_detector_side_params_alt.minArea = self._blob_min_area
+        self._blob_detector_side_params_alt.maxArea = self._blob_side_max_area
+        self._blob_detector_side_params_alt.minThreshold = self._blob_min_threshold
+        self._blob_detector_side_params_alt.maxThreshold = self._blob_max_threshold
+        self._blob_detector_side_params_alt.thresholdStep = self._blob_threshold_step
+        self._blob_detector_side_params_alt.minDistBetweenBlobs = self._blob_min_distance_between_blobs
+        self._blob_detector_side_params_alt.minRepeatability = self._blob_repeatability
+        self._blob_detector_side_params_alt.filterByColor = True
+        self._blob_detector_side_params_alt.filterByArea = True
+        self._blob_detector_side_params_alt.filterByCircularity = False
+        self._blob_detector_side_params_alt.filterByInertia = False
+        self._blob_detector_side_params_alt.filterByConvexity = True
+
         self._blob_detector = cv2.SimpleBlobDetector(self._blob_detector_params)
         self._blob_detector_alt = cv2.SimpleBlobDetector(self._blob_detector_params_alt)
+        self._blob_detector_side = cv2.SimpleBlobDetector(self._blob_detector_side_params)
+        self._blob_detector_side_alt = cv2.SimpleBlobDetector(self._blob_detector_side_params_alt)
+
         self._camera_model = None
 
         self._found_queue = Queue.Queue()
@@ -199,12 +234,12 @@ class BeaconFinder:
             # if we made it here and foundSide is still true, break,
             # we must have found it
             if(foundSide):
-                cv2.rectangle(image, (int(topThree[0].pt[0]-avgSize), int(topThree[0].pt[1]-avgSize)),
+                cv2.rectangle(self._debug_image_cv, (int(topThree[0].pt[0]-avgSize), int(topThree[0].pt[1]-avgSize)),
                         (int(topThree[2].pt[0]+avgSize), int(topThree[2].pt[1]+avgSize)),
                         (255,0,0),
                         thickness=-1
                 )
-                self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(image, self._image_output_encoding))
+
                 rospy.logerr('found %s', name)
                 break
             else:
@@ -212,10 +247,12 @@ class BeaconFinder:
                 # try again.
                 sortedBlobs = sortedBlobs[1:]
 
+        # draw blobs, for debugging
+        self.draw_debug_keypoints_image(blobs)
+
     def image_callback(self, image):
         # This function receives an image, attempts to locate the beacon
-        # in it, then if successful outputs a vector towards it in the
-        # camera's frame
+        # in it, then if successful outputs a beacon pose
         found = False
         centers = numpy.array([])
         image_cv = self._cv_bridge.imgmsg_to_cv2(image)
@@ -227,6 +264,8 @@ class BeaconFinder:
             while not self._found_queue.empty():
                 self._found_queue.get()
 
+            self._debug_image_cv = copy.deepcopy(image_cv)
+
             front_thread = threading.Thread( target=self.look,
                     args = ("Front", image_cv, self._blob_detector) )
             front_thread.start()
@@ -234,10 +273,10 @@ class BeaconFinder:
                     args = ("Back", image_cv, self._blob_detector_alt))
             back_thread.start()
             left_thread = threading.Thread( target=self.sideLook,
-                    args = ("Left", image_cv, self._blob_detector))
+                    args = ("Left", image_cv, self._blob_detector_side))
             left_thread.start()
             right_thread = threading.Thread( target=self.sideLook,
-                    args = ("Right", image_cv, self._blob_detector_alt))
+                    args = ("Right", image_cv, self._blob_detector_side_alt))
             right_thread.start()
 
             left_thread.join()
@@ -257,8 +296,11 @@ class BeaconFinder:
                 pose_matrix = self.compute_beacon_pose(centers, transform)
                 self.send_beacon_message(pose_matrix, image.header)
 
+            # Debug image output
+            self.draw_debug_chessboard_image(centers, found)
+            self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(self._debug_image_cv, self._image_output_encoding))
+
         rospy.loginfo("Latency: %f", (rospy.Time.now() - image.header.stamp).to_sec())
-        self.send_debug_image( image_cv, centers, found)
 
     def compute_beacon_pose(self, centers, transform):
         # Compute the position and orientation of the beacon
@@ -290,13 +332,16 @@ class BeaconFinder:
         beacon_pose.header = header
         self._beacon_pose_publisher.publish(beacon_pose)
 
-    def send_debug_image(self, image, centers, found):
+    def draw_debug_keypoints_image(self, keypoints):
         if self._beacon_debug_image.get_num_connections() > 0:
-            cv2.drawChessboardCorners(image,
+            self._debug_image_cv = cv2.drawKeypoints(self._debug_image_cv, keypoints, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    def draw_debug_chessboard_image(self, centers, found):
+        if self._beacon_debug_image.get_num_connections() > 0:
+            cv2.drawChessboardCorners(self._debug_image_cv,
                     (self._num_rows, self._num_columns),
                     centers,
                     found)
-            self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(image, self._image_output_encoding))
 
     def camera_info_callback(self, camera_info):
         camera_model = PinholeCameraModel()
