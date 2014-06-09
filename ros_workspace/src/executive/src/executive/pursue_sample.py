@@ -476,6 +476,9 @@ class ApproachSample(smach.State):
         #check_for_stop needs this flag
         userdata.check_pursuit_distance = False
  
+        #small delay to help ensure costmap updates
+        rospy.sleep(2.0)            
+            
         #this is the first move, which is always to point right at the sample
         if len(userdata.approach_points) == 0:
             self.announcer.say("Sample detected.")
@@ -484,7 +487,7 @@ class ApproachSample(smach.State):
             return self.spin(rotate_yaw, userdata)
         else:
             #last move was a spin, which is only done to point at the sample
-            #time to strafe towards sample
+            #time to strafe towards sample if center not blocked
             if userdata.active_strafe_key is None:
                 return self.strafe('center', userdata)
             #getting here means last move was a strafe, first check if it was an offset move,
