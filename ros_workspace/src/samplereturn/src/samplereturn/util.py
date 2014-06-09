@@ -123,6 +123,12 @@ def get_current_robot_pose(tf_listener, frame_id = 'odom'):
                                     
     return geometry_msg.PoseStamped(header, pose)
 
+#get robot yaw pointing to the specified frame origin
+def get_robot_distance_to_origin(tf_listener, frame_id = 'odom'):
+    robot = get_current_robot_pose(tf_listener, frame_id)
+    return point_distance_2d(robot.pose.position,
+                                geometry_msg.Point(0,0,0))
+
 #get robot yaw in the specified frame
 def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
     now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
