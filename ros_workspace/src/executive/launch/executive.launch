@@ -50,7 +50,7 @@
                 right_check_offset: 0.6     
             center:
                 angle: 0
-                distance: 15.0
+                distance: 16.0
                 blocked: False                
             right:
                 angle: -0.7854
@@ -100,10 +100,13 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
-        <param name="spoke_count" type="int" value="10"/>
-        <param name="first_spoke_offset" type="double" value="175"/>
-        <param name="star_hub_radius" type="int" value="15"/>
-        <param name="return_time_minutes" type="double" value="1.0"/>
+        <param name="spoke_count" type="int" value="60"/>
+        <param name="first_spoke_offset" type="double" value="135"/>
+        <param name="star_hub_radius" type="int" value="20"/>
+        <param name="min_spin_radius" type="double" value="40"/>
+        <param name="spin_step" type="double" value="15"/>
+        
+        <param name="return_time_minutes" type="double" value="100"/>
 
         <!-- for Beacon approach -->
         <rosparam>
@@ -112,11 +115,11 @@
         </rosparam>
 
         <!-- simple mover parameters --> 
-        <param name="spin_velocity" type="double" value="0.5"/>
+        <param name="spin_velocity" type="double" value="0.444"/>
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
-                max_velocity: 2.0
+                max_velocity: 1.0 
                 acceleration: 0.5
                 stop_deceleration: 2.0
                 loop_rate: 10 

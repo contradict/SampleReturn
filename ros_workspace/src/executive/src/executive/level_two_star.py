@@ -97,14 +97,15 @@ class LevelTwoStar(object):
         self.state_machine.userdata.target_tolerance = 0.2 #both meters and radians for now!
         
         #search line parameters
+        self.state_machine.userdata.min_spin_radius = self.node_params.min_spin_radius
+        self.state_machine.userdata.last_spin_radius = 0
+        self.state_machine.userdata.spin_step = self.node_params.spin_step
         self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
-
-        #search line variables
-        self.state_machine.userdata.next_line_pose = None
-        self.state_machine.userdata.last_line_pose = None
         self.state_machine.userdata.line_yaw = None #IN RADIANS!
         self.state_machine.userdata.outbound = False
         self.state_machine.userdata.distance_to_origin = 100
+        
+        #stop function flags
         self.state_machine.userdata.stop_on_sample = True
         self.state_machine.userdata.stop_on_beacon = False
 
@@ -144,8 +145,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('STAR_MANAGER',
                                    StarManager(self.tf_listener,
                                                self.announcer),
-                                   transitions = {'start_line':'LINE_MANAGER',
-                                                  'rotate':'ROTATION_MANAGER',
+                                   transitions = {'rotate':'ROTATION_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME'})
 
             smach.StateMachine.add('LINE_MANAGER',
@@ -153,6 +153,7 @@ class LevelTwoStar(object):
                                                      self.simple_mover,
                                                      self.announcer),
                                    transitions = {'move':'LINE_MOVE',
+                                                  'spin':'ROTATE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
                                                   'next_spoke':'STAR_MANAGER',
@@ -176,7 +177,8 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'LINE_MANAGER',
                                                   'timeout':'LINE_MANAGER',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'velocity':'spin_velocity'})
             
             @smach.cb_interface(input_keys=['detected_sample'])
             def pursuit_goal_cb(userdata, request):
@@ -412,9 +414,9 @@ class StarManager(smach.State):
                                             'spokes',
                                             'offset_count',
                                             'offset_limit',
+                                            'last_spin_radius',
                                             'within_hub_radius'],
-                             outcomes=['start_line',
-                                       'rotate',
+                             outcomes=['rotate',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -422,12 +424,15 @@ class StarManager(smach.State):
         self.announcer = announcer  
 
     def execute(self, userdata):
-        #are we returning to the center?
+        
+        #returning to the center
         if not userdata.outbound:
             #just finished inbound spoke, turn around and head outwards again
             if len(userdata.spokes) == 1:
                 rospy.loginfo("STAR MANAGER finished inbound move, last spoke")
                 return 'return_home'
+            userdata.last_spin_radius = util.get_robot_distance_to_origin(self.tf_listener,
+                                                                          userdata.world_fixed_frame)
             userdata.line_yaw = userdata.spokes.pop(0)['yaw']
             userdata.offset_count = 0
             userdata.offset_limit = 1
@@ -435,8 +440,8 @@ class StarManager(smach.State):
             rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
             return 'rotate'        
-        
-        if userdata.outbound:
+        #outbound
+        else:
             #just finished outbound spoke, head towards next star point and set offset limit higher.
             #If inbound, rotation manager calculates the line yaw each time it is asked to make a
             #rotation. userdata.line_yaw remains the yaw FROM the origin
@@ -447,8 +452,7 @@ class StarManager(smach.State):
             rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
             return 'rotate'
-        
-        return 'start_line'    
+
 
 class RotationManager(smach.State):
 
@@ -506,11 +510,16 @@ class SearchLineManager(smach.State):
                                            'detected_sample',
                                            'world_fixed_frame',
                                            'odometry_frame',
+                                           'last_spin_radius',
+                                           'min_spin_radius',
+                                           'spin_step',
                                            'within_hub_radius'],
                              output_keys = ['simple_move',
                                             'offset_count',
-                                            'active_strafe_key'],
+                                            'active_strafe_key',
+                                            'last_spin_radius'],
                              outcomes=['move',
+                                       'spin',
                                        'sample_detected',
                                        'line_blocked',
                                        'next_spoke',
@@ -533,6 +542,8 @@ class SearchLineManager(smach.State):
                 userdata.world_fixed_frame)
         current_pose = util.get_current_robot_pose(self.tf_listener,
                 userdata.world_fixed_frame)
+        current_radius = util.point_distance_2d(current_pose.pose.position,
+                                                geometry_msg.Point(0,0,0))
         
         rospy.loginfo("SEARCH LINE MANAGER, outbound: %s,  line_yaw: %.1f,  actual_yaw: %.1f,  position: (%.2f,%.2f) " % (
                        userdata.outbound,
@@ -562,6 +573,16 @@ class SearchLineManager(smach.State):
         #are we within the star hub radius?
         if not userdata.outbound and userdata.within_hub_radius:
             return 'next_spoke'     
+
+        #time for a spin?
+        if userdata.outbound \
+           and (current_radius > userdata.min_spin_radius) \
+           and (current_radius - userdata.last_spin_radius) > userdata.spin_step:
+            self.announcer.say("Scan ing for samples")
+            userdata.last_spin_radius = current_radius
+            userdata.simple_move = {'type':'spin',
+                                    'angle':2*math.pi}
+            return 'spin'
         
         #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
         #first check if we are offset from line either direction, and if so, is the path
