@@ -67,6 +67,7 @@
     </rosparam>
 
     <!-- Remaps -->
+    <remap from="twist" to="/motion/servo_command"/>
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
