@@ -48,14 +48,14 @@
     <!-- servo sample simple motion parameters -->
     <rosparam>
         servo_params:
-        initial_velocity: 0.1
-        initial_accel: 0.1
-        initial_tolerance: 0.050
-        final_velocity: 0.01
-        final_accel: 0.02
-        final_tolerance: 0.010
-        settle_time: 1.0
-        try_limit: 3
+            initial_velocity: 0.1
+            initial_accel: 0.1
+            initial_tolerance: 0.050
+            final_velocity: 0.01
+            final_accel: 0.02
+            final_tolerance: 0.010
+            settle_time: 1.0
+            try_limit: 3
     </rosparam>
 
 
