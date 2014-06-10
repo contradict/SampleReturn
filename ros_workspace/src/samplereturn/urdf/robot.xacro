@@ -252,7 +252,7 @@
         <origin xyz="-0.1147 0.0 0.064" rpy="-2.792 0 -1.571"/>
     </joint>
 
-    <link name="search_camera_body">
+    <link name="search_camera">
         <visual>
             <geometry>
                 <box size="0.10 0.08 0.05"/>
@@ -269,15 +269,15 @@
         </visual>
     </link>
     <joint name="search_lens_joint" type="fixed">
-        <parent link="search_camera_body"/>
+        <parent link="search_camera"/>
         <child link="search_camera_lens"/>
         <origin xyz="0.0 0.0 0.025" rpy="0 0 0"/>
     </joint>
     <joint name="search_camera_joint" type="fixed">
         <parent link="body_triangle"/>
-        <child link="search_camera_body"/>
+        <child link="search_camera"/>
         <!-- still considering 3 search camera angles: 20, 25, 40 degrees -->
-        <origin xyz="0.1763 0.0 0.9203" rpy="-1.92 0 -1.57"/>
+        <origin xyz="0.124 0.0 0.963" rpy="-1.92 0 -1.571"/>
     </joint>
 
     <!--fake laser scanner-->
