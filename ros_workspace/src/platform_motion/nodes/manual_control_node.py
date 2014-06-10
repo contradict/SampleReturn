@@ -63,6 +63,7 @@ class ManualController(object):
         self.state_machine.userdata.simple_move_tolerance = 1.0
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
+        self.state_machine.userdata.velocity = None
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
