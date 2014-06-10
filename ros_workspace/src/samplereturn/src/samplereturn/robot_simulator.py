@@ -57,7 +57,7 @@ class RobotSimulator(object):
         self.excluded_ids = []
         self.fake_samples = [{'point':geometry_msg.Point(74, -3.0, 0),'id':1},
                              {'point':geometry_msg.Point(6, -28, 0),'id':5},
-                             {'point':geometry_msg.Point(-42, 3, 0), 'id':3},
+                             {'point':geometry_msg.Point(-47, 10, 0), 'id':3},
                              {'point':geometry_msg.Point(-65, 20, 0), 'id':7},
                              {'point':geometry_msg.Point(-104, 45, 0), 'id':9},
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
@@ -898,6 +898,7 @@ class ManipulatorState(smach.State):
         while (rospy.get_time() - start_time) < wait_time:
             if self.preempt_requested():
                 userdata.action_result = manipulator_msg.ManipulatorResult('fake_failure', False)
+                self.service_preempt()
                 return 'preempted'
             rospy.sleep(0.2)
         userdata.action_result = manipulator_msg.ManipulatorResult('fake_success', True)
