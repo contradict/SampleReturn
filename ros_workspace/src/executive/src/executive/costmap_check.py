@@ -61,6 +61,7 @@ class ExecutiveCostmapChecker(object):
         lethal_threshold = self.node_params.lethal_threshold
         check_width = self.node_params.obstacle_check_width
         check_dist = self.node_params.obstacle_check_distance
+        min_dist = self.node_params.min_check_distance
         
         #load up the costmap and its info into useful structure        
         try:
@@ -110,6 +111,9 @@ class ExecutiveCostmapChecker(object):
                                   costmap.info.resolution)
             lr = self.check_point(ll[0], check_dist, odom_yaw, costmap.info.resolution)
             ur = self.check_point(ul[0], check_dist, odom_yaw, costmap.info.resolution)
+            #shift start of check lines by min dist
+            ll = self.check_point(ll[0], min_dist, odom_yaw, costmap.info.resolution)
+            ul = self.check_point(ul[0], min_dist, odom_yaw, costmap.info.resolution)
             
             start_points = bresenham.points(ll, ul)
             end_points = bresenham.points(lr, ur)

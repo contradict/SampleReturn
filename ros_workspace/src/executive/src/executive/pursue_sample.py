@@ -534,7 +534,10 @@ class ApproachSample(smach.State):
                         self.announcer.say("Sample approach blocked. Abort ing")
                         return 'blocked'                    
             #center is clear check tolerance and rotate if necessary, or keep going
-            elif (np.abs(yaw_to_sample) > userdata.pursuit_yaw_tolerance):
+            elif (np.abs(rotate_yaw) > userdata.pursuit_yaw_tolerance):
+                rospy.loginfo("SAMPLE APPROACH rotating to correct yaw error, yaw_to_sample: %.1f, yaw_tolerance: %1f, (deg)" % (
+                              np.degrees(yaw_to_sample),
+                              np.degrees(userdata.pursuit_yaw_tolerance)))
                 userdata.approach_points.appendleft(robot_point)
                 return self.spin(rotate_yaw, userdata)
             else:    
