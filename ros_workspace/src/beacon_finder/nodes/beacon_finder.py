@@ -6,6 +6,7 @@ import rosnode
 import math
 import Queue
 import threading
+import cv
 import cv2
 import numpy
 import tf
@@ -244,6 +245,7 @@ class BeaconFinder:
                         (255,0,0),
                         thickness=-1
                 )
+                self._found_queue.put((name, topThree, foundSide))
 
                 rospy.logerr('found %s', name)
                 break
@@ -286,6 +288,8 @@ class BeaconFinder:
             front_thread.join()
             back_thread.join()
 
+            pose_matrix = None
+            pose_matrix_side = None
             while not self._found_queue.empty():
                 name, centers, found = self._found_queue.get()
                 if name == "Back":
@@ -293,13 +297,28 @@ class BeaconFinder:
                             [[ 0, 1,  0,  0]],
                             [[ 0, 0, -1, -self._beacon_thickness]],
                             [[ 0, 0,  0,  1]]]
-                else:
+                    pose_matrix = self.compute_beacon_pose(centers, transform)
+                    self.draw_debug_chessboard_image(centers, found)
+                elif name == "Front":
                     transform = numpy.eye(4)
-                pose_matrix = self.compute_beacon_pose(centers, transform)
+                    pose_matrix = self.compute_beacon_pose(centers, transform)
+                    self.draw_debug_chessboard_image(centers, found)
+                if name == "Left":
+                    transform = numpy.eye(4)
+                    pose_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
+                elif name == "Right":
+                    transform =    numpy.r_[[[-1, 0,  0,  0]],
+                            [[ 0, 1,  0,  0]],
+                            [[ 0, 0, -1, -self._beacon_thickness]],
+                            [[ 0, 0,  0,  1]]]
+                    pose_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
+
+            if pose_matrix is not None:
                 self.send_beacon_message(pose_matrix, image.header)
+            elif pose_matrix_side is not None:
+                self.send_beacon_message(pose_matrix_side, image.header)
 
             # Debug image output
-            self.draw_debug_chessboard_image(centers, found)
             self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(self._debug_image_cv, self._image_output_encoding))
 
         rospy.loginfo("Latency: %f", (rospy.Time.now() - image.header.stamp).to_sec())
@@ -319,6 +338,50 @@ class BeaconFinder:
         pose_matrix = numpy.dot( pose_matrix, transform )
 
         return pose_matrix
+
+    def compute_beacon_pose_side(self, centers, image, transform):
+        # Compute the position and orientation of the beacon
+        # (identity transform is the left side)
+        if centers is None or self._camera_model is None or len(centers) != 3:
+            return None
+
+        image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        ret, image_binary = cv2.threshold(image_gray, 127, 255, cv2.THRESH_BINARY)
+        circle_width_height_ratio = 0
+        highest_center_point = centers[0].pt
+        for center in centers:
+            if (center.pt[1] > highest_center_point[1]):
+                highest_center_point = center.pt
+            center_point = [int(coord) for coord in center.pt]
+            flood_color = image_binary[center_point[0]][center_point[1]]
+            bounding_rect = cv.FloodFill(cv.fromarray(image_binary), (center_point[0], center_point[1]), float(flood_color))
+            circle_width_height_ratio = circle_width_height_ratio + (bounding_rect[2][2]/bounding_rect[2][3])
+        circle_width_height_ratio = circle_width_height_ratio / len(centers)
+        
+        very_approx_angle = 0
+        if circle_width_height_ratio > 1.0:
+            # emit high covariance
+            very_approx_angle = math.pi/2.0
+        else:
+            very_approx_angle = math.acos(circle_width_height_ratio)
+
+        # Compute rotation and translation vectors such that they emulate
+        # the output of solvePnP()
+        average_circle_distance = math.sqrt((centers[0].pt[0]-centers[1].pt[0])**2 + (centers[0].pt[1]-centers[1].pt[1])**2)
+        average_circle_distance = average_circle_distance + math.sqrt((centers[1].pt[0]-centers[2].pt[0])**2 + (centers[1].pt[1]-centers[2].pt[1])**2)
+        average_circle_distance = average_circle_distance / 2.0
+        beacon_distance = (self._camera_model.fy()/average_circle_distance)*(13.5*0.0254)
+        x_meters = (highest_center_point[0] - self._camera_model.cx())/self._camera_model.fx()*beacon_distance
+        y_meters = (highest_center_point[1] - self._camera_model.cy())/self._camera_model.fy()*beacon_distance
+        rotation_vector = numpy.r_[0, -very_approx_angle, 0]
+        translation_vector = numpy.r_[[[x_meters]], [[y_meters]], [[beacon_distance]]]
+        rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
+        pose_matrix = numpy.vstack((rotation_matrix, numpy.zeros((1,3))))
+        pose_matrix = numpy.hstack((pose_matrix, numpy.r_[translation_vector,[[1]]]))
+        pose_matrix = numpy.dot(pose_matrix, transform)
+        return pose_matrix
+            
+        
 
     def send_beacon_message(self, pose_matrix, header):
         quat = quaternion_from_matrix(pose_matrix)
