@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+
+<launch>
+
+    <arg name="world_fixed_frame" default="map"/>
+    <arg name="odometry_frame" default="odom"/>
+
+    <remap from="/processes/beacon_finder/odometry" to="/motion/odometry"/>
+    <node
+		machine="search"
+		name="beacon_localizer"
+		pkg="beacon_localizer"
+		type="beacon_localizer"
+        output="log"
+        ns="/processes/beacon_finder">
+
+        <param name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+
+        <rosparam file="$(find beacon_localizer)/config/filter_params.yaml" command="load"/>
+    </node>
+
+</launch>
