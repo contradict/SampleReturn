@@ -514,8 +514,11 @@ class RobotSimulator(object):
     def sample_in_view(self, point, max_x, max_y):
         header = std_msg.Header(0, rospy.Time(0), 'map')
         point_stamped = geometry_msg.PointStamped(header, point)
-        base_relative = self.tf_listener.transformPoint('base_link',
-                                                        point_stamped)
+        try:
+            base_relative = self.tf_listener.transformPoint('base_link',
+                                                            point_stamped)
+        except:
+            return False
         x = base_relative.point.x
         y = base_relative.point.y
         return ( ((x > -0.1) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
