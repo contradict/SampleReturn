@@ -445,7 +445,7 @@ class ServoController(smach.State):
                 point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
                                                              userdata.detected_sample).point
             except tf.Exception:
-                rospy.logwarn("MANUAL_CONTROL failed to get manipulator_arm -> odom transform in 1.0 seconds")
+                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> odom transform in 1.0 seconds")
                 self.try_count = 0
                 return 'aborted'
             point_in_manipulator.x -= userdata.manipulator_correction['x']
@@ -459,15 +459,18 @@ class ServoController(smach.State):
                 return 'complete'
             elif distance < userdata.servo_params['initial_tolerance']:
                 velocity = userdata.servo_params['final_velocity']
+                accel = userdata.servo_params['final_accel']
             else:
                 velocity = userdata.servo_params['initial_velocity']
+                accel = userdata.servo_params['initial_accel']
             yaw = util.pointing_yaw(origin, point_in_manipulator)
             userdata.simple_move = {'type':'strafe',
                                     'angle':yaw,
                                     'distance':distance,
-                                    'velocity':velocity}
+                                    'velocity':velocity,
+                                    'acceleration':accel}
             self.announcer.say("Servo ing, distance, %.1f centimeters" % (distance*100))
-            rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): " + str(point_in_manipulator))
+            rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): %s" % (point_in_manipulator))
             self.try_count += 1
             return 'move'
         
@@ -495,22 +498,26 @@ class ExecuteSimpleMove(smach.State):
                 
         move = deepcopy(userdata.simple_move)
         userdata.simple_move = None #consume simple move
-        velocity = move.get('velocity', userdata.velocity)
+        #load values from dict, absent values become None
         angle = move.get('angle')
         distance = move.get('distance')
+        velocity = move.get('velocity', userdata.velocity)
+        accel = move.get('acceleration')
  
         while not rospy.is_shutdown():
             try:
                 if move['type'] == 'spin':
                     error = self.simple_mover.execute_spin(angle,
-                                                           max_velocity = velocity)
+                                                           max_velocity = velocity,
+                                                           acceleration = accel)
                     rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
                                                                        np.degrees(error)))
                 elif move['type'] == 'strafe':
                     strafe_angle = move['angle']
                     error = self.simple_mover.execute_strafe(strafe_angle,
                                                              distance,
-                                                             max_velocity = velocity)
+                                                             max_velocity = velocity,
+                                                             acceleration = accel)
                     rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %(
                                    np.degrees(angle),
                                    distance,
