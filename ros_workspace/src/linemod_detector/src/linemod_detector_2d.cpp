@@ -380,7 +380,15 @@ class LineMOD_Detector
           median_disp, xyz);
       temp_point.point.x = xyz.x;
       temp_point.point.y = xyz.y;
-      temp_point.point.z = xyz.z;
+      if (xyz.z > max_depth) {
+        temp_point.point.z = max_depth;
+      }
+      else if (xyz.z < min_depth) {
+        temp_point.point.z = min_depth;
+      }
+      else {
+        temp_point.point.z = xyz.z;
+      }
       bool wait =
         listener_.waitForTransform(_detection_frame_id, header.frame_id, header.stamp, ros::Duration(0.03));
       if (!wait) {
