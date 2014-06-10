@@ -72,8 +72,8 @@
         <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
 
         <!-- camera ignore params, to allow testing without certain cameras -->
-        <param name="ignore_search_camera" value="True"/>
-        <param name="ignore_manipulator_camera" value="True"/>
+        <param name="ignore_search_camera" value="False"/>
+        <param name="ignore_manipulator_camera" value="False"/>
         
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
         <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
@@ -101,7 +101,7 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="60"/>
-        <param name="first_spoke_offset" type="double" value="135"/>
+        <param name="first_spoke_offset" type="double" value="170"/>
         <param name="star_hub_radius" type="int" value="20"/>
         <param name="min_spin_radius" type="double" value="40"/>
         <param name="spin_step" type="double" value="15"/>
@@ -142,16 +142,18 @@
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
-        <param name="min_pursuit_distance" type="double" value="3.0"/>
-        <param name="max_pursuit_error" type="double" value="0.2"/>
+        <!-- sample approach (pursuit) parameters -->
+        <param name="min_pursuit_distance" type="double" value="4.0"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
-        <param name="square_search_size" type="double" value="0.4"/> 
         <param name="pursuit_step" type="double" value="4.0"/>
+        <param name="pursuit_yaw_tolerance" type="double" value="0.2"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>
-        <param name="return_velocity" type="double" value="1.0"/>
         <param name="pursuit_strafe" type="double" value="5.0"/>
-        <param name="search_velocity" type="double" value="0.25"/>
 
+        <param name="square_search_size" type="double" value="0.4"/> 
+        <param name="return_velocity" type="double" value="1.0"/>
+        <param name="search_velocity" type="double" value="0.25"/>
+       
         <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
         <rosparam>
             manipulator_correction:
@@ -174,10 +176,11 @@
         <rosparam>
            servo_params:
               initial_velocity: 0.1
+              initial_accel: 0.1
               initial_tolerance: 0.050
-              final_velocity: 0.005
+              final_velocity: 0.01
+              final_accel: 0.02
               final_tolerance: 0.010
-              acceleration: 0.02
               settle_time: 1.0
               try_limit: 3
         </rosparam>
