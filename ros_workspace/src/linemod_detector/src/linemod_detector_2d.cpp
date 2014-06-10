@@ -382,9 +382,13 @@ class LineMOD_Detector
       temp_point.point.y = xyz.y;
       if (xyz.z > max_depth) {
         temp_point.point.z = max_depth;
+        temp_point.point.x /= (xyz.z/max_depth);
+        temp_point.point.y /= (xyz.z/max_depth);
       }
       else if (xyz.z < min_depth) {
         temp_point.point.z = min_depth;
+        temp_point.point.x /= (xyz.z/min_depth);
+        temp_point.point.y /= (xyz.z/min_depth);
       }
       else {
         temp_point.point.z = xyz.z;
