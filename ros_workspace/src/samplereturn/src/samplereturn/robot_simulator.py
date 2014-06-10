@@ -129,9 +129,9 @@ class RobotSimulator(object):
         point_cloud_port_name = "/cameras/navigation/port/points2"
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
-
         self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
         self.odometry_is_noisy = False
+        self.broadcast_fake_localization = False
 
         #tf stuff
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -401,11 +401,12 @@ class RobotSimulator(object):
         
     def broadcast_tf_and_motion(self, event):
         now = rospy.Time.now()
-        self.tf_broadcaster.sendTransform(self.zero_translation,
-                                          self.zero_rotation,
-                                          now,
-                                          'fake_odom',
-                                          'fake_map')
+        if self.broadcast_fake_localization:
+            self.tf_broadcaster.sendTransform(self.zero_translation,
+                                              self.zero_rotation,
+                                              now,
+                                              'fake_odom',
+                                              'fake_map')
         
         self.integrate_odometry()
         
