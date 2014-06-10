@@ -4,6 +4,7 @@ import copy
 import rospy
 import rosnode
 import math
+from math import pi
 import Queue
 import threading
 import cv
@@ -13,7 +14,7 @@ import tf
 from cv_bridge import CvBridge
 from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo
-from geometry_msgs.msg import Vector3, Quaternion, PoseStamped
+from geometry_msgs.msg import Vector3, Quaternion, PoseStamped, PoseWithCovarianceStamped
 from tf.transformations import quaternion_from_matrix, quaternion_inverse, quaternion_multiply
 from image_geometry import PinholeCameraModel
 
@@ -25,7 +26,7 @@ class BeaconFinder:
                 self.image_callback, queue_size=1, buff_size=1024*1024*64)
         self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo,
                 self.camera_info_callback, queue_size=1)
-        self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseStamped)
+        self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseWithCovarianceStamped)
         self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
         self._cv_bridge = CvBridge()
 
@@ -289,7 +290,9 @@ class BeaconFinder:
             back_thread.join()
 
             pose_matrix = None
+            covariance_matrix = None
             pose_matrix_side = None
+            covariance_matrix_side = None
             while not self._found_queue.empty():
                 name, centers, found = self._found_queue.get()
                 if name == "Back":
@@ -297,26 +300,26 @@ class BeaconFinder:
                             [[ 0, 1,  0,  0]],
                             [[ 0, 0, -1, -self._beacon_thickness]],
                             [[ 0, 0,  0,  1]]]
-                    pose_matrix = self.compute_beacon_pose(centers, transform)
+                    pose_matrix, covariance_matrix = self.compute_beacon_pose(centers, transform)
                     self.draw_debug_chessboard_image(centers, found)
                 elif name == "Front":
                     transform = numpy.eye(4)
-                    pose_matrix = self.compute_beacon_pose(centers, transform)
+                    pose_matrix, covariance_matrix  = self.compute_beacon_pose(centers, transform)
                     self.draw_debug_chessboard_image(centers, found)
                 if name == "Left":
                     transform = numpy.eye(4)
-                    pose_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
+                    pose_matrix_side, covariance_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
                 elif name == "Right":
                     transform =    numpy.r_[[[-1, 0,  0,  0]],
                             [[ 0, 1,  0,  0]],
                             [[ 0, 0, -1, -self._beacon_thickness]],
                             [[ 0, 0,  0,  1]]]
-                    pose_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
+                    pose_matrix_side, covariance_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
 
-            if pose_matrix is not None:
-                self.send_beacon_message(pose_matrix, image.header)
-            elif pose_matrix_side is not None:
-                self.send_beacon_message(pose_matrix_side, image.header)
+            if pose_matrix is not None and covariance_matrix is not None:
+                self.send_beacon_message(pose_matrix, covariance_matrix, image.header)
+            elif pose_matrix_side is not None and covariance_matrix_side is not None:
+                self.send_beacon_message(pose_matrix_side, covariance_matrix_side, image.header)
 
             # Debug image output
             self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(self._debug_image_cv, self._image_output_encoding))
@@ -336,8 +339,14 @@ class BeaconFinder:
             numpy.zeros((1,3))))
         pose_matrix = numpy.hstack((pose_matrix, numpy.r_[translation_vector,[[1]]]))
         pose_matrix = numpy.dot( pose_matrix, transform )
+        covariance_matrix = [0.25, 0.20, 1.5, pi/10.0, pi/5.0,  pi/10.0,\
+                             0.20, 0.15, 1.0, pi/10.0, pi/6.0,  pi/10.0,\
+                             0.15, 1.0,  0.5, pi/10.0, pi/10.0, pi/10.0,\
+                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
+                             pi/5.0, pi/6.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
+                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0]
 
-        return pose_matrix
+        return pose_matrix, covariance_matrix
 
     def compute_beacon_pose_side(self, centers, image, transform):
         # Compute the position and orientation of the beacon
@@ -379,22 +388,30 @@ class BeaconFinder:
         pose_matrix = numpy.vstack((rotation_matrix, numpy.zeros((1,3))))
         pose_matrix = numpy.hstack((pose_matrix, numpy.r_[translation_vector,[[1]]]))
         pose_matrix = numpy.dot(pose_matrix, transform)
-        return pose_matrix
+
+        covariance_matrix = [1.00, 1.00, 1.0, pi/10.0, pi/5.0,  pi/10.0,\
+                             1.00, 1.00, 1.0, pi/10.0, pi/6.0,  pi/10.0,\
+                             1.00, 1.00, 2.0, pi/10.0, pi/10.0, pi/10.0,\
+                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
+                             pi/5.0, pi/6.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
+                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0]
+        return pose_matrix, covariance_matrix
             
         
 
-    def send_beacon_message(self, pose_matrix, header):
+    def send_beacon_message(self, pose_matrix, covariance_matrix, header):
         quat = quaternion_from_matrix(pose_matrix)
 
-        beacon_pose = PoseStamped()
-        beacon_pose.pose.position.x = pose_matrix[0, -1]
-        beacon_pose.pose.position.y = pose_matrix[1, -1]
-        beacon_pose.pose.position.z = pose_matrix[2, -1]
-        beacon_pose.pose.orientation.x = quat[0]
-        beacon_pose.pose.orientation.y = quat[1]
-        beacon_pose.pose.orientation.z = quat[2]
-        beacon_pose.pose.orientation.w = quat[3]
+        beacon_pose = PoseWithCovarianceStamped()
+        beacon_pose.pose.pose.position.x = pose_matrix[0, -1]
+        beacon_pose.pose.pose.position.y = pose_matrix[1, -1]
+        beacon_pose.pose.pose.position.z = pose_matrix[2, -1]
+        beacon_pose.pose.pose.orientation.x = quat[0]
+        beacon_pose.pose.pose.orientation.y = quat[1]
+        beacon_pose.pose.pose.orientation.z = quat[2]
+        beacon_pose.pose.pose.orientation.w = quat[3]
         beacon_pose.header = header
+        beacon_pose.pose.covariance = covariance_matrix
         self._beacon_pose_publisher.publish(beacon_pose)
 
     def draw_debug_keypoints_image(self, keypoints):
