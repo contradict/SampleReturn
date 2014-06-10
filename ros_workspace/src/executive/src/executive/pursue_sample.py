@@ -69,30 +69,34 @@ class PursueSample(object):
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
         
+        #tf frames
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
 
+        #strafe dictionary and active strafe key
         self.state_machine.userdata.strafes = self.strafes
         self.state_machine.userdata.active_strafe_key = None
         
+        #userdata that subscribers fiddle with
         self.state_machine.userdata.paused = False        
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.target_sample = None
-        self.state_machine.userdata.search_point = None
         self.state_machine.latched_sample = None
-        
-        self.state_machine.userdata.return_velocity = self.node_params.return_velocity
         
         #pursuit params
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
         self.state_machine.userdata.pursuit_step = self.node_params.pursuit_step
         self.state_machine.userdata.pursuit_strafe = self.node_params.pursuit_strafe
-        self.state_machine.userdata.check_pursuit_distance = False
-        self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error       
+        self.state_machine.userdata.pursuit_yaw_tolerance = self.node_params.pursuit_yaw_tolerance
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        
+        self.state_machine.userdata.return_velocity = self.node_params.return_velocity
 
-        #strafe search and servo settings, search_count limits the number of times we can enter the
+        #stop function check flags        
+        self.state_machine.userdata.check_pursuit_distance = False
+        self.state_machine.userdata.stop_on_sample = False
+
+        #area search and servo settings, search_count limits the number of times we can enter the
         #sample_lost search pattern
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
         self.state_machine.userdata.square_search_size = self.node_params.square_search_size
@@ -341,7 +345,7 @@ class PursueSample(object):
         
         active_strafe_key = self.state_machine.userdata.active_strafe_key
         
-        #stop if we are blocked in strafe direction
+        #stop if we are blocked in strafe direction, or have closed within sample distance
         if active_strafe_key is not None:
             if self.strafes[active_strafe_key]['blocked']:
                 rospy.loginfo("PURSUE SAMPLE STOP: on strafe %s blocked" %(active_strafe_key))
@@ -407,7 +411,6 @@ class StartSamplePursuit(smach.State):
                              output_keys=['velocity',
                                           'approach_points',
                                           'pursuit_point',
-                                          'last_sample_detection_time',
                                           'stop_on_sample',
                                           'action_result',
                                           'search_count',
@@ -450,6 +453,7 @@ class ApproachSample(smach.State):
                                          'min_pursuit_distance',
                                          'pursuit_step',
                                          'pursuit_strafe',
+                                         'pursuit_yaw_tolerance',
                                          'odometry_frame',
                                          'distance_to_sample'],
                              output_keys=['simple_move',
@@ -473,11 +477,17 @@ class ApproachSample(smach.State):
                                                 userdata.odometry_frame)
         rotate_yaw = util.unwind(yaw_to_sample - actual_yaw)
         
-        #check_for_stop needs this flag
+        #check_for_stop needs this flag, set to false for rotates, strafe turns it on
         userdata.check_pursuit_distance = False
+
+        #check before any strafe move:
+        if userdata.distance_to_sample <= userdata.min_pursuit_distance:
+            rospy.loginfo("PURSUIT within minimum distance")
+            userdata.active_strafe_key = None
+            return 'complete'
  
         #small delay to help ensure costmap updates
-        rospy.sleep(2.0)            
+        rospy.sleep(1.0)            
             
         #this is the first move, which is always to point right at the sample
         if len(userdata.approach_points) == 0:
@@ -523,20 +533,17 @@ class ApproachSample(smach.State):
                         userdata.active_strafe_key = None
                         self.announcer.say("Sample approach blocked. Abort ing")
                         return 'blocked'                    
-            #center is clear, keep going
-            else:
+            #center is clear check tolerance and rotate if necessary, or keep going
+            elif (np.abs(yaw_to_sample) > userdata.pursuit_yaw_tolerance):
+                userdata.approach_points.appendleft(robot_point)
+                return self.spin(rotate_yaw, userdata)
+            else:    
                 return self.strafe('center', userdata)
             
             return 'aborted'
  
     def strafe(self, key, userdata):
-        #check before any strafe move:
-        if userdata.distance_to_sample <= userdata.min_pursuit_distance:
-            rospy.loginfo("PURSUIT within minimum distance")
-            userdata.active_strafe_key = None
-            return 'complete'
         strafe = userdata.strafes[key]
-        #distance = strafe['distance']
         distance = userdata.pursuit_strafe
         userdata.offset_count += np.sign(strafe['angle'])
         userdata.simple_move = {'type':'strafe',
