@@ -187,7 +187,6 @@ class SaliencyDetectorNode
         //header.frame_id = "/search_camera_lens";
         samplereturn_msgs::NamedPoint np_msg;
         np_msg.header = msg->header;
-        np_msg.header.frame_id = "/search_camera_lens";
         np_msg.name = dominant_color;
         np_msg.point.x = ray.x;
         np_msg.point.y = ray.y;
