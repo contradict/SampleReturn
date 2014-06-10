@@ -289,13 +289,13 @@ class LineMOD_Detector
         if (m.similarity > LineMOD_Detector::pub_threshold && dominant_color!="green")
         {
           if (m.class_id.c_str() == "red_puck" &&
-              (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple"))
+              (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple" || dominant_color=="orange"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::RED_PUCK);
           }
           if (m.class_id.c_str() == "orange_pipe" &&
-              (dominant_color=="orange" || dominant_color=="white"))
+              (dominant_color=="orange" || dominant_color=="white" || dominant_color=="yellow"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
@@ -313,7 +313,7 @@ class LineMOD_Detector
                 angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
           }
           if (m.class_id.c_str() == "pink_tennis_ball" &&
-              (dominant_color=="pink"))
+              (dominant_color=="pink" || dominant_color=="white"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
