@@ -8,7 +8,7 @@
         pkg="camera_calibration"
         type="cameracalibrator.py"
         name="calibrator"
-        args="--size 8x6 --square 0.1 -p chessboard --approximate=0.05"
+        args="--size 9x6 --square 0.1 -p chessboard --approximate=0.05"
         output="screen"
         >
         <remap from="right" to="/cameras/$(arg cameras)/right/image_mono"/>
