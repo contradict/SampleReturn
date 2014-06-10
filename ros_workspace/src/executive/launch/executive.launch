@@ -201,6 +201,7 @@
         <param name="min_check_distance" type="double" value ="1.5"/>
         <param name="obstacle_check_distance" type="double" value="5"/>
         <param name="obstacle_check_width" type="double" value="2.5"/>
+        <param name="min_check_distance" type="double" value="0.7"/>
 
     </node>
 
