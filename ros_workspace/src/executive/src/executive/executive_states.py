@@ -529,7 +529,6 @@ class ExecuteSimpleMove(smach.State):
                 #did we exit the move execute because of a pause?
                 if userdata.paused:
                     #wait here for unpause, as long as it takes
-                    paused_during_move = True
                     rospy.loginfo("SIMPLE MOVE stopped by pause")
                     while not rospy.is_shutdown() and userdata.paused:
                         rospy.sleep(0.2)
@@ -546,78 +545,6 @@ class ExecuteSimpleMove(smach.State):
 
         return 'complete'
 
-#scary class for going to list of points with no obstacle checking, good for searching area
-#with strafing.  obstacle_detection optional on 0 yaw strafes
-class MoveToPoints(smach.State):
-    def __init__(self, tf_listener):
-        smach.State.__init__(self,
-                             input_keys=['point_list',
-                                         'strafes',
-                                         'active_strafe_key',
-                                         'detected_sample',
-                                         'odometry_frame',
-                                         'stop_on_sample',
-                                         'face_next_point',
-                                         'check_for_obstacles'],
-                             output_keys=['simple_move',
-                                          'active_strafe_key',
-                                          'point_list'],
-                             outcomes=['next_point',
-                                       'sample_detected',
-                                       'blocked',
-                                       'complete',
-                                       'aborted'])
-        
-        self.tf_listener = tf_listener
-        self.facing_next_point = False
-            
-    def execute(self, userdata):    
-       
-        #check for obstacles if facing points and flag set
-        if userdata.check_for_obstacles \
-           and userdata.active_strafe_key is not None \
-           and userdata.strafes['center']['blocked']:
-                userdata.active_strafe_key = None
-                return 'blocked'
-
-        userdata.active_strafe_key = None
-        
-        #if we are looking for samples, mover will be stopped, check it here
-        if userdata.detected_sample is not None and userdata.stop_on_sample:
-            return 'sample_detected'
-        
-        if (len(userdata.point_list) > 0):
-            rospy.logdebug("MOVE TO POINTS list: %s" %(userdata.point_list))
-            target_point = userdata.point_list[0]
-            header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
-            target_stamped = geometry_msg.PointStamped(header, target_point)
-            try:
-                yaw, distance = util.get_robot_strafe(self.tf_listener, target_stamped)
-            except(tf.Exception):
-                rospy.logwarn("MOVE_TO_POINTS failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
-                return 'aborted'
-
-            if userdata.face_next_point and not self.facing_next_point:
-                userdata.simple_move = {'type':'spin',
-                                        'angle':yaw}
-                self.facing_next_point = True
-                return 'next_point'
-            else:
-                #remove the point if we are heading to it
-                userdata.point_list.popleft()
-                userdata.simple_move = {'type':'strafe',
-                                        'angle':yaw,
-                                        'distance':distance}
-                self.facing_next_point = False
-                if userdata.face_next_point and userdata.check_for_obstacles:
-                    userdata.active_strafe_key = 'center'
-                return 'next_point'                
-
-        else:
-            self.facing_next_point = False
-            return 'complete'
-        
-        return 'aborted'
 
 #drive to a target_point, stamped.  After getting there, rotate to target_yaw
 class DriveToPoint(smach.State):
@@ -738,4 +665,147 @@ class DriveToPoint(smach.State):
                                 'angle':angle}
         userdata.active_strafe_key = None
         return 'move'
+    
+class RotateToClear(smach.State):
+    def __init__(self, simple_mover, tf_listener):
+        smach.State.__init__(self,
+                             input_keys=['simple_move',
+                                         'strafes'],
+                             output_keys=['active_strafe_key',
+                                          'point_list'],
+                             outcomes=['clear',
+                                       'blocked',
+                                       'complete',
+                                       'aborted'])
+        
+        self.tf_listener = tf_listener
+        self.simple_mover = simple_mover
+ 
+        rospy.Subscriber('costmap_check',
+                          samplereturn_msg.CostmapCheck,
+                          self.handle_costmap_check)
+ 
+ 
+    def execute(self, userdata):
+        
+        move = deepcopy(userdata.simple_move)
+        userdata.simple_move = None #consume simple move
+        
+        #load values from dict, absent values become None
+        if move['type'] != 'spin':
+            rospy.logwarn('ROTATE TO CLEAR received non-spin simple move')
+            return 'aborted'
+        
+        angle = move.get('angle')
+        velocity = move.get('velocity', userdata.velocity)
+        accel = move.get('acceleration')
+ 
+        while not rospy.is_shutdown():
+            try:
+                error = self.simple_mover.execute_spin(angle,
+                                                       max_velocity = velocity,
+                                                       acceleration = accel)
+                rospy.loginfo("EXECUTED ROTATE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
+                                                                              np.degrees(error)))
+                #did we exit the move execute because of a pause?
+                if userdata.paused:
+                    #wait here for unpause, as long as it takes
+                    rospy.loginfo("ROTATE TO CLEAR stopped by pause")
+                    while not rospy.is_shutdown() and userdata.paused:
+                        rospy.sleep(0.2)
+                    #unpaused, try again, changing both goal values to returned error
+                    distance = error
+                    angle = error
+                else:
+                    #made it through move without being paused, break out
+                    break
+                
+            except(TimeoutException):
+                    rospy.logwarn("TIMEOUT during simple_motion.")
+                    return 'timeout'
+
+        return 'complete'    
+
+    def stop_if_clear(self):
+        if not self.strafes['center']['blocked']:
+            rospy.loginfo("ROTATE_TO_CLEAR STOP simple_move on center clear")
+            return True
+    
+    def costmap_update(self, costmap_check):
+        for strafe_key, blocked in zip(costmap_check.strafe_keys,
+                                       costmap_check.blocked):
+            self.strafes[strafe_key]['blocked'] = blocked            
+
+#scary class for going to list of points with no obstacle checking, good for searching area
+#with strafing.  obstacle_detection optional on 0 yaw strafes
+class MoveToPoints(smach.State):
+    def __init__(self, tf_listener):
+        smach.State.__init__(self,
+                             input_keys=['point_list',
+                                         'strafes',
+                                         'active_strafe_key',
+                                         'detected_sample',
+                                         'odometry_frame',
+                                         'stop_on_sample',
+                                         'face_next_point',
+                                         'check_for_obstacles'],
+                             output_keys=['simple_move',
+                                          'active_strafe_key',
+                                          'point_list'],
+                             outcomes=['next_point',
+                                       'sample_detected',
+                                       'blocked',
+                                       'complete',
+                                       'aborted'])
+        
+        self.tf_listener = tf_listener
+        self.facing_next_point = False
+            
+    def execute(self, userdata):    
+       
+        #check for obstacles if facing points and flag set
+        if userdata.check_for_obstacles \
+           and userdata.active_strafe_key is not None \
+           and userdata.strafes['center']['blocked']:
+                userdata.active_strafe_key = None
+                return 'blocked'
+
+        userdata.active_strafe_key = None
+        
+        #if we are looking for samples, mover will be stopped, check it here
+        if userdata.detected_sample is not None and userdata.stop_on_sample:
+            return 'sample_detected'
+        
+        if (len(userdata.point_list) > 0):
+            rospy.logdebug("MOVE TO POINTS list: %s" %(userdata.point_list))
+            target_point = userdata.point_list[0]
+            header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
+            target_stamped = geometry_msg.PointStamped(header, target_point)
+            try:
+                yaw, distance = util.get_robot_strafe(self.tf_listener, target_stamped)
+            except(tf.Exception):
+                rospy.logwarn("MOVE_TO_POINTS failed to transform search point (%s) to base_link in 1.0 seconds", search_point.header.frame_id)
+                return 'aborted'
+
+            if userdata.face_next_point and not self.facing_next_point:
+                userdata.simple_move = {'type':'spin',
+                                        'angle':yaw}
+                self.facing_next_point = True
+                return 'next_point'
+            else:
+                #remove the point if we are heading to it
+                userdata.point_list.popleft()
+                userdata.simple_move = {'type':'strafe',
+                                        'angle':yaw,
+                                        'distance':distance}
+                self.facing_next_point = False
+                if userdata.face_next_point and userdata.check_for_obstacles:
+                    userdata.active_strafe_key = 'center'
+                return 'next_point'                
+
+        else:
+            self.facing_next_point = False
+            return 'complete'
+        
+        return 'aborted'
 
