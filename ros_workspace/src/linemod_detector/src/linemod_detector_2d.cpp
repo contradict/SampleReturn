@@ -288,37 +288,37 @@ class LineMOD_Detector
 
         if (m.similarity > LineMOD_Detector::pub_threshold && dominant_color!="green")
         {
-          if (m.class_id.c_str() == "red_puck" &&
+          if (m.class_id == "red_puck" &&
               (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple" || dominant_color=="orange"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::RED_PUCK);
           }
-          if (m.class_id.c_str() == "orange_pipe" &&
+          if (m.class_id == "orange_pipe" &&
               (dominant_color=="orange" || dominant_color=="white" || dominant_color=="yellow"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
           }
-          if (m.class_id.c_str() == "pre_cached" &&
+          if (m.class_id == "pre_cached" &&
               (dominant_color=="white"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
           }
-          if (m.class_id.c_str() == "wood_cube" &&
+          if (m.class_id == "wood_cube" &&
               (dominant_color=="yellow" || dominant_color=="brown"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
           }
-          if (m.class_id.c_str() == "pink_tennis_ball" &&
+          if (m.class_id == "pink_tennis_ball" &&
               (dominant_color=="pink" || dominant_color=="white"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
           }
-          if (m.class_id.c_str() == "colored_ball" &&
+          if (m.class_id == "colored_ball" &&
               dominant_color!="brown" && dominant_color!="white" && dominant_color!="grey")
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
