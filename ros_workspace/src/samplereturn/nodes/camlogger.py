@@ -56,7 +56,7 @@ def camlogger():
 
   cam_info = CameraInfo()
   calib_file = rospy.get_param('~calib_file', None)
-  frame_id = rospy.get_param('~frame_id', '/search_camera_lens')
+  frame_id = rospy.get_param('~frame_id', '/search_camera')
   rospy.logdebug("calib_file: %s", calib_file)
   if calib_file is not None:
     cam_info = parse_yaml(calib_file)
