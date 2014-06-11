@@ -314,7 +314,7 @@ class RobotSimulator(object):
         msg_keys = ['left','right','center']
         blocked_keys = [True, True, True]
         all_blocked = samplereturn_msg.CostmapCheck(msg_keys, blocked_keys)
-        self.check_publisher.pub(all_blocked)
+        self.check_publisher.publish(all_blocked)
         
     def publish_path_markers(self, event):
         self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, 'map').pose
