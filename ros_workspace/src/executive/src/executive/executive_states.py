@@ -450,11 +450,11 @@ class ServoController(smach.State):
                 rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> odom transform in 1.0 seconds")
                 self.try_count = 0
                 return 'aborted'
-            rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
+            #rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
             rospy.loginfo("SERVO point in manipulator before correction %s: " %(point_in_manipulator))
             point_in_manipulator.x += userdata.manipulator_correction['x']
             point_in_manipulator.y += userdata.manipulator_correction['y']
-            rospy.loginfo("SERVO point in manipulator after correction %s: " %(point_in_manipulator))
+            #rospy.loginfo("SERVO point in manipulator after correction %s: " %(point_in_manipulator))
             origin = geometry_msg.Point(0,0,0)
             distance = util.point_distance_2d(origin, point_in_manipulator)
             if distance < userdata.servo_params['final_tolerance']:
@@ -474,7 +474,7 @@ class ServoController(smach.State):
                                     'distance':distance,
                                     'velocity':velocity,
                                     'acceleration':accel}
-            rospy.loginfo("SERVO simple_move: %s" % (userdata.simple_move))
+            #rospy.loginfo("SERVO simple_move: %s" % (userdata.simple_move))
             self.announcer.say("Servo ing, distance, %.1f centimeters" % (distance*100))
             rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): %s" % (point_in_manipulator))
             self.try_count += 1
