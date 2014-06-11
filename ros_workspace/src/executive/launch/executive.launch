@@ -154,13 +154,6 @@
         <param name="return_velocity" type="double" value="1.0"/>
         <param name="search_velocity" type="double" value="0.05"/>
        
-        <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
-        <rosparam>
-            manipulator_correction:
-                x: -0.012
-                y: 0.022
-        </rosparam>
-
         <!-- pursue sample simple motion parameters --> 
         <!-- these are defaults and should be overridden as necessary -->
         <rosparam>
@@ -170,8 +163,12 @@
                 stop_deceleration: 1.0
                 loop_rate: 10
                 steering_angle_epsilon: 0.01
-         </rosparam>
+        </rosparam>
 
+        <!-- this file loads the velocities and such for servoing onto sample,
+             the node must already have a simple_mover up and running -->
+        <rosparam file="$(find samplereturn)/config/visual_servo.yaml" command="load"/>  
+                
         <!-- servo sample simple motion parameters -->
         <rosparam>
            servo_params:
@@ -183,6 +180,13 @@
               final_tolerance: 0.010
               settle_time: 1.0
               try_limit: 3
+        </rosparam>
+
+        <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
+        <rosparam>
+            manipulator_correction:
+                x: -0.012
+                y: 0.022
         </rosparam>
 
     </node>
