@@ -104,18 +104,19 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="6"/>
-        <param name="first_spoke_offset" type="double" value="40"/>
-        <param name="star_hub_radius" type="int" value="5"/>
-        <param name="min_spin_radius" type="double" value="10"/>
+        <param name="first_spoke_offset" type="double" value="-20"/>
+        <param name="star_hub_radius" type="int" value="15"/>
+        <param name="min_spin_radius" type="double" value="40"/>
         <param name="spin_step" type="double" value="15"/>
         
-        <param name="return_time_minutes" type="double" value="100"/>
+        <param name="return_time_minutes" type="double" value=".3"/>
 
         <!-- for Beacon approach -->
         <rosparam>
             beacon_approach_point:
                 {x: 15.0, y: 0}
         </rosparam>
+        <param name="beacon_mount_step" type="double" value="2"/>
 
         <!-- simple mover parameters --> 
         <param name="spin_velocity" type="double" value="0.3"/>

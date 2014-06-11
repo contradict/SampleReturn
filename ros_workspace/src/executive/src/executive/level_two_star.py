@@ -91,6 +91,7 @@ class LevelTwoStar(object):
         
         #beacon approach
         self.state_machine.userdata.beacon_approach_point = self.beacon_approach_point
+        self.state_machine.userdata.beacon_mount_step = self.node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
         self.state_machine.userdata.offset_count = 0
         self.state_machine.userdata.offset_limit = 0
@@ -212,12 +213,11 @@ class LevelTwoStar(object):
  
             smach.StateMachine.add('BEACON_SEARCH',
                                    BeaconSearch(self.tf_listener, self.announcer),
-                                   transitions = {'mount':'MOUNT_MOVE',
+                                   transitions = {'mount':'MOUNT_MANAGER',
                                                   'move':'BEACON_SEARCH_DRIVER',
                                                   'spin':'BEACON_SEARCH_SPIN',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
-            
-
+ 
             smach.StateMachine.add('BEACON_SEARCH_SPIN',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
@@ -241,10 +241,23 @@ class LevelTwoStar(object):
                                                   'timeout':'BEACON_SEARCH_DRIVER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
+            smach.StateMachine.add('MOUNT_MANAGER',
+                                   MountManager(self.tf_listener, self.announcer),
+                                   transitions = {'move':'MOUNT_MOVE',
+                                                  'final':'MOUNT_FINAL',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+ 
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'MOUNT_MANAGER',
+                                                  'timeout':'MOUNT_MANAGER',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+            
+ 
+            smach.StateMachine.add('MOUNT_FINAL',
+                                   ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'DESELECT_PLANNER',
-                                                  'timeout':'LEVEL_TWO_ABORTED',
+                                                  'timeout':'MOUNT_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
@@ -706,7 +719,7 @@ class BeaconSearch(smach.State):
                                                        userdata.world_fixed_frame)
             yaw_to_platform = util.pointing_yaw(current_pose.pose.position,
                                                 userdata.platform_point.point)
-            yaw_error = yaw_to_platform - current_yaw
+            yaw_error = util.unwind(yaw_to_platform - current_yaw)
             userdata.stop_on_beacon = False
             self.tried_spin = False            
             #on the back side
@@ -727,24 +740,58 @@ class BeaconSearch(smach.State):
             elif np.abs(yaw_error) > .05:
                 #this means beacon is in view and we are within 1 meter of approach point
                 #but not pointed so well at beacon
-                self.announcer.say("At approach point. Aligning to beacon")
+                self.announcer.say("At approach point. Rotate ing to beacon")
                 userdata.simple_move = {'type':'spin',
                                         'angle':yaw_error,
                                         'velocity':0.5}
                 return 'spin'
             else:    
-                self.announcer.say("Mount ing platform")
-                #make this a parameter probably
-                distance_to_platform = util.point_distance_2d(current_pose.pose.position,
-                                                              userdata.platform_point.point)
-                userdata.simple_move = {'type':'strafe',
-                                        'angle':yaw_error,
-                                        'distance':distance_to_platform,
-                                        'velocity':0.5}                
+                self.announcer.say("Initiate ing platform mount")
+                userdata.stop_on_beacon = False
                 return 'mount'
         
         return 'aborted'
- 
+    
+class MountManager(smach.State):
+    
+    def __init__(self, tf_listener, announcer):
+
+        smach.State.__init__(self,
+                             outcomes=['move',
+                                       'final',
+                                       'aborted'],
+                             input_keys=['platform_point',
+                                         'beacon_point',
+                                         'beacon_mount_step'],
+                             output_keys=['simple_move',
+                                          'beacon_point',
+                                          'active_strafe_key'])
+
+        self.tf_listener = tf_listener
+        self.announcer = announcer
+
+    def execute(self, userdata):
+        #disable obstacle checking!
+        rospy.sleep(2.0) #wait a sec for beacon pose to catch up
+        userdata.active_strafe_key = None
+        yaw, distance = util.get_robot_strafe(self.tf_listener,
+                                             userdata.platform_point)
+        if (userdata.beacon_point is None) or (distance < userdata.beacon_mount_step):
+            #we don't see the beacon anymore, or we see it and are damn close (doubtful!)
+            userdata.simple_move = {'type':'strafe',
+                                    'angle':yaw,
+                                    'distance':distance,
+                                    'velocity':0.5}
+            self.announcer.say("Execute ing final mount move")
+            return 'final'
+        else:
+            userdata.simple_move = {'type':'strafe',
+                                    'angle':yaw,
+                                    'distance':userdata.beacon_mount_step,
+                                    'velocity':0.5}
+            self.announcer.say("Aligning to beacon")
+            userdata.beacon_point = None #clear beacon returns to see if we are still seeing it
+            return 'move'
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
