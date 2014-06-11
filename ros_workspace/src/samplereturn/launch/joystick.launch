@@ -38,33 +38,16 @@
 
     <rosparam>
         simple_move_params:
-            max_velocity: 0.01
-            acceleration: 0.02
-            stop_deceleration: 0.2
+            max_velocity: 0.5
+            acceleration: 0.5
+            stop_deceleration: 1.0 
             loop_rate: 10
             steering_angle_epsilon: 0.01
     </rosparam>
 
-    <!-- servo sample simple motion parameters -->
-    <rosparam>
-        servo_params:
-            initial_velocity: 0.1
-            initial_accel: 0.1
-            initial_tolerance: 0.050
-            final_velocity: 0.01
-            final_accel: 0.02
-            final_tolerance: 0.010
-            settle_time: 1.0
-            try_limit: 3
-    </rosparam>
-
-
-    <!-- manipulator correction for inaccuracy -->
-    <rosparam>
-        manipulator_correction:
-            x: -0.012
-            y: 0.022
-    </rosparam>
+    <!-- this file loads the velocities and such for servoing onto sample,
+         the node must already have a simple_mover up and running -->
+    <rosparam file="$(find samplereturn)/config/visual_servo.yaml" command="load"/>  
 
     <!-- Remaps -->
     <remap from="twist" to="/motion/servo_command"/>
