@@ -228,6 +228,12 @@ class KalmanDetectionFilter
         odom_point.point.y = xyz_point.y;
         odom_point.point.z = xyz_point.z;
         geometry_msgs::PointStamped temp_point;
+        try {
+          listener_.waitForTransform("manipulator_left_camera","/odom",ros::Time(0),ros::Duration(1.0));
+        }
+        catch (tf::TransformException e) {
+          ROS_ERROR_STREAM("Aww shit " << e.what());
+        }
         listener_.transformPoint("manipulator_left_camera", odom_point, temp_point);
         cv::Point3d cam_xyz_point;
         cam_xyz_point.x = temp_point.point.x;
