@@ -378,7 +378,15 @@ class LineMOD_Detector
       cv::Mat trimmed = trimDisparity(flat, min_disp);
       ROS_DEBUG("Number of disparities in trimmed: %i",trimmed.cols);
       ROS_DEBUG("Number of disparities in flat: %i",flat.cols);
-      median_disp = trimmed.at<float>(0,(trimmed.cols/2));
+      if( trimmed.cols > 1 )
+      {
+          median_disp = trimmed.at<float>(0,(trimmed.cols/2));
+      }
+      else
+      {
+          ROS_ERROR("No disparities present, cannot emit point.");
+          return;
+      }
       std::cout << "Median Disp: " << median_disp << std::endl;
 
       cam_model_.projectDisparityTo3d(cv::Point2d(m.x+templates[1].width/2,m.y+templates[1].height/2),
