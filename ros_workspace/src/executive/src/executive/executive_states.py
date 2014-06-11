@@ -687,6 +687,7 @@ class RotateToClear(smach.State):
         self.tf_listener = tf_listener
         self.simple_mover = simple_mover
         self.clear = False
+        self.strafes = {}
  
         rospy.Subscriber('costmap_check',
                           samplereturn_msg.CostmapCheck,
