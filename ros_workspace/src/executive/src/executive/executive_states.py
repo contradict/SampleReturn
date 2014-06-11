@@ -673,7 +673,7 @@ class DriveToPoint(smach.State):
         return 'move'
     
 class RotateToClear(smach.State):
-    def __init__(self, simple_mover, tf_listener):
+    def __init__(self, simple_mover, tf_listener, strafes):
         smach.State.__init__(self,
                              input_keys=['clear_spin',
                                          'clear_move',
@@ -687,7 +687,7 @@ class RotateToClear(smach.State):
         self.tf_listener = tf_listener
         self.simple_mover = simple_mover
         self.clear = False
-        self.strafes = {}
+        self.strafes = deepcopy(strafes)
  
         rospy.Subscriber('costmap_check',
                           samplereturn_msg.CostmapCheck,

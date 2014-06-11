@@ -243,7 +243,7 @@ class LevelTwoStar(object):
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('BEACON_CLEAR_MOVE',
-                                   RotateToClear(self.simple_mover, self.tf_listener),
+                                   RotateToClear(self.simple_mover, self.tf_listener, self.strafes),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'blocked':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
