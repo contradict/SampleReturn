@@ -33,6 +33,7 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import ServoController
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import MoveToPoints
+from executive.executive_states import RotateToClear
 
 class PursueSample(object):
     
