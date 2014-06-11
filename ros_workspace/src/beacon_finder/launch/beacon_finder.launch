@@ -31,6 +31,7 @@
     <param name="max_size_error" type="double" value="0.1"/>
     <param name="max_distance_error" type="double" value="0.1"/>
     <param name="max_horizontal_radians" type="double" value="0.17"/>
+    <rosparam file="$(find samplereturn)/config/beacon_finder.yaml" command="load"/>
     <remap from="camera_image" to="/cameras/search/image"/>
     <remap from="camera_info" to="/cameras/search/info"/>
 	</node>
