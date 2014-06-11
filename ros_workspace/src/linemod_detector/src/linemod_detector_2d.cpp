@@ -213,8 +213,8 @@ class LineMOD_Detector
     cv::Mat blur;
     cv::medianBlur(color_ptr->image, blur, 13);
 
-    //LineMOD_Detector::display = color_ptr->image.clone();
-    LineMOD_Detector::display = blur.clone();
+    LineMOD_Detector::display = color_ptr->image.clone();
+    //LineMOD_Detector::display = blur.clone();
     //LineMOD_Detector::color_img = lab_img;
     //LineMOD_Detector::color_img = color_ptr->image.clone();
     LineMOD_Detector::color_img = blur.clone();
