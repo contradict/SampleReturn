@@ -156,6 +156,7 @@ class LevelTwoStar(object):
                                                      self.announcer),
                                    transitions = {'move':'LINE_MOVE',
                                                   'spin':'ROTATE',
+                                                  'recalibrate':'ROTATION_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
                                                   'next_spoke':'STAR_MANAGER',
@@ -487,7 +488,8 @@ class RotationManager(smach.State):
                              output_keys=['line_yaw',
                                           'simple_move',
                                           'outbound',
-                                          'rotate_pose']),  
+                                          'rotate_pose',
+                                          'beacon_point']),  
   
         self.tf_listener = tf_listener
         self.mover = mover
@@ -514,6 +516,8 @@ class RotationManager(smach.State):
         userdata.simple_move = {'type':'spin',
                                  'angle':rotate_yaw,
                                  'velocity':userdata.spin_velocity}
+        #clear the beacon points before returning, make sure we respond to new beacon poses
+        userdata.beacon_point = None
         return 'next'
 
 #drive to detected sample location        
@@ -533,13 +537,16 @@ class SearchLineManager(smach.State):
                                            'last_spin_radius',
                                            'min_spin_radius',
                                            'spin_step',
-                                           'within_hub_radius'],
+                                           'within_hub_radius',
+                                           'beacon_point'],
                              output_keys = ['simple_move',
                                             'offset_count',
                                             'active_strafe_key',
-                                            'last_spin_radius'],
+                                            'last_spin_radius',
+                                            'beacon_point'],
                              outcomes=['move',
                                        'spin',
+                                       'recalibrate',
                                        'sample_detected',
                                        'line_blocked',
                                        'next_spoke',
@@ -603,6 +610,14 @@ class SearchLineManager(smach.State):
             userdata.simple_move = {'type':'spin',
                                     'angle':2*math.pi}
             return 'spin'
+        
+        if (not userdata.outbound) and (userdata.beacon_point is not None) \
+            and not False in userdata.strafes:
+            #if we are seeing the beacon, and are not making some kind of move because we're blocked,
+            #adjust our yaw to map coords.  Hopefully these are small rotations....
+            self.announcer.say("Align ing to map")
+            userdata.beacon_point = None
+            return 'recalibrate'
         
         #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
         #first check if we are offset from line either direction, and if so, is the path
@@ -673,7 +688,7 @@ class BeaconSearch(smach.State):
                                           'stop_on_beacon',
                                           'beacon_point',
                                           'clear_spin',
-                                          'clear_distance'])
+                                          'clear_move'])
         
         self.tf_listener = tf_listener
         self.announcer = announcer
@@ -734,9 +749,10 @@ class BeaconSearch(smach.State):
                 #we think we're near the beacon, but we don't see it
                 #right now, that is just to move 30 m on other side of the beacon that we don't know about
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
-                userdata.target_point = deepcopy(userdata.beacon_approach_point)                
+                search_point = deepcopy(userdata.beacon_approach_point)                
                 #invert the approach_point, and try again
-                userdata.target_point.point.x *= -1
+                search_point.point.x *= -1
+                userdata.target_point = search_point
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
                 return 'move'               
