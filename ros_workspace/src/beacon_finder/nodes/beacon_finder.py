@@ -22,18 +22,12 @@ class BeaconFinder:
     """A class to locate the beacon in an image and publish a vector in the camera's frame from the robot to the beacon"""
 
     def __init__(self):
-        self._image_subscriber = rospy.Subscriber('camera_image', Image,
-                self.image_callback, queue_size=1, buff_size=1024*1024*64)
-        self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo,
-                self.camera_info_callback, queue_size=1)
         self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseWithCovarianceStamped)
         self._beacon_debug_pose_publisher = rospy.Publisher('beacon_pose_debug', PoseStamped)
         self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
         self._cv_bridge = CvBridge()
 
-        #tf broadcaster stuff
-        self.tf_broadcaster = tf.TransformBroadcaster()
-        rospy.Timer(rospy.Duration(0.5), self.broadcast_beacon_tf) 
+        self._camera_model = None
 
         # Get params
         self._num_rows = rospy.get_param("~num_rows", 3)
@@ -143,6 +137,14 @@ class BeaconFinder:
         self._beacon_width = rospy.get_param("~beacon_width", 1.51765)
         shifted = rospy.get_param("~is_first_column_shifted_down", False)
         self._circles_grid = self.create_circles_grid(d, shifted)
+
+        self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo,
+                self.camera_info_callback, queue_size=1)
+        self._image_subscriber = rospy.Subscriber('camera_image', Image,
+                self.image_callback, queue_size=1, buff_size=1024*1024*64)
+        #tf broadcaster stuff
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        rospy.Timer(rospy.Duration(0.5), self.broadcast_beacon_tf)
 
     def create_circles_grid(self, d, shifted):
         if shifted:
