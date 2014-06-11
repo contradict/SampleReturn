@@ -103,7 +103,7 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
-        <param name="spoke_count" type="int" value="50"/>
+        <param name="spoke_count" type="int" value="45"/>
         <param name="first_spoke_offset" type="double" value="90"/>
         <param name="star_hub_radius" type="int" value="15"/>
         <param name="min_spin_radius" type="double" value="40"/>
