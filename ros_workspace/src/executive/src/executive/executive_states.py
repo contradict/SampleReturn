@@ -432,7 +432,7 @@ class ServoController(smach.State):
             self.announcer.say("Servo exceeded try limit")
             rospy.loginfo("SERVO STRAFE failed to hit tolerance before try_limit: %s" % (userdata.servo_params['try_limit']))
             self.try_count = 0
-            return 'aborted'
+            return 'complete'
         
         if userdata.detected_sample is None:
             self.announcer.say("Sample lost")
