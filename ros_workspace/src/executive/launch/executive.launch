@@ -119,7 +119,7 @@
         <param name="beacon_mount_step" type="double" value="2"/>
 
         <!-- simple mover parameters --> 
-        <param name="spin_velocity" type="double" value="0.3"/>
+        <param name="spin_velocity" type="double" value="0.2"/>
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
