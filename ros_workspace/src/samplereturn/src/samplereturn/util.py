@@ -40,7 +40,6 @@ class AnnouncerInterface(object):
     def audio_ready(self):
         return (self.pub.get_num_connections() > 0)
         
-        
     def __getstate__(self):
         return {'Class':'AnnouncerInterface'}
 
@@ -73,18 +72,23 @@ def pointing_quaternion_2d(pt1, pt2):
 def pointing_yaw(pt1, pt2):
     return math.atan2(pt2.y - pt1.y, pt2.x - pt1.x)
 
-#takes a stamped pose and returns a stamped pose translated by x and y in /map frame
-def pose_translate(listener, start_pose, dx, dy):
+#takes a stamped pose and returns a stamped pose translated by x and y
+#in the base_link frame, returns in /odom by default, useful for translating
+#the robot pose for making new goals
+def translate_base_link(listener, start_pose, dx, dy, frame_id = '/odom'):
     rospy.loginfo('start pose: %s', start_pose)
-    header = std_msg.Header(0, rospy.Time(0), '/base_link')
-    new_base_point = geometry_msg.PointStamped(header,
-                                               geometry_msg.Point(dx, dy, 0))
-    new_point = listener.transformPoint('/map', new_base_point)
+    base_header = std_msg.Header(0, rospy.Time(0), '/base_link')
+    base_point = geometry_msg.PointStamped(base_header,
+                                           geometry_msg.Point(dx, dy, 0))
+    listener.waitForTransform(frame_id,
+                        '/base_link',
+                        start_pose.header.stamp,
+                        rospy.Duration(1.0))
+    new_point = listener.transformPoint(frame_id, base_point)
     rospy.loginfo('new point: %s %s', dx, dy)
     new_pose = geometry_msg.Pose(new_point.point, start_pose.pose.orientation)
-    header = std_msg.Header(0, rospy.Time(0), '/map')
     rospy.loginfo('new pose: %s', new_pose)
-    return geometry_msg.PoseStamped(header, new_pose)
+    return geometry_msg.PoseStamped(start_pose.header, new_pose)
 
 #translates a stamped pose by yaw and distance, returns in same frame
 def pose_translate_by_yaw(start_pose, distance, yaw):
@@ -93,10 +97,10 @@ def pose_translate_by_yaw(start_pose, distance, yaw):
         new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
         return new_pose   
 
-#rotates a stamped pose, returns in /map frame  
+#rotates a stamped pose, returns in same frame  
 def pose_rotate(start_pose, angle):
     #rospy.loginfo('start pose: %s', start_pose)
-    goal_quat = tf.transformations.quaternion_from_euler(0,0, angle)
+    goal_quat = tf.transformations.quaternion_from_euler(0, 0, angle)
     start_quat = (start_pose.pose.orientation.x,
                   start_pose.pose.orientation.y,
                   start_pose.pose.orientation.z,
@@ -105,17 +109,14 @@ def pose_rotate(start_pose, angle):
     new_quat = tf.transformations.quaternion_multiply(start_quat, goal_quat)
     new_orientation = geometry_msg.Quaternion(*new_quat)
     new_pose = geometry_msg.Pose(start_pose.pose.position, new_orientation)
-    header = std_msg.Header(0, rospy.Time(0), '/map')
-    #rospy.loginfo('rotate %f', angle)
-    #rospy.loginfo('new pose: %s', new_pose)
-    return geometry_msg.PoseStamped(header, new_pose)    
+    return geometry_msg.PoseStamped(start_pose.header, new_pose)    
 
-def get_current_robot_pose(tf_listener):
-    now = tf_listener.getLatestCommonTime('/map', '/base_link')
-    pos, quat = tf_listener.lookupTransform('/map',
+def get_current_robot_pose(tf_listener, frame_id = '/odom'):
+    now = tf_listener.getLatestCommonTime(frame_id, '/base_link')
+    pos, quat = tf_listener.lookupTransform(frame_id,
                                             '/base_link',
                                             rospy.Time(0))
-    header = std_msg.Header(0, now, '/map')
+    header = std_msg.Header(0, now, frame_id)
     pose = geometry_msg.Pose(geometry_msg.Point(*pos),
                              geometry_msg.Quaternion(*quat))
                                     

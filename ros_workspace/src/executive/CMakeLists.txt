@@ -29,5 +29,8 @@ endforeach()
 install(
     PROGRAMS
        nodes/executive_master_node.py
+       nodes/level_one_node.py
+       nodes/level_two_node.py
+       nodes/pursue_sample_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

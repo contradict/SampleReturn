@@ -70,6 +70,7 @@ class LineMOD_Detector
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
   cv::Mat disparity_img;
+  float min_disp;
   cv::Mat display;
   cv::Mat K;
   cv::Ptr<cv::linemod::Detector> detector;
@@ -181,6 +182,7 @@ class LineMOD_Detector
     //cv::Mat depth_img = (f*T*1000)/(disp_ptr->image).clone();
     //depth_img.convertTo(depth_img, CV_16U);
     disparity_img = (disp_ptr->image).clone();
+    min_disp = msg->min_disparity;
     got_disp_ = true;
   }
 
@@ -205,13 +207,20 @@ class LineMOD_Detector
     }
 
     LineMOD_Detector::got_color = true;
-    cv::Mat lab_img;
-    cv::cvtColor(color_ptr->image,lab_img,CV_RGB2Lab);
+    //cv::Mat lab_img;
+    //cv::cvtColor(color_ptr->image,lab_img,CV_RGB2Lab);
+
+    cv::Mat blur;
+    cv::medianBlur(color_ptr->image, blur, 13);
 
     LineMOD_Detector::display = color_ptr->image.clone();
-    LineMOD_Detector::color_img = lab_img;
+    //LineMOD_Detector::display = blur.clone();
+    //LineMOD_Detector::color_img = lab_img;
+    //LineMOD_Detector::color_img = color_ptr->image.clone();
+    LineMOD_Detector::color_img = blur.clone();
 
     LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
+    //LineMOD_Detector::sources.push_back(blur);
 
     // Perform matching
     std::vector<cv::linemod::Match> matches;
@@ -279,9 +288,44 @@ class LineMOD_Detector
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
         }
 
-        if (m.similarity > LineMOD_Detector::pub_threshold)
+        if (m.similarity > LineMOD_Detector::pub_threshold && dominant_color!="green")
         {
-          LineMOD_Detector::publishPoint(templates, m, color_ptr->header, angle);
+          if (m.class_id == "red_puck" &&
+              (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple" || dominant_color=="orange"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::RED_PUCK);
+          }
+          if (m.class_id == "orange_pipe" &&
+              (dominant_color=="orange" || dominant_color=="white" || dominant_color=="yellow"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
+          }
+          if (m.class_id == "pre_cached" &&
+              (dominant_color=="white"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
+          }
+          if (m.class_id == "wood_cube" &&
+              (dominant_color=="yellow" || dominant_color=="brown"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
+          }
+          if (m.class_id == "pink_tennis_ball" &&
+              (dominant_color=="pink" || dominant_color=="white"))
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
+          }
+          if (m.class_id == "colored_ball" &&
+              dominant_color!="brown" && dominant_color!="white" && dominant_color!="grey")
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::COLORED_BALL);
+          }
         }
 
       }
@@ -304,11 +348,12 @@ class LineMOD_Detector
 //
 
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
-      std_msgs::Header header, float grip_angle)
+      std_msgs::Header header, float grip_angle, int sample_id)
   {
     ROS_DEBUG("Publishing Img Point");
     samplereturn_msgs::NamedPoint img_point_msg;
     img_point_msg.name = m.class_id;
+    img_point_msg.sample_id = sample_id;
     img_point_msg.header = header;
     // We only care about the base pyramid level gradient modality
     img_point_msg.point.x = m.x + templates[1].width/2;
@@ -330,14 +375,29 @@ class LineMOD_Detector
           cv::Range(m.x,m.x+2*half_width)).clone();
       cv::Mat flat = sub_disp.reshape(0,1);
       cv::sort(flat, flat, CV_SORT_ASCENDING+CV_SORT_EVERY_ROW);
-      median_disp = flat.at<float>(0,(flat.cols/2));
+      cv::Mat trimmed = trimDisparity(flat, min_disp);
+      ROS_INFO("Number of disparities in trimmed: %i",trimmed.cols);
+      ROS_INFO("Number of disparities in flat: %i",flat.cols);
+      median_disp = trimmed.at<float>(0,(trimmed.cols/2));
       std::cout << "Median Disp: " << median_disp << std::endl;
 
       cam_model_.projectDisparityTo3d(cv::Point2d(m.x+templates[1].width/2,m.y+templates[1].height/2),
           median_disp, xyz);
       temp_point.point.x = xyz.x;
       temp_point.point.y = xyz.y;
-      temp_point.point.z = xyz.z;
+      if (xyz.z > max_depth) {
+        temp_point.point.z = max_depth;
+        temp_point.point.x /= (xyz.z/max_depth);
+        temp_point.point.y /= (xyz.z/max_depth);
+      }
+      else if (xyz.z < min_depth) {
+        temp_point.point.z = min_depth;
+        temp_point.point.x /= (xyz.z/min_depth);
+        temp_point.point.y /= (xyz.z/min_depth);
+      }
+      else {
+        temp_point.point.z = xyz.z;
+      }
       bool wait =
         listener_.waitForTransform("/odom", header.frame_id, header.stamp, ros::Duration(0.03));
       if (!wait) {
@@ -347,6 +407,7 @@ class LineMOD_Detector
 
       //std::cout << "Camera 3D point: " << temp_point << std::endl;
       point_msg.name = m.class_id;
+      point_msg.sample_id = sample_id;
       point_msg.header = header;
       point_msg.header.frame_id = "/odom";
       point_msg.grip_angle = grip_angle;
@@ -355,6 +416,14 @@ class LineMOD_Detector
     }
 
     LineMOD_Detector::img_point_pub.publish(img_point_msg);
+  }
+
+  cv::Mat trimDisparity(cv::Mat flat_disparity, float min_disparity) {
+    int i = 0;
+    while (i < flat_disparity.cols && flat_disparity.at<float>(0,i) < min_disparity) {
+      i++;
+    }
+    return flat_disparity.colRange(i,flat_disparity.cols);
   }
 
   std::vector<cv::Point> templateConvexHull(const std::vector<cv::linemod::Template>& templates,

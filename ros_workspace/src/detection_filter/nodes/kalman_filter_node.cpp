@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <image_geometry/pinhole_camera_model.h>
+#include <tf/transform_listener.h>
 
 #include <ros/ros.h>
 #include <ros/time.h>
@@ -26,6 +27,7 @@ class KalmanDetectionFilter
   ros::Subscriber sub_cam_info;
   ros::Publisher pub_detection;
   ros::Publisher pub_img_detection;
+  ros::Publisher pub_debug_img;
 
   ros::Subscriber sub_ack;
 
@@ -35,6 +37,7 @@ class KalmanDetectionFilter
   std::string filtered_detection_topic;
   std::string filtered_img_detection_topic;
   std::string ack_topic;
+  std::string debug_img_topic;
 
   std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
   std::vector<std::shared_ptr<cv::KalmanFilter> > latched_filter_list_;
@@ -59,6 +62,7 @@ class KalmanDetectionFilter
   double period_;
 
   image_geometry::PinholeCameraModel cam_model_;
+  tf::TransformListener listener_;
 
   public:
   KalmanDetectionFilter()
@@ -69,6 +73,7 @@ class KalmanDetectionFilter
     img_detection_topic = "img_point";
     filtered_detection_topic = "filtered_point";
     filtered_img_detection_topic = "filtered_img_point";
+    debug_img_topic = "debug_img";
 
     ack_topic = "ack";
 
@@ -101,6 +106,9 @@ class KalmanDetectionFilter
 
     pub_img_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_img_detection_topic.c_str(), 3);
+
+    pub_debug_img =
+      nh.advertise<sensor_msgs::Image>(debug_img_topic.c_str(), 3);
 
     if(accumulate_) {
       sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
@@ -170,6 +178,21 @@ class KalmanDetectionFilter
       point_msg.point.y = latched_filter_list_[0]->statePost.at<float>(1);
       point_msg.point.z = 0;
       pub_detection.publish(point_msg);
+
+      if (cam_model_.initialized()) {
+        cv::Point3d xyz_point;
+        xyz_point.x = double(latched_filter_list_[0]->statePost.at<float>(0));
+        xyz_point.y = double(latched_filter_list_[0]->statePost.at<float>(1));
+        xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
+        cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
+        samplereturn_msgs::NamedPoint img_point_msg;
+        img_point_msg.header.frame_id = "";
+        img_point_msg.header.stamp = ros::Time::now();
+        img_point_msg.point.x = uv_point.x;
+        img_point_msg.point.y = uv_point.y;
+        img_point_msg.point.z = 0;
+        pub_img_detection.publish(img_point_msg);
+      }
     }
   }
 
@@ -182,8 +205,8 @@ class KalmanDetectionFilter
           break;
         }
       }
-      if (filter_ptr->statePost.at<float>(2) < max_pub_vel_ ||
-          filter_ptr->statePost.at<float>(3) < max_pub_vel_) {
+      if (filter_ptr->statePost.at<float>(3) < max_pub_vel_ ||
+          filter_ptr->statePost.at<float>(4) < max_pub_vel_) {
         samplereturn_msgs::NamedPoint point_msg;
         point_msg.header.frame_id = "/odom";
         point_msg.header.stamp = ros::Time::now();
@@ -194,19 +217,55 @@ class KalmanDetectionFilter
         point_msg.point.z = 0;
         pub_detection.publish(point_msg);
       }
+      if (cam_model_.initialized()) {
+        cv::Point3d xyz_point;
+        xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
+        geometry_msgs::PointStamped odom_point;
+        odom_point.header = msg.header;
+        odom_point.point.x = xyz_point.x;
+        odom_point.point.y = xyz_point.y;
+        odom_point.point.z = xyz_point.z;
+        geometry_msgs::PointStamped temp_point;
+        try {
+          listener_.waitForTransform("manipulator_left_camera","/odom",ros::Time(0),ros::Duration(1.0));
+        }
+        catch (tf::TransformException e) {
+          ROS_ERROR_STREAM("Aww shit " << e.what());
+        }
+        listener_.transformPoint("manipulator_left_camera", odom_point, temp_point);
+        cv::Point3d cam_xyz_point;
+        cam_xyz_point.x = temp_point.point.x;
+        cam_xyz_point.y = temp_point.point.y;
+        cam_xyz_point.z = temp_point.point.z;
+        cam_xyz_point.x /= cam_xyz_point.z;
+        cam_xyz_point.y /= cam_xyz_point.z;
+        cam_xyz_point.z /= cam_xyz_point.z;
+        cv::Point2d uv_point = cam_model_.project3dToPixel(cam_xyz_point);
+        samplereturn_msgs::NamedPoint img_point_msg;
+        img_point_msg.header.frame_id = "";
+        img_point_msg.header.stamp = ros::Time::now();
+        img_point_msg.point.x = uv_point.x;
+        img_point_msg.point.y = uv_point.y;
+        img_point_msg.point.z = 0;
+        pub_img_detection.publish(img_point_msg);
+      }
     }
   }
 
   void addFilter(const samplereturn_msgs::NamedPoint& msg)
   {
-    std::shared_ptr<cv::KalmanFilter> KF (new cv::KalmanFilter(4,2));
-    cv::Mat state(4, 1, CV_32F); /* x, y, vx, vy */
-    cv::Mat processNoise(4, 1, CV_32F);
+    std::shared_ptr<cv::KalmanFilter> KF (new cv::KalmanFilter(6,3));
+    cv::Mat state(6, 1, CV_32F); /* x, y, z, vx, vy, vz */
+    cv::Mat processNoise(6, 1, CV_32F);
 
-    KF->transitionMatrix = (cv::Mat_<float>(4,4) << 1, 0, period_, 0,
-                                                    0, 1, 0, period_,
-                                                    0, 0, 1, 0,
-                                                    0, 0, 0, 1);
+    KF->transitionMatrix = (cv::Mat_<float>(6,6) << 1, 0, 0, period_, 0, 0,
+                                                    0, 1, 0, 0, period_, 0,
+                                                    0, 0, 1, 0, 0, period_,
+                                                    0, 0, 0, 1, 0, 0,
+                                                    0, 0, 0, 0, 1, 0,
+                                                    0, 0, 0, 0, 0, 1);
     cv::setIdentity(KF->measurementMatrix);
     cv::setIdentity(KF->processNoiseCov, cv::Scalar(process_noise_cov_));
     cv::setIdentity(KF->measurementNoiseCov, cv::Scalar(measurement_noise_cov_));
@@ -214,8 +273,10 @@ class KalmanDetectionFilter
 
     KF->statePost.at<float>(0) = msg.point.x;
     KF->statePost.at<float>(1) = msg.point.y;
-    KF->statePost.at<float>(2) = 0;
+    KF->statePost.at<float>(2) = msg.point.z;
     KF->statePost.at<float>(3) = 0;
+    KF->statePost.at<float>(4) = 0;
+    KF->statePost.at<float>(5) = 0;
 
     KF->predict();
     filter_list_.push_back(KF);
@@ -235,9 +296,10 @@ class KalmanDetectionFilter
 
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
-    cv::Mat meas_state(2, 1, CV_32F);
+    cv::Mat meas_state(3, 1, CV_32F);
     meas_state.at<float>(0) = msg.point.x;
     meas_state.at<float>(1) = msg.point.y;
+    meas_state.at<float>(2) = msg.point.z;
 
     for (int i=0; i<exclusion_list_.size(); i++) {
       float dist = sqrt(pow((std::get<0>(exclusion_list_[i]) - msg.point.x),2) +
@@ -273,6 +335,9 @@ class KalmanDetectionFilter
   /* The process tick for all filters */
   void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
+    if (!cam_model_.initialized()) {
+      cam_model_.fromCameraInfo(msg);
+    }
     if (filter_list_.size()==0 && latched_filter_list_.size()==0) {
       return;
     }
@@ -369,8 +434,12 @@ class KalmanDetectionFilter
     }
 
     printFilterState();
-    cv::imshow("Filter States", img);
-    cv::waitKey(10);
+    //cv::imshow("Filter States", img);
+    //cv::waitKey(10);
+    std_msgs::Header header;
+    sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",img).toImageMsg();
+    pub_debug_img.publish(debug_img_msg);
+
   }
 
   void printFilterState() {
