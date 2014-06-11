@@ -264,12 +264,12 @@ class PursueSample(object):
                 goal.wrist_angle = userdata.latched_sample.grip_angle                    
                 if (userdata.latched_sample.sample_id in userdata.big_sample_ids):
                     if len(userdata.available_big_bins) > 0:
-                        goal.target_bin = userdata.available_big_bins.pop[0]
+                        goal.target_bin = userdata.available_big_bins.pop(0)
                     else:
                         goal.target_bin = 0
                 else:
                     if len(userdata.available_small_bins) > 0:
-                        goal.target_bin = userdata.available_small_bins.pop[0]
+                        goal.target_bin = userdata.available_small_bins.pop(0)
                     else:
                         goal.target_bin = 0                    
                 goal.grip_torque = 0.7
@@ -713,6 +713,8 @@ class ManipulatorApproach(smach.State):
         
         self.tf_listener = tf_listener
         
+        self.yaw_correction = -0.04
+        
     def execute(self, userdata):
         
         userdata.target_sample = None
@@ -722,6 +724,7 @@ class ManipulatorApproach(smach.State):
         else:
             try:
                 yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
+                yaw += self.yaw_correction
             except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
