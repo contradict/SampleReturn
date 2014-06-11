@@ -430,11 +430,12 @@ class ServoController(smach.State):
         if self.try_count > userdata.servo_params['try_limit']:
             self.announcer.say("Servo exceeded try limit")
             rospy.loginfo("SERVO STRAFE failed to hit tolerance before try_limit: %s" % (userdata.servo_params['try_limit']))
+            self.try_count = 0
             return 'aborted'
         
         if userdata.detected_sample is None:
-            self.try_count = 0
             self.announcer.say("Sample lost")
+            self.try_count = 0
             return 'point_lost'
         else:
             sample_time = userdata.detected_sample.header.stamp
@@ -455,7 +456,7 @@ class ServoController(smach.State):
             if distance < userdata.servo_params['final_tolerance']:
                 self.try_count = 0
                 userdata.latched_sample = userdata.detected_sample
-                self.announcer.say("Servo complete at %.1f millimeters. Deploying gripper" % (distance*1000))    
+                self.announcer.say("Servo complete at %.1f millimeters." % (distance*1000))    
                 return 'complete'
             elif distance < userdata.servo_params['initial_tolerance']:
                 velocity = userdata.servo_params['final_velocity']
