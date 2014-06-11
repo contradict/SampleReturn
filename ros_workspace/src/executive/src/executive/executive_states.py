@@ -757,7 +757,7 @@ class RotateToClear(smach.State):
             rospy.loginfo("ROTATE_TO_CLEAR STOP simple_move on center clear")
             return True
     
-    def costmap_update(self, costmap_check):
+    def handle_costmap_check(self, costmap_check):
         for strafe_key, blocked in zip(costmap_check.strafe_keys,
                                        costmap_check.blocked):
             self.strafes[strafe_key]['blocked'] = blocked            
