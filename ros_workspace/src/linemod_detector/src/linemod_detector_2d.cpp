@@ -376,8 +376,8 @@ class LineMOD_Detector
       cv::Mat flat = sub_disp.reshape(0,1);
       cv::sort(flat, flat, CV_SORT_ASCENDING+CV_SORT_EVERY_ROW);
       cv::Mat trimmed = trimDisparity(flat, min_disp);
-      ROS_INFO("Number of disparities in trimmed: %i",trimmed.cols);
-      ROS_INFO("Number of disparities in flat: %i",flat.cols);
+      ROS_DEBUG("Number of disparities in trimmed: %i",trimmed.cols);
+      ROS_DEBUG("Number of disparities in flat: %i",flat.cols);
       median_disp = trimmed.at<float>(0,(trimmed.cols/2));
       std::cout << "Median Disp: " << median_disp << std::endl;
 
