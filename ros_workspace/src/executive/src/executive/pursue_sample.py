@@ -114,7 +114,7 @@ class PursueSample(object):
         #total bullshit for bins
         self.state_machine.userdata.available_small_bins = [1,2,3,8,9,10]
         self.state_machine.userdata.available_big_bins = [4,5,6,7]
-        self.state_machine.big_sample_ids = [4]
+        self.state_machine.userdata.big_sample_ids = [4]
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
