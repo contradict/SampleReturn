@@ -170,6 +170,8 @@ class BeaconFinder:
         if found:
             rospy.loginfo("Found %s", name)
             self._found_queue.put((name, centers, found))
+        else:
+            rospy.loginfo("No circles found in %s.", name)
 
     def sideLook(self, name, image, detector):
         rospy.logerr("Looking for %s", name)
@@ -342,8 +344,8 @@ class BeaconFinder:
                 numpy.asarray(self._camera_model.fullIntrinsicMatrix()),
                 numpy.asarray(self._camera_model.distortionCoeffs()))
 
-        rospy.logerr("Translation vector:")
-        rospy.logerr(translation_vector)
+        rospy.loginfo("solvePnP inliers: %d", len(inliers))
+        rospy.loginfo("Translation vector: %s", translation_vector)
 
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
         pose_matrix = numpy.vstack((rotation_matrix,
