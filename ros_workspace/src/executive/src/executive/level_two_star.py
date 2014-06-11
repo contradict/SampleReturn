@@ -27,6 +27,7 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import DriveToPoint
+from executive.executive_states import RotateToClear
 
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
