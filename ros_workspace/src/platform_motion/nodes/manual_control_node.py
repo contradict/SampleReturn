@@ -117,7 +117,7 @@ class ManualController(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
-                                                  'aborted':'ANNOUNCE_FAILURE',
+                                                  'aborted':'MANUAL_ABORTED',
                                                   })
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
