@@ -675,27 +675,27 @@ class DriveToPoint(smach.State):
 class RotateToClear(smach.State):
     def __init__(self, simple_mover, tf_listener):
         smach.State.__init__(self,
-                             input_keys=['simple_move',
+                             input_keys=['clear_spin',
+                                         'clear_move',
                                          'strafes'],
                              output_keys=['active_strafe_key',
                                           'point_list'],
-                             outcomes=['clear',
+                             outcomes=['complete',
                                        'blocked',
-                                       'complete',
                                        'aborted'])
         
         self.tf_listener = tf_listener
         self.simple_mover = simple_mover
+        self.clear = False
  
         rospy.Subscriber('costmap_check',
                           samplereturn_msg.CostmapCheck,
                           self.handle_costmap_check)
  
- 
     def execute(self, userdata):
         
-        move = deepcopy(userdata.simple_move)
-        userdata.simple_move = None #consume simple move
+        move = deepcopy(userdata.clear_spin)
+        self.clear = False
         
         #load values from dict, absent values become None
         if move['type'] != 'spin':
@@ -729,6 +729,26 @@ class RotateToClear(smach.State):
             except(TimeoutException):
                     rospy.logwarn("TIMEOUT during simple_motion.")
                     return 'timeout'
+
+        if self.clear:
+
+            move = deepcopy(userdata.clear_spin)
+            self.clear = False
+            
+            #load values from dict, absent values become None
+            if move['type'] != 'spin':
+                rospy.logwarn('ROTATE TO CLEAR received non-spin simple move')
+                return 'aborted'
+            
+            angle = move.get('angle')
+            velocity = move.get('velocity', userdata.velocity)
+            accel = move.get('acceleration')
+             
+            
+            
+        else:
+            return 'blocked'
+
 
         return 'complete'    
 
