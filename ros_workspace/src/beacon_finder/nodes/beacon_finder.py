@@ -284,15 +284,15 @@ class BeaconFinder:
             back_thread = threading.Thread( target=self.look,
                     args = ("Back", image_cv, self._blob_detector_alt))
             back_thread.start()
-            left_thread = threading.Thread( target=self.sideLook,
-                    args = ("Left", image_cv, self._blob_detector_side))
-            left_thread.start()
-            right_thread = threading.Thread( target=self.sideLook,
-                    args = ("Right", image_cv, self._blob_detector_side_alt))
-            right_thread.start()
+            # left_thread = threading.Thread( target=self.sideLook,
+            #         args = ("Left", image_cv, self._blob_detector_side))
+            # left_thread.start()
+            # right_thread = threading.Thread( target=self.sideLook,
+            #         args = ("Right", image_cv, self._blob_detector_side_alt))
+            # right_thread.start()
 
-            left_thread.join()
-            right_thread.join()
+            #left_thread.join()
+            #right_thread.join()
             front_thread.join()
             back_thread.join()
 
