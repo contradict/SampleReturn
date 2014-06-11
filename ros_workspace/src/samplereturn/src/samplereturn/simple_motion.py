@@ -148,7 +148,7 @@ class SimpleMover(object):
     self.publisher.publish(Twist())
 
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
-    if stop_function is not callable:
+    if not callable(stop_function): 
       stop_function = self.default_stop_function
     
     rate = rospy.Rate(self.loop_rate)
