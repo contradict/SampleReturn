@@ -53,11 +53,13 @@ class BeaconFinder:
         self._beacon_mounting_frame = rospy.get_param("~beacon_mounting_frame",
                 "platform")
         self._world_fixed_frame = rospy.get_param("~world_fixed_frame", "map")
+        self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
 
         # beacon side params
         self.maxSizeError = rospy.get_param("~max_size_error", 0.1)
         self.maxDistanceError = rospy.get_param("~max_distance_error", 0.05)
         self.maxHorizontalRadians = rospy.get_param("~max_horizontal_radians", 0.1)
+        self._side_covariance = rospy.get_param("~side_covariance", [2.0, 2.0, 2.0, pi/8.0, pi/8.0, pi/8.0])
 
         # Initialize member variables
         self._blob_detector_params = cv2.SimpleBlobDetector_Params()
@@ -348,12 +350,10 @@ class BeaconFinder:
             numpy.zeros((1,3))))
         pose_matrix = numpy.hstack((pose_matrix, numpy.r_[translation_vector,[[1]]]))
         pose_matrix = numpy.dot( pose_matrix, transform )
-        covariance_matrix = [0.25, 0.20, 1.5, pi/10.0, pi/5.0,  pi/10.0,\
-                             0.20, 0.15, 1.0, pi/10.0, pi/6.0,  pi/10.0,\
-                             0.15, 1.0,  0.5, pi/10.0, pi/10.0, pi/10.0,\
-                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
-                             pi/5.0, pi/6.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
-                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0]
+
+        covariance_matrix = [self._frontback_covariance[0]]
+        for variance in self._frontback_covariance[1:]:
+            covariance_matrix.extend(6*[0]+[variance])
 
         return pose_matrix, covariance_matrix
 
@@ -408,12 +408,9 @@ class BeaconFinder:
         #rospy.logerr("Rotation angle: %f" % (very_approx_angle*180.0/pi))
         #rospy.logerr("Circle width/height ratio: %f" % (circle_width_height_ratio))
 
-        covariance_matrix = [1.00, 1.00, 1.0, pi/10.0, pi/5.0,  pi/10.0,\
-                             1.00, 1.00, 1.0, pi/10.0, pi/6.0,  pi/10.0,\
-                             1.00, 1.00, 2.0, pi/10.0, pi/10.0, pi/10.0,\
-                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
-                             pi/5.0, pi/6.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0,\
-                             pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0, pi/10.0]
+        covariance_matrix = [self._side_covariance[0]]
+        for variance in self._side_covariance[1:]:
+            covariance_matrix.extend(6*[0]+[variance])
         return pose_matrix, covariance_matrix
             
         
