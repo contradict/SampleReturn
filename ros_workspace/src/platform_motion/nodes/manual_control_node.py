@@ -111,7 +111,7 @@ class ManualController(object):
                                    transitions = {'move':'SERVO_MOVE',
                                                   'complete':'ANNOUNCE_SERVO_COMPLETE',
                                                   'point_lost':'ANNOUNCE_NO_SAMPLE',
-                                                  'aborted':'ANNOUNCE_FAILURE'})
+                                                  'aborted':'SELECT_JOYSTICK'})
 
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -119,12 +119,7 @@ class ManualController(object):
                                                   'timeout':'VISUAL_SERVO',
                                                   'aborted':'ANNOUNCE_FAILURE',
                                                   })
-
-            smach.StateMachine.add('ANNOUNCE_FAILURE',
-                                   AnnounceState(self.announcer,
-                                                 'Visual servo failure'),
-                                   transitions = {'next':'SELECT_JOYSTICK'})
-
+   
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
                                                  'No sample in view, cancel in'),
