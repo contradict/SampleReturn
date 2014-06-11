@@ -71,9 +71,17 @@ def masacre_nodelets_in_namespace(namespace):
             continue
         ns=get_envvar(pid, "ROS_NAMESPACE")
         if ns==namespace:
-            os.system('kill -9 %d'%pid)
+            rospy.loginfo("Killing -INT pid %d, %s/%s", pid, ns, name)
+            os.system('kill -INT %d'%pid)
+            time.sleep(30.0)
+            if os.system('kill -0 %d'%pid):
+                rospy.loginfo("Killing -TERM pid %d, %s/%s", pid, ns, name)
+                os.system('kill -TERM %d'%pid)
+                time.sleep(30.0)
+                if os.system('kill -0 %d'%pid):
+                    rospy.loginfo("Killing -KILL pid %d, %s/%s", pid, ns, name)
+                    os.system('kill -KILL %d'%pid)
             killed_some=True
-            rospy.loginfo("Killing pid %d, %s/%s", pid, ns, name)
     return killed_some
 
 
