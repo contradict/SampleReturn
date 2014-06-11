@@ -677,7 +677,8 @@ class RotateToClear(smach.State):
         smach.State.__init__(self,
                              input_keys=['clear_spin',
                                          'clear_move',
-                                         'strafes'],
+                                         'strafes',
+                                         'paused'],
                              output_keys=['active_strafe_key',
                                           'point_list'],
                              outcomes=['complete',
@@ -704,14 +705,15 @@ class RotateToClear(smach.State):
             return 'aborted'
         
         angle = move.get('angle')
-        velocity = move.get('velocity', userdata.velocity)
+        velocity = move.get('velocity')
         accel = move.get('acceleration')
  
         while not rospy.is_shutdown():
             try:
                 error = self.simple_mover.execute_spin(angle,
                                                        max_velocity = velocity,
-                                                       acceleration = accel)
+                                                       acceleration = accel,
+                                                       stop_function = self.stop_if_clear)
                 rospy.loginfo("EXECUTED ROTATE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
                                                                               np.degrees(error)))
                 #did we exit the move execute because of a pause?
@@ -721,7 +723,6 @@ class RotateToClear(smach.State):
                     while not rospy.is_shutdown() and userdata.paused:
                         rospy.sleep(0.2)
                     #unpaused, try again, changing both goal values to returned error
-                    distance = error
                     angle = error
                 else:
                     #made it through move without being paused, break out
@@ -732,30 +733,55 @@ class RotateToClear(smach.State):
                     return 'timeout'
 
         if self.clear:
+            
+            rospy.sleep(1.0) #costmap wait
 
-            move = deepcopy(userdata.clear_spin)
+            move = deepcopy(userdata.clear_move)
             self.clear = False
-            
-            #load values from dict, absent values become None
-            if move['type'] != 'spin':
-                rospy.logwarn('ROTATE TO CLEAR received non-spin simple move')
-                return 'aborted'
-            
+ 
             angle = move.get('angle')
-            velocity = move.get('velocity', userdata.velocity)
+            distance = move.get('distance')
+            velocity = move.get('velocity')
             accel = move.get('acceleration')
-             
-            
-            
+
+            while not rospy.is_shutdown():
+                try:
+                    userdata.active_strafe_key = 'center'
+                    error = self.simple_mover.execute_strafe(angle,
+                                                             distance,
+                                                             max_velocity = velocity,
+                                                             acceleration = accel)
+                    rospy.loginfo("EXECUTED STRAFE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
+                                                                                  np.degrees(error)))
+                    #did we exit the move execute because of a pause?
+                    if userdata.paused:
+                        #wait here for unpause, as long as it takes
+                        rospy.loginfo("ROTATE TO CLEAR stopped by pause")
+                        while not rospy.is_shutdown() and userdata.paused:
+                            rospy.sleep(0.2)
+                        #unpaused, try again, changing both goal values to returned error
+                        distance = error
+                    else:
+                        #made it through move without being paused, break out
+                        break
+                    
+                except(TimeoutException):
+                        rospy.logwarn("TIMEOUT during simple_motion.")
+                        return 'timeout'
+                
+        
+        #blocked, who knows what to do
         else:
+            self.active_strafe_key = None
             return 'blocked'
-
-
+        
+        self.active_strafe_key = None
         return 'complete'    
 
     def stop_if_clear(self):
         if not self.strafes['center']['blocked']:
             rospy.loginfo("ROTATE_TO_CLEAR STOP simple_move on center clear")
+            self.clear = True
             return True
     
     def handle_costmap_check(self, costmap_check):
