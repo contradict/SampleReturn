@@ -379,8 +379,8 @@ class LevelTwoStar(object):
             point_in_frame.point.x += 1.5 #start point is 1.5 meters in front of beacon
             beacon_point.point = point_in_frame.point
             self.state_machine.userdata.beacon_point = beacon_point
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose!")
+        except tf.Exception, e:
+            rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose: %s", e)
             
     def get_hollow_star(self, spoke_count, offset, hub_radius):
 
