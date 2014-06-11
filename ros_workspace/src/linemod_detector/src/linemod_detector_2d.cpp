@@ -70,6 +70,7 @@ class LineMOD_Detector
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
   cv::Mat disparity_img;
+  float min_disp;
   cv::Mat display;
   cv::Mat K;
   cv::Ptr<cv::linemod::Detector> detector;
@@ -184,6 +185,7 @@ class LineMOD_Detector
     //cv::Mat depth_img = (f*T*1000)/(disp_ptr->image).clone();
     //depth_img.convertTo(depth_img, CV_16U);
     disparity_img = (disp_ptr->image).clone();
+    min_disp = msg->min_disparity;
     got_disp_ = true;
   }
 
@@ -373,7 +375,18 @@ class LineMOD_Detector
           cv::Range(m.x,m.x+2*half_width)).clone();
       cv::Mat flat = sub_disp.reshape(0,1);
       cv::sort(flat, flat, CV_SORT_ASCENDING+CV_SORT_EVERY_ROW);
-      median_disp = flat.at<float>(0,(flat.cols/2));
+      cv::Mat trimmed = trimDisparity(flat, min_disp);
+      ROS_DEBUG("Number of disparities in trimmed: %i",trimmed.cols);
+      ROS_DEBUG("Number of disparities in flat: %i",flat.cols);
+      if( trimmed.cols > 1 )
+      {
+          median_disp = trimmed.at<float>(0,(trimmed.cols/2));
+      }
+      else
+      {
+          ROS_ERROR("No disparities present, cannot emit point.");
+          return;
+      }
       std::cout << "Median Disp: " << median_disp << std::endl;
 
       cam_model_.projectDisparityTo3d(cv::Point2d(m.x+templates[1].width/2,m.y+templates[1].height/2),
@@ -382,9 +395,13 @@ class LineMOD_Detector
       temp_point.point.y = xyz.y;
       if (xyz.z > max_depth) {
         temp_point.point.z = max_depth;
+        temp_point.point.x /= (xyz.z/max_depth);
+        temp_point.point.y /= (xyz.z/max_depth);
       }
       else if (xyz.z < min_depth) {
         temp_point.point.z = min_depth;
+        temp_point.point.x /= (xyz.z/min_depth);
+        temp_point.point.y /= (xyz.z/min_depth);
       }
       else {
         temp_point.point.z = xyz.z;
@@ -407,6 +424,14 @@ class LineMOD_Detector
     }
 
     LineMOD_Detector::img_point_pub.publish(img_point_msg);
+  }
+
+  cv::Mat trimDisparity(cv::Mat flat_disparity, float min_disparity) {
+    int i = 0;
+    while (i < flat_disparity.cols && flat_disparity.at<float>(0,i) < min_disparity) {
+      i++;
+    }
+    return flat_disparity.colRange(i,flat_disparity.cols);
   }
 
   std::vector<cv::Point> templateConvexHull(const std::vector<cv::linemod::Template>& templates,

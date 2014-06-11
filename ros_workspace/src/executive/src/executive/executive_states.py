@@ -412,7 +412,8 @@ class ServoController(smach.State):
                              input_keys=['detected_sample',
                                          'settle_time',
                                          'manipulator_correction',
-                                         'servo_params'],
+                                         'servo_params',
+                                         'simple_move'],
                              output_keys=['simple_move',
                                           'detected_sample',
                                           'latched_sample',
@@ -451,8 +452,8 @@ class ServoController(smach.State):
                 return 'aborted'
             rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
             rospy.loginfo("SERVO point in manipulator before correction %s: " %(point_in_manipulator))
-            point_in_manipulator.x -= userdata.manipulator_correction['x']
-            point_in_manipulator.y -= userdata.manipulator_correction['y']
+            point_in_manipulator.x += userdata.manipulator_correction['x']
+            point_in_manipulator.y += userdata.manipulator_correction['y']
             rospy.loginfo("SERVO point in manipulator after correction %s: " %(point_in_manipulator))
             origin = geometry_msg.Point(0,0,0)
             distance = util.point_distance_2d(origin, point_in_manipulator)
