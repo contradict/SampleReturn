@@ -232,7 +232,7 @@ class KalmanDetectionFilter
         odom_point.point.z = xyz_point.z;
         geometry_msgs::PointStamped temp_point;
         try {
-          listener_.waitForTransform("manipulator_left_camera","/odom",ros::Time(0),ros::Duration(1.0));
+          listener_.waitForTransform("manipulator_left_camera", msg.header.frame_id, msg.header.stamp, ros::Duration(1.0));
         }
         catch (tf::TransformException e) {
           ROS_ERROR_STREAM("Aww shit " << e.what());
