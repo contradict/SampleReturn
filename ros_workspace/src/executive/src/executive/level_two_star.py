@@ -685,7 +685,8 @@ class BeaconSearch(smach.State):
                                           'stop_on_beacon',
                                           'beacon_point',
                                           'clear_spin',
-                                          'clear_move'])
+                                          'clear_move',
+                                          'outbound'])
         
         self.tf_listener = tf_listener
         self.announcer = announcer
@@ -698,6 +699,10 @@ class BeaconSearch(smach.State):
                            'velocity': 0.2}
 
     def execute(self, userdata):
+        
+        #this is lame as hell, but to disable simple_mover stop function returning true
+        #from here on out, easiest thing to do is set outbound back to true
+        userdata.outbound = True 
         
         #reset offset counter for driving moves
         userdata.offset_count = 0
