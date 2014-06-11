@@ -378,7 +378,7 @@ class BeaconFinder:
             if (center.pt[1] > highest_center_point[1]):
                 highest_center_point = center.pt
             center_point = [int(coord) for coord in center.pt]
-            flood_color = image_binary[center_point[0]][center_point[1]]
+            flood_color = image_binary[center_point[1],center_point[0]]
             #rospy.logerr("Center point: %f, %f" % (center_point[0], center_point[1]))
             #rospy.logerr("Flood color: %f" % flood_color)
             bounding_rect = cv.FloodFill(cv.fromarray(image_binary), (center_point[0], center_point[1]), float(flood_color))
