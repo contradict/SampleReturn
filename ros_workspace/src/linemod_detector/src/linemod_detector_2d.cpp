@@ -210,17 +210,20 @@ class LineMOD_Detector
     }
 
     LineMOD_Detector::got_color = true;
-    cv::Mat lab_img;
-    cv::cvtColor(color_ptr->image,lab_img,CV_RGB2Lab);
-
-    LineMOD_Detector::display = color_ptr->image.clone();
-    LineMOD_Detector::color_img = lab_img;
+    //cv::Mat lab_img;
+    //cv::cvtColor(color_ptr->image,lab_img,CV_RGB2Lab);
 
     cv::Mat blur;
-    cv::medianBlur(lab_img, blur, 13);
+    cv::medianBlur(color_ptr->image, blur, 13);
 
-    //LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
-    LineMOD_Detector::sources.push_back(blur);
+    LineMOD_Detector::display = color_ptr->image.clone();
+    //LineMOD_Detector::display = blur.clone();
+    //LineMOD_Detector::color_img = lab_img;
+    //LineMOD_Detector::color_img = color_ptr->image.clone();
+    LineMOD_Detector::color_img = blur.clone();
+
+    LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
+    //LineMOD_Detector::sources.push_back(blur);
 
     // Perform matching
     std::vector<cv::linemod::Match> matches;
@@ -309,7 +312,7 @@ class LineMOD_Detector
                 angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
           }
           if (m.class_id == "wood_cube" &&
-              (dominant_color=="yellow" || dominant_color=="brown"))
+              (dominant_color=="yellow" || dominant_color=="brown" || dominant_color=="white"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
