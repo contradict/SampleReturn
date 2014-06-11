@@ -175,7 +175,8 @@ class SaliencyDetectorNode
       if (cam_model_.initialized()
           && dominant_color != "green" && dominant_color != "brown"
           && dominant_exterior_color == "green"
-          && dominant_color != "gray") {
+          && dominant_color != "gray" && dominant_color != "black"
+          && dominant_color != "blue") {
         //float scale = cv_ptr->image.rows/600.;
         float scale = cv_ptr->image.cols/bms_img_width_;
         cv::Point3d ray =
