@@ -147,6 +147,8 @@
         
         <!-- sample approach (pursuit) parameters -->
         <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <!-- after min_pursuit reached, we move to check_distance and observe for
+             obstacles.  Then we make the manipulator view approach -->
         <param name="sample_obstacle_check_distance" type="double" value="2.0"/>
         <param name="final_pursuit_step" type="double" value="0.6"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
@@ -187,7 +189,6 @@
         <!-- executive tf frame and planner_mode -->
 
         <param name="lethal_threshold" type="int" value="90"/>        
-        <param name="min_check_distance" type="double" value="1.5"/>
         <param name="obstacle_check_distance" type="double" value="5"/>
         <param name="obstacle_check_width" type="double" value="2.5"/>
         <param name="min_check_distance" type="double" value="0.7"/>
