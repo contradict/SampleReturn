@@ -103,13 +103,13 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
-        <param name="spoke_count" type="int" value="60"/>
-        <param name="first_spoke_offset" type="double" value="0"/>
-        <param name="star_hub_radius" type="int" value="5"/>
-        <param name="min_spin_radius" type="double" value="10"/>
+        <param name="spoke_count" type="int" value="50"/>
+        <param name="first_spoke_offset" type="double" value="90"/>
+        <param name="star_hub_radius" type="int" value="15"/>
+        <param name="min_spin_radius" type="double" value="40"/>
         <param name="spin_step" type="double" value="15"/>
         
-        <param name="return_time_minutes" type="double" value="30"/>
+        <param name="return_time_minutes" type="double" value="100"/>
 
         <!-- for Beacon approach -->
         <rosparam>
