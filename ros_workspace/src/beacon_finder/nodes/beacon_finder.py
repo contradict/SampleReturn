@@ -27,6 +27,7 @@ class BeaconFinder:
         self._camera_info_subscriber = rospy.Subscriber('camera_info', CameraInfo,
                 self.camera_info_callback, queue_size=1)
         self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseWithCovarianceStamped)
+        self._beacon_debug_pose_publisher = rospy.Publisher('beacon_pose_debug', PoseStamped)
         self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
         self._cv_bridge = CvBridge()
 
@@ -135,7 +136,9 @@ class BeaconFinder:
 
         # Construct a matrix of points representing the circles grid facing the camera
         d = rospy.get_param("~vertical_distance_between_circles", 0.3048)
+        self._beacon_side_distance_between_circles = rospy.get_param("~side_distance_between_circles", 0.3429)
         self._beacon_thickness = rospy.get_param("~beacon_thickness", 0.394)
+        self._beacon_width = rospy.get_param("~beacon_width", 1.51765)
         shifted = rospy.get_param("~is_first_column_shifted_down", False)
         self._circles_grid = self.create_circles_grid(d, shifted)
 
@@ -306,13 +309,16 @@ class BeaconFinder:
                     transform = numpy.eye(4)
                     pose_matrix, covariance_matrix  = self.compute_beacon_pose(centers, transform)
                     self.draw_debug_chessboard_image(centers, found)
-                if name == "Left":
-                    transform = numpy.eye(4)
+                elif name == "Left":
+                    transform =    numpy.r_[[[0, 0, -1,  self._beacon_thickness/2.0]],
+                            [[ 0, 1,  0,  0]],
+                            [[ 1, 0, 0,  self._beacon_width/2.0]],
+                            [[ 0, 0,  0,  1]]]
                     pose_matrix_side, covariance_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
                 elif name == "Right":
-                    transform =    numpy.r_[[[-1, 0,  0,  0]],
+                    transform =    numpy.r_[[[0, 0,  1,  -self._beacon_thickness/2.0]],
                             [[ 0, 1,  0,  0]],
-                            [[ 0, 0, -1, -self._beacon_thickness]],
+                            [[-1, 0,  0,  self._beacon_width/2.0]],
                             [[ 0, 0,  0,  1]]]
                     pose_matrix_side, covariance_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
 
@@ -334,6 +340,9 @@ class BeaconFinder:
                 numpy.asarray(self._camera_model.fullIntrinsicMatrix()),
                 numpy.asarray(self._camera_model.distortionCoeffs()))
 
+        rospy.logerr("Translation vector:")
+        rospy.logerr(translation_vector)
+
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
         pose_matrix = numpy.vstack((rotation_matrix,
             numpy.zeros((1,3))))
@@ -350,12 +359,12 @@ class BeaconFinder:
 
     def compute_beacon_pose_side(self, centers, image, transform):
         # Compute the position and orientation of the beacon
-        # (identity transform is the left side)
+        # x right, y down, z away
         if centers is None or self._camera_model is None or len(centers) != 3:
             return None
 
         image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        ret, image_binary = cv2.threshold(image_gray, 127, 255, cv2.THRESH_BINARY)
+        ret, image_binary = cv2.threshold(image_gray, 64, 255, cv2.THRESH_BINARY)
         circle_width_height_ratio = 0
         highest_center_point = centers[0].pt
         for center in centers:
@@ -363,31 +372,41 @@ class BeaconFinder:
                 highest_center_point = center.pt
             center_point = [int(coord) for coord in center.pt]
             flood_color = image_binary[center_point[0]][center_point[1]]
+            #rospy.logerr("Center point: %f, %f" % (center_point[0], center_point[1]))
+            #rospy.logerr("Flood color: %f" % flood_color)
             bounding_rect = cv.FloodFill(cv.fromarray(image_binary), (center_point[0], center_point[1]), float(flood_color))
-            circle_width_height_ratio = circle_width_height_ratio + (bounding_rect[2][2]/bounding_rect[2][3])
+            #rospy.logerr("Bounding rect width: %f, height: %f" % (float(bounding_rect[2][2]), float(bounding_rect[2][3])))
+            circle_width_height_ratio = circle_width_height_ratio + float(bounding_rect[2][2])/float(bounding_rect[2][3])
+            #rospy.logerr("Circle width height ratio: %f" % (circle_width_height_ratio))
         circle_width_height_ratio = circle_width_height_ratio / len(centers)
         
-        very_approx_angle = 0
+        very_approx_angle = 0.0
         if circle_width_height_ratio > 1.0:
-            # emit high covariance
-            very_approx_angle = math.pi/2.0
+            very_approx_angle = 0.0
         else:
             very_approx_angle = math.acos(circle_width_height_ratio)
 
         # Compute rotation and translation vectors such that they emulate
-        # the output of solvePnP()
+        # the output of solvePnP().  This has many hard-coded assumptions about
+        # the number of circles on the beacon's sides
         average_circle_distance = math.sqrt((centers[0].pt[0]-centers[1].pt[0])**2 + (centers[0].pt[1]-centers[1].pt[1])**2)
         average_circle_distance = average_circle_distance + math.sqrt((centers[1].pt[0]-centers[2].pt[0])**2 + (centers[1].pt[1]-centers[2].pt[1])**2)
         average_circle_distance = average_circle_distance / 2.0
-        beacon_distance = (self._camera_model.fy()/average_circle_distance)*(13.5*0.0254)
-        x_meters = (highest_center_point[0] - self._camera_model.cx())/self._camera_model.fx()*beacon_distance
-        y_meters = (highest_center_point[1] - self._camera_model.cy())/self._camera_model.fy()*beacon_distance
-        rotation_vector = numpy.r_[0, -very_approx_angle, 0]
+        beacon_distance = (self._camera_model.fy()/average_circle_distance)*self._beacon_side_distance_between_circles
+        beacon_distance_z = math.cos(math.atan((highest_center_point[0] - self._camera_model.cx())/self._camera_model.fx()))*beacon_distance
+        x_meters = (highest_center_point[0] - self._camera_model.cx())/self._camera_model.fx()*beacon_distance_z
+        y_meters = (highest_center_point[1] - self._camera_model.cy())/self._camera_model.fy()*beacon_distance_z
+        rotation_vector = numpy.r_[0, very_approx_angle, 0]
         translation_vector = numpy.r_[[[x_meters]], [[y_meters]], [[beacon_distance]]]
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
         pose_matrix = numpy.vstack((rotation_matrix, numpy.zeros((1,3))))
         pose_matrix = numpy.hstack((pose_matrix, numpy.r_[translation_vector,[[1]]]))
         pose_matrix = numpy.dot(pose_matrix, transform)
+
+        #rospy.logerr("Beacon dist: %f, beacon dist z: %f" % (beacon_distance, beacon_distance_z))
+        #rospy.logerr("X dist: %f, Y dist: %f" % (x_meters, y_meters))
+        #rospy.logerr("Rotation angle: %f" % (very_approx_angle*180.0/pi))
+        #rospy.logerr("Circle width/height ratio: %f" % (circle_width_height_ratio))
 
         covariance_matrix = [1.00, 1.00, 1.0, pi/10.0, pi/5.0,  pi/10.0,\
                              1.00, 1.00, 1.0, pi/10.0, pi/6.0,  pi/10.0,\
@@ -413,6 +432,11 @@ class BeaconFinder:
         beacon_pose.header = header
         beacon_pose.pose.covariance = covariance_matrix
         self._beacon_pose_publisher.publish(beacon_pose)
+
+        debug_pose = PoseStamped()
+        debug_pose.pose = beacon_pose.pose.pose
+        debug_pose.header = header
+        self._beacon_debug_pose_publisher.publish(debug_pose)
 
     def draw_debug_keypoints_image(self, keypoints):
         if self._beacon_debug_image.get_num_connections() > 0:
