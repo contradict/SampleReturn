@@ -176,7 +176,7 @@ class BeaconFinder:
             rospy.loginfo("No circles found in %s.", name)
 
     def sideLook(self, name, image, detector):
-        rospy.logerr("Looking for %s", name)
+        rospy.loginfo("Looking for %s", name)
         foundSide = True
         blobs = detector.detect(image)
 
@@ -204,7 +204,7 @@ class BeaconFinder:
             for b in topThree:
                 if (abs(b.size - avgSize) > avgSize*self.maxSizeError):
                     foundSide = False
-                    rospy.logerr('rejecting points for size inconsistencies')
+                    #rospy.logdebug('rejecting points for size inconsistencies')
 
             horizontal0to1 = topThree[0].pt[0]-topThree[1].pt[0]
             horizontal1to2 = topThree[1].pt[0]-topThree[2].pt[0]
@@ -219,7 +219,7 @@ class BeaconFinder:
             if abs(distance0to1 - distance1to2) > \
                min(distance0to1, distance1to2) * self.maxDistanceError:
                 foundSide = False
-                rospy.logerr('rejecting points for distance errors')
+                #rospy.logdebug('rejecting points for distance errors')
 
             if distance0to1 < 0.00001 or\
                distance1to2 < 0.00001 or\
@@ -227,7 +227,7 @@ class BeaconFinder:
                math.asin(abs(horizontal1to2)/distance1to2) > self.maxHorizontalRadians or\
                numpy.sign(horizontal0to1) != numpy.sign(horizontal1to2):
                 foundSide = False
-                rospy.logerr('rejecting points for horizontal error')
+                #rospy.logdebug('rejecting points for horizontal error')
 
             # sometimes we see the front or back and think it is a side.
             # deal with this by not allowing there to be too many similar sized blobs
@@ -244,7 +244,7 @@ class BeaconFinder:
                                 sameSizeCount += 1
 
                 if sameSizeCount >= 1:
-                    rospy.logerr('found %d similar sized blobs, which is too many!', sameSizeCount)
+                    #rospy.logdebug('found %d similar sized blobs, which is too many!', sameSizeCount)
                     foundSide = False
                         
             # if we made it here and foundSide is still true, break,
@@ -257,7 +257,7 @@ class BeaconFinder:
                 )
                 self._found_queue.put((name, topThree, foundSide))
 
-                rospy.logerr('found %s', name)
+                rospy.loginfo('found %s', name)
                 break
             else:
                 # if we didn't find it, remove one element from sorted blobs and
@@ -305,9 +305,10 @@ class BeaconFinder:
             while not self._found_queue.empty():
                 name, centers, found = self._found_queue.get()
                 if name == "Back":
-                    transform =    numpy.r_[[[-1, 0,  0,  0]],
+                    transform =    numpy.r_[
+                            [[-1, 0,  0,  0]],
                             [[ 0, 1,  0,  0]],
-                            [[ 0, 0, -1, -self._beacon_thickness]],
+                            [[ 0, 0, -1,  self._beacon_thickness]],
                             [[ 0, 0,  0,  1]]]
                     pose_matrix, covariance_matrix = self.compute_beacon_pose(centers, transform)
                     self.draw_debug_chessboard_image(centers, found)
@@ -316,13 +317,15 @@ class BeaconFinder:
                     pose_matrix, covariance_matrix  = self.compute_beacon_pose(centers, transform)
                     self.draw_debug_chessboard_image(centers, found)
                 elif name == "Left":
-                    transform =    numpy.r_[[[0, 0, -1,  self._beacon_thickness/2.0]],
+                    transform =    numpy.r_[
+                            [[ 0, 0, -1,  self._beacon_thickness/2.0]],
                             [[ 0, 1,  0,  0]],
-                            [[ 1, 0, 0,  self._beacon_width/2.0]],
+                            [[ 1, 0,  0,  self._beacon_width/2.0]],
                             [[ 0, 0,  0,  1]]]
                     pose_matrix_side, covariance_matrix_side = self.compute_beacon_pose_side(centers, image_cv, transform)
                 elif name == "Right":
-                    transform =    numpy.r_[[[0, 0,  1,  -self._beacon_thickness/2.0]],
+                    transform =    numpy.r_[
+                            [[ 0, 0,  1,  -self._beacon_thickness/2.0]],
                             [[ 0, 1,  0,  0]],
                             [[-1, 0,  0,  self._beacon_width/2.0]],
                             [[ 0, 0,  0,  1]]]
