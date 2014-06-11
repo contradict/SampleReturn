@@ -154,6 +154,7 @@ class ManualController(object):
                 grab_msg.wrist_angle = 0
                 if userdata.detected_sample is not None:
                     grab_msg.wrist_angle = userdata.detected_sample.grip_angle
+                    grab_msg.target_bin = userdata.detected_sample.sample_id
                 return grab_msg
             
             smach.StateMachine.add('MANIPULATOR_GRAB',

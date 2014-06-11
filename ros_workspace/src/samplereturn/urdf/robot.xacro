@@ -190,7 +190,7 @@
     <joint name="manipulator_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="manipulator_arm"/>
-        <origin xyz="0.06666666 0 0" rpy="0 0 0"/>
+        <origin xyz="0.066 0 0" rpy="0 0 0"/>
     </joint>    
     <link name="manipulator_arm">
         <visual>
