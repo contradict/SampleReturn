@@ -309,7 +309,7 @@ class LineMOD_Detector
                 angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
           }
           if (m.class_id == "wood_cube" &&
-              (dominant_color=="yellow" || dominant_color=="brown"))
+              (dominant_color=="yellow" || dominant_color=="brown" || dominant_color=="white"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
