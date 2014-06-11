@@ -57,6 +57,9 @@
                 distance: 4.0
                 blocked: False
                 left_check_offset: 0.6
+            sample_area:
+                angle: 0
+                check_distance: 3.5
     </rosparam>
 
     <node
@@ -101,7 +104,7 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="6"/>
-        <param name="first_spoke_offset" type="double" value="0"/>
+        <param name="first_spoke_offset" type="double" value="40"/>
         <param name="star_hub_radius" type="int" value="5"/>
         <param name="min_spin_radius" type="double" value="10"/>
         <param name="spin_step" type="double" value="15"/>
@@ -143,7 +146,9 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- sample approach (pursuit) parameters -->
-        <param name="min_pursuit_distance" type="double" value="2.0"/>
+        <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <param name="sample_obstacle_check_distance" type="double" value="2.0"/>
+        <param name="final_pursuit_step" type="double" value="0.6"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
         <param name="pursuit_step" type="double" value="4.0"/>
         <param name="pursuit_yaw_tolerance" type="double" value="0.2"/>
@@ -168,26 +173,6 @@
         <!-- this file loads the velocities and such for servoing onto sample,
              the node must already have a simple_mover up and running -->
         <rosparam file="$(find samplereturn)/config/visual_servo.yaml" command="load"/>  
-                
-        <!-- servo sample simple motion parameters -->
-        <rosparam>
-           servo_params:
-              initial_velocity: 0.1
-              initial_accel: 0.1
-              initial_tolerance: 0.050
-              final_velocity: 0.01
-              final_accel: 0.02
-              final_tolerance: 0.010
-              settle_time: 1.0
-              try_limit: 3
-        </rosparam>
-
-        <!-- manipulator correction, measured manually, corrects for inaccuracy of reality -->
-        <rosparam>
-            manipulator_correction:
-                x: -0.012
-                y: 0.022
-        </rosparam>
 
     </node>
 
@@ -202,7 +187,7 @@
         <!-- executive tf frame and planner_mode -->
 
         <param name="lethal_threshold" type="int" value="90"/>        
-        <param name="min_check_distance" type="double" value ="1.5"/>
+        <param name="min_check_distance" type="double" value="1.5"/>
         <param name="obstacle_check_distance" type="double" value="5"/>
         <param name="obstacle_check_width" type="double" value="2.5"/>
         <param name="min_check_distance" type="double" value="0.7"/>
