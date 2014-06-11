@@ -60,7 +60,7 @@ class ExecutiveCostmapChecker(object):
         #check parameters       
         lethal_threshold = self.node_params.lethal_threshold
         check_width = self.node_params.obstacle_check_width
-        check_dist = self.node_params.obstacle_check_distance
+        #check distance set below
         min_dist = self.node_params.min_check_distance
         
         #load up the costmap and its info into useful structure        
@@ -97,6 +97,9 @@ class ExecutiveCostmapChecker(object):
             msg_keys.append(strafe_key)
                         
             odom_yaw = actual_yaw + strafe['angle']
+        
+            #get the default check_distance, or if specified in the dict, get that
+            check_dist = strafe.get('check_distance', self.node_params.obstacle_check_distance)
             
             right_offset = strafe.get('right_check_offset', 0)
             left_offset = strafe.get('left_check_offset', 0)
@@ -152,7 +155,7 @@ class ExecutiveCostmapChecker(object):
                 return True
         return False
     
-        #returns array of array for bresenham implementation    
+    #returns array of array for bresenham implementation    
     def check_point(self, start, distance, angle, res):
         x = np.trunc(start[0] + (distance * math.cos(angle))/res).astype('i2')
         y = np.trunc(start[1] + (distance * math.sin(angle))/res).astype('i2')
