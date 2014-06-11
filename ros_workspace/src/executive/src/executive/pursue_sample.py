@@ -274,7 +274,7 @@ class PursueSample(object):
                         goal.target_bin = 0                    
                 goal.grip_torque = 0.7
                 rospy.loginfo("PURSUE_SAMPLE grab_goal_cb, goal: %s, sample_id: %s" % (
-                              goal, latched_sample.sample_id))
+                              goal, userdata.latched_sample.sample_id))
                 return goal
     
             #if Steve pauses the robot during this action, it returns preempted,
