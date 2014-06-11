@@ -489,7 +489,8 @@ class RotationManager(smach.State):
                                           'simple_move',
                                           'outbound',
                                           'rotate_pose',
-                                          'beacon_point']),  
+                                          'beacon_point',
+                                          'last_align_time']),  
   
         self.tf_listener = tf_listener
         self.mover = mover
@@ -517,6 +518,7 @@ class RotationManager(smach.State):
                                  'angle':rotate_yaw,
                                  'velocity':userdata.spin_velocity}
         #clear the beacon points before returning, make sure we respond to new beacon poses
+        userdata.last_align_time = rospy.get_time()
         userdata.beacon_point = None
         return 'next'
 
@@ -538,12 +540,14 @@ class SearchLineManager(smach.State):
                                            'min_spin_radius',
                                            'spin_step',
                                            'within_hub_radius',
-                                           'beacon_point'],
+                                           'beacon_point',
+                                           'last_align_time'],
                              output_keys = ['simple_move',
                                             'offset_count',
                                             'active_strafe_key',
                                             'last_spin_radius',
-                                            'beacon_point'],
+                                            'beacon_point',
+                                            'last_align_time'],
                              outcomes=['move',
                                        'spin',
                                        'recalibrate',
@@ -559,10 +563,6 @@ class SearchLineManager(smach.State):
 
     def execute(self, userdata):
     
-        #did we get here from a rotation, if so, pause to wait for costmaps
-        if userdata.active_strafe_key is None:
-            rospy.sleep(2.0)
-        
         userdata.active_strafe_key = None
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
@@ -612,12 +612,18 @@ class SearchLineManager(smach.State):
             return 'spin'
         
         if (not userdata.outbound) and (userdata.beacon_point is not None) \
-            and not False in userdata.strafes:
+            and not False in userdata.strafes and ((rospy.get_time() - userdata.last_align_time) > 10):
             #if we are seeing the beacon, and are not making some kind of move because we're blocked,
             #adjust our yaw to map coords.  Hopefully these are small rotations....
             self.announcer.say("Align ing to map")
+            userdata.last_align_time = rospy.get_time()
             userdata.beacon_point = None
             return 'recalibrate'
+        
+        
+        #did we get here from a rotation, if so, pause to wait for costmaps
+        if userdata.active_strafe_key is None:
+            rospy.sleep(1.0)        
         
         #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
         #first check if we are offset from line either direction, and if so, is the path
