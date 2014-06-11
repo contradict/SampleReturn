@@ -377,17 +377,8 @@ class LevelTwoStar(object):
     def beacon_update(self, beacon_pose):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                  beacon_pose.pose.position)
-        try:
-            self.tf_listener.waitForTransform(self.odometry_frame,
-                                              beacon_point.header.frame_id,
-                                              beacon_point.header.stamp,
-                                              rospy.Duration(1.0))
-            point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, beacon_point)
-            point_in_frame.point.x += 1.5 #start point is 1.5 meters in front of beacon
-            beacon_point.point = point_in_frame.point
-            self.state_machine.userdata.beacon_point = beacon_point
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose!")
+        self.state_machine.userdata.beacon_point = beacon_point
+
             
     def get_hollow_star(self, spoke_count, offset, hub_radius):
 
