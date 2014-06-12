@@ -44,7 +44,7 @@ class LevelTwoStar(object):
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
         #make a Point msg out of beacon_approach_point
-        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+        header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         point = geometry_msg.Point(self.node_params.beacon_approach_point['x'],
                                    self.node_params.beacon_approach_point['y'], 0)
         self.beacon_approach_point = geometry_msg.PointStamped(header, point)

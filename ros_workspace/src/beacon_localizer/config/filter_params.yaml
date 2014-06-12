@@ -1,2 +1,2 @@
-system_noise_covariance: [ 1.e-1, 0, 0, 1.e-1, 0, 5.e-2 ]
+system_noise_covariance: [ 5.e-3, 0, 0, 5.e-3, 0, 2.e-3 ]
 measurement_noise_covariance: [ 0.5, 0, 0, 0.5, 0, 0.1 ]
