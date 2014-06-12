@@ -46,8 +46,8 @@
         pkg="samplereturn"
         type="announcer.py"
         ns="/io/audio">
-        <remap from="audio_in" to="navigate"/>
-        <remap from="audio_out" to="navigate_soundplay"/>
+        <remap from="audio_in" to="search"/>
+        <remap from="audio_out" to="search_soundplay"/>
     </node>
 
     <!-- joint state publishing -->
