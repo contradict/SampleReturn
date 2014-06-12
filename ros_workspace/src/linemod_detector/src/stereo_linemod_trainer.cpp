@@ -40,6 +40,30 @@ static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
   return detector;
 }
 
+static cv::Ptr<cv::linemod::Detector> readExpandedLinemod(const std::string& filename)
+{
+  cv::Ptr<cv::linemod::Detector> detector = cv::linemod::getExpandedLINEMOD();
+
+  cv::FileStorage fs(filename, cv::FileStorage::READ);
+  cv::FileNode fn = fs["classes"];
+  for (cv::FileNodeIterator i = fn.begin(), iend = fn.end(); i != iend; ++i)
+    detector->readClass(*i);
+
+  return detector;
+}
+
+static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filename)
+{
+  cv::Ptr<cv::linemod::Detector> detector = cv::linemod::getInnerLINE();
+
+  cv::FileStorage fs(filename, cv::FileStorage::READ);
+  cv::FileNode fn = fs["classes"];
+  for (cv::FileNodeIterator i = fn.begin(), iend = fn.end(); i != iend; ++i)
+    detector->readClass(*i);
+
+  return detector;
+}
+
 static void writeLinemod(const cv::Ptr<cv::linemod::Detector>& detector, const std::string& filename)
 {
   cv::FileStorage fs(filename, cv::FileStorage::WRITE);
