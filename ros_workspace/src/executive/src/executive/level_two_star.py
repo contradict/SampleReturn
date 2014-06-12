@@ -49,7 +49,7 @@ class LevelTwoStar(object):
                                    self.node_params.beacon_approach_point['y'], 0)
         self.beacon_approach_point = geometry_msg.PointStamped(header, point)
         #also need platform point
-        platform_point = geometry_msg.Point( -0.4, 0, 0)
+        platform_point = geometry_msg.Point( 0, 0, 0)
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
         
         #interfaces
@@ -82,7 +82,7 @@ class LevelTwoStar(object):
         #sets the default velocity used by ExecuteSimpleMove, if none, use simple_motion default
         self.state_machine.userdata.velocity = None
 
-        #these are important values!  master frame id and return timing
+        #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
