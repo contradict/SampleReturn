@@ -626,7 +626,7 @@ class DriveToPoint(smach.State):
         #costmap update wait
         rospy.sleep(3.0)
 
-        if np.abs(yaw_to_point) > userdata.target_tolerance:
+        if np.abs(yaw_to_point) > 0.2:
             #if we are outside the angle tolerance to the target point, face it
             self.announcer.say("Rotate ing towards point")
             return self.spin(util.unwind(yaw_to_point), userdata)
