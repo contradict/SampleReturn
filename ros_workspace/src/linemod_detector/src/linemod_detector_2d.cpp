@@ -98,6 +98,7 @@ class LineMOD_Detector
   float min_depth;
   float max_depth;
   float min_count;
+  bool hard_samples;
   bool _publish_debug_img;
 
   ColorNaming cn;
@@ -132,14 +133,21 @@ class LineMOD_Detector
     ros::param::get("~min_depth", LineMOD_Detector::min_depth);
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
+    ros::param::get("~hard_samples", LineMOD_Detector::hard_samples);
     ros::param::param<bool>("~publish_debug_img", _publish_debug_img, true);
     ros::param::param<std::string>("~detection_frame_id", _detection_frame_id, "odom");
 
     ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
     // Initialize LINEMOD data structures
-    detector = readLinemod(filename);
-    num_modalities = (int)detector->getModalities().size();
+    if (!hard_samples) {
+      detector = readLinemod(filename);
+      num_modalities = (int)detector->getModalities().size();
+    }
+    else {
+      detector = readInnerLinemod(filename);
+      num_modalities = (int)detector->getModalities().size();
+    }
     std::cout << num_modalities << std::endl;
 
     enabled_ = true;
@@ -242,7 +250,12 @@ class LineMOD_Detector
     //LineMOD_Detector::display = blur.clone();
     //LineMOD_Detector::color_img = lab_img;
     //LineMOD_Detector::color_img = color_ptr->image.clone();
-    LineMOD_Detector::color_img = blur.clone();
+    if (hard_samples) {
+      LineMOD_Detector::color_img = color_ptr->image.clone();
+    }
+    else {
+      LineMOD_Detector::color_img = blur.clone();
+    }
 
     LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
     //LineMOD_Detector::sources.push_back(blur);
@@ -355,10 +368,34 @@ class LineMOD_Detector
                 angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
           }
           if (m.class_id == "colored_ball" &&
-              dominant_color!="brown" && dominant_color!="white" && dominant_color!="grey")
+              dominant_color!="brown" && dominant_color!="white" && dominant_color!="gray")
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::COLORED_BALL);
+          }
+          if (m.class_id == "metal_star" &&
+              dominant_color!="brown")
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::METAL_1);
+          }
+          if (m.class_id == "metal_pi" &&
+              dominant_color!="brown")
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::METAL_1);
+          }
+          if (m.class_id == "metal_tree" &&
+              dominant_color!="brown")
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::METAL_1);
+          }
+          if (m.class_id == "metal_lines" &&
+              dominant_color!="brown")
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::METAL_1);
           }
         }
 
