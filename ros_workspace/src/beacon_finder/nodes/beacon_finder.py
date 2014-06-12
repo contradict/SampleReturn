@@ -29,6 +29,8 @@ class BeaconFinder:
 
         self._camera_model = None
 
+        self._detect_sides = rospy.get_param("~detect_sides", False)
+
         # Get params
         self._num_rows = rospy.get_param("~num_rows", 3)
         self._num_columns = rospy.get_param("~num_columns", 9)
@@ -286,15 +288,17 @@ class BeaconFinder:
             back_thread = threading.Thread( target=self.look,
                     args = ("Back", image_cv, self._blob_detector_alt))
             back_thread.start()
-            left_thread = threading.Thread( target=self.sideLook,
-                    args = ("Left", image_cv, self._blob_detector_side))
-            left_thread.start()
-            right_thread = threading.Thread( target=self.sideLook,
-                    args = ("Right", image_cv, self._blob_detector_side_alt))
-            right_thread.start()
+            if self._detect_sides:
+                left_thread = threading.Thread( target=self.sideLook,
+                        args = ("Left", image_cv, self._blob_detector_side))
+                left_thread.start()
+                right_thread = threading.Thread( target=self.sideLook,
+                        args = ("Right", image_cv, self._blob_detector_side_alt))
+                right_thread.start()
 
-            left_thread.join()
-            right_thread.join()
+                left_thread.join()
+                right_thread.join()
+
             front_thread.join()
             back_thread.join()
 
