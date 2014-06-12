@@ -55,5 +55,7 @@
           <remap from="base_pose_ground_truth" to="/motion/odometry"/>
     </node>
 
+    <!--
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
+    -->
 </launch>
