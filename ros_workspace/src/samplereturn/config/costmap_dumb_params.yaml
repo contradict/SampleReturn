@@ -7,8 +7,8 @@ publish_frequency: 1.0
 footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
 
 rolling_window: true
-width: 30.0
-height: 30.0
+width: 20.0
+height: 20.0
 resolution: 0.10
 
 inscribed_radius: 0.4
@@ -31,8 +31,8 @@ obstacle_layer:
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 15.5
-    raytrace_range: 16.0
+    obstacle_range: 10.5
+    raytrace_range: 10.6
 
     observation_sources: port_point_cloud center_point_cloud starboard_point_cloud
     port_point_cloud: {
@@ -44,8 +44,8 @@ obstacle_layer:
         clearing: true,
         min_obstacle_height: 0.0,
         max_obstacle_height: 4.0,
-        obstacle_range: 15.5,
-        raytrace_range: 16.0,
+        obstacle_range: 10.5,
+        raytrace_range: 10.6,
         }
     center_point_cloud: {
         topic: /cameras/navigation/center/points2,
@@ -56,8 +56,8 @@ obstacle_layer:
         clearing: true,
         min_obstacle_height: 0.0,
         max_obstacle_height: 4.0,
-        obstacle_range: 15.5,
-        raytrace_range: 16.0,
+        obstacle_range: 10.5,
+        raytrace_range: 10.6,
         }
     starboard_point_cloud: {
         topic: /cameras/navigation/starboard/points2,
@@ -68,8 +68,8 @@ obstacle_layer:
         clearing: true,
         min_obstacle_height: 0.0,
         max_obstacle_height: 4.0,
-        obstacle_range: 15.5,
-        raytrace_range: 16.0,
+        obstacle_range: 10.5,
+        raytrace_range: 10.6,
         }
 
 inflation_layer:
