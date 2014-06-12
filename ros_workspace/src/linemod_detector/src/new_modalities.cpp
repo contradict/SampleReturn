@@ -345,11 +345,11 @@ InnerColorGradient::InnerColorGradient(float _weak_threshold, size_t _num_featur
 {
 }
 
-static const char CG_NAME[] = "InnerColorGradient";
+static const char ICG_NAME[] = "InnerColorGradient";
 
 std::string InnerColorGradient::name() const
 {
-  return CG_NAME;
+  return ICG_NAME;
 }
 
 Ptr<QuantizedPyramid> InnerColorGradient::processImpl(const Mat& src,
@@ -361,7 +361,7 @@ Ptr<QuantizedPyramid> InnerColorGradient::processImpl(const Mat& src,
 void InnerColorGradient::read(const FileNode& fn)
 {
   std::string type = fn["type"];
-  CV_Assert(type == CG_NAME);
+  CV_Assert(type == ICG_NAME);
 
   weak_threshold = fn["weak_threshold"];
   num_features = int(fn["num_features"]);
@@ -370,7 +370,7 @@ void InnerColorGradient::read(const FileNode& fn)
 
 void InnerColorGradient::write(FileStorage& fs) const
 {
-  fs << "type" << CG_NAME;
+  fs << "type" << ICG_NAME;
   fs << "weak_threshold" << weak_threshold;
   fs << "num_features" << int(num_features);
   fs << "strong_threshold" << strong_threshold;
@@ -380,7 +380,6 @@ Ptr<Detector> getExpandedLINEMOD()
 {
   std::vector< Ptr<Modality> > modalities;
   modalities.push_back(new ColorGradient);
-  modalities.push_back(new DepthNormal);
   modalities.push_back(new InnerColorGradient);
   return new Detector(modalities, std::vector<int>(T_DEFAULTS, T_DEFAULTS + 2));
 }
