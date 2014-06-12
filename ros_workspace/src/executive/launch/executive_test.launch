@@ -21,7 +21,7 @@
         pkg="sound_play"
         type="soundplay_node.py"
         ns="/io/audio">
-        <remap from="robotsound" to="navigate_soundplay"/>
+        <remap from="robotsound" to="search_soundplay"/>
     </node>
     
     <include file="$(find samplereturn)/launch/joystick.launch"/>
