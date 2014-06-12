@@ -27,6 +27,7 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import DriveToPoint
+from executive.executive_states import RotateToClear
 
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
@@ -155,6 +156,7 @@ class LevelTwoStar(object):
                                                      self.announcer),
                                    transitions = {'move':'LINE_MOVE',
                                                   'spin':'ROTATE',
+                                                  'recalibrate':'ROTATION_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'line_blocked':'STAR_MANAGER',
                                                   'next_spoke':'STAR_MANAGER',
@@ -230,7 +232,7 @@ class LevelTwoStar(object):
                                    DriveToPoint(self.tf_listener, self.announcer),
                                    transitions = {'move':'BEACON_SPIN_MOVE',
                                                   'detection_interrupt':'BEACON_SEARCH',
-                                                  'blocked':'BEACON_SEARCH',
+                                                  'blocked':'BEACON_CLEAR_MOVE',
                                                   'complete':'BEACON_SEARCH'},
                                    remapping = {'detection_object':'beacon_point',
                                                 'stop_on_detection':'stop_on_beacon'})
@@ -239,6 +241,12 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'BEACON_SEARCH_DRIVER',
                                                   'timeout':'BEACON_SEARCH_DRIVER',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
+            smach.StateMachine.add('BEACON_CLEAR_MOVE',
+                                   RotateToClear(self.simple_mover, self.tf_listener, self.strafes),
+                                   transitions = {'complete':'BEACON_SEARCH',
+                                                  'blocked':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_MANAGER',
@@ -252,7 +260,6 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'MOUNT_MANAGER',
                                                   'timeout':'MOUNT_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
-            
  
             smach.StateMachine.add('MOUNT_FINAL',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -370,18 +377,8 @@ class LevelTwoStar(object):
     def beacon_update(self, beacon_pose):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                  beacon_pose.pose.pose.position)
-        try:
-            self.tf_listener.waitForTransform(self.odometry_frame,
-                                              beacon_point.header.frame_id,
-                                              beacon_point.header.stamp,
-                                              rospy.Duration(1.0))
-            point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, beacon_point)
-            point_in_frame.point.x += 1.5 #start point is 1.5 meters in front of beacon
-            beacon_point.point = point_in_frame.point
-            self.state_machine.userdata.beacon_point = beacon_point
-        except tf.Exception, e:
-            rospy.logwarn("LEVEL_TWO failed to transform beacon detection pose: %s", e)
-            
+        self.state_machine.userdata.beacon_point = beacon_point
+
     def get_hollow_star(self, spoke_count, offset, hub_radius):
 
         offset = np.radians(offset)
@@ -481,7 +478,9 @@ class RotationManager(smach.State):
                              output_keys=['line_yaw',
                                           'simple_move',
                                           'outbound',
-                                          'rotate_pose']),  
+                                          'rotate_pose',
+                                          'beacon_point',
+                                          'last_align_time']),  
   
         self.tf_listener = tf_listener
         self.mover = mover
@@ -508,6 +507,9 @@ class RotationManager(smach.State):
         userdata.simple_move = {'type':'spin',
                                  'angle':rotate_yaw,
                                  'velocity':userdata.spin_velocity}
+        #clear the beacon points before returning, make sure we respond to new beacon poses
+        userdata.last_align_time = rospy.get_time()
+        userdata.beacon_point = None
         return 'next'
 
 #drive to detected sample location        
@@ -527,13 +529,18 @@ class SearchLineManager(smach.State):
                                            'last_spin_radius',
                                            'min_spin_radius',
                                            'spin_step',
-                                           'within_hub_radius'],
+                                           'within_hub_radius',
+                                           'beacon_point',
+                                           'last_align_time'],
                              output_keys = ['simple_move',
                                             'offset_count',
                                             'active_strafe_key',
-                                            'last_spin_radius'],
+                                            'last_spin_radius',
+                                            'beacon_point',
+                                            'last_align_time'],
                              outcomes=['move',
                                        'spin',
+                                       'recalibrate',
                                        'sample_detected',
                                        'line_blocked',
                                        'next_spoke',
@@ -546,10 +553,6 @@ class SearchLineManager(smach.State):
 
     def execute(self, userdata):
     
-        #did we get here from a rotation, if so, pause to wait for costmaps
-        if userdata.active_strafe_key is None:
-            rospy.sleep(2.0)
-        
         userdata.active_strafe_key = None
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
@@ -597,6 +600,20 @@ class SearchLineManager(smach.State):
             userdata.simple_move = {'type':'spin',
                                     'angle':2*math.pi}
             return 'spin'
+        
+        if (not userdata.outbound) and (userdata.beacon_point is not None) \
+            and not False in userdata.strafes and ((rospy.get_time() - userdata.last_align_time) > 10):
+            #if we are seeing the beacon, and are not making some kind of move because we're blocked,
+            #adjust our yaw to map coords.  Hopefully these are small rotations....
+            self.announcer.say("Align ing to map")
+            userdata.last_align_time = rospy.get_time()
+            userdata.beacon_point = None
+            return 'recalibrate'
+        
+        
+        #did we get here from a rotation, if so, pause to wait for costmaps
+        if userdata.active_strafe_key is None:
+            rospy.sleep(1.0)        
         
         #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
         #first check if we are offset from line either direction, and if so, is the path
@@ -665,17 +682,32 @@ class BeaconSearch(smach.State):
                                           'simple_move',
                                           'stop_on_sample',
                                           'stop_on_beacon',
-                                          'beacon_point'])
+                                          'beacon_point',
+                                          'clear_spin',
+                                          'clear_move',
+                                          'outbound'])
         
         self.tf_listener = tf_listener
         self.announcer = announcer
         self.tried_spin = False
+        self.clear_move = {'type':'strafe',
+                           'angle':0,
+                           'distance': 20.0}
+        self.clear_spin = {'type':'spin',
+                           'angle':math.pi*2,
+                           'velocity': 0.2}
 
     def execute(self, userdata):
+        
+        #this is lame as hell, but to disable simple_mover stop function returning true
+        #from here on out, easiest thing to do is set outbound back to true
+        userdata.outbound = True 
         
         #reset offset counter for driving moves
         userdata.offset_count = 0
         userdata.offset_limit = 3
+        userdata.clear_spin = self.clear_spin
+        userdata.clear_move = self.clear_move
         #ignore samples now
         userdata.stop_on_sample = False
         #by default, driving moves won't have a target_yaw
@@ -705,14 +737,27 @@ class BeaconSearch(smach.State):
                 self.tried_spin = True
                 return 'spin'
             #already tried a spin, drive towards beacon_approach_point, stopping on detection
-            else:
-                #gotta add some heroic shit here to search around for beacon       
+            elif distance_to_approach_point > 5.0:
+                #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
                 userdata.target_point = deepcopy(userdata.beacon_approach_point)
                 userdata.target_yaw = math.pi
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
-                return 'move' 
+                return 'move'
+            else:
+                #gotta add some heroic shit here
+                #we think we're near the beacon, but we don't see it
+                #right now, that is just to move 30 m on other side of the beacon that we don't know about
+                self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
+                search_point = deepcopy(userdata.beacon_approach_point)                
+                #invert the approach_point, and try again
+                search_point.point.x *= -1
+                userdata.target_point = search_point
+                userdata.stop_on_beacon = True
+                self.tried_spin = False
+                return 'move'               
+                
         else: #beacon is in view
             #need to add some stuff here to get to other side of beacon if viewing back
             current_yaw = util.get_current_robot_yaw(self.tf_listener,

@@ -111,6 +111,11 @@ class PursueSample(object):
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
         
+        #total bullshit for bins
+        self.state_machine.userdata.available_small_bins = [1,2,3,8,9,10]
+        self.state_machine.userdata.available_big_bins = [4,5,6,7]
+        self.state_machine.userdata.big_sample_ids = [4]
+        
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
@@ -247,13 +252,29 @@ class PursueSample(object):
                                                  "Deploy ing gripper"),
                                    transitions = {'next':'GRAB_SAMPLE'})
 
-            @smach.cb_interface(input_keys=['latched_sample'])
+            @smach.cb_interface(input_keys=['latched_sample',
+                                            'available_small_bins',
+                                            'available_big_bins',
+                                            'big_sample_ids'],
+                                output_keys=['available_small_bins',
+                                             'available_big_bins'])
             def grab_goal_cb(userdata, request):
                 goal = manipulator_msg.ManipulatorGoal()
                 goal.type = goal.GRAB
                 goal.wrist_angle = userdata.latched_sample.grip_angle                    
-                goal.target_bin = userdata.latched_sample.sample_id
+                if (userdata.latched_sample.sample_id in userdata.big_sample_ids):
+                    if len(userdata.available_big_bins) > 0:
+                        goal.target_bin = userdata.available_big_bins.pop(0)
+                    else:
+                        goal.target_bin = 0
+                else:
+                    if len(userdata.available_small_bins) > 0:
+                        goal.target_bin = userdata.available_small_bins.pop(0)
+                    else:
+                        goal.target_bin = 0                    
                 goal.grip_torque = 0.7
+                rospy.loginfo("PURSUE_SAMPLE grab_goal_cb, goal: %s, sample_id: %s" % (
+                              goal, userdata.latched_sample.sample_id))
                 return goal
     
             #if Steve pauses the robot during this action, it returns preempted,
@@ -692,6 +713,8 @@ class ManipulatorApproach(smach.State):
         
         self.tf_listener = tf_listener
         
+        self.yaw_correction = -0.04
+        
     def execute(self, userdata):
         
         userdata.target_sample = None
@@ -701,6 +724,7 @@ class ManipulatorApproach(smach.State):
         else:
             try:
                 yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
+                yaw += self.yaw_correction
             except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'

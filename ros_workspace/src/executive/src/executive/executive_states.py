@@ -432,7 +432,7 @@ class ServoController(smach.State):
             self.announcer.say("Servo exceeded try limit")
             rospy.loginfo("SERVO STRAFE failed to hit tolerance before try_limit: %s" % (userdata.servo_params['try_limit']))
             self.try_count = 0
-            return 'aborted'
+            return 'complete'
         
         if userdata.detected_sample is None:
             self.announcer.say("Sample lost")
@@ -673,29 +673,31 @@ class DriveToPoint(smach.State):
         return 'move'
     
 class RotateToClear(smach.State):
-    def __init__(self, simple_mover, tf_listener):
+    def __init__(self, simple_mover, tf_listener, strafes):
         smach.State.__init__(self,
-                             input_keys=['simple_move',
-                                         'strafes'],
+                             input_keys=['clear_spin',
+                                         'clear_move',
+                                         'strafes',
+                                         'paused'],
                              output_keys=['active_strafe_key',
                                           'point_list'],
-                             outcomes=['clear',
+                             outcomes=['complete',
                                        'blocked',
-                                       'complete',
                                        'aborted'])
         
         self.tf_listener = tf_listener
         self.simple_mover = simple_mover
+        self.clear = False
+        self.strafes = deepcopy(strafes)
  
         rospy.Subscriber('costmap_check',
                           samplereturn_msg.CostmapCheck,
                           self.handle_costmap_check)
  
- 
     def execute(self, userdata):
         
-        move = deepcopy(userdata.simple_move)
-        userdata.simple_move = None #consume simple move
+        move = deepcopy(userdata.clear_spin)
+        self.clear = False
         
         #load values from dict, absent values become None
         if move['type'] != 'spin':
@@ -703,14 +705,15 @@ class RotateToClear(smach.State):
             return 'aborted'
         
         angle = move.get('angle')
-        velocity = move.get('velocity', userdata.velocity)
+        velocity = move.get('velocity')
         accel = move.get('acceleration')
  
         while not rospy.is_shutdown():
             try:
                 error = self.simple_mover.execute_spin(angle,
                                                        max_velocity = velocity,
-                                                       acceleration = accel)
+                                                       acceleration = accel,
+                                                       stop_function = self.stop_if_clear)
                 rospy.loginfo("EXECUTED ROTATE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
                                                                               np.degrees(error)))
                 #did we exit the move execute because of a pause?
@@ -720,7 +723,6 @@ class RotateToClear(smach.State):
                     while not rospy.is_shutdown() and userdata.paused:
                         rospy.sleep(0.2)
                     #unpaused, try again, changing both goal values to returned error
-                    distance = error
                     angle = error
                 else:
                     #made it through move without being paused, break out
@@ -730,14 +732,59 @@ class RotateToClear(smach.State):
                     rospy.logwarn("TIMEOUT during simple_motion.")
                     return 'timeout'
 
+        if self.clear:
+            
+            rospy.sleep(1.0) #costmap wait
+
+            move = deepcopy(userdata.clear_move)
+            self.clear = False
+ 
+            angle = move.get('angle')
+            distance = move.get('distance')
+            velocity = move.get('velocity')
+            accel = move.get('acceleration')
+
+            while not rospy.is_shutdown():
+                try:
+                    userdata.active_strafe_key = 'center'
+                    error = self.simple_mover.execute_strafe(angle,
+                                                             distance,
+                                                             max_velocity = velocity,
+                                                             acceleration = accel)
+                    rospy.loginfo("EXECUTED STRAFE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
+                                                                                  np.degrees(error)))
+                    #did we exit the move execute because of a pause?
+                    if userdata.paused:
+                        #wait here for unpause, as long as it takes
+                        rospy.loginfo("ROTATE TO CLEAR stopped by pause")
+                        while not rospy.is_shutdown() and userdata.paused:
+                            rospy.sleep(0.2)
+                        #unpaused, try again, changing both goal values to returned error
+                        distance = error
+                    else:
+                        #made it through move without being paused, break out
+                        break
+                    
+                except(TimeoutException):
+                        rospy.logwarn("TIMEOUT during simple_motion.")
+                        return 'timeout'
+                
+        
+        #blocked, who knows what to do
+        else:
+            self.active_strafe_key = None
+            return 'blocked'
+        
+        self.active_strafe_key = None
         return 'complete'    
 
     def stop_if_clear(self):
         if not self.strafes['center']['blocked']:
             rospy.loginfo("ROTATE_TO_CLEAR STOP simple_move on center clear")
+            self.clear = True
             return True
     
-    def costmap_update(self, costmap_check):
+    def handle_costmap_check(self, costmap_check):
         for strafe_key, blocked in zip(costmap_check.strafe_keys,
                                        costmap_check.blocked):
             self.strafes[strafe_key]['blocked'] = blocked            

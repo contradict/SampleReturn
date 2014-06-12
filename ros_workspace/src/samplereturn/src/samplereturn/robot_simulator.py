@@ -311,7 +311,16 @@ class RobotSimulator(object):
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
+        self.check_publisher = rospy.Publisher('/processes/executive/costmap_check',
+                                               samplereturn_msg.CostmapCheck)
+
         #rospy.spin()
+        
+    def publish_all_blocked(self):
+        msg_keys = ['left','right','center']
+        blocked_keys = [True, True, True]
+        all_blocked = samplereturn_msg.CostmapCheck(msg_keys, blocked_keys)
+        self.check_publisher.publish(all_blocked)
         
     def publish_path_markers(self, event):
         try:

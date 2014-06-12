@@ -103,13 +103,13 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
-        <param name="spoke_count" type="int" value="6"/>
-        <param name="first_spoke_offset" type="double" value="-20"/>
+        <param name="spoke_count" type="int" value="45"/>
+        <param name="first_spoke_offset" type="double" value="90"/>
         <param name="star_hub_radius" type="int" value="15"/>
         <param name="min_spin_radius" type="double" value="40"/>
         <param name="spin_step" type="double" value="15"/>
         
-        <param name="return_time_minutes" type="double" value=".3"/>
+        <param name="return_time_minutes" type="double" value="100"/>
 
         <!-- for Beacon approach -->
         <rosparam>
@@ -119,7 +119,7 @@
         <param name="beacon_mount_step" type="double" value="2"/>
 
         <!-- simple mover parameters --> 
-        <param name="spin_velocity" type="double" value="0.3"/>
+        <param name="spin_velocity" type="double" value="0.2"/>
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
@@ -190,6 +190,7 @@
         <!-- executive tf frame and planner_mode -->
 
         <param name="lethal_threshold" type="int" value="90"/>        
+        <param name="min_check_distance" type="double" value ="1.5"/>
         <param name="obstacle_check_distance" type="double" value="5"/>
         <param name="obstacle_check_width" type="double" value="2.5"/>
         <param name="min_check_distance" type="double" value="0.7"/>
