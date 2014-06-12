@@ -830,7 +830,7 @@ class MountManager(smach.State):
 
     def execute(self, userdata):
         #disable obstacle checking!
-        rospy.sleep(2.0) #wait a sec for beacon pose to catch up
+        rospy.sleep(4.0) #wait a sec for beacon pose to catch up
         userdata.active_strafe_key = None
         yaw, distance = util.get_robot_strafe(self.tf_listener,
                                              userdata.platform_point)
