@@ -96,7 +96,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.platform_point = self.platform_point
         self.state_machine.userdata.offset_count = 0
         self.state_machine.userdata.offset_limit = 0
-        self.state_machine.userdata.target_tolerance = 0.2 #both meters and radians for now!
+        self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
         
         #search line parameters
         self.state_machine.userdata.min_spin_radius = self.node_params.min_spin_radius
