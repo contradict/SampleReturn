@@ -623,6 +623,9 @@ class DriveToPoint(smach.State):
         if userdata.stop_on_detection and userdata.detection_object is not None:
             return 'detection_interrupt'
  
+        #costmap update wait
+        rospy.sleep(3.0)
+
         if np.abs(yaw_to_point) > userdata.target_tolerance:
             #if we are outside the angle tolerance to the target point, face it
             self.announcer.say("Rotate ing towards point")
@@ -734,7 +737,7 @@ class RotateToClear(smach.State):
 
         if self.clear:
             
-            rospy.sleep(1.0) #costmap wait
+            rospy.sleep(3.0) #costmap wait
 
             move = deepcopy(userdata.clear_move)
             self.clear = False

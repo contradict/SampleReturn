@@ -626,7 +626,7 @@ class SearchLineManager(smach.State):
         
         #did we get here from a rotation, if so, pause to wait for costmaps
         if userdata.active_strafe_key is None:
-            rospy.sleep(1.0)        
+            rospy.sleep(3.0)        
         
         #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
         #first check if we are offset from line either direction, and if so, is the path
