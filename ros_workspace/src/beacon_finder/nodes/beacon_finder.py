@@ -465,7 +465,7 @@ class BeaconFinder:
     def broadcast_beacon_tf(self, evt):
         now = rospy.Time.now()
         #beacon_trans = (0.0, -1.3, -1.0)
-        beacon_trans = (-1.22, 0.0, 1.48)
+        beacon_trans = (-0.780, 0.0, 0.712)
         beacon_rot = tf.transformations.quaternion_from_euler(
                 -math.pi/2,
                 -math.pi/2,
