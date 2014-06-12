@@ -166,7 +166,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     tf::poseMsgToTF( msg->pose.pose, T_beacon_to_camera);
     T_beacon_to_camera.stamp_ = msg->header.stamp;
     _camera_frame_id = msg->header.frame_id;
-    ROS_ERROR_STREAM("T_beacon_to_camera t: (" <<
+    ROS_DEBUG_STREAM("T_beacon_to_camera t: (" <<
             T_beacon_to_camera.getOrigin()[0] << ", " <<
             T_beacon_to_camera.getOrigin()[1] << ", " <<
             T_beacon_to_camera.getOrigin()[2] << ") " <<
@@ -180,7 +180,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
 
     tf::StampedTransform T_camera_to_base;
     _tf.lookupTransform("base_link", _camera_frame_id, ros::Time(0), T_camera_to_base);
-    ROS_ERROR_STREAM("T_camera_to_base t: (" <<
+    ROS_DEBUG_STREAM("T_camera_to_base t: (" <<
             T_camera_to_base.getOrigin()[0] << ", " <<
             T_camera_to_base.getOrigin()[1] << ", " <<
             T_camera_to_base.getOrigin()[2] << ") " <<
@@ -194,7 +194,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
 
     tf::StampedTransform T_map_to_beacon;
     _tf.lookupTransform("beacon", _world_fixed_frame, ros::Time(0), T_map_to_beacon);
-    ROS_ERROR_STREAM("T_beacon_to_map t: (" <<
+    ROS_DEBUG_STREAM("T_beacon_to_map t: (" <<
             T_map_to_beacon.getOrigin()[0] << ", " <<
             T_map_to_beacon.getOrigin()[1] << ", " <<
             T_map_to_beacon.getOrigin()[2] << ") " <<
@@ -207,7 +207,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             );
 
     //T_odom is T_base_to_odom
-    ROS_ERROR_STREAM("T_base_to_odom t: (" <<
+    ROS_DEBUG_STREAM("T_base_to_odom t: (" <<
             _T_odom.getOrigin()[0] << ", " <<
             _T_odom.getOrigin()[1] << ", " <<
             _T_odom.getOrigin()[2] << ") " <<
@@ -220,7 +220,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             );
 
     tf::Transform T_map_to_odom = _T_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
-    ROS_ERROR_STREAM("T_map_to_odom t: (" <<
+    ROS_DEBUG_STREAM("T_map_to_odom t: (" <<
             T_map_to_odom.getOrigin()[0] << ", " <<
             T_map_to_odom.getOrigin()[1] << ", " <<
             T_map_to_odom.getOrigin()[2] << ") " <<
@@ -237,7 +237,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     measurement(1) = T_map_to_odom.getOrigin()[0];
     measurement(2) = T_map_to_odom.getOrigin()[1];
     measurement(3) = tf::getYaw( T_map_to_odom.getRotation() );
-    ROS_ERROR_STREAM("measurement: " << measurement.transpose() );
+    ROS_DEBUG_STREAM("measurement: " << measurement.transpose() );
 
 
     MatrixWrapper::SymmetricMatrix cov(6);
@@ -291,8 +291,8 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMesurementPdf);
 
     _filter->Update(_system_model, &beaconMeasurementModel, measurement);
-    ROS_ERROR_STREAM("State: " << _filter->PostGet()->ExpectedValueGet().transpose() );
-    ROS_ERROR_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
+    ROS_DEBUG_STREAM("State: " << _filter->PostGet()->ExpectedValueGet().transpose() );
+    ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
 }
 
 void BeaconKFNode::filterUpdateCallback( const ros::TimerEvent& e )
@@ -301,8 +301,8 @@ void BeaconKFNode::filterUpdateCallback( const ros::TimerEvent& e )
     ROS_DEBUG_STREAM("pre-Update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
     ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
     _filter->Update(_system_model);
-    ROS_DEBUG_STREAM("Update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
-    ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
+    ROS_INFO_STREAM("Update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
+    ROS_INFO_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
 }
 
 void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::SymmetricMatrix& m)
