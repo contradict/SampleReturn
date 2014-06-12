@@ -129,7 +129,8 @@ class LevelTwoStar(object):
             
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(input_keys=[],
-                                                 output_keys=['action_result'],
+                                                 output_keys=['action_result',
+                                                              'dismount_move'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -141,8 +142,15 @@ class LevelTwoStar(object):
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
-                                    transitions = {'next':'STAR_MANAGER',
+                                    transitions = {'next':'DISMOUNT_MOVE',
                                                   'failed':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('DISMOUNT_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'STAR_MANAGER',
+                                                  'timeout':'STAR_MANAGER',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'simple_move':'dismount_move'})
             
             smach.StateMachine.add('STAR_MANAGER',
                                    StarManager(self.tf_listener,
@@ -382,7 +390,7 @@ class LevelTwoStar(object):
     def get_hollow_star(self, spoke_count, offset, hub_radius):
 
         offset = np.radians(offset)
-        yaws = list(np.linspace(0 + offset, 2*np.pi + offset, spoke_count, endpoint=False))
+        yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
         spokes = []
         
         for yaw in yaws:
@@ -410,6 +418,11 @@ class StartLeveLTwo(smach.State):
         result = samplereturn_msg.GeneralExecutiveResult()
         result.result_string = 'initialized'
         userdata.action_result = result
+        
+        userdata.dismount_move = {'type':'strafe',
+                                   'angle':0,
+                                   'distance':5,
+                                   'velocity':0.2}
 
         return 'next'
 
@@ -732,7 +745,7 @@ class BeaconSearch(smach.State):
                 self.announcer.say("Beacon not in view. Rotate ing")
                 userdata.simple_move = {'type':'spin',
                                         'angle':math.pi*2,
-                                        'velocity':0.25}
+                                        'velocity':0.15}
                 userdata.stop_on_beacon = True
                 self.tried_spin = True
                 return 'spin'
@@ -788,7 +801,7 @@ class BeaconSearch(smach.State):
                 self.announcer.say("At approach point. Rotate ing to beacon")
                 userdata.simple_move = {'type':'spin',
                                         'angle':yaw_error,
-                                        'velocity':0.5}
+                                        'velocity':0.3}
                 return 'spin'
             else:    
                 self.announcer.say("Initiate ing platform mount")
