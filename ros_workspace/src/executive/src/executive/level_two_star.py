@@ -302,7 +302,7 @@ class LevelTwoStar(object):
                         self.sample_update)
         
         rospy.Subscriber("beacon_pose",
-                        geometry_msg.PoseStamped,
+                        geometry_msg.PoseWithCovarianceStamped,
                         self.beacon_update)
         
         rospy.Subscriber('costmap_check',
@@ -376,10 +376,9 @@ class LevelTwoStar(object):
             
     def beacon_update(self, beacon_pose):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
-                                                 beacon_pose.pose.position)
+                                                 beacon_pose.pose.pose.position)
         self.state_machine.userdata.beacon_point = beacon_point
 
-            
     def get_hollow_star(self, spoke_count, offset, hub_radius):
 
         offset = np.radians(offset)

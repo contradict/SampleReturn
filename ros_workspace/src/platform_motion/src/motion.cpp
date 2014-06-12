@@ -693,7 +693,9 @@ void Motion::planToZeroTwist( void )
     starboard->getPosition(&starboard_steering, NULL, NULL, &starboard_wheel_velocity);
     stern->getPosition(&stern_steering, NULL, NULL, &stern_wheel_velocity);
 
-    double max_velocity = std::max(port_wheel_velocity, std::max(starboard_wheel_velocity, stern_wheel_velocity));
+    double max_velocity = std::max(fabs(port_wheel_velocity),
+                                   std::max(fabs(starboard_wheel_velocity),
+                                       fabs(stern_wheel_velocity)));
     double planToZeroTime = max_velocity/planToZeroDecel_;
     if(planToZeroTime>planToZeroPeriod_)
     {
@@ -713,6 +715,8 @@ void Motion::planToZeroTwist( void )
             port->drive( port_steering, port_wheel_velocity );
             starboard->drive( port_steering, port_wheel_velocity );
             stern->drive( port_steering, port_wheel_velocity );
+
+            loop.sleep();
         }
     }
     port->drive( port_steering, 0.0 );

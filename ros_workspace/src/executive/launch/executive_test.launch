@@ -2,6 +2,9 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
+    <arg name="odometry_frame" value="fake_odom"/>
+    <arg name="world_fixed_frame" value="fake_map"/>
+
     <!-- begin test arguments -->
     <machine name="search"
              address="localhost"/>
@@ -10,8 +13,8 @@
     <!-- end test arguments -->
     
     <include file="$(find executive)/launch/executive.launch">
-        <arg name="odometry_frame" value="fake_odom"/>
-        <arg name="world_fixed_frame" value="fake_map"/>
+        <arg name="odometry_frame" value="$(arg odometry_frame)"/>
+        <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
 
     <!-- crap below here is for test only -->
@@ -27,7 +30,7 @@
     <include file="$(find samplereturn)/launch/joystick.launch"/>
 
     <include file="$(find samplereturn)/launch/planner_dumb.launch">
-        <arg name="odometry_frame" value="fake_odom"/>
+        <arg name="odometry_frame" value="$(arg odometry_frame)"/>
     </include>
 
     <arg name="map_config" value="maps/map_park_fake.yaml"/>
@@ -65,6 +68,26 @@
     </node>
 
     <include file="$(find beacon_finder)/launch/beacon_finder.launch">
-        <arg name="world_fixed_frame" value="fake_map"/>
+        <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
+
+    <group if="$(arg beacon_localization)">
+        <include file="$(find beacon_localizer)/launch/beacon_localizer.launch">
+            <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
+            <arg name="odometry_frame" value="$(arg odometry_frame)"/>
+        </include>
+    </group>
+    <group unless="$(arg beacon_localization)">
+        <node
+            pkg="fake_localization"
+            type="fake_localization"
+            name="fake_localization"
+            ns="/processes">
+            <remap from="base_pose_ground_truth" to="/motion/odometry"/>
+
+            <param name="odom_frame_id" value="$(arg odometry_frame)"/>
+            <param name="global_frame_id" value="$(arg world_fixed_frame)"/>
+        </node>
+    </group>
+
 </launch>

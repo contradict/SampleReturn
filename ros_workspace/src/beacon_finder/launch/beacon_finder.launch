@@ -21,12 +21,17 @@
 	<param name="blob_color" type="double" value="0"/>
 	<param name="blob_min_area" type="double" value="50"/>
 	<param name="blob_max_area" type="double" value="5000"/>
+	<param name="blob_side_max_area" type="double" value="20000"/>
 	<param name="blob_min_threshold" type="double" value="20"/>
 	<param name="blob_max_threshold" type="double" value="220"/>
 	<param name="blob_threshold_step" type="double" value="10"/>
 	<param name="blob_min_distance_between_blobs" type="double" value="3.0"/>
 	<param name="blob_repeatability" type="int" value="3"/>
 	<param name="do_histogram_equalization" type="bool" value="False"/>
+    <param name="max_size_error" type="double" value="0.1"/>
+    <param name="max_distance_error" type="double" value="0.1"/>
+    <param name="max_horizontal_radians" type="double" value="0.17"/>
+    <rosparam file="$(find samplereturn)/config/beacon_finder.yaml" command="load"/>
     <remap from="camera_image" to="/cameras/search/image"/>
     <remap from="camera_info" to="/cameras/search/info"/>
 	</node>
