@@ -332,7 +332,7 @@ bool InnerColorGradientPyramid::extractTemplate(Template& templ) const
 }
 
 InnerColorGradient::InnerColorGradient()
-  : weak_threshold(10.0f),
+  : weak_threshold(40.0f),
     num_features(63),
     strong_threshold(55.0f)
 {
