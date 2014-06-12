@@ -4,6 +4,7 @@
 
     <arg name="odometry_frame" value="fake_odom"/>
     <arg name="world_fixed_frame" value="fake_map"/>
+    <arg name="beacon_localization" value="true"/>
 
     <!-- begin test arguments -->
     <machine name="search"
