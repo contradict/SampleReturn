@@ -13,6 +13,7 @@
 #include <image_geometry/stereo_camera_model.h>
 #include <tf/transform_listener.h>
 #include <samplereturn_msgs/Enable.h>
+#include "new_modalities.hpp"
 
 // Function prototypes
 void drawResponse(const std::vector<cv::linemod::Template>& templates,
@@ -24,6 +25,18 @@ static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
   cv::FileStorage fs(filename, cv::FileStorage::READ);
   detector->read(fs.root());
 
+  cv::FileNode fn = fs["classes"];
+  for (cv::FileNodeIterator i = fn.begin(), iend = fn.end(); i != iend; ++i)
+    detector->readClass(*i);
+
+  return detector;
+}
+
+static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filename)
+{
+  cv::Ptr<cv::linemod::Detector> detector = cv::linemod::getInnerLINE();
+
+  cv::FileStorage fs(filename, cv::FileStorage::READ);
   cv::FileNode fn = fs["classes"];
   for (cv::FileNodeIterator i = fn.begin(), iend = fn.end(); i != iend; ++i)
     detector->readClass(*i);

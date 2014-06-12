@@ -119,6 +119,7 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
    ${catkin_LIBRARIES}
  )
  target_link_libraries(linemod_detector_2d
+   new_modalities
    #color_naming
    ${catkin_LIBRARIES}
  )
