@@ -50,7 +50,7 @@ class ExecutiveMaster(object):
         self.GPIO_PIN_LEVEL_TWO = int(self.node_params.GPIO_PIN_LEVEL_TWO, 16)
         
         # create publishers
-        self.announcer = util.AnnouncerInterface("audio_navigate")
+        self.announcer = util.AnnouncerInterface("audio_search")
   
         self.state_machine = smach.StateMachine(outcomes=['shutdown', 'aborted'],
                                                 input_keys = [],

@@ -46,7 +46,7 @@ class PursueSample(object):
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
         #interfaces
-        self.announcer = util.AnnouncerInterface("audio_navigate")
+        self.announcer = util.AnnouncerInterface("audio_search")
         self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
         self.light_pub = rospy.Publisher('search_lights', std_msg.Bool)
         self.CAN_interface = util.CANInterface()

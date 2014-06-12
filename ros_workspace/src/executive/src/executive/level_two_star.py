@@ -53,7 +53,7 @@ class LevelTwoStar(object):
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
         
         #interfaces
-        self.announcer = util.AnnouncerInterface("audio_navigate")
+        self.announcer = util.AnnouncerInterface("audio_search")
         self.CAN_interface = util.CANInterface()
        
         #get a simple_mover, it's parameters are inside a rosparam tag for this node

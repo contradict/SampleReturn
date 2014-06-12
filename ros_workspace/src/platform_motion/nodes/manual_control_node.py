@@ -39,7 +39,7 @@ class ManualController(object):
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
-        self.announcer = util.AnnouncerInterface("audio_navigate")
+        self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
  
         #get a simple_mover, it's parameters are inside a rosparam tag for this node

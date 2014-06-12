@@ -56,6 +56,7 @@
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
+    <remap from="audio_search" to="/io/audio/search"/>
     <remap from="joy" to="/io/joy"/>
 
 </node>
