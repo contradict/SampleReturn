@@ -795,7 +795,7 @@ class BeaconSearch(smach.State):
                 userdata.target_yaw = math.pi
                 self.announcer.say("Beacon in view. Move ing to approach point")                
                 return 'move'   
-            elif np.abs(yaw_error) > .05:
+            elif np.abs(yaw_error) > .1:
                 #this means beacon is in view and we are within 1 meter of approach point
                 #but not pointed so well at beacon
                 self.announcer.say("At approach point. Rotate ing to beacon")
@@ -830,10 +830,13 @@ class MountManager(smach.State):
 
     def execute(self, userdata):
         #disable obstacle checking!
-        rospy.sleep(4.0) #wait a sec for beacon pose to catch up
+        rospy.sleep(10.0) #wait a sec for beacon pose to catch up
         userdata.active_strafe_key = None
+        target_point = deepcopy(userdata.beacon_point)
+        target_point.header.stamp = rospy.Time(0)
         yaw, distance = util.get_robot_strafe(self.tf_listener,
-                                             userdata.platform_point)
+                                             target_point)
+        distance -= 0.7 #holy crap, this is bad
         if (userdata.beacon_point is None) or (distance < userdata.beacon_mount_step):
             #we don't see the beacon anymore, or we see it and are damn close (doubtful!)
             userdata.simple_move = {'type':'strafe',
