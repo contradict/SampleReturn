@@ -48,9 +48,9 @@ def camlogger():
   rospy.init_node('camlogger')
 
   #camera publishers, topic names should be remapped in launch file
-  pub = rospy.Publisher('cam_img',Image)
-  info_pub = rospy.Publisher('cam_info',CameraInfo)
-  status_pub = rospy.Publisher('cam_status',std_msg.String)
+  pub = rospy.Publisher('cam_img',Image,queue_size=4)
+  info_pub = rospy.Publisher('cam_info',CameraInfo,queue_size=4)
+  status_pub = rospy.Publisher('cam_status',std_msg.String,queue_size=4)
 
   rospy.Subscriber('pause_state', std_msg.Bool, pause)
 
