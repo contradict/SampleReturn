@@ -789,13 +789,13 @@ class BeaconSearch(smach.State):
                 userdata.target_yaw = math.pi
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 return 'move'   
-            elif distance_to_approach_point > 1.0:
+            elif distance_to_approach_point > 2.0:
                 #on correct side of beacon, but far from approach point
                 userdata.target_point = deepcopy(userdata.beacon_approach_point)
                 userdata.target_yaw = math.pi
                 self.announcer.say("Beacon in view. Move ing to approach point")                
                 return 'move'   
-            elif np.abs(yaw_error) > .1:
+            elif np.abs(yaw_error) > .2:
                 #this means beacon is in view and we are within 1 meter of approach point
                 #but not pointed so well at beacon
                 self.announcer.say("At approach point. Rotate ing to beacon")
@@ -837,22 +837,25 @@ class MountManager(smach.State):
         yaw, distance = util.get_robot_strafe(self.tf_listener,
                                              target_point)
         distance -= 0.7 #holy crap, this is bad
-        if (userdata.beacon_point is None) or (distance < userdata.beacon_mount_step):
+        userdata.simple_move = {'type':'strafe',
+                                'angle':yaw,
+                                'distance':distance,
+                                'velocity':0.5}
+        self.announcer.say("Execute ing final mount move")
+        return 'final'
+        
+        
+        #if (userdata.beacon_point is None) or (distance < userdata.beacon_mount_step):
             #we don't see the beacon anymore, or we see it and are damn close (doubtful!)
-            userdata.simple_move = {'type':'strafe',
-                                    'angle':yaw,
-                                    'distance':distance,
-                                    'velocity':0.5}
-            self.announcer.say("Execute ing final mount move")
-            return 'final'
-        else:
-            userdata.simple_move = {'type':'strafe',
-                                    'angle':yaw,
-                                    'distance':userdata.beacon_mount_step,
-                                    'velocity':0.5}
-            self.announcer.say("Aligning to beacon")
-            userdata.beacon_point = None #clear beacon returns to see if we are still seeing it
-            return 'move'
+        #else:
+        #    userdata.simple_move = {'type':'strafe',
+        #                            'angle':yaw,
+        #                            'distance':userdata.beacon_mount_step,
+        #                            'velocity':0.5}
+        #    self.announcer.say("Aligning to beacon")
+        
+        #userdata.beacon_point = None #clear beacon returns to see if we are still seeing it
+        #return 'move'
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
