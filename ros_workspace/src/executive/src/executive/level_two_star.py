@@ -849,7 +849,7 @@ class MountManager(smach.State):
         target_point.header.stamp = rospy.Time(0)
         yaw, distance = util.get_robot_strafe(self.tf_listener,
                                              target_point)
-        distance -= 0.7 #holy crap, this is bad
+        distance -= 0.5 #holy crap, this is bad
         userdata.simple_move = {'type':'strafe',
                                 'angle':yaw,
                                 'distance':distance,
