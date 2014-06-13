@@ -50,6 +50,6 @@
         type="announce_voltage.py"
         ns="/io">
         <param name="lowVoltageLimit" type="double" value="49"/>
-        <remap from="audio_navigate" to="audio/navigate"/>
+        <remap from="audio_search" to="audio/search"/>
     </node>
 </launch>
