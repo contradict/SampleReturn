@@ -377,22 +377,28 @@ def GetPursueDetectedPointState(move_client, listener):
 
 class SelectMotionMode(smach.State):
     def __init__(self, CAN_interface, motion_mode):
-        smach.State.__init__(self, outcomes = ['next', 'failed'])
+        smach.State.__init__(self, outcomes = ['next', 'paused', 'failed'])
         self.CAN_interface = CAN_interface
         self.motion_mode = motion_mode
 
     def execute(self, userdata):
         try:
-            mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
-            if mode.mode == self.motion_mode:
+            current_mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
+            if current_mode.mode == self.motion_mode:
                 return 'next'
+            elif current_mode.mode == platform_srv.SelectMotionModeRequest.MODE_PAUSE \
+                    and motion_mode != platform_srv.SelectMotionModeRequest.MODE_RESUME:
+                return 'paused'
         except rospy.ServiceException:
             rospy.logerr( "Unable to query present motion mode")
+            return 'failed'
+        
         try:
             self.CAN_interface.select_mode(self.motion_mode)
         except rospy.ServiceException:
             rospy.logerr( "Unable to select mode %d", self.motion_mode )
             return 'failed'
+
         self.CAN_interface.publish_zero()
         return 'next'
 
