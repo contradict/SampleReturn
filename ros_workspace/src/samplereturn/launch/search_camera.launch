@@ -20,6 +20,7 @@
         <param name="rate" value="1.0"/>
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera"/>
+        <param name="capture_delay" type="double" value="0.575"/>
         <remap from="pause_state" to="/io/pause_state"/>
         <remap from="cam_img" to="image"/>
         <remap from="cam_info" to="info"/>

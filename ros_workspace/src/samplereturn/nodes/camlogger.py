@@ -56,7 +56,8 @@ def camlogger():
 
   cam_info = CameraInfo()
   calib_file = rospy.get_param('~calib_file', None)
-  frame_id = rospy.get_param('~frame_id', '/search_camera')
+  frame_id = rospy.get_param('~frame_id', 'search_camera')
+  time_offset = rospy.get_param('~capture_delay', 0.0)
   rospy.logdebug("calib_file: %s", calib_file)
   if calib_file is not None:
     cam_info = parse_yaml(calib_file)
@@ -68,7 +69,7 @@ def camlogger():
   while not rospy.is_shutdown():
     if not paused:
       now = rospy.Time.now()
-
+      now += rospy.Duration(time_offset)
       img = capture_image(status_pub)
       rospy.logdebug("img (%d, %d)", img.width, img.height)
 
