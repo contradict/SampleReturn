@@ -134,8 +134,6 @@ class RobotSimulator(object):
         self.odometry_is_noisy = True
         self.broadcast_localization = True
 
-        self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
-        self.beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
         #tf stuff
         self.tf_broadcaster = tf.TransformBroadcaster()
         self.tf_listener = tf.TransformListener()
@@ -230,7 +228,7 @@ class RobotSimulator(object):
         self.joint_transforms_available = False
         rospy.Timer(rospy.Duration(0.05), self.broadcast_tf_and_motion)
 
-        #sample and beacon detection stuff
+        #sample detection stuff
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
 
@@ -242,19 +240,6 @@ class RobotSimulator(object):
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    samplereturn_msg.PursuitResult,
                                                    self.handle_pursuit_result)
-        
-        beacon_rot = tf.transformations.quaternion_from_euler(0.0,
-                                                              0.0,
-                                                              0.0,
-                                                             'rxyz')        
-        self.fake_beacon_pose = geometry_msg.Pose(geometry_msg.Point(0,0,0),
-                                                  geometry_msg.Quaternion(*beacon_rot))
-        
-        self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
-                geometry_msg.PoseWithCovarianceStamped)
-        self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
-                geometry_msg.PoseStamped)
-        rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
         
         self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
                                                          samplereturn_srv.Enable,
@@ -313,6 +298,23 @@ class RobotSimulator(object):
 
         self.check_publisher = rospy.Publisher('/processes/executive/costmap_check',
                                                samplereturn_msg.CostmapCheck)
+
+        #beacon stuff, needs param server up
+        self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
+        self.beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
+
+        beacon_rot = tf.transformations.quaternion_from_euler(0.0,
+                                                              0.0,
+                                                              0.0,
+                                                             'rxyz')        
+        self.fake_beacon_pose = geometry_msg.Pose(geometry_msg.Point(0,0,0),
+                                                  geometry_msg.Quaternion(*beacon_rot))
+        
+        self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
+                geometry_msg.PoseWithCovarianceStamped)
+        self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
+                geometry_msg.PoseStamped)
+        rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
 
         #rospy.spin()
         
