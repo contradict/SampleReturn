@@ -189,6 +189,15 @@ class LineMOD_Detector
     got_disp_ = true;
   }
 
+  double unwrap90(double angle)
+  {
+      while(angle>M_PI/2)
+          angle -= M_PI;
+      while(angle<-M_PI/2)
+          angle += M_PI;
+      return angle;
+  }
+
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     if (!enabled_) {
@@ -275,17 +284,20 @@ class LineMOD_Detector
         std::cout << "Dominant color " << dominant_color << std::endl;
 
         cv::RotatedRect rect = cv::minAreaRect(hull);
+        ROS_INFO("Meausred angle: %f width: %f height: %f",
+                rect.angle, rect.size.width, rect.size.height);
         float angle;
-        if (rect.size.width > rect.size.height) {
-          angle = rect.angle + 90;
+        if(rect.size.width>rect.size.height)
+        {
+            angle = -rect.angle*M_PI/180+M_PI_2;
         }
-        else {
-          angle = rect.angle + 180;
+        else
+        {
+            angle = -rect.angle*M_PI/180;
         }
-        angle -= 90.;
-        angle = angle*(M_PI/180);
+        angle = unwrap90(angle);
 
-        std::cout << "Angle: " << angle << std::endl;
+        ROS_INFO("Angle: %f", angle);
 
         if (dominant_color != "green") {
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
