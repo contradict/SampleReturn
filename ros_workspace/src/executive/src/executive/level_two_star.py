@@ -28,6 +28,7 @@ from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import DriveToPoint
 from executive.executive_states import RotateToClear
+from executive.executive_states import WaitForFlagState
 
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
@@ -124,6 +125,7 @@ class LevelTwoStar(object):
         planner_mode = self.node_params.planner_mode
         MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
         MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
+        MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
     
         with self.state_machine:
             
@@ -143,7 +145,18 @@ class LevelTwoStar(object):
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
                                     transitions = {'next':'DISMOUNT_MOVE',
+                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('WAIT_FOR_UNPAUSE',
+                                   WaitForFlagState('paused',
+                                                    flag_trigger_value = False,
+                                                    timeout = 15,
+                                                    announcer = self.announcer,
+                                                    start_message ='System is paused. Un pause to continue level two'),
+                                   transitions = {'next':'SELECT_PLANNER',
+                                                  'timeout':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})
             
             smach.StateMachine.add('DISMOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -275,12 +288,12 @@ class LevelTwoStar(object):
                                                   'timeout':'MOUNT_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
-            MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
             smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
-                                                     MODE_PLANNER),
+                                                     MODE_PAUSE),
                                     transitions = {'next':'complete',
-                                                  'failed':'LEVEL_TWO_ABORTED'})   
+                                                   'paused':'LEVEL_TWO_ABORTED',
+                                                   'failed':'LEVEL_TWO_ABORTED'})   
     
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),

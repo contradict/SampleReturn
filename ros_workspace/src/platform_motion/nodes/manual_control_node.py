@@ -9,6 +9,7 @@ import threading
 import actionlib
 import tf
 
+import std_msgs.msg as std_msg
 import actionlib_msgs.msg as action_msg
 import manipulator_msgs.msg as manipulator_msg
 import platform_motion_msgs.msg as platform_msg
@@ -26,6 +27,7 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import ServoController
+from executive.executive_states import WaitForFlagState
 
 #this state machine provides manual control of the robot
 
@@ -88,7 +90,18 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_JOYSTICK),
                                    transitions = {'next':'JOYSTICK_LISTEN',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'MANUAL_ABORTED'})
+ 
+            smach.StateMachine.add('WAIT_FOR_UNPAUSE',
+                                   WaitForFlagState('paused',
+                                                    flag_trigger_value = False,
+                                                    timeout = 15,
+                                                    announcer = self.announcer,
+                                                    start_message ='System is paused. Un pause to allow manual control'),
+                                   transitions = {'next':'SELECT_JOYSTICK',
+                                                  'timeout':'WAIT_FOR_UNPAUSE',
+                                                  'preempted':'MANUAL_PREEMPTED'})
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
@@ -103,6 +116,7 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_SERVO),
                                    transitions = {'next':'VISUAL_SERVO',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
 
             #calculate the strafe move to the sample
@@ -139,8 +153,9 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PAUSE),
                                    transitions = {'next':'MANIPULATOR_GRAB',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
- 
+  
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
                 grab_msg.type = grab_msg.GRAB
@@ -183,6 +198,7 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_RESUME),
                                    transitions = {'next':'SELECT_JOYSTICK',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
@@ -199,6 +215,7 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_HOME),
                                    transitions = {'next':'PERFORM_HOME',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
 
             home_goal = platform_msg.HomeGoal()
@@ -224,12 +241,14 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PAUSE),
                                    transitions = {'next':'SELECT_LOCK',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_LOCK'})
 
             smach.StateMachine.add('SELECT_LOCK',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_LOCK),
                                    transitions = {'next':'ANNOUNCE_LOCK',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'RESUME_FROM_LOCK'})
 
             smach.StateMachine.add('ANNOUNCE_LOCK',
@@ -249,12 +268,14 @@ class ManualController(object):
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_UNLOCK),
                                    transitions = {'next':'RESUME_FROM_LOCK',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'RESUME_FROM_LOCK'})
 
             smach.StateMachine.add('RESUME_FROM_LOCK',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_RESUME),
                                    transitions = {'next':'JOYSTICK_LISTEN',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
 
              #end with state_machine
@@ -275,8 +296,10 @@ class ManualController(object):
                                             '/START_MANUAL_CONTROL')
         sls.start()
 
-
+        rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
+        
         joy_sub = rospy.Subscriber("joy", sensor_msg.Joy, self.joy_callback)
+        
         self.sample_sub_manipulator = rospy.Subscriber('detected_sample_manipulator',
                                                         samplereturn_msg.NamedPoint,
                                                         self.sample_detection_manipulator)
@@ -288,6 +311,9 @@ class ManualController(object):
         #store message and current time in joy_state
         self.joy_state.update(joy_msg)
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
+        
+    def pause_state_update(self, msg):
+        self.state_machine.userdata.paused = msg.data
         
     def sample_detection_manipulator(self, sample):
         self.state_machine.userdata.detected_sample = sample
