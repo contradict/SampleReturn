@@ -76,7 +76,7 @@ class RobotSimulator(object):
         self.debug_marker = vis_msg.Marker()
         self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'fake_odom')
         self.debug_marker.type = vis_msg.Marker.CYLINDER
-        self.debug_marker.color = std_msg.ColorRGBA(0, 254, 0, 1)
+        self.debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
         self.debug_marker.scale = geometry_msg.Vector3(.05, .05, .5)
         self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
         self.debug_marker.lifetime = rospy.Duration(1.5)
