@@ -601,6 +601,7 @@ class DriveToPoint(smach.State):
         except tf.Exception:
             rospy.logwarn("DRIVE TO POINT failed to transform point: %s->%s",
                            sample.header.frame_id, self.odometry_frame)
+            userdata.active_strafe_key = None
             return 'aborted'
     
         #incremental yaw angle to rotate robot to face sample
@@ -623,10 +624,12 @@ class DriveToPoint(smach.State):
                     return self.spin(rotate_yaw, userdata)    
             
             #position and yaw in tolerance
+            userdata.active_strafe_key = None
             return 'complete'
     
         #check if we were interrupted by a detection (sample... beacon maybe?)
         if userdata.stop_on_detection and userdata.detection_object is not None:
+            userdata.active_strafe_key = None
             return 'detection_interrupt'
  
         #costmap update wait
@@ -655,8 +658,7 @@ class DriveToPoint(smach.State):
         else: #center is clear and we're pointing pretty well, try to drive to the point
             distance = min(distance_to_point, userdata.strafes['center']['distance'])
             return self.strafe('center', userdata, distance)
-            return 'aborted'
- 
+            
     def strafe(self, key, userdata, distance=None):
         #check before any strafe move:
         strafe = userdata.strafes[key]
