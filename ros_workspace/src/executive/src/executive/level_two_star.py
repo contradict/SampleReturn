@@ -109,7 +109,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.distance_to_origin = 100
         
         #stop function flags
-        self.state_machine.userdata.stop_on_sample = True
+        self.state_machine.userdata.stop_on_sample = False
         self.state_machine.userdata.stop_on_beacon = False
 
         #subscriber controlled userdata
@@ -452,7 +452,8 @@ class StarManager(smach.State):
                                             'offset_count',
                                             'offset_limit',
                                             'last_spin_radius',
-                                            'within_hub_radius'],
+                                            'within_hub_radius',
+                                            'stop_on_sample'],
                              outcomes=['rotate',
                                        'return_home',
                                        'preempted', 'aborted'])
@@ -461,7 +462,8 @@ class StarManager(smach.State):
         self.announcer = announcer  
 
     def execute(self, userdata):
-        
+
+        userdata.stop_on_sample = True
         #returning to the center
         if not userdata.outbound:
             #just finished inbound spoke, turn around and head outwards again
