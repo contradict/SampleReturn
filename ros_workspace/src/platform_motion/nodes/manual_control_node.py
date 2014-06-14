@@ -55,7 +55,8 @@ class ManualController(object):
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.paused = False
-        
+        state = self.state_machine.userdata.light_state = False
+
         # disable obstacle checking in ExecuteSimpleMove
         self.state_machine.userdata.active_strafe_key = None
 
@@ -311,6 +312,9 @@ class ManualController(object):
         #store message and current time in joy_state
         self.joy_state.update(joy_msg)
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
+        if self.joy_state.button('BUTTON_LIGHTS'):
+            self.state_machine.userdata.light_state ^= True
+            self.CAN_interface.set_search_lights(self.state_machine.userdata.light_state)
         
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
