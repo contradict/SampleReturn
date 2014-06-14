@@ -35,5 +35,7 @@
     <param name="process_noise_cov" type="double" value="0.001"/>
     <param name="measurement_noise_cov" type="double" value="0.02"/>
     <param name="period" type="double" value="0.03"/>
+    <param name="positive_exclusion_radius" type="double" value="0.0"/>
+    <param name="negative_exclusion_radius" type="double" value="0.0"/>
   </node>
 </launch>
