@@ -239,58 +239,71 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     measurement(3) = tf::getYaw( T_map_to_odom.getRotation() );
     ROS_DEBUG_STREAM("measurement: " << measurement.transpose() );
 
+    MatrixWrapper::ColumnVector state =_filter->PostGet()->ExpectedValueGet();
+    MatrixWrapper::ColumnVector err = (state-measurement);
+    double distance = sqrt(err.transpose()*err);
 
-    MatrixWrapper::SymmetricMatrix cov(6);
-    cov(1,1) = msg->pose.covariance[0]; cov(1,2) = msg->pose.covariance[1]; cov(1,3) = msg->pose.covariance[2]; cov(1,4) = msg->pose.covariance[3]; cov(1,5) = msg->pose.covariance[4]; cov(1,6) = msg->pose.covariance[5];
-    cov(2,1) = msg->pose.covariance[6]; cov(2,2) = msg->pose.covariance[7]; cov(2,3) = msg->pose.covariance[8]; cov(2,4) = msg->pose.covariance[9]; cov(2,5) = msg->pose.covariance[10];cov(2,6) = msg->pose.covariance[11];
-    cov(3,1) = msg->pose.covariance[12];cov(3,2) = msg->pose.covariance[13];cov(3,3) = msg->pose.covariance[14];cov(3,4) = msg->pose.covariance[15];cov(3,5) = msg->pose.covariance[16];cov(3,6) = msg->pose.covariance[17];
-    cov(4,1) = msg->pose.covariance[18];cov(4,2) = msg->pose.covariance[19];cov(4,3) = msg->pose.covariance[20];cov(4,4) = msg->pose.covariance[21];cov(4,5) = msg->pose.covariance[22];cov(4,6) = msg->pose.covariance[23];
-    cov(5,1) = msg->pose.covariance[24];cov(5,2) = msg->pose.covariance[25];cov(5,3) = msg->pose.covariance[26];cov(5,4) = msg->pose.covariance[27];cov(5,5) = msg->pose.covariance[28];cov(5,6) = msg->pose.covariance[29];
-    cov(6,1) = msg->pose.covariance[30];cov(6,2) = msg->pose.covariance[31];cov(6,3) = msg->pose.covariance[32];cov(6,4) = msg->pose.covariance[33];cov(6,5) = msg->pose.covariance[34];cov(6,6) = msg->pose.covariance[35];
+    if(distance>5)
+    {
+        _prior->ExpectedValueSet( measurement );
+        _filter->Reset(_prior);
+    }
+    else
+    {
 
-    /*
-    tf::Matrix3x3 pointDevMat(
-        sqrt(cov(1,1)),              0,             0,
-                   0.0, sqrt(cov(2,2)),             0,
-                   0.0,            0.0, sqrt(cov(3,3)));
-    ROS_INFO("Point deviation");
-    ROS_INFO("[ %f, %f, %f ]", pointDevMat[0][0], pointDevMat[0][1], pointDevMat[0][2]);
-    ROS_INFO("[ %f, %f, %f ]", pointDevMat[1][0], pointDevMat[1][1], pointDevMat[1][2]);
-    ROS_INFO("[ %f, %f, %f ]", pointDevMat[2][0], pointDevMat[2][1], pointDevMat[2][2]);
+        MatrixWrapper::SymmetricMatrix cov(6);
+        cov(1,1) = msg->pose.covariance[0]; cov(1,2) = msg->pose.covariance[1]; cov(1,3) = msg->pose.covariance[2]; cov(1,4) = msg->pose.covariance[3]; cov(1,5) = msg->pose.covariance[4]; cov(1,6) = msg->pose.covariance[5];
+        cov(2,1) = msg->pose.covariance[6]; cov(2,2) = msg->pose.covariance[7]; cov(2,3) = msg->pose.covariance[8]; cov(2,4) = msg->pose.covariance[9]; cov(2,5) = msg->pose.covariance[10];cov(2,6) = msg->pose.covariance[11];
+        cov(3,1) = msg->pose.covariance[12];cov(3,2) = msg->pose.covariance[13];cov(3,3) = msg->pose.covariance[14];cov(3,4) = msg->pose.covariance[15];cov(3,5) = msg->pose.covariance[16];cov(3,6) = msg->pose.covariance[17];
+        cov(4,1) = msg->pose.covariance[18];cov(4,2) = msg->pose.covariance[19];cov(4,3) = msg->pose.covariance[20];cov(4,4) = msg->pose.covariance[21];cov(4,5) = msg->pose.covariance[22];cov(4,6) = msg->pose.covariance[23];
+        cov(5,1) = msg->pose.covariance[24];cov(5,2) = msg->pose.covariance[25];cov(5,3) = msg->pose.covariance[26];cov(5,4) = msg->pose.covariance[27];cov(5,5) = msg->pose.covariance[28];cov(5,6) = msg->pose.covariance[29];
+        cov(6,1) = msg->pose.covariance[30];cov(6,2) = msg->pose.covariance[31];cov(6,3) = msg->pose.covariance[32];cov(6,4) = msg->pose.covariance[33];cov(6,5) = msg->pose.covariance[34];cov(6,6) = msg->pose.covariance[35];
 
-    tf::Matrix3x3 rpointDev = _T_odom.getBasis()*T_camera_to_base.getBasis()*pointDevMat*T_map_to_beacon.getBasis();
-    tf::Matrix3x3 rpointCov = rpointDev*rpointDev;
-    ROS_INFO("rPoint covariance");
-    ROS_INFO("[ %f, %f, %f ]", rpointCov[0][0], rpointCov[0][1], rpointCov[0][2]);
-    ROS_INFO("[ %f, %f, %f ]", rpointCov[1][0], rpointCov[1][1], rpointCov[1][2]);
-    ROS_INFO("[ %f, %f, %f ]", rpointCov[2][0], rpointCov[2][1], rpointCov[2][2]);
-    */
+        /*
+           tf::Matrix3x3 pointDevMat(
+           sqrt(cov(1,1)),              0,             0,
+           0.0, sqrt(cov(2,2)),             0,
+           0.0,            0.0, sqrt(cov(3,3)));
+           ROS_INFO("Point deviation");
+           ROS_INFO("[ %f, %f, %f ]", pointDevMat[0][0], pointDevMat[0][1], pointDevMat[0][2]);
+           ROS_INFO("[ %f, %f, %f ]", pointDevMat[1][0], pointDevMat[1][1], pointDevMat[1][2]);
+           ROS_INFO("[ %f, %f, %f ]", pointDevMat[2][0], pointDevMat[2][1], pointDevMat[2][2]);
+
+           tf::Matrix3x3 rpointDev = _T_odom.getBasis()*T_camera_to_base.getBasis()*pointDevMat*T_map_to_beacon.getBasis();
+           tf::Matrix3x3 rpointCov = rpointDev*rpointDev;
+           ROS_INFO("rPoint covariance");
+           ROS_INFO("[ %f, %f, %f ]", rpointCov[0][0], rpointCov[0][1], rpointCov[0][2]);
+           ROS_INFO("[ %f, %f, %f ]", rpointCov[1][0], rpointCov[1][1], rpointCov[1][2]);
+           ROS_INFO("[ %f, %f, %f ]", rpointCov[2][0], rpointCov[2][1], rpointCov[2][2]);
+           */
 
 
-    MatrixWrapper::SymmetricMatrix measNoiseCovariance(3);
-    //measNoiseCovariance(1,1) = rpointCov[0][0]; measNoiseCovariance(1,2) = rpointCov[0][1]; measNoiseCovariance(1,3) = 0;
-    //measNoiseCovariance(2,1) = rpointCov[1][0]; measNoiseCovariance(2,2) = rpointCov[1][1]; measNoiseCovariance(2,3) = 0;
-    //measNoiseCovariance(3,1) = 0;               measNoiseCovariance(3,2) = 0;               measNoiseCovariance(3,3) = cov(5,5);
-    measNoiseCovariance(1,1) = cov(3,3); measNoiseCovariance(1,2) =      0.0; measNoiseCovariance(1,3) = 0.0;
-    measNoiseCovariance(2,1) =      0.0; measNoiseCovariance(2,2) = cov(3,3); measNoiseCovariance(2,3) = 0.0;
-    measNoiseCovariance(3,1) =      0.0; measNoiseCovariance(3,2) =      0.0; measNoiseCovariance(3,3) = cov(5,5);
-    ROS_INFO_STREAM("measurement noise covariance: " << measNoiseCovariance);
-    MatrixWrapper::ColumnVector measNoiseMu(3); // zeros
-    measNoiseMu(1) = 0.0;
-    measNoiseMu(2) = 0.0;
-    measNoiseMu(3) = 0.0;
-    BFL::Gaussian measUncertainty(measNoiseMu, measNoiseCovariance);
+        MatrixWrapper::SymmetricMatrix measNoiseCovariance(3);
+        //measNoiseCovariance(1,1) = rpointCov[0][0]; measNoiseCovariance(1,2) = rpointCov[0][1]; measNoiseCovariance(1,3) = 0;
+        //measNoiseCovariance(2,1) = rpointCov[1][0]; measNoiseCovariance(2,2) = rpointCov[1][1]; measNoiseCovariance(2,3) = 0;
+        //measNoiseCovariance(3,1) = 0;               measNoiseCovariance(3,2) = 0;               measNoiseCovariance(3,3) = cov(5,5);
+        measNoiseCovariance(1,1) = cov(3,3); measNoiseCovariance(1,2) =      0.0; measNoiseCovariance(1,3) = 0.0;
+        measNoiseCovariance(2,1) =      0.0; measNoiseCovariance(2,2) = cov(3,3); measNoiseCovariance(2,3) = 0.0;
+        measNoiseCovariance(3,1) =      0.0; measNoiseCovariance(3,2) =      0.0; measNoiseCovariance(3,3) = cov(5,5);
+        ROS_INFO_STREAM("measurement noise covariance: " << measNoiseCovariance);
+        MatrixWrapper::ColumnVector measNoiseMu(3); // zeros
+        measNoiseMu(1) = 0.0;
+        measNoiseMu(2) = 0.0;
+        measNoiseMu(3) = 0.0;
+        BFL::Gaussian measUncertainty(measNoiseMu, measNoiseCovariance);
 
-    MatrixWrapper::Matrix measH(3,3);
-    measH(1,1) = 1.0; measH(1,2) = 0.0; measH(1,3) = 0.0;
-    measH(2,1) = 0.0; measH(2,2) = 1.0; measH(2,3) = 0.0;
-    measH(3,1) = 0.0; measH(3,2) = 0.0; measH(3,3) = 1.0;
+        MatrixWrapper::Matrix measH(3,3);
+        measH(1,1) = 1.0; measH(1,2) = 0.0; measH(1,3) = 0.0;
+        measH(2,1) = 0.0; measH(2,2) = 1.0; measH(2,3) = 0.0;
+        measH(3,1) = 0.0; measH(3,2) = 0.0; measH(3,3) = 1.0;
 
-    BFL::LinearAnalyticConditionalGaussian beaconMesurementPdf(measH, measUncertainty);
+        BFL::LinearAnalyticConditionalGaussian beaconMesurementPdf(measH, measUncertainty);
 
-    BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMesurementPdf);
+        BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMesurementPdf);
 
-    _filter->Update(_system_model, &beaconMeasurementModel, measurement);
+
+        _filter->Update(_system_model, &beaconMeasurementModel, measurement);
+    }
     ROS_DEBUG_STREAM("State: " << _filter->PostGet()->ExpectedValueGet().transpose() );
     ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
 }
