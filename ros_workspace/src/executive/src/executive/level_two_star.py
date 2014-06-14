@@ -500,18 +500,21 @@ class RotationManager(smach.State):
                                          'spokes',
                                          'spin_velocity',
                                          'outbound',
-                                         'world_fixed_frame'],
+                                         'world_fixed_frame',
+                                         'active_strafe_key'],
                              output_keys=['line_yaw',
                                           'simple_move',
                                           'outbound',
                                           'rotate_pose',
                                           'beacon_point',
-                                          'last_align_time']),  
+                                          'last_align_time',
+                                          'active_strafe_key']),  
   
         self.tf_listener = tf_listener
         self.mover = mover
     
     def execute(self, userdata):
+        userdata.active_strafe_key = None
         #if heading out, always move parallel to line yaw
         if userdata.outbound:
             map_yaw = deepcopy(userdata.line_yaw)
