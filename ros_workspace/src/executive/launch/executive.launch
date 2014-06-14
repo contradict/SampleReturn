@@ -123,8 +123,8 @@
         <!-- default for simple move execute -->  
         <rosparam>
             simple_motion_params:
-                max_velocity: 0.8
-                acceleration: 0.8
+                max_velocity: 0.4
+                acceleration: 0.5
                 stop_deceleration: 2.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
