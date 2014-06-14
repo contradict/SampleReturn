@@ -387,7 +387,7 @@ class SelectMotionMode(smach.State):
             if current_mode.mode == self.motion_mode:
                 return 'next'
             elif current_mode.mode == platform_srv.SelectMotionModeRequest.MODE_PAUSE \
-                    and motion_mode != platform_srv.SelectMotionModeRequest.MODE_RESUME:
+                    and self.motion_mode != platform_srv.SelectMotionModeRequest.MODE_RESUME:
                 return 'paused'
         except rospy.ServiceException:
             rospy.logerr( "Unable to query present motion mode")
@@ -399,7 +399,6 @@ class SelectMotionMode(smach.State):
             rospy.logerr( "Unable to select mode %d", self.motion_mode )
             return 'failed'
 
-        self.CAN_interface.publish_zero()
         return 'next'
 
 class AnnounceState(smach.State):
