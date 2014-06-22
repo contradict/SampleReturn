@@ -30,6 +30,9 @@ class SimpleMover(object):
 
     self.running = False
     self.stop_requested = False
+    
+    #this is a hack to allow changes in strafe direction
+    self.strafe_angle = None
 
     #get stern wheel transform
     try:
@@ -86,10 +89,14 @@ class SimpleMover(object):
     twist.angular.z = sign*velocity/self.stern_offset
     self.publisher.publish(twist)
 
-  def strafe_publisher(self, velocity, angle):
+  #set the strafe angle, and the publisher should just send the robot off at a new angle  
+  def set_strafe_angle(self, new_angle):
+    self.strafe_angle = new_angle
+
+  def strafe_publisher(self, velocity):
     twist = Twist()
-    twist.linear.x = velocity*np.cos(angle)
-    twist.linear.y = velocity*np.sin(angle)
+    twist.linear.x = velocity*np.cos(self.strafe_angle)
+    twist.linear.y = velocity*np.sin(self.strafe_angle)
     self.publisher.publish(twist)
 
   def execute_spin(self, rotation, max_velocity=None, acceleration=None, stop_function=None):
@@ -106,6 +113,7 @@ class SimpleMover(object):
 
   def execute_strafe(self, angle, distance, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
+    self.strafe_angle = angle
     if (-np.pi/2<=angle<=np.pi/2):
       target_angle = angle
     elif (np.pi/2 < angle):
@@ -117,7 +125,7 @@ class SimpleMover(object):
             dict(stern=target_angle,
                 port=target_angle,
                 starboard=target_angle),
-            lambda v, angle=angle : self.strafe_publisher(v, angle),
+            lambda v : self.strafe_publisher(v),
             max_velocity,
             acceleration,
             stop_function)
