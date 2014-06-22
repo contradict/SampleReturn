@@ -177,12 +177,16 @@ class CANInterface(object):
         self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
         self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
         self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist)
+        self.search_lights = rospy.Publisher("search_lights", std_msg.Bool)
 
     def select_mode(self, motion_mode):
         return self.CAN_select_motion_mode(motion_mode)
         
     def publish_joy_state(self, joy_state):
         self.joystick_command.publish(joy_state.get_twist())
+
+    def set_search_lights(self, state):
+        self.search_lights.publish(state)
         
     def publish_zero(self):
         t=geometry_msg.Twist()

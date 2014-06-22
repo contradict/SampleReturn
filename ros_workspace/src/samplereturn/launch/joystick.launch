@@ -30,6 +30,7 @@
     <param name="BUTTON_SERVO" value="1"/>
     <param name="BUTTON_CANCEL" value="2"/>
     <param name="BUTTON_LOCK" value="0"/>
+    <param name="BUTTON_LIGHTS" value="6"/>
     <!-- Scaling -->
     <param name="LINEAR_SCALE" value="1.5" type="double"/>
     <param name="LINEAR_EXP" value="2" type="double"/>
@@ -58,6 +59,7 @@
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="joy" to="/io/joy"/>
+    <remap from="search_lights" to="/io/search_lights"/>
 
 </node>
 
