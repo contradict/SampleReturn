@@ -20,6 +20,7 @@ import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
+import visualization_msgs.msg as vis_msg
 
 import samplereturn.simple_motion as simple_motion
 
@@ -372,7 +373,6 @@ class LevelTwoStar(object):
                 self.state_machine.userdata.beacon_point is not None:
             rospy.loginfo("LEVEL_TWO STOP simple_move on beacon detection")
             return True
-        
         return False
 
     def handle_costmap_check(self, costmap_check):
@@ -435,7 +435,7 @@ class StartLeveLTwo(smach.State):
         
         userdata.dismount_move = {'type':'strafe',
                                    'angle':0,
-                                   'distance':5,
+                                   'distance':2,
                                    'velocity':0.2}
 
         return 'next'
@@ -510,6 +510,7 @@ class RotationManager(smach.State):
                                           'outbound',
                                           'rotate_pose',
                                           'beacon_point',
+                                          'distance_to_hub',
                                           'last_align_time',
                                           'active_strafe_key']),  
   
@@ -527,6 +528,8 @@ class RotationManager(smach.State):
                                                        userdata.world_fixed_frame)
             map_yaw = util.pointing_yaw(current_pose.pose.position,
                                                   userdata.spokes[0]['starting_point'])
+            userdata.distance_to_hub = util.point_distance_2d(current_pose.pose.position,
+                                                              userdata.spokes[0]['starting_point'])
         
         actual_yaw = util.get_current_robot_yaw(self.tf_listener,
                 userdata.world_fixed_frame)
@@ -561,6 +564,7 @@ class SearchLineManager(smach.State):
                                            'last_spin_radius',
                                            'min_spin_radius',
                                            'spin_step',
+                                           'distance_to_hub',
                                            'within_hub_radius',
                                            'beacon_point',
                                            'last_align_time'],
@@ -583,114 +587,233 @@ class SearchLineManager(smach.State):
         self.mover = mover
         self.announcer = announcer
 
+        self.costmap = None
+        
+        self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+
+        self.costmap_listener = rospy.Subscriber('local_costmap',
+                                nav_msg.OccupancyGrid,
+                                self.handle_costmap)
+        
+        self.costmap_info = None
+        self.costmap_header = None
+
+        #vfh params
+        self.running = False
+
+        self.sector_angle = np.radians(5.0)
+        self.active_window = np.radians(120)
+        #sector count, 1 more than window/angle
+        self.sector_count = int(self.active_window/self.sector_angle) + 1
+        #offset from first sector in array to the robot zero sector
+        self.zero_offset = int(self.active_window/(self.sector_angle * 2))
+        #sectors are free if 0, or blocked if 1, start with all free!
+        self.sectors = np.zeros(self.sector_count, dtype=np.bool)
+        
+        self.min_obstacle_distance = 1.5 #minimum distance at which to check for obstacles
+        
+        #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
+        #so that obstacles produce zero cost at a range of dmax
+        self.max_obstacle_distance = 6.0  #look at obstacles up to 8 meters out
+        self.const_b = 1 #uuuuh, if this is 1 then a = dmax... is that cool?
+        self.const_a = self.const_b*self.max_obstacle_distance
+        
+        #cost coefficients
+        self.u_goal = 5 #cost multiplier for angular difference to target_angle
+        self.u_current = 3 #cost multiplier for angular difference from current angle
+        
+        #thresholds at which to set clear, or blocked, a gap for hysteresis
+        #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
+        self.threshold_high = 6000
+        self.threshold_low = 2000
+        
+        #target point and current_yaw
+        self.target_point = None
+        self.current_sector_index = 0 #start moving straight along the robot's yaw
+        
+        #debug marker stuff
+        self.debug_marker_pub = rospy.Publisher('vfh_markers', vis_msg.MarkerArray)
+        self.marker_id = 0
+
+        #this loop controls the strafe angle using vfh sauce
+        rospy.Timer(rospy.Duration(0.5), self.vfh_planner)
+        
     def execute(self, userdata):
-    
-        userdata.active_strafe_key = None
+
+        self.odometry_frame = userdata.odometry_frame
+
+        #head off for 100 meters
+        if not userdata.outbound:
+            distance = userdata.distance_to_hub
+        else:
+            distance = 150
+
+        current_pose = util.get_current_robot_pose(self.tf_listener, self.odometry_frame)
+        target_pose = util.translate_base_link(self.tf_listener,
+                                               current_pose,
+                                               distance, 0,
+                                               self.odometry_frame)
+        self.target_point = geometry_msg.PointStamped(std_msg.Header(0, rospy.Time(0), self.odometry_frame),
+                                                      target_pose.pose.position)
+        #head off
+        self.running = True
+        self.mover.execute_strafe(0.0, distance)
+        self.running = False
         
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
-                userdata.world_fixed_frame)
-        current_pose = util.get_current_robot_pose(self.tf_listener,
-                userdata.world_fixed_frame)
-        current_radius = util.point_distance_2d(current_pose.pose.position,
-                                                geometry_msg.Point(0,0,0))
+        #wait to actually be stopped
+        rospy.sleep(2.0)
         
-        rospy.loginfo("SEARCH LINE MANAGER, outbound: %s,  line_yaw: %.1f,  actual_yaw: %.1f,  position: (%.2f,%.2f) " % (
-                       userdata.outbound,
-                       np.degrees(userdata.line_yaw),
-                       np.degrees(actual_yaw),
-                       current_pose.pose.position.x,
-                       current_pose.pose.position.y))
-        
-        #useful condition lambdas and other flags for dumb planner behaviour
-        under_offset_limit = lambda: np.abs(userdata.offset_count) < userdata.offset_limit
-        first_angle_choice = 'left' if userdata.outbound else 'right'
-        second_angle_choice = 'right' if userdata.outbound else 'left'
-        
-        if rospy.Time.now() > userdata.return_time:
-            self.announcer.say("Search time expired")
-            return 'return_home'
-        
-        #check preempt after deciding whether or not to calculate next line pose
         if self.preempt_requested():
-            rospy.loginfo("LINE MANAGER: preempt requested")
-            self.service_preempt()
-            return 'preempted'
+            return 'aborted'
         
-        if userdata.detected_sample is not None:
-            return "sample_detected"
-
-        #are we within the star hub radius?
-        if not userdata.outbound and userdata.within_hub_radius:
-            return 'next_spoke'     
-
-        #time for a spin?
-        if userdata.outbound \
-           and (current_radius > userdata.min_spin_radius) \
-           and (current_radius - userdata.last_spin_radius) > userdata.spin_step:
-            self.announcer.say("Scan ing for samples")
-            userdata.last_spin_radius = current_radius
-            userdata.simple_move = {'type':'spin',
-                                    'angle':2*math.pi}
-            return 'spin'
-        
-        if (not userdata.outbound) and (userdata.beacon_point is not None) \
-            and not False in userdata.strafes and ((rospy.get_time() - userdata.last_align_time) > 10):
-            #if we are seeing the beacon, and are not making some kind of move because we're blocked,
-            #adjust our yaw to map coords.  Hopefully these are small rotations....
-            self.announcer.say("Align ing to map")
-            userdata.last_align_time = rospy.get_time()
-            userdata.beacon_point = None
-            return 'recalibrate'
-        
-        
-        #did we get here from a rotation, if so, pause to wait for costmaps
-        if userdata.active_strafe_key is None:
-            rospy.sleep(3.0)        
-        
-        #BEGINNING OF THE MIGHTY LINE MANAGER CASE       
-        #first check if we are offset from line either direction, and if so, is the path
-        #back the line clear.  If is is, strafe towards the line
-        if (userdata.offset_count > 0) and not userdata.strafes['right']['blocked']:
-            #left of line
-            self.announcer.say('Right clear, strafe ing to line')
-            return self.strafe('right', userdata)
-        elif (userdata.offset_count < 0) and not userdata.strafes['left']['blocked']:
-            #right of line
-            self.announcer.say('Left clear, strafe ing to line')
-            return self.strafe('left', userdata)
-        
-        #if not offset or returning to line is blocked, going straight is next priority
-        elif not userdata.strafes['center']['blocked']:
-            self.announcer.say("Line clear, continue ing")    
-            return self.strafe('center', userdata)
-           
-        #if returning to the line not possible or necessary,
-        #and going straight isn't possible: offset from line             
-        elif not userdata.strafes[first_angle_choice]['blocked'] and under_offset_limit():
-            self.announcer.say("Obstacle in line, strafe ing %s" % (first_angle_choice))
-            return self.strafe(first_angle_choice, userdata)
-            
-        elif not userdata.strafes[second_angle_choice]['blocked'] and under_offset_limit():
-            self.announcer.say("Obstacle in line, strafe ing %s" % (second_angle_choice))
-            return self.strafe(second_angle_choice, userdata)
-        
-        #getting here means lethal cells in all three yaw check lines,
-        #or that the only unblocked line takes us outside our allowable offset
-        else:             
-            self.announcer.say("Line is blocked, rotate ing")
-            return 'line_blocked'
-        
-        return 'aborted'
+        return 'next_spoke'
     
-    def strafe(self, key, userdata):
-        strafe = userdata.strafes[key]
-        userdata.offset_count += np.sign(strafe['angle'])
-        rospy.loginfo("STRAFING %s to offset_count: %s" % (key, userdata.offset_count))
-        userdata.simple_move = {'type':'strafe',
-                                'angle':strafe['angle'],
-                                'distance': strafe['distance']}
-        userdata.active_strafe_key = key
-        return 'move'
+    def vfh_planner(self, event):
+        if not self.running:
+            return
+        
+        if self.preempt_requested():
+            self.mover.stop()
+        
+        start_time = rospy.get_time()
+
+        #get the robot position inside costmap
+        try:
+            robot_position, robot_orientation = self.tf_listener.lookupTransform(self.costmap_header.frame_id,
+                                                                                 'base_link',
+                                                                                 rospy.Time(0))
+        except tf.Exception, e:
+            rospy.logerr("Unable to look up transform base_link->%s",
+                            costmap.header.frame_id)
+            return
+        robot_yaw = tf.transformations.euler_from_quaternion(robot_orientation)[-1]
+        valid, robot_in_costmap = self.world2map(robot_position[:2], self.costmap_info)
+
+        target_in_odom = self.tf_listener.transformPoint(self.odometry_frame, self.target_point)
+        yaw_to_target, distance_to_target = util.get_robot_strafe(self.tf_listener, target_in_odom)
+        target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
+        #if the target is not in the active window, we are probably way off course, stop!
+        if not 0 <= target_index < len(self.sectors):
+            self.mover.stop()
+            return
+                 
+        obstacle_density = np.zeros(self.sector_count)
+        inverse_cost = np.zeros(self.sector_count)
+        nonzero_coords = np.transpose(np.nonzero(self.costmap))
+        
+        for coords in nonzero_coords:
+            cell_value = self.costmap[tuple(coords)]
+            position = self.costmap_info.resolution * (coords - robot_in_costmap)
+            distance = np.linalg.norm(position)
+ 
+            #break if the cell is too close to the robot
+            if (distance >= self.max_obstacle_distance) or (distance <= self.min_obstacle_distance):
+                continue
+                                
+            #m is the obstacle vector magnitude
+            m = cell_value * (self.const_a - self.const_b * distance)
+            
+            #calculate the yaw of the cell as seen by the robot
+            #remember, costmap coords are y, x
+            cell_yaw = util.unwind(np.arctan2(position[0], position[1]) - robot_yaw)
+            
+            #turn the yaw into the sector index
+            sector_index = round(cell_yaw/self.sector_angle) + self.zero_offset
+            
+            #rospy.loginfo("CELL cell_yaw: %.2f, robot_yaw: %.2f, index: %d" % (cell_yaw, robot_yaw, sector_index))
+           
+            #if the cell is outside the active_window, break
+            if not 0 <= sector_index < len(self.sectors):
+                continue
+
+            #finally, if it's an obstacle in the active window, add its vector magnitude to the list
+            obstacle_density[sector_index] += m
+
+        for index in range(len(self.sectors)):
+            #set sectors above threshold density as blocked, those below as clear, and do
+            #not change the ones in between
+            if obstacle_density[index] >= self.threshold_high:
+                self.sectors[index] = True
+                inverse_cost[index] = 0 #inversely infinitely expensive
+            if obstacle_density[index] <= self.threshold_low:
+                self.sectors[index] = False
+            #if sector is clear (it may not have been changed this time!) set its cost, making it a candidate sector
+            if not self.sectors[index]:
+                inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
+                                            + self.u_current*np.abs(self.current_sector_index - index)*self.sector_angle
+                                          ) 
+
+        #stop the mover if the path is blocked
+        if np.all(self.sectors):
+            self.mover.stop()
+            return
+
+        min_cost_index = np.argmax(inverse_cost)
+        if self.current_sector_index != min_cost_index:
+            self.mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
+            self.current_sector_index = min_cost_index
+
+        rospy.loginfo("TARGET SECTOR index: %d" % (target_index))
+        rospy.loginfo("SELECTED SECTOR index: %d" %(self.current_sector_index))
+        rospy.loginfo("SECTORS: %s" % (self.sectors))
+        rospy.loginfo("OBSTACLES: %s" % (obstacle_density))
+        rospy.loginfo("INVERSE_COSTS: %s" % (inverse_cost))
+
+        #START DEBUG CRAP
+        vfh_debug_array = []
+        vfh_debug_marker = vis_msg.Marker()
+        vfh_debug_marker.pose = geometry_msg.Pose()
+        vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+        vfh_debug_marker.type = vis_msg.Marker.ARROW
+        vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
+        vfh_debug_marker.scale = geometry_msg.Vector3(10.0, .04, .04)
+        vfh_debug_marker.lifetime = rospy.Duration(0.5)
+        
+        #rospy.loginfo("SECTORS: %s" % (self.sectors))
+        for index in range(len(self.sectors)):
+            debug_marker = deepcopy(vfh_debug_marker)
+            sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
+            debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, sector_yaw))
+            debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
+            if self.current_sector_index == index:
+                debug_marker.color = std_msg.ColorRGBA(0.1, 1.0, 0.1, 1)                
+            elif not self.sectors[index]:
+                debug_marker.color = std_msg.ColorRGBA(0.1, 0.1, 1.0, 1)                
+            else:
+                debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 0.1, 1)                
+            debug_marker.id = self.marker_id
+            self.marker_id += 1
+            vfh_debug_array.append(debug_marker)
+
+        vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
+        self.debug_marker_pub.publish(vfh_debug_msg)
+        
+        rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))
+        
+
+    def handle_costmap(self, costmap):
+               
+        #load up the costmap and its info into useful structure        
+        
+        self.costmap_info = costmap.info
+        self.costmap_header = costmap.header
+
+        self.costmap = np.array(costmap.data,
+                                dtype='i1').reshape((costmap.info.height,
+                                                     costmap.info.width))
+        
+    def world2map(self, world, info):
+        origin = np.r_[info.origin.position.x,
+                       info.origin.position.y]
+        resolution = info.resolution
+        map_coords = np.trunc((world-origin)/resolution)[::-1]
+        valid = (map_coords[0]>=0 and
+                 map_coords[0]<info.height and
+                 map_coords[1]>=0 and
+                 map_coords[1]<info.width)
+        return valid, map_coords
+
+        
   
 class BeaconSearch(smach.State):
  
