@@ -624,7 +624,7 @@ class SearchLineManager(smach.State):
         
         #thresholds at which to set clear, or blocked, a gap for hysteresis
         #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
-        self.threshold_high = 6000
+        self.threshold_high = 4000
         self.threshold_low = 2000
         
         #target point and current_yaw
@@ -646,7 +646,7 @@ class SearchLineManager(smach.State):
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
-            distance = 150
+            distance = 50
 
         current_pose = util.get_current_robot_pose(self.tf_listener, self.odometry_frame)
         target_pose = util.translate_base_link(self.tf_listener,
@@ -766,7 +766,7 @@ class SearchLineManager(smach.State):
         vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         vfh_debug_marker.type = vis_msg.Marker.ARROW
         vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
-        vfh_debug_marker.scale = geometry_msg.Vector3(10.0, .04, .04)
+        vfh_debug_marker.scale = geometry_msg.Vector3(self.max_obstacle_distance, .02, .02)
         vfh_debug_marker.lifetime = rospy.Duration(0.5)
         
         #rospy.loginfo("SECTORS: %s" % (self.sectors))
@@ -784,6 +784,14 @@ class SearchLineManager(smach.State):
             debug_marker.id = self.marker_id
             self.marker_id += 1
             vfh_debug_array.append(debug_marker)
+            
+        debug_marker = deepcopy(vfh_debug_marker)
+        debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, yaw_to_target))
+        debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
+        debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 1.0, 1)                
+        debug_marker.id = self.marker_id
+        self.marker_id += 1
+        vfh_debug_array.append(debug_marker)    
 
         vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
         self.debug_marker_pub.publish(vfh_debug_msg)
