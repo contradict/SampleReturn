@@ -9,7 +9,6 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(catkin REQUIRED COMPONENTS tf rospy
   roscpp
   sensor_msgs
-  samplereturn_msgs
   cv_bridge
   image_geometry
   samplereturn_msgs)
@@ -79,7 +78,7 @@ add_definitions( -std=gnu++0x )
  add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
 
 ## Add dependencies to the executable
-# add_dependencies(sample_detection_node ${PROJECT_NAME})
+ add_dependencies(kalman_filter_node samplereturn_msgs_gencpp)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(kalman_filter_node
