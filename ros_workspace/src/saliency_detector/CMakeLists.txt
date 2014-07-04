@@ -13,7 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   samplereturn_msgs
   cv_bridge
   dynamic_reconfigure
-  image_geometry)
+  image_geometry
+  cmake_modules)
 
 find_package(Eigen REQUIRED)
 
