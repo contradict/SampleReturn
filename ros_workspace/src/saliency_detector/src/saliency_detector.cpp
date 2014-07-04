@@ -105,7 +105,7 @@ class SaliencyDetectorNode
   {
     ROS_INFO("Camera Info Callback");
     cam_model_.fromCameraInfo(msg);
-    cv::Mat K = cam_model_.intrinsicMatrix();
+    cv::Mat K = cv::Mat(cam_model_.intrinsicMatrix());
     inv_K_ = K.inv();
   }
 
