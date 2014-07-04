@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
     geometry_msgs
     nav_msgs
     sensor_msgs
+    cmake_modules
     )
 
 find_package(Eigen REQUIRED)
