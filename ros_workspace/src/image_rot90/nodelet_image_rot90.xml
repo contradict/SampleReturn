@@ -1,7 +1,0 @@
-<library path="lib/libnodelet_image_rot90">
-  <class name="image_rot90/ImageRot90" type="image_rot90::ImageRot90" base_class_type="nodelet::Nodelet">
-    <description>
-        A nodelet that rotates an image by a multiple of pi/2
-    </description>
-  </class>
-</library>
