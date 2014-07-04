@@ -4,9 +4,6 @@
 [submodule "ros_workspace/src/photo"]
 	path = ros_workspace/src/photo
 	url = git://github.com/contradict/bosch_photo
-[submodule "ros_workspace/src/sbpl_lattice_planner"]
-	path = ros_workspace/src/sbpl_lattice_planner
-	url = https://github.com/brandon-m-booth/sbpl_lattice_planner.git
 [submodule "ros_workspace/src/camera1394"]
 	path = ros_workspace/src/camera1394
 	url = https://github.com/zaclizer/camera1394.git
