@@ -18,6 +18,7 @@ find_package(catkin REQUIRED
         image_geometry
         saliency_detector
         tf
+        cmake_modules
         )
 
 find_package(Eigen REQUIRED)
