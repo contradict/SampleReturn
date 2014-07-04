@@ -23,6 +23,7 @@ find_package(catkin REQUIRED
 	    visual_servo_msgs
 	    manipulator_msgs
         rviz
+        cmake_modules
         )
 
 find_package(Boost REQUIRED COMPONENTS thread)
