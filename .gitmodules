@@ -9,5 +9,5 @@
 	url = https://github.com/zaclizer/camera1394.git
 [submodule "ros_workspace/src/audio_common"]
 	path = ros_workspace/src/audio_common
-	url = https://github.com/ros-drivers/audio_common.git
-	branch = hydro-devel
+	url = https://github.com/contradict/audio_common.git
+	branch = indigo-devel
