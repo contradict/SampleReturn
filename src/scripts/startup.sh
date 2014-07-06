@@ -13,9 +13,8 @@ eval `ssh-agent`
 ssh-add ${HOME}/.ssh/robot_rsa
 
 cd ${HOME}/Desktop/SampleReturn
-. /opt/ros/hydro/setup.bash
+. /opt/ros/indigo/setup.bash
 . ros_workspace/install/setup.bash
-ROS_PACKAGE_PATH=/opt/ros/phidgets:$ROS_PACKAGE_PATH
 
 export ROSLAUNCH_SSH_UNKNOWN=1
 export ROS_MASTER_URI="http://${MASTER_HOST}:11311"
