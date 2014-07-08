@@ -20,6 +20,7 @@ class ExecutiveCostmapChecker(object):
         
         self.node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
+        rospy.sleep(2.0)
 
         self.strafes = rospy.get_param('strafes')
 

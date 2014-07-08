@@ -29,6 +29,7 @@ class ray_to_points(object):
     self.marker_pub = rospy.Publisher('marker', Marker)
 
     self.tf = TransformListener()
+    rospy.sleep(2.0)
 
     self.pitch_error = rospy.get_param("~pitch_error",0.1)
     self.yaw_error = rospy.get_param("~yaw_error",0.1)

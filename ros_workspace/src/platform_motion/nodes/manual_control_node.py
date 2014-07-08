@@ -43,6 +43,7 @@ class ManualController(object):
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
+        rospy.sleep(2.0)
  
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)

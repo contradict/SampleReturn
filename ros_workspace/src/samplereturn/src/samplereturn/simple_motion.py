@@ -18,6 +18,7 @@ class SimpleMover(object):
       self.tf = listener
     else:
       self.tf = TransformListener()
+      rospy.sleep(2.0)
       
     self.default_stop_function = stop_function
 
