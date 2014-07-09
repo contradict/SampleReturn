@@ -1,6 +1,9 @@
 #!/bin/bash
 
 MASTER_HOST="sr1"
+MASTER_PORT="11311"
+OTHER_HOST="sr2"
+SSH_PORT="22"
 PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOME=/home/robot
 if [ $# -eq 0 ]; then
@@ -17,7 +20,7 @@ cd ${HOME}/Desktop/SampleReturn
 . ros_workspace/install/setup.bash
 
 export ROSLAUNCH_SSH_UNKNOWN=1
-export ROS_MASTER_URI="http://${MASTER_HOST}:11311"
+export ROS_MASTER_URI="http://${MASTER_HOST}:${MASTER_PORT}"
 
 if echo ${MASTER_HOST} | grep -q `hostname`; then
 
@@ -26,7 +29,8 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
         roscore &
     fi
 
-    sleep 1
+    # wait for roscore and sr2 to be ready
+    until nc -z ${MASTER_HOST} ${MASTER_PORT} && nc -z ${OTHER_HOST} ${SSH_PORT}; do sleep 1; done
 
     pidname=`basename ${LAUNCH_FILE} .launch`.pid
     roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
