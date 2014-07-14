@@ -713,8 +713,8 @@ void Motion::planToZeroTwist( void )
             stern_wheel_velocity -= stern_decel;
 
             port->drive( port_steering, port_wheel_velocity );
-            starboard->drive( port_steering, port_wheel_velocity );
-            stern->drive( port_steering, port_wheel_velocity );
+            starboard->drive( starboard_steering, starboard_wheel_velocity );
+            stern->drive( stern_steering, stern_wheel_velocity );
 
             loop.sleep();
         }
