@@ -697,13 +697,13 @@ class SearchLineManager(smach.State):
             return
         
         #debug costmap stuff
-        debug_costmap_data = np.zeros(self.costmap.shape)
+        #debug_costmap_data = np.zeros(self.costmap.shape)
                  
         obstacle_density = np.zeros(self.sector_count)
         inverse_cost = np.zeros(self.sector_count)
         #nonzero_coords = np.transpose(np.nonzero(self.costmap))        
 
-        debug_costmap_data[tuple(robot_in_costmap)] = 64
+        #debug_costmap_data[tuple(robot_in_costmap)] = 64
 
         for index in range(len(self.sectors)):
             #yaw in odom            
@@ -735,10 +735,10 @@ class SearchLineManager(smach.State):
             if obstacle_density[index] >= self.threshold_high:
                 self.sectors[index] = True
                 inverse_cost[index] = 0 #inversely infinitely expensive
-                debug_costmap_data[tuple(start[0])] = 99
+                #debug_costmap_data[tuple(start[0])] = 99
             if obstacle_density[index] <= self.threshold_low:
                 self.sectors[index] = False
-                debug_costmap_data[tuple(start[0])] = 64
+                #debug_costmap_data[tuple(start[0])] = 64
             #if sector is clear (it may not have been changed this time!) set its cost, making it a candidate sector
             if not self.sectors[index]:
                 inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
@@ -763,8 +763,8 @@ class SearchLineManager(smach.State):
         rospy.loginfo("INVERSE_COSTS: %s" % (inverse_cost))
 
         #START DEBUG CRAP
-        self.costmap_msg.data = list(np.reshape(debug_costmap_data, -1))
-        self.debug_map_pub.publish(self.costmap_msg)                     
+        #self.costmap_msg.data = list(np.reshape(debug_costmap_data, -1))
+        #self.debug_map_pub.publish(self.costmap_msg)                     
         
         vfh_debug_array = []
         vfh_debug_marker = vis_msg.Marker()
