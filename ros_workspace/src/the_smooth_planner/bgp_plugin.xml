@@ -1,8 +1,0 @@
-<library path="lib/libthe_smooth_planner">
-  <class name="TheSmoothPlanner" type="the_smooth_planner::TheSmoothPlanner" base_class_type="nav_core::BaseLocalPlanner">
-    <description>
-      A planner for assigning time stamps to the global planner's PoseArray forsmooth velocity throttling
-    </description>
-  </class>
-</library>
-
