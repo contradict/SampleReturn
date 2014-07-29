@@ -597,6 +597,8 @@ class SearchLineManager(smach.State):
         
         self.costmap_info = None
         self.costmap_header = None
+        
+        self.costmap_msg = None
 
         #vfh params
         self.running = False
@@ -646,7 +648,7 @@ class SearchLineManager(smach.State):
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
-            distance = 50
+            distance = 100
 
         current_pose = util.get_current_robot_pose(self.tf_listener, self.odometry_frame)
         target_pose = util.translate_base_link(self.tf_listener,
@@ -696,47 +698,50 @@ class SearchLineManager(smach.State):
         if not 0 <= target_index < len(self.sectors):
             self.mover.stop()
             return
+        
+        #debug costmap stuff
+        debug_costmap_data = np.zeros(self.costmap.shape)
                  
         obstacle_density = np.zeros(self.sector_count)
         inverse_cost = np.zeros(self.sector_count)
-        nonzero_coords = np.transpose(np.nonzero(self.costmap))
-        
-        for coords in nonzero_coords:
-            cell_value = self.costmap[tuple(coords)]
-            position = self.costmap_info.resolution * (coords - robot_in_costmap)
-            distance = np.linalg.norm(position)
- 
-            #break if the cell is too close to the robot
-            if (distance >= self.max_obstacle_distance) or (distance <= self.min_obstacle_distance):
-                continue
-                                
-            #m is the obstacle vector magnitude
-            m = cell_value * (self.const_a - self.const_b * distance)
-            
-            #calculate the yaw of the cell as seen by the robot
-            #remember, costmap coords are y, x
-            cell_yaw = util.unwind(np.arctan2(position[0], position[1]) - robot_yaw)
-            
-            #turn the yaw into the sector index
-            sector_index = round(cell_yaw/self.sector_angle) + self.zero_offset
-            
-            #rospy.loginfo("CELL cell_yaw: %.2f, robot_yaw: %.2f, index: %d" % (cell_yaw, robot_yaw, sector_index))
-           
-            #if the cell is outside the active_window, break
-            if not 0 <= sector_index < len(self.sectors):
-                continue
+        #nonzero_coords = np.transpose(np.nonzero(self.costmap))        
 
-            #finally, if it's an obstacle in the active window, add its vector magnitude to the list
-            obstacle_density[sector_index] += m
+        debug_costmap_data[tuple(robot_in_costmap)] = 64
 
         for index in range(len(self.sectors)):
+            #yaw in odom            
+            sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
+            #get start and end points for the bresenham line
+            start = self.bresenham_point(robot_in_costmap,
+                                        self.min_obstacle_distance,
+                                        sector_yaw,
+                                        self.costmap_info.resolution)
+            end = self.bresenham_point(robot_in_costmap,
+                                        self.max_obstacle_distance,                                   
+                                        sector_yaw,
+                                        self.costmap_info.resolution)            
+            sector_line = bresenham.points(start, end)
+
+            for coords in sector_line:
+                #coords = coords[::-1]
+                cell_value = self.costmap[tuple(coords)]
+                position = self.costmap_info.resolution * (coords - robot_in_costmap)
+                distance = np.linalg.norm(position)
+            
+                #m is the obstacle vector magnitude
+                m = cell_value * (self.const_a - self.const_b * distance)
+                
+                obstacle_density[index] += m
+            
             #set sectors above threshold density as blocked, those below as clear, and do
             #not change the ones in between
             if obstacle_density[index] >= self.threshold_high:
                 self.sectors[index] = True
                 inverse_cost[index] = 0 #inversely infinitely expensive
+                debug_costmap_data[tuple(start[0])] = 99
             if obstacle_density[index] <= self.threshold_low:
                 self.sectors[index] = False
+                debug_costmap_data[tuple(start[0])] = 64
             #if sector is clear (it may not have been changed this time!) set its cost, making it a candidate sector
             if not self.sectors[index]:
                 inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
@@ -748,6 +753,7 @@ class SearchLineManager(smach.State):
             self.mover.stop()
             return
 
+        #find the sector index with the lowest cost index (inverse cost!)
         min_cost_index = np.argmax(inverse_cost)
         if self.current_sector_index != min_cost_index:
             self.mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
@@ -760,6 +766,9 @@ class SearchLineManager(smach.State):
         rospy.loginfo("INVERSE_COSTS: %s" % (inverse_cost))
 
         #START DEBUG CRAP
+        self.costmap_msg.data = list(np.reshape(debug_costmap_data, -1))
+        self.debug_map_pub.publish(self.costmap_msg)                     
+        
         vfh_debug_array = []
         vfh_debug_marker = vis_msg.Marker()
         vfh_debug_marker.pose = geometry_msg.Pose()
@@ -797,7 +806,6 @@ class SearchLineManager(smach.State):
         self.debug_marker_pub.publish(vfh_debug_msg)
         
         rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))
-        
 
     def handle_costmap(self, costmap):
                
@@ -805,6 +813,9 @@ class SearchLineManager(smach.State):
         
         self.costmap_info = costmap.info
         self.costmap_header = costmap.header
+        
+        #for debug publishing
+        self.costmap_msg = costmap
 
         self.costmap = np.array(costmap.data,
                                 dtype='i1').reshape((costmap.info.height,
@@ -821,10 +832,14 @@ class SearchLineManager(smach.State):
                  map_coords[1]<info.width)
         return valid, map_coords
 
-        
-  
+    #returns a 1d array containing the coordinates array for our bresenham implementation    
+    def bresenham_point(self, start, distance, angle, res):
+        x = np.trunc(start[1] + (distance * math.cos(angle))/res).astype('i2')
+        y = np.trunc(start[0] + (distance * math.sin(angle))/res).astype('i2')
+        return np.array([[y, x]])
+            
 class BeaconSearch(smach.State):
- 
+    
     def __init__(self, tf_listener, announcer):
 
         smach.State.__init__(self,
