@@ -57,6 +57,9 @@ class ExecutiveCostmapChecker(object):
             self.publish_debug = True
         else:
             self.publish_debug = False
+            
+        #disable publishing for sure
+        self.publish_debug = False
         
         #check parameters       
         lethal_threshold = self.node_params.lethal_threshold
