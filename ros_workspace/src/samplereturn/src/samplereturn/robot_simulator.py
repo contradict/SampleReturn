@@ -131,7 +131,7 @@ class RobotSimulator(object):
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
         self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
-        self.odometry_is_noisy = True
+        self.odometry_is_noisy = False
         self.broadcast_localization = True
 
         #tf stuff
