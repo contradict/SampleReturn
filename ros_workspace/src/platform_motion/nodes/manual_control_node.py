@@ -19,7 +19,7 @@ import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn.util as util
-import samplereturn.simple_motion as simple_motion
+import motion_planning.simple_motion as simple_motion
 
 from samplereturn_msgs.msg import VoiceAnnouncement
 

@@ -18,7 +18,7 @@ import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 
 import samplereturn.util as util
-from samplereturn.simple_motion import TimeoutException
+from motion_planning.simple_motion import TimeoutException
 
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified

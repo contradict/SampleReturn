@@ -22,7 +22,7 @@ import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import visualization_msgs.msg as vis_msg
 
-import samplereturn.simple_motion as simple_motion
+import motion_planning.simple_motion as simple_motion
 
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState

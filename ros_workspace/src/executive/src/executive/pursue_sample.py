@@ -24,8 +24,8 @@ import samplereturn_msgs.srv as samplereturn_srv
 import visualization_msgs.msg as vis_msg
 
 import samplereturn.util as util
-import samplereturn.simple_motion as simple_motion
-from samplereturn.simple_motion import TimeoutException
+import motion_planning.simple_motion as simple_motion
+from motion_planning.simple_motion import TimeoutException
 
 from executive.executive_states import WaitForFlagState
 from executive.executive_states import AnnounceState

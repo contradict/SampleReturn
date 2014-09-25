@@ -7,7 +7,7 @@ from nav_msgs.msg import Odometry
 import tf
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion
-import util
+import samplereturn.util as util
 from samplereturn_msgs.srv import SimpleMotionResponse, SimpleMotion
 
 class SimpleMover(object):
