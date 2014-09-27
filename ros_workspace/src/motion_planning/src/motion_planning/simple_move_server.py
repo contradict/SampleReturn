@@ -37,7 +37,7 @@ class SimpleMoveServer( object ):
 
         self._mover = SimpleMover("~")
 
-        self._as = actionlib.SimpleActionServer("drive", SimpleMoveAction,
+        self._as = actionlib.SimpleActionServer("simple_move", SimpleMoveAction,
                 execute_cb = self.execute_cb, auto_start=False)
 
         self._robot_position = None
