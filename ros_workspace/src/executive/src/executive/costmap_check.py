@@ -25,9 +25,12 @@ class ExecutiveCostmapChecker(object):
         self.strafes = rospy.get_param('strafes')
 
         self.check_publisher = rospy.Publisher('costmap_check',
-                                               samplereturn_msg.CostmapCheck)
+                                               samplereturn_msg.CostmapCheck,
+                                               queue_size=1)
  
-        self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+        self.debug_map_pub = rospy.Publisher('/test_costmap',
+                                             nav_msg.OccupancyGrid,
+                                             queue_size=1)
 
         self.costmap_listener = rospy.Subscriber('local_costmap',
                                 nav_msg.OccupancyGrid,

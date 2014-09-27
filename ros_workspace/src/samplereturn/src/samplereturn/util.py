@@ -20,7 +20,7 @@ actionlib_working_states = [action_msg.GoalStatus.ACTIVE,
 
 class AnnouncerInterface(object):
     def __init__(self, topic):
-        self.pub = rospy.Publisher(topic, VoiceAnnouncement)
+        self.pub = rospy.Publisher(topic, VoiceAnnouncement, queue_size=1)
         self.msg = VoiceAnnouncement()
         
     def say(self, words):
@@ -45,7 +45,7 @@ class AnnouncerInterface(object):
         return {'Class':'AnnouncerInterface'}
 
 def wait_for_rosout():
-    test_pub = rospy.Publisher("/rosout", rosgraph_msg.Log)
+    test_pub = rospy.Publisher("/rosout", rosgraph_msg.Log, queue_size=1)
     while (test_pub.get_num_connections() < 1 and not rospy.is_shutdown()):
         rospy.sleep(rospy.Duration(0.1))
     test_pub.unregister()
@@ -174,10 +174,10 @@ class CANInterface(object):
         self.CAN_select_motion_mode = \
                 rospy.ServiceProxy("CAN_select_motion_mode",
                 platform_srv.SelectMotionMode)
-        self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
-        self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
-        self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist)
-        self.search_lights = rospy.Publisher("search_lights", std_msg.Bool)
+        self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist, queue_size=1)
+        self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist, queue_size=1)
+        self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist, queue_size=1)
+        self.search_lights = rospy.Publisher("search_lights", std_msg.Bool, queue_size=1)
 
     def select_mode(self, motion_mode):
         return self.CAN_select_motion_mode(motion_mode)

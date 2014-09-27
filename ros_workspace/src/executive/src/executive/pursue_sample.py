@@ -48,8 +48,8 @@ class PursueSample(object):
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")
-        self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult)
-        self.light_pub = rospy.Publisher('search_lights', std_msg.Bool)
+        self.result_pub = rospy.Publisher('pursuit_result', samplereturn_msg.PursuitResult, queue_size=1)
+        self.light_pub = rospy.Publisher('search_lights', std_msg.Bool, queue_size=1)
         self.CAN_interface = util.CANInterface()
         
         #get a simple_mover, it's parameters are inside a rosparam tag for this node

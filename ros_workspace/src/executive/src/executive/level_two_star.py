@@ -22,7 +22,6 @@ import geometry_msgs.msg as geometry_msg
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import visualization_msgs.msg as vis_msg
-import motion_planning_msgs.msg
 
 import motion_planning.simple_motion as simple_motion
 
@@ -67,7 +66,7 @@ class LevelTwoStar(object):
                                                       stop_function = self.check_for_stop)
         
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
-                                                       motion_planning_msg.SimpleMoveAction)
+                                                       samplereturn_msg.SimpleMoveAction)
   
         #strafe definitions, offset is length along strafe line
         #the yaws have a static angle, which the direction from base_link the robot strafes
@@ -610,16 +609,19 @@ class SearchLineManager(smach.State):
         self.target_point = geometry_msg.PointStamped(std_msg.Header(0, rospy.Time(0), self.odometry_frame),
                                                       target_pose.pose.position)
         #head off
-        self.running = True
-        self.mover.execute_strafe(0.0, distance)
-        self.running = False
-        
-        #wait to actually be stopped
-        rospy.sleep(2.0)
-        
-        if self.preempt_requested():
-            return 'aborted'
-        
+        goal = samplereturn_msg.SimpleMoveGoal()
+        goal.target_pose = target_pose
+        self.mover.send_goal(goal)
+
+        #watch the action server
+        while not rospy.is_shutdown():
+            rospy.sleep(0.1)
+            move_state = self.mover.get_state()
+            if move_state not in util.actionlib_working_states:
+                break            
+            if self.preempt_requested():
+                return 'aborted'
+            
         return 'next_spoke'
     
             

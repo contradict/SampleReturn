@@ -46,7 +46,7 @@ class SimpleMover(object):
       return
 
     #publishers and subscribers
-    self.publisher = rospy.Publisher("twist", Twist)
+    self.publisher = rospy.Publisher("twist", Twist, queue_size=1)
     rospy.Subscriber("odometry", Odometry, self.odometry_callback, None, 1)
     rospy.Subscriber("platform_joint_state", JointState, self.joint_state_callback, None, 1)
 

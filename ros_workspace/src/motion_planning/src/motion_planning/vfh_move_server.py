@@ -58,7 +58,9 @@ class VFHMoveServer( object ):
         #costmap crap
         self.costmap = None
         
-        self.debug_map_pub = rospy.Publisher('/test_costmap', nav_msg.OccupancyGrid)
+        self.debug_map_pub = rospy.Publisher('/test_costmap',
+                                             nav_msg.OccupancyGrid,
+                                             queue_size=1)
 
         self.costmap_listener = rospy.Subscriber('local_costmap',
                                 nav_msg.OccupancyGrid,
@@ -103,7 +105,9 @@ class VFHMoveServer( object ):
         self.current_sector_index = 0 #start moving straight along the robot's yaw
         
         #debug marker stuff
-        self.debug_marker_pub = rospy.Publisher('vfh_markers', vis_msg.MarkerArray)
+        self.debug_marker_pub = rospy.Publisher('vfh_markers',
+                                                vis_msg.MarkerArray,
+                                                queue_size=1)
         self.marker_id = 0
 
         #this loop controls the strafe angle using vfh sauce
