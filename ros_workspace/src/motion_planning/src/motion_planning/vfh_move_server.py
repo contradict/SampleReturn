@@ -4,20 +4,24 @@ Use simple_motion to drive to a position and yaw
 """
 #!/usr/bin/env python
 import numpy as np
+from copy import deepcopy
 import rospy
 import actionlib
 from tf.transformations import euler_from_quaternion
 import tf
 
-from std_msgs.msg import Float64
+import std_msgs.msg as std_msg
 import nav_msgs.msg as nav_msg
-from nav_msgs.msg import Odometry
 import visualization_msgs.msg as vis_msg
+import geometry_msgs.msg as geometry_msg
 
-from geometry_msgs.msg import PoseStamped, Point
-from motion_planning.msg import (SimpleMoveAction,
-                                SimpleMoveResult,
-                                SimpleMoveFeedback)
+
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64
+from geometry_msgs.msg import Pose, PoseStamped, Point, PointStamped
+from samplereturn_msgs.msg import (SimpleMoveAction,
+                                   SimpleMoveResult,
+                                   SimpleMoveFeedback)
 from motion_planning.simple_motion import SimpleMover
 
 import samplereturn.util as util
@@ -41,8 +45,10 @@ class VFHMoveServer( object ):
     def __init__(self):
         self._goal_orientation_tolerance = \
                 rospy.get_param("~goal_orientation_tolerance", 0.05)
+        
+        self.odometry_frame = rospy.get_param("~odometry_frame")
 
-        self._mover = SimpleMover("~")
+        self._mover = SimpleMover("~simple_motion_params/")
 
         self._as = actionlib.SimpleActionServer("vfh_move", SimpleMoveAction,
                 execute_cb = self.execute_cb, auto_start=False)
@@ -87,7 +93,7 @@ class VFHMoveServer( object ):
         
         #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
         #so that obstacles produce zero cost at a range of dmax
-        self.max_obstacle_distance = 6.0  #look at obstacles up to 8 meters out
+        self.max_obstacle_distance = 6.0  #look at obstacles up to X meters out
         self.const_b = 1 #uuuuh, if this is 1 then a = dmax... is that cool?
         self.const_a = self.const_b*self.max_obstacle_distance
         
@@ -120,10 +126,12 @@ class VFHMoveServer( object ):
         Called by SimpleActionServer when a new goal is ready
         """
         try:
-            goal_local = self._tf.transformPose('base_link', goal.pose)
-            goal_odom = self._tf.transformPose('odom', goal.pose)
+            rospy.loginfo("VFH_mover target_goal: %s" % goal.target_pose)
+            goal_local = self._tf.transformPose('base_link', goal.target_pose)
+            goal_odom = self._tf.transformPose(self.odometry_frame, goal.target_pose)
         except tf.Exception, exc:
-            self._as.set_aborted("Could not transform goal: %s"%exc)
+            rospy.logwarn("VFH MOVE SERVER:could not transform goal: %s"%exc)
+            self._as.set_aborted(text = "Could not transform goal: %s"%exc)
             return
         self._goal_odom = goal_odom
         rospy.logdebug("Received goal, transformed to %s", goal_odom)
@@ -175,16 +183,16 @@ class VFHMoveServer( object ):
         if not self.vfh_running:
             return
         
-        if self.preempt_requested():
-            self.mover.stop()
+        #if self.preempt_requested():
+        #    self.mover.stop()
         
         start_time = rospy.get_time()
 
         #get the robot position inside costmap
         try:
-            robot_position, robot_orientation = self.tf_listener.lookupTransform(self.costmap_header.frame_id,
-                                                                                 'base_link',
-                                                                                 rospy.Time(0))
+            robot_position, robot_orientation = self._tf.lookupTransform(self.costmap_header.frame_id,
+                                                                         'base_link',
+                                                                         rospy.Time(0))
         except tf.Exception, e:
             rospy.logerr("Unable to look up transform base_link->%s",
                             costmap.header.frame_id)
@@ -192,8 +200,9 @@ class VFHMoveServer( object ):
         robot_yaw = tf.transformations.euler_from_quaternion(robot_orientation)[-1]
         valid, robot_in_costmap = self.world2map(robot_position[:2], self.costmap_info)
 
-        target_in_odom = self.tf_listener.transformPoint(self.odometry_frame, self.target_point)
-        yaw_to_target, distance_to_target = util.get_robot_strafe(self.tf_listener, target_in_odom)
+        target_in_odom = PointStamped(self._goal_odom.header,
+                                      self._goal_odom.pose.position)
+        yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, target_in_odom)
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         #if the target is not in the active window, we are probably way off course, stop!
         if not 0 <= target_index < len(self.sectors):
@@ -251,13 +260,13 @@ class VFHMoveServer( object ):
 
         #stop the mover if the path is blocked
         if np.all(self.sectors):
-            self.mover.stop()
+            self._mover.stop()
             return
 
         #find the sector index with the lowest cost index (inverse cost!)
         min_cost_index = np.argmax(inverse_cost)
         if self.current_sector_index != min_cost_index:
-            self.mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
+            self._mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
             self.current_sector_index = min_cost_index
 
         rospy.loginfo("TARGET SECTOR index: %d" % (target_index))
@@ -272,7 +281,7 @@ class VFHMoveServer( object ):
         
         vfh_debug_array = []
         vfh_debug_marker = vis_msg.Marker()
-        vfh_debug_marker.pose = geometry_msg.Pose()
+        vfh_debug_marker.pose = Pose()
         vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         vfh_debug_marker.type = vis_msg.Marker.ARROW
         vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
@@ -335,8 +344,8 @@ class VFHMoveServer( object ):
 
     #returns a 1d array containing the coordinates array for our bresenham implementation    
     def bresenham_point(self, start, distance, angle, res):
-        x = np.trunc(start[1] + (distance * math.cos(angle))/res).astype('i2')
-        y = np.trunc(start[0] + (distance * math.sin(angle))/res).astype('i2')
+        x = np.trunc(start[1] + (distance * np.cos(angle))/res).astype('i2')
+        y = np.trunc(start[0] + (distance * np.sin(angle))/res).astype('i2')
         return np.array([[y, x]])
 
     def yaw_error(self):
