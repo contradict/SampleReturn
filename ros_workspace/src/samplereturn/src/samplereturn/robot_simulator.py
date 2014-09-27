@@ -132,7 +132,8 @@ class RobotSimulator(object):
 
         self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
         self.odometry_is_noisy = False
-        self.broadcast_localization = True
+        #fake localization handled by the executive_test file... generally
+        self.broadcast_localization = False
 
         #tf stuff
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -173,13 +174,13 @@ class RobotSimulator(object):
         #camera publishers
         self.cam_publishers = []
         for topic in cam_status_list:
-            self.cam_publishers.append(rospy.Publisher(topic, std_msg.String))
+            self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=1))
         rospy.Timer(rospy.Duration(0.5), self.publish_cam_status)
                 
         #io publishers
-        self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO)
+        self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=1)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
-        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool)
+        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, queue_size=1)
         rospy.Timer(rospy.Duration(0.2), self.publish_pause)
 
 
@@ -207,7 +208,8 @@ class RobotSimulator(object):
         self.home_wheelpods_server.start()
         
         self.joint_state_pub = rospy.Publisher(joint_state_name,
-                                               sensor_msg.JointState)
+                                               sensor_msg.JointState,
+                                               queue_size=1)
         
         #planner, odom and tf
         self.planner_sub = rospy.Subscriber(planner_command_name,
@@ -223,19 +225,26 @@ class RobotSimulator(object):
                                             self.handle_joystick)
 
         self.odometry_pub = rospy.Publisher(odometry_name,
-                                            nav_msg.Odometry)
+                                            nav_msg.Odometry,
+                                            queue_size=1)
 
         self.joint_transforms_available = False
         rospy.Timer(rospy.Duration(0.05), self.broadcast_tf_and_motion)
 
         #sample detection stuff
-        self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
+        self.search_sample_pub = rospy.Publisher(detected_sample_search_name,
+                                                 samplereturn_msg.NamedPoint,
+                                                 queue_size=1)
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
 
-        self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name, samplereturn_msg.NamedPoint)
+        self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name,
+                                                      samplereturn_msg.NamedPoint,
+                                                      queue_size=1)
         rospy.Timer(rospy.Duration(0.1), self.publish_sample_detection_manipulator)         
         
-        self.sample_marker_pub = rospy.Publisher('fake_samples', vis_msg.Marker)
+        self.sample_marker_pub = rospy.Publisher('fake_samples',
+                                                 vis_msg.Marker,
+                                                 queue_size=1)
         
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    samplereturn_msg.PursuitResult,
@@ -253,11 +262,14 @@ class RobotSimulator(object):
         self.visual_servo_server.start()
         
         self.points_center_pub = rospy.Publisher(point_cloud_center_name,
-                                                 sensor_msg.PointCloud2)
+                                                 sensor_msg.PointCloud2,
+                                                 queue_size=1)
         self.points_port_pub = rospy.Publisher(point_cloud_port_name,
-                                                 sensor_msg.PointCloud2)
+                                                 sensor_msg.PointCloud2,
+                                                 queue_size=1)
         self.points_starboard_pub = rospy.Publisher(point_cloud_starboard_name,
-                                                 sensor_msg.PointCloud2)
+                                                 sensor_msg.PointCloud2,
+                                                 queue_size=1)
         
         #map stuff
         print "Waiting for map server"
@@ -287,17 +299,22 @@ class RobotSimulator(object):
 
         self.joint_transforms_available = True
         
-        self.debug_marker_pub = rospy.Publisher('debug_markers', vis_msg.Marker)
+        self.debug_marker_pub = rospy.Publisher('debug_markers',
+                                                vis_msg.Marker,
+                                                queue_size=1)
         rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
         
         self.path_counter = 0
-        self.path_marker_pub = rospy.Publisher('path_markers', vis_msg.Marker)
+        self.path_marker_pub = rospy.Publisher('path_markers',
+                                               vis_msg.Marker,
+                                               queue_size=1)
         rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
         self.check_publisher = rospy.Publisher('/processes/executive/costmap_check',
-                                               samplereturn_msg.CostmapCheck)
+                                               samplereturn_msg.CostmapCheck,
+                                               queue_size=1)
 
         #beacon stuff, needs param server up
         self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
@@ -311,9 +328,11 @@ class RobotSimulator(object):
                                                   geometry_msg.Quaternion(*beacon_rot))
         
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
-                geometry_msg.PoseWithCovarianceStamped)
+                                               geometry_msg.PoseWithCovarianceStamped,
+                                               queue_size=1)
         self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
-                geometry_msg.PoseStamped)
+                                                     geometry_msg.PoseStamped,
+                                                     queue_size=1)
         rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
 
         #rospy.spin()
