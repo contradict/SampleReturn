@@ -594,20 +594,20 @@ class SearchLineManager(smach.State):
     def execute(self, userdata):
 
         self.odometry_frame = userdata.odometry_frame
-
+        
         #head off for 100 meters
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
             distance = 100
 
-        current_pose = util.get_current_robot_pose(self.tf_listener, self.odometry_frame)
+        current_pose = util.get_current_robot_pose(self.tf_listener,
+                                                   frame_id = self.odometry_frame)
         target_pose = util.translate_base_link(self.tf_listener,
                                                current_pose,
                                                distance, 0,
-                                               self.odometry_frame)
-        self.target_point = geometry_msg.PointStamped(std_msg.Header(0, rospy.Time(0), self.odometry_frame),
-                                                      target_pose.pose.position)
+                                               frame_id = self.odometry_frame)
+        target_pose.header.stamp = rospy.Time(0)
         #head off
         goal = samplereturn_msg.SimpleMoveGoal()
         goal.target_pose = target_pose
