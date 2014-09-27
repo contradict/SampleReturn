@@ -29,6 +29,7 @@
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
+    <remap from="vfh_move" to="/processes/vfh_move"/>
 
     <!-- io remaps -->
     <remap from="pause_state" to="/io/pause_state"/>
