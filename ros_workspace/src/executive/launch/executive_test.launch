@@ -68,6 +68,16 @@
 
     </node>
 
+    <node name="vfh_driver"
+          pkg="motion_planning" 
+          type="vfh_driving.py"
+          output="log"
+          ns="/processes">
+
+        <remap from="odometry" to="/motion/odometry"/>
+
+    </node>
+
     <include file="$(find beacon_finder)/launch/beacon_finder.launch">
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
