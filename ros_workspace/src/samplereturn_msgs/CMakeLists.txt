@@ -102,6 +102,7 @@ add_action_files(
 	DIRECTORY action
 	FILES
     GeneralExecutive.action
+    SimpleMove.action
 )
 
 ## Generate added messages and services with any dependencies listed here
