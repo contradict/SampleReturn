@@ -7,7 +7,8 @@ setup_obj = generate_distutils_setup(
                   packages=['motion_planning'],
                   package_dir={'': 'src'},
                   scripts=[
-                      'nodes/simple_driving.py'
+                      'nodes/simple_driving.py',
+                      'nodes/vfh_driving.py'
                       ]
                 )
 

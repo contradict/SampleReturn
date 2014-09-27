@@ -130,6 +130,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 install(PROGRAMS
    nodes/simple_driving.py
+   nodes/vfh_driving.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
