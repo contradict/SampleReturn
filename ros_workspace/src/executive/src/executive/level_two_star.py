@@ -180,7 +180,7 @@ class LevelTwoStar(object):
 
             smach.StateMachine.add('LINE_MANAGER',
                                    SearchLineManager(self.tf_listener,
-                                                     self.simple_mover,
+                                                     self.vfh_mover,
                                                      self.announcer),
                                    transitions = {'move':'LINE_MOVE',
                                                   'spin':'ROTATE',
