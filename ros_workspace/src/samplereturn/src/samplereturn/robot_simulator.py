@@ -174,13 +174,13 @@ class RobotSimulator(object):
         #camera publishers
         self.cam_publishers = []
         for topic in cam_status_list:
-            self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=1))
+            self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.5), self.publish_cam_status)
                 
         #io publishers
-        self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=1)
+        self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
-        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, queue_size=1)
+        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_pause)
 
 
@@ -209,7 +209,7 @@ class RobotSimulator(object):
         
         self.joint_state_pub = rospy.Publisher(joint_state_name,
                                                sensor_msg.JointState,
-                                               queue_size=1)
+                                               queue_size=2)
         
         #planner, odom and tf
         self.planner_sub = rospy.Subscriber(planner_command_name,
@@ -226,7 +226,7 @@ class RobotSimulator(object):
 
         self.odometry_pub = rospy.Publisher(odometry_name,
                                             nav_msg.Odometry,
-                                            queue_size=1)
+                                            queue_size=2)
 
         self.joint_transforms_available = False
         rospy.Timer(rospy.Duration(0.05), self.broadcast_tf_and_motion)
@@ -234,7 +234,7 @@ class RobotSimulator(object):
         #sample detection stuff
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name,
                                                  samplereturn_msg.NamedPoint,
-                                                 queue_size=1)
+                                                 queue_size=10)
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
 
         self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name,
@@ -244,7 +244,7 @@ class RobotSimulator(object):
         
         self.sample_marker_pub = rospy.Publisher('fake_samples',
                                                  vis_msg.Marker,
-                                                 queue_size=1)
+                                                 queue_size=30)
         
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    samplereturn_msg.PursuitResult,
@@ -263,13 +263,13 @@ class RobotSimulator(object):
         
         self.points_center_pub = rospy.Publisher(point_cloud_center_name,
                                                  sensor_msg.PointCloud2,
-                                                 queue_size=1)
+                                                 queue_size=2)
         self.points_port_pub = rospy.Publisher(point_cloud_port_name,
                                                  sensor_msg.PointCloud2,
-                                                 queue_size=1)
+                                                 queue_size=2)
         self.points_starboard_pub = rospy.Publisher(point_cloud_starboard_name,
                                                  sensor_msg.PointCloud2,
-                                                 queue_size=1)
+                                                 queue_size=2)
         
         #map stuff
         print "Waiting for map server"
@@ -301,20 +301,20 @@ class RobotSimulator(object):
         
         self.debug_marker_pub = rospy.Publisher('debug_markers',
                                                 vis_msg.Marker,
-                                                queue_size=1)
+                                                queue_size=100)
         rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
         
         self.path_counter = 0
         self.path_marker_pub = rospy.Publisher('path_markers',
                                                vis_msg.Marker,
-                                               queue_size=1)
+                                               queue_size=10)
         rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
         self.check_publisher = rospy.Publisher('/processes/executive/costmap_check',
                                                samplereturn_msg.CostmapCheck,
-                                               queue_size=1)
+                                               queue_size=10)
 
         #beacon stuff, needs param server up
         self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
@@ -329,10 +329,10 @@ class RobotSimulator(object):
         
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
                                                geometry_msg.PoseWithCovarianceStamped,
-                                               queue_size=1)
+                                               queue_size=2)
         self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
                                                      geometry_msg.PoseStamped,
-                                                     queue_size=1)
+                                                     queue_size=2)
         rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
 
         #rospy.spin()
@@ -414,6 +414,8 @@ class RobotSimulator(object):
             self.integrate_odometry( twist)
 
     def publish_point_cloud(self, event):
+        #rospy.loginfo("Starting PC generation")
+
         now = event.current_real
         header = std_msg.Header(0, now, 'map')
         target_frame = 'navigation_center_left_camera'
@@ -425,7 +427,9 @@ class RobotSimulator(object):
             current_pose = util.get_current_robot_pose(self.tf_listener,
                     'map')
             transform = self.tf_listener.asMatrix(target_frame, header)
-        except ( tf.Exception ):
+        except ( tf.Exception ), e:
+            rospy.loginfo("Failed to transform map for PC")
+            rospy.loginfo("Exception: %s"%e)
             return
         center_cloud = self.get_pointcloud2(self.global_map,
                                             current_pose.pose.position,
@@ -438,7 +442,11 @@ class RobotSimulator(object):
         empty_cloud.header.frame_id = 'navigation_starboard_left_camera'
         self.points_starboard_pub.publish(empty_cloud)
         
+        #interval = rospy.get_time() - now.to_sec()
+        #rospy.loginfo("Finished PC generation in: %f"%interval)
+               
     def broadcast_tf_and_motion(self, event):
+        #rospy.loginfo("Starting TF and Odom")
         now = rospy.Time.now()
         if self.broadcast_localization:
             self.tf_broadcaster.sendTransform(self.zero_translation,
@@ -502,6 +510,9 @@ class RobotSimulator(object):
 
         #publish joint states
         self.publish_joint_states(self.robot_odometry)
+        
+        #interval = rospy.get_time() - now.to_sec()
+        #rospy.loginfo("Finished TF and Odom in: %f"%interval)
 
     def publish_cam_status(self, event):
         if self.cameras_ready:
