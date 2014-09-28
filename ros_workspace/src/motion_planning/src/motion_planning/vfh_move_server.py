@@ -139,13 +139,14 @@ class VFHMoveServer( object ):
         # turn to face goal
         dyaw = np.arctan2( goal_local.pose.position.y,
                            goal_local.pose.position.x)
-        rospy.logdebug("Rotating by %f.", dyaw)
-        self._mover.execute_spin(dyaw,
-                stop_function=self._as.is_preempt_requested)
-        if self._as.is_preempt_requested():
-            rospy.logdebug("Preempted during initial rotation.")
-            self._as.set_preempted()
-            return
+        if np.abs(dyaw) > self._goal_orientation_tolerance:
+            rospy.logdebug("Rotating by %f.", dyaw)
+            self._mover.execute_spin(dyaw,
+                    stop_function=self._as.is_preempt_requested)
+            if self._as.is_preempt_requested():
+                rospy.logdebug("Preempted during initial rotation.")
+                self._as.set_preempted()
+                return
 
         # drive to goal using vfh
         distance = np.hypot(goal_local.pose.position.x,
@@ -204,9 +205,12 @@ class VFHMoveServer( object ):
                                       self._goal_odom.pose.position)
         yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, target_in_odom)
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
+        
+        rospy.loginfo("ROBOT IN COSTMAP: %s"%robot_in_costmap)
+        
         #if the target is not in the active window, we are probably way off course, stop!
         if not 0 <= target_index < len(self.sectors):
-            self.mover.stop()
+            self._mover.stop()
             return
         
         #debug costmap stuff
@@ -235,6 +239,7 @@ class VFHMoveServer( object ):
             for coords in sector_line:
                 #coords = coords[::-1]
                 cell_value = self.costmap[tuple(coords)]
+
                 position = self.costmap_info.resolution * (coords - robot_in_costmap)
                 distance = np.linalg.norm(position)
             
@@ -269,11 +274,11 @@ class VFHMoveServer( object ):
             self._mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
             self.current_sector_index = min_cost_index
 
-        rospy.loginfo("TARGET SECTOR index: %d" % (target_index))
-        rospy.loginfo("SELECTED SECTOR index: %d" %(self.current_sector_index))
-        rospy.loginfo("SECTORS: %s" % (self.sectors))
-        rospy.loginfo("OBSTACLES: %s" % (obstacle_density))
-        rospy.loginfo("INVERSE_COSTS: %s" % (inverse_cost))
+        rospy.logdebug("TARGET SECTOR index: %d" % (target_index))
+        rospy.logdebug("SELECTED SECTOR index: %d" %(self.current_sector_index))
+        rospy.logdebug("SECTORS: %s" % (self.sectors))
+        rospy.logdebug("OBSTACLES: %s" % (obstacle_density))
+        rospy.logdebug("INVERSE_COSTS: %s" % (inverse_cost))
 
         #START DEBUG CRAP
         #self.costmap_msg.data = list(np.reshape(debug_costmap_data, -1))
