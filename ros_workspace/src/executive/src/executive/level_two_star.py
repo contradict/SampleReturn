@@ -599,7 +599,7 @@ class SearchLineManager(smach.State):
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
-            distance = 100
+            distance = 50
 
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    frame_id = self.odometry_frame)
@@ -619,7 +619,11 @@ class SearchLineManager(smach.State):
             move_state = self.mover.get_state()
             if move_state not in util.actionlib_working_states:
                 break            
+            if userdata.detected_sample is not None:
+                self.mover.cancel_all_goals()
+                return 'sample_detected'
             if self.preempt_requested():
+                self.mover.cancel_all_goals()
                 return 'aborted'
             
         return 'next_spoke'
