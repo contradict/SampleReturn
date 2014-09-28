@@ -428,8 +428,8 @@ class RobotSimulator(object):
                     'map')
             transform = self.tf_listener.asMatrix(target_frame, header)
         except ( tf.Exception ), e:
-            rospy.loginfo("Failed to transform map for PC")
-            rospy.loginfo("Exception: %s"%e)
+            #rospy.loginfo("Failed to transform map for PC")
+            #rospy.loginfo("Exception: %s"%e)
             return
         center_cloud = self.get_pointcloud2(self.global_map,
                                             current_pose.pose.position,
