@@ -43,11 +43,12 @@ class VFHMoveServer( object ):
     VFHMoveServer node
     """
     def __init__(self):
+        
+        self.publish_debug=True
+        
         self._goal_orientation_tolerance = \
                 rospy.get_param("~goal_orientation_tolerance", 0.05)
-        
         self.odometry_frame = rospy.get_param("~odometry_frame")
-
         self._mover = SimpleMover("~simple_motion_params/")
 
         self._as = actionlib.SimpleActionServer("vfh_move", SimpleMoveAction,
@@ -113,7 +114,7 @@ class VFHMoveServer( object ):
         #debug marker stuff
         self.debug_marker_pub = rospy.Publisher('vfh_markers',
                                                 vis_msg.MarkerArray,
-                                                queue_size=1)
+                                                queue_size=2)
         self.marker_id = 0
 
         #this loop controls the strafe angle using vfh sauce
@@ -206,8 +207,6 @@ class VFHMoveServer( object ):
         yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, target_in_odom)
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         
-        rospy.loginfo("ROBOT IN COSTMAP: %s"%robot_in_costmap)
-        
         #if the target is not in the active window, we are probably way off course, stop!
         if not 0 <= target_index < len(self.sectors):
             self._mover.stop()
@@ -274,53 +273,53 @@ class VFHMoveServer( object ):
             self._mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
             self.current_sector_index = min_cost_index
 
-        rospy.logdebug("TARGET SECTOR index: %d" % (target_index))
-        rospy.logdebug("SELECTED SECTOR index: %d" %(self.current_sector_index))
-        rospy.logdebug("SECTORS: %s" % (self.sectors))
-        rospy.logdebug("OBSTACLES: %s" % (obstacle_density))
-        rospy.logdebug("INVERSE_COSTS: %s" % (inverse_cost))
-
         #START DEBUG CRAP
-        #self.costmap_msg.data = list(np.reshape(debug_costmap_data, -1))
-        #self.debug_map_pub.publish(self.costmap_msg)                     
-        
-        vfh_debug_array = []
-        vfh_debug_marker = vis_msg.Marker()
-        vfh_debug_marker.pose = Pose()
-        vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-        vfh_debug_marker.type = vis_msg.Marker.ARROW
-        vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
-        vfh_debug_marker.scale = geometry_msg.Vector3(self.max_obstacle_distance, .02, .02)
-        vfh_debug_marker.lifetime = rospy.Duration(0.5)
-        
-        #rospy.loginfo("SECTORS: %s" % (self.sectors))
-        for index in range(len(self.sectors)):
+        if self.publish_debug:
+    
+            rospy.logdebug("TARGET SECTOR index: %d" % (target_index))
+            rospy.logdebug("SELECTED SECTOR index: %d" %(self.current_sector_index))
+            rospy.logdebug("SECTORS: %s" % (self.sectors))
+            rospy.logdebug("OBSTACLES: %s" % (obstacle_density))
+            rospy.logdebug("INVERSE_COSTS: %s" % (inverse_cost))
+            
+            vfh_debug_array = []
+            vfh_debug_marker = vis_msg.Marker()
+            vfh_debug_marker.pose = Pose()
+            vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+            vfh_debug_marker.type = vis_msg.Marker.ARROW
+            vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
+            vfh_debug_marker.scale = geometry_msg.Vector3(self.max_obstacle_distance, .02, .02)
+            vfh_debug_marker.lifetime = rospy.Duration(0.5)
+            
+            #rospy.loginfo("SECTORS: %s" % (self.sectors))
+            for index in range(len(self.sectors)):
+                debug_marker = deepcopy(vfh_debug_marker)
+                sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
+                debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, sector_yaw))
+                debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
+                if self.current_sector_index == index:
+                    debug_marker.color = std_msg.ColorRGBA(0.1, 1.0, 0.1, 1)                
+                elif not self.sectors[index]:
+                    debug_marker.color = std_msg.ColorRGBA(0.1, 0.1, 1.0, 1)                
+                else:
+                    debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 0.1, 1)                
+                debug_marker.id = self.marker_id
+                self.marker_id += 1
+                vfh_debug_array.append(debug_marker)
+                
             debug_marker = deepcopy(vfh_debug_marker)
-            sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
-            debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, sector_yaw))
+            target_yaw_odom = robot_yaw + yaw_to_target
+            debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, target_yaw_odom))
             debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
-            if self.current_sector_index == index:
-                debug_marker.color = std_msg.ColorRGBA(0.1, 1.0, 0.1, 1)                
-            elif not self.sectors[index]:
-                debug_marker.color = std_msg.ColorRGBA(0.1, 0.1, 1.0, 1)                
-            else:
-                debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 0.1, 1)                
+            debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 1.0, 1)                
             debug_marker.id = self.marker_id
             self.marker_id += 1
-            vfh_debug_array.append(debug_marker)
-            
-        debug_marker = deepcopy(vfh_debug_marker)
-        debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, yaw_to_target))
-        debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
-        debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 1.0, 1)                
-        debug_marker.id = self.marker_id
-        self.marker_id += 1
-        vfh_debug_array.append(debug_marker)    
-
-        vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
-        self.debug_marker_pub.publish(vfh_debug_msg)
+            vfh_debug_array.append(debug_marker)    
+    
+            vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
+            self.debug_marker_pub.publish(vfh_debug_msg)
         
-        rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))        
+            rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))        
 
     def handle_costmap(self, costmap):
                
