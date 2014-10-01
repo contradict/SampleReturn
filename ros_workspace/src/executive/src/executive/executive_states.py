@@ -138,49 +138,40 @@ class WaitForFlagState(smach.State):
         return 'paused'
 
 #general class for using the robot's planner to drive to a point
-class DriveToPoseState(smach.State):
+class ExecuteVFHMove(smach.State):
 
     def __init__(self, move_client, listener):
 
         smach.State.__init__(self,
                              outcomes=['complete',
-                                       'timeout',
                                        'sample_detected',
                                        'preempted','aborted'],
-                             input_keys=['target_pose',
-                                         'velocity',
+                             input_keys=['vfh_move',
                                          'pursue_samples',
                                          'stop_on_sample',
                                          'detected_sample',
                                          'motion_check_interval',
                                          'min_motion',
                                          'paused',
-                                         'world_fixed_frame',
-                                         ],
+                                         'world_fixed_frame'],
                              output_keys=['last_pose',
                                           'detected_sample'])
 
         self.move_client = move_client
-
         self.listener = listener
-        self.sample_detected = False
 
     def execute(self, userdata):
-        #on entry to Drive To Pose clear old sample_detections!
+        #on entry clear old sample_detections!
         userdata.detected_sample = None
         try:        
             last_pose = util.get_current_robot_pose(self.listener,
                     userdata.world_fixed_frame)
         except(tf.Exception):
-            rospy.logwarn("DriveToPose failed to get current pose")
+            rospy.logwarn("ExecuteVFHMove failed to get current pose")
             return 'aborted'
-        velocity = userdata.velocity
-        goal = move_base_msg.MoveBaseGoal()
-        goal.target_pose=userdata.target_pose
+        goal = userdata.vfh_move
+        rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
-        rospy.loginfo("DriveToPose initial goal: %s" % (goal))
-        move_state = self.move_client.get_state()
-        last_motion_check_time = rospy.get_time()
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
             #log current pose for use in other states
@@ -188,7 +179,7 @@ class DriveToPoseState(smach.State):
                 current_pose = util.get_current_robot_pose(self.listener,
                         userdata.world_fixed_frame)
             except(tf.Exception):
-                rospy.logwarn("DriveToPose failed to get current pose")
+                rospy.logwarn("ExecuteVFHMove failed to get current pose")
                 return 'aborted'
             userdata.last_pose = current_pose
             #is action server still working?
@@ -197,30 +188,20 @@ class DriveToPoseState(smach.State):
                 break
             #handle preempts
             if self.preempt_requested():
-                rospy.loginfo("PREEMPT REQUESTED IN DriveToPoseState")
+                rospy.loginfo("PREEMPT REQUESTED IN ExecuteVFHMove")
                 self.move_client.cancel_all_goals()
                 self.service_preempt()
                 return 'preempted'
             #handle sample detection
             if (userdata.detected_sample is not None) and userdata.pursue_samples:
-                rospy.loginfo("DriveToPose detected sample: " + str(userdata.detected_sample))
+                rospy.loginfo("ExecuteVFHMove detected sample: " + str(userdata.detected_sample))
                 if userdata.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
             #handle target_pose changes
-            if userdata.target_pose != goal.target_pose:
-                rospy.loginfo("DriveToPose sending new goal")
-                goal.target_pose = userdata.target_pose
+            if userdata.vfh_move != goal:
+                rospy.loginfo("ExecuteVFHMove sending new goal")
                 self.move_client.send_goal(goal)
-            #check if we are stuck and move_base isn't handling it
-            now = rospy.get_time()
-            if (now - last_motion_check_time) > userdata.motion_check_interval:
-                distance = util.pose_distance_2d(current_pose, last_pose)
-                last_pose = current_pose
-                last_motion_check_time = now
-                if (distance < userdata.min_motion):
-                    self.move_client.cancel_all_goals()
-                    return 'timeout'
             #if we are paused, cancel goal and wait, then resend
             #last goal and reset timeout timer
             if userdata.paused:
@@ -230,12 +211,58 @@ class DriveToPoseState(smach.State):
                     if not userdata.paused:
                         break
                 self.move_client.send_goal(goal)
-                self.last_motion_check_time = rospy.get_time()
-                    
+                                    
         if move_state == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
 
         return 'aborted'
+
+#simple move executor, set up interrupts outside this.  If you want obstacle detection
+#to work, and this is strafing in a checked direction, set the active_strafe_key
+class ExecuteSimpleMove(smach.State):
+    def __init__(self, move_client):
+        
+        smach.State.__init__(self,
+                             outcomes=['complete',
+                                       'timeout',
+                                       'aborted'],
+                             input_keys=['simple_move',
+                                         'stop_on_sample',
+                                         'detected_sample',
+                                         'paused'],
+                             output_keys=['simple_move'])
+        
+        self.move_client = move_client
+        
+    def execute(self, userdata):
+
+        goal = userdata.simple_move
+        self.move_client.send_goal(goal)
+
+        #watch the action server
+        while not rospy.is_shutdown():
+            rospy.sleep(0.1)
+            move_state = self.move_client.get_state()
+            if move_state not in util.actionlib_working_states:
+                break            
+            if self.preempt_requested():
+                self.move_client.cancel_all_goals()
+                return 'aborted'
+            #if we are paused, cancel goal and wait, then resend
+            #last goal and reset timeout timer
+            if userdata.paused:
+                self.move_client.cancel_all_goals()
+                while not rospy.is_shutdown():
+                    rospy.sleep(0.2)
+                    if not userdata.paused:
+                        break
+                self.move_client.send_goal(goal)
+                
+        if move_state == action_msg.GoalStatus.SUCCEEDED:
+            return 'complete'                
+
+        return 'aborted'
+
 
 #pursues a detected point, changing the move_base goal if the detection point
 #changes too much.  Detection and movement all specified in odometry_frame.
@@ -488,39 +515,6 @@ class ServoController(smach.State):
         self.try_count = 0
         return 'aborted'
 
-#simple move executor, set up interrupts outside this.  If you want obstacle detection
-#to work, and this is strafing in a checked direction, set the active_strafe_key
-class ExecuteSimpleMove(smach.State):
-    def __init__(self, simple_mover):
-        
-        smach.State.__init__(self,
-                             outcomes=['complete',
-                                       'timeout',
-                                       'aborted'],
-                             input_keys=['simple_move',
-                                         'velocity',
-                                         'strafes',
-                                         'paused'],
-                             output_keys=['simple_move'])
-        
-        self.simple_mover = simple_mover
-        
-    def execute(self, userdata):
-
-        goal = userdata.simple_move
-        self.simple_mover.send_goal(goal)
-
-        #watch the action server
-        while not rospy.is_shutdown():
-            rospy.sleep(0.1)
-            move_state = self.simple_mover.get_state()
-            if move_state not in util.actionlib_working_states:
-                break            
-            if self.preempt_requested():
-                self.simple_mover.cancel_all_goals()
-                return 'aborted'
-
-        return 'complete'
 
 
 #drive to a target_point, stamped.  After getting there, rotate to target_yaw
