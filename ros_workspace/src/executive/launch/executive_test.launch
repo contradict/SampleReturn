@@ -92,7 +92,31 @@
 
     </node>
 
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
+    <node name="simple_driver"
+          pkg="motion_planning" 
+          type="simple_driving.py"
+          output="log"
+          ns="/processes">
+
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+
+        <remap from="odometry" to="/motion/odometry"/>
+        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="twist" to="/motion/planner_command"/>
+        <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        
+        <rosparam>
+            simple_motion_params:
+                max_velocity: 0.8
+                acceleration: 0.5
+                stop_deceleration: 2.0
+                loop_rate: 10 
+                steering_angle_epsilon: 0.01
+        </rosparam>
+
+    </node>
+
+   <include file="$(find beacon_finder)/launch/beacon_finder.launch">
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
 

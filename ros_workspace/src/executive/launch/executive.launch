@@ -30,6 +30,7 @@
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="vfh_move" to="/processes/vfh_move"/>
+    <remap from="simple_move" to="/processes/simple_move"/>
 
     <!-- io remaps -->
     <remap from="pause_state" to="/io/pause_state"/>
