@@ -19,9 +19,9 @@ import geometry_msgs.msg as geometry_msg
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Pose, PoseStamped, Point, PointStamped
-from samplereturn_msgs.msg import (SimpleMoveAction,
-                                   SimpleMoveResult,
-                                   SimpleMoveFeedback)
+from samplereturn_msgs.msg import (VFHMoveAction,
+                                   VFHMoveResult,
+                                   VFHMoveFeedback)
 from motion_planning.simple_motion import SimpleMover
 
 import samplereturn.util as util
@@ -51,7 +51,7 @@ class VFHMoveServer( object ):
         self.odometry_frame = rospy.get_param("~odometry_frame")
         self._mover = SimpleMover("~simple_motion_params/")
 
-        self._as = actionlib.SimpleActionServer("vfh_move", SimpleMoveAction,
+        self._as = actionlib.SimpleActionServer("vfh_move", VFHMoveAction,
                 execute_cb = self.execute_cb, auto_start=False)
 
         self._robot_position = None
@@ -177,7 +177,7 @@ class VFHMoveServer( object ):
 
         rospy.logdebug("Successfully completed goal.")
         self._as.set_succeeded(
-                SimpleMoveResult(True,
+                VFHMoveResult(True,
                 self.position_error(),
                 Float64(self.yaw_error())))
         
@@ -385,7 +385,7 @@ class VFHMoveServer( object ):
         Send actionserver feedback.
         """
         self._as.publish_feedback(
-                SimpleMoveFeedback( self.position_error(),
+                VFHMoveFeedback( self.position_error(),
                     Float64(self.yaw_error())
                     )
                 )
