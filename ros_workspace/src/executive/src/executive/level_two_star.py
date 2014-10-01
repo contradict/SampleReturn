@@ -28,12 +28,19 @@ import motion_planning.simple_motion as simple_motion
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
+from executive.executive_states import ExecuteVFHMove
 from executive.executive_states import DriveToPoint
 from executive.executive_states import RotateToClear
 from executive.executive_states import WaitForFlagState
 
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
+
+#this crap is too long to type
+from samplereturn_msgs.msg import (SimpleMoveGoal,
+                                   SimpleMoveAction,
+                                   SimpleMoveResult,
+                                   SimpleMoveFeedback)
 
 class LevelTwoStar(object):
     
@@ -60,12 +67,11 @@ class LevelTwoStar(object):
         self.announcer = util.AnnouncerInterface("audio_search")
         self.CAN_interface = util.CANInterface()
        
-        #get a simple_mover, it's parameters are inside a rosparam tag for this node
-        self.simple_mover = simple_motion.SimpleMover('~simple_motion_params/',
-                                                      self.tf_listener,
-                                                      stop_function = self.check_for_stop)
-        
+        #movement action servers        
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
+                                                       samplereturn_msg.VFHMoveAction)
+
+        self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
   
         #strafe definitions, offset is length along strafe line
@@ -169,7 +175,8 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'STAR_MANAGER',
                                                   'timeout':'STAR_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'dismount_move'})
+                                   remapping = {'simple_move':'dismount_move',
+                                                'stop_on_sample':'false'})
             
             smach.StateMachine.add('STAR_MANAGER',
                                    StarManager(self.tf_listener,
@@ -183,19 +190,16 @@ class LevelTwoStar(object):
                                                      self.announcer),
                                    transitions = {'move':'LINE_MOVE',
                                                   'spin':'ROTATE',
-                                                  'recalibrate':'ROTATION_MANAGER',
-                                                  'sample_detected':'PURSUE_SAMPLE',
-                                                  'line_blocked':'STAR_MANAGER',
-                                                  'next_spoke':'STAR_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('LINE_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'LINE_MANAGER',
-                                                  'timeout':'LINE_MANAGER',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
+                                   ExecuteVFHMove(self.vfh_mover, self.tf_listener),
+                                   transitions = {'complete':'STAR_MANAGER',
+                                                  'sample_detected':'PURSUE_SAMPLE',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'pursue_samples':'true'})
             
             smach.StateMachine.add('ROTATION_MANAGER',
                                    RotationManager(self.tf_listener, self.simple_mover),
@@ -208,7 +212,7 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'LINE_MANAGER',
                                                   'timeout':'LINE_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'velocity':'spin_velocity'})
+                                   remapping = {'stop_on_sample':'true'})
             
             @smach.cb_interface(input_keys=['detected_sample'])
             def pursuit_goal_cb(userdata, request):
@@ -437,10 +441,12 @@ class StartLeveLTwo(smach.State):
         result.result_string = 'initialized'
         userdata.action_result = result
         
-        userdata.dismount_move = {'type':'strafe',
-                                   'angle':0,
-                                   'distance':2,
-                                   'velocity':0.2}
+        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                              angle = 0,
+                              distance = 2,
+                              velocity = 0.2)
+
+        userdata.dismount_move = move
 
         return 'next'
 
@@ -543,9 +549,10 @@ class RotationManager(smach.State):
                       np.degrees(actual_yaw),
                       np.degrees(rotate_yaw)))
         #create the simple move command
-        userdata.simple_move = {'type':'spin',
-                                 'angle':rotate_yaw,
-                                 'velocity':userdata.spin_velocity}
+        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                              angle = rotate_yaw,
+                                              velocity = userdata.spin_velocity)        
+
         #clear the beacon points before returning, make sure we respond to new beacon poses
         userdata.last_align_time = rospy.get_time()
         userdata.beacon_point = None
@@ -555,12 +562,8 @@ class RotationManager(smach.State):
 class SearchLineManager(smach.State):
     def __init__(self, tf_listener, mover, announcer):
         smach.State.__init__(self,
-                             input_keys = ['strafes',
-                                           'active_strafe_key',
-                                           'line_yaw',
+                             input_keys = ['line_yaw',
                                            'outbound',
-                                           'offset_count',
-                                           'offset_limit',
                                            'return_time',
                                            'detected_sample',
                                            'world_fixed_frame',
@@ -572,18 +575,12 @@ class SearchLineManager(smach.State):
                                            'within_hub_radius',
                                            'beacon_point',
                                            'last_align_time'],
-                             output_keys = ['simple_move',
-                                            'offset_count',
-                                            'active_strafe_key',
+                             output_keys = ['vfh_move',
                                             'last_spin_radius',
                                             'beacon_point',
                                             'last_align_time'],
                              outcomes=['move',
                                        'spin',
-                                       'recalibrate',
-                                       'sample_detected',
-                                       'line_blocked',
-                                       'next_spoke',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -595,7 +592,6 @@ class SearchLineManager(smach.State):
 
         self.odometry_frame = userdata.odometry_frame
         
-        #head off for 100 meters
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
@@ -608,25 +604,12 @@ class SearchLineManager(smach.State):
                                                distance, 0,
                                                frame_id = self.odometry_frame)
         target_pose.header.stamp = rospy.Time(0)
-        #head off
-        goal = samplereturn_msg.SimpleMoveGoal()
-        goal.target_pose = target_pose
-        self.mover.send_goal(goal)
+        
+        #create destination
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose)
+        userdata.vfh_move = goal
 
-        #watch the action server
-        while not rospy.is_shutdown():
-            rospy.sleep(0.1)
-            move_state = self.mover.get_state()
-            if move_state not in util.actionlib_working_states:
-                break            
-            if userdata.detected_sample is not None:
-                self.mover.cancel_all_goals()
-                return 'sample_detected'
-            if self.preempt_requested():
-                self.mover.cancel_all_goals()
-                return 'aborted'
-            
-        return 'next_spoke'
+        return 'move'
     
             
 class BeaconSearch(smach.State):
