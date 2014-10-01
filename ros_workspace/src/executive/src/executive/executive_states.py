@@ -506,53 +506,19 @@ class ExecuteSimpleMove(smach.State):
         self.simple_mover = simple_mover
         
     def execute(self, userdata):
-                
-        move = deepcopy(userdata.simple_move)
-        userdata.simple_move = None #consume simple move
-        #load values from dict, absent values become None
-        angle = move.get('angle')
-        distance = move.get('distance')
-        velocity = move.get('velocity', userdata.velocity)
-        accel = move.get('acceleration')
- 
+
+        goal = userdata.simple_move
+        self.simple_mover.send_goal(goal)
+
+        #watch the action server
         while not rospy.is_shutdown():
-            try:
-                if move['type'] == 'spin':
-                    error = self.simple_mover.execute_spin(angle,
-                                                           max_velocity = velocity,
-                                                           acceleration = accel)
-                    rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(angle),
-                                                                       np.degrees(error)))
-                elif move['type'] == 'strafe':
-                    strafe_angle = move['angle']
-                    error = self.simple_mover.execute_strafe(strafe_angle,
-                                                             distance,
-                                                             max_velocity = velocity,
-                                                             acceleration = accel)
-                    rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %(
-                                   np.degrees(angle),
-                                   distance,
-                                   error))
-                else:
-                    rospy.logwarn('SIMPLE MOTION invalid type')
-                    return 'aborted'
-                
-                #did we exit the move execute because of a pause?
-                if userdata.paused:
-                    #wait here for unpause, as long as it takes
-                    rospy.loginfo("SIMPLE MOVE stopped by pause")
-                    while not rospy.is_shutdown() and userdata.paused:
-                        rospy.sleep(0.2)
-                    #unpaused, try again, changing both goal values to returned error
-                    distance = error
-                    angle = error
-                else:
-                    #made it through move without being paused, break out
-                    break
-                
-            except(TimeoutException):
-                    rospy.logwarn("TIMEOUT during simple_motion.")
-                    return 'timeout'
+            rospy.sleep(0.1)
+            move_state = self.simple_mover.get_state()
+            if move_state not in util.actionlib_working_states:
+                break            
+            if self.preempt_requested():
+                self.simple_mover.cancel_all_goals()
+                return 'aborted'
 
         return 'complete'
 
