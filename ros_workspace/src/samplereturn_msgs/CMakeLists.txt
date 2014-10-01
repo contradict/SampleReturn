@@ -103,6 +103,7 @@ add_action_files(
 	FILES
     GeneralExecutive.action
     SimpleMove.action
+    VFHMove.action
 )
 
 ## Generate added messages and services with any dependencies listed here
