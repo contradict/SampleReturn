@@ -1,5 +1,6 @@
 #goal
 geometry_msgs/PoseStamped target_pose
+float32 velocity
 ---
 #result
 bool success
