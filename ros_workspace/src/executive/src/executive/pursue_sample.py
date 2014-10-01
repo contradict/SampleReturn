@@ -145,7 +145,7 @@ class PursueSample(object):
                                    transitions = {'complete':'APPROACH_SAMPLE',
                                                   'timeout':'APPROACH_SAMPLE',
                                                   'aborted':'APPROACH_SAMPLE'},
-                                   remapping = {'velocity':'pursuit_velocity'})
+                                   remapping = {'stop_on_sample':'true'})
            
             smach.StateMachine.add('ANNOUNCE_OBSTACLE_CHECK',
                                    AnnounceState(self.announcer,
@@ -165,8 +165,7 @@ class PursueSample(object):
                                    transitions = {'complete':'OBSTACLE_CHECK',
                                                   'timeout':'OBSTACLE_CHECK',
                                                   'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'velocity':'pursuit_velocity',
-                                                'stop_on_sample':'false'})
+                                   remapping = {'stop_on_sample':'false'})
             
             smach.StateMachine.add('ANNOUNCE_BLOCKED',
                                    AnnounceState(self.announcer,
@@ -197,7 +196,7 @@ class PursueSample(object):
                                    transitions = {'complete':'MANIPULATOR_FINAL_MOVE',
                                                   'timeout':'MANIPULATOR_FINAL_MOVE',
                                                   'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'velocity':'pursuit_velocity'})
+                                   remapping = {'stop_on_sample':'true'})
             
             smach.StateMachine.add('MANIPULATOR_FINAL_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -205,7 +204,7 @@ class PursueSample(object):
                                                   'timeout':'HANDLE_SEARCH',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'simple_move':'final_move',
-                                                'velocity':'search_velocity'})
+                                                'stop_on_sample':'true'})
             
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
@@ -227,7 +226,7 @@ class PursueSample(object):
                                    transitions = {'complete':'HANDLE_SEARCH_MOVES',
                                                   'timeout':'HANDLE_SEARCH_MOVES',
                                                   'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'velocity':'search_velocity'})
+                                   remapping = {'stop_on_sample':'true'})
 
             smach.StateMachine.add('ANNOUNCE_SEARCH_FAILURE',
                                    AnnounceState(self.announcer,
@@ -246,7 +245,8 @@ class PursueSample(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
-                                                  'aborted':'PUBLISH_FAILURE'})
+                                                  'aborted':'PUBLISH_FAILURE'},
+                                   remapping = {'stop_on_sample':'false'})
 
             smach.StateMachine.add('ANNOUNCE_GRAB',
                                    AnnounceState(self.announcer,
