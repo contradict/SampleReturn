@@ -575,7 +575,7 @@ class SearchLineManager(smach.State):
                                            'within_hub_radius',
                                            'beacon_point',
                                            'last_align_time'],
-                             output_keys = ['vfh_move',
+                             output_keys = ['move_goal',
                                             'last_spin_radius',
                                             'beacon_point',
                                             'last_align_time'],
@@ -607,7 +607,7 @@ class SearchLineManager(smach.State):
         
         #create destination
         goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose)
-        userdata.vfh_move = goal
+        userdata.move_goal = goal
 
         return 'move'
     

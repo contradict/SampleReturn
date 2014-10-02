@@ -146,7 +146,7 @@ class ExecuteVFHMove(smach.State):
                              outcomes=['complete',
                                        'sample_detected',
                                        'preempted','aborted'],
-                             input_keys=['vfh_move',
+                             input_keys=['move_goal',
                                          'pursue_samples',
                                          'stop_on_sample',
                                          'detected_sample',
@@ -169,7 +169,7 @@ class ExecuteVFHMove(smach.State):
         except(tf.Exception):
             rospy.logwarn("ExecuteVFHMove failed to get current pose")
             return 'aborted'
-        goal = userdata.vfh_move
+        goal = userdata.move_goal
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
         while not rospy.is_shutdown():
@@ -199,7 +199,7 @@ class ExecuteVFHMove(smach.State):
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
             #handle target_pose changes
-            if userdata.vfh_move != goal:
+            if userdata.move_goal != goal:
                 rospy.loginfo("ExecuteVFHMove sending new goal")
                 self.move_client.send_goal(goal)
             #if we are paused, cancel goal and wait, then resend
