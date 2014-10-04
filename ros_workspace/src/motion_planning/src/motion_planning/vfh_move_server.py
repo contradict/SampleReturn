@@ -152,9 +152,12 @@ class VFHMoveServer( object ):
         # drive to goal using vfh
         distance = np.hypot(goal_local.pose.position.x,
                 goal_local.pose.position.y)
+        #use param velocity unless a velocity was included in goal
+        velocity = goal.velocity if (goal.velocity != 0) else None
         rospy.logdebug("Moving %f meters ahead.", distance)
         self.vfh_running = True
         self._mover.execute_strafe(0.0, distance,
+                max_velocity = velocity,
                 stop_function=self._as.is_preempt_requested)
         self.vfh_running = False
         if self._as.is_preempt_requested():
