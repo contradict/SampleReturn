@@ -150,12 +150,9 @@ class ExecuteVFHMove(smach.State):
                                          'pursue_samples',
                                          'stop_on_sample',
                                          'detected_sample',
-                                         'motion_check_interval',
-                                         'min_motion',
                                          'paused',
-                                         'world_fixed_frame'],
-                             output_keys=['last_pose',
-                                          'detected_sample'])
+                                         'odometry_frame'],
+                             output_keys=['detected_sample'])
 
         self.move_client = move_client
         self.listener = listener
@@ -163,12 +160,6 @@ class ExecuteVFHMove(smach.State):
     def execute(self, userdata):
         #on entry clear old sample_detections!
         userdata.detected_sample = None
-        try:        
-            last_pose = util.get_current_robot_pose(self.listener,
-                    userdata.world_fixed_frame)
-        except(tf.Exception):
-            rospy.logwarn("ExecuteVFHMove failed to get current pose")
-            return 'aborted'
         goal = userdata.move_goal
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
@@ -177,11 +168,10 @@ class ExecuteVFHMove(smach.State):
             #log current pose for use in other states
             try:
                 current_pose = util.get_current_robot_pose(self.listener,
-                        userdata.world_fixed_frame)
+                        userdata.odometry_frame)
             except(tf.Exception):
                 rospy.logwarn("ExecuteVFHMove failed to get current pose")
                 return 'aborted'
-            userdata.last_pose = current_pose
             #is action server still working?
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
@@ -276,14 +266,13 @@ class PursuePointManager(smach.State):
                              outcomes=['min_distance',
                                        'point_lost',
                                        'preempted', 'aborted'],
-                             input_keys=['target_pose',
+                             input_keys=['move_goal',
                                          'pursuit_point',
-                                         'last_pose',
                                          'min_pursuit_distance',
                                          'max_pursuit_error',
-                                         'max_point_lost_time',
+                                         'max_sample_lost_time',
                                          'odometry_frame'],
-                             output_keys=['target_pose'])
+                             output_keys=['move_goal'])
 
         self.listener = listener
 
@@ -292,9 +281,14 @@ class PursuePointManager(smach.State):
         last_point_detection = userdata.pursuit_point.header.stamp
 
         while not rospy.is_shutdown():
-            #last_pose is updated by DriveToPose
-            current_pose = userdata.last_pose
-            point_distance = util.pose_distance_2d(current_pose, userdata.target_pose)
+            try:
+                current_pose = util.get_current_robot_pose(self.listener,
+                        userdata.odometry_frame)
+            except(tf.Exception):
+                rospy.logwarn("PursuePointManager failed to get current pose")
+                return 'aborted'
+            point_distance = util.pose_distance_2d(current_pose,
+                                                   userdata.move_goal.target_pose)
             rospy.logdebug("PURSUIT distance: " + str(point_distance))
             if point_distance < userdata.min_pursuit_distance:
                 return 'min_distance'
@@ -319,7 +313,7 @@ class PursuePointManager(smach.State):
                     userdata.target_pose = new_pose
 
             if (rospy.Time.now() - last_point_detection) > \
-             rospy.Duration(userdata.max_point_lost_time):
+             rospy.Duration(userdata.max_sample_lost_time):
                 return 'point_lost'
 
             if self.preempt_requested():
@@ -338,33 +332,26 @@ class PursueDetectedPoint(smach.Concurrence):
         smach.Concurrence.__init__(self,
             outcomes=['min_distance',
                       'complete',
-                      'timeout',
                       'point_lost',
                       'preempted', 'aborted'],
             default_outcome = 'aborted',
-            input_keys=['target_pose',
-                        'last_pose',
+            input_keys=['move_goal',
                         'pursuit_point',
                         'pursue_samples',
                         'stop_on_sample',
                         'detected_sample',
-                        'velocity',
                         'min_pursuit_distance',
                         'max_pursuit_error',
-                        'max_point_lost_time',
-                        'motion_check_interval',
-                        'min_motion',
+                        'max_sample_lost_time',
                         'paused',
                         'odometry_frame'],
-            output_keys=['target_pose',
-                         'last_pose'],
+            output_keys=['move_goal'],
             child_termination_cb = lambda preempt: True,
             outcome_map = {'min_distance':{'PURSUIT_MANAGER':'min_distance'},
                            'point_lost':{'PURSUIT_MANAGER':'point_lost'},
-                           'complete':{'DRIVE_TO_POSE':'complete'},
-                           'timeout':{'DRIVE_TO_POSE':'timeout'},
-                           'preempted':{'PURSUIT_MANAGER':'preempted',
-                                        'DRIVE_TO_POSE':'preempted'}})
+                           'complete':{'EXECUTE_MOVE':'complete'},
+                           'aborted':{'PURSUIT_MANAGER':'preempted',
+                                        'EXECUTE_MOVE':'preempted'}})
 
         self.listener = listener
 
@@ -385,8 +372,9 @@ class PursueDetectedPoint(smach.Concurrence):
         goal_pose = geometry_msg.Pose(point_stamped.point,
                     util.pointing_quaternion_2d(start_pose.pose.position,
                                                 point_stamped.point))
-        userdata.target_pose = geometry_msg.PoseStamped(goal_header, goal_pose)
-        userdata.last_pose = start_pose
+        target_pose = geometry_msg.PoseStamped(goal_header, goal_pose)
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose)
+        userdata.move_goal = goal
         rospy.logdebug("PURSUIT initial target point: %s", point_stamped)
 
         return smach.Concurrence.execute(self, userdata)
@@ -397,8 +385,8 @@ def GetPursueDetectedPointState(move_client, listener):
     with pursue:
         smach.Concurrence.add('PURSUIT_MANAGER',
                               PursuePointManager(listener))
-        smach.Concurrence.add('DRIVE_TO_POSE',
-                              DriveToPoseState(move_client, listener))
+        smach.Concurrence.add('EXECUTE_MOVE',
+                              ExecuteVFHMove(move_client, listener))
 
     return pursue
 
