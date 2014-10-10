@@ -29,7 +29,6 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import ExecuteVFHMove
-from executive.executive_states import DriveToPoint
 from executive.executive_states import RotateToClear
 from executive.executive_states import WaitForFlagState
 
@@ -195,7 +194,7 @@ class LevelTwoStar(object):
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('LINE_MOVE',
-                                   ExecuteVFHMove(self.vfh_mover, self.tf_listener),
+                                   ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'STAR_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
@@ -247,7 +246,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('BEACON_SEARCH',
                                    BeaconSearch(self.tf_listener, self.announcer),
                                    transitions = {'mount':'MOUNT_MANAGER',
-                                                  'move':'BEACON_SEARCH_DRIVER',
+                                                  'move':'BEACON_SEARCH_MOVE',
                                                   'spin':'BEACON_SEARCH_SPIN',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
@@ -259,21 +258,15 @@ class LevelTwoStar(object):
             
             #return to start along the approach point
             #if the path is ever blocked just give up and return to the level_two search
-            smach.StateMachine.add('BEACON_SEARCH_DRIVER',
-                                   DriveToPoint(self.tf_listener, self.announcer),
-                                   transitions = {'move':'BEACON_SPIN_MOVE',
-                                                  'detection_interrupt':'BEACON_SEARCH',
-                                                  'blocked':'BEACON_CLEAR_MOVE',
-                                                  'complete':'BEACON_SEARCH'},
-                                   remapping = {'detection_object':'beacon_point',
-                                                'stop_on_detection':'stop_on_beacon'})
-
-            smach.StateMachine.add('BEACON_SPIN_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'BEACON_SEARCH_DRIVER',
-                                                  'timeout':'BEACON_SEARCH_DRIVER',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
-
+            smach.StateMachine.add('BEACON_SEARCH_MOVE',
+                                   ExecuteVFHMove(self.vfh_mover),
+                                   transitions = {'complete':'BEACON_SEARCH',
+                                                  'sample_detected':'BEACON_SEARCH',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'pursue_samples':'true',
+                                                'detected_sample':'beacon_point'})
+            
+            
             smach.StateMachine.add('BEACON_CLEAR_MOVE',
                                    RotateToClear(self.simple_mover, self.tf_listener, self.strafes),
                                    transitions = {'complete':'BEACON_SEARCH',
@@ -595,7 +588,7 @@ class SearchLineManager(smach.State):
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
-            distance = 50
+            distance = 20
 
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    frame_id = self.odometry_frame)
