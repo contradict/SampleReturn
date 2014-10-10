@@ -140,7 +140,7 @@ class WaitForFlagState(smach.State):
 #general class for using the robot's planner to drive to a point
 class ExecuteVFHMove(smach.State):
 
-    def __init__(self, move_client, listener):
+    def __init__(self, move_client):
 
         smach.State.__init__(self,
                              outcomes=['complete',
@@ -155,12 +155,11 @@ class ExecuteVFHMove(smach.State):
                              output_keys=['detected_sample'])
 
         self.move_client = move_client
-        self.listener = listener
 
     def execute(self, userdata):
         #on entry clear old sample_detections!
         userdata.detected_sample = None
-        goal = deepcopy(userdata.move_goal)
+        goal = userdata.move_goal
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
         while not rospy.is_shutdown():
@@ -179,11 +178,6 @@ class ExecuteVFHMove(smach.State):
                 if userdata.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
-            #If move_goal changes, update the action server goal.
-            if userdata.move_goal != goal:
-                rospy.loginfo("ExecuteVFHMove sending new goal")
-                goal = deepcopy(userdata.move_goal)
-                self.move_client.send_goal(goal)
             #Check to see if we are paused.  If so, cancel active goals.
             #Resend last goal on unpause
             if userdata.paused:
@@ -387,7 +381,7 @@ def GetPursueDetectedPointState(move_client, listener):
         smach.Concurrence.add('PURSUIT_MANAGER',
                               PursuePointManager(listener))
         smach.Concurrence.add('EXECUTE_MOVE',
-                              ExecuteVFHMove(move_client, listener))
+                              ExecuteVFHMove(move_client))
 
     return pursue
 
