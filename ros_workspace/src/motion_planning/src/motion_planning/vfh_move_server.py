@@ -94,7 +94,7 @@ class VFHMoveServer( object ):
         
         #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
         #so that obstacles produce zero cost at a range of dmax
-        self.max_obstacle_distance = 6.0  #look at obstacles up to X meters out
+        self.max_obstacle_distance = 6.0  #this is dmax
         self.const_b = 1 #uuuuh, if this is 1 then a = dmax... is that cool?
         self.const_a = self.const_b*self.max_obstacle_distance
         
@@ -188,9 +188,6 @@ class VFHMoveServer( object ):
         if not self.vfh_running:
             return
         
-        #if self.preempt_requested():
-        #    self.mover.stop()
-        
         start_time = rospy.get_time()
 
         #get the robot position inside costmap
@@ -215,14 +212,9 @@ class VFHMoveServer( object ):
             self._mover.stop()
             return
         
-        #debug costmap stuff
-        #debug_costmap_data = np.zeros(self.costmap.shape)
-                 
         obstacle_density = np.zeros(self.sector_count)
         inverse_cost = np.zeros(self.sector_count)
         #nonzero_coords = np.transpose(np.nonzero(self.costmap))        
-
-        #debug_costmap_data[tuple(robot_in_costmap)] = 64
 
         for index in range(len(self.sectors)):
             #yaw in odom            
@@ -233,7 +225,7 @@ class VFHMoveServer( object ):
                                         sector_yaw,
                                         self.costmap_info.resolution)
             end = self.bresenham_point(robot_in_costmap,
-                                        self.max_obstacle_distance,                                   
+                                        min(self.max_obstacle_distance, distance_to_target),                                   
                                         sector_yaw,
                                         self.costmap_info.resolution)            
             sector_line = bresenham.points(start, end)
@@ -255,15 +247,12 @@ class VFHMoveServer( object ):
             if obstacle_density[index] >= self.threshold_high:
                 self.sectors[index] = True
                 inverse_cost[index] = 0 #inversely infinitely expensive
-                #debug_costmap_data[tuple(start[0])] = 99
             if obstacle_density[index] <= self.threshold_low:
                 self.sectors[index] = False
-                #debug_costmap_data[tuple(start[0])] = 64
             #if sector is clear (it may not have been changed this time!) set its cost, making it a candidate sector
             if not self.sectors[index]:
                 inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
-                                            + self.u_current*np.abs(self.current_sector_index - index)*self.sector_angle
-                                          ) 
+                                            + self.u_current*np.abs(self.current_sector_index - index)*self.sector_angle) 
 
         #stop the mover if the path is blocked
         if np.all(self.sectors):
@@ -291,7 +280,7 @@ class VFHMoveServer( object ):
             vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
             vfh_debug_marker.type = vis_msg.Marker.ARROW
             vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
-            vfh_debug_marker.scale = geometry_msg.Vector3(self.max_obstacle_distance, .02, .02)
+            vfh_debug_marker.scale = geometry_msg.Vector3(min(self.max_obstacle_distance, distance_to_target), .02, .02)
             vfh_debug_marker.lifetime = rospy.Duration(0.5)
             
             #rospy.loginfo("SECTORS: %s" % (self.sectors))
