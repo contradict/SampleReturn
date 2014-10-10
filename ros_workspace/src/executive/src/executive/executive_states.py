@@ -160,52 +160,53 @@ class ExecuteVFHMove(smach.State):
     def execute(self, userdata):
         #on entry clear old sample_detections!
         userdata.detected_sample = None
-        goal = userdata.move_goal
+        goal = deepcopy(userdata.move_goal)
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
         while not rospy.is_shutdown():
+            #Wait, then get action server state.
             rospy.sleep(0.1)
-            #log current pose for use in other states
-            try:
-                current_pose = util.get_current_robot_pose(self.listener,
-                        userdata.odometry_frame)
-            except(tf.Exception):
-                rospy.logwarn("ExecuteVFHMove failed to get current pose")
-                return 'aborted'
-            #is action server still working?
+            #First, handle preempts.
+            if self.preempt_requested():
+                return self.handle_preempt()
+            #Is action server still working?
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
                 break
-            #handle preempts
-            if self.preempt_requested():
-                rospy.loginfo("PREEMPT REQUESTED IN ExecuteVFHMove")
-                self.move_client.cancel_all_goals()
-                self.service_preempt()
-                return 'preempted'
-            #handle sample detection
+            #Handle sample detection
             if (userdata.detected_sample is not None) and userdata.pursue_samples:
                 rospy.loginfo("ExecuteVFHMove detected sample: " + str(userdata.detected_sample))
                 if userdata.stop_on_sample:
                     self.move_client.cancel_all_goals()
                 return 'sample_detected'
-            #handle target_pose changes
+            #If move_goal changes, update the action server goal.
             if userdata.move_goal != goal:
                 rospy.loginfo("ExecuteVFHMove sending new goal")
+                goal = deepcopy(userdata.move_goal)
                 self.move_client.send_goal(goal)
-            #if we are paused, cancel goal and wait, then resend
-            #last goal and reset timeout timer
+            #Check to see if we are paused.  If so, cancel active goals.
+            #Resend last goal on unpause
             if userdata.paused:
                 self.move_client.cancel_all_goals()
                 while not rospy.is_shutdown():
-                    rospy.sleep(0.2)
-                    if not userdata.paused:
-                        break
-                self.move_client.send_goal(goal)
+                    rospy.sleep(0.1)
+                    #Must check preempt in pause loop too, no matter how lame it is
+                    if self.preempt_requested():
+                        return self.handle_preempt()
+                    if not userdata.paused: break
+                self.move_client.send_goal(goal)      
                                     
         if move_state == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
 
         return 'aborted'
+
+    def handle_preempt(self):
+        rospy.loginfo("PREEMPT REQUESTED IN ExecuteVFHMove")
+        self.move_client.cancel_all_goals()
+        self.service_preempt()
+        return 'preempted'        
+        
 
 #simple move executor, set up interrupts outside this.  If you want obstacle detection
 #to work, and this is strafing in a checked direction, set the active_strafe_key
