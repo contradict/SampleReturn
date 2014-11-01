@@ -87,6 +87,7 @@ add_service_files(
     DIRECTORY srv
     FILES
         Enable.srv
+        ObstacleCheck.srv
         SimpleMotion.srv
 )
 
