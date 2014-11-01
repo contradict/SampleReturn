@@ -19,6 +19,7 @@ import platform_motion_msgs.srv as platform_srv
 
 import samplereturn.util as util
 from motion_planning.simple_motion import TimeoutException
+from samplereturn_msgs.msg import SimpleMoveGoal
 
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
@@ -490,11 +491,11 @@ class ServoController(smach.State):
                 velocity = userdata.servo_params['initial_velocity']
                 accel = userdata.servo_params['initial_accel']
             yaw = util.pointing_yaw(origin, point_in_manipulator)
-            userdata.simple_move = {'type':'strafe',
-                                    'angle':yaw,
-                                    'distance':distance,
-                                    'velocity':velocity,
-                                    'acceleration':accel}
+            userdata.simple_move =  SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                   angle = yaw,
+                                                   distance = distance,
+                                                   velocity = velocity,
+                                                   acceleration = accel)
             #rospy.loginfo("SERVO simple_move: %s" % (userdata.simple_move))
             self.announcer.say("Servo ing, distance, %.1f centimeters" % (distance*100))
             rospy.loginfo("DETECTED SAMPLE IN manipulator_arm frame (corrected): %s" % (point_in_manipulator))
