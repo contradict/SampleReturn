@@ -26,12 +26,14 @@ import visualization_msgs.msg as vis_msg
 import samplereturn.util as util
 import motion_planning.simple_motion as simple_motion
 from motion_planning.simple_motion import TimeoutException
+from samplereturn_msgs.msg import SimpleMoveGoal
 
 from executive.executive_states import WaitForFlagState
 from executive.executive_states import AnnounceState
 from executive.executive_states import SelectMotionMode
 from executive.executive_states import ServoController
 from executive.executive_states import ExecuteSimpleMove
+from executive.executive_states import ExecuteVFHMove
 from executive.executive_states import MoveToPoints
 from executive.executive_states import GetPursueDetectedPointState
 
@@ -59,11 +61,7 @@ class PursueSample(object):
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
         
-        #strafe definitions, offset is length along strafe line
-        #the yaws have a static angle, which the direction from base_link the robot strafes
-        self.strafes = rospy.get_param('strafes')
-        self.strafes['center']['distance'] = self.node_params.pursuit_step
-        
+       
         #for this state machine, there is no preempt path.  It either finshes successfully and
         #reports success on the PursuitResult topic, or in case of any interupption or failure, it
         #exits through the abort path, reporting failure on the topic.
@@ -75,10 +73,6 @@ class PursueSample(object):
         #tf frames
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
-
-        #strafe dictionary and active strafe key
-        self.state_machine.userdata.strafes = self.strafes
-        self.state_machine.userdata.active_strafe_key = None
         
         #userdata that subscribers fiddle with
         self.state_machine.userdata.paused = False        
@@ -132,7 +126,12 @@ class PursueSample(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_SAMPLE_PURSUIT',
-                                   StartSamplePursuit(),
+                                   StartSamplePursuit(self.tf_listener),
+                                   transitions = {'next':'ANNOUNCE_SAMPLE_PURSUIT'})
+            
+            smach.StateMachine.add('ANNOUNCE_SAMPLE_PURSUIT',
+                                   AnnounceState(self.announcer,
+                                                 'Sample detected.  Pursue ing'),
                                    transitions = {'next':'APPROACH_SAMPLE'})
 
             #sample approach concurrence
@@ -151,25 +150,27 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  'Check ing for obstacles in sample area'),
                                    transitions = {'next':'OBSTACLE_CHECK'})
+  
+            @smach.cb_interface(outcomes=['clear','blocked'])
+            def obstacle_check_cb(userdata, response):
+                if response.obstacle:
+                    return 'blocked'
+                else:
+                    return 'clear'
             
             smach.StateMachine.add('OBSTACLE_CHECK',
-                                   SampleAreaObstacleCheck(self.tf_listener),
-                                   transitions = {'move':'OBSTACLE_CHECK_MOVE',
-                                                  'blocked':'ANNOUNCE_BLOCKED',
-                                                  'clear':'ANNOUNCE_MANIPULATOR_APPROACH',
-                                                  'point_lost':'ANNOUNCE_POINT_LOST',
-                                                  'aborted':'PUBLISH_FAILURE'})            
-           
-            smach.StateMachine.add('OBSTACLE_CHECK_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'OBSTACLE_CHECK',
-                                                  'timeout':'OBSTACLE_CHECK',
-                                                  'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'stop_on_sample':'false'})
-            
+                smach_ros.ServiceState('obstacle_check', samplereturn_srv.ObstacleCheck,
+                request = samplereturn_srv.ObstacleCheckRequest(1.5, 2.0),
+                response_cb = obstacle_check_cb),
+                transitions = {'blocked':'ANNOUNCE_BLOCKED',
+                               'clear':'ANNOUNCE_MANIPULATOR_APPROACH',
+                               'succeeded':'PUBLISH_FAILURE', #means cb error I think
+                               'aborted':'PUBLISH_FAILURE'}
+            )
+    
             smach.StateMachine.add('ANNOUNCE_BLOCKED',
                                    AnnounceState(self.announcer,
-                                                 'Obstacles in manipulator area. Abort ing'),
+                                                 'Obstacles in sample area. Abort ing'),
                                    transitions = {'next':'PUBLISH_FAILURE'})   
            
             smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
@@ -194,6 +195,7 @@ class PursueSample(object):
             smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'MANIPULATOR_FINAL_MOVE',
+                                                  'sample_detected':'VISUAL_SERVO',
                                                   'timeout':'MANIPULATOR_FINAL_MOVE',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'stop_on_sample':'true'})
@@ -201,6 +203,7 @@ class PursueSample(object):
             smach.StateMachine.add('MANIPULATOR_FINAL_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'HANDLE_SEARCH',
+                                                  'sample_detected':'VISUAL_SERVO',
                                                   'timeout':'HANDLE_SEARCH',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'simple_move':'final_move',
@@ -209,21 +212,20 @@ class PursueSample(object):
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
                                    transitions = {'sample_search':'HANDLE_SEARCH_MOVES',
-                                                  'sample_detected':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('HANDLE_SEARCH_MOVES',
                                    MoveToPoints(self.tf_listener),
                                    transitions = {'next_point':'SEARCH_MOVE',
-                                                  'sample_detected':'HANDLE_SEARCH',
-                                                  'blocked':'SEARCH_MOVE',
-                                                  'complete':'ANNOUNCE_SEARCH_FAILURE'},
+                                                  'complete':'ANNOUNCE_SEARCH_FAILURE',
+                                                  'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'face_next_point':'false',
                                                 'check_for_obstacles':'false'})
    
             smach.StateMachine.add('SEARCH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'HANDLE_SEARCH_MOVES',
+                                                  'sample_detected':'VISUAL_SERVO',
                                                   'timeout':'HANDLE_SEARCH_MOVES',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'stop_on_sample':'true'})
@@ -244,6 +246,7 @@ class PursueSample(object):
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
+                                                  'sample_detected':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'stop_on_sample':'false'})
@@ -332,32 +335,23 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
-                                                 "Continue ing search line"),
+                                                 "Continue ing search"),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN',
                                    AnnounceState(self.announcer,
-                                                 "Returning to search line"),
+                                                 "Returning to search"),
                                    transitions = {'next':'RETURN_TO_START'})
 
             #return to start along the approach point
             #if the path is ever blocked just give up and return to the level_two search
             smach.StateMachine.add('RETURN_TO_START',
-                                   MoveToPoints(self.tf_listener),
-                                   transitions = {'next_point':'RETURN_MOVE',
-                                                  'sample_detected':'RETURN_MOVE',
-                                                  'blocked':'complete',
-                                                  'complete':'complete'},
-                                   remapping = {'point_list':'approach_points',
-                                                'face_next_point':'true',
-                                                'check_for_obstacles':'true'})
-            
-            smach.StateMachine.add('RETURN_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'RETURN_TO_START',
-                                                  'timeout':'RETURN_TO_START',
+                                   ExecuteVFHMove(self.vfh_mover),
+                                   transitions = {'complete':'complete',
+                                                  'sample_detected':'complete',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'},
-                                   remapping = {'velocity':'return_velocity'})
+                                   remapping = {'move_goal':'return_goal',
+                                                'pursue_samples':'true'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN_BLOCKED',
                                     AnnounceState(self.announcer,
@@ -392,10 +386,7 @@ class PursueSample(object):
                         samplereturn_msg.NamedPoint,
                         self.sample_detection_manipulator)
         
-        rospy.Subscriber('costmap_check',
-                                samplereturn_msg.CostmapCheck,
-                                self.handle_costmap_check)
-        
+         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
 
         #start action servers and services
@@ -403,11 +394,7 @@ class PursueSample(object):
         pursue_sample_server.run_server()
         rospy.spin()
         sls.stop()
-     
-    def handle_costmap_check(self, costmap_check):
-        for strafe_key, blocked in zip(costmap_check.strafe_keys,
-                                       costmap_check.blocked):
-            self.strafes[strafe_key]['blocked'] = blocked                        
+                     
 
     def sample_detection_search(self, sample):
             try:
@@ -436,18 +423,21 @@ class PursueSample(object):
     
 #searches the globe   
 class StartSamplePursuit(smach.State):
-    def __init__(self):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys=['action_goal',
-                                         'pursuit_point'],
-                             output_keys=['approach_points',
+                                         'pursuit_point',
+                                         'odometry_frame'],
+                             output_keys=['return_goal',
                                           'pursuit_point',
                                           'stop_on_sample',
                                           'action_result',
                                           'search_count',
                                           'grab_count',
                                           'distance_to_sample'])
+        
+        self.tf_listener = tf_listener
     
     def execute(self, userdata):
         
@@ -463,62 +453,16 @@ class StartSamplePursuit(smach.State):
         userdata.grab_count = 0
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))
         userdata.pursuit_point = userdata.action_goal.input_point
-        userdata.approach_points = collections.deque([])
         userdata.distance_to_sample = 20 #maximum possible detection
         
+        current_pose = util.get_current_robot_pose(self.tf_listener,
+                                                   frame_id = userdata.odometry_frame)
+        current_pose.header.stamp = rospy.Time(0)
+        #create return destination
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose)
+        userdata.return_goal = goal        
+        
         return 'next'
-
-class SampleAreaObstacleCheck(smach.State):
-    def __init__(self, tf_listener):
-        smach.State.__init__(self,
-                             outcomes=['move', 'blocked', 'clear', 'point_lost', 'aborted'],
-                             input_keys=['target_sample',
-                                         'settle_time',
-                                         'strafes',
-                                         'active_strafe_key',
-                                         'sample_obstacle_check_distance'],
-                             output_keys=['simple_move',
-                                          'active_strafe_key',
-                                          'target_sample',
-                                          'detected_sample',
-                                          'stop_on_sample'])
-        
-        self.tf_listener = tf_listener
-        
-    def execute(self, userdata):
-        
-        #if we have already made the move, wait a couple seconds and see if their are obstacles
-        if userdata.active_strafe_key == 'sample_area':
-            rospy.sleep(2.0)
-            userdata.active_strafe_key = None
-            if userdata.strafes['sample_area']['blocked']:
-                rospy.loginfo("PURSUE SAMPLE sample area contains obstacles")
-                return 'blocked'
-            else:
-                return 'clear'
-        
-        userdata.target_sample = None
-        rospy.sleep(userdata.settle_time)
-        if userdata.target_sample is None:
-            return 'point_lost'
-        else:
-            try:
-                yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
-            except tf.Exception:
-                rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
-                return 'aborted'
-            userdata.detected_sample = None
-            #time to look for sample in manipulator view, stop when it is seen
-            userdata.stop_on_sample = True
-            #move to the obstacle check distance
-            distance = distance - userdata.sample_obstacle_check_distance
-            userdata.active_strafe_key = 'sample_area'
-            userdata.simple_move = {'type':'strafe',
-                                    'angle':yaw,
-                                    'distance': distance}
-            return 'move'
-        
-        return 'aborted'
 
 class ManipulatorApproach(smach.State):
     def __init__(self, tf_listener):
@@ -555,12 +499,12 @@ class ManipulatorApproach(smach.State):
             #time to look for sample in manipulator view, stop when it is seen
             userdata.stop_on_sample = True
             distance -= userdata.final_pursuit_step
-            userdata.simple_move = {'type':'strafe',
-                                    'angle':yaw,
-                                    'distance':distance}
-            userdata.final_move = {'type':'strafe',
-                                   'angle':yaw,
-                                   'distance':userdata.final_pursuit_step}
+            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                  angle = yaw,
+                                                  distance = distance)
+            userdata.final_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                 angle = yaw,
+                                                 distance = userdata.final_pursuit_step)
             return 'move'
         
         return 'aborted'
@@ -568,7 +512,7 @@ class ManipulatorApproach(smach.State):
 class HandleSearch(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
-                             outcomes=['sample_search', 'sample_detected', 'aborted'],
+                             outcomes=['sample_search', 'aborted'],
                              input_keys=['square_search_size',
                                          'search_count',
                                          'search_try_limit',
@@ -584,10 +528,6 @@ class HandleSearch(smach.State):
     def execute(self, userdata):
 
         userdata.stop_on_sample = True
-
-        if userdata.detected_sample is not None:
-            self.announcer.say("Sample in manipulator view")
-            return 'sample_detected'
 
         if userdata.search_count >= userdata.search_try_limit:
             self.announcer.say("Search limit reached")
@@ -622,7 +562,6 @@ class HandleSearch(smach.State):
             rospy.logwarn("PURSUE_SAMPLE failed to transform %s-%s in GetSearchMoves: %s",
                     'base_link', userdata.odometry_frame, e)
             return 'aborted'
-
 
 
 class ConfirmSampleAcquired(smach.State):
