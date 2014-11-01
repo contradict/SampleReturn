@@ -40,31 +40,6 @@
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="gpio_read" to="/io/gpio_read"/>
 
-    <!-- dictionary for dumb planning, costmap_checker
-         also uses this to determine where to check for obstacles.
-         The angles must not be changed for proper block checking,
-         but the distances can be overridden by nodes-->
-    <rosparam ns="/processes/executive">
-        strafes:
-            left:
-                angle: 0.7854
-                distance: 4.0
-                blocked: False
-                right_check_offset: 0.6     
-            center:
-                angle: 0
-                distance: 16.0
-                blocked: False                
-            right:
-                angle: -0.7854
-                distance: 4.0
-                blocked: False
-                left_check_offset: 0.6
-            sample_area:
-                angle: 0
-                check_distance: 3.5
-    </rosparam>
-
     <node
         pkg="executive"
         type="executive_master_node.py"
