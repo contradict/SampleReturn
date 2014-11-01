@@ -12,6 +12,7 @@ import rospy
 import rosnode
 import actionlib
 import tf
+import tf2_ros
 import tf_conversions
 
 import samplereturn.util as util
@@ -35,6 +36,9 @@ import sensor_msgs.point_cloud2 as pc2
 
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
+
+from geometry_msgs.msg import TransformStamped, Transform
+
 
 class RobotSimulator(object):
     
@@ -136,11 +140,11 @@ class RobotSimulator(object):
         self.broadcast_localization = True
 
         #tf stuff
-        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self.tf_listener = tf.TransformListener()
         
-        self.zero_translation = (0,0,0)
-        self.zero_rotation = (0,0,0,1)
+        self.zero_translation = geometry_msg.Vector3(0,0,0)
+        self.zero_rotation = geometry_msg.Quaternion(0,0,0,1)
                                                   
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
@@ -448,25 +452,21 @@ class RobotSimulator(object):
     def broadcast_tf_and_motion(self, event):
         #rospy.loginfo("Starting TF and Odom")
         now = rospy.Time.now()
+        transforms = []
         if self.broadcast_localization:
-            self.tf_broadcaster.sendTransform(self.zero_translation,
-                                              self.zero_rotation,
-                                              now,
-                                              'fake_odom',
-                                              'fake_map')
-        
+            transform = TransformStamped(std_msg.Header(0, now, 'fake_map'),
+                                         'fake_odom',
+                                         Transform(self.zero_translation,
+                                                   self.zero_rotation))
+            transforms.append(transform)
+
         self.integrate_odometry()
         
-        trans = (self.robot_pose.pose.position.x,
-                       self.robot_pose.pose.position.y,
-                       self.robot_pose.pose.position.z)
-        
-        rot = (self.robot_pose.pose.orientation.x,
-                    self.robot_pose.pose.orientation.y,
-                    self.robot_pose.pose.orientation.z,
-                    self.robot_pose.pose.orientation.w)
-        
-        self.tf_broadcaster.sendTransform(trans, rot, now, 'base_link', 'fake_odom')
+        transform = TransformStamped(std_msg.Header(0, now, 'fake_odom'),
+                                     'base_link',
+                                     Transform(self.robot_pose.pose.position,
+                                               self.robot_pose.pose.orientation))
+        transforms.append(transform)
 
         if self.odometry_is_noisy:
             qn = (self.noisy_robot_pose.pose.orientation.x,
@@ -496,15 +496,22 @@ class RobotSimulator(object):
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
             mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
 
-            self.tf_broadcaster.sendTransform(mfm_translate, mfm_rot, now,
-                    'fake_map', 'map')
+            transform = TransformStamped(std_msg.Header(0, now, 'map'),
+                                         'fake_map',
+                                         Transform(geometry_msg.Vector3(*mfm_translate),
+                                                   geometry_msg.Quaternion(*mfm_rot)))
+            transforms.append(transform)
+        
         else:
-            self.tf_broadcaster.sendTransform(
-                    self.zero_translation,
-                    self.zero_rotation,
-                    now,
-                    'fake_map', 'map')
-
+            transform = TransformStamped(std_msg.Header(0, now, 'map'),
+                                         'fake_map',
+                                         Transform(self.zero_translation,
+                                                   self.zero_rotation))
+            transforms.append(transform)
+  
+        #broadcast transformlist
+        self.tf_broadcaster.sendTransform(transforms)
+  
         #also publish odometry
         self.odometry_pub.publish(self.robot_odometry)
 
