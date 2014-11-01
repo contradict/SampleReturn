@@ -131,17 +131,6 @@
         <param name="return_velocity" type="double" value="1.0"/>
         <param name="search_velocity" type="double" value="0.05"/>
        
-        <!-- pursue sample simple motion parameters --> 
-        <!-- these are defaults and should be overridden as necessary -->
-        <rosparam>
-           simple_motion_params:
-                max_velocity: 0.5
-                acceleration: 0.5
-                stop_deceleration: 1.0
-                loop_rate: 10
-                steering_angle_epsilon: 0.01
-        </rosparam>
-
         <!-- this file loads the velocities and such for servoing onto sample,
              the node must already have a simple_mover up and running -->
         <rosparam file="$(find samplereturn)/config/visual_servo.yaml" command="load"/>  

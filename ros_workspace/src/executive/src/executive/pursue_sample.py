@@ -471,7 +471,8 @@ class ManipulatorApproach(smach.State):
                              input_keys=['target_sample',
                                          'settle_time',
                                          'final_pursuit_step',
-                                         'distance_to_sample'],
+                                         'distance_to_sample',
+                                         'search_velocity'],
                              output_keys=['simple_move',
                                           'final_move',
                                           'target_sample',
@@ -504,7 +505,8 @@ class ManipulatorApproach(smach.State):
                                                   distance = distance)
             userdata.final_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                                  angle = yaw,
-                                                 distance = userdata.final_pursuit_step)
+                                                 distance = userdata.final_pursuit_step,
+                                                 velocity = userdata.search_velocity)
             return 'move'
         
         return 'aborted'
