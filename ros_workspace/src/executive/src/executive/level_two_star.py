@@ -172,6 +172,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('DISMOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'STAR_MANAGER',
+                                                  'sample_detected':'STAR_MANAGER',
                                                   'timeout':'STAR_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'simple_move':'dismount_move',
@@ -209,6 +210,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('ROTATE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'LINE_MANAGER',
+                                                  'sample_detected':'PURSUE_SAMPLE',
                                                   'timeout':'LINE_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'true'})
@@ -253,6 +255,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('BEACON_SEARCH_SPIN',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
+                                                  'sample_detected':'BEACON_SEARCH',
                                                   'timeout':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -282,12 +285,14 @@ class LevelTwoStar(object):
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'MOUNT_MANAGER',
+                                                  'sample_detected':'MOUNT_MANAGER',
                                                   'timeout':'MOUNT_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_FINAL',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'DESELECT_PLANNER',
+                                                  'sample_detected':'MOUNT_MANAGER',                                                  
                                                   'timeout':'MOUNT_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
