@@ -1,6 +1,5 @@
-""" Simple Driving
-
-Use simple_motion to drive to a position and yaw
+""" VFH Move Server
+Use vfh to drive to a position and yaw
 """
 #!/usr/bin/env python
 import numpy as np
@@ -18,10 +17,11 @@ import geometry_msgs.msg as geometry_msg
 
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
-from geometry_msgs.msg import Pose, PoseStamped, Point, PointStamped
+from geometry_msgs.msg import Pose, PoseStamped, Point, PointStamped, Quaternion
 from samplereturn_msgs.msg import (VFHMoveAction,
                                    VFHMoveResult,
                                    VFHMoveFeedback)
+from samplereturn_msgs.srv import ObstacleCheck, ObstacleCheckRequest
 from motion_planning.simple_motion import SimpleMover
 
 import samplereturn.util as util
@@ -48,13 +48,14 @@ class VFHMoveServer( object ):
         
         self._goal_orientation_tolerance = \
                 rospy.get_param("~goal_orientation_tolerance", 0.05)
+        self._lethal_threshold = rospy.get_param("~lethal_threshold", 100)
         self.odometry_frame = rospy.get_param("~odometry_frame")
         self._mover = SimpleMover("~simple_motion_params/")
 
         self._as = actionlib.SimpleActionServer("vfh_move", VFHMoveAction,
                 execute_cb = self.execute_cb, auto_start=False)
 
-        self._robot_position = None
+        self._robot_pose = None
         self._odometry_sub = rospy.Subscriber("odometry", Odometry,
                 self.odometry_cb)
 
@@ -75,9 +76,7 @@ class VFHMoveServer( object ):
         
         self.costmap_info = None
         self.costmap_header = None
-        
-        self.costmap_msg = None
-
+ 
         #vfh params
         self.vfh_running = False
 
@@ -118,7 +117,11 @@ class VFHMoveServer( object ):
         self.marker_id = 0
 
         #this loop controls the strafe angle using vfh sauce
-        rospy.Timer(rospy.Duration(0.5), self.vfh_planner)       
+        rospy.Timer(rospy.Duration(0.5), self.vfh_planner)
+        
+        self.obstacle_check_service = rospy.Service('obstacle_check',
+                                                    ObstacleCheck,
+                                                    self.obstacle_check)        
         
         self._as.start()
 
@@ -190,17 +193,16 @@ class VFHMoveServer( object ):
         
         start_time = rospy.get_time()
 
-        #get the robot position inside costmap
-        try:
-            robot_position, robot_orientation = self._tf.lookupTransform(self.costmap_header.frame_id,
-                                                                         'base_link',
-                                                                         rospy.Time(0))
-        except tf.Exception, e:
-            rospy.logerr("Unable to look up transform base_link->%s",
-                            costmap.header.frame_id)
-            return
+        robot_position = np.array([self._robot_pose.pose.position.x,
+                                   self._robot_pose.pose.position.y,
+                                   self._robot_pose.pose.position.z])
+        robot_orientation = np.array([self._robot_pose.pose.orientation.x,
+                                      self._robot_pose.pose.orientation.y,
+                                      self._robot_pose.pose.orientation.z,
+                                      self._robot_pose.pose.orientation.w])
+
         robot_yaw = tf.transformations.euler_from_quaternion(robot_orientation)[-1]
-        valid, robot_in_costmap = self.world2map(robot_position[:2], self.costmap_info)
+        valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
 
         target_in_odom = PointStamped(self._goal_odom.header,
                                       self._goal_odom.pose.position)
@@ -220,11 +222,11 @@ class VFHMoveServer( object ):
             #yaw in odom            
             sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
             #get start and end points for the bresenham line
-            start = self.bresenham_point(robot_in_costmap,
+            start = self.bresenham_point(robot_cmap_coords,
                                         self.min_obstacle_distance,
                                         sector_yaw,
                                         self.costmap_info.resolution)
-            end = self.bresenham_point(robot_in_costmap,
+            end = self.bresenham_point(robot_cmap_coords,
                                         min(self.max_obstacle_distance, distance_to_target),                                   
                                         sector_yaw,
                                         self.costmap_info.resolution)            
@@ -234,7 +236,7 @@ class VFHMoveServer( object ):
                 #coords = coords[::-1]
                 cell_value = self.costmap[tuple(coords)]
 
-                position = self.costmap_info.resolution * (coords - robot_in_costmap)
+                position = self.costmap_info.resolution * (coords - robot_cmap_coords)
                 distance = np.linalg.norm(position)
             
                 #m is the obstacle vector magnitude
@@ -311,7 +313,7 @@ class VFHMoveServer( object ):
             vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
             self.debug_marker_pub.publish(vfh_debug_msg)
         
-            rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))        
+            #rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))        
 
     def handle_costmap(self, costmap):
                
@@ -320,12 +322,59 @@ class VFHMoveServer( object ):
         self.costmap_info = costmap.info
         self.costmap_header = costmap.header
         
-        #for debug publishing
-        self.costmap_msg = costmap
-
         self.costmap = np.array(costmap.data,
                                 dtype='i1').reshape((costmap.info.height,
                                                      costmap.info.width))
+        
+    def obstacle_check(self, request ):
+        """
+        Check a rectangular area in the costmap and return true if any lethal
+        cells are inside that area.
+        """
+        robot_position = np.array([self._robot_pose.pose.position.x,
+                                   self._robot_pose.pose.position.y,
+                                   self._robot_pose.pose.position.z])
+        robot_orientation = np.array([self._robot_pose.pose.orientation.x,
+                                      self._robot_pose.pose.orientation.y,
+                                      self._robot_pose.pose.orientation.z,
+                                      self._robot_pose.pose.orientation.w])
+        
+        robot_yaw = tf.transformations.euler_from_quaternion(robot_orientation)[-1]
+        valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
+        
+        ll = self.bresenham_point(robot_cmap_coords,
+                                  request.width/2,
+                                  (robot_yaw - np.pi/2),
+                                  self.costmap_info.resolution)
+        ul = self.bresenham_point(robot_cmap_coords,
+                                  request.width/2,
+                                  (robot_yaw + np.pi/2),
+                                  self.costmap_info.resolution)
+        lr = self.bresenham_point(ll[0], request.distance, robot_yaw, self.costmap_info.resolution)
+        ur = self.bresenham_point(ul[0], request.distance, robot_yaw, self.costmap_info.resolution)
+
+        start_points = bresenham.points(ll, ul)
+        end_points = bresenham.points(lr, ur)
+        
+        #check lines for lethal values
+        if self.any_line_blocked(start_points, end_points):
+            rospy.logdebug("PROBE SWATHE %f X %f BLOCKED " %(request.width, request.distance))
+            return True
+        else:    
+            rospy.logdebug("PROBE SWATHE %f X %f CLEAR " %(request.width, request.distance))
+            return False
+        
+    def any_line_blocked(self, start_points, end_points):
+        for start, end in zip(start_points, end_points):
+            line = bresenham.points(start[None,:], end[None,:])
+            line_vals = self.costmap[line[:,1], line[:,0]]
+            max_val = (np.amax(line_vals))
+            if np.any(line_vals > self._lethal_threshold):
+                #for debug, mark lethal lines
+                if self.publish_debug: self.costmap[line[:,1], line[:,0]] = 64
+                #once an obstacle is found no need to keep checking this angle
+                return True
+        return False
         
     def world2map(self, world, info):
         origin = np.r_[info.origin.position.x,
@@ -350,7 +399,7 @@ class VFHMoveServer( object ):
         goal orientation.
         """
         return (euler_from_orientation(self._goal_odom.pose.orientation)[-1] -
-            euler_from_orientation(self._robot_position.pose.orientation)[-1])
+            euler_from_orientation(self._robot_pose.pose.orientation)[-1])
 
     def position_error(self):
         """
@@ -359,16 +408,17 @@ class VFHMoveServer( object ):
         """
         return Point(
                 self._goal_odom.pose.position.x -
-                self._robot_position.pose.position.x,
+                self._robot_pose.pose.position.x,
                 self._goal_odom.pose.position.x -
-                self._robot_position.pose.position.x,
+                self._robot_pose.pose.position.x,
                 0)
 
     def odometry_cb(self, odo):
         """
-        Remeber current robot position
+        Remember current robot position
         """
-        self._robot_position = PoseStamped(odo.header, odo.pose.pose)
+        self._robot_pose = PoseStamped(odo.header, odo.pose.pose)
+
         if self._as.is_active():
             self.publish_feedback()
 
