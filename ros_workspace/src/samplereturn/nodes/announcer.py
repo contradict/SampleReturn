@@ -35,8 +35,8 @@ class Announcer(object):
     
     def handle_announcement(self, announcement):
         
-        rospy.loginfo("ANNOUNCER: current list: %s"%(self.announcements))
-        rospy.loginfo("ANNOUNCER: announcement received: %s"%(announcement))
+        rospy.logdebug("ANNOUNCER: current list: %s"%(self.announcements))
+        rospy.logdebug("ANNOUNCER: announcement received: %s"%(announcement))
 
         self.announceCV.acquire()        
         if announcement.priority == announcement.LAST:
@@ -48,7 +48,7 @@ class Announcer(object):
             self.announceCV.notifyAll()
         self.announceCV.release()
         
-        rospy.loginfo("ANNOUNCER: new list: %s"%(self.announcements))
+        rospy.logdebug("ANNOUNCER: new list: %s"%(self.announcements))
     
     def announcement_worker(self):
         while not rospy.is_shutdown():
