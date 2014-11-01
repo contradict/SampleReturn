@@ -20,7 +20,7 @@ actionlib_working_states = [action_msg.GoalStatus.ACTIVE,
 
 class AnnouncerInterface(object):
     def __init__(self, topic):
-        self.pub = rospy.Publisher(topic, VoiceAnnouncement, queue_size=1)
+        self.pub = rospy.Publisher(topic, VoiceAnnouncement, queue_size=10)
         self.msg = VoiceAnnouncement()
         
     def say(self, words):
