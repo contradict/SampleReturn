@@ -31,6 +31,7 @@
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="vfh_move" to="/processes/vfh_move"/>
     <remap from="simple_move" to="/processes/simple_move"/>
+    <remap from="obstacle_check" to="/processes/obstacle_check"/>
 
     <!-- io remaps -->
     <remap from="pause_state" to="/io/pause_state"/>
@@ -106,10 +107,11 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="45"/>
-        <param name="first_spoke_offset" type="double" value="0"/>
+        <param name="first_spoke_offset" type="double" value="55"/>
         <param name="star_hub_radius" type="int" value="15"/>
         <param name="min_spin_radius" type="double" value="100"/>
         <param name="spin_step" type="double" value="15"/>
+        <param name="spin_velocity" type="double" value="0.4"/>
         
         <param name="return_time_minutes" type="double" value="100"/>
 
@@ -137,12 +139,14 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- sample approach (pursuit) parameters -->
+        <param name="max_pursuit_error" type="double" value="1.0"/>
         <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <param name="max_sample_lost_time" type="double" value="20"/>
+
         <!-- after min_pursuit reached, we move to check_distance and observe for
              obstacles.  Then we make the manipulator view approach -->
         <param name="sample_obstacle_check_distance" type="double" value="2.0"/>
         <param name="final_pursuit_step" type="double" value="0.6"/>
-        <param name="max_sample_lost_time" type="double" value="20"/>
         <param name="pursuit_step" type="double" value="4.0"/>
         <param name="pursuit_yaw_tolerance" type="double" value="0.2"/>
         <param name="pursuit_velocity" type="double" value="0.5"/>

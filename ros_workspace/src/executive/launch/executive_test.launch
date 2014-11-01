@@ -75,6 +75,7 @@
           ns="/processes">
 
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="lethal_threshold" type="int" value="90"/>
 
         <remap from="odometry" to="/motion/odometry"/>
         <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
