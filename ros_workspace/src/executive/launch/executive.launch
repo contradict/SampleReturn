@@ -114,18 +114,16 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- sample approach (pursuit) parameters -->
+        <param name="pursuit_velocity" type="double" value="0.5"/>
         <param name="max_pursuit_error" type="double" value="1.0"/>
-        <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <param name="min_pursuit_distance" type="double" value="2.0"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
 
         <!-- after min_pursuit reached, we move to check_distance and observe for
              obstacles.  Then we make the manipulator view approach -->
-        <param name="sample_obstacle_check_distance" type="double" value="2.0"/>
-        <param name="final_pursuit_step" type="double" value="0.6"/>
-        <param name="pursuit_step" type="double" value="4.0"/>
-        <param name="pursuit_yaw_tolerance" type="double" value="0.2"/>
-        <param name="pursuit_velocity" type="double" value="0.5"/>
-        <param name="pursuit_strafe" type="double" value="5.0"/>
+        <param name="sample_obstacle_check_width" type="double" value="1.0"/>
+        <param name="sample_obstacle_check_distance" type="double" value="2.5"/>
+        <param name="final_pursuit_step" type="double" value="0.4"/>
 
         <param name="square_search_size" type="double" value="0.3"/> 
         <param name="return_velocity" type="double" value="1.0"/>

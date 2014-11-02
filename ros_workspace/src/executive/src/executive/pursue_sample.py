@@ -82,16 +82,15 @@ class PursueSample(object):
         
         #pursuit params
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
-        self.state_machine.userdata.pursuit_step = self.node_params.pursuit_step
         self.state_machine.userdata.final_pursuit_step = self.node_params.final_pursuit_step
         self.state_machine.userdata.pursuit_strafe = self.node_params.pursuit_strafe
-        self.state_machine.userdata.pursuit_yaw_tolerance = self.node_params.pursuit_yaw_tolerance
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
         self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        
         self.state_machine.userdata.return_velocity = self.node_params.return_velocity
-        self.state_machine.userdata.sample_obstacle_check_distance = self.node_params.sample_obstacle_check_distance
-
+        self.sample_obstacle_check_width = self.node_params.sample_obstacle_check_width
+        self.sample_obstacle_check_distance = self.node_params.sample_obstacle_check_distance
+        
         #stop function check flags        
         self.state_machine.userdata.check_pursuit_distance = False
         self.state_machine.userdata.stop_on_sample = False
@@ -160,7 +159,8 @@ class PursueSample(object):
             
             smach.StateMachine.add('OBSTACLE_CHECK',
                 smach_ros.ServiceState('obstacle_check', samplereturn_srv.ObstacleCheck,
-                request = samplereturn_srv.ObstacleCheckRequest(1.5, 2.0),
+                request = samplereturn_srv.ObstacleCheckRequest(width = self.sample_obstacle_check_width,
+                                                                distance = self.sample_obstacle_check_distance),
                 response_cb = obstacle_check_cb),
                 transitions = {'blocked':'ANNOUNCE_BLOCKED',
                                'clear':'ANNOUNCE_MANIPULATOR_APPROACH',
