@@ -72,10 +72,6 @@ class LevelTwoStar(object):
 
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
-  
-        #strafe definitions, offset is length along strafe line
-        #the yaws have a static angle, which the direction from base_link the robot strafes
-        self.strafes = rospy.get_param('strafes')
 
         #get the star shape
         self.spokes = self.get_hollow_star(self.node_params.spoke_count,
@@ -89,8 +85,6 @@ class LevelTwoStar(object):
     
         self.state_machine.userdata.spokes = self.spokes
         self.state_machine.userdata.star_hub_radius = self.node_params.star_hub_radius
-        self.state_machine.userdata.strafes = self.strafes
-        self.state_machine.userdata.active_strafe_key = None
         #sets the default velocity used by ExecuteSimpleMove, if none, use simple_motion default
         self.state_machine.userdata.velocity = None
 
@@ -271,7 +265,7 @@ class LevelTwoStar(object):
             
             
             smach.StateMachine.add('BEACON_CLEAR_MOVE',
-                                   RotateToClear(self.simple_mover, self.tf_listener, self.strafes),
+                                   RotateToClear(self.simple_mover, self.tf_listener),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'blocked':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -334,11 +328,6 @@ class LevelTwoStar(object):
                         geometry_msg.PoseWithCovarianceStamped,
                         self.beacon_update)
         
-        rospy.Subscriber('costmap_check',
-                                samplereturn_msg.CostmapCheck,
-                                self.handle_costmap_check)
-
-        
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
         #start action servers and services
@@ -347,45 +336,6 @@ class LevelTwoStar(object):
         rospy.spin()
         sls.stop()
     
-    #this is the callback from simple_mover that sees if it should stop!    
-    def check_for_stop(self):
-        
-        #the pause switch stops the robot, but we must tell the simple_mover it is stopped
-        if self.state_machine.userdata.paused:
-            rospy.loginfo("LEVEL TWO STOP: on pause")
-            return True
-        
-        active_strafe_key = self.state_machine.userdata.active_strafe_key
-        
-        if active_strafe_key is not None:
-            if self.strafes[active_strafe_key]['blocked']:
-                return True
-            if not self.state_machine.userdata.outbound:
-                current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                           self.world_fixed_frame)
-                distance_to_origin = np.sqrt(current_pose.pose.position.x**2 +
-                                             current_pose.pose.position.y**2)                
-                if (distance_to_origin <= self.node_params.star_hub_radius):
-                    self.state_machine.userdata.within_hub_radius = True
-                    rospy.loginfo("LEVEL_TWO STOP simple_move on distance to origin = %.3f" %(distance_to_origin))
-                    return True                
-                                    
-        if self.state_machine.userdata.stop_on_sample and \
-                self.state_machine.userdata.detected_sample is not None:
-            rospy.loginfo("LEVEL_TWO STOP simple_move on sample detection")
-            return True
-        
-        if self.state_machine.userdata.stop_on_beacon and \
-                self.state_machine.userdata.beacon_point is not None:
-            rospy.loginfo("LEVEL_TWO STOP simple_move on beacon detection")
-            return True
-        return False
-
-    def handle_costmap_check(self, costmap_check):
-        for strafe_key, blocked in zip(costmap_check.strafe_keys,
-                                       costmap_check.blocked):
-            self.strafes[strafe_key]['blocked'] = blocked                        
-
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
         
@@ -511,22 +461,19 @@ class RotationManager(smach.State):
                                          'spokes',
                                          'spin_velocity',
                                          'outbound',
-                                         'world_fixed_frame',
-                                         'active_strafe_key'],
+                                         'world_fixed_frame',],
                              output_keys=['line_yaw',
                                           'simple_move',
                                           'outbound',
                                           'rotate_pose',
                                           'beacon_point',
                                           'distance_to_hub',
-                                          'last_align_time',
-                                          'active_strafe_key']),  
+                                          'last_align_time',])
   
         self.tf_listener = tf_listener
         self.mover = mover
     
     def execute(self, userdata):
-        userdata.active_strafe_key = None
         #if heading out, always move parallel to line yaw
         if userdata.outbound:
             map_yaw = deepcopy(userdata.line_yaw)
@@ -593,7 +540,7 @@ class SearchLineManager(smach.State):
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
-            distance = 20
+            distance = 100
 
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    frame_id = self.odometry_frame)
@@ -759,8 +706,7 @@ class MountManager(smach.State):
                                          'beacon_point',
                                          'beacon_mount_step'],
                              output_keys=['simple_move',
-                                          'beacon_point',
-                                          'active_strafe_key'])
+                                          'beacon_point'])
 
         self.tf_listener = tf_listener
         self.announcer = announcer
@@ -768,7 +714,6 @@ class MountManager(smach.State):
     def execute(self, userdata):
         #disable obstacle checking!
         rospy.sleep(10.0) #wait a sec for beacon pose to catch up
-        userdata.active_strafe_key = None
         target_point = deepcopy(userdata.beacon_point)
         target_point.header.stamp = rospy.Time(0)
         yaw, distance = util.get_robot_strafe(self.tf_listener,

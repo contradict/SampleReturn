@@ -83,7 +83,6 @@ class PursueSample(object):
         #pursuit params
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
         self.state_machine.userdata.final_pursuit_step = self.node_params.final_pursuit_step
-        self.state_machine.userdata.pursuit_strafe = self.node_params.pursuit_strafe
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
         self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        

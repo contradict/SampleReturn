@@ -506,7 +506,7 @@ class ServoController(smach.State):
         return 'aborted'
     
 class RotateToClear(smach.State):
-    def __init__(self, simple_mover, tf_listener, strafes):
+    def __init__(self, simple_mover, tf_listener):
         smach.State.__init__(self,
                              input_keys=['clear_spin',
                                          'clear_move',
@@ -521,7 +521,7 @@ class RotateToClear(smach.State):
         self.tf_listener = tf_listener
         self.simple_mover = simple_mover
         self.clear = False
-        self.strafes = deepcopy(strafes)
+        self.strafes = None #this may be useful later
  
         rospy.Subscriber('costmap_check',
                           samplereturn_msg.CostmapCheck,
