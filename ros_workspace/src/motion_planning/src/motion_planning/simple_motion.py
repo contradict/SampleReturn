@@ -134,31 +134,6 @@ class SimpleMover(object):
             acceleration,
             stop_function)
 
-  def decel_at_current(self, acceleration):
-    timeout = np.max((self.current_speed/acceleration,
-                      self.current_omega*self.stern_offset/acceleration))
-    if timeout > 1./self.loop_rate:
-      timeout_time = rospy.Time.now() + rospy.Duration( timeout*1.5 )
-      tolerance = self.acceleration*self.loop_rate
-      self.stop_requested = False
-      accel_per_loop = acceleration/self.loop_rate
-      angle = self.current_angle
-      while ((rospy.Time().now() < timeout_time) and
-             (not self.stop_requested) and
-             (self.current_speed>tolerance)):
-          if (self.current_omega*self.stern_offset>tolerance):
-            raise TimeoutException("Could not stop before adjusting steering")
-          omega = np.sign(self.current_omega)*np.min((np.abs(self.current_omega) -
-                                                    accel_per_loop/self.stern_offset,0))
-          speed = np.min((self.current_speed - accel_per_loop, 0))
-          twist = Twist()
-          twist.angular.z = omega
-          twist.linear.x = speed*np.cos(angle)
-          twist.linear.y = speed*np.sin(angle)
-          self.publisher.publish(twist)
-    # publish a final 0
-    self.publisher.publish(Twist())
-
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
     if not callable(stop_function): 
       stop_function = self.default_stop_function
@@ -257,6 +232,31 @@ class SimpleMover(object):
       else:
         vel = 0
     return vel
+
+  def decel_at_current(self, acceleration):
+    timeout = np.max((self.current_speed/acceleration,
+                      self.current_omega*self.stern_offset/acceleration))
+    if timeout > 1./self.loop_rate:
+      timeout_time = rospy.Time.now() + rospy.Duration( timeout*1.5 )
+      tolerance = self.acceleration*self.loop_rate
+      self.stop_requested = False
+      accel_per_loop = acceleration/self.loop_rate
+      angle = self.current_angle
+      while ((rospy.Time().now() < timeout_time) and
+             (not self.stop_requested) and
+             (self.current_speed>tolerance)):
+          if (self.current_omega*self.stern_offset>tolerance):
+            raise TimeoutException("Could not stop before adjusting steering")
+          omega = np.sign(self.current_omega)*np.min((np.abs(self.current_omega) -
+                                                    accel_per_loop/self.stern_offset,0))
+          speed = np.min((self.current_speed - accel_per_loop, 0))
+          twist = Twist()
+          twist.angular.z = omega
+          twist.linear.x = speed*np.cos(angle)
+          twist.linear.y = speed*np.sin(angle)
+          self.publisher.publish(twist)
+    # publish a final 0
+    self.publisher.publish(Twist())
 
   def is_running(self):
     return self.running
