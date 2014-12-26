@@ -68,7 +68,7 @@ class SimpleMover(object):
     self.current_position = np.r_[msg.pose.pose.position.x,
                                   msg.pose.pose.position.y,
                                   msg.pose.pose.position.z]
-
+            
     self.current_omega = msg.twist.twist.angular.z
     self.current_speed = np.hypot( msg.twist.twist.linear.x,
                                    msg.twist.twist.linear.y)
@@ -133,6 +133,27 @@ class SimpleMover(object):
             max_velocity,
             acceleration,
             stop_function)
+  
+  #use with caution, strafes at constant velocity until external stop is called
+  def execute_continuous_strafe(self, angle, max_velocity=None, acceleration=None, stop_function=None):
+    
+    angle = util.unwind(angle)
+    self.strafe_angle = angle
+    if (-np.pi/2<=angle<=np.pi/2):
+      target_angle = angle
+    elif (np.pi/2 < angle):
+      target_angle = angle - np.pi
+    elif (angle < -np.pi/2):
+      target_angle = angle + np.pi
+    return self.execute(
+            lambda start_position=self.current_position: x,
+            dict(stern=target_angle,
+                port=target_angle,
+                starboard=target_angle),
+            lambda v : self.strafe_publisher(v),
+            max_velocity,
+            acceleration,
+            stop_function)  
 
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
     if not callable(stop_function): 
@@ -177,6 +198,8 @@ class SimpleMover(object):
         if (rospy.Time.now()>steering_timeout_time):
           publisher(0)
           raise TimeoutException('Steering move failed to complete before timeout')
+      #we have achieved proper steering angle, but not started the motion yet
+      #get the velocity function with total_distance as the current error
       elif not started:
         start_time = rospy.Time.now()
         velocity = lambda start_time = start_time, d = np.abs(self.current_error) : self.velocity_of_time( d, (rospy.Time.now() - start_time).to_sec(), acceleration, max_velocity)
