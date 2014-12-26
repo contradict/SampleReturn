@@ -82,7 +82,7 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="45"/>
-        <param name="first_spoke_offset" type="double" value="55"/>
+        <param name="first_spoke_offset" type="double" value="75"/>
         <param name="star_hub_radius" type="int" value="15"/>
         <param name="min_spin_radius" type="double" value="100"/>
         <param name="spin_step" type="double" value="15"/>
@@ -132,25 +132,6 @@
         <!-- this file loads the velocities and such for servoing onto sample,
              the node must already have a simple_mover up and running -->
         <rosparam file="$(find samplereturn)/config/visual_servo.yaml" command="load"/>  
-
-    </node>
-
-    <node
-        pkg="executive"
-        type="costmap_checker_node.py"
-        name="costmap_checker"
-        machine="navigate"
-        output="log"
-        ns="/processes/executive">
-
-        <!-- executive tf frame and planner_mode -->
-
-        <param name="lethal_threshold" type="int" value="90"/>        
-        <param name="min_check_distance" type="double" value ="1.5"/>
-        <param name="obstacle_check_distance" type="double" value="5"/>
-        <param name="obstacle_check_width" type="double" value="2.5"/>
-        <param name="min_check_distance" type="double" value="0.7"/>
-
     </node>
 
 </launch>
