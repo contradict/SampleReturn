@@ -24,6 +24,7 @@ class SimpleMover(object):
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
     self.acceleration = rospy.get_param(param_ns + 'acceleration', 0.5)
+    self.deceleration = self.acceleration
     self.stop_deceleration = rospy.get_param(param_ns + 'stop_deceleration', 1.5)
     self.loop_rate = rospy.get_param(param_ns + 'loop_rate', 10.0)
     self.steering_angle_epsilon = rospy.get_param(param_ns + 'steering_angle_epsilon', 0.01)
@@ -133,7 +134,6 @@ class SimpleMover(object):
   
   #use with caution, strafes at constant velocity until external stop is called
   def execute_continuous_strafe(self, angle, max_velocity=None, acceleration=None, stop_function=None):
-    
     angle = util.unwind(angle)
     self.strafe_angle = angle
     if (-np.pi/2<=angle<=np.pi/2):
@@ -143,7 +143,7 @@ class SimpleMover(object):
     elif (angle < -np.pi/2):
       target_angle = angle + np.pi
     return self.execute(
-            lambda start_position=self.current_position: x,
+            lambda: np.inf ,
             dict(stern=target_angle,
                 port=target_angle,
                 starboard=target_angle),
@@ -169,6 +169,7 @@ class SimpleMover(object):
       return error()
 
     self.stop_requested = False
+    self.deceleration = acceleration
     self.running = True
 
     started = False
@@ -200,14 +201,11 @@ class SimpleMover(object):
         started = True
       v = velocity()
       publisher(v)
-
-    if self.stop_requested:
-      accel_per_loop = self.stop_deceleration/self.loop_rate
-    else:
-      accel_per_loop = self.acceleration/self.loop_rate
-    #decel to zero
+   
+    #decel to zero (this is necessary after a stop is requested)
     while v > 0:
-      v = np.max((v - accel_per_loop, 0))
+      #if an estop was requested, deceleration will be stop_deceleration
+      v = np.max((v - (self.deceleration/self.loop_rate), 0))
       publisher(v)
       rate.sleep()
 
@@ -224,6 +222,10 @@ class SimpleMover(object):
 
 
   def velocity_of_time(self, total_distance, t, acceleration, max_velocity):
+    #if total_distance is np.inf, set it equal to accel ramps distance +
+    #distance traveled at max_velocity.  This make this loop get to max_v and go forever!    
+    if np.isinf(total_distance):
+      total_distance = max_velocity**2/acceleration + t*max_velocity
     if( max_velocity**2/2./acceleration > total_distance/2. ):
       # cannot accel to max velocity, compute peak velocity
       vmax = np.sqrt(2*(total_distance/2.)*acceleration)
@@ -279,6 +281,10 @@ class SimpleMover(object):
     return self.running
 
   def stop(self):
+    self.stop_requested = True
+
+  def estop(self):
+    self.deceleration = self.stop_deceleration
     self.stop_requested = True
 
 #these execute functions should return this exception if they timeout

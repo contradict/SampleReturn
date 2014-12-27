@@ -51,6 +51,11 @@ class VFHMoveServer( object ):
         self._lethal_threshold = rospy.get_param("~lethal_threshold", 100)
         self.odometry_frame = rospy.get_param("~odometry_frame")
         self._mover = SimpleMover("~simple_motion_params/")
+        
+        #calculate the stop_distance for stopping once near target pose
+        accel = rospy.get_param("~simple_motion_params/acceleration")
+        max_vel = rospy.get_param("~simple_motion_params/max_velocity")
+        self.stop_distance = max_vel**2/2./accel
 
         self._as = actionlib.SimpleActionServer("vfh_move", VFHMoveAction,
                 execute_cb = self.execute_cb, auto_start=False)
@@ -155,7 +160,7 @@ class VFHMoveServer( object ):
         velocity = goal.velocity if (goal.velocity != 0) else None
         rospy.logdebug("Moving %f meters ahead.", distance)
         self.vfh_running = True
-        self._mover.execute_strafe(0.0, distance,
+        self._mover.execute_continuous_strafe(0.0,
                 max_velocity = velocity,
                 stop_function=self._as.is_preempt_requested)
         self.vfh_running = False
@@ -200,11 +205,16 @@ class VFHMoveServer( object ):
         yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, target_in_odom)
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         
+        #if we are within stop_distance initiate stop
+        if distance_to_target < self.stop_distance:
+            self.mover.stop()
+                    
         #if the target is not in the active window, we are probably way off course,
         #or possibly trying to drive too far around an obstacle near the target: stop!
         if not 0 <= target_index < len(self.sectors):
             self._mover.stop()
-            return
+            if target_index < 0: target_index = 0
+            if target_index >= len(self.sectors): target_index = len(self.sectors)
         
         obstacle_density = np.zeros(self.sector_count)
         inverse_cost = np.zeros(self.sector_count)
@@ -248,10 +258,9 @@ class VFHMoveServer( object ):
                 inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
                                             + self.u_current*np.abs(self.current_sector_index - index)*self.sector_angle) 
 
-        #stop the mover if the path is blocked
+        #stop the mover if the path is blocked.  This is an estop situation!
         if np.all(self.sectors):
-            self._mover.stop()
-            return
+            self._mover.estop()
 
         #find the sector index with the lowest cost index (inverse cost!)
         min_cost_index = np.argmax(inverse_cost)
