@@ -55,10 +55,6 @@ class VFHMoveServer( object ):
         self._as = actionlib.SimpleActionServer("vfh_move", VFHMoveAction,
                 execute_cb = self.execute_cb, auto_start=False)
 
-        self._robot_pose = None
-        self._odometry_sub = rospy.Subscriber("odometry", Odometry,
-                self.odometry_cb)
-
         self._tf = tf.TransformListener()
 
         self._goal_odom = None
@@ -334,7 +330,8 @@ class VFHMoveServer( object ):
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
         
         ll = self.bresenham_point(robot_cmap_coords,
-                                    (robot_yaw - np.pi/2),
+                                  request.width/2,
+                                  (robot_yaw - np.pi/2),
                                   self.costmap_info.resolution)
         ul = self.bresenham_point(robot_cmap_coords,   
                                   request.width/2,
@@ -408,15 +405,6 @@ class VFHMoveServer( object ):
                 self._goal_odom.pose.position.y -
                 current_pose.pose.position.y,
                 0)
-
-    def odometry_cb(self, odo):
-        """
-        Remember current robot position
-        """
-        self._robot_pose = PoseStamped(odo.header, odo.pose.pose)
-
-        if self._as.is_active():
-            self.publish_feedback()
 
     def publish_feedback(self):
         """
