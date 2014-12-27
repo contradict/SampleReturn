@@ -21,9 +21,6 @@ class SimpleMover(object):
       rospy.sleep(2.0)
       
     self.default_stop_function = stop_function
-    #store current error, so it doesn't need to be calculated over and over and
-    #also to make it more accessible to caller
-    self.current_error = None
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
     self.acceleration = rospy.get_param(param_ns + 'acceleration', 0.5)
@@ -166,12 +163,10 @@ class SimpleMover(object):
       max_velocity = self.max_velocity
     if acceleration is None:
       acceleration = self.acceleration
-    
-    self.current_error = error()
 
     # if one step of accel overshoots half the distance, give up
-    if np.abs(self.current_error/2.) < 0.5*acceleration/self.loop_rate**2:
-      return self.current_error
+    if np.abs(error()/2.) < 0.5*acceleration/self.loop_rate**2:
+      return error()
 
     self.stop_requested = False
     self.running = True
@@ -184,7 +179,6 @@ class SimpleMover(object):
            (v != 0)):
       # Run at some rate, ~10Hz
       rate.sleep()
-      self.current_error = error()
             
       #wait until correct steering angles are achieved
       if ((np.abs(self.stern_pos-target['stern'])>self.steering_angle_epsilon or
@@ -202,7 +196,7 @@ class SimpleMover(object):
       #get the velocity function with total_distance as the current error
       elif not started:
         start_time = rospy.Time.now()
-        velocity = lambda start_time = start_time, d = np.abs(self.current_error) : self.velocity_of_time( d, (rospy.Time.now() - start_time).to_sec(), acceleration, max_velocity)
+        velocity = lambda start_time = start_time, d = np.abs(error()) : self.velocity_of_time( d, (rospy.Time.now() - start_time).to_sec(), acceleration, max_velocity)
         started = True
       v = velocity()
       publisher(v)

@@ -68,10 +68,12 @@ class SimpleMoveServer( object ):
  
     def mover_stop_cb(self):
         """
-        Check to see if mover should be stopped, also sends actionserver feedback.
+        Check to see if mover is running, if so, publish actionserver feedback.
+        This also stops the mover if a preempt is requested on the action server.
         """
         
-        self._as.publish_feedback(SimpleMoveFeedback(self._mover.current_error))
+        #just publish 1 if we are running now
+        self._as.publish_feedback(SimpleMoveFeedback(1))
         
         #if action server is preempted, stop the mover
         return self._as.is_preempt_requested()
