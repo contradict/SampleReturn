@@ -193,15 +193,10 @@ class VFHMoveServer( object ):
         
         start_time = rospy.get_time()
 
-        robot_position = np.array([self._robot_pose.pose.position.x,
-                                   self._robot_pose.pose.position.y,
-                                   self._robot_pose.pose.position.z])
-        robot_orientation = np.array([self._robot_pose.pose.orientation.x,
-                                      self._robot_pose.pose.orientation.y,
-                                      self._robot_pose.pose.orientation.z,
-                                      self._robot_pose.pose.orientation.w])
+        #get current position from mover object
+        robot_position = self._mover.current_position
+        robot_yaw = self._mover.current_yaw
 
-        robot_yaw = tf.transformations.euler_from_quaternion(robot_orientation)[-1]
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
 
         target_in_odom = PointStamped(self._goal_odom.header,
@@ -209,7 +204,8 @@ class VFHMoveServer( object ):
         yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, target_in_odom)
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         
-        #if the target is not in the active window, we are probably way off course, stop!
+        #if the target is not in the active window, we are probably way off course,
+        #or possibly trying to drive too far around an obstacle near the target: stop!
         if not 0 <= target_index < len(self.sectors):
             self._mover.stop()
             return
@@ -331,22 +327,16 @@ class VFHMoveServer( object ):
         Check a rectangular area in the costmap and return true if any lethal
         cells are inside that area.
         """
-        robot_position = np.array([self._robot_pose.pose.position.x,
-                                   self._robot_pose.pose.position.y,
-                                   self._robot_pose.pose.position.z])
-        robot_orientation = np.array([self._robot_pose.pose.orientation.x,
-                                      self._robot_pose.pose.orientation.y,
-                                      self._robot_pose.pose.orientation.z,
-                                      self._robot_pose.pose.orientation.w])
         
-        robot_yaw = tf.transformations.euler_from_quaternion(robot_orientation)[-1]
+        #get current position from mover object
+        robot_position = self._mover.current_position
+        robot_yaw = self._mover.current_yaw
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
         
         ll = self.bresenham_point(robot_cmap_coords,
-                                  request.width/2,
-                                  (robot_yaw - np.pi/2),
+                                    (robot_yaw - np.pi/2),
                                   self.costmap_info.resolution)
-        ul = self.bresenham_point(robot_cmap_coords,
+        ul = self.bresenham_point(robot_cmap_coords,   
                                   request.width/2,
                                   (robot_yaw + np.pi/2),
                                   self.costmap_info.resolution)
@@ -398,19 +388,25 @@ class VFHMoveServer( object ):
         Compute difference between present orientation and
         goal orientation.
         """
+        current_pose = util.get_current_robot_pose(self._tf,
+                                                   self.odometry_frame)             
+        
         return (euler_from_orientation(self._goal_odom.pose.orientation)[-1] -
-            euler_from_orientation(self._robot_pose.pose.orientation)[-1])
+            euler_from_orientation(current_pose.pose.orientation)[-1])
 
     def position_error(self):
         """
         Compute difference between present position and
         goal position.
         """
+        
+        current_pose = util.get_current_robot_pose(self._tf,
+                                                   self.odometry_frame)          
         return Point(
                 self._goal_odom.pose.position.x -
-                self._robot_pose.pose.position.x,
-                self._goal_odom.pose.position.x -
-                self._robot_pose.pose.position.x,
+                current_pose.pose.position.x,
+                self._goal_odom.pose.position.y -
+                current_pose.pose.position.y,
                 0)
 
     def odometry_cb(self, odo):
