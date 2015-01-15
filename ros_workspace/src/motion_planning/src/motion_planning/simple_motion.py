@@ -216,7 +216,7 @@ class SimpleMover(object):
 
   def should_stop(self, stop_function):
     external_stop = (callable(stop_function) and stop_function())
-    if external_stop or rospy.is_shutdown():
+    if external_stop:
         self.stop_requested = True
     return self.stop_requested
 
