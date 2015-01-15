@@ -227,22 +227,12 @@ class ExecutiveMaster(object):
         rospy.Subscriber("gpio_read", platform_msg.GPIO, self.gpio_update)
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
+        #start state machine an introspection server
         sls.start()
-        
-        smach_thread = threading.Thread(target=self.state_machine.execute)
-        smach_thread.start()
-        
-        # Wait for ctrl-c
-        rospy.spin()
-        sls.stop()
-        
-        # Request the container to preempt
-        self.state_machine.request_preempt()
-        
-        smach_thread.join()
-
-    def start_state_machine(self):
         self.state_machine.execute()
+        sls.stop()
+        rospy.logwarn("EXECUTIVE MASTER STATE MACHINE EXIT")
+                
         rospy.spin()
 
     #topic handlers
@@ -450,7 +440,11 @@ class TopPreempted(smach.State):
         
         self.service_preempt()
         
-        return 'next'
+        if rospy.core.is_shutdown_requested():
+            rospy.logwarn("ENTERED TOP PREEMPT WHILE SHUTDOWN REQUESTED")
+            return 'aborted'
+        else:
+            return 'next'
 
 class TopAborted(smach.State):
     def __init__(self):
