@@ -293,6 +293,7 @@ class ManualController(object):
         
         #start action servers and services
         manual_control_server.run_server()
+        rospy.spin()
 
     def joy_callback(self, joy_msg):
         #store message and current time in joy_state
@@ -312,6 +313,7 @@ class ManualController(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+        rospy.logwarn("MANUAL CONTROL STATE MACHINE EXIT")
    
 class ProcessGoal(smach.State):
     def __init__(self, announcer):
