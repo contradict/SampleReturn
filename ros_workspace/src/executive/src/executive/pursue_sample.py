@@ -419,6 +419,7 @@ class PursueSample(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+        rospy.logwarn("EXECUTIVE PURSUE_SAMPLE STATE MACHINE EXIT")
     
 #searches the globe   
 class StartSamplePursuit(smach.State):
@@ -495,6 +496,7 @@ class ManipulatorApproach(smach.State):
             except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
+            rospy.loginfo("MANIPULATOR_APPROACH starting with distance: %f " % distance)
             userdata.detected_sample = None
             #time to look for sample in manipulator view, stop when it is seen
             userdata.stop_on_sample = True

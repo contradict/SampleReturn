@@ -168,6 +168,7 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'STAR_MANAGER',
                                                   'sample_detected':'STAR_MANAGER',
                                                   'timeout':'STAR_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'simple_move':'dismount_move',
                                                 'stop_on_sample':'false'})
@@ -192,6 +193,7 @@ class LevelTwoStar(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'STAR_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'pursue_samples':'true'})
             
@@ -206,6 +208,7 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'LINE_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'timeout':'LINE_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'true'})
             
@@ -251,6 +254,7 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'timeout':'BEACON_SEARCH',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
             #return to start along the approach point
@@ -259,6 +263,7 @@ class LevelTwoStar(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'pursue_samples':'true',
                                                 'detected_sample':'beacon_point'})
@@ -281,6 +286,7 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'MOUNT_MANAGER',
                                                   'sample_detected':'MOUNT_MANAGER',
                                                   'timeout':'MOUNT_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_FINAL',
@@ -288,6 +294,7 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'DESELECT_PLANNER',
                                                   'sample_detected':'MOUNT_MANAGER',                                                  
                                                   'timeout':'MOUNT_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('DESELECT_PLANNER',
@@ -335,6 +342,7 @@ class LevelTwoStar(object):
         level_two_server.run_server()
         rospy.spin()
         sls.stop()
+                
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -379,6 +387,8 @@ class LevelTwoStar(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+        rospy.logwarn("EXECUTIVE LEVEL_TWO STATE MACHINE EXIT")
+        #rospy.sleep(0.5) #wait for action server wrapper to get its damn message out
     
 #searches the globe   
 class StartLeveLTwo(smach.State):
