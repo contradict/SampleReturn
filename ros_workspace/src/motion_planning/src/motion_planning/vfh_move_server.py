@@ -44,6 +44,8 @@ class VFHMoveServer( object ):
     """
     def __init__(self):
         
+        rospy.on_shutdown(self.shutdown_cb)
+        self.shutdown=False
         self.publish_debug=True
         
         self._goal_orientation_tolerance = \
@@ -118,7 +120,7 @@ class VFHMoveServer( object ):
         self.marker_id = 0
 
         #this loop controls the strafe angle using vfh sauce
-        rospy.Timer(rospy.Duration(0.5), self.vfh_planner)
+        rospy.Timer(rospy.Duration(0.2), self.vfh_planner)
         
         self.obstacle_check_service = rospy.Service('obstacle_check',
                                                     ObstacleCheck,
@@ -131,7 +133,6 @@ class VFHMoveServer( object ):
         Called by SimpleActionServer when a new goal is ready
         """
         try:
-            rospy.loginfo("VFH_mover target_goal: %s" % goal.target_pose)
             goal_local = self._tf.transformPose('base_link', goal.target_pose)
             goal_odom = self._tf.transformPose(self.odometry_frame, goal.target_pose)
         except tf.Exception, exc:
@@ -148,10 +149,7 @@ class VFHMoveServer( object ):
             rospy.logdebug("Rotating by %f.", dyaw)
             self._mover.execute_spin(dyaw,
                     stop_function=self._as.is_preempt_requested)
-            if self._as.is_preempt_requested():
-                rospy.logdebug("Preempted during initial rotation.")
-                self._as.set_preempted()
-                return
+            if self.exit_check(): return
 
         # drive to goal using vfh
         distance = np.hypot(goal_local.pose.position.x,
@@ -164,10 +162,7 @@ class VFHMoveServer( object ):
                 max_velocity = velocity,
                 stop_function=self._as.is_preempt_requested)
         self.vfh_running = False
-        if self._as.is_preempt_requested():
-            rospy.logdebug("Preempted during drive to goal.")
-            self._as.set_preempted()
-            return
+        if self.exit_check(): return
 
         # turn to requested orientation
         dyaw = self.yaw_error()
@@ -175,12 +170,7 @@ class VFHMoveServer( object ):
             rospy.logdebug("Rotating to goal yaw %f.", dyaw)
             self._mover.execute_spin(dyaw,
                     stop_function=self._as.is_preempt_requested)
-            if self._as.is_preempt_requested():
-                rospy.logdebug("Preempted during final rotation.")
-                self._as.set_preempted()
-                return
-        else:
-            rospy.logdebug("Within tolerance of goal yaw, not rotating.")
+            if self.exit_check(): return
 
         rospy.logdebug("Successfully completed goal.")
         self._as.set_succeeded(
@@ -188,6 +178,36 @@ class VFHMoveServer( object ):
                 self.position_error(),
                 Float64(self.yaw_error())))
         
+    def exit_check(self):
+        if self._as.is_preempt_requested():
+            rospy.loginfo("VFH server preempted, shutdown = %s" % self.shutdown)
+            if not self.shutdown: self._as.set_preempted()
+            return True
+        else:
+            return False
+    
+    def shutdown_cb(self):
+        self._mover.estop()
+        self.vfh_running = False
+        self.shutdown = True
+        #hold up the action server on shutdown, until the client requests preempt
+        start_time = rospy.get_time()
+        while not self._as.is_preempt_requested():
+            rospy.sleep(0.05)
+            elapsed = rospy.get_time() - start_time
+            if  elapsed > 2.0:
+                rospy.logwarn("VFH action server forced to shutdown without preempt (2 second timeout)")
+                return
+        self._as.set_preempted()
+        start_time = rospy.get_time()
+        #wait for mover to stop, then allow the rest of shutdown
+        while self._mover.is_running():
+            rospy.sleep(0.05)
+            elapsed = rospy.get_time() - start_time
+            if  elapsed > 2.0:
+                rospy.logwarn("VFH action server forced to shutdown with simple_motion running (2 second timeout)")
+                return
+                    
     def vfh_planner(self, event):
         if not self.vfh_running:
             return
@@ -207,7 +227,8 @@ class VFHMoveServer( object ):
         
         #if we are within stop_distance initiate stop
         if distance_to_target < self.stop_distance:
-            self.mover.stop()
+            rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
+            self._mover.stop()
                     
         #if the target is not in the active window, we are probably way off course,
         #or possibly trying to drive too far around an obstacle near the target: stop!
@@ -284,7 +305,7 @@ class VFHMoveServer( object ):
             vfh_debug_marker.type = vis_msg.Marker.ARROW
             vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
             vfh_debug_marker.scale = geometry_msg.Vector3(min(self.max_obstacle_distance, distance_to_target), .02, .02)
-            vfh_debug_marker.lifetime = rospy.Duration(0.5)
+            vfh_debug_marker.lifetime = rospy.Duration(0.2)
             
             #rospy.loginfo("SECTORS: %s" % (self.sectors))
             for index in range(len(self.sectors)):
