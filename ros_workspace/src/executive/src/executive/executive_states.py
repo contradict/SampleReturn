@@ -118,10 +118,6 @@ class WaitForFlagState(smach.State):
         self.start_message = start_message
 
     def execute(self, userdata):
-
-        if self.preempt_requested():
-            self.service_preempt()
-            return 'preempted'
         
         if getattr(userdata, self.flag_name) != self.flag_trigger_value and \
            (self.announcer is not None) and \
@@ -129,7 +125,10 @@ class WaitForFlagState(smach.State):
             self.announcer.say(self.start_message)
 
         start_time = rospy.get_time()
-        while not rospy.is_shutdown():
+        while True:
+            if self.preempt_requested():
+                self.service_preempt()
+                return 'preempted'            
             if getattr(userdata, self.flag_name) == self.flag_trigger_value:
                 return 'next'
             rospy.sleep(0.1)
@@ -152,7 +151,8 @@ class ExecuteVFHMove(smach.State):
                                          'stop_on_sample',
                                          'detected_sample',
                                          'paused',
-                                         'odometry_frame'],
+                                         'odometry_frame',
+                                         'shutdown_requested'],
                              output_keys=['detected_sample'])
 
         self.move_client = move_client
@@ -163,7 +163,7 @@ class ExecuteVFHMove(smach.State):
         goal = userdata.move_goal
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
-        while not rospy.is_shutdown():
+        while True:
             #Wait, then get action server state.
             rospy.sleep(0.1)
             #First, handle preempts.
@@ -177,13 +177,13 @@ class ExecuteVFHMove(smach.State):
             if (userdata.detected_sample is not None) and userdata.pursue_samples:
                 rospy.loginfo("ExecuteVFHMove detected sample: " + str(userdata.detected_sample))
                 if userdata.stop_on_sample:
-                    self.move_client.cancel_all_goals()
+                    self.cancel_move()
                 return 'sample_detected'
             #Check to see if we are paused.  If so, cancel active goals.
             #Resend last goal on unpause
             if userdata.paused:
-                self.move_client.cancel_all_goals()
-                while not rospy.is_shutdown():
+                self.cancel_move()
+                while True:
                     rospy.sleep(0.1)
                     #Must check preempt in pause loop too, no matter how lame it is
                     if self.preempt_requested():
@@ -194,13 +194,38 @@ class ExecuteVFHMove(smach.State):
         if move_state == action_msg.GoalStatus.SUCCEEDED:
             return 'complete'
 
+        self.cancel_move()
         return 'aborted'
 
     def handle_preempt(self):
         rospy.loginfo("PREEMPT REQUESTED IN ExecuteVFHMove")
-        self.move_client.cancel_all_goals()
+        self.cancel_move()
         self.service_preempt()
-        return 'preempted'        
+        return 'preempted'
+    
+    #this method cancels the action server move, and waits for motion to 
+    def cancel_move(self):
+        rospy.loginfo("CANCELING GOAL IN ExecuteVFHMove")
+        move_state = self.move_client.get_state()
+        rospy.logwarn("PRE CANCEL move_state: %s" % move_state)
+        self.move_client.cancel_all_goals()
+        start_time = rospy.get_time()
+        while True:
+            rospy.sleep(0.1) 
+            rospy.loginfo("WAITING FOR VFH TO STOP, shutdown: {!s}, shutdown_requested: {!s}".format(rospy.is_shutdown(), rospy.core.is_shutdown_requested()))
+            #if we are in shutdown, stop polling the action server
+            if rospy.core.is_shutdown_requested():
+                return
+            elapsed = rospy.get_time() - start_time
+            move_state = self.move_client.get_state()
+            rospy.logwarn("POST CANCEL move_state: {!s}".format(move_state))
+            if move_state not in util.actionlib_working_states:
+                rospy.loginfo("VFH action server reports stopped (no longer working state) in: %f seconds" % elapsed)
+                return
+            if  elapsed > 5.0:
+                rospy.logwarn("VFH action server failed to report stop with 5 seconds after cancel request")
+                return
+        return
         
 
 #simple move executor, set up interrupts outside this.  If you want obstacle detection
@@ -212,6 +237,7 @@ class ExecuteSimpleMove(smach.State):
                              outcomes=['complete',
                                        'sample_detected',
                                        'timeout',
+                                       'preempted',
                                        'aborted'],
                              input_keys=['simple_move',
                                          'stop_on_sample',
@@ -227,14 +253,14 @@ class ExecuteSimpleMove(smach.State):
         self.move_client.send_goal(goal)
 
         #watch the action server
-        while not rospy.is_shutdown():
+        while True:
             rospy.sleep(0.1)
             move_state = self.move_client.get_state()
             if move_state not in util.actionlib_working_states:
                 break            
             if self.preempt_requested():
                 self.move_client.cancel_all_goals()
-                return 'aborted'
+                return 'preempted'
             #Handle sample detection
             if userdata.stop_on_sample and (userdata.detected_sample is not None):
                 rospy.loginfo("ExecuteSimpleMove detected sample: " + str(userdata.detected_sample))
@@ -244,10 +270,11 @@ class ExecuteSimpleMove(smach.State):
             #last goal and reset timeout timer
             if userdata.paused:
                 self.move_client.cancel_all_goals()
-                while not rospy.is_shutdown():
+                while True():
                     rospy.sleep(0.1)
-                    if not userdata.paused:
-                        break
+                    if self.preempt_requested():
+                        return 'preempted'
+                    if not userdata.paused: break
                 self.move_client.send_goal(goal)
                 
         if move_state == action_msg.GoalStatus.SUCCEEDED:
@@ -282,7 +309,7 @@ class PursuePointManager(smach.State):
 
         last_point_detection = userdata.pursuit_point.header.stamp
 
-        while not rospy.is_shutdown():
+        while True:
             try:
                 current_pose = util.get_current_robot_pose(self.listener,
                         userdata.odometry_frame)
@@ -293,6 +320,7 @@ class PursuePointManager(smach.State):
                                                    userdata.move_goal.target_pose)
             rospy.logdebug("PURSUIT distance: " + str(point_distance))
             if point_distance < userdata.min_pursuit_distance:
+                rospy.loginfo("PURSUE_POINT achieved min_distance: %f" % point_distance)
                 return 'min_distance'
 
             #has pursuit point been changed outside the state?
