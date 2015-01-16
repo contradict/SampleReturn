@@ -11,6 +11,7 @@ import Queue
 
 import std_msgs.msg as std_msg
 from sensor_msgs.msg import Image, CameraInfo
+from platform_motion_msgs.srv import GPIOServiceRequest, GPIOService
 from platform_motion_msgs.msg import GPIO
 
 
@@ -50,7 +51,7 @@ class TriggeredCamera(object):
         self.output = rospy.Publisher('timestamped_image', Image, queue_size=1)
         self.status_pub = rospy.Publisher('cam_status',
                 std_msg.String, queue_size=1)
-        self.gpio_pub = rospy.Publisher('gpio_write', GPIO, queue_size=1)
+        self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService, persistent=True)
 
         rospy.Subscriber("triggered_image", Image, self.handle_image,
                 queue_size=2, buff_size=2*5000*4000)
@@ -91,16 +92,15 @@ class TriggeredCamera(object):
         if self.paused:
             return
         self.trigger_count += 1
-        now = rospy.Time.now()
-        self.gpio_pub.publish(GPIO(servo_id=self.gpio_servo_id,
+        gpio_req = GPIOServiceRequest(GPIO(servo_id=self.gpio_servo_id,
                                    new_pin_states=0,
                                    pin_mask=self.gpio_pin))
+        capture_stamp = self.gpio_service(gpio_req).stamp
         rospy.sleep(self.pulse_width)
-        self.gpio_pub.publish(GPIO(servo_id=self.gpio_servo_id,
-                                   new_pin_states=self.gpio_pin,
-                                   pin_mask=self.gpio_pin))
-        now += rospy.Duration(self.time_offset)
-        self.timestamp_queue.put((self.trigger_count, now))
+        gpio_req.gpio.new_pin_states = self.gpio_pin
+        self.gpio_service(gpio_req)
+        capture_stamp += rospy.Duration(self.time_offset)
+        self.timestamp_queue.put((self.trigger_count, capture_stamp))
         if self.error_status_timer is None:
             self.error_status_timer = rospy.Timer(
                     rospy.Duration(self.error_timeout),
