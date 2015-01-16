@@ -89,6 +89,7 @@ add_service_files(
     FILES
         Enable.srv
         SelectMotionMode.srv
+        GPIOService.srv
 )
 
 # actions

@@ -3,6 +3,7 @@
 #include <nav_msgs/Path.h>
 #include <std_msgs/Bool.h>
 #include <platform_motion_msgs/Path.h>
+#include <platform_motion_msgs/GPIOService.h>
 
 namespace platform_motion{
 
@@ -50,6 +51,9 @@ class Motion : public CANOpen::TransferCallbackReceiver {
                                     platform_motion_msgs::Enable::Response &resp);
         bool selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Request &req,
                                      platform_motion_msgs::SelectMotionMode::Response &resp);
+        bool gpioServiceCallback(platform_motion_msgs::GPIOService::Request &req,
+                                 platform_motion_msgs::GPIOService::Response &resp);
+        void gpioCompleteCallback(CANOpen::PDO &pdo);
         bool handleEnablePods(bool en, bool *result);
         void handlePause( void );
         void handleUnlock( void );
@@ -136,6 +140,12 @@ class Motion : public CANOpen::TransferCallbackReceiver {
 
         ros::ServiceServer motion_mode_server;
         int motion_mode, saved_mode;
+
+        ros::ServiceServer gpio_server;
+        boost::mutex gpio_service_mutex;
+        boost::condition_variable gpio_service_cond;
+        ros::Time gpio_sent_timestamp;
+
 
         boost::mutex lock_state_mutex_;
         boost::condition_variable lock_state_cond_;

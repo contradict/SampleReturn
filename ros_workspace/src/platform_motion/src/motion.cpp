@@ -107,6 +107,9 @@ Motion::Motion() :
     enable_carousel_server = nh_.advertiseService("enable_carousel",
             &Motion::enableCarouselCallback, this);
 
+    gpio_server = nh_.advertiseService("gpio_service",
+            &Motion::gpioServiceCallback, this);
+
     motion_mode_server = nh_.advertiseService("CAN_select_motion_mode",
             &Motion::selectMotionModeCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
@@ -1154,6 +1157,42 @@ void Motion::gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr
             return;
     }
 }
+
+bool Motion::gpioServiceCallback(platform_motion_msgs::GPIOService::Request &req,
+                                 platform_motion_msgs::GPIOService::Response &resp)
+{
+    if((unsigned long)req.gpio.servo_id == carousel->node_id) {
+        boost::unique_lock<boost::mutex> lock(CAN_mutex);
+        uint16_t current = carousel->getOutputPins();
+        uint16_t set   = req.gpio.pin_mask & ( req.gpio.new_pin_states & ~current);
+        uint16_t clear = req.gpio.pin_mask & (~req.gpio.new_pin_states &  current);
+        CANOpen::PDOCallbackObject
+            gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                static_cast<CANOpen::PDOCallbackObject::CallbackFunction>(&Motion::gpioCompleteCallback));
+        carousel->output(set, clear, gpiocb);
+    } else {
+            ROS_ERROR("Unknown servo_id in GPIO: %d", req.gpio.servo_id);
+            return false;
+    }
+    bool notified;
+    boost::unique_lock<boost::mutex> lock(gpio_service_mutex);
+    boost::system_time now=boost::get_system_time();
+    notified = gpio_service_cond.timed_wait(lock, now+boost::posix_time::milliseconds(100));
+    if(!notified)
+    {
+        ROS_ERROR("GPIO service timeout");
+    }
+    resp.stamp = gpio_sent_timestamp;
+    return notified;
+}
+
+void Motion::gpioCompleteCallback(CANOpen::PDO &pdo)
+{
+    boost::unique_lock<boost::mutex> lock(gpio_service_mutex);
+    gpio_sent_timestamp = ros::Time::now();
+    gpio_service_cond.notify_all();
+}
+
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {
