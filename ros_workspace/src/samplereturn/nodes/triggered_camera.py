@@ -26,7 +26,7 @@ class TriggeredCamera(object):
         self.gpio_servo_id = rospy.get_param('~gpio_servo_id', 1)
         self.gpio_pin = rospy.get_param('~gpio_pin', 2)
         self.pulse_width = rospy.get_param('~pulse_width', 0.1)
-        self.error_timeout = rospy.get_param('~error_timeout', 2.0)
+        self.error_timeout = rospy.get_param('~error_timeout', 3.0)
         self.queue_size_warning = rospy.get_param('~queue_size_warning', 3)
         self.frame_id = rospy.get_param('~frame_id', 'search_camera')
         calibration_name = rospy.get_param('~calib_file', None)
@@ -91,6 +91,9 @@ class TriggeredCamera(object):
     def trigger_camera(self, evt):
         if self.paused:
             return
+        if self.timestamp_queue.qsize()>0:
+            rospy.logwarn("missed trigger")
+            return
         self.trigger_count += 1
         gpio_req = GPIOServiceRequest(GPIO(servo_id=self.gpio_servo_id,
                                    new_pin_states=0,
@@ -107,7 +110,12 @@ class TriggeredCamera(object):
                     self.handle_error)
 
     def handle_error(self, evt):
+        rospy.logerr("No image received")
         self.status_pub.publish("Error")
+        try:
+            self.timestamp_queue.get_nowait()
+        except Queue.Empty:
+            pass
 
     def parse_yaml(self, filename):
         stream = file(filename, 'r')
