@@ -5,6 +5,7 @@ from sensor_msgs.msg import CameraInfo
 import rospy
 import rosnode
 import os
+import time
 
 def get_argv(pid):
     try:
