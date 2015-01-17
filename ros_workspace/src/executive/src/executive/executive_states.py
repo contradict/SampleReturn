@@ -198,32 +198,28 @@ class ExecuteVFHMove(smach.State):
         return 'aborted'
 
     def handle_preempt(self):
-        rospy.loginfo("PREEMPT REQUESTED IN ExecuteVFHMove")
+        rospy.loginfo("ExecuteVFHMove: preempt requested")
         self.cancel_move()
         self.service_preempt()
         return 'preempted'
     
     #this method cancels the action server move, and waits for motion to 
     def cancel_move(self):
-        rospy.loginfo("CANCELING GOAL IN ExecuteVFHMove")
         move_state = self.move_client.get_state()
-        rospy.logwarn("PRE CANCEL move_state: %s" % move_state)
         self.move_client.cancel_all_goals()
         start_time = rospy.get_time()
         while True:
             rospy.sleep(0.1) 
-            rospy.loginfo("WAITING FOR VFH TO STOP, shutdown: {!s}, shutdown_requested: {!s}".format(rospy.is_shutdown(), rospy.core.is_shutdown_requested()))
             #if we are in shutdown, stop polling the action server
             if rospy.core.is_shutdown_requested():
                 return
             elapsed = rospy.get_time() - start_time
             move_state = self.move_client.get_state()
-            rospy.logwarn("POST CANCEL move_state: {!s}".format(move_state))
             if move_state not in util.actionlib_working_states:
-                rospy.loginfo("VFH action server reports stopped (no longer working state) in: %f seconds" % elapsed)
+                rospy.loginfo("ExecuteVFHMove: action server reports stopped (no longer working state) in: %f seconds" % elapsed)
                 return
             if  elapsed > 5.0:
-                rospy.logwarn("VFH action server failed to report stop with 5 seconds after cancel request")
+                rospy.logwarn("ExecuteVFHMove: action server failed to report stop with 5 seconds after cancel request")
                 return
         return
         
@@ -260,6 +256,7 @@ class ExecuteSimpleMove(smach.State):
                 break            
             if self.preempt_requested():
                 self.move_client.cancel_all_goals()
+                self.service_preempt()
                 return 'preempted'
             #Handle sample detection
             if userdata.stop_on_sample and (userdata.detected_sample is not None):
@@ -273,6 +270,7 @@ class ExecuteSimpleMove(smach.State):
                 while True():
                     rospy.sleep(0.1)
                     if self.preempt_requested():
+                        self.service_preempt()
                         return 'preempted'
                     if not userdata.paused: break
                 self.move_client.send_goal(goal)
