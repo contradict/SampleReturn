@@ -89,7 +89,6 @@ class PursueSample(object):
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
         self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        
-        self.state_machine.userdata.return_velocity = self.node_params.return_velocity
         self.sample_obstacle_check_width = self.node_params.sample_obstacle_check_width
         
         #stop function check flags        
@@ -450,6 +449,7 @@ class StartSamplePursuit(smach.State):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys=['action_goal',
+                                         'pursuit_velocity',
                                          'min_pursuit_distance',
                                          'odometry_frame'],
                              output_keys=['return_goal',
@@ -482,7 +482,8 @@ class StartSamplePursuit(smach.State):
                                         userdata.odometry_frame)
 
         #this is the initial vfh goal pose
-        goal = samplereturn_msg.VFHMoveGoal(target_pose = pose)
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
+                                            velocity = userdata.pursuit_velocity)
         userdata.pursuit_goal = goal
        
         #create return destination
