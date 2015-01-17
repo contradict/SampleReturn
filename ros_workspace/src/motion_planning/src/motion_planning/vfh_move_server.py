@@ -78,12 +78,6 @@ class VFHMoveServer( object ):
         #costmap crap
         self.costmap = None
         
-        self.debug_map_pub = rospy.Publisher('/test_costmap',
-                                             nav_msg.OccupancyGrid,
-                                             queue_size=1)
-        self.map_np = None
-        self.costmap_msg = None
-
         self.costmap_listener = rospy.Subscriber('local_costmap',
                                 nav_msg.OccupancyGrid,
                                 self.handle_costmap)
@@ -325,7 +319,7 @@ class VFHMoveServer( object ):
 
         #stop the mover if the path is blocked.  This is an estop situation!
         if np.all(self.sectors):
-            rospy.loginfo("VFH all blocked, estop.")
+            rospy.loginfo("VFH all blocked, estop!")
             self._mover.estop()
 
         #find the sector index with the lowest cost index (inverse cost!)
@@ -405,13 +399,7 @@ class VFHMoveServer( object ):
         self.costmap = np.array(costmap.data,
                                 dtype='i1').reshape((costmap.info.height,
                                                      costmap.info.width))
-        
-        self.map_np = np.array(costmap.data,
-                                dtype='i1').reshape((costmap.info.height,
-                                                     costmap.info.width))
-        self.costmap_msg = costmap
-        
-        
+         
     def obstacle_check(self, request ):
         """
         Check a rectangular area in the costmap and return true if any lethal
@@ -435,23 +423,12 @@ class VFHMoveServer( object ):
 
         start_points = bresenham.points(ll, ul)
         end_points = bresenham.points(lr, ur)
-        
-        #debug!
-       
-        self.map_np[start_points[:,0], start_points[:,1]] = 127
-        self.map_np[end_points[:,0], end_points[:,1]] = 127
-        
-
-        
+               
         #check lines for lethal values
         if self.any_line_blocked(start_points, end_points):
             rospy.logdebug("PROBE SWATHE %f X %f BLOCKED " %(request.width, request.distance))
-            self.costmap_msg.data = list(np.reshape(self.map_np, -1))
-            self.debug_map_pub.publish(self.costmap_msg)         
             return True
         else:
-            self.costmap_msg.data = list(np.reshape(self.map_np, -1))
-            self.debug_map_pub.publish(self.costmap_msg)         
             rospy.logdebug("PROBE SWATHE %f X %f CLEAR " %(request.width, request.distance))
             return False
         
@@ -460,7 +437,6 @@ class VFHMoveServer( object ):
             line = bresenham.points(start[None,:], end[None,:])
             line_vals = self.costmap[line[:,0], line[:,1]]
             max_val = (np.amax(line_vals))
-            self.map_np[line[:,0], line[:,1]] = 127
             if np.any(line_vals > self._lethal_threshold):
                 #once an obstacle is found no need to keep checking this angle
                 return True
