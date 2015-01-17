@@ -716,8 +716,8 @@ void Motion::planToZeroTwist( void )
             stern_wheel_velocity -= stern_decel;
 
             port->drive( port_steering, port_wheel_velocity );
-            starboard->drive( port_steering, port_wheel_velocity );
-            stern->drive( port_steering, port_wheel_velocity );
+            starboard->drive( starboard_steering, starboard_wheel_velocity );
+            stern->drive( stern_steering, stern_wheel_velocity );
 
             loop.sleep();
         }
@@ -859,9 +859,16 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     ROS_DEBUG("Drive stern to angle: %2.5f , vel: %2.5f", stern_steering_angle, stern_wheel_speed);
     
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    port->drive(port_steering_angle, port_wheel_speed);
-    starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
-    stern->drive(stern_steering_angle, -stern_wheel_speed);
+    if( motion_mode != platform_motion_msgs::SelectMotionModeRequest::MODE_PAUSE )
+    {
+        port->drive(port_steering_angle, port_wheel_speed);
+        starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
+        stern->drive(stern_steering_angle, -stern_wheel_speed);
+    }
+    else
+    {
+        ROS_ERROR("Attempted twist during pause.");
+    }
 }
 
 int Motion::computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
