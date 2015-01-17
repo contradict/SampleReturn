@@ -535,6 +535,9 @@ class SearchLineManager(smach.State):
 
         self.odometry_frame = userdata.odometry_frame
         
+        if rospy.Time.now() > userdata.return_time:
+            return 'return_home'
+        
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:

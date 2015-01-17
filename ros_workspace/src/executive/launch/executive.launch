@@ -88,7 +88,7 @@
         <param name="spin_step" type="double" value="15"/>
         <param name="spin_velocity" type="double" value="0.4"/>
         
-        <param name="return_time_minutes" type="double" value="2"/>
+        <param name="return_time_minutes" type="double" value="100"/>
 
         <!-- for Beacon approach -->
         <rosparam>
