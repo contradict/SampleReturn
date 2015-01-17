@@ -311,6 +311,7 @@ class SelectMotionMode(smach.State):
 
         return 'next'
 
+#class for saying something on the speakers
 class AnnounceState(smach.State):
     def __init__(self, announcer, announcement):
         smach.State.__init__(self, outcomes = ['next'])
@@ -320,6 +321,7 @@ class AnnounceState(smach.State):
         self.announcer.say(self.announcement)
         return 'next'
 
+#class for servoing robot onto a sample using manipulator detections
 class ServoController(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
@@ -397,126 +399,10 @@ class ServoController(smach.State):
         
         self.try_count = 0
         return 'aborted'
-    
-class RotateToClear(smach.State):
-    def __init__(self, simple_mover, tf_listener):
-        smach.State.__init__(self,
-                             input_keys=['clear_spin',
-                                         'clear_move',
-                                         'strafes',
-                                         'paused'],
-                             output_keys=['active_strafe_key',
-                                          'point_list'],
-                             outcomes=['complete',
-                                       'blocked',
-                                       'aborted'])
-        
-        self.tf_listener = tf_listener
-        self.simple_mover = simple_mover
-        self.clear = False
-        self.strafes = None #this may be useful later
- 
-        rospy.Subscriber('costmap_check',
-                          samplereturn_msg.CostmapCheck,
-                          self.handle_costmap_check)
- 
-    def execute(self, userdata):
-        
-        move = deepcopy(userdata.clear_spin)
-        self.clear = False
-        
-        #load values from dict, absent values become None
-        if move['type'] != 'spin':
-            rospy.logwarn('ROTATE TO CLEAR received non-spin simple move')
-            return 'aborted'
-        
-        angle = move.get('angle')
-        velocity = move.get('velocity')
-        accel = move.get('acceleration')
- 
-        while not rospy.is_shutdown():
-            try:
-                error = self.simple_mover.execute_spin(angle,
-                                                       max_velocity = velocity,
-                                                       acceleration = accel,
-                                                       stop_function = self.stop_if_clear)
-                rospy.loginfo("EXECUTED ROTATE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
-                                                                              np.degrees(error)))
-                #did we exit the move execute because of a pause?
-                if userdata.paused:
-                    #wait here for unpause, as long as it takes
-                    rospy.loginfo("ROTATE TO CLEAR stopped by pause")
-                    while not rospy.is_shutdown() and userdata.paused:
-                        rospy.sleep(0.2)
-                    #unpaused, try again, changing both goal values to returned error
-                    angle = error
-                else:
-                    #made it through move without being paused, break out
-                    break
-                
-            except(TimeoutException):
-                    rospy.logwarn("TIMEOUT during simple_motion.")
-                    return 'timeout'
 
-        if self.clear:
-            
-            rospy.sleep(3.0) #costmap wait
-
-            move = deepcopy(userdata.clear_move)
-            self.clear = False
- 
-            angle = move.get('angle')
-            distance = move.get('distance')
-            velocity = move.get('velocity')
-            accel = move.get('acceleration')
-
-            while not rospy.is_shutdown():
-                try:
-                    userdata.active_strafe_key = 'center'
-                    error = self.simple_mover.execute_strafe(angle,
-                                                             distance,
-                                                             max_velocity = velocity,
-                                                             acceleration = accel)
-                    rospy.loginfo("EXECUTED STRAFE TO CLEAR: %.1f, error %.3f" %( np.degrees(angle),
-                                                                                  np.degrees(error)))
-                    #did we exit the move execute because of a pause?
-                    if userdata.paused:
-                        #wait here for unpause, as long as it takes
-                        rospy.loginfo("ROTATE TO CLEAR stopped by pause")
-                        while not rospy.is_shutdown() and userdata.paused:
-                            rospy.sleep(0.2)
-                        #unpaused, try again, changing both goal values to returned error
-                        distance = error
-                    else:
-                        #made it through move without being paused, break out
-                        break
-                    
-                except(TimeoutException):
-                        rospy.logwarn("TIMEOUT during simple_motion.")
-                        return 'timeout'
-                
-        
-        #blocked, who knows what to do
-        else:
-            self.active_strafe_key = None
-            return 'blocked'
-        
-        self.active_strafe_key = None
-        return 'complete'    
-
-    def stop_if_clear(self):
-        if not self.strafes['center']['blocked']:
-            rospy.loginfo("ROTATE_TO_CLEAR STOP simple_move on center clear")
-            self.clear = True
-            return True
-    
-    def handle_costmap_check(self, costmap_check):
-        for strafe_key, blocked in zip(costmap_check.strafe_keys,
-                                       costmap_check.blocked):
-            self.strafes[strafe_key]['blocked'] = blocked            
 
 #scary class for going to list of points with no obstacle checking,
-#good for searching area with strafing
+#good for searching area with strafing, or complex mounting maneuvers
 class MoveToPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
