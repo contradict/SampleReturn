@@ -72,6 +72,8 @@ class VFHMoveServer( object ):
         self.debug_map_pub = rospy.Publisher('/test_costmap',
                                              nav_msg.OccupancyGrid,
                                              queue_size=1)
+        self.map_np = None
+        self.costmap_msg = None
 
         self.costmap_listener = rospy.Subscriber('local_costmap',
                                 nav_msg.OccupancyGrid,
@@ -181,6 +183,7 @@ class VFHMoveServer( object ):
     def exit_check(self):
         if self._as.is_preempt_requested():
             rospy.loginfo("VFH server preempted, shutdown = %s" % self.shutdown)
+            #don't attempt to send preempt result if we are in shutdown
             if not self.shutdown: self._as.set_preempted()
             return True
         else:
@@ -190,6 +193,8 @@ class VFHMoveServer( object ):
         self._mover.estop()
         self.vfh_running = False
         self.shutdown = True
+        #if the action server does not have an active goal, just exit
+        if not self._as.is_active(): return
         #hold up the action server on shutdown, until the client requests preempt
         start_time = rospy.get_time()
         while not self._as.is_preempt_requested():
@@ -256,7 +261,6 @@ class VFHMoveServer( object ):
             sector_line = bresenham.points(start, end)
 
             for coords in sector_line:
-                #coords = coords[::-1]
                 cell_value = self.costmap[tuple(coords)]
 
                 position = self.costmap_info.resolution * (coords - robot_cmap_coords)
@@ -348,47 +352,74 @@ class VFHMoveServer( object ):
                                 dtype='i1').reshape((costmap.info.height,
                                                      costmap.info.width))
         
+        self.map_np = np.array(costmap.data,
+                                dtype='i1').reshape((costmap.info.height,
+                                                     costmap.info.width))
+        self.costmap_msg = costmap
+        
+        
     def obstacle_check(self, request ):
         """
         Check a rectangular area in the costmap and return true if any lethal
         cells are inside that area.
         """
+        try:
+            pos, quat = self._tf.lookupTransform(self.costmap_header.frame_id,
+                                                'base_link',
+                                                rospy.Time(0))
+        except tf.Exception, e:
+            rospy.logerr("Unable to look up transform base_link->%s, reporting all blocked",
+                    self.costmap_header.frame_id)
+            self.publish_all_blocked()
+            return
+        actual_yaw = tf.transformations.euler_from_quaternion(quat)[-1]
         
         #get current position from mover object
         robot_position = self._mover.current_position
-        robot_yaw = self._mover.current_yaw
+        target_yaw = request.yaw
+        rospy.logwarn("OBSTACLE CHECK, current_yaw: {:f}, target_yaw: {:f}, actual_yaw: {:f}".format(target_yaw, request.yaw, actual_yaw))
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
         
         ll = self.bresenham_point(robot_cmap_coords,
                                   request.width/2,
-                                  (robot_yaw - np.pi/2),
+                                  (target_yaw - np.pi/2),
                                   self.costmap_info.resolution)
         ul = self.bresenham_point(robot_cmap_coords,   
                                   request.width/2,
-                                  (robot_yaw + np.pi/2),
+                                  (target_yaw + np.pi/2),
                                   self.costmap_info.resolution)
-        lr = self.bresenham_point(ll[0], request.distance, robot_yaw, self.costmap_info.resolution)
-        ur = self.bresenham_point(ul[0], request.distance, robot_yaw, self.costmap_info.resolution)
+        lr = self.bresenham_point(ll[0], request.distance, target_yaw, self.costmap_info.resolution)
+        ur = self.bresenham_point(ul[0], request.distance, target_yaw, self.costmap_info.resolution)
 
         start_points = bresenham.points(ll, ul)
         end_points = bresenham.points(lr, ur)
         
+        #debug!
+       
+        self.map_np[start_points[:,0], start_points[:,1]] = 127
+        self.map_np[end_points[:,0], end_points[:,1]] = 127
+        
+
+        
         #check lines for lethal values
         if self.any_line_blocked(start_points, end_points):
             rospy.logdebug("PROBE SWATHE %f X %f BLOCKED " %(request.width, request.distance))
+            self.costmap_msg.data = list(np.reshape(self.map_np, -1))
+            self.debug_map_pub.publish(self.costmap_msg)         
             return True
-        else:    
+        else:
+            self.costmap_msg.data = list(np.reshape(self.map_np, -1))
+            self.debug_map_pub.publish(self.costmap_msg)         
             rospy.logdebug("PROBE SWATHE %f X %f CLEAR " %(request.width, request.distance))
             return False
         
     def any_line_blocked(self, start_points, end_points):
         for start, end in zip(start_points, end_points):
             line = bresenham.points(start[None,:], end[None,:])
-            line_vals = self.costmap[line[:,1], line[:,0]]
+            line_vals = self.costmap[line[:,0], line[:,1]]
             max_val = (np.amax(line_vals))
+            self.map_np[line[:,0], line[:,1]] = 127
             if np.any(line_vals > self._lethal_threshold):
-                #for debug, mark lethal lines
-                if self.publish_debug: self.costmap[line[:,1], line[:,0]] = 64
                 #once an obstacle is found no need to keep checking this angle
                 return True
         return False
