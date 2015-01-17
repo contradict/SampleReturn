@@ -12,6 +12,7 @@ import rospy
 import rosnode
 import actionlib
 import tf
+import tf2_ros
 import tf_conversions
 
 import samplereturn.util as util
@@ -35,6 +36,9 @@ import sensor_msgs.point_cloud2 as pc2
 
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
+
+from geometry_msgs.msg import TransformStamped, Transform
+
 
 class RobotSimulator(object):
     
@@ -63,7 +67,7 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
                              {'point':geometry_msg.Point(-38, -16, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
-                             {'point':geometry_msg.Point(16, 25, 0), 'id':4},
+                             {'point':geometry_msg.Point(10.8, 30.6, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
@@ -131,15 +135,16 @@ class RobotSimulator(object):
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
         self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
-        self.odometry_is_noisy = True
+        self.odometry_is_noisy = False
+        #fake localization handled by the executive_test file... generally
         self.broadcast_localization = True
 
         #tf stuff
-        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self.tf_listener = tf.TransformListener()
         
-        self.zero_translation = (0,0,0)
-        self.zero_rotation = (0,0,0,1)
+        self.zero_translation = geometry_msg.Vector3(0,0,0)
+        self.zero_rotation = geometry_msg.Quaternion(0,0,0,1)
                                                   
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
@@ -173,13 +178,13 @@ class RobotSimulator(object):
         #camera publishers
         self.cam_publishers = []
         for topic in cam_status_list:
-            self.cam_publishers.append(rospy.Publisher(topic, std_msg.String))
+            self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.5), self.publish_cam_status)
                 
         #io publishers
-        self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO)
+        self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
-        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool)
+        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_pause)
 
 
@@ -207,7 +212,8 @@ class RobotSimulator(object):
         self.home_wheelpods_server.start()
         
         self.joint_state_pub = rospy.Publisher(joint_state_name,
-                                               sensor_msg.JointState)
+                                               sensor_msg.JointState,
+                                               queue_size=2)
         
         #planner, odom and tf
         self.planner_sub = rospy.Subscriber(planner_command_name,
@@ -223,19 +229,26 @@ class RobotSimulator(object):
                                             self.handle_joystick)
 
         self.odometry_pub = rospy.Publisher(odometry_name,
-                                            nav_msg.Odometry)
+                                            nav_msg.Odometry,
+                                            queue_size=2)
 
         self.joint_transforms_available = False
         rospy.Timer(rospy.Duration(0.05), self.broadcast_tf_and_motion)
 
         #sample detection stuff
-        self.search_sample_pub = rospy.Publisher(detected_sample_search_name, samplereturn_msg.NamedPoint)
+        self.search_sample_pub = rospy.Publisher(detected_sample_search_name,
+                                                 samplereturn_msg.NamedPoint,
+                                                 queue_size=10)
         rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
 
-        self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name, samplereturn_msg.NamedPoint)
+        self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name,
+                                                      samplereturn_msg.NamedPoint,
+                                                      queue_size=1)
         rospy.Timer(rospy.Duration(0.1), self.publish_sample_detection_manipulator)         
         
-        self.sample_marker_pub = rospy.Publisher('fake_samples', vis_msg.Marker)
+        self.sample_marker_pub = rospy.Publisher('fake_samples',
+                                                 vis_msg.Marker,
+                                                 queue_size=30)
         
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    samplereturn_msg.PursuitResult,
@@ -253,11 +266,14 @@ class RobotSimulator(object):
         self.visual_servo_server.start()
         
         self.points_center_pub = rospy.Publisher(point_cloud_center_name,
-                                                 sensor_msg.PointCloud2)
+                                                 sensor_msg.PointCloud2,
+                                                 queue_size=2)
         self.points_port_pub = rospy.Publisher(point_cloud_port_name,
-                                                 sensor_msg.PointCloud2)
+                                                 sensor_msg.PointCloud2,
+                                                 queue_size=2)
         self.points_starboard_pub = rospy.Publisher(point_cloud_starboard_name,
-                                                 sensor_msg.PointCloud2)
+                                                 sensor_msg.PointCloud2,
+                                                 queue_size=2)
         
         #map stuff
         print "Waiting for map server"
@@ -287,17 +303,22 @@ class RobotSimulator(object):
 
         self.joint_transforms_available = True
         
-        self.debug_marker_pub = rospy.Publisher('debug_markers', vis_msg.Marker)
+        self.debug_marker_pub = rospy.Publisher('debug_markers',
+                                                vis_msg.Marker,
+                                                queue_size=100)
         rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
         
         self.path_counter = 0
-        self.path_marker_pub = rospy.Publisher('path_markers', vis_msg.Marker)
+        self.path_marker_pub = rospy.Publisher('path_markers',
+                                               vis_msg.Marker,
+                                               queue_size=10)
         rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
         self.check_publisher = rospy.Publisher('/processes/executive/costmap_check',
-                                               samplereturn_msg.CostmapCheck)
+                                               samplereturn_msg.CostmapCheck,
+                                               queue_size=10)
 
         #beacon stuff, needs param server up
         self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
@@ -311,9 +332,11 @@ class RobotSimulator(object):
                                                   geometry_msg.Quaternion(*beacon_rot))
         
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
-                geometry_msg.PoseWithCovarianceStamped)
+                                               geometry_msg.PoseWithCovarianceStamped,
+                                               queue_size=2)
         self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
-                geometry_msg.PoseStamped)
+                                                     geometry_msg.PoseStamped,
+                                                     queue_size=2)
         rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
 
         #rospy.spin()
@@ -395,6 +418,8 @@ class RobotSimulator(object):
             self.integrate_odometry( twist)
 
     def publish_point_cloud(self, event):
+        #rospy.loginfo("Starting PC generation")
+
         now = event.current_real
         header = std_msg.Header(0, now, 'map')
         target_frame = 'navigation_center_left_camera'
@@ -406,7 +431,9 @@ class RobotSimulator(object):
             current_pose = util.get_current_robot_pose(self.tf_listener,
                     'map')
             transform = self.tf_listener.asMatrix(target_frame, header)
-        except ( tf.Exception ):
+        except ( tf.Exception ), e:
+            #rospy.loginfo("Failed to transform map for PC")
+            #rospy.loginfo("Exception: %s"%e)
             return
         center_cloud = self.get_pointcloud2(self.global_map,
                                             current_pose.pose.position,
@@ -419,27 +446,27 @@ class RobotSimulator(object):
         empty_cloud.header.frame_id = 'navigation_starboard_left_camera'
         self.points_starboard_pub.publish(empty_cloud)
         
+        #interval = rospy.get_time() - now.to_sec()
+        #rospy.loginfo("Finished PC generation in: %f"%interval)
+               
     def broadcast_tf_and_motion(self, event):
+        #rospy.loginfo("Starting TF and Odom")
         now = rospy.Time.now()
+        transforms = []
         if self.broadcast_localization:
-            self.tf_broadcaster.sendTransform(self.zero_translation,
-                                              self.zero_rotation,
-                                              now,
-                                              'fake_odom',
-                                              'fake_map')
-        
+            transform = TransformStamped(std_msg.Header(0, now, 'fake_map'),
+                                         'fake_odom',
+                                         Transform(self.zero_translation,
+                                                   self.zero_rotation))
+            transforms.append(transform)
+
         self.integrate_odometry()
         
-        trans = (self.robot_pose.pose.position.x,
-                       self.robot_pose.pose.position.y,
-                       self.robot_pose.pose.position.z)
-        
-        rot = (self.robot_pose.pose.orientation.x,
-                    self.robot_pose.pose.orientation.y,
-                    self.robot_pose.pose.orientation.z,
-                    self.robot_pose.pose.orientation.w)
-        
-        self.tf_broadcaster.sendTransform(trans, rot, now, 'base_link', 'fake_odom')
+        transform = TransformStamped(std_msg.Header(0, now, 'fake_odom'),
+                                     'base_link',
+                                     Transform(self.robot_pose.pose.position,
+                                               self.robot_pose.pose.orientation))
+        transforms.append(transform)
 
         if self.odometry_is_noisy:
             qn = (self.noisy_robot_pose.pose.orientation.x,
@@ -469,20 +496,30 @@ class RobotSimulator(object):
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
             mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
 
-            self.tf_broadcaster.sendTransform(mfm_translate, mfm_rot, now,
-                    'fake_map', 'map')
+            transform = TransformStamped(std_msg.Header(0, now, 'map'),
+                                         'fake_map',
+                                         Transform(geometry_msg.Vector3(*mfm_translate),
+                                                   geometry_msg.Quaternion(*mfm_rot)))
+            transforms.append(transform)
+        
         else:
-            self.tf_broadcaster.sendTransform(
-                    self.zero_translation,
-                    self.zero_rotation,
-                    now,
-                    'fake_map', 'map')
-
+            transform = TransformStamped(std_msg.Header(0, now, 'map'),
+                                         'fake_map',
+                                         Transform(self.zero_translation,
+                                                   self.zero_rotation))
+            transforms.append(transform)
+  
+        #broadcast transformlist
+        self.tf_broadcaster.sendTransform(transforms)
+  
         #also publish odometry
         self.odometry_pub.publish(self.robot_odometry)
 
         #publish joint states
         self.publish_joint_states(self.robot_odometry)
+        
+        #interval = rospy.get_time() - now.to_sec()
+        #rospy.loginfo("Finished TF and Odom in: %f"%interval)
 
     def publish_cam_status(self, event):
         if self.cameras_ready:

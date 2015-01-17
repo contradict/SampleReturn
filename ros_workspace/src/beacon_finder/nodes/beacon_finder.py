@@ -22,9 +22,9 @@ class BeaconFinder:
     """A class to locate the beacon in an image and publish a vector in the camera's frame from the robot to the beacon"""
 
     def __init__(self):
-        self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseWithCovarianceStamped)
-        self._beacon_debug_pose_publisher = rospy.Publisher('beacon_pose_debug', PoseStamped)
-        self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image)
+        self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseWithCovarianceStamped, queue_size=1)
+        self._beacon_debug_pose_publisher = rospy.Publisher('beacon_pose_debug', PoseStamped, queue_size=1)
+        self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image, queue_size=1)
         self._cv_bridge = CvBridge()
 
         self._camera_model = None

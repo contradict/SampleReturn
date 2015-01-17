@@ -19,7 +19,7 @@ import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn.util as util
-import samplereturn.simple_motion as simple_motion
+import motion_planning.simple_motion as simple_motion
 
 from samplereturn_msgs.msg import VoiceAnnouncement
 
@@ -43,7 +43,6 @@ class ManualController(object):
         self.CAN_interface = util.CANInterface()
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
-        rospy.sleep(2.0)
  
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
@@ -133,9 +132,11 @@ class ManualController(object):
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
+                                                  'sample_detected':'VISUAL_SERVO',
                                                   'timeout':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED',
-                                                  })
+                                                  },
+                                   remapping = {'stop_on_sample':'true'})
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
@@ -291,6 +292,7 @@ class ManualController(object):
         
         #start action servers and services
         manual_control_server.run_server()
+        rospy.spin()
 
     def joy_callback(self, joy_msg):
         #store message and current time in joy_state
@@ -310,6 +312,8 @@ class ManualController(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+        rospy.sleep(0.2) #hideous hack delay to let action server get its final message out
+        rospy.logwarn("MANUAL CONTROL STATE MACHINE EXIT")
    
 class ProcessGoal(smach.State):
     def __init__(self, announcer):

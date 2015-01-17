@@ -5,15 +5,14 @@ transform_tolerance: 0.3
 update_frequency: 2.0
 publish_frequency: 1.0
 
-footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
+#footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
 
 rolling_window: true
 width: 20.0
 height: 20.0
 resolution: 0.10
 
-inscribed_radius: 0.4
-circumscribed_radius: 0.75
+robot_radius: 1.0
 
 plugins:
     -
@@ -75,6 +74,7 @@ obstacle_layer:
 
 inflation_layer:
     cost_scaling_factor: 1.0
-    inflation_radius: 2.0
+    inflation_radius: 2.0 
+
 
 

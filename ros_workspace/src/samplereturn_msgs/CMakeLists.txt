@@ -87,6 +87,7 @@ add_service_files(
     DIRECTORY srv
     FILES
         Enable.srv
+        ObstacleCheck.srv
         SimpleMotion.srv
 )
 
@@ -102,6 +103,8 @@ add_action_files(
 	DIRECTORY action
 	FILES
     GeneralExecutive.action
+    SimpleMove.action
+    VFHMove.action
 )
 
 ## Generate added messages and services with any dependencies listed here

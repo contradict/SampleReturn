@@ -29,6 +29,9 @@
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
     <remap from="beacon_pose" to="/processes/beacon_finder/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
+    <remap from="vfh_move" to="/processes/vfh_move"/>
+    <remap from="simple_move" to="/processes/simple_move"/>
+    <remap from="obstacle_check" to="/processes/obstacle_check"/>
 
     <!-- io remaps -->
     <remap from="pause_state" to="/io/pause_state"/>
@@ -36,31 +39,6 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="gpio_read" to="/io/gpio_read"/>
-
-    <!-- dictionary for dumb planning, costmap_checker
-         also uses this to determine where to check for obstacles.
-         The angles must not be changed for proper block checking,
-         but the distances can be overridden by nodes-->
-    <rosparam ns="/processes/executive">
-        strafes:
-            left:
-                angle: 0.7854
-                distance: 4.0
-                blocked: False
-                right_check_offset: 0.6     
-            center:
-                angle: 0
-                distance: 16.0
-                blocked: False                
-            right:
-                angle: -0.7854
-                distance: 4.0
-                blocked: False
-                left_check_offset: 0.6
-            sample_area:
-                angle: 0
-                check_distance: 3.5
-    </rosparam>
 
     <node
         pkg="executive"
@@ -104,12 +82,13 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="45"/>
-        <param name="first_spoke_offset" type="double" value="-125"/>
+        <param name="first_spoke_offset" type="double" value="75"/>
         <param name="star_hub_radius" type="int" value="15"/>
-        <param name="min_spin_radius" type="double" value="60"/>
+        <param name="min_spin_radius" type="double" value="100"/>
         <param name="spin_step" type="double" value="15"/>
+        <param name="spin_velocity" type="double" value="0.4"/>
         
-        <param name="return_time_minutes" type="double" value="100"/>
+        <param name="return_time_minutes" type="double" value="2"/>
 
         <!-- for Beacon approach -->
         <rosparam>
@@ -117,18 +96,6 @@
                 {x: 10.0, y: 0}
         </rosparam>
         <param name="beacon_mount_step" type="double" value="2"/>
-
-        <!-- simple mover parameters --> 
-        <param name="spin_velocity" type="double" value="0.15"/>
-        <!-- default for simple move execute -->  
-        <rosparam>
-            simple_motion_params:
-                max_velocity: 0.8
-                acceleration: 0.8
-                stop_deceleration: 2.0
-                loop_rate: 10 
-                steering_angle_epsilon: 0.01
-        </rosparam>
     
     </node>
         
@@ -147,54 +114,22 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- sample approach (pursuit) parameters -->
-        <param name="min_pursuit_distance" type="double" value="4.0"/>
+        <param name="pursuit_velocity" type="double" value="0.5"/>
+        <param name="max_pursuit_error" type="double" value="0.5"/>
+        <param name="min_pursuit_distance" type="double" value="2.5"/>
+        <param name="max_sample_lost_time" type="double" value="20"/>
+
         <!-- after min_pursuit reached, we move to check_distance and observe for
              obstacles.  Then we make the manipulator view approach -->
-        <param name="sample_obstacle_check_distance" type="double" value="2.0"/>
-        <param name="final_pursuit_step" type="double" value="0.6"/>
-        <param name="max_sample_lost_time" type="double" value="20"/>
-        <param name="pursuit_step" type="double" value="4.0"/>
-        <param name="pursuit_yaw_tolerance" type="double" value="0.2"/>
-        <param name="pursuit_velocity" type="double" value="0.5"/>
-        <param name="pursuit_strafe" type="double" value="5.0"/>
+        <param name="sample_obstacle_check_width" type="double" value="1.0"/>
+        <param name="final_pursuit_step" type="double" value="0.4"/>
 
         <param name="square_search_size" type="double" value="0.3"/> 
-        <param name="return_velocity" type="double" value="1.0"/>
         <param name="search_velocity" type="double" value="0.05"/>
        
-        <!-- pursue sample simple motion parameters --> 
-        <!-- these are defaults and should be overridden as necessary -->
-        <rosparam>
-           simple_motion_params:
-                max_velocity: 0.5
-                acceleration: 0.5
-                stop_deceleration: 1.0
-                loop_rate: 10
-                steering_angle_epsilon: 0.01
-        </rosparam>
-
         <!-- this file loads the velocities and such for servoing onto sample,
              the node must already have a simple_mover up and running -->
         <rosparam file="$(find samplereturn)/config/visual_servo.yaml" command="load"/>  
-
-    </node>
-
-    <node
-        pkg="executive"
-        type="costmap_checker_node.py"
-        name="costmap_checker"
-        machine="navigate"
-        output="log"
-        ns="/processes/executive">
-
-        <!-- executive tf frame and planner_mode -->
-
-        <param name="lethal_threshold" type="int" value="90"/>        
-        <param name="min_check_distance" type="double" value ="1.5"/>
-        <param name="obstacle_check_distance" type="double" value="5"/>
-        <param name="obstacle_check_width" type="double" value="2.5"/>
-        <param name="min_check_distance" type="double" value="0.7"/>
-
     </node>
 
 </launch>

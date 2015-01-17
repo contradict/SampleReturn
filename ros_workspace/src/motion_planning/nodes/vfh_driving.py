@@ -3,9 +3,9 @@
 Start the SimpleDriving action server
 """
 import rospy
-from simple_driving import SimpleDriving
+from motion_planning import vfh_move_server
 
 if __name__ == "__main__":
-    rospy.init_node("driving")
-    DRIVE = SimpleDriving()
+    rospy.init_node("vfh_mover")
+    MOVER = vfh_move_server.VFHMoveServer()
     rospy.spin()

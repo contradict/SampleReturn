@@ -4,7 +4,7 @@
 
     <arg name="odometry_frame" value="fake_odom"/>
     <arg name="world_fixed_frame" value="fake_map"/>
-    <arg name="beacon_localization" value="true"/>
+    <arg name="beacon_localization" value="false"/>
 
     <!-- begin test arguments -->
     <machine name="search"
@@ -68,7 +68,56 @@
 
     </node>
 
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
+    <node name="vfh_driver"
+          pkg="motion_planning" 
+          type="vfh_driving.py"
+          output="log"
+          ns="/processes">
+
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="lethal_threshold" type="int" value="90"/>
+
+        <remap from="odometry" to="/motion/odometry"/>
+        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="twist" to="/motion/planner_command"/>
+        <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        
+        <rosparam>
+            simple_motion_params:
+                max_velocity: 0.8
+                acceleration: 0.5
+                stop_deceleration: 2.0
+                loop_rate: 10 
+                steering_angle_epsilon: 0.01
+        </rosparam>
+
+    </node>
+
+    <node name="simple_driver"
+          pkg="motion_planning" 
+          type="simple_driving.py"
+          output="log"
+          ns="/processes">
+
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+
+        <remap from="odometry" to="/motion/odometry"/>
+        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="twist" to="/motion/planner_command"/>
+        <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        
+        <rosparam>
+            simple_motion_params:
+                max_velocity: 0.5
+                acceleration: 0.5
+                stop_deceleration: 2.0
+                loop_rate: 10 
+                steering_angle_epsilon: 0.01
+        </rosparam>
+
+    </node>
+
+   <include file="$(find beacon_finder)/launch/beacon_finder.launch">
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
 
@@ -77,8 +126,8 @@
             <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
             <arg name="odometry_frame" value="$(arg odometry_frame)"/>
         </include>
-    </group>
-    <group unless="$(arg beacon_localization)">
+</group>
+<!-- <group unless="$(arg beacon_localization)">
         <node
             pkg="fake_localization"
             type="fake_localization"
@@ -89,6 +138,6 @@
             <param name="odom_frame_id" value="$(arg odometry_frame)"/>
             <param name="global_frame_id" value="$(arg world_fixed_frame)"/>
         </node>
-    </group>
+    </group>-->
 
 </launch>

@@ -4,10 +4,11 @@ from distutils.core import setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
 setup_obj = generate_distutils_setup(
-                  packages=['simple_driving'],
+                  packages=['motion_planning'],
                   package_dir={'': 'src'},
                   scripts=[
-                      'nodes/driving.py'
+                      'nodes/simple_driving.py',
+                      'nodes/vfh_driving.py'
                       ]
                 )
 
