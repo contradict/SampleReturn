@@ -3,6 +3,7 @@ Use vfh to drive to a position and yaw
 """
 #!/usr/bin/env python
 import numpy as np
+import threading
 from copy import deepcopy
 import rospy
 import actionlib
@@ -59,12 +60,20 @@ class VFHMoveServer( object ):
         max_vel = rospy.get_param("~simple_motion_params/max_velocity")
         self.stop_distance = max_vel**2/2./accel
 
-        self._as = actionlib.SimpleActionServer("vfh_move", VFHMoveAction,
-                execute_cb = self.execute_cb, auto_start=False)
+        self._as = actionlib.SimpleActionServer("vfh_move",
+                                                VFHMoveAction,
+                                                auto_start=False)
+        
+        self._as.register_goal_callback(self.goal_cb)
+        self._as.register_preempt_callback(self.preempt_cb)
+        
 
         self._tf = tf.TransformListener()
 
         self._goal_odom = None
+        self._goal_local = None
+        self._target_point_odom = None
+        self.velocity = None
 
         #costmap crap
         self.costmap = None
@@ -84,6 +93,7 @@ class VFHMoveServer( object ):
  
         #vfh params
         self.vfh_running = False
+        self.stop_requested = False
 
         self.sector_angle = np.radians(5.0)
         self.active_window = np.radians(120)
@@ -130,10 +140,16 @@ class VFHMoveServer( object ):
         
         self._as.start()
 
-    def execute_cb(self, goal):
+    def goal_cb(self):
         """
         Called by SimpleActionServer when a new goal is ready
         """
+        #was the server active when goal was received?
+        active = self._as.is_active()
+        
+        #this makes it active if it wasn't
+        goal = self._as.accept_new_goal()
+        
         try:
             goal_local = self._tf.transformPose('base_link', goal.target_pose)
             goal_odom = self._tf.transformPose(self.odometry_frame, goal.target_pose)
@@ -141,37 +157,62 @@ class VFHMoveServer( object ):
             rospy.logwarn("VFH MOVE SERVER:could not transform goal: %s"%exc)
             self._as.set_aborted(text = "Could not transform goal: %s"%exc)
             return
+        self._goal_local = goal_local
         self._goal_odom = goal_odom
-        rospy.logdebug("Received goal, transformed to %s", goal_odom)
+        header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+        self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
+        self.velocity = goal.velocity if (goal.velocity != 0) else None
+        
+        rospy.loginfo("VFH Received goal, transformed to %s", goal_odom)
+
+        #if the action server is inactive, fire up a movement thread
+        if not active:
+            rospy.loginfo("VFH Server not active, goal received, starting.")
+            self.stop_requested = False
+            self.execute_thread = threading.Thread(target=self.execute_movement);
+            self.execute_thread.start();
+        else:
+            rospy.loginfo("VFH Server active, self._goal_odom updated.")
+        
+    #called by the AS when new goal received, and also when preempted
+    def preempt_cb(self):
+        #if we receive a preempt without a new goal available, this means it
+        #was called by an actual preempt request
+        if not self._as.is_new_goal_available():
+            self.stop_requested = True
+        
+    def is_stop_requested(self):
+        return self.stop_requested
+
+    def execute_movement(self):
 
         # turn to face goal
-        dyaw = np.arctan2( goal_local.pose.position.y,
-                           goal_local.pose.position.x)
+        dyaw = np.arctan2( self._goal_local.pose.position.y,
+                           self._goal_local.pose.position.x)
         if np.abs(dyaw) > self._goal_orientation_tolerance:
-            rospy.logdebug("Rotating by %f.", dyaw)
+            rospy.loginfo("VFH Rotating to heading by %f.", dyaw)
             self._mover.execute_spin(dyaw,
-                    stop_function=self._as.is_preempt_requested)
+                    stop_function=self.is_stop_requested)
             if self.exit_check(): return
 
         # drive to goal using vfh
-        distance = np.hypot(goal_local.pose.position.x,
-                goal_local.pose.position.y)
+        distance = np.hypot(self._goal_local.pose.position.x,
+                            self._goal_local.pose.position.y)
         #use param velocity unless a velocity was included in goal
-        velocity = goal.velocity if (goal.velocity != 0) else None
-        rospy.logdebug("Moving %f meters ahead.", distance)
+        rospy.loginfo("VFH Moving %f meters ahead.", distance)
         self.vfh_running = True
         self._mover.execute_continuous_strafe(0.0,
-                max_velocity = velocity,
-                stop_function=self._as.is_preempt_requested)
+                max_velocity = self.velocity,
+                stop_function=self.is_stop_requested)
         self.vfh_running = False
         if self.exit_check(): return
 
         # turn to requested orientation
         dyaw = self.yaw_error()
         if np.abs(dyaw) > self._goal_orientation_tolerance:
-            rospy.logdebug("Rotating to goal yaw %f.", dyaw)
+            rospy.loginfo("VFH Rotating to goal yaw %f.", dyaw)
             self._mover.execute_spin(dyaw,
-                    stop_function=self._as.is_preempt_requested)
+                    stop_function=self.is_stop_requested)
             if self.exit_check(): return
 
         rospy.logdebug("Successfully completed goal.")
@@ -225,9 +266,7 @@ class VFHMoveServer( object ):
 
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
 
-        target_in_odom = PointStamped(self._goal_odom.header,
-                                      self._goal_odom.pose.position)
-        yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, target_in_odom)
+        yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, self._target_point_odom)
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         
         #if we are within stop_distance initiate stop
@@ -335,7 +374,20 @@ class VFHMoveServer( object ):
             debug_marker.id = self.marker_id
             self.marker_id += 1
             vfh_debug_array.append(debug_marker)    
-    
+ 
+            debug_marker = vis_msg.Marker()
+            debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+            debug_marker.type = vis_msg.Marker.CYLINDER
+            debug_marker.color = std_msg.ColorRGBA(1, 0, 0, 1)
+            debug_marker.scale = geometry_msg.Vector3(.5, .5, .5)
+            debug_marker.pose = Pose()
+            debug_marker.pose.position = self._target_point_odom.point
+            debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
+            debug_marker.lifetime = rospy.Duration(3.0) 
+            debug_marker.id = self.marker_id
+            self.marker_id += 1
+            vfh_debug_array.append(debug_marker) 
+            
             vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
             self.debug_marker_pub.publish(vfh_debug_msg)
         
