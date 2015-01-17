@@ -35,7 +35,6 @@ from executive.executive_states import ServoController
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import ExecuteVFHMove
 from executive.executive_states import MoveToPoints
-from executive.executive_states import GetPursueDetectedPointState
 
 class PursueSample(object):
     
@@ -131,19 +130,7 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  'Sample detected.  Pursue ing'),
                                    transitions = {'next':'APPROACH_SAMPLE'})
-            '''
-            #sample approach concurrence
-            sample_approach = GetPursueDetectedPointState(self.vfh_mover, self.tf_listener)
-            
-            smach.StateMachine.add('APPROACH_SAMPLE',
-                                   sample_approach,
-                                   transitions = {'min_distance':'ANNOUNCE_OBSTACLE_CHECK',
-                                                  'point_lost':'ANNOUNCE_POINT_LOST',
-                                                  'complete':'PUBLISH_FAILURE',
-                                                  'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'pursue_samples':'false',
-                                                'pursuit_point':'target_sample'})
-            '''
+ 
             smach.StateMachine.add('APPROACH_SAMPLE',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'ANNOUNCE_OBSTACLE_CHECK',
