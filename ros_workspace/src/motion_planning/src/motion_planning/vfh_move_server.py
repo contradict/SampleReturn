@@ -363,21 +363,9 @@ class VFHMoveServer( object ):
         Check a rectangular area in the costmap and return true if any lethal
         cells are inside that area.
         """
-        try:
-            pos, quat = self._tf.lookupTransform(self.costmap_header.frame_id,
-                                                'base_link',
-                                                rospy.Time(0))
-        except tf.Exception, e:
-            rospy.logerr("Unable to look up transform base_link->%s, reporting all blocked",
-                    self.costmap_header.frame_id)
-            self.publish_all_blocked()
-            return
-        actual_yaw = tf.transformations.euler_from_quaternion(quat)[-1]
-        
         #get current position from mover object
         robot_position = self._mover.current_position
         target_yaw = request.yaw
-        rospy.logwarn("OBSTACLE CHECK, current_yaw: {:f}, target_yaw: {:f}, actual_yaw: {:f}".format(target_yaw, request.yaw, actual_yaw))
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
         
         ll = self.bresenham_point(robot_cmap_coords,
