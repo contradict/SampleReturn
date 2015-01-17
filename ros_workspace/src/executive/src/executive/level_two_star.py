@@ -388,8 +388,8 @@ class LevelTwoStar(object):
         while self.state_machine.is_running():
             rospy.sleep(0.1)
         rospy.logwarn("EXECUTIVE LEVEL_TWO STATE MACHINE EXIT")
-        #rospy.sleep(0.5) #wait for action server wrapper to get its damn message out
-    
+        rospy.sleep(0.2) #hideous hack delay to let action server get its final message out
+     
 #searches the globe   
 class StartLeveLTwo(smach.State):
 

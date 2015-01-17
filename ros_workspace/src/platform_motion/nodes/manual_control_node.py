@@ -313,6 +313,7 @@ class ManualController(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+        rospy.sleep(0.2) #hideous hack delay to let action server get its final message out
         rospy.logwarn("MANUAL CONTROL STATE MACHINE EXIT")
    
 class ProcessGoal(smach.State):
