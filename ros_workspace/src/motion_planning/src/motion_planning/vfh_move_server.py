@@ -104,7 +104,7 @@ class VFHMoveServer( object ):
         #sectors are free if 0, or blocked if 1, start with all free!
         self.sectors = np.zeros(self.sector_count, dtype=np.bool)
         
-        self.min_obstacle_distance = 1.5 #minimum distance at which to check for obstacles
+        self.min_obstacle_distance = 0.5 #minimum distance at which to check for obstacles
         
         #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
         #so that obstacles produce zero cost at a range of dmax
@@ -118,9 +118,8 @@ class VFHMoveServer( object ):
         
         #thresholds at which to set clear, or blocked, a gap for hysteresis
         #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
-        self.threshold_high = 4000
-        self.threshold_low = 2000
-        
+        self.threshold_high = 2000
+        self.threshold_low = 1000        
         #target point and current_yaw
         self.target_point = None
         self.current_sector_index = 0 #start moving straight along the robot's yaw
@@ -293,8 +292,10 @@ class VFHMoveServer( object ):
                                         self.min_obstacle_distance,
                                         sector_yaw,
                                         self.costmap_info.resolution)
+            #if we are close to the target, truncate the check distance
             end = self.bresenham_point(robot_cmap_coords,
-                                        min(self.max_obstacle_distance, distance_to_target),                                   
+                                        min(self.max_obstacle_distance,
+                                           (distance_to_target+self.costmap_info.resolution)),                                   
                                         sector_yaw,
                                         self.costmap_info.resolution)            
             sector_line = bresenham.points(start, end)
@@ -324,6 +325,7 @@ class VFHMoveServer( object ):
 
         #stop the mover if the path is blocked.  This is an estop situation!
         if np.all(self.sectors):
+            rospy.loginfo("VFH all blocked, estop.")
             self._mover.estop()
 
         #find the sector index with the lowest cost index (inverse cost!)
