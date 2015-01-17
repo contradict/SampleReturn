@@ -96,7 +96,16 @@ def pose_translate_by_yaw(start_pose, distance, yaw):
         new_pose = deepcopy(start_pose)
         new_pose.pose.position.x = new_pose.pose.position.x + distance * math.cos(yaw)
         new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
-        return new_pose   
+        return new_pose
+
+def pose_translate_by_quat(start_pose, distance, quat):
+    quat_vals = (quat.x, quat.y, quat.z, quat.w)
+    yaw = tf.transformations.euler_from_quaternion(quat_vals)[-1]
+    new_pose = deepcopy(start_pose)
+    new_pose.pose.position.x = new_pose.pose.position.x + distance * math.cos(yaw)
+    new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
+    return new_pose    
+
 
 #rotates a stamped pose, returns in same frame  
 def pose_rotate(start_pose, angle):
