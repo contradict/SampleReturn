@@ -51,11 +51,14 @@ class LevelTwoStar(object):
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
-        #make a Point msg out of beacon_approach_point
+        #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         point = geometry_msg.Point(self.node_params.beacon_approach_point['x'],
                                    self.node_params.beacon_approach_point['y'], 0)
-        self.beacon_approach_point = geometry_msg.PointStamped(header, point)
+        beacon_facing_orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
+        pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
+        self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
+        
         #also need platform point
         platform_point = geometry_msg.Point( 0, 0, 0)
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
@@ -95,7 +98,8 @@ class LevelTwoStar(object):
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #beacon approach
-        self.state_machine.userdata.beacon_approach_point = self.beacon_approach_point
+        self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
+
         self.state_machine.userdata.beacon_mount_step = self.node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
         self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
@@ -107,7 +111,6 @@ class LevelTwoStar(object):
         self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
         self.state_machine.userdata.line_yaw = None #IN RADIANS!
         self.state_machine.userdata.outbound = False
-        self.state_machine.userdata.distance_to_origin = 100
         
         #stop function flags
         self.state_machine.userdata.stop_on_sample = False
@@ -259,19 +262,11 @@ class LevelTwoStar(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'preempted':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'pursue_samples':'true',
                                                 'detected_sample':'beacon_point'})
             
-            
-            smach.StateMachine.add('BEACON_CLEAR_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'BEACON_SEARCH',
-                                                  'sample_detected':'BEACON_SEARCH',
-                                                  'timeout':'BEACON_SEARCH',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_MANAGER',
                                    MountManager(self.tf_listener, self.announcer),
@@ -397,6 +392,7 @@ class StartLeveLTwo(smach.State):
         result.result_string = 'initialized'
         userdata.action_result = result
         
+        #create the dismount_move
         move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                               angle = 0,
                               distance = 2,
@@ -568,51 +564,39 @@ class BeaconSearch(smach.State):
                                        'spin',
                                        'mount',
                                        'aborted'],
-                             input_keys=['beacon_approach_point',
+                             input_keys=['beacon_approach_pose',
+                                         'spin_velocity',
                                          'platform_point',
                                          'beacon_point',
                                          'stop_on_beacon',
                                          'world_fixed_frame'],
-                             output_keys=['target_point',
-                                          'target_yaw',
-                                          'target_tolerance',
+                             output_keys=['move_goal',
                                           'simple_move',
                                           'stop_on_sample',
                                           'stop_on_beacon',
                                           'beacon_point',
-                                          'clear_spin',
-                                          'clear_move',
                                           'outbound'])
         
         self.tf_listener = tf_listener
         self.announcer = announcer
         self.tried_spin = False
-        self.clear_move = {'type':'strafe',
-                           'angle':0,
-                           'distance': 20.0}
-        self.clear_spin = {'type':'spin',
-                           'angle':math.pi*2,
-                           'velocity': 0.2}
 
     def execute(self, userdata):
         
-        #this is lame as hell, but to disable simple_mover stop function returning true
-        #from here on out, easiest thing to do is set outbound back to true
-        userdata.outbound = True 
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
         
-        userdata.clear_spin = self.clear_spin
-        userdata.clear_move = self.clear_move
         #ignore samples now
         userdata.stop_on_sample = False
-        #by default, driving moves won't have a target_yaw
-        userdata.target_yaw = None
         
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.world_fixed_frame)        
+        
         #this is possibly a highly inaccurate number.   If we get to the approach point,
         #and don't see the beacon, the map is probably messed up
         distance_to_approach_point = util.point_distance_2d(current_pose.pose.position,
-                                                            userdata.beacon_approach_point.point)
+                                                            userdata.beacon_approach_pose.pose.position)
 
         #if we have been ignoring beacon detections prior to this,
         #we should clear them here, and wait for a fresh detection
@@ -624,9 +608,9 @@ class BeaconSearch(smach.State):
             #first hope, we can spin slowly and see the beacon
             if not self.tried_spin:
                 self.announcer.say("Beacon not in view. Rotate ing")
-                userdata.simple_move = {'type':'spin',
-                                        'angle':math.pi*2,
-                                        'velocity':0.15}
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                      angle = math.pi*2,
+                                                      velocity = userdata.spin_velocity)        
                 userdata.stop_on_beacon = True
                 self.tried_spin = True
                 return 'spin'
@@ -634,8 +618,8 @@ class BeaconSearch(smach.State):
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
-                userdata.target_point = deepcopy(userdata.beacon_approach_point)
-                userdata.target_yaw = math.pi
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose)
+                userdata.move_goal = goal                
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
                 return 'move'
@@ -644,10 +628,11 @@ class BeaconSearch(smach.State):
                 #we think we're near the beacon, but we don't see it
                 #right now, that is just to move 30 m on other side of the beacon that we don't know about
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
-                search_point = deepcopy(userdata.beacon_approach_point)                
+                search_pose = deepcopy(userdata.beacon_approach_pose)                
                 #invert the approach_point, and try again
-                search_point.point.x *= -1
-                userdata.target_point = search_point
+                search_pose.pose.position.x *= -1
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.search_pose)
+                userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
                 return 'move'               
@@ -663,26 +648,26 @@ class BeaconSearch(smach.State):
             self.tried_spin = False            
             #on the back side
             if current_pose.pose.position.x < 0:
-                front_point = deepcopy(userdata.beacon_approach_point)
-                #try not to have to drive through the platform
-                front_point.point.y = 5.0 * np.sign(current_pose.pose.position.y)
-                userdata.target_point = front_point
-                userdata.target_yaw = math.pi
+                front_pose = deepcopy(userdata.beacon_approach_pose)
+                #try not to drive through the platform
+                front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.front_pose)
+                userdata.move_goal = goal                          
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 return 'move'   
             elif distance_to_approach_point > 2.0:
                 #on correct side of beacon, but far from approach point
-                userdata.target_point = deepcopy(userdata.beacon_approach_point)
-                userdata.target_yaw = math.pi
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose)
+                userdata.move_goal = goal       
                 self.announcer.say("Beacon in view. Move ing to approach point")                
                 return 'move'   
             elif np.abs(yaw_error) > .2:
                 #this means beacon is in view and we are within 1 meter of approach point
                 #but not pointed so well at beacon
                 self.announcer.say("At approach point. Rotate ing to beacon")
-                userdata.simple_move = {'type':'spin',
-                                        'angle':yaw_error,
-                                        'velocity':0.3}
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                      angle = yaw_error,
+                                                      velocity = userdata.spin_velocity)                   
                 return 'spin'
             else:    
                 self.announcer.say("Initiate ing platform mount")
@@ -711,30 +696,17 @@ class MountManager(smach.State):
     def execute(self, userdata):
         #disable obstacle checking!
         rospy.sleep(10.0) #wait a sec for beacon pose to catch up
-        target_point = deepcopy(userdata.beacon_point)
+        target_point = deepcopy(userdata.platform_point)
         target_point.header.stamp = rospy.Time(0)
         yaw, distance = util.get_robot_strafe(self.tf_listener,
                                              target_point)
-        distance -= 0.5 #holy crap, this is bad
-        userdata.simple_move = {'type':'strafe',
-                                'angle':yaw,
-                                'distance':distance,
-                                'velocity':0.5}
+        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                              angle = yaw,
+                              distance = distance,
+                              velocity = 0.5)        
+        userdata.simple_move = move
         self.announcer.say("Execute ing final mount move")
         return 'final'
-        
-        
-        #if (userdata.beacon_point is None) or (distance < userdata.beacon_mount_step):
-            #we don't see the beacon anymore, or we see it and are damn close (doubtful!)
-        #else:
-        #    userdata.simple_move = {'type':'strafe',
-        #                            'angle':yaw,
-        #                            'distance':userdata.beacon_mount_step,
-        #                            'velocity':0.5}
-        #    self.announcer.say("Aligning to beacon")
-        
-        #userdata.beacon_point = None #clear beacon returns to see if we are still seeing it
-        #return 'move'
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
