@@ -160,7 +160,7 @@ class ExecuteVFHMove(smach.State):
     def execute(self, userdata):
         #on entry clear old sample_detections!
         userdata.detected_sample = None
-        goal = userdata.move_goal
+        goal = deepcopy(userdata.move_goal)
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self.move_client.send_goal(goal)
         while True:
@@ -179,6 +179,11 @@ class ExecuteVFHMove(smach.State):
                 if userdata.stop_on_sample:
                     self.cancel_move()
                 return 'sample_detected'
+            #handle goal changes
+            if not (goal.target_pose == userdata.move_goal.target_pose):
+                rospy.loginfo("ExecuteVFHMove goal changed: {!s} to {!s}".format(goal, userdata.move_goal))
+                goal = deepcopy(userdata.move_goal)
+                self.move_client.send_goal(goal)
             #Check to see if we are paused.  If so, cancel active goals.
             #Resend last goal on unpause
             if userdata.paused:
@@ -334,8 +339,7 @@ class PursuePointManager(smach.State):
                 point_delta = util.point_distance_2d(userdata.target_pose.pose.position,
                                                      point_stamped.point)
                 if point_delta > userdata.max_pursuit_error:
-                    rospy.loginfo("POINT_DELTA: " + str(point_delta))
-                    rospy.logdebug("PURSUE point updated: %s", point_stamped)
+                    rospy.logdinfo("PURSUIT_POINT moved more than: {!s}, new point: {!s}".format(userdata.max_pursuit_error, point_stamped))
                     new_pose = deepcopy(userdata.target_pose)
                     new_pose.pose.position = point_stamped.point
                     userdata.target_pose = new_pose
