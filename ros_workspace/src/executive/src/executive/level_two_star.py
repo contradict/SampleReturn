@@ -98,8 +98,6 @@ class LevelTwoStar(object):
         self.state_machine.userdata.beacon_approach_point = self.beacon_approach_point
         self.state_machine.userdata.beacon_mount_step = self.node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
-        self.state_machine.userdata.offset_count = 0
-        self.state_machine.userdata.offset_limit = 0
         self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
         
         #search line parameters
@@ -268,9 +266,11 @@ class LevelTwoStar(object):
             
             
             smach.StateMachine.add('BEACON_CLEAR_MOVE',
-                                   RotateToClear(self.simple_mover, self.tf_listener),
+                                   ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
-                                                  'blocked':'BEACON_SEARCH',
+                                                  'sample_detected':'BEACON_SEARCH',
+                                                  'timeout':'BEACON_SEARCH',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_MANAGER',
@@ -416,8 +416,6 @@ class StarManager(smach.State):
                              output_keys = ['line_yaw',
                                             'outbound',
                                             'spokes',
-                                            'offset_count',
-                                            'offset_limit',
                                             'last_spin_radius',
                                             'within_hub_radius',
                                             'stop_on_sample'],
@@ -440,8 +438,6 @@ class StarManager(smach.State):
             userdata.last_spin_radius = util.get_robot_distance_to_origin(self.tf_listener,
                                                                           userdata.world_fixed_frame)
             userdata.line_yaw = userdata.spokes.pop(0)['yaw']
-            userdata.offset_count = 0
-            userdata.offset_limit = 1
             userdata.outbound = True
             rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
@@ -452,8 +448,6 @@ class StarManager(smach.State):
             #If inbound, rotation manager calculates the line yaw each time it is asked to make a
             #rotation. userdata.line_yaw remains the yaw FROM the origin
             userdata.within_hub_radius = False
-            userdata.offset_count = 0
-            userdata.offset_limit = 2
             userdata.outbound = False
             rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
@@ -582,8 +576,6 @@ class BeaconSearch(smach.State):
                              output_keys=['target_point',
                                           'target_yaw',
                                           'target_tolerance',
-                                          'offset_count',
-                                          'offset_limit',
                                           'simple_move',
                                           'stop_on_sample',
                                           'stop_on_beacon',
@@ -608,9 +600,6 @@ class BeaconSearch(smach.State):
         #from here on out, easiest thing to do is set outbound back to true
         userdata.outbound = True 
         
-        #reset offset counter for driving moves
-        userdata.offset_count = 0
-        userdata.offset_limit = 3
         userdata.clear_spin = self.clear_spin
         userdata.clear_move = self.clear_move
         #ignore samples now
