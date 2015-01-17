@@ -29,7 +29,6 @@ from executive.executive_states import SelectMotionMode
 from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import ExecuteVFHMove
-from executive.executive_states import RotateToClear
 from executive.executive_states import WaitForFlagState
 
 import samplereturn.util as util

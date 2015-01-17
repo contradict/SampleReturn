@@ -502,8 +502,6 @@ class CalculateManipulatorApproach(smach.State):
         
         self.tf_listener = tf_listener
         
-        self.yaw_correction = -0.04
-        
     def execute(self, userdata):
         
         userdata.target_sample = None
@@ -514,7 +512,6 @@ class CalculateManipulatorApproach(smach.State):
             try:
                 yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
                 robot_yaw = util.get_current_robot_yaw(self.tf_listener, userdata.odometry_frame)
-                yaw += self.yaw_correction
             except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
