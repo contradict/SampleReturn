@@ -48,7 +48,6 @@ class LevelTwoStar(object):
         rospy.on_shutdown(self.shutdown_cb)
         self.node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
-        rospy.sleep(2.0)
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
