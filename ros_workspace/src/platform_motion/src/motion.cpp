@@ -107,6 +107,9 @@ Motion::Motion() :
     enable_carousel_server = nh_.advertiseService("enable_carousel",
             &Motion::enableCarouselCallback, this);
 
+    gpio_server = nh_.advertiseService("gpio_service",
+            &Motion::gpioServiceCallback, this);
+
     motion_mode_server = nh_.advertiseService("CAN_select_motion_mode",
             &Motion::selectMotionModeCallback, this);
     planner_sub = nh_.subscribe("planner_command", 2, &Motion::plannerTwistCallback, this);
@@ -713,8 +716,8 @@ void Motion::planToZeroTwist( void )
             stern_wheel_velocity -= stern_decel;
 
             port->drive( port_steering, port_wheel_velocity );
-            starboard->drive( port_steering, port_wheel_velocity );
-            stern->drive( port_steering, port_wheel_velocity );
+            starboard->drive( starboard_steering, starboard_wheel_velocity );
+            stern->drive( stern_steering, stern_wheel_velocity );
 
             loop.sleep();
         }
@@ -856,9 +859,16 @@ void Motion::handleTwist(const geometry_msgs::Twist::ConstPtr twist)
     ROS_DEBUG("Drive stern to angle: %2.5f , vel: %2.5f", stern_steering_angle, stern_wheel_speed);
     
     boost::unique_lock<boost::mutex> lock(CAN_mutex);
-    port->drive(port_steering_angle, port_wheel_speed);
-    starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
-    stern->drive(stern_steering_angle, -stern_wheel_speed);
+    if( motion_mode != platform_motion_msgs::SelectMotionModeRequest::MODE_PAUSE )
+    {
+        port->drive(port_steering_angle, port_wheel_speed);
+        starboard->drive(starboard_steering_angle, -starboard_wheel_speed);
+        stern->drive(stern_steering_angle, -stern_wheel_speed);
+    }
+    else
+    {
+        ROS_ERROR("Attempted twist during pause.");
+    }
 }
 
 int Motion::computePod(Eigen::Vector2d body_vel, double body_omega, Eigen::Vector2d body_pt,
@@ -1154,6 +1164,42 @@ void Motion::gpioSubscriptionCallback(const platform_motion_msgs::GPIO::ConstPtr
             return;
     }
 }
+
+bool Motion::gpioServiceCallback(platform_motion_msgs::GPIOService::Request &req,
+                                 platform_motion_msgs::GPIOService::Response &resp)
+{
+    if((unsigned long)req.gpio.servo_id == carousel->node_id) {
+        boost::unique_lock<boost::mutex> lock(CAN_mutex);
+        uint16_t current = carousel->getOutputPins();
+        uint16_t set   = req.gpio.pin_mask & ( req.gpio.new_pin_states & ~current);
+        uint16_t clear = req.gpio.pin_mask & (~req.gpio.new_pin_states &  current);
+        CANOpen::PDOCallbackObject
+            gpiocb(static_cast<CANOpen::TransferCallbackReceiver *>(this),
+                static_cast<CANOpen::PDOCallbackObject::CallbackFunction>(&Motion::gpioCompleteCallback));
+        carousel->output(set, clear, gpiocb);
+    } else {
+            ROS_ERROR("Unknown servo_id in GPIO: %d", req.gpio.servo_id);
+            return false;
+    }
+    bool notified;
+    boost::unique_lock<boost::mutex> lock(gpio_service_mutex);
+    boost::system_time now=boost::get_system_time();
+    notified = gpio_service_cond.timed_wait(lock, now+boost::posix_time::milliseconds(100));
+    if(!notified)
+    {
+        ROS_ERROR("GPIO service timeout");
+    }
+    resp.stamp = gpio_sent_timestamp;
+    return notified;
+}
+
+void Motion::gpioCompleteCallback(CANOpen::PDO &pdo)
+{
+    boost::unique_lock<boost::mutex> lock(gpio_service_mutex);
+    gpio_sent_timestamp = ros::Time::now();
+    gpio_service_cond.notify_all();
+}
+
 
 void Motion::syncCallback(CANOpen::SYNC &sync)
 {

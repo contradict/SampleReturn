@@ -162,6 +162,7 @@ class CopleyServo : public DS301 {
         void outputPinFunction(int pin_index, enum OutputPinFunction function,
                 std::vector<uint8_t> parameters, bool activeLow);
         void output(uint16_t set, uint16_t clear);
+        void output(uint16_t set, uint16_t clear, PDOCallbackObject callback);
 
         class InputChangeCallback {
             public:

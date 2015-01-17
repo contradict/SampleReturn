@@ -18,6 +18,7 @@
 
     <remap from="gpio_read" to="/io/gpio_read"/>
     <remap from="gpio_write" to="/io/gpio_write"/>
+    <remap from="gpio_service" to="/io/gpio_service"/>
     <remap from="joy" to="/io/joy"/>
     <remap from="battery_voltage" to="/io/battery_voltage"/>
     <remap from="audio_search" to="/io/audio/search"/>

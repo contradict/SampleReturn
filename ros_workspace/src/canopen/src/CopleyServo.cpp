@@ -615,6 +615,15 @@ void CopleyServo::output(uint16_t set, uint16_t clear)
     modeControl(0, 0, mode_of_operation);
 }
 
+void CopleyServo::output( uint16_t set, uint16_t clear,
+        PDOCallbackObject callback
+        )
+{
+    output_pins |= set;
+    output_pins &= ~clear;
+    modeControl(0, 0, mode_of_operation, callback);
+}
+
 void CopleyServo::enable(bool state,
         DS301CallbackObject callback)
 {

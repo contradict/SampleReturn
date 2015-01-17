@@ -14,16 +14,23 @@
     <node
         machine="search"
         pkg="samplereturn"
-        type="camlogger.py"
-        name="camlogger"
+        type="triggered_camera.py"
+        name="triggered_camera"
         ns="/cameras/search">
         <param name="rate" value="1.0"/>
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera"/>
-        <param name="capture_delay" type="double" value="0.575"/>
+        <param name="capture_delay" type="double" value="0.15"/>
+        <param name="gpio_servo_id" type="int" value="1"/>
+        <param name="gpio_pin" type="int" value="2"/>
+        <param name="pulse_width" type="double" value="0.1"/>
         <remap from="pause_state" to="/io/pause_state"/>
         <remap from="cam_img" to="image"/>
         <remap from="cam_info" to="info"/>
         <remap from="cam_status" to="status"/>
+        <remap from="gpio_service" to="/io/gpio_service"/>
+        <remap from="triggered_image" to="photo_node/triggered_capture"/>
+        <remap from="timestamped_image" to="image"/>
+        <remap from="timestamped_info" to="info"/>
     </node>
 </launch>
