@@ -147,20 +147,33 @@ class PursueSample(object):
             smach.StateMachine.add('ANNOUNCE_OBSTACLE_CHECK',
                                    AnnounceState(self.announcer,
                                                  'Check ing for obstacles in sample area'),
-                                   transitions = {'next':'OBSTACLE_CHECK'})
+                                   transitions = {'next':'CALCULATE_MANIPULATOR_APPROACH'})
+
+            #calculate the final strafe move to the sample, this gets us the yaw for the obstacle check
+            smach.StateMachine.add('CALCULATE_MANIPULATOR_APPROACH',
+                                   CalculateManipulatorApproach(self.tf_listener),
+                                   transitions = {'move':'OBSTACLE_CHECK',
+                                                  'point_lost':'ANNOUNCE_POINT_LOST',
+                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
   
             @smach.cb_interface(outcomes=['clear','blocked'])
-            def obstacle_check_cb(userdata, response):
+            def obstacle_check_resp(userdata, response):
                 if response.obstacle:
                     return 'blocked'
                 else:
                     return 'clear'
             
+            #request_cb for obstacle check, gets the yaw from userdata    
+            @smach.cb_interface(input_keys=['target_yaw'])
+            def obstacle_check_req(userdata, request):
+                return samplereturn_srv.ObstacleCheckRequest(yaw = userdata.target_yaw,
+                                                             width = self.sample_obstacle_check_width,
+                                                             distance = self.sample_obstacle_check_distance)
+            
             smach.StateMachine.add('OBSTACLE_CHECK',
                 smach_ros.ServiceState('obstacle_check', samplereturn_srv.ObstacleCheck,
-                request = samplereturn_srv.ObstacleCheckRequest(width = self.sample_obstacle_check_width,
-                                                                distance = self.sample_obstacle_check_distance),
-                response_cb = obstacle_check_cb),
+                request_cb = obstacle_check_req,
+                response_cb = obstacle_check_resp),
                 transitions = {'blocked':'ANNOUNCE_BLOCKED',
                                'clear':'ANNOUNCE_MANIPULATOR_APPROACH',
                                'succeeded':'PUBLISH_FAILURE', #means cb error I think
@@ -174,22 +187,15 @@ class PursueSample(object):
            
             smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
                                    AnnounceState(self.announcer,
-                                                 'Clear. Calculate ing manipulator approach'),
+                                                 'Clear. Begin ing manipulator approach'),
                                    transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})                
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'MANIPULATOR_APPROACH',
+                                     transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
                                                     'aborted':'PUBLISH_FAILURE'})
- 
-            #calculate the final strafe move to the sample
-            smach.StateMachine.add('MANIPULATOR_APPROACH',
-                                   ManipulatorApproach(self.tf_listener),
-                                   transitions = {'move':'MANIPULATOR_APPROACH_MOVE',
-                                                  'point_lost':'ANNOUNCE_POINT_LOST',
-                                                  'aborted':'PURSUE_SAMPLE_ABORTED'})
             
             smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -419,6 +425,7 @@ class PursueSample(object):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
+        rospy.sleep(0.2) #hideous hack delay to let action server get its final message out
         rospy.logwarn("EXECUTIVE PURSUE_SAMPLE STATE MACHINE EXIT")
     
 #searches the globe   
@@ -464,7 +471,9 @@ class StartSamplePursuit(smach.State):
         
         return 'next'
 
-class ManipulatorApproach(smach.State):
+#waits for the chassis to settle and then get a good image of the maybe-sample,  then load
+#a set of simple approach moves to get the manipulator cameras directly over the target
+class CalculateManipulatorApproach(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
                              outcomes=['move', 'complete', 'point_lost', 'aborted'],
@@ -472,10 +481,12 @@ class ManipulatorApproach(smach.State):
                                          'settle_time',
                                          'final_pursuit_step',
                                          'distance_to_sample',
-                                         'search_velocity'],
+                                         'search_velocity',
+                                         'odometry_frame'],
                              output_keys=['simple_move',
                                           'final_move',
                                           'target_sample',
+                                          'target_yaw',
                                           'detected_sample',
                                           'stop_on_sample'])
         
@@ -492,11 +503,13 @@ class ManipulatorApproach(smach.State):
         else:
             try:
                 yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
+                robot_yaw = util.get_current_robot_yaw(self.tf_listener, userdata.odometry_frame)
                 yaw += self.yaw_correction
             except tf.Exception:
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
-            rospy.loginfo("MANIPULATOR_APPROACH starting with distance: %f " % distance)
+            rospy.loginfo("MANIPULATOR_APPROACH calculated with distance: {:f}, yaw: {:f} ".format(distance, yaw))
+            userdata.target_yaw = robot_yaw + yaw
             userdata.detected_sample = None
             #time to look for sample in manipulator view, stop when it is seen
             userdata.stop_on_sample = True
