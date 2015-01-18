@@ -114,7 +114,7 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- sample approach (pursuit) parameters -->
-        <param name="pursuit_velocity" type="double" value="0.5"/>
+        <param name="pursuit_velocity" type="double" value="0.3"/>
         <param name="max_pursuit_error" type="double" value="0.5"/>
         <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
