@@ -53,7 +53,7 @@
         <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
 
         <!-- camera ignore params, to allow testing without certain cameras -->
-        <param name="ignore_search_camera" value="False"/>
+        <param name="ignore_search_camera" value="True"/>
         <param name="ignore_manipulator_camera" value="False"/>
         
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
