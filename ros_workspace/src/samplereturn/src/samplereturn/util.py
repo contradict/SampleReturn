@@ -59,9 +59,14 @@ def get_node_params():
 def point_distance_2d(pt1, pt2):
     return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
 
+#returns the distance between point, and the line from pt1 to pt2
+def point_distance_to_line(pt0, pt1, pt2):
+    return( np.abs( (pt2.y-pt1.y)*pt0.x - (pt2.x-pt1.x)*pt0.y  + pt2.x*pt1.y - pt2.y*pt1.x ) /
+            math.sqrt((pt2.x-pt1.x)**2 + (pt2.y-pt1.y)**2) )
+
 #takes two std_msg.PoseStamped objects, and returns the xy plane distance
 def pose_distance_2d(pose1, pose2):
-    return math.sqrt((pose1.pose.position.x-pose2.pose.position.x)**2 + \
+    return math.sqrt((pose1.pose.position.x-pose2.pose.position.x)**2 + 
                      (pose1.pose.position.y-pose2.pose.position.y)**2)
 
 #takes two Points and returns the quaternion that points from pt1 to pt2

@@ -73,7 +73,8 @@ class VFHMoveServer( object ):
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
-        self.velocity = None
+        self._start_point = None
+        self._velocity = None
 
         #costmap crap
         self.costmap = None
@@ -154,7 +155,7 @@ class VFHMoveServer( object ):
         self._goal_odom = goal_odom
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
-        self.velocity = goal.velocity if (goal.velocity != 0) else None
+        self._velocity = goal.velocity if (goal.velocity != 0) else None
         
         rospy.loginfo("VFH Received goal, transformed to %s", goal_odom)
 
@@ -179,6 +180,10 @@ class VFHMoveServer( object ):
 
     def execute_movement(self):
 
+        #store the starting point in odom
+        current_pose = util.get_current_robot_pose(self._tf, self.odometry_frame)
+        self._start_point = current_pose.pose.position
+
         # turn to face goal
         dyaw = np.arctan2( self._goal_local.pose.position.y,
                            self._goal_local.pose.position.x)
@@ -195,7 +200,7 @@ class VFHMoveServer( object ):
         rospy.loginfo("VFH Moving %f meters ahead.", distance)
         self.vfh_running = True
         self._mover.execute_continuous_strafe(0.0,
-                max_velocity = self.velocity,
+                max_velocity = self._velocity,
                 stop_function=self.is_stop_requested)
         self.vfh_running = False
         if self.exit_check(): return
@@ -265,6 +270,18 @@ class VFHMoveServer( object ):
         #if we are within stop_distance initiate stop
         if distance_to_target < self.stop_distance:
             rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
+            self._mover.stop()
+            
+        #if we are too far off the line between start point, and goal, initiate stop
+        dist_off_course = util.point_distance_to_line(geometry_msg.Point(*robot_position),
+                                                      self._start_point,
+                                                      self._target_point_odom.point)
+        if (dist_off_course > 5.0):
+            rospy.loginfo("VFH more than 5.0m off course, stopping: {!s}, {!s}, {!s}, {!s}".format(
+                                                      dist_off_course,
+                                                      geometry_msg.Point(*robot_position),
+                                                      self._start_point,
+                                                      self._target_point_odom.point))
             self._mover.stop()
                     
         #if the target is not in the active window, we are probably way off course,
