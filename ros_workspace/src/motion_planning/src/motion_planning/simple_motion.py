@@ -20,6 +20,8 @@ class SimpleMover(object):
       self.tf = TransformListener()
       rospy.sleep(2.0)
       
+    self.param_ns = param_ns
+      
     self.default_stop_function = stop_function
 
     self.max_velocity = rospy.get_param(param_ns + 'max_velocity', 0.5)
@@ -153,6 +155,8 @@ class SimpleMover(object):
             stop_function)  
 
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
+    rospy.loginfo("SIMPLE_MOTION: {}, starting execute".format(self.param_ns))
+    
     if not callable(stop_function): 
       stop_function = self.default_stop_function
     
@@ -186,13 +190,14 @@ class SimpleMover(object):
            np.abs(self.port_pos-target['port'])>self.steering_angle_epsilon or
            np.abs(self.starboard_pos-target['starboard'])>self.steering_angle_epsilon) and
            not started):
-        rospy.logdebug("Turning to target angles: %f %f %f",
+        rospy.loginfo("SIMPLE_MOTION: {}, Turning to target angles: {:f} {:f} {:f}".format(
+                self.param_ns,
                 np.abs(self.stern_pos-target['stern']),
                 np.abs(self.port_pos-target['port']),
-                np.abs(self.starboard_pos-target['starboard']))
+                np.abs(self.starboard_pos-target['starboard'])))
         if (rospy.Time.now()>steering_timeout_time):
           publisher(0)
-          raise TimeoutException('Steering move failed to complete before timeout')
+          raise TimeoutException('Steering move failed to complete before timeout: {:f}'.format(steering_timeout_time))
       #we have achieved proper steering angle, but not started the motion yet
       #get the velocity function with total_distance as the current error
       elif not started:
@@ -211,6 +216,8 @@ class SimpleMover(object):
 
     self.running = False
     self.stop_requested = False
+
+    rospy.loginfo("SIMPLE_MOTION: {}, exiting execute".format(self.param_ns))
 
     return error()
 
