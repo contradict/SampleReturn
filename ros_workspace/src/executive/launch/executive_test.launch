@@ -83,9 +83,9 @@
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
         
         <rosparam>
-            simple_motion_params:
-                max_velocity: 0.5
-                acceleration: 0.5
+            vfh_motion_params:
+                max_velocity: 0.5 
+                acceleration: 1.0
                 stop_deceleration: 2.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
@@ -109,7 +109,7 @@
         <rosparam>
             simple_motion_params:
                 max_velocity: 0.5
-                acceleration: 0.5
+                acceleration: 1.0
                 stop_deceleration: 2.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
