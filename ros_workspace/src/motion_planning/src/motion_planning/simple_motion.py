@@ -178,6 +178,7 @@ class SimpleMover(object):
     self.running = False
     steering_timeout_time = rospy.Time.now() + rospy.Duration(self.steering_timeout)
     velocity = lambda:self.velocity_epsilon
+    v = velocity()
     while ((not self.should_stop(stop_function)) and (v != 0)):
       # Run at some rate, ~10Hz
       rate.sleep()
