@@ -117,13 +117,13 @@ class SimpleMover(object):
 
   def execute_strafe(self, angle, distance, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
-    self.strafe_angle = angle
     if (-np.pi/2<=angle<=np.pi/2):
       target_angle = angle
     elif (np.pi/2 < angle):
       target_angle = angle - np.pi
     elif (angle < -np.pi/2):
       target_angle = angle + np.pi
+    self.strafe_angle = target_angle 
     return self.execute(
             lambda start_position=self.current_position: np.abs(distance-np.linalg.norm(start_position-self.current_position)),
             dict(stern=target_angle,
@@ -137,13 +137,13 @@ class SimpleMover(object):
   #use with caution, strafes at constant velocity until external stop is called
   def execute_continuous_strafe(self, angle, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
-    self.strafe_angle = angle
     if (-np.pi/2<=angle<=np.pi/2):
       target_angle = angle
     elif (np.pi/2 < angle):
       target_angle = angle - np.pi
     elif (angle < -np.pi/2):
       target_angle = angle + np.pi
+    self.strafe_angle = target_angle
     return self.execute(
             lambda: np.inf ,
             dict(stern=target_angle,
@@ -157,9 +157,6 @@ class SimpleMover(object):
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
     rospy.loginfo("SIMPLE_MOTION: {}, starting execute".format(self.param_ns))
     
-    if not callable(stop_function): 
-      stop_function = self.default_stop_function
-    
     rate = rospy.Rate(self.loop_rate)
 
     #load defaults if no kwargs present
@@ -167,29 +164,28 @@ class SimpleMover(object):
       max_velocity = self.max_velocity
     if acceleration is None:
       acceleration = self.acceleration
+    self.deceleration = acceleration
+
+    if not callable(stop_function): 
+      stop_function = self.default_stop_function
 
     # if one step of accel overshoots half the distance, give up
     if np.abs(error()/2.) < 0.5*acceleration/self.loop_rate**2:
       return error()
-
+    
+    #prepare to start main loop
     self.stop_requested = False
-    self.deceleration = acceleration
-    self.running = True
-
-    started = False
+    self.running = False
     steering_timeout_time = rospy.Time.now() + rospy.Duration(self.steering_timeout)
-    velocity = lambda:self.steering_angle_epsilon
-    v=velocity()
-    while ((not self.should_stop(stop_function)) and
-           (v != 0)):
+    velocity = lambda:self.velocity_epsilon
+    while ((not self.should_stop(stop_function)) and (v != 0)):
       # Run at some rate, ~10Hz
       rate.sleep()
-            
       #wait until correct steering angles are achieved
       if ((np.abs(self.stern_pos-target['stern'])>self.steering_angle_epsilon or
            np.abs(self.port_pos-target['port'])>self.steering_angle_epsilon or
            np.abs(self.starboard_pos-target['starboard'])>self.steering_angle_epsilon) and
-           not started):
+           not self.running):
         rospy.loginfo("SIMPLE_MOTION: {}, Turning to target angles: {:f} {:f} {:f}".format(
                 self.param_ns,
                 np.abs(self.stern_pos-target['stern']),
@@ -197,13 +193,13 @@ class SimpleMover(object):
                 np.abs(self.starboard_pos-target['starboard'])))
         if (rospy.Time.now()>steering_timeout_time):
           publisher(0)
-          raise TimeoutException('Steering move failed to complete before timeout: {:f}'.format(steering_timeout_time))
+          raise TimeoutException('Steering move failed to complete before timeout: {!s}'.format(steering_timeout_time))
       #we have achieved proper steering angle, but not started the motion yet
       #get the velocity function with total_distance as the current error
-      elif not started:
+      elif not self.running:
         start_time = rospy.Time.now()
         velocity = lambda start_time = start_time, d = np.abs(error()) : self.velocity_of_time( d, (rospy.Time.now() - start_time).to_sec(), acceleration, max_velocity)
-        started = True
+        self.running = True
       v = velocity()
       publisher(v)
    
