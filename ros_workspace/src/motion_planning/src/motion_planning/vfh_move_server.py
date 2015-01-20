@@ -266,9 +266,11 @@ class VFHMoveServer( object ):
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         
         #if we are within stop_distance initiate stop
+        #in this case, stop attempting to change the wheel angles
         if distance_to_target < self.stop_distance:
             rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
             self._mover.stop()
+            return
             
         #if we are too far off the line between start point, and goal, initiate stop
         dist_off_course = util.point_distance_to_line(geometry_msg.Point(*robot_position),
