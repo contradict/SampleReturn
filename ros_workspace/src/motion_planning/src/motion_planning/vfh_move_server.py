@@ -250,7 +250,8 @@ class VFHMoveServer( object ):
                 return
                     
     def vfh_planner(self, event):
-        if not self.vfh_running:
+        #only run vfh when requested AND mover has aligned wheels
+        if not (self.vfh_running and self._mover.is_running()) :
             return
         
         start_time = rospy.get_time()
