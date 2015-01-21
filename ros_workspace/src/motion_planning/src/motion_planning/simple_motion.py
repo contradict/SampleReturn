@@ -117,13 +117,14 @@ class SimpleMover(object):
 
   def execute_strafe(self, angle, distance, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
+    self.strafe_angle = angle 
+    #now calculate the angles of the wheel pods
     if (-np.pi/2<=angle<=np.pi/2):
       target_angle = angle
     elif (np.pi/2 < angle):
       target_angle = angle - np.pi
     elif (angle < -np.pi/2):
       target_angle = angle + np.pi
-    self.strafe_angle = target_angle 
     return self.execute(
             lambda start_position=self.current_position: np.abs(distance-np.linalg.norm(start_position-self.current_position)),
             dict(stern=target_angle,
@@ -137,13 +138,14 @@ class SimpleMover(object):
   #use with caution, strafes at constant velocity until external stop is called
   def execute_continuous_strafe(self, angle, max_velocity=None, acceleration=None, stop_function=None):
     angle = util.unwind(angle)
+    self.strafe_angle = angle
+    #now calculate the angles of the wheel pods
     if (-np.pi/2<=angle<=np.pi/2):
       target_angle = angle
     elif (np.pi/2 < angle):
       target_angle = angle - np.pi
     elif (angle < -np.pi/2):
       target_angle = angle + np.pi
-    self.strafe_angle = target_angle
     return self.execute(
             lambda: np.inf ,
             dict(stern=target_angle,
