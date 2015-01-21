@@ -53,20 +53,14 @@ class VFHMoveServer( object ):
                 rospy.get_param("~goal_orientation_tolerance", 0.05)
         self._lethal_threshold = rospy.get_param("~lethal_threshold", 100)
         self.odometry_frame = rospy.get_param("~odometry_frame")
-        self._mover = SimpleMover("~simple_motion_params/")
-        
-        #calculate the stop_distance for stopping once near target pose
-        accel = rospy.get_param("~simple_motion_params/acceleration")
-        max_vel = rospy.get_param("~simple_motion_params/max_velocity")
-        self.stop_distance = max_vel**2/2./accel
-
+        self._mover = SimpleMover("~vfh_motion_params/")
+ 
         self._as = actionlib.SimpleActionServer("vfh_move",
                                                 VFHMoveAction,
                                                 auto_start=False)
         
         self._as.register_goal_callback(self.goal_cb)
         self._as.register_preempt_callback(self.preempt_cb)
-        
 
         self._tf = tf.TransformListener()
 
@@ -74,8 +68,7 @@ class VFHMoveServer( object ):
         self._goal_local = None
         self._target_point_odom = None
         self._start_point = None
-        self._velocity = None
-
+ 
         #costmap crap
         self.costmap = None
         
@@ -155,7 +148,10 @@ class VFHMoveServer( object ):
         self._goal_odom = goal_odom
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
-        self._velocity = goal.velocity if (goal.velocity != 0) else None
+        
+        #calculate the stop_distance for stopping once near target pose
+        velocity = goal.velocity if (goal.velocity != 0) else self._mover.max_velocity
+        self.stop_distance = velocity**2/2./self._mover.acceleration
         
         rospy.loginfo("VFH Received goal, transformed to %s", goal_odom)
 
@@ -163,7 +159,8 @@ class VFHMoveServer( object ):
         if not active:
             rospy.loginfo("VFH Server not active, goal received, starting.")
             self.stop_requested = False
-            self.execute_thread = threading.Thread(target=self.execute_movement);
+            self.execute_thread = threading.Thread(target=self.execute_movement,
+                                                   args=(velocity,));
             self.execute_thread.start();
         else:
             rospy.loginfo("VFH Server active, self._goal_odom updated.")
@@ -178,7 +175,7 @@ class VFHMoveServer( object ):
     def is_stop_requested(self):
         return self.stop_requested
 
-    def execute_movement(self):
+    def execute_movement(self, velocity):
 
         #store the starting point in odom
         current_pose = util.get_current_robot_pose(self._tf, self.odometry_frame)
@@ -200,7 +197,7 @@ class VFHMoveServer( object ):
         rospy.loginfo("VFH Moving %f meters ahead.", distance)
         self.vfh_running = True
         self._mover.execute_continuous_strafe(0.0,
-                max_velocity = self._velocity,
+                max_velocity = velocity,
                 stop_function=self.is_stop_requested)
         self.vfh_running = False
         if self.exit_check(): return
@@ -253,7 +250,8 @@ class VFHMoveServer( object ):
                 return
                     
     def vfh_planner(self, event):
-        if not self.vfh_running:
+        #only run vfh when requested AND mover has aligned wheels
+        if not (self.vfh_running and self._mover.is_running()) :
             return
         
         start_time = rospy.get_time()
@@ -268,9 +266,11 @@ class VFHMoveServer( object ):
         target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
         
         #if we are within stop_distance initiate stop
+        #in this case, stop attempting to change the wheel angles
         if distance_to_target < self.stop_distance:
             rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
             self._mover.stop()
+            return
             
         #if we are too far off the line between start point, and goal, initiate stop
         dist_off_course = util.point_distance_to_line(geometry_msg.Point(*robot_position),

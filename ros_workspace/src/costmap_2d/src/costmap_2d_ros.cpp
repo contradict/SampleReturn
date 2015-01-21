@@ -268,6 +268,8 @@ void Costmap2DROS::reconfigureCB(costmap_2d::Costmap2DConfig &config, uint32_t l
   else
     publish_cycle = ros::Duration(-1);
 
+  clear_every_send_ = config.clear_every_send;
+
   // find size parameters
   double map_width_meters = config.width, map_height_meters = config.height, resolution = config.resolution, origin_x =
              config.origin_x,
@@ -561,6 +563,8 @@ void Costmap2DROS::mapUpdateLoop(double frequency)
       {
         publisher_->publishCostmap();
         last_publish_ = now;
+        if(clear_every_send_)
+            resetLayers();
       }
     }
     r.sleep();
