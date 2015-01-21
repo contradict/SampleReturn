@@ -155,7 +155,7 @@ class SimpleMover(object):
             stop_function)  
 
   def execute(self, error, target, publisher, max_velocity=None, acceleration=None, stop_function=None):
-    rospy.loginfo("SIMPLE_MOTION: {}, starting execute".format(self.param_ns))
+    rospy.logdebug("SIMPLE_MOTION: {}, starting execute".format(self.param_ns))
     
     rate = rospy.Rate(self.loop_rate)
 
@@ -187,7 +187,7 @@ class SimpleMover(object):
            np.abs(self.port_pos-target['port'])>self.steering_angle_epsilon or
            np.abs(self.starboard_pos-target['starboard'])>self.steering_angle_epsilon) and
            not self.running):
-        rospy.loginfo("SIMPLE_MOTION: {}, Turning to target angles: {:f} {:f} {:f}".format(
+        rospy.logdebug("SIMPLE_MOTION: {}, Turning to target angles: {:f} {:f} {:f}".format(
                 self.param_ns,
                 np.abs(self.stern_pos-target['stern']),
                 np.abs(self.port_pos-target['port']),
@@ -214,7 +214,7 @@ class SimpleMover(object):
     self.running = False
     self.stop_requested = False
 
-    rospy.loginfo("SIMPLE_MOTION: {}, exiting execute".format(self.param_ns))
+    rospy.logdebug("SIMPLE_MOTION: {}, exiting execute".format(self.param_ns))
 
     return error()
 

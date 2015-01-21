@@ -152,8 +152,6 @@ class VFHMoveServer( object ):
         #calculate the stop_distance for stopping once near target pose
         velocity = goal.velocity if (goal.velocity != 0) else self._mover.max_velocity
         self.stop_distance = velocity**2/2./self._mover.acceleration
-        
-        rospy.loginfo("VFH Received goal, transformed to %s", goal_odom)
 
         #if the action server is inactive, fire up a movement thread
         if not active:
@@ -268,7 +266,7 @@ class VFHMoveServer( object ):
         #if we are within stop_distance initiate stop
         #in this case, stop attempting to change the wheel angles
         if distance_to_target < self.stop_distance:
-            rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
+            #rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
             self._mover.stop()
             return
             
