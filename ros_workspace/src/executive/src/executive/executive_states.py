@@ -409,7 +409,8 @@ class MoveToPoints(smach.State):
                              input_keys=['point_list',
                                          'detected_sample',
                                          'odometry_frame',
-                                         'stop_on_sample'],
+                                         'stop_on_sample',
+                                         'velocity'],
                              output_keys=['simple_move',
                                           'point_list'],
                              outcomes=['next_point',
@@ -417,12 +418,11 @@ class MoveToPoints(smach.State):
                                        'aborted'])
         
         self.tf_listener = tf_listener
-        self.facing_next_point = False
             
     def execute(self, userdata):    
                
         if (len(userdata.point_list) > 0):
-            rospy.logdebug("MOVE TO POINTS list: %s" %(userdata.point_list))
+            rospy.loginfo("MOVE TO POINTS list: %s" %(userdata.point_list))
             target_point = userdata.point_list[0]
             header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
             target_stamped = geometry_msg.PointStamped(header, target_point)
@@ -435,8 +435,8 @@ class MoveToPoints(smach.State):
             userdata.point_list.popleft()
             userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                                   angle = yaw,
-                                                  distance = distance)
-            self.facing_next_point = False
+                                                  distance = distance,
+                                                  velocity = userdata.velocity)
             return 'next_point'                
 
         else:
