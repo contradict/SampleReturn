@@ -221,8 +221,7 @@ class PursueSample(object):
                                    transitions = {'next_point':'SEARCH_MOVE',
                                                   'complete':'ANNOUNCE_SEARCH_FAILURE',
                                                   'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'face_next_point':'false',
-                                                'check_for_obstacles':'false'})
+                                   remapping = {'velocity':'search_velocity'})
    
             smach.StateMachine.add('SEARCH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -490,6 +489,7 @@ class CalculateManipulatorApproach(smach.State):
                              input_keys=['target_sample',
                                          'settle_time',
                                          'final_pursuit_step',
+                                         'pursuit_velocity',
                                          'search_velocity',
                                          'odometry_frame'],
                              output_keys=['simple_move',
@@ -526,7 +526,8 @@ class CalculateManipulatorApproach(smach.State):
             distance -= userdata.final_pursuit_step
             userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                                   angle = yaw,
-                                                  distance = distance)
+                                                  distance = distance,
+                                                  velocity = userdata.pursuit_velocity)
             userdata.final_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                                  angle = yaw,
                                                  distance = userdata.final_pursuit_step,
