@@ -4,7 +4,6 @@ import rospy
 import samplereturn.util as util
 
 from executive import level_two_star
-from executive import level_two_random
 
 if __name__=="__main__":
     rospy.init_node('level_two')

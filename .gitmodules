@@ -7,7 +7,3 @@
 [submodule "ros_workspace/src/camera1394"]
 	path = ros_workspace/src/camera1394
 	url = https://github.com/zaclizer/camera1394.git
-[submodule "ros_workspace/src/audio_common"]
-	path = ros_workspace/src/audio_common
-	url = https://github.com/contradict/audio_common.git
-	branch = indigo-devel

@@ -20,7 +20,7 @@ actionlib_working_states = [action_msg.GoalStatus.ACTIVE,
 
 class AnnouncerInterface(object):
     def __init__(self, topic):
-        self.pub = rospy.Publisher(topic, VoiceAnnouncement)
+        self.pub = rospy.Publisher(topic, VoiceAnnouncement, queue_size=10)
         self.msg = VoiceAnnouncement()
         
     def say(self, words):
@@ -45,7 +45,7 @@ class AnnouncerInterface(object):
         return {'Class':'AnnouncerInterface'}
 
 def wait_for_rosout():
-    test_pub = rospy.Publisher("/rosout", rosgraph_msg.Log)
+    test_pub = rospy.Publisher("/rosout", rosgraph_msg.Log, queue_size=1)
     while (test_pub.get_num_connections() < 1 and not rospy.is_shutdown()):
         rospy.sleep(rospy.Duration(0.1))
     test_pub.unregister()
@@ -59,9 +59,14 @@ def get_node_params():
 def point_distance_2d(pt1, pt2):
     return math.sqrt((pt1.x-pt2.x)**2 + (pt1.y-pt2.y)**2)
 
+#returns the distance between point, and the line from pt1 to pt2
+def point_distance_to_line(pt0, pt1, pt2):
+    return( np.abs( (pt2.y-pt1.y)*pt0.x - (pt2.x-pt1.x)*pt0.y  + pt2.x*pt1.y - pt2.y*pt1.x ) /
+            math.sqrt((pt2.x-pt1.x)**2 + (pt2.y-pt1.y)**2) )
+
 #takes two std_msg.PoseStamped objects, and returns the xy plane distance
 def pose_distance_2d(pose1, pose2):
-    return math.sqrt((pose1.pose.position.x-pose2.pose.position.x)**2 + \
+    return math.sqrt((pose1.pose.position.x-pose2.pose.position.x)**2 + 
                      (pose1.pose.position.y-pose2.pose.position.y)**2)
 
 #takes two Points and returns the quaternion that points from pt1 to pt2
@@ -96,7 +101,16 @@ def pose_translate_by_yaw(start_pose, distance, yaw):
         new_pose = deepcopy(start_pose)
         new_pose.pose.position.x = new_pose.pose.position.x + distance * math.cos(yaw)
         new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
-        return new_pose   
+        return new_pose
+
+def pose_translate_by_quat(start_pose, distance, quat):
+    quat_vals = (quat.x, quat.y, quat.z, quat.w)
+    yaw = tf.transformations.euler_from_quaternion(quat_vals)[-1]
+    new_pose = deepcopy(start_pose)
+    new_pose.pose.position.x = new_pose.pose.position.x + distance * math.cos(yaw)
+    new_pose.pose.position.y = new_pose.pose.position.y + distance * math.sin(yaw)
+    return new_pose    
+
 
 #rotates a stamped pose, returns in same frame  
 def pose_rotate(start_pose, angle):
@@ -174,10 +188,10 @@ class CANInterface(object):
         self.CAN_select_motion_mode = \
                 rospy.ServiceProxy("CAN_select_motion_mode",
                 platform_srv.SelectMotionMode)
-        self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist)
-        self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist)
-        self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist)
-        self.search_lights = rospy.Publisher("search_lights", std_msg.Bool)
+        self.joystick_command=rospy.Publisher("joystick_command", geometry_msg.Twist, queue_size=1)
+        self.planner_command=rospy.Publisher("planner_command", geometry_msg.Twist, queue_size=1)
+        self.servo_command=rospy.Publisher("servo_command", geometry_msg.Twist, queue_size=1)
+        self.search_lights = rospy.Publisher("search_lights", std_msg.Bool, queue_size=1)
 
     def select_mode(self, motion_mode):
         return self.CAN_select_motion_mode(motion_mode)

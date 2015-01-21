@@ -17,7 +17,7 @@ class Announcer(object):
         self.speech_delay = rospy.get_param("~speech_delay", 0.8)
         self.speech_rate = rospy.get_param("~speech_rate", 0.07)        
         
-        self.audio_pub=rospy.Publisher("audio_out", SoundRequest)
+        self.audio_pub=rospy.Publisher("audio_out", SoundRequest, queue_size=1)
 
         while self.audio_pub.get_num_connections == 0:
             rospy.sleep(0.1)
@@ -34,6 +34,9 @@ class Announcer(object):
         rospy.spin()
     
     def handle_announcement(self, announcement):
+        
+        rospy.logdebug("ANNOUNCER: current list: %s"%(self.announcements))
+        rospy.logdebug("ANNOUNCER: announcement received: %s"%(announcement))
 
         self.announceCV.acquire()        
         if announcement.priority == announcement.LAST:
@@ -44,7 +47,8 @@ class Announcer(object):
             self.announcements = [announcement.words]
             self.announceCV.notifyAll()
         self.announceCV.release()
-
+        
+        rospy.logdebug("ANNOUNCER: new list: %s"%(self.announcements))
     
     def announcement_worker(self):
         while not rospy.is_shutdown():

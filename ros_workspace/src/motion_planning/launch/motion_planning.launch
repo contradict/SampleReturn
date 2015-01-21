@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+    <arg name="odometry_frame" default="odom"/>
+    <arg name="world_fixed_frame" default="map"/>
+    
+    <node name="vfh_driver"
+          pkg="motion_planning" 
+          type="vfh_driving.py"
+          machine="navigate"
+          output="log"
+          ns="/processes">
+
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="lethal_threshold" type="int" value="90"/>
+
+        <remap from="odometry" to="/motion/odometry"/>
+        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="twist" to="/motion/planner_command"/>
+        <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        
+        <rosparam>
+            simple_motion_params:
+                max_velocity: 1.0
+                acceleration: 1.0 
+                stop_deceleration: 2.0
+                loop_rate: 10 
+                steering_angle_epsilon: 0.01
+        </rosparam>
+
+    </node>
+
+    <node name="simple_driver"
+          pkg="motion_planning" 
+          type="simple_driving.py"
+          machine="navigate"
+          output="log"
+          ns="/processes">
+
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+
+        <remap from="odometry" to="/motion/odometry"/>
+        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="twist" to="/motion/planner_command"/>
+        <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        
+        <rosparam>
+            simple_motion_params:
+                max_velocity: 1.0
+                acceleration: 1.0
+                stop_deceleration: 2.0
+                loop_rate: 10 
+                steering_angle_epsilon: 0.01
+        </rosparam>
+
+    </node>
+</launch>
+

@@ -4,7 +4,7 @@
 
     <arg name="odometry_frame" value="fake_odom"/>
     <arg name="world_fixed_frame" value="fake_map"/>
-    <arg name="beacon_localization" value="true"/>
+    <arg name="beacon_localization" value="false"/>
 
     <!-- begin test arguments -->
     <machine name="search"
@@ -18,6 +18,10 @@
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
 
+    <include file="$(find motion_planning)/launch/motion_planning.launch">
+        <arg name="odometry_frame" value="$(arg odometry_frame)"/>
+        <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
+    </include>
     <!-- crap below here is for test only -->
 
     <node
@@ -68,7 +72,7 @@
 
     </node>
 
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
+   <include file="$(find beacon_finder)/launch/beacon_finder.launch">
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
 
@@ -77,8 +81,8 @@
             <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
             <arg name="odometry_frame" value="$(arg odometry_frame)"/>
         </include>
-    </group>
-    <group unless="$(arg beacon_localization)">
+</group>
+<!-- <group unless="$(arg beacon_localization)">
         <node
             pkg="fake_localization"
             type="fake_localization"
@@ -89,6 +93,6 @@
             <param name="odom_frame_id" value="$(arg odometry_frame)"/>
             <param name="global_frame_id" value="$(arg world_fixed_frame)"/>
         </node>
-    </group>
+    </group>-->
 
 </launch>
