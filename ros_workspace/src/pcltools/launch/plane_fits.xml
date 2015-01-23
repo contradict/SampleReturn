@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="devel"/>
+
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+
+    <node machine="navigate"
+        pkg="pcltools"
+        type="planefit_node"
+        name="ground_fit_center"
+        ns="pcl">
+        <remap from="points" to="/cameras/navigation/center/points2"/>
+        <remap from="plane_coefficients" to="center_ground_coefficients"/>
+        <remap from="plane_normal" to="center_ground_normal"/>
+        <remap from="inlier" to="center_ground_points"/>
+        <rosparam>
+            axis: [0.0, 0.0, 1.0]
+            input_frame: base_link
+        </rosparam>
+    </node>
+    <node machine="navigate"
+        pkg="pcltools"
+        type="planefit_node"
+        name="ground_fit_starboard"
+        ns="pcl">
+        <remap from="points" to="/cameras/navigation/starboard/points2"/>
+        <remap from="plane_coefficients" to="starboard_ground_coefficients"/>
+        <remap from="plane_normal" to="starboard_ground_normal"/>
+        <remap from="inlier" to="starboard_ground_points"/>
+        <rosparam>
+            axis: [0.0, 0.0, 1.0]
+            input_frame: base_link
+        </rosparam>
+    </node>
+    <node machine="search"
+        pkg="pcltools"
+        type="planefit_node"
+        name="ground_fit_port"
+        ns="pcl">
+        <remap from="points" to="/cameras/navigation/port/points2"/>
+        <remap from="plane_coefficients" to="port_ground_coefficients"/>
+        <remap from="plane_normal" to="port_ground_normal"/>
+        <remap from="inlier" to="port_ground_points"/>
+        <rosparam>
+            axis: [0.0, 0.0, 1.0]
+            input_frame: base_link
+        </rosparam>
+    </node>
+    <node machine="navigate"
+        pkg="pcltools"
+        type="planefit_node"
+        name="wall_fit_center"
+        ns="pcl">
+        <remap from="points" to="/cameras/navigation/center/points2"/>
+        <remap from="plane_coefficients" to="center_wall_coefficients"/>
+        <remap from="plane_normal" to="center_wall_normal"/>
+        <remap from="inlier" to="center_wall_points"/>
+        <rosparam>
+            modelType: 9
+            axis: [1.0, 0.0, 0.0]
+            input_frame: base_link
+        </rosparam>
+    </node>
+    <node machine="navigate"
+        pkg="pcltools"
+        type="planefit_node"
+        name="wall_fit_starboard"
+        ns="pcl">
+        <remap from="points" to="/cameras/navigation/starboard/points2"/>
+        <remap from="plane_coefficients" to="starboard_wall_coefficients"/>
+        <remap from="plane_normal" to="starboard_wall_normal"/>
+        <remap from="inlier" to="starboard_wall_points"/>
+        <rosparam>
+            modelType: 9
+            axis: [1.0, 0.0, 0.0]
+            input_frame: base_link
+        </rosparam>
+    </node>
+    <node machine="search"
+        pkg="pcltools"
+        type="planefit_node"
+        name="wall_fit_port"
+        ns="pcl">
+        <remap from="points" to="/cameras/navigation/port/points2"/>
+        <remap from="plane_coefficients" to="port_wall_coefficients"/>
+        <remap from="plane_normal" to="port_wall_normal"/>
+        <remap from="inlier" to="port_wall_points"/>
+        <rosparam>
+            modelType: 9
+            axis: [1.0, 0.0, 0.0]
+            input_frame: base_link
+        </rosparam>
+    </node>
+</launch>
