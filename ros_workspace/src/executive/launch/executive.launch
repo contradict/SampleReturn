@@ -81,10 +81,10 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- for search  behaviour, degrees and meters--> 
-        <param name="spoke_count" type="int" value="45"/>
-        <param name="first_spoke_offset" type="double" value="75"/>
-        <param name="star_hub_radius" type="int" value="15"/>
-        <param name="min_spin_radius" type="double" value="100"/>
+        <param name="spoke_count" type="int" value="36"/>
+        <param name="first_spoke_offset" type="double" value="30"/>
+        <param name="star_hub_radius" type="int" value="10"/>
+        <param name="min_spin_radius" type="double" value="30"/>
         <param name="spin_step" type="double" value="15"/>
         <param name="spin_velocity" type="double" value="0.3"/>
         
@@ -114,7 +114,7 @@
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
         
         <!-- sample approach (pursuit) parameters -->
-        <param name="pursuit_velocity" type="double" value="1.0"/>
+        <param name="pursuit_velocity" type="double" value="0.5"/>
         <param name="max_pursuit_error" type="double" value="0.5"/>
         <param name="min_pursuit_distance" type="double" value="2.5"/>
         <param name="max_sample_lost_time" type="double" value="20"/>
