@@ -65,7 +65,7 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-65, 20, 0), 'id':7},
                              {'point':geometry_msg.Point(-104, 45, 0), 'id':9},
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
-                             {'point':geometry_msg.Point(-38, -16, 0), 'id':2},
+                             {'point':geometry_msg.Point(10, 0, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
                              {'point':geometry_msg.Point(10.8, 30.6, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
