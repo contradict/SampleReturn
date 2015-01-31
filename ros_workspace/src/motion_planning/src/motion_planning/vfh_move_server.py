@@ -61,6 +61,7 @@ class VFHMoveServer( object ):
         
         self._as.register_goal_callback(self.goal_cb)
         self._as.register_preempt_callback(self.preempt_cb)
+        self._action_outcome = None
 
         self._tf = tf.TransformListener()
 
@@ -142,7 +143,7 @@ class VFHMoveServer( object ):
             goal_odom = self._tf.transformPose(self.odometry_frame, goal.target_pose)
         except tf.Exception, exc:
             rospy.logwarn("VFH MOVE SERVER:could not transform goal: %s"%exc)
-            self._as.set_aborted(text = "Could not transform goal: %s"%exc)
+            self._as.set_aborted(result = VFHMoveResult(outcome = VFHMoveResult.ERROR))
             return
         self._goal_local = goal_local
         self._goal_odom = goal_odom
@@ -152,8 +153,6 @@ class VFHMoveServer( object ):
         #calculate the stop_distance for stopping once near target pose
         velocity = goal.velocity if (goal.velocity != 0) else self._mover.max_velocity
         self.stop_distance = velocity**2/2./self._mover.acceleration
-        
-        rospy.loginfo("VFH Received goal, transformed to %s", goal_odom)
 
         #if the action server is inactive, fire up a movement thread
         if not active:
@@ -180,6 +179,8 @@ class VFHMoveServer( object ):
         #store the starting point in odom
         current_pose = util.get_current_robot_pose(self._tf, self.odometry_frame)
         self._start_point = current_pose.pose.position
+        #if nothing modifies this... that would be an error!
+        self._action_outcome = VFHMoveResult.ERROR
 
         # turn to face goal
         dyaw = np.arctan2( self._goal_local.pose.position.y,
@@ -211,16 +212,17 @@ class VFHMoveServer( object ):
             if self.exit_check(): return
 
         rospy.logdebug("Successfully completed goal.")
-        self._as.set_succeeded(
-                VFHMoveResult(True,
-                self.position_error(),
-                Float64(self.yaw_error())))
+        self._as.set_succeeded(result =
+                               VFHMoveResult(outcome = self._action_outcome,
+                                             position_error = self.position_error(),
+                                             yaw_error = Float64(self.yaw_error())))
         
     def exit_check(self):
         if self._as.is_preempt_requested():
             rospy.loginfo("VFH server preempted, shutdown = %s" % self.shutdown)
             #don't attempt to send preempt result if we are in shutdown
-            if not self.shutdown: self._as.set_preempted()
+            if not self.shutdown:
+                self._as.set_preempted(result = VFHMoveResult(outcome = VFHMoveResult.EXTERNAL_STOP))
             return True
         else:
             return False
@@ -239,7 +241,7 @@ class VFHMoveServer( object ):
             if  elapsed > 2.0:
                 rospy.logwarn("VFH action server forced to shutdown without preempt (2 second timeout)")
                 return
-        self._as.set_preempted()
+        self._as.set_preempted(result = VFHMoveResult(outcome = VFHMoveResult.EXTERNAL_STOP))
         start_time = rospy.get_time()
         #wait for mover to stop, then allow the rest of shutdown
         while self._mover.is_running():
@@ -268,7 +270,8 @@ class VFHMoveServer( object ):
         #if we are within stop_distance initiate stop
         #in this case, stop attempting to change the wheel angles
         if distance_to_target < self.stop_distance:
-            rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
+            #rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
+            self._action_outcome = VFHMoveResult.COMPLETE
             self._mover.stop()
             return
             
@@ -282,11 +285,13 @@ class VFHMoveServer( object ):
                                                       geometry_msg.Point(*robot_position),
                                                       self._start_point,
                                                       self._target_point_odom.point))
+            self._action_outcome = VFHMoveResult.OFF_COURSE
             self._mover.stop()
                     
         #if the target is not in the active window, we are probably way off course,
         #or possibly trying to drive too far around an obstacle near the target: stop!
         if not 0 <= target_index < len(self.sectors):
+            self._action_outcome = VFHMoveResult.OFF_COURSE
             self._mover.stop()
             if target_index < 0: target_index = 0
             if target_index >= len(self.sectors): target_index = len(self.sectors)
@@ -337,6 +342,7 @@ class VFHMoveServer( object ):
         #stop the mover if the path is blocked.  This is an estop situation!
         if np.all(self.sectors):
             rospy.loginfo("VFH all blocked, estop!")
+            self._action_outcome = VFHMoveResult.BLOCKED
             self._mover.estop()
 
         #find the sector index with the lowest cost index (inverse cost!)

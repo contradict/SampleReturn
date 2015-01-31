@@ -20,6 +20,9 @@ import platform_motion_msgs.srv as platform_srv
 import samplereturn.util as util
 from motion_planning.simple_motion import TimeoutException
 from samplereturn_msgs.msg import SimpleMoveGoal
+from samplereturn_msgs.msg import (VFHMoveAction,
+                                   VFHMoveResult,
+                                   VFHMoveFeedback)
 
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
@@ -144,6 +147,8 @@ class ExecuteVFHMove(smach.State):
 
         smach.State.__init__(self,
                              outcomes=['complete',
+                                       'blocked',
+                                       'off_course',
                                        'sample_detected',
                                        'preempted','aborted'],
                              input_keys=['move_goal',
@@ -197,7 +202,16 @@ class ExecuteVFHMove(smach.State):
                 self.move_client.send_goal(goal)      
                                     
         if move_state == action_msg.GoalStatus.SUCCEEDED:
-            return 'complete'
+            result = self.move_client.get_result().outcome
+            if result == VFHMoveResult.COMPLETE:
+                return 'complete'
+            elif result == VFHMoveResult.BLOCKED:
+                return 'blocked'
+            elif result == VFHMoveResult.OFF_COURSE:
+                return 'off_course'
+            else:
+                rospy.logwarn("ExecuteVFHMove received unexpected outcome from action server, aborting")
+                return 'aborted'
 
         self.cancel_move()
         return 'aborted'
@@ -409,7 +423,8 @@ class MoveToPoints(smach.State):
                              input_keys=['point_list',
                                          'detected_sample',
                                          'odometry_frame',
-                                         'stop_on_sample'],
+                                         'stop_on_sample',
+                                         'velocity'],
                              output_keys=['simple_move',
                                           'point_list'],
                              outcomes=['next_point',
@@ -417,12 +432,11 @@ class MoveToPoints(smach.State):
                                        'aborted'])
         
         self.tf_listener = tf_listener
-        self.facing_next_point = False
             
     def execute(self, userdata):    
                
         if (len(userdata.point_list) > 0):
-            rospy.logdebug("MOVE TO POINTS list: %s" %(userdata.point_list))
+            rospy.loginfo("MOVE TO POINTS list: %s" %(userdata.point_list))
             target_point = userdata.point_list[0]
             header = std_msg.Header(0, rospy.Time(0), userdata.odometry_frame)
             target_stamped = geometry_msg.PointStamped(header, target_point)
@@ -435,8 +449,8 @@ class MoveToPoints(smach.State):
             userdata.point_list.popleft()
             userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                                   angle = yaw,
-                                                  distance = distance)
-            self.facing_next_point = False
+                                                  distance = distance,
+                                                  velocity = userdata.velocity)
             return 'next_point'                
 
         else:
