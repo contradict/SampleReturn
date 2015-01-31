@@ -20,6 +20,9 @@ import platform_motion_msgs.srv as platform_srv
 import samplereturn.util as util
 from motion_planning.simple_motion import TimeoutException
 from samplereturn_msgs.msg import SimpleMoveGoal
+from samplereturn_msgs.msg import (VFHMoveAction,
+                                   VFHMoveResult,
+                                   VFHMoveFeedback)
 
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
@@ -144,6 +147,8 @@ class ExecuteVFHMove(smach.State):
 
         smach.State.__init__(self,
                              outcomes=['complete',
+                                       'blocked',
+                                       'off_course',
                                        'sample_detected',
                                        'preempted','aborted'],
                              input_keys=['move_goal',
@@ -197,7 +202,16 @@ class ExecuteVFHMove(smach.State):
                 self.move_client.send_goal(goal)      
                                     
         if move_state == action_msg.GoalStatus.SUCCEEDED:
-            return 'complete'
+            result = self.move_client.get_result().outcome
+            if result == VFHMoveResult.COMPLETE:
+                return 'complete'
+            elif result == VFHMoveResult.BLOCKED:
+                return 'blocked'
+            elif result == VFHMoveResult.OFF_COURSE:
+                return 'off_course'
+            else:
+                rospy.logwarn("ExecuteVFHMove received unexpected outcome from action server, aborting")
+                return 'aborted'
 
         self.cancel_move()
         return 'aborted'
