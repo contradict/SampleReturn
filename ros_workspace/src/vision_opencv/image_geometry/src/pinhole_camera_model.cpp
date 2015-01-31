@@ -1,6 +1,7 @@
 #include "image_geometry/pinhole_camera_model.h"
 #include <sensor_msgs/distortion_models.h>
 #include <boost/make_shared.hpp>
+#include <opencv2/gpu/gpu.hpp>
 
 namespace image_geometry {
 
@@ -17,6 +18,7 @@ struct PinholeCameraModel::Cache
 
   mutable bool reduced_maps_dirty;
   mutable cv::Mat reduced_map1, reduced_map2;
+  mutable cv::gpu::GpuMat gpu_reduced_map1, gpu_reduced_map2;
   
   mutable bool rectified_roi_dirty;
   mutable cv::Rect rectified_roi;
@@ -293,6 +295,26 @@ void PinholeCameraModel::rectifyImage(const cv::Mat& raw, cv::Mat& rectified, in
   }
 }
 
+void PinholeCameraModel::rectifyImageGPU(const cv::gpu::GpuMat& raw,
+        cv::gpu::GpuMat& rectified, int interpolation) const
+{
+  assert( initialized() );
+
+  switch (cache_->distortion_state) {
+    case NONE:
+      raw.copyTo(rectified);
+      break;
+    case CALIBRATED:
+      initRectificationMaps(true);
+      cv::gpu::remap(raw, rectified, cache_->gpu_reduced_map1, cache_->gpu_reduced_map2, interpolation);
+      break;
+    default:
+      assert(cache_->distortion_state == UNKNOWN);
+      throw Exception("Cannot call rectifyImage when distortion is unknown.");
+  }
+}
+
+
 void PinholeCameraModel::unrectifyImage(const cv::Mat& rectified, cv::Mat& raw, int interpolation) const
 {
   assert( initialized() );
@@ -389,7 +411,7 @@ cv::Rect PinholeCameraModel::unrectifyRoi(const cv::Rect& roi_rect) const
   return cv::Rect(roi_tl.x, roi_tl.y, roi_br.x - roi_tl.x, roi_br.y - roi_tl.y);
 }
 
-void PinholeCameraModel::initRectificationMaps() const
+void PinholeCameraModel::initRectificationMaps(bool gpu) const
 {
   /// @todo For large binning settings, can drop extra rows/cols at bottom/right boundary.
   /// Make sure we're handling that 100% correctly.
@@ -450,6 +472,10 @@ void PinholeCameraModel::initRectificationMaps() const
       roi.height /= binningY();
       cache_->reduced_map1 = cache_->full_map1(roi) - cv::Scalar(roi.x, roi.y);
       cache_->reduced_map2 = cache_->full_map2(roi);
+      if(gpu) {
+          cache_->gpu_reduced_map1.upload(cache_->reduced_map1);
+          cache_->gpu_reduced_map2.upload(cache_->reduced_map2);
+      }
     }
     else {
       // Otherwise we're rectifying the full image

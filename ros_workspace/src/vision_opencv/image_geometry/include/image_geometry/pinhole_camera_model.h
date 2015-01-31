@@ -116,6 +116,14 @@ public:
 #else
                     int interpolation = CV_INTER_LINEAR) const;
 #endif
+  void rectifyImageGPU(const cv::gpu::GpuMat& raw, cv::gpu::GpuMat& rectified,
+#if OPENCV3
+                    int interpolation = cv::INTER_LINEAR) const;
+#else
+                    int interpolation = CV_INTER_LINEAR) const;
+#endif
+
+
 
   /**
    * \brief Apply camera distortion to a rectified image.
@@ -280,7 +288,7 @@ protected:
   struct Cache;
   boost::shared_ptr<Cache> cache_; // Holds cached data for internal use
 
-  void initRectificationMaps() const;
+  void initRectificationMaps(bool gpu=false) const;
 
   friend class StereoCameraModel;
 };
