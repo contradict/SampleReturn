@@ -3,7 +3,7 @@ project(opencv_apps)
 
 find_package(catkin REQUIRED COMPONENTS cv_bridge dynamic_reconfigure message_generation image_transport nodelet roscpp)
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 2.4.10 REQUIRED)
 if (OpenCV_VERSION VERSION_EQUAL "3")
   add_definitions("-DOPENCV3=1")
   set(${PROJECT_NAME}_EXTRA_CFG)
