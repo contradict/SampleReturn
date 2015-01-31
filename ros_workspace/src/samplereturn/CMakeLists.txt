@@ -38,5 +38,6 @@ install(
        nodes/announce_voltage.py
        nodes/pause_switch.py
        nodes/announcer.py
+       nodes/triggered_camera.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
