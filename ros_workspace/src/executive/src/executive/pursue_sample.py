@@ -200,7 +200,6 @@ class PursueSample(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'MANIPULATOR_FINAL_MOVE',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'timeout':'MANIPULATOR_FINAL_MOVE',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'stop_on_sample':'true'})
             
@@ -208,7 +207,6 @@ class PursueSample(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'HANDLE_SEARCH',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'timeout':'HANDLE_SEARCH',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'simple_move':'final_move',
                                                 'stop_on_sample':'true'})
@@ -229,7 +227,6 @@ class PursueSample(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'HANDLE_SEARCH_MOVES',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'timeout':'HANDLE_SEARCH_MOVES',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'stop_on_sample':'true'})
 
@@ -250,7 +247,6 @@ class PursueSample(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'timeout':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'stop_on_sample':'false'})
 

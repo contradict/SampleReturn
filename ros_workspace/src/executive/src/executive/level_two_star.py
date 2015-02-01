@@ -166,7 +166,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'STAR_MANAGER',
                                                   'sample_detected':'STAR_MANAGER',
-                                                  'timeout':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'simple_move':'dismount_move',
@@ -208,7 +207,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'LINE_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
-                                                  'timeout':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'true'})
@@ -254,7 +252,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
-                                                  'timeout':'BEACON_SEARCH',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -282,7 +279,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'MOUNT_MANAGER',
                                                   'sample_detected':'MOUNT_MANAGER',
-                                                  'timeout':'MOUNT_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
@@ -290,7 +286,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'DESELECT_PLANNER',
                                                   'sample_detected':'MOUNT_MANAGER',                                                  
-                                                  'timeout':'MOUNT_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 

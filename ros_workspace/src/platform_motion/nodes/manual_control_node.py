@@ -133,7 +133,6 @@ class ManualController(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'timeout':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED',
                                                   },
                                    remapping = {'stop_on_sample':'true'})
