@@ -66,6 +66,8 @@ class TriggeredCamera(object):
         self.output = rospy.Publisher('timestamped_image', Image, queue_size=1)
         self.status_pub = rospy.Publisher('cam_status',
                 std_msg.String, queue_size=1)
+        self.wait_for_service('gpio_service')
+        self.wait_for_service('set_config')
         self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService,
                 persistent=True)
         self.photo_config = rospy.ServiceProxy('set_config', SetConfig,
@@ -80,6 +82,17 @@ class TriggeredCamera(object):
         self.wait_for_first_image_timer = None
         self.trigger_timer = None
         self.start_trigger_timer(None)
+
+    def wait_for_service(self, name):
+        while not rospy.is_shutdown():
+            try:
+                rospy.wait_for_service(name, 20.0)
+                break
+            except rospy.ROSException:
+                rospy.logerr("Cannot contact %s, retrying.", name)
+            except rospy.ROSInterrupException:
+                rospy.logerr("Never found %s, exiting for shutdown.", name)
+                return
 
     def handle_pause(self, msg):
         self.paused = msg.data
@@ -138,6 +151,7 @@ class TriggeredCamera(object):
             self.pause_for_restart_timer.shutdown()
             self.pause_for_restart_timer = None
         rospy.loginfo("starting trigger")
+        self.wait_for_service('set_config')
         self.photo_config(SetConfigRequest(param="recordingmedia",
             value="1 SDRAM"))
         self.send_one_trigger()
@@ -156,10 +170,21 @@ class TriggeredCamera(object):
         gpio_req = GPIOServiceRequest(GPIO(servo_id=self.gpio_servo_id,
                                    new_pin_states=0,
                                    pin_mask=self.gpio_pin))
-        capture_stamp = self.gpio_service(gpio_req).stamp
+        try:
+            capture_stamp = self.gpio_service(gpio_req).stamp
+        except rospy.ServiceException:
+            rospy.logerr("gpio service low failed, reconnecting.")
+            self.wait_for_service('gpio_service')
+            return
+
         rospy.sleep(self.pulse_width)
         gpio_req.gpio.new_pin_states = self.gpio_pin
-        self.gpio_service(gpio_req)
+        try:
+            self.gpio_service(gpio_req)
+        except rospy.ServiceException:
+            rospy.logerr("gpio service high failed, reconnecting.")
+            self.wait_for_service('gpio_service')
+            # this probably resulted in a trigger, keep going!
         capture_stamp += rospy.Duration(self.time_offset)
         self.timestamp_queue.put((self.trigger_count, capture_stamp))
 
