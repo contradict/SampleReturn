@@ -32,5 +32,6 @@
         <remap from="triggered_image" to="photo_node/triggered_capture"/>
         <remap from="timestamped_image" to="image"/>
         <remap from="timestamped_info" to="info"/>
+        <remap from="set_config" to="photo_node/set_config"/>
     </node>
 </launch>

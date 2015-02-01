@@ -12,6 +12,7 @@ import Queue
 import std_msgs.msg as std_msg
 from sensor_msgs.msg import Image, CameraInfo
 from platform_motion_msgs.srv import GPIOServiceRequest, GPIOService
+from photo.srv import SetConfig, SetConfigRequest
 from platform_motion_msgs.msg import GPIO
 
 
@@ -52,7 +53,10 @@ class TriggeredCamera(object):
         self.output = rospy.Publisher('timestamped_image', Image, queue_size=1)
         self.status_pub = rospy.Publisher('cam_status',
                 std_msg.String, queue_size=1)
-        self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService, persistent=True)
+        self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService,
+                persistent=True)
+        self.photo_config = rospy.ServiceProxy('set_config', SetConfig,
+                persistent=True)
 
         rospy.Subscriber("triggered_image", Image, self.handle_image,
                 queue_size=2, buff_size=2*5000*4000)
@@ -104,6 +108,8 @@ class TriggeredCamera(object):
 
     def start_trigger_timer(self, evt):
         rospy.loginfo("starting trigger")
+        self.photo_config(SetConfigRequest(param="recordingmedia",
+            value="1 SDRAM"))
         self.pause_for_restart = None
         self.trigger_timer = rospy.Timer(rospy.Duration(1./self.trigger_rate),
                 self.trigger_camera)
