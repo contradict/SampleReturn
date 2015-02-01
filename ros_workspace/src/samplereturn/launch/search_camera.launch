@@ -6,7 +6,7 @@
           pkg="photo"
           type="photo_node"
           name="photo_node"
-          respawn_delay="1.0"
+          respawn_delay="10.0"
           respawn="true"
           ns="/cameras/search">
         <remap from="cam_img" to="image"/>
@@ -19,7 +19,7 @@
         type="triggered_camera.py"
         name="triggered_camera"
         ns="/cameras/search">
-        <param name="rate" value="1.5"/>
+        <param name="rate" value="1.0"/>
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera"/>
         <param name="capture_delay" type="double" value="0.15"/>
