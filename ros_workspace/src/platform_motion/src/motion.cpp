@@ -504,9 +504,11 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
         case platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE:
             if( req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_RESUME &&
                 req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE &&
-                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK)
+                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_LOCK &&
+                req.mode != platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE
+                )
             {
-                ROS_ERROR("Attempted mode transition other than RESUME, ENABLE or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
+                ROS_ERROR("Attempted mode transition other than RESUME, ENABLE, PAUSE or LOCK from PAUSE: %s", motion_mode_string(req.mode).c_str());
                 return false;
             }
             break;
@@ -569,6 +571,10 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
                 // take care of slowing down
                 motion_mode = req.mode;
                 handlePause();
+            }
+            else if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE )
+            {
+                motion_mode = req.mode;
             }
             else
             {
