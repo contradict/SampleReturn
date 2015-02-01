@@ -26,8 +26,9 @@ class TriggeredCamera(object):
         self.gpio_servo_id = rospy.get_param('~gpio_servo_id', 1)
         self.gpio_pin = rospy.get_param('~gpio_pin', 2)
         self.pulse_width = rospy.get_param('~pulse_width', 0.1)
-        self.error_timeout = rospy.get_param('~error_timeout', 3.0)
+        self.error_timeout = rospy.get_param('~error_timeout', 5.0)
         self.queue_size_warning = rospy.get_param('~queue_size_warning', 3)
+        self.restart_delay = rospy.get_param('~restart_delay', 5.0)
         self.frame_id = rospy.get_param('~frame_id', 'search_camera')
         calibration_name = rospy.get_param('~calib_file', None)
         if calibration_name is not None:
@@ -58,22 +59,26 @@ class TriggeredCamera(object):
         rospy.Subscriber('pause_state', std_msg.Bool, self.handle_pause)
 
         self.error_status_timer = None
-        self.trigger_timer = rospy.Timer(rospy.Duration(1./self.trigger_rate),
-                self.trigger_camera)
+        self.start_trigger_timer(None)
 
     def handle_pause(self, msg):
         self.paused = msg.data
 
     def handle_image(self, msg):
-        self.image_count += 1
-        try:
-            seq, stamp = self.timestamp_queue.get_nowait()
-        except Queue.Empty:
-            rospy.logerr("Received image without sending a trigger")
-            return
         if self.error_status_timer is not None:
             self.error_status_timer.shutdown()
             self.error_status_timer = None
+        self.image_count += 1
+        rospy.logdebug("image seq: %d queue: %d", self.image_count,
+                self.timestamp_queue.qsize())
+        try:
+            seq, stamp = self.timestamp_queue.get_nowait()
+        except Queue.Empty:
+            if self.pause_for_restart is not None:
+                self.pause_for_restart.shutdown()
+                self.start_restart_timer()
+            rospy.logerr("Received image without sending a trigger")
+            return
         self.status_pub.publish("Ready")
         msg.header.stamp = stamp
         msg.header.seq = seq
@@ -87,14 +92,31 @@ class TriggeredCamera(object):
         if qsz > self.queue_size_warning:
             rospy.logwarn("trigger count: %d, image count: %d, queue size %d",
                     self.trigger_count, self.image_count, qsz)
+            self.trigger_timer.shutdown()
+            self.start_restart_timer()
+
+    def start_restart_timer(self):
+        self.clear_queue("Queue too deep, limit %d"%self.queue_size_warning)
+        self.pause_for_restart = rospy.Timer(
+                rospy.Duration(self.restart_delay),
+                self.start_trigger_timer,
+                oneshot=True)
+
+    def start_trigger_timer(self, evt):
+        rospy.loginfo("starting trigger")
+        self.pause_for_restart = None
+        self.trigger_timer = rospy.Timer(rospy.Duration(1./self.trigger_rate),
+                self.trigger_camera)
 
     def trigger_camera(self, evt):
         if self.paused:
-            return
-        if self.timestamp_queue.qsize()>0:
-            rospy.logwarn("missed trigger")
+            if self.error_status_timer is not None:
+                self.error_status_timer.shutdown()
+                self.error_status_timer = None
             return
         self.trigger_count += 1
+        rospy.logdebug("trigger seq: %d queue: %d", self.trigger_count,
+                self.timestamp_queue.qsize())
         gpio_req = GPIOServiceRequest(GPIO(servo_id=self.gpio_servo_id,
                                    new_pin_states=0,
                                    pin_mask=self.gpio_pin))
@@ -107,15 +129,18 @@ class TriggeredCamera(object):
         if self.error_status_timer is None:
             self.error_status_timer = rospy.Timer(
                     rospy.Duration(self.error_timeout),
-                    self.handle_error)
+                    lambda evt: self.clear_queue("Image receipt timeout."),
+                    oneshot=True)
 
-    def handle_error(self, evt):
-        rospy.logerr("No image received")
+    def clear_queue(self, reason):
+        rospy.logerr("Clearing timestamp queue with %d entries: %s",
+            self.timestamp_queue.qsize(), reason)
         self.status_pub.publish("Error")
-        try:
-            self.timestamp_queue.get_nowait()
-        except Queue.Empty:
-            pass
+        while True:
+            try:
+                self.timestamp_queue.get_nowait()
+            except Queue.Empty:
+                break
 
     def parse_yaml(self, filename):
         stream = file(filename, 'r')
