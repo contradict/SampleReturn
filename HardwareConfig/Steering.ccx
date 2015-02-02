@@ -1,6 +1,6 @@
 14
 1
-95,0,Host Config State,2:0:1:1536:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1
+95,0,Host Config State,2:0:1:1537:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1:-1
 87,0,Amp Family,2
 40,0,Motor Type,16
 89,0,Amp Max Voltage,910
@@ -53,8 +53,8 @@
 7c,0,Input 5 Config,0
 7d,0,Input 6 Config,0
 80,0,Amp Model Number,ACP-090-36
-8a,0,Voltage Sense,2255
-92,0,Amp Name,Starboard Steering
+8a,0,Voltage Sense,2252
+92,0,Amp Name,Stern Steering
 98,0,Function Generator Config,8193
 99,0,Function Generator Frequency,2
 9a,0,Function Generator Amplitude,48000
@@ -89,12 +89,12 @@ ba,0,Position Following Error Limit,10000
 bb,0,Position Following Warning Limit,5000
 bc,0,Position Tracking Window,2500
 bd,0,Position Tracking Window Time,10
-c8,0,Trajectory Profile Mode,256
-ca,0,Trajectory Position Command,-1000
+c8,0,Trajectory Profile Mode,0
+ca,0,Trajectory Position Command,-170
 cb,0,Trajectory Max Velocity,25000
 cc,0,Trajectory Max Accel,2000
 cd,0,Trajectory Max Decel,2000
-cf,0,Trajectory Abort Decel,200000
+cf,0,Trajectory Abort Decel,4000
 f0,0,Input 1 Debounce Time,0
 f1,0,Input 2 Debounce Time,0
 f2,0,Input 3 Debounce Time,0
@@ -140,7 +140,7 @@ c4,0,Home Velocity Slow,8333
 c5,0,Home Accel/Decel,2000
 c6,0,Home Offset,0
 c7,0,Home Current,150
-ce,0,Trajectory Max Jerk,50000
+ce,0,Trajectory Max Jerk,20000
 d0,0,Input 9 Config,0
 d1,0,Input 10 Config,0
 d2,0,Input 11 Config,0

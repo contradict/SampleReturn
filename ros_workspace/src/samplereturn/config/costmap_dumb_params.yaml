@@ -5,6 +5,8 @@ transform_tolerance: 0.3
 update_frequency: 2.0
 publish_frequency: 1.0
 
+clear_every_send: true
+
 #footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
 
 rolling_window: true

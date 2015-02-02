@@ -166,7 +166,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'STAR_MANAGER',
                                                   'sample_detected':'STAR_MANAGER',
-                                                  'timeout':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'simple_move':'dismount_move',
@@ -191,6 +190,8 @@ class LevelTwoStar(object):
             smach.StateMachine.add('LINE_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'STAR_MANAGER',
+                                                  'blocked':'STAR_MANAGER',
+                                                  'off_course':'STAR_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
@@ -206,7 +207,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'LINE_MANAGER',
                                                   'sample_detected':'PURSUE_SAMPLE',
-                                                  'timeout':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'true'})
@@ -252,7 +252,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
-                                                  'timeout':'BEACON_SEARCH',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -261,6 +260,8 @@ class LevelTwoStar(object):
             smach.StateMachine.add('BEACON_SEARCH_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
+                                                  'blocked':'BEACON_SEARCH',
+                                                  'off_course':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
@@ -278,7 +279,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'MOUNT_MANAGER',
                                                   'sample_detected':'MOUNT_MANAGER',
-                                                  'timeout':'MOUNT_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
@@ -286,7 +286,6 @@ class LevelTwoStar(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'DESELECT_PLANNER',
                                                   'sample_detected':'MOUNT_MANAGER',                                                  
-                                                  'timeout':'MOUNT_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
@@ -541,7 +540,7 @@ class SearchLineManager(smach.State):
         if not userdata.outbound:
             distance = userdata.distance_to_hub
         else:
-            distance = 100
+            distance = 50
 
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    frame_id = self.odometry_frame)

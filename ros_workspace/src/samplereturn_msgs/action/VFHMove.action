@@ -5,7 +5,8 @@ float32 velocity
 #result
 int8 COMPLETE = 0
 int8 BLOCKED = 1
-int8 STOPPED = 2
+int8 OFF_COURSE = 2
+int8 EXTERNAL_STOP = 2
 int8 ERROR = 3
 
 int8 outcome
