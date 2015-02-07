@@ -341,16 +341,16 @@ class PursueSample(object):
             smach.StateMachine.add('ANNOUNCE_RETURN',
                                    AnnounceState(self.announcer,
                                                  "Returning to search"),
-                                   transitions = {'next':'RETURN_TO_START'})
+                                   transitions = {'next':'complete'})
 
             #return to start along the approach point
             #if the path is ever blocked just give up and return to the level_two search
             smach.StateMachine.add('RETURN_TO_START',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'complete',
-                                                  'blocked':'complete',
+                                                  'blocked':'ANNOUNCE_RETURN_BLOCKED',
                                                   'missed_target':'complete',
-                                                  'off_course':'complete',
+                                                  'off_course':'ANNOUNCE_RETURN_BLOCKED',
                                                   'sample_detected':'complete',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'},
                                    remapping = {'move_goal':'return_goal',
