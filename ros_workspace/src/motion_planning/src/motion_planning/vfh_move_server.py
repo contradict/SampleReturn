@@ -288,10 +288,10 @@ class VFHMoveServer( object ):
             self._action_outcome = VFHMoveResult.OFF_COURSE
             self._mover.stop()
                     
-        #if the target is not in the active window, we are probably way off course,
-        #or possibly trying to drive too far around an obstacle near the target: stop!
+        #if the target is not in the active window, we are probably close to it,
+        #but locally blocked: stop!
         if not 0 <= target_index < len(self.sectors):
-            self._action_outcome = VFHMoveResult.OFF_COURSE
+            self._action_outcome = VFHMoveResult.MISSED_TARGET
             self._mover.stop()
             if target_index < 0: target_index = 0
             if target_index >= len(self.sectors): target_index = len(self.sectors)
