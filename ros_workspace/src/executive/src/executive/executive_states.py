@@ -200,6 +200,7 @@ class ExecuteVFHMove(ExecuteMoveState):
                                             outcomes=['complete',
                                                       'blocked',
                                                       'off_course',
+                                                      'missed_target',
                                                       'sample_detected',
                                                       'preempted','aborted'],
                                             input_keys=['move_goal',
@@ -241,17 +242,22 @@ class ExecuteVFHMove(ExecuteMoveState):
             self.check_pause(userdata, goal)
             
                                     
-        if move_state == action_msg.GoalStatus.SUCCEEDED:
-            result = self._move_client.get_result().outcome
-            if result == VFHMoveResult.COMPLETE:
-                return 'complete'
-            elif result == VFHMoveResult.BLOCKED:
-                return 'blocked'
-            elif result == VFHMoveResult.OFF_COURSE:
-                return 'off_course'
+        if (move_state == action_msg.GoalStatus.SUCCEEDED):
+            if (self._move_client.wait_for_result(timeout = rospy.Duration(2.0))):
+                result = self._move_client.get_result().outcome
+                if result == VFHMoveResult.COMPLETE:
+                    return 'complete'
+                elif result == VFHMoveResult.BLOCKED:
+                    return 'blocked'
+                elif result == VFHMoveResult.OFF_COURSE:
+                    return 'off_course'
+                elif result == VFHMoveResult.MISSED_TARGET:
+                    return 'missed_target'
+                else:
+                    rospy.logwarn("ExecuteVFHMove received unexpected outcome from action server, aborting")
+                    return 'aborted'
             else:
-                rospy.logwarn("ExecuteVFHMove received unexpected outcome from action server, aborting")
-                return 'aborted'
+                rospy.logwarn("ExecuteVFHMove received SUCCEEDED state from action server, but no action result, aborting")
 
         self.cancel_move()
         return 'aborted'
