@@ -82,7 +82,8 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="36"/>
-        <param name="first_spoke_offset" type="double" value="30"/>
+        <param name="spoke_length" type="int" value="100"/>
+        <param name="first_spoke_offset" type="double" value="80"/>
         <param name="star_hub_radius" type="int" value="10"/>
         <param name="min_spin_radius" type="double" value="30"/>
         <param name="spin_step" type="double" value="15"/>
