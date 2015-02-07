@@ -5,6 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/gpu/gpu.hpp>
 #include <stdexcept>
 
 namespace image_geometry {
@@ -118,10 +119,11 @@ public:
 #endif
   void rectifyImageGPU(const cv::gpu::GpuMat& raw, cv::gpu::GpuMat& rectified,
 #if OPENCV3
-                    int interpolation = cv::INTER_LINEAR) const;
+                    int interpolation = cv::INTER_LINEAR,
 #else
-                    int interpolation = CV_INTER_LINEAR) const;
+                    int interpolation = CV_INTER_LINEAR,
 #endif
+                    cv::gpu::Stream& strm=cv::gpu::Stream::Null()) const;
 
 
 
