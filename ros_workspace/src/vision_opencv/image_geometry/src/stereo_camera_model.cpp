@@ -137,4 +137,18 @@ void StereoCameraModel::projectDisparityImageTo3d(const cv::Mat& disparity, cv::
   cv::reprojectImageTo3D(disparity, point_cloud, Q_, handleMissingValues);
 }
 
+void StereoCameraModel::projectDisparityImageTo3dGPU(
+        const cv::gpu::GpuMat& disparity,
+        cv::gpu::GpuMat& point_cloud,
+        bool handleMissingValues,
+        cv::gpu::Stream& strm) const
+{
+  assert( initialized() );
+
+  cv::Mat Qdouble(Q_);
+  cv::Mat Qfloat(4, 4, CV_32F);
+  Qdouble.convertTo( Qfloat, CV_32F);
+  cv::gpu::reprojectImageTo3D(disparity, point_cloud, Qfloat, 3, strm);
+}
+
 } //namespace image_geometry

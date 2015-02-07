@@ -61,6 +61,13 @@ public:
    */
   void projectDisparityImageTo3d(const cv::Mat& disparity, cv::Mat& point_cloud,
                                  bool handleMissingValues = false) const;
+
+  void projectDisparityImageTo3dGPU(
+          const cv::gpu::GpuMat& disparity,
+          cv::gpu::GpuMat& point_cloud,
+          bool handleMissingValues = false,
+          cv::gpu::Stream& strm=cv::gpu::Stream::Null()) const;
+
   static const double MISSING_Z;
   
   /**
