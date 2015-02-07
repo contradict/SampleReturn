@@ -436,14 +436,15 @@ void Stereoproc::sendDisparity(void)
 void Stereoproc::configCb(Config &config, uint32_t level)
 {
     // Tweak all settings to be valid
-    config.prefilter_size |= 0x1; // must be odd
     config.correlation_window_size |= 0x1; // must be odd
     config.disparity_range = (config.disparity_range / 16) * 16; // must be multiple of 16
 
     // Note: With single-threaded NodeHandle, configCb and imageCb can't be called
     // concurrently, so this is thread-safe.
+    block_matcher_.preset = config.preset;
     block_matcher_.winSize = config.correlation_window_size;
     block_matcher_.ndisp = config.disparity_range;
+    block_matcher_.avergeTexThreshold = config.texture_threshold;
 }
 
 } // namespace stereo_image_proc
