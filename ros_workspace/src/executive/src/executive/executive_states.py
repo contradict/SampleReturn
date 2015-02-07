@@ -335,10 +335,14 @@ class SelectMotionMode(smach.State):
 #class for saying something on the speakers
 class AnnounceState(smach.State):
     def __init__(self, announcer, announcement):
-        smach.State.__init__(self, outcomes = ['next'])
+        smach.State.__init__(self,
+                             outcomes = ['next'],
+                             input_keys = ['announcement'])
         self.announcer = announcer
         self.announcement = announcement
     def execute(self, userdata):
+        if self.announcement is None:
+            self.announcement = userdata.announcement
         self.announcer.say(self.announcement)
         return 'next'
 
