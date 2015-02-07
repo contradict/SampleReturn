@@ -180,9 +180,7 @@ class LevelTwoStar(object):
                                                   'return_home':'ANNOUNCE_RETURN_HOME'})
 
             smach.StateMachine.add('LINE_MANAGER',
-                                   SearchLineManager(self.tf_listener,
-                                                     self.vfh_mover,
-                                                     self.announcer),
+                                   SearchLineManager(self.tf_listener),
                                    transitions = {'move':'LINE_MOVE',
                                                   'line_end':'STAR_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
@@ -192,16 +190,28 @@ class LevelTwoStar(object):
             smach.StateMachine.add('LINE_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'ROTATION_MANAGER',
-                                                  'missed_target':'ROTATION_MANAGER',
-                                                  'blocked':'STAR_MANAGER',
-                                                  'off_course':'STAR_MANAGER',
+                                                  'missed_target':'ANNOUNCE_MISSED_TARGET',
+                                                  'blocked':'ANNOUNCE_LINE_BLOCKED',
+                                                  'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'pursue_samples':'true'})
             
+            smach.StateMachine.add('ANNOUNCE_LINE_BLOCKED',
+                                   AnnounceState(self.announcer, 'Line Blocked.'),
+                                   transitions = {'next':'STAR_MANAGER'})
+            
+            smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
+                                   AnnounceState(self.announcer, 'Off Course.'),
+                                   transitions = {'next':'STAR_MANAGER'})
+            
+            smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
+                                   AnnounceState(self.announcer, 'Line Blocked'),
+                                   transitions = {'next':'ROTATION_MANAGER'})
+            
             smach.StateMachine.add('ROTATION_MANAGER',
-                                   RotationManager(self.tf_listener, self.simple_mover),
+                                   RotationManager(self.tf_listener),
                                    transitions = {'spin':'ROTATE',
                                                   'move':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
@@ -456,7 +466,7 @@ class StarManager(smach.State):
 
 class RotationManager(smach.State):
 
-    def __init__(self, tf_listener, mover):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
                              outcomes=['spin', 'move', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
@@ -472,7 +482,6 @@ class RotationManager(smach.State):
                                           'last_align_time',])
   
         self.tf_listener = tf_listener
-        self.mover = mover
     
     def execute(self, userdata):
         #if heading out, and further than spin step, and not on last move, spin
@@ -486,11 +495,10 @@ class RotationManager(smach.State):
 
         #otherwise, on to next movement        
         return 'move'    
-            
 
 #drive to detected sample location        
 class SearchLineManager(smach.State):
-    def __init__(self, tf_listener, mover, announcer):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
                                            'line_points',
@@ -511,8 +519,6 @@ class SearchLineManager(smach.State):
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
-        self.mover = mover
-        self.announcer = announcer
 
     def execute(self, userdata):
 
@@ -521,11 +527,12 @@ class SearchLineManager(smach.State):
         if rospy.Time.now() > userdata.return_time:
             return 'return_home'
         
+        #if len of points is zero we have reached the start or end of a line
         if len(userdata.line_points) == 0:
             return 'line_end'
         else:
             target_point = userdata.line_points.pop(0)
-        
+
         try:
             self.tf_listener.waitForTransform(odometry_frame,
                                               target_point.header.frame_id,
@@ -537,15 +544,12 @@ class SearchLineManager(smach.State):
                           target_point.frame_id, odometry_frame)
 
         header = std_msg.Header(0, rospy.Time(0), odometry_frame)
-
         pose = geometry_msg.Pose(position = point_in_odom.point,
                                  orientation = geometry_msg.Quaternion())
         target_pose = geometry_msg.PoseStamped(header, pose)
-                
         goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose,
                                             orient_at_target = False)
         userdata.move_goal = goal
-
         return 'move'
             
 class BeaconSearch(smach.State):
