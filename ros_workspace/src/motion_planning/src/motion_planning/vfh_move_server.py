@@ -69,6 +69,7 @@ class VFHMoveServer( object ):
         self._goal_local = None
         self._target_point_odom = None
         self._start_point = None
+        self._orient_at_target = False
  
         #costmap crap
         self.costmap = None
@@ -147,6 +148,7 @@ class VFHMoveServer( object ):
             return
         self._goal_local = goal_local
         self._goal_odom = goal_odom
+        self._orient_at_target = bool(goal.orient_at_target)
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
         
@@ -205,7 +207,7 @@ class VFHMoveServer( object ):
 
         # turn to requested orientation
         dyaw = self.yaw_error()
-        if np.abs(dyaw) > self._goal_orientation_tolerance:
+        if self._orient_at_target and (np.abs(dyaw) > self._goal_orientation_tolerance):
             rospy.loginfo("VFH Rotating to goal yaw %f.", dyaw)
             self._mover.execute_spin(dyaw,
                     stop_function=self.is_stop_requested)
