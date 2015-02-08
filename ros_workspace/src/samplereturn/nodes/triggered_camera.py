@@ -67,6 +67,17 @@ class TriggeredCamera(object):
         self.output = rospy.Publisher('timestamped_image', Image, queue_size=1)
         self.status_pub = rospy.Publisher('cam_status',
                 std_msg.String, queue_size=1)
+
+        self.missing_image_timer = None
+        self.pause_for_restart_timer = None
+        self.wait_for_first_image_timer = None
+        self.trigger_timer = None
+
+        self.enable_srv = rospy.Service('enable', Enable, self.enable_callback)
+        rospy.Subscriber("triggered_image", Image, self.handle_image,
+                queue_size=2, buff_size=2*5000*4000)
+        rospy.Subscriber('pause_state', std_msg.Bool, self.handle_pause)
+
         self.wait_for_service('gpio_service')
         self.wait_for_service('set_config')
         self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService,
@@ -74,16 +85,7 @@ class TriggeredCamera(object):
         self.photo_config = rospy.ServiceProxy('set_config', SetConfig,
                 persistent=True)
 
-        self.missing_image_timer = None
-        self.pause_for_restart_timer = None
-        self.wait_for_first_image_timer = None
-        self.trigger_timer = None
         self.start_trigger_timer(None)
-
-        self.enable_srv = rospy.Service('enable', Enable, self.enable_callback)
-        rospy.Subscriber("triggered_image", Image, self.handle_image,
-                queue_size=2, buff_size=2*5000*4000)
-        rospy.Subscriber('pause_state', std_msg.Bool, self.handle_pause)
 
     def wait_for_service(self, name):
         while not rospy.is_shutdown():
