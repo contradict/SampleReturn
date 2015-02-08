@@ -65,6 +65,8 @@ class Stereoproc : public nodelet::Nodelet
   cv::gpu::StereoBM_GPU block_matcher_;
   const int block_matcher_min_disparity_ = 0;
 
+  cv::gpu::StereoConstantSpaceBP csbp_;
+
   void connectCb();
 
   void imageCb(const sensor_msgs::ImageConstPtr& l_mono_msg, const sensor_msgs::ImageConstPtr& l_color_msg, const sensor_msgs::CameraInfoConstPtr& l_info_msg,

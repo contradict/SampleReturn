@@ -247,7 +247,18 @@ void Stereoproc::imageCb(
     if(connected_.Disparity || connected_.Pointcloud)
     {
         // May need to wait for r_strm completion here
+#if 1
         block_matcher_(l_rect_mono, r_rect_mono, disparity, l_strm);
+#else
+        int ndisp=48, iters, levels, nr_plane;
+        csbp_.estimateRecommendedParams( l_rect_mono.cols, l_rect_mono.rows,
+                ndisp, iters, levels, nr_plane);
+        csbp_.ndisp = ndisp;
+        csbp_.iters = iters;
+        csbp_.levels = levels;
+        csbp_.nr_plane = nr_plane;
+        csbp_(l_rect_mono, r_rect_mono, disparity, l_strm);
+#endif
     }
 
     if(connected_.Disparity)
