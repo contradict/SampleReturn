@@ -59,7 +59,7 @@ class ManualController(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.paused = False
         self.state_machine.userdata.light_state = False
-        self.state_machine.userdata.search_camera_state = False
+        self.state_machine.userdata.search_camera_state = True
 
         # disable obstacle checking in ExecuteSimpleMove
         self.state_machine.userdata.active_strafe_key = None
@@ -192,12 +192,14 @@ class ManualController(object):
                                    transitions = {'next':'SELECT_JOYSTICK'})
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
-                                     ManualPreempted(self.CAN_interface),
+                                     ManualPreempted(self.CAN_interface,
+                                                     self.search_camera_enable),
                                      transitions = {'complete':'preempted',
                                                    'fail':'aborted'})
 
             smach.StateMachine.add('MANUAL_ABORTED',
-                                    ManualAborted(self.CAN_interface),
+                                    ManualAborted(self.CAN_interface,
+                                                  self.search_camera_enable),
                                     transitions = {'recover':'SELECT_JOYSTICK',
                                                    'fail':'aborted'})
 
@@ -594,14 +596,22 @@ class InterruptibleActionClientState(smach.State):
 
 
 class ManualPreempted(smach.State):
-    def __init__(self, CAN_interface):
+    def __init__(self, CAN_interface, search_camera_enable):
         smach.State.__init__(self, outcomes=['complete','fail'],
                                    output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
+        self.search_camera_enable = search_camera_enable
         
     def execute(self, userdata):
-        
+
+        try:
+            self.search_camera_enable(True)
+        except (rospy.ServiceException,
+                rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("Unable to re-enable search camera: %s", e)
+
+
         #we are preempted by the top state machine
         #set motion mode to None and exit
         self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_PAUSE)
@@ -614,13 +624,20 @@ class ManualPreempted(smach.State):
         return 'complete'
 
 class ManualAborted(smach.State):
-    def __init__(self, CAN_interface):
+    def __init__(self, CAN_interface, search_camera_enable):
         smach.State.__init__(self, outcomes=['recover','fail'],
                                    output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
+        self.search_camera_enable = search_camera_enable
         
     def execute(self, userdata):
+        try:
+            self.search_camera_enable(True)
+        except (rospy.ServiceException,
+                rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("Unable to re-enable search camera: %s", e)
+
         result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
         
