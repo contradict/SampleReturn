@@ -81,6 +81,7 @@ class ManualController(object):
             
             MODE_JOYSTICK = platform_srv.SelectMotionModeRequest.MODE_JOYSTICK
             MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
+            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
             MODE_RESUME = platform_srv.SelectMotionModeRequest.MODE_RESUME
             MODE_HOME = platform_srv.SelectMotionModeRequest.MODE_HOME
@@ -113,16 +114,16 @@ class ManualController(object):
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
-                                   transitions = {'visual_servo_requested':'SELECT_SERVO',
+                                   transitions = {'visual_servo_requested':'SELECT_PLANNER',
                                                   'manipulator_grab_requested':'MANIPULATOR_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
                                                   'aborted':'MANUAL_ABORTED'})           
             
-            smach.StateMachine.add('SELECT_SERVO',
+            smach.StateMachine.add('SELECT_PLANNER',
                                    SelectMotionMode(self.CAN_interface,
-                                                    MODE_SERVO),
+                                                    MODE_PLANNER),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
