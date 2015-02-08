@@ -3,14 +3,54 @@
 <launch>
     <arg name="run_cameras" default="true"/>
 
-    <include file="$(find samplereturn)/launch/navigation_pair.launch">
+    <!-- special-case for port, cameras are plugged in to search -->
+    <!-- this manager runs only disparity->pointcloud -->
+    <node name="manager"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="manager"
+          ns="/cameras/navigation/port"
+          output="log"
+          respawn_delay="25.0"
+          respawn="true">
+    </node>
+    <!-- this manager runs the rest of port on search -->
+    <node if="$(arg run_cameras)" name="port_search_manager"
+          machine="search"
+          pkg="nodelet"
+          type="nodelet"
+          args="manager"
+          ns="/cameras/navigation/port"
+          output="log"
+          respawn_delay="25.0"
+          respawn="true">
+    </node>
+    <!-- load up cameras, debayer, rectify, disparity on search-->
+    <include file="$(find samplereturn)/launch/camera_pair.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="machine" value="search"/>
         <arg name="namespace" value="port"/>
+        <arg name="manager_name" value="port_search_manager"/>
         <arg name="left_guid" value="00b09d0100a85719"/>
         <arg name="right_guid" value="00b09d0100bb69f3"/>
         <arg name="strobe" value="true"/>
-        <arg name="machine" value="search"/>
     </include>
+    <!-- Compute Stereo Point Cloud on navigate to avoid shipping it over the
+         network-->
+    <node name="stereo_image_points"
+          machine="navigate"
+          pkg="nodelet"
+          type="nodelet"
+          args="load stereo_image_proc/point_cloud2 manager"
+          ns="/cameras/navigation/port"
+          output="log"
+          respawn_delay="30.0"
+          respawn="true">
+        <param name="approximate_sync" type="bool" value="true"/>
+    </node>
+
+
 
     <include file="$(find samplereturn)/launch/navigation_pair.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
