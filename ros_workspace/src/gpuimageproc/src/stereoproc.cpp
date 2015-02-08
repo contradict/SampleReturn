@@ -65,7 +65,7 @@ void Stereoproc::onInit()
 // Handles (un)subscribing when clients (un)subscribe
 void Stereoproc::connectCb()
 {
-    boost::lock_guard<boost::mutex> lock(connect_mutex_);
+    boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
     connected_.RectifyMonoLeft = (pub_mono_rect_left_.getNumSubscribers() > 0)?1:0;
     connected_.RectifyMonoRight = (pub_mono_rect_right_.getNumSubscribers() > 0)?1:0;
     connected_.RectifyColorLeft = (pub_color_rect_left_.getNumSubscribers() > 0)?1:0;
@@ -159,6 +159,8 @@ void Stereoproc::imageCb(
         const sensor_msgs::ImageConstPtr& r_color_msg,
         const sensor_msgs::CameraInfoConstPtr& r_info_msg)
 {
+    boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
+    boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
     int level = connected_.level();
     NODELET_INFO("got images, level %d", level);
 
@@ -445,6 +447,9 @@ void Stereoproc::configCb(Config &config, uint32_t level)
     block_matcher_.winSize = config.correlation_window_size;
     block_matcher_.ndisp = config.disparity_range;
     block_matcher_.avergeTexThreshold = config.texture_threshold;
+    NODELET_INFO("Reconfigure preset:%d winsz:%d ndisp:%d tex:%3.1f",
+            config.preset, config.correlation_window_size, config.disparity_range,
+            config.texture_threshold);
 }
 
 } // namespace stereo_image_proc
