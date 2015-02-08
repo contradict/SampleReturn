@@ -134,6 +134,7 @@
           output="log"
           respawn_delay="30.0"
           respawn="true">
+          <param name="queue_size" type="int" value="1"/>
     </node>
     <node name="rect_color"
           machine="$(arg machine)"
@@ -146,6 +147,7 @@
           respawn="true">
         <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
+          <param name="queue_size" type="int" value="1"/>
     </node>
     <node name="rect"
           machine="$(arg machine)"
@@ -156,7 +158,9 @@
           output="log"
           respawn_delay="30.0"
           respawn="true">
-    </node>
+          <param name="queue_size" type="int" value="1"/>
+      </node>
+      <!--
     <node name="rect_color"
           machine="$(arg machine)"
           pkg="nodelet"
@@ -168,7 +172,9 @@
           respawn="true">
         <remap from="image_mono" to="image_color"/>
         <remap from="image_rect" to="image_rect_color"/>
+          <param name="queue_size" type="int" value="1"/>
     </node>
+    -->
 
     <!-- Compute Stereo -->
     <node name="stereo_image_disparity"
