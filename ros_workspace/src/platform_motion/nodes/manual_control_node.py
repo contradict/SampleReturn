@@ -66,7 +66,6 @@ class ManualController(object):
         self.state_machine.userdata.active_strafe_key = None
 
         #strafe search settings
-        self.state_machine.userdata.settle_time = 1
         #set move tolerance huge, this prevent retrying by the simple mover
         self.state_machine.userdata.simple_move_tolerance = 1.0
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction

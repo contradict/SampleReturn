@@ -353,7 +353,6 @@ class ServoController(smach.State):
         smach.State.__init__(self,
                              outcomes=['move', 'complete', 'point_lost', 'aborted'],
                              input_keys=['detected_sample',
-                                         'settle_time',
                                          'manipulator_correction',
                                          'servo_params',
                                          'simple_move'],
