@@ -158,8 +158,9 @@ class ExecuteMoveState(smach.State):
             while True:
                 rospy.sleep(0.1)
                 #Must check preempt in pause loop too, no matter how lame it is
-                if self.preempt_requested():
-                    return self.handle_preempt()
+                #If preempted here, exit, and let main loop handle preempt
+                #Do not resend goal! Only resend goal on unpause
+                if self.preempt_requested(): return 
                 if not userdata.paused: break
             self._move_client.send_goal(goal)      
     
