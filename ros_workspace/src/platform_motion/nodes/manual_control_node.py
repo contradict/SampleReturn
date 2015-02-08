@@ -48,7 +48,8 @@ class ManualController(object):
         self.tf = tf.TransformListener()
  
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
-        self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
+        self.simple_mover = actionlib.SimpleActionClient("simple_move",
+                                                       samplereturn_msg.SimpleMoveAction)
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],

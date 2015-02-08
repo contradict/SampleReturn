@@ -76,8 +76,10 @@ class LevelTwoStar(object):
 
         #get the star shape
         self.spokes = self.get_hollow_star(self.node_params.spoke_count,
+                                           self.node_params.spoke_length,
                                            self.node_params.first_spoke_offset,
-                                           self.node_params.star_hub_radius)
+                                           self.node_params.star_hub_radius,
+                                           self.node_params.spin_step)
                        
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -174,32 +176,44 @@ class LevelTwoStar(object):
             smach.StateMachine.add('STAR_MANAGER',
                                    StarManager(self.tf_listener,
                                                self.announcer),
-                                   transitions = {'rotate':'ROTATION_MANAGER',
+                                   transitions = {'next_spoke':'LINE_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME'})
 
             smach.StateMachine.add('LINE_MANAGER',
-                                   SearchLineManager(self.tf_listener,
-                                                     self.vfh_mover,
-                                                     self.announcer),
+                                   SearchLineManager(self.tf_listener),
                                    transitions = {'move':'LINE_MOVE',
-                                                  'spin':'ROTATE',
+                                                  'line_end':'STAR_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('LINE_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'STAR_MANAGER',
-                                                  'blocked':'STAR_MANAGER',
-                                                  'off_course':'STAR_MANAGER',
+                                   transitions = {'complete':'ROTATION_MANAGER',
+                                                  'missed_target':'ANNOUNCE_MISSED_TARGET',
+                                                  'blocked':'ANNOUNCE_LINE_BLOCKED',
+                                                  'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'pursue_samples':'true'})
             
+            smach.StateMachine.add('ANNOUNCE_LINE_BLOCKED',
+                                   AnnounceState(self.announcer, 'Line Blocked.'),
+                                   transitions = {'next':'STAR_MANAGER'})
+            
+            smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
+                                   AnnounceState(self.announcer, 'Off Course.'),
+                                   transitions = {'next':'STAR_MANAGER'})
+            
+            smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
+                                   AnnounceState(self.announcer, 'Line Blocked'),
+                                   transitions = {'next':'ROTATION_MANAGER'})
+            
             smach.StateMachine.add('ROTATION_MANAGER',
-                                   RotationManager(self.tf_listener, self.simple_mover),
-                                   transitions = {'next':'ROTATE',
+                                   RotationManager(self.tf_listener),
+                                   transitions = {'spin':'ROTATE',
+                                                  'move':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -233,8 +247,8 @@ class LevelTwoStar(object):
 
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
-                                                 'Rotate ing to search line'),
-                                   transitions = {'next':'ROTATION_MANAGER'})   
+                                                 'Return ing to search line'),
+                                   transitions = {'next':'LINE_MANAGER'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
@@ -261,6 +275,7 @@ class LevelTwoStar(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'blocked':'BEACON_SEARCH',
+                                                  'missed_target':'BEACON_SEARCH',
                                                   'off_course':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'BEACON_SEARCH',
@@ -357,21 +372,25 @@ class LevelTwoStar(object):
                                                  beacon_pose.pose.pose.position)
         self.state_machine.userdata.beacon_point = beacon_point
 
-    def get_hollow_star(self, spoke_count, offset, hub_radius):
+    def get_hollow_star(self, spoke_count, spoke_length, offset, hub_radius, spin_step):
 
         offset = np.radians(offset)
         yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
         spokes = []
-        
         for yaw in yaws:
             yaw = util.unwind(yaw)
-            starting_point = geometry_msg.Point(hub_radius*math.cos(yaw),
-                                                hub_radius*math.sin(yaw),
-                                                0)
-            spokes.append({'yaw':yaw,'starting_point':starting_point})
-        
-        #last star point is the beacon approach point    
-        spokes.append({'yaw':None, 'starting_point':geometry_msg.Point(hub_radius, 0, 0)})
+            radius = hub_radius
+            points = []
+            while radius < spoke_length:
+                header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+                pos = geometry_msg.Point(radius*math.cos(yaw),
+                                         radius*math.sin(yaw), 0)
+                point = geometry_msg.PointStamped(header, pos)
+                radius += spin_step
+                if radius > spoke_length: radius = spoke_length
+                points.append(point)
+            spokes.append({'yaw':yaw,
+                           'points':points})
         
         return spokes
  
@@ -409,12 +428,11 @@ class StarManager(smach.State):
                                            'spokes',
                                            'world_fixed_frame'],
                              output_keys = ['line_yaw',
+                                            'line_points',
                                             'outbound',
                                             'spokes',
-                                            'last_spin_radius',
-                                            'within_hub_radius',
                                             'stop_on_sample'],
-                             outcomes=['rotate',
+                             outcomes=['next_spoke',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -424,138 +442,115 @@ class StarManager(smach.State):
     def execute(self, userdata):
 
         userdata.stop_on_sample = True
-        #returning to the center
+
+        if len(userdata.spokes) == 0:
+            rospy.loginfo("STAR MANAGER finished last spoke")
+            return 'return_home'
+
         if not userdata.outbound:
             #just finished inbound spoke, turn around and head outwards again
-            if len(userdata.spokes) == 1:
-                rospy.loginfo("STAR MANAGER finished inbound move, last spoke")
-                return 'return_home'
-            userdata.last_spin_radius = util.get_robot_distance_to_origin(self.tf_listener,
-                                                                          userdata.world_fixed_frame)
-            userdata.line_yaw = userdata.spokes.pop(0)['yaw']
+            spoke = userdata.spokes.pop(0)
+            userdata.line_yaw = spoke['yaw']
+            userdata.line_points = spoke['points']
             userdata.outbound = True
             rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
-            return 'rotate'        
-        #outbound
         else:
-            #just finished outbound spoke, head towards next star point and set offset limit higher.
-            #If inbound, rotation manager calculates the line yaw each time it is asked to make a
-            #rotation. userdata.line_yaw remains the yaw FROM the origin
-            userdata.within_hub_radius = False
+            #just finished outbound spoke, head towards first point in next spoke
             userdata.outbound = False
-            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
+            userdata.line_points = [userdata.spokes[0]['points'].pop(0)]
+            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['points'][0]))
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-            return 'rotate'
 
+        return 'next_spoke'
 
 class RotationManager(smach.State):
 
-    def __init__(self, tf_listener, mover):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             outcomes=['next', 'preempted', 'aborted'],
+                             outcomes=['spin', 'move', 'preempted', 'aborted'],
                              input_keys=['line_yaw',
-                                         'spokes',
+                                         'line_points',
+                                         'min_spin_radius',
                                          'spin_velocity',
                                          'outbound',
                                          'world_fixed_frame',],
                              output_keys=['line_yaw',
                                           'simple_move',
-                                          'outbound',
-                                          'rotate_pose',
                                           'beacon_point',
                                           'distance_to_hub',
                                           'last_align_time',])
   
         self.tf_listener = tf_listener
-        self.mover = mover
     
     def execute(self, userdata):
-        #if heading out, always move parallel to line yaw
+        #if heading out, and further than spin step, and not on last move, spin
         if userdata.outbound:
-            map_yaw = deepcopy(userdata.line_yaw)
-        #if inbound, always point to next starting point
-        else:
-            current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                       userdata.world_fixed_frame)
-            map_yaw = util.pointing_yaw(current_pose.pose.position,
-                                                  userdata.spokes[0]['starting_point'])
-            userdata.distance_to_hub = util.point_distance_2d(current_pose.pose.position,
-                                                              userdata.spokes[0]['starting_point'])
-        
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
-                userdata.world_fixed_frame)
-        rotate_yaw = util.unwind(map_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER map_yaw: %.1f, robot_yaw: %.1f, rotate_yaw: %.1f" %(
-                      np.degrees(map_yaw),
-                      np.degrees(actual_yaw),
-                      np.degrees(rotate_yaw)))
-        #create the simple move command
-        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
-                                              angle = rotate_yaw,
-                                              velocity = userdata.spin_velocity)        
+            distance = util.get_robot_distance_to_origin(self.tf_listener, userdata.world_fixed_frame)
+            if (len(userdata.line_points) > 0) and (distance > userdata.min_spin_radius):     
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                      angle = 2.*math.pi,
+                                                      velocity = userdata.spin_velocity)        
+                return 'spin'                
 
-        #clear the beacon points before returning, make sure we respond to new beacon poses
-        userdata.last_align_time = rospy.get_time()
-        userdata.beacon_point = None
-        return 'next'
+        #otherwise, on to next movement        
+        return 'move'    
 
 #drive to detected sample location        
 class SearchLineManager(smach.State):
-    def __init__(self, tf_listener, mover, announcer):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
+                                           'line_points',
                                            'outbound',
                                            'return_time',
                                            'detected_sample',
                                            'world_fixed_frame',
                                            'odometry_frame',
-                                           'last_spin_radius',
-                                           'min_spin_radius',
-                                           'spin_step',
-                                           'distance_to_hub',
-                                           'within_hub_radius',
                                            'beacon_point',
                                            'last_align_time'],
                              output_keys = ['move_goal',
-                                            'last_spin_radius',
+                                            'line_points',
                                             'beacon_point',
                                             'last_align_time'],
                              outcomes=['move',
-                                       'spin',
+                                       'line_end',
                                        'return_home',
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
-        self.mover = mover
-        self.announcer = announcer
 
     def execute(self, userdata):
 
-        self.odometry_frame = userdata.odometry_frame
+        odometry_frame = userdata.odometry_frame
         
         if rospy.Time.now() > userdata.return_time:
             return 'return_home'
         
-        if not userdata.outbound:
-            distance = userdata.distance_to_hub
+        #if len of points is zero we have reached the start or end of a line
+        if len(userdata.line_points) == 0:
+            return 'line_end'
         else:
-            distance = 50
+            target_point = userdata.line_points.pop(0)
 
-        current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                   frame_id = self.odometry_frame)
-        target_pose = util.translate_base_link(self.tf_listener,
-                                               current_pose,
-                                               distance, 0,
-                                               frame_id = self.odometry_frame)
-        target_pose.header.stamp = rospy.Time(0)
-        
-        #create destination
-        goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose)
+        try:
+            self.tf_listener.waitForTransform(odometry_frame,
+                                              target_point.header.frame_id,
+                                              target_point.header.stamp,
+                                              rospy.Duration(1.0))
+            point_in_odom = self.tf_listener.transformPoint(odometry_frame, target_point)
+        except tf.Exception:
+            rospy.logwarn("LEVEL_TWO failed to transform line manager point %s->%s",
+                          target_point.frame_id, odometry_frame)
+
+        header = std_msg.Header(0, rospy.Time(0), odometry_frame)
+        pose = geometry_msg.Pose(position = point_in_odom.point,
+                                 orientation = geometry_msg.Quaternion())
+        target_pose = geometry_msg.PoseStamped(header, pose)
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose,
+                                            orient_at_target = False)
         userdata.move_goal = goal
-
         return 'move'
-    
             
 class BeaconSearch(smach.State):
     
