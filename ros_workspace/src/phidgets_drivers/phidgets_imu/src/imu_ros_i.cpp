@@ -40,12 +40,12 @@ ImuRosI::ImuRosI(ros::NodeHandle nh, ros::NodeHandle nh_private):
 
   // **** advertise topics
 
-  imu_publisher_ = nh_.advertise<ImuMsg>(
-    "imu/data_raw", 5);
-  mag_publisher_ = nh_.advertise<MagMsg>(
-    "imu/mag", 5);
-  cal_publisher_ = nh_.advertise<std_msgs::Bool>(
-    "imu/is_calibrated", 5);
+  imu_publisher_ = nh_private_.advertise<ImuMsg>(
+    "data_raw", 5);
+  mag_publisher_ = nh_private_.advertise<MagMsg>(
+    "mag", 5);
+  cal_publisher_ = nh_private_.advertise<std_msgs::Bool>(
+    "is_calibrated", 5);
 
   // **** advertise services
 
