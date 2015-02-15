@@ -12,6 +12,8 @@ ImuRosI::ImuRosI(ros::NodeHandle nh, ros::NodeHandle nh_private):
 
   // **** get parameters
 
+  if (!nh_private_.getParam ("serial_number", serial_number_))
+    serial_number_ = -1; // any device
   if (!nh_private_.getParam ("period", period_))
     period_ = 8; // 8 ms
   if (!nh_private_.getParam ("frame_id", frame_id_))
@@ -99,7 +101,7 @@ ImuRosI::ImuRosI(ros::NodeHandle nh, ros::NodeHandle nh_private):
 void ImuRosI::initDevice()
 {
 	ROS_INFO("Opening device");
-	open(-1);
+	open(serial_number_);
 
 	ROS_INFO("Waiting for IMU to be attached...");
 	int result = waitForAttachment(10000);
@@ -107,7 +109,7 @@ void ImuRosI::initDevice()
 	{
 	  const char *err;
 		CPhidget_getErrorDescription(result, &err);
-		ROS_FATAL("Problem waiting for IMU attachment: %s Make sure the USB cable is connected and you have executed the phidgets_c_api/setup-udev.sh script.", err);
+		ROS_FATAL("Problem waiting for IMU attachment, serial number %d: %s Make sure the USB cable is connected and you have executed the phidgets_c_api/setup-udev.sh script.", serial_number_, err);
 	}
 
 	// set the data rate for the spatial events

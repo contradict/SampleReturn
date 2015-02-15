@@ -46,6 +46,7 @@ class ImuRosI : public Imu
 
     // params
 
+    int serial_number_;
     std::string frame_id_;
     int period_;  // rate in ms
 
