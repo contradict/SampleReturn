@@ -304,4 +304,17 @@
         <axis xyz="0 0 1"/>
         <origin xyz="-0.239 0.0 -0.121"/>
     </joint>
+
+    <link name="imu_0"/>
+    <joint name="imu_0_mount" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="imu_0"/>
+        <origin xyz="-0.445 0 0.0113" rpy="0 3.1416 -1.5708"/>
+    </joint>
+    <link name="imu_1"/>
+    <joint name="imu_1_mount" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="imu_1"/>
+        <origin xyz="-0.445 0 0.0175" rpy="0 3.1416 -1.5708"/>
+    </joint>
 </robot>
