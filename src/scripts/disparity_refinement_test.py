@@ -43,8 +43,11 @@ def refine(disparity, left, right, blocksize=7, maxdisp=64):
     ssd = np.zeros_like(disparity)
     ssdm = np.zeros_like(disparity)
     ssdp = np.zeros_like(disparity)
+    Vdisp = 0;
+    Rdisp = 0;
     for row in xrange(blocksize, disparity.shape[0]-blocksize):
         for col in xrange(blocksize+maxdisp, disparity.shape[1]-blocksize-1):
+            Vdisp += 1;
             disp = disparity[row, col]
             lbl = col-blocksize
             rbl = lbl-disp
@@ -68,7 +71,9 @@ def refine(disparity, left, right, blocksize=7, maxdisp=64):
             b = (ssdp[row, col]-ssdm[row, col])/2.
             d = a+abs(b)
             if a > 0 and abs(d) > 1:
+                Rdisp += 1
                 refined_disparity[row, col] += b/d
+    print "Refined %d of %d"%(Rdisp, Vdisp)
     return refined_disparity, ssd, ssdp, ssdm
 
 def reproject(disparity):
