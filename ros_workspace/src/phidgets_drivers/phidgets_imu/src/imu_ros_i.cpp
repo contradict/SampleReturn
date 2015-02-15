@@ -110,6 +110,7 @@ void ImuRosI::initDevice()
 	  const char *err;
 		CPhidget_getErrorDescription(result, &err);
 		ROS_FATAL("Problem waiting for IMU attachment, serial number %d: %s Make sure the USB cable is connected and you have executed the phidgets_c_api/setup-udev.sh script.", serial_number_, err);
+        exit(1);
 	}
 
 	// set the data rate for the spatial events
