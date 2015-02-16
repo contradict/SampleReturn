@@ -57,6 +57,7 @@ void Stereoproc::onInit()
     pub_mono_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_mono", 1, connect_cb, connect_cb);
     pub_color_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_color", 1, connect_cb, connect_cb);
     pub_disparity_ = nh.advertise<stereo_msgs::DisparityImage>("disparity", 1, connect_cb, connect_cb);
+    pub_disparity_vis_ = nh.advertise<sensor_msgs::Image>("disparity_vis", 1, connect_cb, connect_cb);
     pub_pointcloud_ = nh.advertise<sensor_msgs::PointCloud2>("pointcloud", 1, connect_cb, connect_cb);
 
     cv::gpu::printShortCudaDeviceInfo(cv::gpu::getDevice());
@@ -71,6 +72,7 @@ void Stereoproc::connectCb()
     connected_.RectifyColorLeft = (pub_color_rect_left_.getNumSubscribers() > 0)?1:0;
     connected_.RectifyColorRight = (pub_color_rect_right_.getNumSubscribers() > 0)?1:0;
     connected_.Disparity = (pub_disparity_.getNumSubscribers() > 0)?1:0;
+    connected_.DisparityVis = (pub_disparity_vis_.getNumSubscribers() > 0)?1:0;
     connected_.Pointcloud = (pub_pointcloud_.getNumSubscribers() > 0)?1:0;
     int level = connected_.level();
     if (level == 0)
@@ -196,11 +198,11 @@ void Stereoproc::imageCb(
         r_strm.enqueueUpload(r_cpu_color, r_color);
 
     cv::gpu::GpuMat l_rect_mono, r_rect_mono;
-    if(connected_.RectifyMonoLeft || connected_.Disparity || connected_.Pointcloud)
+    if(connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
         model_.left().rectifyImageGPU(l_mono, l_rect_mono, l_strm);
     }
-    if(connected_.RectifyMonoRight || connected_.Disparity || connected_.Pointcloud)
+    if(connected_.RectifyMonoRight || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
         model_.right().rectifyImageGPU(r_mono, r_rect_mono, r_strm);
     }
@@ -244,7 +246,7 @@ void Stereoproc::imageCb(
     }
 
     cv::gpu::GpuMat disparity;
-    if(connected_.Disparity || connected_.Pointcloud)
+    if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
         // May need to wait for r_strm completion here
 #if 1
@@ -316,6 +318,31 @@ void Stereoproc::imageCb(
                     static_cast<Stereoproc*>(userData)->sendDisparity();
                 },
                 (void*)this);
+    }
+
+    if(connected_.DisparityVis)
+    {
+        GPUSender::Ptr t(new GPUSender(l_color_msg,
+                    sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_));
+        senders.push_back(t);
+        cv::gpu::GpuMat disparity_int(l_cpu_color.size(), CV_16SC1);
+        cv::gpu::GpuMat disparity_image(l_cpu_color.size(), CV_8UC4);
+        if(disparity.type() == CV_32F)
+            l_strm.enqueueConvert(disparity, disparity_int, CV_16SC1, 16, 0);
+        else
+            disparity_int = disparity;
+        try
+        {
+            cv::gpu::drawColorDisp(disparity_int, disparity_image,
+                    block_matcher_.ndisp*16, l_strm);
+            t->enqueueSend(disparity_image, l_strm);
+        }
+        catch(cv::Exception e)
+        {
+            NODELET_ERROR_STREAM("Unable to draw color disparity: " << e.err <<
+                             "in " << e.file << ":" << e.func <<
+                             " line " << e.line);
+        }
     }
 
     cv::gpu::GpuMat xyzw;

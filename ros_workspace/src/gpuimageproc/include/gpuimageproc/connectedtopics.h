@@ -14,6 +14,7 @@ struct ConnectedTopics {
             uint32_t RectifyColorLeft : 1;
             uint32_t RectifyColorRight : 1;
             uint32_t Disparity : 1;
+            uint32_t DisparityVis : 1;
             uint32_t Pointcloud : 1;
         };
     };

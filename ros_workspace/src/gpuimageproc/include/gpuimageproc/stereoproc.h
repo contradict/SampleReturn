@@ -47,6 +47,7 @@ class Stereoproc : public nodelet::Nodelet
   ros::Publisher pub_color_rect_left_;
   ros::Publisher pub_color_rect_right_;
   ros::Publisher pub_disparity_;
+  ros::Publisher pub_disparity_vis_;
   ros::Publisher pub_pointcloud_;
   struct ConnectedTopics connected_;
 
