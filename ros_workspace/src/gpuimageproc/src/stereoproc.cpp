@@ -164,7 +164,7 @@ void Stereoproc::imageCb(
     boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
     int level = connected_.level();
-    NODELET_INFO("got images, level %d", level);
+    NODELET_DEBUG("got images, level %d", level);
 
     // Update the camera model
     model_.fromCameraInfo(l_info_msg, r_info_msg);
