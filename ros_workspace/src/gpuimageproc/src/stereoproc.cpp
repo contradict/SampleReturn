@@ -348,13 +348,7 @@ void Stereoproc::imageCb(
     cv::gpu::GpuMat xyzw;
     if(connected_.Pointcloud)
     {
-        cv::gpu::GpuMat disparity_int;
-        if(disparity.type() == CV_32F)
-            l_strm.enqueueConvert(disparity, disparity_int, CV_16SC1, 16, 0);
-        else
-            disparity_int = disparity;
-
-        model_.projectDisparityImageTo3dGPU(disparity_int, xyzw, true, l_strm);
+        model_.projectDisparityImageTo3dGPU(disparity, xyzw, true, l_strm);
         cv::gpu::CudaMem cuda_xyzw;
         l_strm.enqueueDownload(xyzw, cuda_xyzw);
         sensor_msgs::PointCloud2Ptr points_msg = boost::make_shared<sensor_msgs::PointCloud2>();
