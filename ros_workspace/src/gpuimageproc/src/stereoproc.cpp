@@ -264,7 +264,10 @@ void Stereoproc::imageCb(
     if(connected_.Disparity)
     {
         cv::gpu::GpuMat disparity_float;
-        l_strm.enqueueConvert(disparity, disparity_float, CV_32FC1);
+        if(disparity.type() != CV_32F)
+            l_strm.enqueueConvert(disparity, disparity_float, CV_32FC1);
+        else
+            disparity_float = disparity;
 
         // Adjust for any x-offset between the principal points: d' = d - (cx_l - cx_r)
         double cx_l = model_.left().cx();
@@ -318,7 +321,13 @@ void Stereoproc::imageCb(
     cv::gpu::GpuMat xyzw;
     if(connected_.Pointcloud)
     {
-        model_.projectDisparityImageTo3dGPU(disparity, xyzw, true, l_strm);
+        cv::gpu::GpuMat disparity_int;
+        if(disparity.type() == CV_32F)
+            l_strm.enqueueConvert(disparity, disparity_int, CV_16SC1, 16, 0);
+        else
+            disparity_int = disparity;
+
+        model_.projectDisparityImageTo3dGPU(disparity_int, xyzw, true, l_strm);
         cv::gpu::CudaMem cuda_xyzw;
         l_strm.enqueueDownload(xyzw, cuda_xyzw);
         sensor_msgs::PointCloud2Ptr points_msg = boost::make_shared<sensor_msgs::PointCloud2>();
@@ -453,13 +462,15 @@ void Stereoproc::configCb(Config &config, uint32_t level)
     config.disparity_range = (config.disparity_range / 16) * 16; // must be multiple of 16
 
     // Note: With single-threaded NodeHandle, configCb and imageCb can't be called
-    // concurrently, so this is thread-safe.
-    block_matcher_.preset = config.preset;
+    // concurrently, so this is thread-safe.Q
+    block_matcher_.preset = 0;
+    block_matcher_.preset |= config.xsobel?cv::gpu::StereoBM_GPU::PREFILTER_XSOBEL:0;
+    block_matcher_.preset |= config.refine_disparity?cv::gpu::StereoBM_GPU::FLOAT_DISPARITY:0;
     block_matcher_.winSize = config.correlation_window_size;
     block_matcher_.ndisp = config.disparity_range;
     block_matcher_.avergeTexThreshold = config.texture_threshold;
     NODELET_INFO("Reconfigure preset:%d winsz:%d ndisp:%d tex:%3.1f",
-            config.preset, config.correlation_window_size, config.disparity_range,
+            block_matcher_.preset, config.correlation_window_size, config.disparity_range,
             config.texture_threshold);
 }
 
