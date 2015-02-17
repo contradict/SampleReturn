@@ -286,7 +286,7 @@ void Stereoproc::imageCb(
     cv::gpu::GpuMat disparity;
     if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
-        // May need to wait for r_strm completion here
+        r_strm.waitForCompletion();
 #if 1
         block_matcher_(l_rect_mono, r_rect_mono, disparity, l_strm);
 #else
