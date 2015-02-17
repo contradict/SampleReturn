@@ -32,7 +32,11 @@
         type="nodelet"
         name="manager"
         args="manager"
-        output="screen"/>
+        output="screen"
+        />
+    <!--
+         launch-prefix="nvprof -o manager_triple.prof - -analysis-metrics -s "
+         -->
 
     <node
         pkg="nodelet"
