@@ -365,14 +365,17 @@ void Stereoproc::imageCb(
         senders.push_back(t);
         cv::gpu::GpuMat disparity_int(l_cpu_raw.size(), CV_16SC1);
         cv::gpu::GpuMat disparity_image(l_cpu_raw.size(), CV_8UC4);
+        int ndisp = block_matcher_.ndisp;
         if(disparity.type() == CV_32F)
+        {
             l_strm.enqueueConvert(disparity, disparity_int, CV_16SC1, 16, 0);
+            ndisp *= 16;
+        }
         else
             disparity_int = disparity;
         try
         {
-            cv::gpu::drawColorDisp(disparity_int, disparity_image,
-                    block_matcher_.ndisp*16, l_strm);
+            cv::gpu::drawColorDisp(disparity_int, disparity_image, ndisp, l_strm);
             t->enqueueSend(disparity_image, l_strm);
         }
         catch(cv::Exception e)
