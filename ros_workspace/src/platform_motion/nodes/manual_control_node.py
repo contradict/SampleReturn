@@ -141,7 +141,7 @@ class ManualController(object):
                                                   'sample_detected':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED',
                                                   },
-                                   remapping = {'stop_on_sample':'true'})
+                                   remapping = {'stop_on_sample':'false'})
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
