@@ -34,29 +34,12 @@
         args="manager"
         output="screen"/>
 
-    <!-- Debayer -->
-    <node
-        pkg="nodelet"
-        type="nodelet"
-        name="debayer"
-        args="load image_proc/debayer /manager"
-        ns="left"
-        output="screen">
-    </node>
-    <node
-        pkg="nodelet"
-        type="nodelet"
-        name="debayer"
-        args="load image_proc/debayer /manager"
-        ns="right"
-        >
-    </node>
-
     <node
         pkg="nodelet"
         type="nodelet"
         name="stereo"
         args="load gpuimageproc/Stereoproc manager"
+        output="screen"
         >
         <param name="approximate_sync" type="bool" value="true"/>
     </node>
