@@ -28,18 +28,18 @@ void Stereoproc::onInit()
     if (approx)
     {
         approximate_sync_.reset( new ApproximateSync(ApproximatePolicy(queue_size),
-                    sub_l_mono_image_, sub_l_color_image_, sub_l_info_,
-                    sub_r_mono_image_, sub_r_color_image_, sub_r_info_) );
+                    sub_l_raw_image_, sub_l_info_,
+                    sub_r_raw_image_, sub_r_info_) );
         approximate_sync_->registerCallback(boost::bind(&Stereoproc::imageCb,
-                    this, _1, _2, _3, _4, _5, _6));
+                    this, _1, _2, _3, _4));
     }
     else
     {
         exact_sync_.reset( new ExactSync(ExactPolicy(queue_size),
-                    sub_l_mono_image_, sub_l_color_image_, sub_l_info_,
-                    sub_r_mono_image_, sub_r_color_image_, sub_r_info_) );
+                    sub_l_raw_image_, sub_l_info_,
+                    sub_r_raw_image_, sub_r_info_) );
         exact_sync_->registerCallback(boost::bind(&Stereoproc::imageCb,
-                    this, _1, _2, _3, _4, _5, _6));
+                    this, _1, _2, _3, _4));
     }
 
     // Set up dynamic reconfiguration
@@ -52,6 +52,10 @@ void Stereoproc::onInit()
     ros::SubscriberStatusCallback connect_cb = boost::bind(&Stereoproc::connectCb, this);
     // Make sure we don't enter connectCb() between advertising and assigning to pub_disparity_
     boost::lock_guard<boost::mutex> lock(connect_mutex_);
+    pub_mono_left_ = nh.advertise<sensor_msgs::Image>("left/image_mono", 1, connect_cb, connect_cb);
+    pub_mono_right_ = nh.advertise<sensor_msgs::Image>("right/image_mono", 1, connect_cb, connect_cb);
+    pub_color_left_ = nh.advertise<sensor_msgs::Image>("left/image_color", 1, connect_cb, connect_cb);
+    pub_color_right_ = nh.advertise<sensor_msgs::Image>("right/image_color", 1, connect_cb, connect_cb);
     pub_mono_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_mono", 1, connect_cb, connect_cb);
     pub_color_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_color", 1, connect_cb, connect_cb);
     pub_mono_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_mono", 1, connect_cb, connect_cb);
@@ -67,6 +71,10 @@ void Stereoproc::onInit()
 void Stereoproc::connectCb()
 {
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
+    connected_.DebayerMonoLeft = (pub_mono_left_.getNumSubscribers() > 0)?1:0;
+    connected_.DebayerMonoRight = (pub_mono_right_.getNumSubscribers() > 0)?1:0;
+    connected_.DebayerColorLeft = (pub_color_left_.getNumSubscribers() > 0)?1:0;
+    connected_.DebayerColorRight = (pub_color_right_.getNumSubscribers() > 0)?1:0;
     connected_.RectifyMonoLeft = (pub_mono_rect_left_.getNumSubscribers() > 0)?1:0;
     connected_.RectifyMonoRight = (pub_mono_rect_right_.getNumSubscribers() > 0)?1:0;
     connected_.RectifyColorLeft = (pub_color_rect_left_.getNumSubscribers() > 0)?1:0;
@@ -77,24 +85,20 @@ void Stereoproc::connectCb()
     int level = connected_.level();
     if (level == 0)
     {
-        sub_l_mono_image_.unsubscribe();
-        sub_l_color_image_.unsubscribe();
+        sub_l_raw_image_.unsubscribe();
         sub_l_info_.unsubscribe();
-        sub_r_mono_image_.unsubscribe();
-        sub_r_color_image_.unsubscribe();
+        sub_r_raw_image_.unsubscribe();
         sub_r_info_.unsubscribe();
     }
-    else if (!sub_l_mono_image_.getSubscriber())
+    else if (!sub_l_raw_image_.getSubscriber())
     {
         ros::NodeHandle &nh = getNodeHandle();
         // Queue size 1 should be OK; the one that matters is the synchronizer queue size.
         /// @todo Allow remapping left, right?
         image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
-        sub_l_mono_image_.subscribe(*it_, "left/image_mono", 1, hints);
-        sub_l_color_image_.subscribe(*it_, "left/image_color", 1, hints);
+        sub_l_raw_image_.subscribe(*it_, "left/image_raw", 1, hints);
         sub_l_info_ .subscribe(nh,   "left/camera_info", 1);
-        sub_r_mono_image_.subscribe(*it_, "right/image_mono", 1, hints);
-        sub_r_color_image_.subscribe(*it_, "right/image_color", 1, hints);
+        sub_r_raw_image_.subscribe(*it_, "right/image_raw", 1, hints);
         sub_r_info_ .subscribe(nh,   "right/camera_info", 1);
     }
 }
@@ -154,11 +158,9 @@ inline bool isValidPoint(const cv::Vec3f& pt)
 }
 
 void Stereoproc::imageCb(
-        const sensor_msgs::ImageConstPtr& l_mono_msg,
-        const sensor_msgs::ImageConstPtr& l_color_msg,
+        const sensor_msgs::ImageConstPtr& l_raw_msg,
         const sensor_msgs::CameraInfoConstPtr& l_info_msg,
-        const sensor_msgs::ImageConstPtr& r_mono_msg,
-        const sensor_msgs::ImageConstPtr& r_color_msg,
+        const sensor_msgs::ImageConstPtr& r_raw_msg,
         const sensor_msgs::CameraInfoConstPtr& r_info_msg)
 {
     boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
@@ -170,32 +172,68 @@ void Stereoproc::imageCb(
     model_.fromCameraInfo(l_info_msg, r_info_msg);
 
     cv::gpu::Stream l_strm, r_strm;
-    cv::gpu::GpuMat l_mono, r_mono;
-    cv::gpu::GpuMat l_color, r_color;
+    cv::gpu::GpuMat l_raw, r_raw;
     std::vector<GPUSender::Ptr> senders;
 
     // Create cv::Mat views onto all buffers
-    const cv::Mat l_cpu_mono = cv_bridge::toCvShare(
-            l_mono_msg,
-            sensor_msgs::image_encodings::MONO8)->image;
-    cv::gpu::registerPageLocked(const_cast<cv::Mat&>(l_cpu_mono));
-    const cv::Mat l_cpu_color = cv_bridge::toCvShare(
-            l_color_msg,
-            sensor_msgs::image_encodings::BGR8)->image;
-    cv::gpu::registerPageLocked(const_cast<cv::Mat&>(l_cpu_color));
-    const cv::Mat r_cpu_mono = cv_bridge::toCvShare(
-            r_mono_msg,
-            sensor_msgs::image_encodings::MONO8)->image;
-    cv::gpu::registerPageLocked(const_cast<cv::Mat&>(r_cpu_mono));
-    const cv::Mat r_cpu_color = cv_bridge::toCvShare(
-            r_color_msg,
-            sensor_msgs::image_encodings::BGR8)->image;
-    cv::gpu::registerPageLocked(const_cast<cv::Mat&>(r_cpu_color));
-    l_strm.enqueueUpload(l_cpu_mono, l_mono);
-    l_strm.enqueueUpload(l_cpu_color, l_color);
-    r_strm.enqueueUpload(r_cpu_mono, r_mono);
-    if(connected_.RectifyColorRight)
-        r_strm.enqueueUpload(r_cpu_color, r_color);
+    const cv::Mat l_cpu_raw = cv_bridge::toCvShare(
+            l_raw_msg,
+            l_raw_msg->encoding)->image;
+    cv::gpu::registerPageLocked(const_cast<cv::Mat&>(l_cpu_raw));
+    const cv::Mat r_cpu_raw = cv_bridge::toCvShare(
+            r_raw_msg,
+            l_raw_msg->encoding)->image;
+    cv::gpu::registerPageLocked(const_cast<cv::Mat&>(r_cpu_raw));
+    l_strm.enqueueUpload(l_cpu_raw, l_raw);
+    r_strm.enqueueUpload(r_cpu_raw, r_raw);
+
+    cv::gpu::GpuMat l_mono;
+    if(connected_.DebayerMonoLeft || connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
+    {
+        cv::gpu::demosaicing(l_raw, l_mono, CV_BayerRG2GRAY, 1, l_strm);
+    }
+    if(connected_.DebayerMonoLeft)
+    {
+       GPUSender::Ptr t(new GPUSender(l_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_left_));
+       senders.push_back(t);
+       t->enqueueSend(l_mono, l_strm);
+    }
+
+    cv::gpu::GpuMat r_mono;
+    if(connected_.DebayerMonoRight || connected_.RectifyMonoRight || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
+    {
+        cv::gpu::demosaicing(r_raw, r_mono, CV_BayerRG2GRAY, 1, r_strm);
+    }
+    if(connected_.DebayerMonoRight)
+    {
+       GPUSender::Ptr t(new GPUSender(r_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_right_));
+       senders.push_back(t);
+       t->enqueueSend(r_mono, r_strm);
+    }
+
+    cv::gpu::GpuMat l_color;
+    if(connected_.DebayerColorLeft || connected_.RectifyColorLeft || connected_.Pointcloud)
+    {
+        cv::gpu::demosaicing(l_raw, l_color, CV_BayerRG2BGR, 3, l_strm);
+    }
+    if(connected_.DebayerColorLeft)
+    {
+       GPUSender::Ptr t(new GPUSender(l_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_left_));
+       senders.push_back(t);
+       t->enqueueSend(l_color, l_strm);
+    }
+
+    cv::gpu::GpuMat r_color;
+    if(connected_.DebayerColorRight || connected_.RectifyColorRight)
+    {
+        cv::gpu::demosaicing(r_raw, r_color, CV_BayerRG2BGR, 3, r_strm);
+    }
+    if(connected_.DebayerColorRight)
+    {
+       GPUSender::Ptr t(new GPUSender(r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_right_));
+       senders.push_back(t);
+       t->enqueueSend(r_color, r_strm);
+    }
 
     cv::gpu::GpuMat l_rect_mono, r_rect_mono;
     if(connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
@@ -209,14 +247,14 @@ void Stereoproc::imageCb(
 
     if(connected_.RectifyMonoLeft)
     {
-       GPUSender::Ptr t(new GPUSender(l_mono_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_left_));
+       GPUSender::Ptr t(new GPUSender(l_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_left_));
        senders.push_back(t);
        t->enqueueSend(l_rect_mono, l_strm);
     }
 
     if(connected_.RectifyMonoRight)
     {
-       GPUSender::Ptr t(new GPUSender(r_mono_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_right_));
+       GPUSender::Ptr t(new GPUSender(r_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_right_));
        senders.push_back(t);
        t->enqueueSend(r_rect_mono, r_strm);
     }
@@ -233,14 +271,14 @@ void Stereoproc::imageCb(
 
     if(connected_.RectifyColorLeft)
     {
-       GPUSender::Ptr t(new GPUSender(l_color_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_left_));
+       GPUSender::Ptr t(new GPUSender(l_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_left_));
        senders.push_back(t);
        t->enqueueSend(l_rect_color, l_strm);
     }
 
     if(connected_.RectifyColorRight)
     {
-       GPUSender::Ptr t(new GPUSender(r_color_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_right_));
+       GPUSender::Ptr t(new GPUSender(r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_right_));
        senders.push_back(t);
        t->enqueueSend(r_rect_color, r_strm);
     }
@@ -322,11 +360,11 @@ void Stereoproc::imageCb(
 
     if(connected_.DisparityVis)
     {
-        GPUSender::Ptr t(new GPUSender(l_color_msg,
+        GPUSender::Ptr t(new GPUSender(l_raw_msg,
                     sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_));
         senders.push_back(t);
-        cv::gpu::GpuMat disparity_int(l_cpu_color.size(), CV_16SC1);
-        cv::gpu::GpuMat disparity_image(l_cpu_color.size(), CV_8UC4);
+        cv::gpu::GpuMat disparity_int(l_cpu_raw.size(), CV_16SC1);
+        cv::gpu::GpuMat disparity_image(l_cpu_raw.size(), CV_8UC4);
         if(disparity.type() == CV_32F)
             l_strm.enqueueConvert(disparity, disparity_int, CV_16SC1, 16, 0);
         else
@@ -351,8 +389,10 @@ void Stereoproc::imageCb(
         model_.projectDisparityImageTo3dGPU(disparity, xyzw, true, l_strm);
         cv::gpu::CudaMem cuda_xyzw;
         l_strm.enqueueDownload(xyzw, cuda_xyzw);
+        cv::Mat l_cpu_color;
+        l_strm.enqueueDownload(l_color, l_cpu_color);
         sensor_msgs::PointCloud2Ptr points_msg = boost::make_shared<sensor_msgs::PointCloud2>();
-        points_msg->header = l_mono_msg->header;
+        points_msg->header = l_raw_msg->header;
         points_msg->height = xyzw.rows;
         points_msg->width  = xyzw.cols;
         points_msg->fields.resize (4);
@@ -405,56 +445,23 @@ void Stereoproc::imageCb(
 
         // Fill in color
         namespace enc = sensor_msgs::image_encodings;
-        const std::string& encoding = l_color_msg->encoding;
         offset = 0;
-        if(encoding == enc::RGB8)
+        const cv::Mat_<cv::Vec3b> color(l_cpu_color);
+        for (int v = 0; v < cpu_xyzw.rows; ++v)
         {
-            const cv::Mat_<cv::Vec3b> color(l_color_msg->height, l_color_msg->width,
-                    (cv::Vec3b*)&l_color_msg->data[0],
-                    l_color_msg->step);
-            for (int v = 0; v < cpu_xyzw.rows; ++v)
+            for (int u = 0; u < cpu_xyzw.cols; ++u, offset += STEP)
             {
-                for (int u = 0; u < cpu_xyzw.cols; ++u, offset += STEP)
+                if (isValidPoint(cpu_xyzw(v,u)))
                 {
-                    if (isValidPoint(cpu_xyzw(v,u)))
-                    {
-                        const cv::Vec3b& rgb = color(v,u);
-                        int32_t rgb_packed = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
-                        memcpy (&points_msg->data[offset + 12], &rgb_packed, sizeof (int32_t));
-                    }
-                    else
-                    {
-                        memcpy (&points_msg->data[offset + 12], &bad_point, sizeof (float));
-                    }
+                    const cv::Vec3b& bgr = color(v,u);
+                    int32_t rgb_packed = (bgr[2] << 16) | (bgr[1] << 8) | bgr[0];
+                    memcpy (&points_msg->data[offset + 12], &rgb_packed, sizeof (int32_t));
+                }
+                else
+                {
+                    memcpy (&points_msg->data[offset + 12], &bad_point, sizeof (float));
                 }
             }
-        }
-        else if (encoding == enc::BGR8)
-        {
-            const cv::Mat_<cv::Vec3b> color(l_color_msg->height, l_color_msg->width,
-                    (cv::Vec3b*)&l_color_msg->data[0],
-                    l_color_msg->step);
-            for (int v = 0; v < cpu_xyzw.rows; ++v)
-            {
-                for (int u = 0; u < cpu_xyzw.cols; ++u, offset += STEP)
-                {
-                    if (isValidPoint(cpu_xyzw(v,u)))
-                    {
-                        const cv::Vec3b& bgr = color(v,u);
-                        int32_t rgb_packed = (bgr[2] << 16) | (bgr[1] << 8) | bgr[0];
-                        memcpy (&points_msg->data[offset + 12], &rgb_packed, sizeof (int32_t));
-                    }
-                    else
-                    {
-                        memcpy (&points_msg->data[offset + 12], &bad_point, sizeof (float));
-                    }
-                }
-            }
-        }
-        else
-        {
-            NODELET_WARN_THROTTLE(30, "Could not fill color channel of the point cloud, "
-                    "unsupported encoding '%s'", encoding.c_str());
         }
 
         pub_pointcloud_.publish(points_msg);
@@ -465,10 +472,8 @@ void Stereoproc::imageCb(
     r_strm.waitForCompletion();
     if(connected_.Disparity)
         cv::gpu::unregisterPageLocked(disp_msg_data_);
-    cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(l_cpu_mono) );
-    cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(l_cpu_color) );
-    cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(r_cpu_mono) );
-    cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(r_cpu_color) );
+    cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(l_cpu_raw) );
+    cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(r_cpu_raw) );
 }
 
 void Stereoproc::sendDisparity(void)

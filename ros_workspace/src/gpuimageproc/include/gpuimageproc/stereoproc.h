@@ -25,13 +25,12 @@ class Stereoproc : public nodelet::Nodelet
   boost::shared_ptr<image_transport::ImageTransport> it_;
   
   // Subscriptions
-  image_transport::SubscriberFilter sub_l_mono_image_, sub_r_mono_image_;
-  image_transport::SubscriberFilter sub_l_color_image_, sub_r_color_image_;
+  image_transport::SubscriberFilter sub_l_raw_image_, sub_r_raw_image_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> sub_l_info_, sub_r_info_;
-  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo,
-          sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> ExactPolicy;
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo,
-          sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> ApproximatePolicy;
+  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::CameraInfo,
+          sensor_msgs::Image, sensor_msgs::CameraInfo> ExactPolicy;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo,
+          sensor_msgs::Image, sensor_msgs::CameraInfo> ApproximatePolicy;
   typedef message_filters::Synchronizer<ExactPolicy> ExactSync;
   typedef message_filters::Synchronizer<ApproximatePolicy> ApproximateSync;
   boost::shared_ptr<ExactSync> exact_sync_;
@@ -40,8 +39,9 @@ class Stereoproc : public nodelet::Nodelet
   // Publications
   boost::mutex connect_mutex_;
   ros::Publisher pub_mono_left_;
-  sensor_msgs::Image::Ptr l_mono_msg;
-  cv::Mat l_mono_msg_data;
+  ros::Publisher pub_mono_right_;
+  ros::Publisher pub_color_left_;
+  ros::Publisher pub_color_right_;
   ros::Publisher pub_mono_rect_left_;
   ros::Publisher pub_mono_rect_right_;
   ros::Publisher pub_color_rect_left_;
@@ -70,8 +70,8 @@ class Stereoproc : public nodelet::Nodelet
 
   void connectCb();
 
-  void imageCb(const sensor_msgs::ImageConstPtr& l_mono_msg, const sensor_msgs::ImageConstPtr& l_color_msg, const sensor_msgs::CameraInfoConstPtr& l_info_msg,
-               const sensor_msgs::ImageConstPtr& r_mono_msg, const sensor_msgs::ImageConstPtr& r_color_msg, const sensor_msgs::CameraInfoConstPtr& r_info_msg);
+  void imageCb(const sensor_msgs::ImageConstPtr& l_raw_msg, const sensor_msgs::CameraInfoConstPtr& l_info_msg,
+               const sensor_msgs::ImageConstPtr& r_raw_msg, const sensor_msgs::CameraInfoConstPtr& r_info_msg);
 
   void configCb(Config &config, uint32_t level);
 
