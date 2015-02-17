@@ -386,18 +386,18 @@ void Stereoproc::imageCb(
         }
     }
 
-    cv::gpu::GpuMat xyzw;
+    cv::gpu::GpuMat xyz;
     if(connected_.Pointcloud)
     {
-        model_.projectDisparityImageTo3dGPU(disparity, xyzw, true, l_strm);
-        cv::gpu::CudaMem cuda_xyzw;
-        l_strm.enqueueDownload(xyzw, cuda_xyzw);
-        cv::Mat l_cpu_color;
+        model_.projectDisparityImageTo3dGPU(disparity, xyz, true, l_strm);
+        cv::gpu::CudaMem cuda_xyz(l_cpu_raw.size(), CV_32FC3);
+        l_strm.enqueueDownload(xyz, cuda_xyz);
+        cv::Mat l_cpu_color(l_cpu_raw.size(), CV_8UC3);
         l_strm.enqueueDownload(l_color, l_cpu_color);
         sensor_msgs::PointCloud2Ptr points_msg = boost::make_shared<sensor_msgs::PointCloud2>();
         points_msg->header = l_raw_msg->header;
-        points_msg->height = xyzw.rows;
-        points_msg->width  = xyzw.cols;
+        points_msg->height = l_cpu_raw.rows;
+        points_msg->width  = l_cpu_raw.cols;
         points_msg->fields.resize (4);
         points_msg->fields[0].name = "x";
         points_msg->fields[0].offset = 0;
@@ -423,19 +423,19 @@ void Stereoproc::imageCb(
         points_msg->is_dense = false; // there may be invalid points
 
         l_strm.waitForCompletion();
-        cv::Mat_<cv::Vec3f> cpu_xyzw = cuda_xyzw.createMatHeader();
+        cv::Mat_<cv::Vec3f> cpu_xyz = cuda_xyz.createMatHeader();
         float bad_point = std::numeric_limits<float>::quiet_NaN ();
         int offset = 0;
-        for (int v = 0; v < cpu_xyzw.rows; ++v)
+        for (int v = 0; v < cpu_xyz.rows; ++v)
         {
-            for (int u = 0; u < cpu_xyzw.cols; ++u, offset += STEP)
+            for (int u = 0; u < cpu_xyz.cols; ++u, offset += STEP)
             {
-                if (isValidPoint(cpu_xyzw(v,u)))
+                if (isValidPoint(cpu_xyz(v,u)))
                 {
                     // x,y,z,rgba
-                    memcpy (&points_msg->data[offset + 0], &cpu_xyzw(v,u)[0], sizeof (float));
-                    memcpy (&points_msg->data[offset + 4], &cpu_xyzw(v,u)[1], sizeof (float));
-                    memcpy (&points_msg->data[offset + 8], &cpu_xyzw(v,u)[2], sizeof (float));
+                    memcpy (&points_msg->data[offset + 0], &cpu_xyz(v,u)[0], sizeof (float));
+                    memcpy (&points_msg->data[offset + 4], &cpu_xyz(v,u)[1], sizeof (float));
+                    memcpy (&points_msg->data[offset + 8], &cpu_xyz(v,u)[2], sizeof (float));
                 }
                 else
                 {
@@ -447,14 +447,13 @@ void Stereoproc::imageCb(
         }
 
         // Fill in color
-        namespace enc = sensor_msgs::image_encodings;
         offset = 0;
         const cv::Mat_<cv::Vec3b> color(l_cpu_color);
-        for (int v = 0; v < cpu_xyzw.rows; ++v)
+        for (int v = 0; v < cpu_xyz.rows; ++v)
         {
-            for (int u = 0; u < cpu_xyzw.cols; ++u, offset += STEP)
+            for (int u = 0; u < cpu_xyz.cols; ++u, offset += STEP)
             {
-                if (isValidPoint(cpu_xyzw(v,u)))
+                if (isValidPoint(cpu_xyz(v,u)))
                 {
                     const cv::Vec3b& bgr = color(v,u);
                     int32_t rgb_packed = (bgr[2] << 16) | (bgr[1] << 8) | bgr[0];
