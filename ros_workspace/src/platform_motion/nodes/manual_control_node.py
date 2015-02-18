@@ -19,7 +19,6 @@ import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn.util as util
-import motion_planning.simple_motion as simple_motion
 
 from samplereturn_msgs.msg import VoiceAnnouncement
 
@@ -47,7 +46,6 @@ class ManualController(object):
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
  
-        #get a simple_mover, it's parameters are inside a rosparam tag for this node
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
     
@@ -62,17 +60,10 @@ class ManualController(object):
         self.state_machine.userdata.light_state = False
         self.state_machine.userdata.search_camera_state = True
 
-        # disable obstacle checking in ExecuteSimpleMove
-        self.state_machine.userdata.active_strafe_key = None
-
         #strafe search settings
-        self.state_machine.userdata.settle_time = 1
-        #set move tolerance huge, this prevent retrying by the simple mover
-        self.state_machine.userdata.simple_move_tolerance = 1.0
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
-        self.state_machine.userdata.velocity = None
-        
+
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
@@ -81,6 +72,7 @@ class ManualController(object):
             
             MODE_JOYSTICK = platform_srv.SelectMotionModeRequest.MODE_JOYSTICK
             MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
+            MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
             MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
             MODE_RESUME = platform_srv.SelectMotionModeRequest.MODE_RESUME
             MODE_HOME = platform_srv.SelectMotionModeRequest.MODE_HOME
@@ -113,16 +105,16 @@ class ManualController(object):
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
-                                   transitions = {'visual_servo_requested':'SELECT_SERVO',
+                                   transitions = {'visual_servo_requested':'SELECT_PLANNER',
                                                   'manipulator_grab_requested':'MANIPULATOR_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
                                                   'aborted':'MANUAL_ABORTED'})           
             
-            smach.StateMachine.add('SELECT_SERVO',
+            smach.StateMachine.add('SELECT_PLANNER',
                                    SelectMotionMode(self.CAN_interface,
-                                                    MODE_SERVO),
+                                                    MODE_PLANNER),
                                    transitions = {'next':'VISUAL_SERVO',
                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
@@ -141,7 +133,7 @@ class ManualController(object):
                                                   'sample_detected':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED',
                                                   },
-                                   remapping = {'stop_on_sample':'true'})
+                                   remapping = {'stop_on_sample':'false'})
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
