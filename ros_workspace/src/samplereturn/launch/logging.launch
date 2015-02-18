@@ -20,6 +20,7 @@
       output="log"
       args="tf
             tf_static
+            diagnostics
             /cameras/navigation/center/right/image_raw
             /cameras/navigation/center/right/camera_info
             /cameras/navigation/center/left/image_raw
@@ -31,14 +32,19 @@
             /io/battery_voltage
             /io/gpio_read
             /io/gpio_write
+            /io/current_motion_mode
             /io/joy
-            /io/phidgets/spatial
+            /io/pause_state
             /motion/odometry
             /motion/platform_joint_state
             /motion/carousel/angle
             /motion/CAN/status_word
-            /process/planner/move_base/goal
-            /process/planner/mover/current_goal
+            /motion/carousel/angle
+            /motion/current_motion_mode
+            /motion/joystick_command
+            /motion/manipulator/motor_states/ttyUSB0
+            /motion/planner_command
+            /motion/servo_command
             "
       >
   </node>
@@ -56,6 +62,7 @@
              /cameras/navigation/port/left/camera_info
              /cameras/search/image
              /cameras/search/info
+             /cameras/search/status
              /cameras/manipulator/left/image_raw
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
