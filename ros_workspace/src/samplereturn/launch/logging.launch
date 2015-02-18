@@ -35,6 +35,12 @@
             /io/current_motion_mode
             /io/joy
             /io/pause_state
+            /io/imu_0/data_raw
+            /io/imu_0/is_calibrated
+            /io/imu_0/mag
+            /io/imu_1/data_raw
+            /io/imu_1/is_calibrated
+            /io/imu_1/mag
             /motion/odometry
             /motion/platform_joint_state
             /motion/carousel/angle
