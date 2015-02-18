@@ -3,13 +3,35 @@
 <launch>
     <arg name="run_cameras" default="true"/>
 
-    <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
+    <!-- special-case for port, cameras are plugged in to search -->
+    <!-- this manager runs the port cameras on search -->
+    <node if="$(arg run_cameras)"
+          name="port_search_manager"
+          machine="search"
+          pkg="nodelet"
+          type="nodelet"
+          args="manager"
+          ns="/cameras/navigation/port"
+          output="log"
+          respawn_delay="25.0"
+          respawn="true">
+    </node>
+    <!-- load up cameras only on search (run_processing=false) -->
+    <include file="$(find samplereturn)/launch/camera_pair.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="machine" value="search"/>
         <arg name="namespace" value="port"/>
+        <arg name="manager_name" value="port_search_manager"/>
         <arg name="left_guid" value="00b09d0100a85719"/>
         <arg name="right_guid" value="00b09d0100bb69f3"/>
         <arg name="strobe" value="true"/>
-        <arg name="machine" value="search"/>
+        <arg name="run_processing" value="false"/>
+    </include>
+    <!-- load up the processing for port -->
+    <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
+        <arg name="run_cameras" value="false"/>
+        <arg name="machine" value="navigate"/>
+        <arg name="namespace" value="port"/>
     </include>
 
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">

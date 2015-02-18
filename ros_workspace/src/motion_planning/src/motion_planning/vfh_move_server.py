@@ -69,6 +69,7 @@ class VFHMoveServer( object ):
         self._goal_local = None
         self._target_point_odom = None
         self._start_point = None
+        self._orient_at_target = False
  
         #costmap crap
         self.costmap = None
@@ -147,6 +148,7 @@ class VFHMoveServer( object ):
             return
         self._goal_local = goal_local
         self._goal_odom = goal_odom
+        self._orient_at_target = bool(goal.orient_at_target)
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
         
@@ -156,13 +158,13 @@ class VFHMoveServer( object ):
 
         #if the action server is inactive, fire up a movement thread
         if not active:
-            rospy.loginfo("VFH Server not active, goal received, starting.")
+            rospy.logdebug("VFH Server not active, goal received, starting.")
             self.stop_requested = False
             self.execute_thread = threading.Thread(target=self.execute_movement,
                                                    args=(velocity,));
             self.execute_thread.start();
         else:
-            rospy.loginfo("VFH Server active, self._goal_odom updated.")
+            rospy.logdebug("VFH Server active, self._goal_odom updated.")
         
     #called by the AS when new goal received, and also when preempted
     def preempt_cb(self):
@@ -186,7 +188,7 @@ class VFHMoveServer( object ):
         dyaw = np.arctan2( self._goal_local.pose.position.y,
                            self._goal_local.pose.position.x)
         if np.abs(dyaw) > self._goal_orientation_tolerance:
-            rospy.loginfo("VFH Rotating to heading by %f.", dyaw)
+            rospy.logdebug("VFH Rotating to heading by %f.", dyaw)
             self._mover.execute_spin(dyaw,
                     stop_function=self.is_stop_requested)
             if self.exit_check(): return
@@ -205,8 +207,8 @@ class VFHMoveServer( object ):
 
         # turn to requested orientation
         dyaw = self.yaw_error()
-        if np.abs(dyaw) > self._goal_orientation_tolerance:
-            rospy.loginfo("VFH Rotating to goal yaw %f.", dyaw)
+        if self._orient_at_target and (np.abs(dyaw) > self._goal_orientation_tolerance):
+            rospy.logdebug("VFH Rotating to goal yaw %f.", dyaw)
             self._mover.execute_spin(dyaw,
                     stop_function=self.is_stop_requested)
             if self.exit_check(): return
@@ -280,7 +282,7 @@ class VFHMoveServer( object ):
                                                       self._start_point,
                                                       self._target_point_odom.point)
         if (dist_off_course > 5.0):
-            rospy.loginfo("VFH more than 5.0m off course, stopping: {!s}, {!s}, {!s}, {!s}".format(
+            rospy.logdebug("VFH more than 5.0m off course, stopping: {!s}, {!s}, {!s}, {!s}".format(
                                                       dist_off_course,
                                                       geometry_msg.Point(*robot_position),
                                                       self._start_point,
@@ -288,10 +290,10 @@ class VFHMoveServer( object ):
             self._action_outcome = VFHMoveResult.OFF_COURSE
             self._mover.stop()
                     
-        #if the target is not in the active window, we are probably way off course,
-        #or possibly trying to drive too far around an obstacle near the target: stop!
+        #if the target is not in the active window, we are probably close to it,
+        #but locally blocked: stop!
         if not 0 <= target_index < len(self.sectors):
-            self._action_outcome = VFHMoveResult.OFF_COURSE
+            self._action_outcome = VFHMoveResult.MISSED_TARGET
             self._mover.stop()
             if target_index < 0: target_index = 0
             if target_index >= len(self.sectors): target_index = len(self.sectors)
@@ -341,7 +343,7 @@ class VFHMoveServer( object ):
 
         #stop the mover if the path is blocked.  This is an estop situation!
         if np.all(self.sectors):
-            rospy.loginfo("VFH all blocked, estop!")
+            rospy.logdebug("VFH all blocked, estop!")
             self._action_outcome = VFHMoveResult.BLOCKED
             self._mover.estop()
 

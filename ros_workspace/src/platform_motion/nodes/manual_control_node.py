@@ -41,11 +41,15 @@ class ManualController(object):
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
+        self.search_camera_enable = rospy.ServiceProxy('enable_search',
+                platform_srv.Enable,
+                persistent=True)
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
  
         #get a simple_mover, it's parameters are inside a rosparam tag for this node
-        self.simple_mover = simple_motion.SimpleMover('~simple_move_params/', self.tf)
+        self.simple_mover = actionlib.SimpleActionClient("simple_move",
+                                                       samplereturn_msg.SimpleMoveAction)
     
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],
@@ -55,7 +59,8 @@ class ManualController(object):
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.paused = False
-        state = self.state_machine.userdata.light_state = False
+        self.state_machine.userdata.light_state = False
+        self.state_machine.userdata.search_camera_state = True
 
         # disable obstacle checking in ExecuteSimpleMove
         self.state_machine.userdata.active_strafe_key = None
@@ -84,10 +89,11 @@ class ManualController(object):
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
            
             smach.StateMachine.add('START_MANUAL_CONTROL',
-                                   ProcessGoal(self.announcer),
+                                   ProcessGoal(self.announcer,
+                                       self.search_camera_enable),
                                    transitions = {'valid_goal':'SELECT_JOYSTICK',
                                                  'invalid_goal':'MANUAL_ABORTED'})
-            
+
             smach.StateMachine.add('SELECT_JOYSTICK',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_JOYSTICK),
@@ -187,12 +193,14 @@ class ManualController(object):
                                    transitions = {'next':'SELECT_JOYSTICK'})
 
             smach.StateMachine.add('MANUAL_PREEMPTED',
-                                     ManualPreempted(self.CAN_interface),
+                                     ManualPreempted(self.CAN_interface,
+                                                     self.search_camera_enable),
                                      transitions = {'complete':'preempted',
                                                    'fail':'aborted'})
 
             smach.StateMachine.add('MANUAL_ABORTED',
-                                    ManualAborted(self.CAN_interface),
+                                    ManualAborted(self.CAN_interface,
+                                                  self.search_camera_enable),
                                     transitions = {'recover':'SELECT_JOYSTICK',
                                                    'fail':'aborted'})
 
@@ -300,6 +308,15 @@ class ManualController(object):
         if self.joy_state.button('BUTTON_LIGHTS'):
             self.state_machine.userdata.light_state ^= True
             self.CAN_interface.set_search_lights(self.state_machine.userdata.light_state)
+        if self.joy_state.button('BUTTON_SEARCH_CAMERA'):
+            newstate = self.state_machine.userdata.search_camera_state^True
+            try:
+                self.search_camera_enable(newstate)
+                self.state_machine.userdata.search_camera_state = newstate
+            except (rospy.ServiceException, rospy.ROSSerializationException,
+                    TypeError), e:
+                rospy.logerr("Unable to set search camera enable %s: %s",
+                            newstate, e)
         
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -315,7 +332,7 @@ class ManualController(object):
         rospy.logwarn("MANUAL CONTROL STATE MACHINE EXIT")
    
 class ProcessGoal(smach.State):
-    def __init__(self, announcer):
+    def __init__(self, announcer, search_camera_enable):
         smach.State.__init__(self,
                              outcomes=['valid_goal',
                                        'invalid_goal'],
@@ -323,9 +340,11 @@ class ProcessGoal(smach.State):
                              output_keys=['action_result',
                                           'action_feedback',
                                           'allow_driving',
-                                          'allow_manipulator'])
+                                          'allow_manipulator',
+                                          'search_camera_state'])
         
         self.announcer = announcer
+        self.search_camera_enable = search_camera_enable
             
     def execute(self, userdata):
         
@@ -352,7 +371,14 @@ class ProcessGoal(smach.State):
             self.announcer.say("Manipulator enabled.")
         else:
             return 'invalid_goal'
-                        
+
+        try:
+            self.search_camera_enable(False)
+            userdata.search_camera_state = False
+        except (rospy.ServiceException,
+                rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("Unable to disable search camera: %s", e)
+
         return 'valid_goal'
 
 class JoystickListen(smach.State):
@@ -571,14 +597,22 @@ class InterruptibleActionClientState(smach.State):
 
 
 class ManualPreempted(smach.State):
-    def __init__(self, CAN_interface):
+    def __init__(self, CAN_interface, search_camera_enable):
         smach.State.__init__(self, outcomes=['complete','fail'],
                                    output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
+        self.search_camera_enable = search_camera_enable
         
     def execute(self, userdata):
-        
+
+        try:
+            self.search_camera_enable(True)
+        except (rospy.ServiceException,
+                rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("Unable to re-enable search camera: %s", e)
+
+
         #we are preempted by the top state machine
         #set motion mode to None and exit
         self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_PAUSE)
@@ -591,13 +625,20 @@ class ManualPreempted(smach.State):
         return 'complete'
 
 class ManualAborted(smach.State):
-    def __init__(self, CAN_interface):
+    def __init__(self, CAN_interface, search_camera_enable):
         smach.State.__init__(self, outcomes=['recover','fail'],
                                    output_keys=['action_result'])
         
         self.CAN_interface = CAN_interface
+        self.search_camera_enable = search_camera_enable
         
     def execute(self, userdata):
+        try:
+            self.search_camera_enable(True)
+        except (rospy.ServiceException,
+                rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("Unable to re-enable search camera: %s", e)
+
         result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
         
