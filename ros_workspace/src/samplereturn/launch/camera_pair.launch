@@ -8,6 +8,7 @@
     <arg name="left_guid"/>
     <arg name="right_guid"/>
     <arg name="strobe"/>
+    <arg name="run_processing" default="true"/>
     <group if="$(arg run_cameras)">
         <node name="left"
               machine="$(arg machine)"
@@ -104,63 +105,64 @@
         </node>
     </group>
 
-    <!-- Debayer -->
-    <node name="debayer"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/debayer /cameras/navigation/$(arg namespace)/$(arg manager_name)"
-          ns="/cameras/navigation/$(arg namespace)/left"
-          respawn_delay="30.0"
-          respawn="true">
-    </node>
-    <node name="debayer"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/debayer /cameras/navigation/$(arg namespace)/$(arg manager_name)"
-          ns="/cameras/navigation/$(arg namespace)/right"
-          respawn_delay="30.0"
-          respawn="true">
-    </node>
+    <group if="$(arg run_processing)">
+        <!-- Debayer -->
+        <node name="debayer"
+            machine="$(arg machine)"
+            pkg="nodelet"
+            type="nodelet"
+            args="load image_proc/debayer /cameras/navigation/$(arg namespace)/$(arg manager_name)"
+            ns="/cameras/navigation/$(arg namespace)/left"
+            respawn_delay="30.0"
+            respawn="true">
+        </node>
+        <node name="debayer"
+            machine="$(arg machine)"
+            pkg="nodelet"
+            type="nodelet"
+            args="load image_proc/debayer /cameras/navigation/$(arg namespace)/$(arg manager_name)"
+            ns="/cameras/navigation/$(arg namespace)/right"
+            respawn_delay="30.0"
+            respawn="true">
+        </node>
 
-    <!-- Rectify images -->
-    <node name="rect"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
-          ns="/cameras/navigation/$(arg namespace)/left"
-          output="log"
-          respawn_delay="30.0"
-          respawn="true">
-          <param name="queue_size" type="int" value="1"/>
-    </node>
-    <node name="rect_color"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
-          ns="/cameras/navigation/$(arg namespace)/left"
-          output="log"
-          respawn_delay="30.0"
-          respawn="true">
-        <remap from="image_mono" to="image_color"/>
-        <remap from="image_rect" to="image_rect_color"/>
-          <param name="queue_size" type="int" value="1"/>
-    </node>
-    <node name="rect"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
-          ns="/cameras/navigation/$(arg namespace)/right"
-          output="log"
-          respawn_delay="30.0"
-          respawn="true">
-          <param name="queue_size" type="int" value="1"/>
-      </node>
-      <!--
+        <!-- Rectify images -->
+        <node name="rect"
+            machine="$(arg machine)"
+            pkg="nodelet"
+            type="nodelet"
+            args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
+            ns="/cameras/navigation/$(arg namespace)/left"
+            output="log"
+            respawn_delay="30.0"
+            respawn="true">
+            <param name="queue_size" type="int" value="1"/>
+        </node>
+        <node name="rect_color"
+            machine="$(arg machine)"
+            pkg="nodelet"
+            type="nodelet"
+            args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
+            ns="/cameras/navigation/$(arg namespace)/left"
+            output="log"
+            respawn_delay="30.0"
+            respawn="true">
+            <remap from="image_mono" to="image_color"/>
+            <remap from="image_rect" to="image_rect_color"/>
+            <param name="queue_size" type="int" value="1"/>
+        </node>
+        <node name="rect"
+            machine="$(arg machine)"
+            pkg="nodelet"
+            type="nodelet"
+            args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
+            ns="/cameras/navigation/$(arg namespace)/right"
+            output="log"
+            respawn_delay="30.0"
+            respawn="true">
+            <param name="queue_size" type="int" value="1"/>
+        </node>
+        <!--
     <node name="rect_color"
           machine="$(arg machine)"
           pkg="nodelet"
@@ -178,14 +180,14 @@
 
     <!-- Compute Stereo -->
     <node name="stereo_image_disparity"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load stereo_image_proc/disparity $(arg manager_name)"
-          ns="/cameras/navigation/$(arg namespace)"
-          output="log"
-          respawn_delay="30.0"
-          respawn="true">
+        machine="$(arg machine)"
+        pkg="nodelet"
+        type="nodelet"
+        args="load stereo_image_proc/disparity $(arg manager_name)"
+        ns="/cameras/navigation/$(arg namespace)"
+        output="log"
+        respawn_delay="30.0"
+        respawn="true">
         <param name="correlation_window_size" type="int" value="17"/>
         <param name="min_disparity" type="int" value="0"/>
         <param name="disparity_range" type="int" value="128"/>
@@ -193,5 +195,5 @@
         <param name="texture_threshold" type="int" value="1000"/>
         <param name="approximate_sync" type="bool" value="true"/>
     </node>
-
+    </group>
 </launch>

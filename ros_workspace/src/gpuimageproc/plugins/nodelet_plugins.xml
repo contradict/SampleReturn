@@ -1,0 +1,7 @@
+<library path="lib/libgpuimageproc">
+    <class name="gpuimageproc/Stereoproc" type="gpuimageproc::Stereoproc" base_class_type="nodelet::Nodelet">
+        <description>
+            Runs stereo image pipeline on GPU
+        </description>
+    </class>
+</library>
