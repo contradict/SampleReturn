@@ -12,14 +12,26 @@
           output="log"
           ns="/processes">
 
-        <param name="odometry_frame" value="$(arg odometry_frame)"/>
-        <param name="lethal_threshold" type="int" value="90"/>
-
         <remap from="odometry" to="/motion/odometry"/>
         <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+
+        <!-- general params-->
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="goal_orientation_tolerance" value="4"/><!--degrees!-->
         
+        <!--VFH algorithm parameters, angles in degrees -->
+        <param name="active_window" value="120"/>
+        <param name="sector_angle" value="5"/>
+        <param name="min_obstacle_distance" value="0.2"/>
+        <param name="max_obstacle_distance" value="6.0"/>
+        <param name="u_goal" value="5.0"/><!--cost multiplier for angle from goal-->
+        <param name="u_current" value="3.0"/><!--cost multiplier for angle from current angle-->
+        <param name="lethal_threshold" type="int" value="90"/>
+        <param name="threshold_high" value="2000"/>
+        <param name="threshold_low" value="1000"/>
+
         <rosparam>
             simple_motion_params:
                 max_velocity: 0.75

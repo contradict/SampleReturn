@@ -15,7 +15,6 @@ import nav_msgs.msg as nav_msg
 import visualization_msgs.msg as vis_msg
 import geometry_msgs.msg as geometry_msg
 
-
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Pose, PoseStamped, Point, PointStamped, Quaternion
@@ -47,14 +46,15 @@ class VFHMoveServer( object ):
         
         rospy.on_shutdown(self.shutdown_cb)
         self.shutdown=False
-        self.publish_debug=True
         
-        self._goal_orientation_tolerance = \
-                rospy.get_param("~goal_orientation_tolerance", 0.05)
-        self._lethal_threshold = rospy.get_param("~lethal_threshold", 100)
-        self.odometry_frame = rospy.get_param("~odometry_frame")
+        node_params = util.get_node_params()
+        self.publish_debug=True
+
+        self.odometry_frame = node_params.odometry_frame
         self._mover = SimpleMover("~vfh_motion_params/")
+        self._tf = tf.TransformListener()
  
+        #action server stuff
         self._as = actionlib.SimpleActionServer("vfh_move",
                                                 VFHMoveAction,
                                                 auto_start=False)
@@ -63,8 +63,8 @@ class VFHMoveServer( object ):
         self._as.register_preempt_callback(self.preempt_cb)
         self._action_outcome = None
 
-        self._tf = tf.TransformListener()
-
+        #goal flags and params
+        self._goal_orientation_tolerance = node_params.goal_orientation_tolerance
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
@@ -73,46 +73,42 @@ class VFHMoveServer( object ):
  
         #costmap crap
         self.costmap = None
-        
         self.costmap_listener = rospy.Subscriber('local_costmap',
                                 nav_msg.OccupancyGrid,
                                 self.handle_costmap)
-        
         self.costmap_info = None
         self.costmap_header = None
  
-        #vfh params
+        #vfh flags
         self.vfh_running = False
         self.stop_requested = False
 
-        self.sector_angle = np.radians(5.0)
-        self.active_window = np.radians(120)
-        #sector count, 1 more than window/angle
+        #VFH algorithm params
+        self._lethal_threshold = node_params.lethal_threshold
+        self.sector_angle = np.radians(node_params.sector_angle)
+        self.active_window = np.radians(node_params.active_window)
+        #cost coefficients
+        self.u_goal = 5 #cost multiplier for angular difference to target_angle
+        self.u_current = 3 #cost multiplier for angular difference from current angle
+        #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
+        #so that obstacles produce zero cost at a range of dmax.  Seems like b=1 is fine...
+        #so I am replacing this with a=dmax
+        self.max_obstacle_distance = 6.0 #this is dmax
+        self.min_obstacle_distance = 0.5 #min. dist. to consider for obstacles                
+        
+        #setup sectors
         self.sector_count = int(self.active_window/self.sector_angle) + 1
         #offset from first sector in array to the robot zero sector
         self.zero_offset = int(self.active_window/(self.sector_angle * 2))
         #sectors are free if 0, or blocked if 1, start with all free!
         self.sectors = np.zeros(self.sector_count, dtype=np.bool)
-        
-        self.min_obstacle_distance = 0.5 #minimum distance at which to check for obstacles
-        
-        #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
-        #so that obstacles produce zero cost at a range of dmax
-        self.max_obstacle_distance = 6.0  #this is dmax
-        self.const_b = 1 #uuuuh, if this is 1 then a = dmax... is that cool?
-        self.const_a = self.const_b*self.max_obstacle_distance
-        
-        #cost coefficients
-        self.u_goal = 5 #cost multiplier for angular difference to target_angle
-        self.u_current = 3 #cost multiplier for angular difference from current angle
-        
+        self.current_sector_index = 0 #start moving straight along the robot's yaw
+        self.target_point = None
+
         #thresholds at which to set clear, or blocked, a gap for hysteresis
         #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
         self.threshold_high = 2000
         self.threshold_low = 1000        
-        #target point and current_yaw
-        self.target_point = None
-        self.current_sector_index = 0 #start moving straight along the robot's yaw
         
         #debug marker stuff
         self.debug_marker_pub = rospy.Publisher('vfh_markers',
@@ -123,6 +119,7 @@ class VFHMoveServer( object ):
         #this loop controls the strafe angle using vfh sauce
         rospy.Timer(rospy.Duration(0.2), self.vfh_planner)
         
+        #service to allow other nodes to look at spots in the costmap for obstacles
         self.obstacle_check_service = rospy.Service('obstacle_check',
                                                     ObstacleCheck,
                                                     self.obstacle_check)        
@@ -325,7 +322,7 @@ class VFHMoveServer( object ):
                 distance = np.linalg.norm(position)
             
                 #m is the obstacle vector magnitude
-                m = cell_value * (self.const_a - self.const_b * distance)
+                m = cell_value * (self.max_obstacle_distance - distance)
                 
                 obstacle_density[index] += m
             
