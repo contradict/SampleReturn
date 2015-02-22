@@ -99,9 +99,11 @@ class LevelTwoStar(object):
                                                   rospy.Duration(self.node_params.return_time_minutes*60)
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
+        #dismount move
+        self.state_machine.userdata.dismount_move = self.node_params.dismount_move
+
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
-
         self.state_machine.userdata.beacon_mount_step = self.node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
         self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
@@ -136,7 +138,7 @@ class LevelTwoStar(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(input_keys=[],
+                                   StartLeveLTwo(input_keys=['dismount_move'],
                                                  output_keys=['action_result',
                                                               'dismount_move'],
                                                  outcomes=['next']),
@@ -412,9 +414,7 @@ class StartLeveLTwo(smach.State):
         
         #create the dismount_move
         move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                              angle = 0,
-                              distance = 2,
-                              velocity = 0.2)
+                              **userdata.dismount_move)
 
         userdata.dismount_move = move
 
