@@ -393,6 +393,7 @@ class VFHMoveServer( object ):
             self.marker_id += 1
             vfh_debug_array.append(debug_marker)    
  
+            #target point marker
             debug_marker = vis_msg.Marker()
             debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
             debug_marker.type = vis_msg.Marker.CYLINDER
@@ -401,7 +402,7 @@ class VFHMoveServer( object ):
             debug_marker.pose = Pose()
             debug_marker.pose.position = self._target_point_odom.point
             debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
-            debug_marker.lifetime = rospy.Duration(3.0) 
+            debug_marker.lifetime = rospy.Duration(60.0) 
             debug_marker.id = self.marker_id
             self.marker_id += 1
             vfh_debug_array.append(debug_marker) 
