@@ -64,7 +64,7 @@ class VFHMoveServer( object ):
         self._action_outcome = None
 
         #goal flags and params
-        self._goal_orientation_tolerance = node_params.goal_orientation_tolerance
+        self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
@@ -174,7 +174,6 @@ class VFHMoveServer( object ):
         return self.stop_requested
 
     def execute_movement(self, velocity):
-
         #store the starting point in odom
         current_pose = util.get_current_robot_pose(self._tf, self.odometry_frame)
         self._start_point = current_pose.pose.position
@@ -264,7 +263,7 @@ class VFHMoveServer( object ):
         valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
 
         yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, self._target_point_odom)
-        target_index = round(yaw_to_target/self.sector_angle) + self.zero_offset
+        target_index = int(round(yaw_to_target/self.sector_angle) + self.zero_offset)
         
         #if we are within stop_distance initiate stop
         #in this case, stop attempting to change the wheel angles
