@@ -140,7 +140,7 @@ class LevelTwoStar(object):
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(input_keys=['dismount_move'],
                                                  output_keys=['action_result',
-                                                              'dismount_move'],
+                                                              'simple_move'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -172,8 +172,7 @@ class LevelTwoStar(object):
                                                   'sample_detected':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'dismount_move',
-                                                'stop_on_sample':'false'})
+                                   remapping = {'stop_on_sample':'false'})
             
             smach.StateMachine.add('STAR_MANAGER',
                                    StarManager(self.tf_listener,
@@ -191,7 +190,7 @@ class LevelTwoStar(object):
 
             smach.StateMachine.add('LINE_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'ROTATION_MANAGER',
+                                   transitions = {'complete':'SPIN_MANAGER',
                                                   'missed_target':'ANNOUNCE_MISSED_TARGET',
                                                   'blocked':'ANNOUNCE_LINE_BLOCKED',
                                                   'off_course':'ANNOUNCE_OFF_COURSE',
@@ -210,10 +209,10 @@ class LevelTwoStar(object):
             
             smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
                                    AnnounceState(self.announcer, 'Line Blocked'),
-                                   transitions = {'next':'ROTATION_MANAGER'})
+                                   transitions = {'next':'SPIN_MANAGER'})
             
-            smach.StateMachine.add('ROTATION_MANAGER',
-                                   RotationManager(self.tf_listener),
+            smach.StateMachine.add('SPIN_MANAGER',
+                                   SpinManager(self.tf_listener),
                                    transitions = {'spin':'ROTATE',
                                                   'move':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
@@ -416,7 +415,7 @@ class StartLeveLTwo(smach.State):
         move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                               **userdata.dismount_move)
 
-        userdata.dismount_move = move
+        userdata.simple_move = move
 
         return 'next'
 
@@ -464,7 +463,7 @@ class StarManager(smach.State):
 
         return 'next_spoke'
 
-class RotationManager(smach.State):
+class SpinManager(smach.State):
 
     def __init__(self, tf_listener):
         smach.State.__init__(self,
