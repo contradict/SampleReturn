@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import math
-import collections
 import threading
 import random
 from copy import deepcopy
+from collections import deque
 import numpy as np
 
 import smach
@@ -208,7 +208,7 @@ class LevelTwoStar(object):
                                    transitions = {'next':'STAR_MANAGER'})
             
             smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
-                                   AnnounceState(self.announcer, 'Line Blocked'),
+                                   AnnounceState(self.announcer, 'Missed Target'),
                                    transitions = {'next':'SPIN_MANAGER'})
             
             smach.StateMachine.add('SPIN_MANAGER',
@@ -233,10 +233,14 @@ class LevelTwoStar(object):
                 goal.input_string = "level_two_pursuit_request"
                 return goal
             
-            @smach.cb_interface(output_keys=['detected_sample'])
+            @smach.cb_interface(input_keys=['line_points','next_line_point'],
+                                output_keys=['line_points','detected_sample'])
             def pursuit_result_cb(userdata, status, result):
                 #clear samples after a pursue action
                 userdata.detected_sample = None
+                #reload the next spoke point, line manager will pop it back
+                #off the array and we will continue to go there
+                userdata.line_points.appendleft(userdata.next_line_point)
                             
             smach.StateMachine.add('PURSUE_SAMPLE',
                                   smach_ros.SimpleActionState('pursue_sample',
@@ -350,7 +354,6 @@ class LevelTwoStar(object):
         level_two_server.run_server()
         rospy.spin()
         sls.stop()
-                
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -374,14 +377,17 @@ class LevelTwoStar(object):
         self.state_machine.userdata.beacon_point = beacon_point
 
     def get_hollow_star(self, spoke_count, spoke_length, offset, hub_radius, spin_step):
-
+        #This creates a list of dictionaries.  The yaw entry is a useful piece of information
+        #for some of the state machine states.  The other entry is the list of points that
+        #the robot should try to achieve along the spoke definied by the yaw
+        
         offset = np.radians(offset)
         yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
         spokes = []
         for yaw in yaws:
             yaw = util.unwind(yaw)
             radius = hub_radius
-            points = []
+            points = deque([])
             while radius < spoke_length:
                 header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
                 pos = geometry_msg.Point(radius*math.cos(yaw),
@@ -393,7 +399,7 @@ class LevelTwoStar(object):
             spokes.append({'yaw':yaw,
                            'points':points})
         
-        return spokes
+        return deque(spokes)
  
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -448,16 +454,16 @@ class StarManager(smach.State):
 
         if not userdata.outbound:
             #just finished inbound spoke, turn around and head outwards again
-            spoke = userdata.spokes.pop(0)
+            spoke = userdata.spokes.popleft()
             userdata.line_yaw = spoke['yaw']
-            userdata.line_points = spoke['points']
+            userdata.line_points = deque(spoke['points'])
             userdata.outbound = True
             rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
         else:
             #just finished outbound spoke, head towards first point in next spoke
             userdata.outbound = False
-            userdata.line_points = [userdata.spokes[0]['points'].pop(0)]
+            userdata.line_points = deque([userdata.spokes[0]['points'].popleft()])
             rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['points'][0]))
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
 
@@ -468,14 +474,12 @@ class SpinManager(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
                              outcomes=['spin', 'move', 'preempted', 'aborted'],
-                             input_keys=['line_yaw',
-                                         'line_points',
+                             input_keys=['line_points',
                                          'min_spin_radius',
                                          'spin_velocity',
                                          'outbound',
                                          'world_fixed_frame',],
-                             output_keys=['line_yaw',
-                                          'simple_move',
+                             output_keys=['simple_move',
                                           'beacon_point',
                                           'distance_to_hub',
                                           'last_align_time',])
@@ -499,8 +503,7 @@ class SpinManager(smach.State):
 class SearchLineManager(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['line_yaw',
-                                           'line_points',
+                             input_keys = ['line_points',
                                            'outbound',
                                            'return_time',
                                            'detected_sample',
@@ -510,6 +513,7 @@ class SearchLineManager(smach.State):
                                            'last_align_time'],
                              output_keys = ['move_goal',
                                             'line_points',
+                                            'next_line_point',
                                             'beacon_point',
                                             'last_align_time'],
                              outcomes=['move',
@@ -530,7 +534,9 @@ class SearchLineManager(smach.State):
         if len(userdata.line_points) == 0:
             return 'line_end'
         else:
-            target_point = userdata.line_points.pop(0)
+            target_point = userdata.line_points.popleft()
+            #store the next point in case of interruption by pursuit.
+            userdata.next_line_point = target_point
 
         try:
             self.tf_listener.waitForTransform(odometry_frame,
