@@ -45,7 +45,7 @@ class LevelTwoStar(object):
     def __init__(self):
         
         rospy.on_shutdown(self.shutdown_cb)
-        self.node_params = util.get_node_params()
+        node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
@@ -53,8 +53,8 @@ class LevelTwoStar(object):
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-        point = geometry_msg.Point(self.node_params.beacon_approach_point['x'],
-                                   self.node_params.beacon_approach_point['y'], 0)
+        point = geometry_msg.Point(node_params.beacon_approach_point['x'],
+                                   node_params.beacon_approach_point['y'], 0)
         beacon_facing_orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
         pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
         self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
@@ -75,11 +75,11 @@ class LevelTwoStar(object):
                                                        samplereturn_msg.SimpleMoveAction)
 
         #get the star shape
-        self.spokes = self.get_hollow_star(self.node_params.spoke_count,
-                                           self.node_params.spoke_length,
-                                           self.node_params.first_spoke_offset,
-                                           self.node_params.star_hub_radius,
-                                           self.node_params.spin_step)
+        self.spokes = self.get_hollow_star(node_params.spoke_count,
+                                           node_params.spoke_length,
+                                           node_params.first_spoke_offset,
+                                           node_params.star_hub_radius,
+                                           node_params.spin_step)
                        
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -87,7 +87,7 @@ class LevelTwoStar(object):
                 output_keys = ['action_result'])
     
         self.state_machine.userdata.spokes = self.spokes
-        self.state_machine.userdata.star_hub_radius = self.node_params.star_hub_radius
+        self.state_machine.userdata.star_hub_radius = node_params.star_hub_radius
         #sets the default velocity used by ExecuteSimpleMove, if none, use simple_motion default
         self.state_machine.userdata.velocity = None
 
@@ -96,23 +96,23 @@ class LevelTwoStar(object):
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
-                                                  rospy.Duration(self.node_params.return_time_minutes*60)
+                                                  rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #dismount move
-        self.state_machine.userdata.dismount_move = self.node_params.dismount_move
+        self.state_machine.userdata.dismount_move = node_params.dismount_move
 
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
-        self.state_machine.userdata.beacon_mount_step = self.node_params.beacon_mount_step
+        self.state_machine.userdata.beacon_mount_step = node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
         self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
         
         #search line parameters
-        self.state_machine.userdata.min_spin_radius = self.node_params.min_spin_radius
+        self.state_machine.userdata.min_spin_radius = node_params.min_spin_radius
         self.state_machine.userdata.last_spin_radius = 0
-        self.state_machine.userdata.spin_step = self.node_params.spin_step
-        self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
+        self.state_machine.userdata.spin_step = node_params.spin_step
+        self.state_machine.userdata.spin_velocity = node_params.spin_velocity
         self.state_machine.userdata.line_yaw = None #IN RADIANS!
         self.state_machine.userdata.outbound = False
         
@@ -130,7 +130,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.false = False
     
         #motion mode stuff
-        planner_mode = self.node_params.planner_mode
+        planner_mode = node_params.planner_mode
         MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
         MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
         MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
