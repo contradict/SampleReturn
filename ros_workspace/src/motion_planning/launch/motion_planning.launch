@@ -34,8 +34,8 @@
         <param name="threshold_low" value="1000"/>
 
         <rosparam>
-            simple_motion_params:
-                max_velocity: 0.75
+            vfh_motion_params:
+                max_velocity: 1.75
                 acceleration: 1.0 
                 stop_deceleration: 2.0
                 loop_rate: 10 
@@ -60,7 +60,7 @@
         
         <rosparam>
             simple_motion_params:
-                max_velocity: 0.5
+                max_velocity: 1.5
                 acceleration: 1.0
                 stop_deceleration: 2.0
                 loop_rate: 10 
