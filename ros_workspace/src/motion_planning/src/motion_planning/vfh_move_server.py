@@ -65,6 +65,7 @@ class VFHMoveServer( object ):
 
         #goal flags and params
         self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
+        self._goal_obstacle_radius = node_params.goal_obstacle_radius
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
@@ -309,7 +310,7 @@ class VFHMoveServer( object ):
             #if we are close to the target, truncate the check distance
             end = self.bresenham_point(robot_cmap_coords,
                                         min(self.max_obstacle_distance,
-                                           (distance_to_target+self.costmap_info.resolution)),                                   
+                                           (distance_to_target+self._goal_obstacle_radius)),                                   
                                         sector_yaw,
                                         self.costmap_info.resolution)            
             sector_line = bresenham.points(start, end)
@@ -364,7 +365,7 @@ class VFHMoveServer( object ):
             vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
             vfh_debug_marker.type = vis_msg.Marker.ARROW
             vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
-            vfh_debug_marker.scale = geometry_msg.Vector3(min(self.max_obstacle_distance, distance_to_target), .02, .02)
+            vfh_debug_marker.scale = geometry_msg.Vector3(min(self.max_obstacle_distance, (distance_to_target + self._goal_obstacle_radius)), .02, .02)
             vfh_debug_marker.lifetime = rospy.Duration(0.2)
             
             #rospy.loginfo("SECTORS: %s" % (self.sectors))

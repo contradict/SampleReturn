@@ -20,7 +20,8 @@
         <!-- general params-->
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
         <param name="goal_orientation_tolerance" value="4"/><!--degrees!-->
-        
+        <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
+
         <!--VFH algorithm parameters, angles in degrees -->
         <param name="active_window" value="120"/>
         <param name="sector_angle" value="5"/>
