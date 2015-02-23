@@ -69,10 +69,9 @@
           ns="/motion">
         <remap from="joint_states" to="platform_joint_state"/>
         <param name="publish_frequency" type="double" value="10"/>
-
     </node>
 
-   <include file="$(find beacon_finder)/launch/beacon_finder.launch">
+    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     </include>
 
@@ -81,18 +80,6 @@
             <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
             <arg name="odometry_frame" value="$(arg odometry_frame)"/>
         </include>
-</group>
-<!-- <group unless="$(arg beacon_localization)">
-        <node
-            pkg="fake_localization"
-            type="fake_localization"
-            name="fake_localization"
-            ns="/processes">
-            <remap from="base_pose_ground_truth" to="/motion/odometry"/>
-
-            <param name="odom_frame_id" value="$(arg odometry_frame)"/>
-            <param name="global_frame_id" value="$(arg world_fixed_frame)"/>
-        </node>
-    </group>-->
+    </group>
 
 </launch>
