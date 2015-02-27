@@ -18,25 +18,25 @@ def parse_yaml(filename):
     return cam_info
 
 def compute_fov(cam_info):
-    K = np.array(cam_info.K).reshape((3, 3))
-    left = np.arctan(K[0, 2]/K[0, 0])
-    right = np.arctan((cam_info.width-K[0, 2])/K[0, 0])
-    top = np.arctan(K[1, 2]/K[1, 1])
-    bottom = np.arctan((cam_info.height-K[1, 2])/K[1, 1])
+    P = np.array(cam_info.P).reshape((3, 4))
+    left = np.arctan(P[0, 2]/P[0, 0])
+    right = np.arctan((cam_info.width-P[0, 2])/P[0, 0])
+    top = np.arctan(P[1, 2]/P[1, 1])
+    bottom = np.arctan((cam_info.height-P[1, 2])/P[1, 1])
     return left, right, top, bottom
 
 def compute_stereo_fov(left_info, right_info, max_d, window):
-    Kleft = np.array(left_info.K).reshape((3, 3))
-    fx = Kleft[0, 0]
-    fy = Kleft[1, 1]
-    cx = Kleft[0, 2]
-    cy = Kleft[1, 2]
+    Pleft = np.array(left_info.P).reshape((3, 4))
     Pright = np.array(right_info.P).reshape((3, 4))
+    fx = Pleft[0, 0]
+    fy = Pleft[1, 1]
+    cx = Pleft[0, 2]
+    cy = Pleft[1, 2]
     Tx = -Pright[0, 3]
     left = np.arctan((cx-window/2.-max_d)/fx)
     right = np.arctan((left_info.width - window/2. - cx)/fx)
-    top = np.arctan((Kleft[1, 2]-window/2.)/fy)
-    bottom = np.arctan((left_info.height-cy-window/2.)/fy)
+    top = np.arctan((cy-window/2.)/fy)
+    bottom = np.arctan((left_info.height - cy - window/2.)/fy)
     z_min = Tx/max_d
     z_max = Tx/1.0
     return left, right, top, bottom, z_min, z_max
