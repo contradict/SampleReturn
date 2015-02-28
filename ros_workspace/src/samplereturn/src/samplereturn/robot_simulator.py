@@ -45,16 +45,24 @@ class RobotSimulator(object):
     def __init__(self, mode='level_two'):
     
         rospy.init_node("robot_simulator")
+
+        #IMPORTANT SWITCHES!        
+        self.publish_samples = True
+        self.publish_beacon = True
+        self.odometry_is_noisy = True
+        self.broadcast_localization = False #fake localization handled by beacon_localizer!
+        self.true_map = 'map'
+        self.sim_map = 'fake_map'
+        self.sim_odom = 'fake_odom'
         
         #simulator state variables and constants            
         self.GPIO_LEVEL_ONE = 0x20
         self.GPIO_LEVEL_TWO = 0x08
-        
+
+        #status flags
         self.mode = mode
         self.cameras_ready = True
         self.paused = False
-        self.publish_samples = True
-        self.publish_beacon = True
         
         self.active_sample_id = None
         self.collected_ids = []
@@ -71,14 +79,14 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
-        self.sample_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
+        self.sample_marker.header = std_msg.Header(0, rospy.Time(0), self.true_map)
         self.sample_marker.type = vis_msg.Marker.CYLINDER
         self.sample_marker.scale = geometry_msg.Vector3(.6, .6, .05)
         self.sample_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
         self.sample_marker.lifetime = rospy.Duration(1.5)
         
         self.debug_marker = vis_msg.Marker()
-        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), 'fake_odom')
+        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), self.sim_odom)
         self.debug_marker.type = vis_msg.Marker.CYLINDER
         self.debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
         self.debug_marker.scale = geometry_msg.Vector3(.05, .05, .5)
@@ -86,7 +94,7 @@ class RobotSimulator(object):
         self.debug_marker.lifetime = rospy.Duration(1.5)
         
         self.path_marker = vis_msg.Marker()
-        self.path_marker.header = std_msg.Header(0, rospy.Time(0), 'map')
+        self.path_marker.header = std_msg.Header(0, rospy.Time(0), self.true_map)
         self.path_marker.type = vis_msg.Marker.ARROW
         self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
         self.path_marker.scale = geometry_msg.Vector3(.5, .04, .04)
@@ -135,9 +143,6 @@ class RobotSimulator(object):
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
         self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
-        self.odometry_is_noisy = True
-        #fake localization handled by the executive_test file... generally
-        self.broadcast_localization = False
 
         #tf stuff
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -349,7 +354,7 @@ class RobotSimulator(object):
         
     def publish_path_markers(self, event):
         try:
-            self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, 'map').pose
+            self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, self.true_map).pose
         except:
             return
         self.path_marker.id = self.path_counter
@@ -361,22 +366,22 @@ class RobotSimulator(object):
         pose_list = []
         square_step = 2.0
 
-        start_pose = util.get_current_robot_pose(self.tf_listener, 'fake_odom')
+        start_pose = util.get_current_robot_pose(self.tf_listener, self.sim_odom)
         next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5,
-                0.2, 'fake_odom')
+                0.2, self.sim_odom)
         pose_list.append(next_pose)
         next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5,
-                -0.2, 'fake_odom')
+                -0.2, self.sim_odom)
         pose_list.append(next_pose)
         next_pose = util.translate_base_link(self.tf_listener, start_pose, 0,
-                0.2, 'fake_odom')
+                0.2, self.sim_odom)
         pose_list.append(next_pose)
         next_pose = util.translate_base_link(self.tf_listener, start_pose, 0,
-                -.2, 'fake_odom')
+                -.2, self.sim_odom)
         pose_list.append(next_pose)
         
-        fake_header = std_msg.Header(0, rospy.Time(0), 'fake_map')
-        header = std_msg.Header(0, rospy.Time(0), 'map')
+        fake_header = std_msg.Header(0, rospy.Time(0), self.sim_map)
+        header = std_msg.Header(0, rospy.Time(0), self.true_map)
         quat = geometry_msg.Quaternion(0,0,0,1)
         pose =  geometry_msg.PoseStamped(header,
                 geometry_msg.Pose(geometry_msg.Point(15,0,0), quat))
@@ -421,15 +426,15 @@ class RobotSimulator(object):
         #rospy.loginfo("Starting PC generation")
 
         now = event.current_real
-        header = std_msg.Header(0, now, 'map')
+        header = std_msg.Header(0, now, self.true_map)
         target_frame = 'navigation_center_left_camera'
         try:
-            self.tf_listener.waitForTransform('map',
+            self.tf_listener.waitForTransform(self.true_map,
                                               target_frame,
                                               now,
                                               rospy.Duration(0.5))
             current_pose = util.get_current_robot_pose(self.tf_listener,
-                    'map')
+                    self.true_map)
             transform = self.tf_listener.asMatrix(target_frame, header)
         except ( tf.Exception ), e:
             #rospy.loginfo("Failed to transform map for PC")
@@ -454,15 +459,15 @@ class RobotSimulator(object):
         now = rospy.Time.now()
         transforms = []
         if self.broadcast_localization:
-            transform = TransformStamped(std_msg.Header(0, now, 'fake_map'),
-                                         'fake_odom',
+            transform = TransformStamped(std_msg.Header(0, now, self.sim_map),
+                                         self.sim_odom,
                                          Transform(self.zero_translation,
                                                    self.zero_rotation))
             transforms.append(transform)
 
         self.integrate_odometry()
         
-        transform = TransformStamped(std_msg.Header(0, now, 'fake_odom'),
+        transform = TransformStamped(std_msg.Header(0, now, self.sim_odom),
                                      'base_link',
                                      Transform(self.robot_pose.pose.position,
                                                self.robot_pose.pose.orientation))
@@ -496,15 +501,15 @@ class RobotSimulator(object):
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
             mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
 
-            transform = TransformStamped(std_msg.Header(0, now, 'map'),
-                                         'fake_map',
+            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+                                         self.sim_map,
                                          Transform(geometry_msg.Vector3(*mfm_translate),
                                                    geometry_msg.Quaternion(*mfm_rot)))
             transforms.append(transform)
         
         else:
-            transform = TransformStamped(std_msg.Header(0, now, 'map'),
-                                         'fake_map',
+            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+                                         self.sim_map,
                                          Transform(self.zero_translation,
                                                    self.zero_rotation))
             transforms.append(transform)
@@ -533,7 +538,7 @@ class RobotSimulator(object):
     def publish_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                header = std_msg.Header(0, rospy.Time.now(), 'map')    
+                header = std_msg.Header(0, rospy.Time.now(), self.true_map)    
                 self.sample_marker.header = header
                 self.sample_marker.pose.position = sample['point']
                 self.sample_marker.id = sample['id']
@@ -561,7 +566,7 @@ class RobotSimulator(object):
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], 0.5, 0.2):
-                        header = std_msg.Header(0, rospy.Time.now(), 'map')
+                        header = std_msg.Header(0, rospy.Time.now(), self.true_map)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
                         msg.point = sample['point']
@@ -569,7 +574,7 @@ class RobotSimulator(object):
                         self.manipulator_sample_pub.publish(msg)
             
     def sample_in_view(self, point, max_x, max_y):
-        header = std_msg.Header(0, rospy.Time(0), 'map')
+        header = std_msg.Header(0, rospy.Time(0), self.true_map)
         point_stamped = geometry_msg.PointStamped(header, point)
         try:
             base_relative = self.tf_listener.transformPoint('base_link',
@@ -623,8 +628,8 @@ class RobotSimulator(object):
             now = rospy.Time.now()
             msg = geometry_msg.PoseWithCovarianceStamped()
             msg_pose = geometry_msg.PoseStamped()
-            msg.header = std_msg.Header(0, now, 'map')
-            msg_pose.header = std_msg.Header(0, now, 'map')
+            msg.header = std_msg.Header(0, now, self.true_map)
+            msg_pose.header = std_msg.Header(0, now, self.true_map)
             q = tf.transformations.quaternion_from_euler(-np.pi/2, -np.pi/2, 0, 'rxyz')
             msg_pose.pose.orientation.x = q[0]
             msg_pose.pose.orientation.y = q[1]
@@ -781,7 +786,7 @@ class RobotSimulator(object):
     def initial_odometry(self):
         odom = nav_msg.Odometry()
         odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = 'fake_odom'
+        odom.header.frame_id = self.sim_odom
         odom.child_frame_id = 'base_link'
         odom.pose.pose.orientation.w=1.0
         odom.pose.covariance = list(eye(6).reshape((36,)))
