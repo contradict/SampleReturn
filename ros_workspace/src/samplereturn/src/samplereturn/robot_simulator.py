@@ -137,7 +137,7 @@ class RobotSimulator(object):
         self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
         self.odometry_is_noisy = True
         #fake localization handled by the executive_test file... generally
-        self.broadcast_localization = True
+        self.broadcast_localization = False
 
         #tf stuff
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
