@@ -620,12 +620,11 @@ class RobotSimulator(object):
                   (-3*pi/4 < angle_to_robot and angle_to_robot < -pi/4)):
                 # right/left (white/black)
                 cov = list(self.beacon_side_covariance.flat)
+            now = rospy.Time.now()
             msg = geometry_msg.PoseWithCovarianceStamped()
             msg_pose = geometry_msg.PoseStamped()
-            msg.header = std_msg.Header(0, rospy.Time(0),
-                                        'map')
-            msg_pose.header = std_msg.Header(0, rospy.Time(0),
-                                        'map')
+            msg.header = std_msg.Header(0, now, 'map')
+            msg_pose.header = std_msg.Header(0, now, 'map')
             q = tf.transformations.quaternion_from_euler(-np.pi/2, -np.pi/2, 0, 'rxyz')
             msg_pose.pose.orientation.x = q[0]
             msg_pose.pose.orientation.y = q[1]
