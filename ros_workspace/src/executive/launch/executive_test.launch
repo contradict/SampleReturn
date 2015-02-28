@@ -4,7 +4,7 @@
 
     <arg name="odometry_frame" value="fake_odom"/>
     <arg name="world_fixed_frame" value="fake_map"/>
-    <arg name="beacon_localization" value="false"/>
+    <arg name="beacon_localization" value="true"/>
 
     <!-- begin test arguments -->
     <machine name="search"
@@ -70,10 +70,6 @@
         <remap from="joint_states" to="platform_joint_state"/>
         <param name="publish_frequency" type="double" value="10"/>
     </node>
-
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
-        <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
-    </include>
 
     <group if="$(arg beacon_localization)">
         <include file="$(find beacon_localizer)/launch/beacon_localizer.launch">
