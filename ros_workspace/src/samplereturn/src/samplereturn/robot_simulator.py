@@ -625,22 +625,25 @@ class RobotSimulator(object):
                   (-3*pi/4 < angle_to_robot and angle_to_robot < -pi/4)):
                 # right/left (white/black)
                 cov = list(self.beacon_side_covariance.flat)
-            now = rospy.Time.now()
-            msg = geometry_msg.PoseWithCovarianceStamped()
-            msg_pose = geometry_msg.PoseStamped()
-            msg.header = std_msg.Header(0, now, self.true_map)
-            msg_pose.header = std_msg.Header(0, now, self.true_map)
-            q = tf.transformations.quaternion_from_euler(-np.pi/2, -np.pi/2, 0, 'rxyz')
-            msg_pose.pose.orientation.x = q[0]
-            msg_pose.pose.orientation.y = q[1]
-            msg_pose.pose.orientation.z = q[2]
-            msg_pose.pose.orientation.w = q[3]
-            msg_pose.pose.position.x = -1.22
-            msg_pose.pose.position.z = 1.48
+            #get the next search_camera transform, and call that the 'picture time'
+            #then load the beacon pose (in true map), and transform to search_camera_lens
             try:
+                now = self.tf_listener.getLatestCommonTime('search_camera_lens',
+                                                            self.true_map,)
+                msg = geometry_msg.PoseWithCovarianceStamped()
+                msg_pose = geometry_msg.PoseStamped()
+                msg.header = std_msg.Header(0, now, self.true_map)
+                msg_pose.header = std_msg.Header(0, now, self.true_map)
+                q = tf.transformations.quaternion_from_euler(-np.pi/2, -np.pi/2, 0, 'rxyz')
+                msg_pose.pose.orientation.x = q[0]
+                msg_pose.pose.orientation.y = q[1]
+                msg_pose.pose.orientation.z = q[2]
+                msg_pose.pose.orientation.w = q[3]
+                msg_pose.pose.position.x = -1.22
+                msg_pose.pose.position.z = 1.48
                 msg_pose = self.tf_listener.transformPose('search_camera_lens', msg_pose)
             except tf.Exception:
-                print("search_camera_lens transform not available")
+                print("Search_camera_lens transform not available, not publishing beacon_pose")
                 return
             msg.pose.pose = msg_pose.pose
             msg.header = msg_pose.header
