@@ -31,8 +31,17 @@
     <param name="max_size_error" type="double" value="0.1"/>
     <param name="max_distance_error" type="double" value="0.1"/>
     <param name="max_horizontal_radians" type="double" value="0.17"/>
-    <rosparam file="$(find samplereturn)/config/beacon_finder.yaml" command="load"/>
     <remap from="camera_image" to="/cameras/search/image"/>
     <remap from="camera_info" to="/cameras/search/info"/>
-	</node>
+
+    <rosparam>
+        <!-- beacon position relative to map -->
+        beacon_translation: [ -0.780, 0.0, 0.712 ]
+        beacon_rotation: [ -1.570796, -1.570796, 0.0, 'rxyz']
+        <!-- beacon covariance -->
+        frontback_covariance: [0.5, 0.5, 1.0, 0.0436, 0.04, 0.0436]
+        side_covariance: [2.0, 2.0, 5.0, 100, 1.5, 100]
+    </rosparam>
+
+</node>
 </launch>

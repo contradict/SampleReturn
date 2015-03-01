@@ -328,14 +328,9 @@ class RobotSimulator(object):
         #beacon stuff, needs param server up
         self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
         self.beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
+        self.beacon_translation = rospy.get_param("/processes/beacon_finder/beacon_translation", [0,0,0])
+        self.beacon_rotation = rospy.get_param("/processes/beacon_finder/beacon_rotation", [0,0,0, 'rxyz'])
 
-        beacon_rot = tf.transformations.quaternion_from_euler(0.0,
-                                                              0.0,
-                                                              0.0,
-                                                             'rxyz')        
-        self.fake_beacon_pose = geometry_msg.Pose(geometry_msg.Point(0,0,0),
-                                                  geometry_msg.Quaternion(*beacon_rot))
-        
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
                                                geometry_msg.PoseWithCovarianceStamped,
                                                queue_size=2)
@@ -634,13 +629,12 @@ class RobotSimulator(object):
                 msg_pose = geometry_msg.PoseStamped()
                 msg.header = std_msg.Header(0, now, self.true_map)
                 msg_pose.header = std_msg.Header(0, now, self.true_map)
-                q = tf.transformations.quaternion_from_euler(-np.pi/2, -np.pi/2, 0, 'rxyz')
+                q = tf.transformations.quaternion_from_euler(*self.beacon_rotation)
                 msg_pose.pose.orientation.x = q[0]
                 msg_pose.pose.orientation.y = q[1]
                 msg_pose.pose.orientation.z = q[2]
                 msg_pose.pose.orientation.w = q[3]
-                msg_pose.pose.position.x = -1.22
-                msg_pose.pose.position.z = 1.48
+                msg_pose.pose.position = geometry_msg.Point(*self.beacon_translation)
                 msg_pose = self.tf_listener.transformPose('search_camera_lens', msg_pose)
             except tf.Exception:
                 print("Search_camera_lens transform not available, not publishing beacon_pose")
