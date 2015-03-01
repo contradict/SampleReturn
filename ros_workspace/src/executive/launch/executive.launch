@@ -82,19 +82,19 @@
         
         <!-- for search  behaviour, degrees and meters--> 
         <param name="spoke_count" type="int" value="36"/>
-        <param name="spoke_length" type="int" value="200"/>
+        <param name="spoke_length" type="int" value="90"/>
         <param name="first_spoke_offset" type="double" value="0"/>
-        <param name="star_hub_radius" type="int" value="15"/>
-        <param name="min_spin_radius" type="double" value="50"/>
+        <param name="star_hub_radius" type="int" value="10"/>
+        <param name="min_spin_radius" type="double" value="20"/>
         <param name="spin_step" type="double" value="30"/>
-        <param name="spin_velocity" type="double" value="1.2"/>
+        <param name="spin_velocity" type="double" value="0.5"/>
         
         <param name="return_time_minutes" type="double" value="100"/>
 
         <!-- dismount and beacon approach -->
         <rosparam>
             dismount_move:
-                {angle: 0, distance: 2.0, velocity: 0.3}
+                {angle: 0, distance: 2.0, velocity: 0.5}
         </rosparam>
         <rosparam>
             beacon_approach_point:
