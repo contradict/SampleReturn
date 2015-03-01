@@ -146,7 +146,7 @@ class SaliencyDetectorNode
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
       for (size_t i=0; i < kp.size(); i++)
       {
-        cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0));
+        cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
       }
     }
 
@@ -172,12 +172,17 @@ class SaliencyDetectorNode
       string dominant_exterior_color = cn_.getDominantColor(exteriorColor);
       std::cout << "Dominant exterior color " << dominant_exterior_color << std::endl;
 
+      cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
+          CV_RGB(100,100,100));
+
       if (cam_model_.initialized()
           && dominant_color != "green" && dominant_color != "brown"
           && dominant_exterior_color == "green"
           && dominant_color != "gray" && dominant_color != "black"
-          && dominant_color != "blue" && (dominant_color == "red" ||
-              dominant_color=="pink")) {
+          && dominant_color != "blue" ) {
+        cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
+        cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
+            CV_RGB(0,255,0));
         //float scale = cv_ptr->image.rows/600.;
         float scale = cv_ptr->image.cols/bms_img_width_;
         cv::Point3d ray =
