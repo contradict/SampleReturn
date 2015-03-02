@@ -325,10 +325,6 @@ class RobotSimulator(object):
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
-        self.check_publisher = rospy.Publisher('/processes/executive/costmap_check',
-                                               samplereturn_msg.CostmapCheck,
-                                               queue_size=10)
-
         #beacon stuff, needs param server up
         self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
         self.beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
@@ -344,13 +340,7 @@ class RobotSimulator(object):
         rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
 
         #rospy.spin()
-        
-    def publish_all_blocked(self):
-        msg_keys = ['left','right','center']
-        blocked_keys = [True, True, True]
-        all_blocked = samplereturn_msg.CostmapCheck(msg_keys, blocked_keys)
-        self.check_publisher.publish(all_blocked)
-        
+       
     def publish_path_markers(self, event):
         try:
             self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, self.true_map).pose
@@ -639,6 +629,7 @@ class RobotSimulator(object):
                 msg_pose.pose.orientation.z = q[2]
                 msg_pose.pose.orientation.w = q[3]
                 msg_pose.pose.position = geometry_msg.Point(*self.beacon_translation)
+                rospy.loginfo("BEACON POSE: {!s}".format(msg_pose))
                 msg_pose = self.tf_listener.transformPose('search_camera_lens', msg_pose)
             except tf.Exception:
                 print("Search_camera_lens transform not available, not publishing beacon_pose")
