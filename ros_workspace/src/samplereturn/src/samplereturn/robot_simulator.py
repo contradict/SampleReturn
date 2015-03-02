@@ -42,12 +42,12 @@ from geometry_msgs.msg import TransformStamped, Transform
 
 class RobotSimulator(object):
     
-    def __init__(self, mode='level_two'):
+    def __init__(self, mode='level_two', publish_samples=True):
     
         rospy.init_node("robot_simulator")
 
         #IMPORTANT SWITCHES!        
-        self.publish_samples = True
+        self.publish_samples = publish_samples
         self.publish_beacon = True
         self.odometry_is_noisy = True
         self.broadcast_localization = False #fake localization handled by beacon_localizer!
@@ -325,12 +325,6 @@ class RobotSimulator(object):
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
 
-        #beacon stuff, needs param server up
-        self.beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
-        self.beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
-        self.beacon_translation = rospy.get_param("/processes/beacon_finder/beacon_translation", [0,0,0])
-        self.beacon_rotation = rospy.get_param("/processes/beacon_finder/beacon_rotation", [0,0,0, 'rxyz'])
-
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
                                                geometry_msg.PoseWithCovarianceStamped,
                                                queue_size=2)
@@ -587,10 +581,17 @@ class RobotSimulator(object):
     def publish_beacon_pose(self, event):
         if not self.publish_beacon:
             return
+
+        #get beacon covar and pose from beacon_finder launch
+        beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
+        beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
+        beacon_translation = rospy.get_param("/processes/beacon_finder/beacon_finder/beacon_translation")
+        beacon_rotation = rospy.get_param("/processes/beacon_finder/beacon_finder/beacon_rotation")
+                
         dist_from_origin = np.hypot(self.robot_pose.pose.position.x,
                                     self.robot_pose.pose.position.y)
         # can't see beacon closer than 10 meters or farther than 40
-        if dist_from_origin < 10.0 or dist_from_origin > 40.0:
+        if dist_from_origin < 5.0 or dist_from_origin > 60.0:
             #print ("NO BEACON PUB: outside beacon view distance: %.2f" %(dist_from_origin))
             return
         angle_to_robot = np.arctan2(self.robot_pose.pose.position.y,
@@ -609,11 +610,11 @@ class RobotSimulator(object):
                 ( 3*pi/4 < angle_to_robot and angle_to_robot < pi) or
                 ( -pi < angle_to_robot and angle_to_robot < -3*pi/4)):
                 # front/back
-                cov = list(self.beacon_frontback_covariance.flat)
+                cov = list(beacon_frontback_covariance.flat)
             elif ((pi/4 < angle_to_robot and angle_to_robot < 3*pi/4) or
                   (-3*pi/4 < angle_to_robot and angle_to_robot < -pi/4)):
                 # right/left (white/black)
-                cov = list(self.beacon_side_covariance.flat)
+                cov = list(beacon_side_covariance.flat)
             #get the next search_camera transform, and call that the 'picture time'
             #then load the beacon pose (in true map), and transform to search_camera_lens
             try:
@@ -623,12 +624,12 @@ class RobotSimulator(object):
                 msg_pose = geometry_msg.PoseStamped()
                 msg.header = std_msg.Header(0, now, self.true_map)
                 msg_pose.header = std_msg.Header(0, now, self.true_map)
-                q = tf.transformations.quaternion_from_euler(*self.beacon_rotation)
+                q = tf.transformations.quaternion_from_euler(*beacon_rotation)
                 msg_pose.pose.orientation.x = q[0]
                 msg_pose.pose.orientation.y = q[1]
                 msg_pose.pose.orientation.z = q[2]
                 msg_pose.pose.orientation.w = q[3]
-                msg_pose.pose.position = geometry_msg.Point(*self.beacon_translation)
+                msg_pose.pose.position = geometry_msg.Point(*beacon_translation)
                 rospy.loginfo("BEACON POSE: {!s}".format(msg_pose))
                 msg_pose = self.tf_listener.transformPose('search_camera_lens', msg_pose)
             except tf.Exception:
