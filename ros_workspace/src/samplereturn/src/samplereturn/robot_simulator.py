@@ -151,7 +151,7 @@ class RobotSimulator(object):
 
         #odometry
         self.odometry_dt = 0.05
-        odometry_noise_sigma = np.diag([0.1, 0.1, 0.05, 0.01])
+        odometry_noise_sigma = np.diag([0.01, 0.01, 0.1, 0.1])
         self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
@@ -480,6 +480,8 @@ class RobotSimulator(object):
                     translate=tp)
 
             mfm = np.dot(rpt, np.linalg.inv(nrpt))
+            
+            mfm = np.linalg.inv(mfm)
 
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
             mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
@@ -824,7 +826,7 @@ class RobotSimulator(object):
             strafe_dir = np.arctan2(twist.linear.y,
                                     twist.linear.x)
             noise = np.random.multivariate_normal(np.zeros((4,)),
-                    self.odometry_noise_covariance)[1:]
+                    self.odometry_noise_covariance)
             ss = np.sin(strafe_dir)
             cs = np.cos(strafe_dir)
             noise = np.r_[noise[0]*cs-noise[1]*ss,
