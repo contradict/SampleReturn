@@ -18,8 +18,12 @@
 
         <param name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="update_period" value="1.0"/>
 
-        <rosparam file="$(find beacon_localizer)/config/filter_params.yaml" command="load"/>
+        <rosparam>
+            system_noise_covariance: [ 5.e-3, 0, 0, 5.e-3, 0, 2.e-3 ]
+        </rosparam>    
+    
     </node>
 
 </launch>
