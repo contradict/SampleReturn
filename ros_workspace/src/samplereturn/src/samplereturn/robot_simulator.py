@@ -142,20 +142,24 @@ class RobotSimulator(object):
         point_cloud_port_name = "/cameras/navigation/port/points2"
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
 
-        self.odometry_noise_covariance = np.diag([1e-3, 1e-3, 1e-4, 1e-5])
-
         #tf stuff
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self.tf_listener = tf.TransformListener()
         
         self.zero_translation = geometry_msg.Vector3(0,0,0)
         self.zero_rotation = geometry_msg.Quaternion(0,0,0,1)
-                                                  
+
+        #odometry
+        self.odometry_dt = 0.05
+        odometry_noise_sigma = np.diag([0.1, 0.1, 0.05, 0.01])
+        self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
         self.noisy_robot_pose = self.initial_pose()
         self.noisy_robot_odometry = self.initial_odometry()
        
+        rospy.logwarn("ODOM_NOISE_COVAR: {!s}".format(self.odometry_noise_covariance))
+
         #manipulator stuff
         self.manipulator_sm = smach.StateMachine(
             outcomes=['success', 'aborted', 'preempted'],
@@ -238,7 +242,7 @@ class RobotSimulator(object):
                                             queue_size=2)
 
         self.joint_transforms_available = False
-        rospy.Timer(rospy.Duration(0.05), self.broadcast_tf_and_motion)
+        rospy.Timer(rospy.Duration(self.odometry_dt), self.broadcast_tf_and_motion)
 
         #sample detection stuff
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name,
