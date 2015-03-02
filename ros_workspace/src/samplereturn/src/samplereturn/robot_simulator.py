@@ -457,6 +457,13 @@ class RobotSimulator(object):
         transforms.append(transform)
 
         if self.odometry_is_noisy:
+ 
+            transform = TransformStamped(std_msg.Header(0, now, self.sim_odom),
+                                         'base_link_noisy',
+                                         Transform(self.noisy_robot_pose.pose.position,
+                                                   self.noisy_robot_pose.pose.orientation))
+            transforms.append(transform)            
+            
             qn = (self.noisy_robot_pose.pose.orientation.x,
                   self.noisy_robot_pose.pose.orientation.y,
                   self.noisy_robot_pose.pose.orientation.z,
