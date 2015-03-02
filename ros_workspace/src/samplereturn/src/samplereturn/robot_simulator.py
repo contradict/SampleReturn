@@ -462,7 +462,7 @@ class RobotSimulator(object):
                                          'base_link_noisy',
                                          Transform(self.noisy_robot_pose.pose.position,
                                                    self.noisy_robot_pose.pose.orientation))
-            transforms.append(transform)            
+            transforms.append(transform)
             
             qn = (self.noisy_robot_pose.pose.orientation.x,
                   self.noisy_robot_pose.pose.orientation.y,
@@ -488,8 +488,6 @@ class RobotSimulator(object):
 
             mfm = np.dot(rpt, np.linalg.inv(nrpt))
             
-            mfm = np.linalg.inv(mfm)
-
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
             mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
 
@@ -798,7 +796,7 @@ class RobotSimulator(object):
     def initial_pose(self):
         pose = geometry_msg.PoseStamped()
         pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = "fake_odom"
+        pose.header.frame_id = self.sim_odom
         pose.pose.orientation.w = 1.0
         return pose
     
