@@ -157,6 +157,7 @@ class RobotSimulator(object):
         self.robot_odometry = self.initial_odometry()
         self.noisy_robot_pose = self.initial_pose()
         self.noisy_robot_odometry = self.initial_odometry()
+        self.command_twist = geometry_msg.Twist()
        
         rospy.logwarn("ODOM_NOISE_COVAR: {!s}".format(self.odometry_noise_covariance))
 
@@ -395,15 +396,15 @@ class RobotSimulator(object):
         
     def handle_planner(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST:
-            self.integrate_odometry( twist)
+            self.command_twist = twist
         
     def handle_servo(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_SERVO:
-            self.integrate_odometry( twist)
+            self.command_twist = twist
 
     def handle_joystick(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_JOYSTICK:
-            self.integrate_odometry( twist)
+            self.command_twist = twist
 
     def publish_point_cloud(self, event):
         #rospy.loginfo("Starting PC generation")
@@ -485,6 +486,16 @@ class RobotSimulator(object):
             rpt = tf.transformations.compose_matrix(
                     angles=tf.transformations.euler_from_quaternion(qp),
                     translate=tp)
+            
+            _,_,rp_angles, rp_translate,_ = tf.transformations.decompose_matrix(rpt)
+            rp_rot = tf.transformations.quaternion_from_euler(*rp_angles)
+
+            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+                                         'base_link_recomposed',
+                                         Transform(geometry_msg.Vector3(*rp_translate),
+                                                   geometry_msg.Quaternion(*rp_rot)))
+            transforms.append(transform)
+
 
             mfm = np.dot(rpt, np.linalg.inv(nrpt))
             
@@ -496,6 +507,16 @@ class RobotSimulator(object):
                                          Transform(geometry_msg.Vector3(*mfm_translate),
                                                    geometry_msg.Quaternion(*mfm_rot)))
             transforms.append(transform)
+            
+            try:
+                p, q = self.tf_listener.lookupTransform('base_link_noisy', 'base_link', rospy.Time(0))
+                transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+                                             'noise_transform',
+                                             Transform(geometry_msg.Vector3(*p),
+                                                       geometry_msg.Quaternion(*q)))
+                transforms.append(transform)
+            except tf.Exception:
+                rospy.logwarn("NO base_link_noisy transform... we probably just started running")
         
         else:
             transform = TransformStamped(std_msg.Header(0, now, self.true_map),
@@ -751,8 +772,10 @@ class RobotSimulator(object):
     def zero_robot(self):
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
+        self.comman_twist = geometry_msg.Twist()
         self.noisy_robot_pose = self.initial_pose()
         self.noisy_robot_odometry = self.initial_odometry()
+        
 
     def get_pointcloud2(self, grid, position, target_frame, transform, range=12.0):
         header =  std_msg.Header(0, rospy.Time.now(), target_frame)
@@ -800,27 +823,13 @@ class RobotSimulator(object):
         pose.pose.orientation.w = 1.0
         return pose
     
-    def integrate_odometry(self, twist=None):
-        now = rospy.Time.now();
-        if twist is None:
-            itwist = geometry_msg.Twist()
-            itwist.angular.z = self.robot_odometry.twist.twist.angular.z
-            itwist.linear.x = self.robot_odometry.twist.twist.linear.x
-            itwist.linear.y = self.robot_odometry.twist.twist.linear.y
-        else:
-            itwist = twist
+    def integrate_odometry(self):
+        now = rospy.Time.now()
+        itwist = self.command_twist
         self.robot_pose, self.robot_odometry = \
                 self.integrate_twist(self.robot_pose,
                         self.robot_odometry,
                         itwist, now)
-
-        if twist is None:
-            itwist = geometry_msg.Twist()
-            itwist.angular.z = self.noisy_robot_odometry.twist.twist.angular.z
-            itwist.linear.x = self.noisy_robot_odometry.twist.twist.linear.x
-            itwist.linear.y = self.noisy_robot_odometry.twist.twist.linear.y
-        else:
-            itwist = twist
         self.noisy_robot_pose, self.noisy_robot_odometry = \
                 self.integrate_twist(self.noisy_robot_pose,
                         self.noisy_robot_odometry,
