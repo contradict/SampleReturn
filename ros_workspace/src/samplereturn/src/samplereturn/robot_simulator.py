@@ -50,7 +50,7 @@ class RobotSimulator(object):
         self.publish_samples = publish_samples
         self.publish_beacon = publish_beacon
         self.odometry_is_noisy = True
-        self.broadcast_localization = False #fake localization handled by beacon_localizer!
+        self.broadcast_localization = True #fake localization handled by beacon_localizer!
         self.true_map = 'map'
         self.sim_map = 'fake_map'
         self.sim_odom = 'fake_odom'
