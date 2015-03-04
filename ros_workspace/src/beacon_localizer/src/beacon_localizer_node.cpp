@@ -154,7 +154,8 @@ void BeaconKFNode::odometryCallback( nav_msgs::OdometryConstPtr odom )
             tf::Transform( odom_orientation, odom_origin ),
             odom->header.stamp,
             _world_fixed_frame,
-            _odometry_frame);
+            //_odometry_frame);
+            "beacon_localizer_correction");
     _tf_broadcast.sendTransform( T_map_to_odom );
 
 }
@@ -231,6 +232,13 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             T_map_to_odom.getRotation()[3] << ", " <<
             ")"
             );
+    
+    //broadcast this T_map_to odom from real map
+    tf::StampedTransform test_map_to_odom(T_map_to_odom,
+                                          msg->header.stamp,
+                                          _world_fixed_frame,
+                                          "beacon_localizer_T");
+    _tf_broadcast.sendTransform( test_map_to_odom );    
 
     MatrixWrapper::ColumnVector measurement(3);
 
