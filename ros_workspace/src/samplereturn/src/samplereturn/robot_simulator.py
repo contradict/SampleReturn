@@ -458,14 +458,15 @@ class RobotSimulator(object):
                                                self.robot_pose.pose.orientation))
         transforms.append(transform)
 
+        #broadcast the clean base_link in map for comparison
+        transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+                                     'base_link_in_map',
+                                     Transform(self.robot_pose.pose.position,
+                                               self.robot_pose.pose.orientation))
+        transforms.append(transform)
+
         if self.odometry_is_noisy:
  
-            transform = TransformStamped(std_msg.Header(0, now, self.sim_odom),
-                                         'base_link_noisy',
-                                         Transform(self.noisy_robot_pose.pose.position,
-                                                   self.noisy_robot_pose.pose.orientation))
-            transforms.append(transform)
-            
             qn = (self.noisy_robot_pose.pose.orientation.x,
                   self.noisy_robot_pose.pose.orientation.y,
                   self.noisy_robot_pose.pose.orientation.z,
@@ -488,28 +489,17 @@ class RobotSimulator(object):
                     angles=tf.transformations.euler_from_quaternion(qp),
                     translate=tp)
             
-            '''           
-            _,_,rp_angles, rp_translate,_ = tf.transformations.decompose_matrix(rpt)
-            rp_rot = tf.transformations.quaternion_from_euler(*rp_angles)
-
-            transform = TransformStamped(std_msg.Header(0, now, self.sim_odom),
-                                         'base_link_recomposed',
-                                         Transform(geometry_msg.Vector3(*rp_translate),
-                                                   geometry_msg.Quaternion(*rp_rot)))
-            transforms.append(transform)
-            
-            '''
-            
+            #a transform to show where the integrated noise takes us in real map
             _,_,nrp_angles, nrp_translate,_ = tf.transformations.decompose_matrix(nrpt)
             nrp_rot = tf.transformations.quaternion_from_euler(*nrp_angles)
 
             transform = TransformStamped(std_msg.Header(0, now, self.true_map),
-                                         'base_link_noisy_recomposed_map',
+                                         'base_link_noisy_in_map',
                                          Transform(geometry_msg.Vector3(*nrp_translate),
                                                    geometry_msg.Quaternion(*nrp_rot)))
             transforms.append(transform)
 
-            
+            #get the transform between clean and nosiy base_link, in odom
             mfm = np.dot(nrpt, np.linalg.inv(rpt))
             
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
@@ -521,27 +511,6 @@ class RobotSimulator(object):
                                                    geometry_msg.Quaternion(*mfm_rot)))
             transforms.append(transform)
             
-            crude_vector = np.subtract(tn, tp)
-            crude_quat = tf.transformations.quaternion_multiply(qn,
-                          tf.transformations.quaternion_inverse(qp))
-            
-            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
-                                         'base_to_noise_translation',
-                                         Transform(geometry_msg.Vector3(*crude_vector),
-                                                   geometry_msg.Quaternion(0,0,0,1)))
-            transforms.append(transform)
-
-            
-            try:
-                p, q = self.tf_listener.lookupTransform('base_link_noisy', 'base_link', rospy.Time(0))
-                transform = TransformStamped(std_msg.Header(0, now, self.true_map),
-                                             'noise_transform',
-                                             Transform(geometry_msg.Vector3(*p),
-                                                       geometry_msg.Quaternion(*q)))
-                transforms.append(transform)
-            except tf.Exception:
-                rospy.logwarn("NO base_link_noisy transform... we probably just started running")
-        
         else:
             transform = TransformStamped(std_msg.Header(0, now, self.true_map),
                                          self.sim_map,
