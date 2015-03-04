@@ -39,7 +39,7 @@
         beacon_translation: [ -0.780, 0.0, 0.712 ]
         beacon_rotation: [ -1.570796, -1.570796, 0.0, 'rxyz']
         <!-- beacon covariance -->
-        frontback_covariance: [0.5, 0.5, 1.0, 0.0436, 0.04, 0.0436]
+        frontback_covariance: [0.2, 0.2, 0.2, 0.02, 0.02, 0.02]
         side_covariance: [2.0, 2.0, 5.0, 100, 1.5, 100]
     </rosparam>
 
