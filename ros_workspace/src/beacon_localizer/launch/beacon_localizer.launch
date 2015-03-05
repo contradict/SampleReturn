@@ -21,7 +21,10 @@
         <param name="update_period" value="1.0"/>
 
         <rosparam>
-            system_noise_covariance: [ 2.5e-5, 0, 0, 2.5e-5, 0, 2.5e-6 ]
+            <!-- system_noise_covariance: [ 2.5e-5, 0, 0, 2.5e-5, 0, 2.5e-6 ] -->
+            system_noise_covariance: [ 1.0e-3, 0, 0, 1.0e-3, 0, 1.0e-3 ]
+    
+    
             
         </rosparam>    
     
