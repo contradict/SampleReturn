@@ -50,7 +50,7 @@ class RobotSimulator(object):
         self.publish_samples = publish_samples
         self.publish_beacon = publish_beacon
         self.odometry_is_noisy = True
-        self.broadcast_localization = True #fake localization handled by beacon_localizer!
+        self.broadcast_localization = False #fake localization handled by beacon_localizer!
         self.true_map = 'map'
         self.sim_map = 'fake_map'
         self.sim_odom = 'fake_odom'
@@ -148,6 +148,10 @@ class RobotSimulator(object):
         
         self.zero_translation = geometry_msg.Vector3(0,0,0)
         self.zero_rotation = geometry_msg.Quaternion(0,0,0,1)
+
+        self.test_translation = geometry_msg.Vector3(4.0,4.0,0)
+        self.test_rotation = geometry_msg.Quaternion(
+                             *tf.transformations.quaternion_from_euler(0,0,0.1))
 
         #odometry
         self.odometry_dt = 0.05
@@ -446,8 +450,8 @@ class RobotSimulator(object):
         if self.broadcast_localization:
             transform = TransformStamped(std_msg.Header(0, now, self.sim_map),
                                          self.sim_odom,
-                                         Transform(self.zero_translation,
-                                                   self.zero_rotation))
+                                         Transform(self.test_translation,
+                                                   self.test_rotation))
             transforms.append(transform)
 
         self.integrate_odometry()
