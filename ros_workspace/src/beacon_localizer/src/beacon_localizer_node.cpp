@@ -49,7 +49,8 @@ class BeaconKFNode
         std::string _camera_frame_id;
         ros::Time _last_beacon_time;
 
-        tf::StampedTransform _T_odom;
+        tf::StampedTransform _T_odom;  //base_link in odom
+        tf::StampedTransform _T_map_to_odom;
 };
 
 BeaconKFNode::BeaconKFNode( void ):
@@ -150,13 +151,14 @@ void BeaconKFNode::odometryCallback( nav_msgs::OdometryConstPtr odom )
         odom_origin.setZ(0);
         odom_orientation = tf::createQuaternionFromYaw( state(3) );
     }
-    tf::StampedTransform T_map_to_odom(
-            tf::Transform( odom_orientation, odom_origin ),
-            odom->header.stamp,
-            _world_fixed_frame,
-            //_odometry_frame);
-            "beacon_localizer_correction");
-    _tf_broadcast.sendTransform( T_map_to_odom );
+    
+    //This is the map to odom transform, it will be used elsewhere
+    _T_map_to_odom = tf::StampedTransform(tf::Transform(odom_orientation, odom_origin),
+                                          odom->header.stamp,
+                                          _world_fixed_frame,
+                                          _odometry_frame);
+                                          //"beacon_localizer_correction");
+    _tf_broadcast.sendTransform( _T_map_to_odom );
 
 }
 
@@ -220,7 +222,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             ")"
             );
 
-    tf::Transform T_map_to_odom = _T_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
+    tf::Transform T_map_to_odom = _T_map_to_odom*_T_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
     ROS_DEBUG_STREAM("T_map_to_odom t: (" <<
             T_map_to_odom.getOrigin()[0] << ", " <<
             T_map_to_odom.getOrigin()[1] << ", " <<
