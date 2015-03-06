@@ -187,78 +187,20 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     ros::Time beacon_stamp = msg->header.stamp;
     T_beacon_to_camera.stamp_ = beacon_stamp;
     _camera_frame_id = msg->header.frame_id;
-    ROS_DEBUG_STREAM("T_beacon_to_camera t: (" <<
-            T_beacon_to_camera.getOrigin()[0] << ", " <<
-            T_beacon_to_camera.getOrigin()[1] << ", " <<
-            T_beacon_to_camera.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_beacon_to_camera.getRotation()[0] << ", " <<
-            T_beacon_to_camera.getRotation()[1] << ", " <<
-            T_beacon_to_camera.getRotation()[2] << ", " <<
-            T_beacon_to_camera.getRotation()[3] << ", " <<
-            ")"
-            );
 
     tf::StampedTransform T_camera_to_base;
     _tf.lookupTransform("base_link", _camera_frame_id, beacon_stamp, T_camera_to_base);
-    ROS_DEBUG_STREAM("T_camera_to_base t: (" <<
-            T_camera_to_base.getOrigin()[0] << ", " <<
-            T_camera_to_base.getOrigin()[1] << ", " <<
-            T_camera_to_base.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_camera_to_base.getRotation()[0] << ", " <<
-            T_camera_to_base.getRotation()[1] << ", " <<
-            T_camera_to_base.getRotation()[2] << ", " <<
-            T_camera_to_base.getRotation()[3] << ", " <<
-            ")"
-            );
 
     tf::StampedTransform T_base_to_odom;
     _tf.lookupTransform(_odometry_frame, "base_link", beacon_stamp, T_base_to_odom);            
             
-            
     //this is in the reverse of the normal xform direction, for the error xform calc
     tf::StampedTransform T_map_to_beacon;
     _tf.lookupTransform("beacon", _world_fixed_frame, beacon_stamp, T_map_to_beacon);
-    ROS_DEBUG_STREAM("T_beacon_to_map t: (" <<
-            T_map_to_beacon.getOrigin()[0] << ", " <<
-            T_map_to_beacon.getOrigin()[1] << ", " <<
-            T_map_to_beacon.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_map_to_beacon.getRotation()[0] << ", " <<
-            T_map_to_beacon.getRotation()[1] << ", " <<
-            T_map_to_beacon.getRotation()[2] << ", " <<
-            T_map_to_beacon.getRotation()[3] << ", " <<
-            ")"
-            );
             
-    //T_odom is T_base_to_odom
-    ROS_DEBUG_STREAM("T_base_to_odom t: (" <<
-            _T_odom.getOrigin()[0] << ", " <<
-            _T_odom.getOrigin()[1] << ", " <<
-            _T_odom.getOrigin()[2] << ") " <<
-            " q: (" <<
-            _T_odom.getRotation()[0] << ", " <<
-            _T_odom.getRotation()[1] << ", " <<
-            _T_odom.getRotation()[2] << ", " <<
-            _T_odom.getRotation()[3] << ", " <<
-            ")"
-            );
-
     //This calculates the correction thusly:
     //map->odom->base->camera->measured-beacon * beacon->map
     tf::Transform T_map_to_odom = _T_map_to_odom*T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
-    ROS_DEBUG_STREAM("T_map_to_odom t: (" <<
-            T_map_to_odom.getOrigin()[0] << ", " <<
-            T_map_to_odom.getOrigin()[1] << ", " <<
-            T_map_to_odom.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_map_to_odom.getRotation()[0] << ", " <<
-            T_map_to_odom.getRotation()[1] << ", " <<
-            T_map_to_odom.getRotation()[2] << ", " <<
-            T_map_to_odom.getRotation()[3] << ", " <<
-            ")"
-            );
     
     //broadcast this T_map_to odom from real map
     tf::StampedTransform test_map_to_odom(T_map_to_odom,
