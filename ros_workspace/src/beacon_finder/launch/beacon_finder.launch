@@ -5,7 +5,8 @@
 <launch>
 
     <arg name="world_fixed_frame" default="map"/>
-	<node
+    <arg name="odometry_frame" default="odom"/>
+    <node
 		machine="search"
 		name="beacon_finder"
 		pkg="beacon_finder"

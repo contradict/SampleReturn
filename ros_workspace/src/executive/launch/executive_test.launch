@@ -72,7 +72,8 @@
     </node>
     
     <include file="$(find beacon_finder)/launch/beacon_finder.launch">
-        <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
+        <!--for sim, beacon finder should publish the beacon visualization xform in map-->
+        <arg name="world_fixed_frame" value="map"/>
     </include>
 
     <group if="$(arg beacon_localization)">

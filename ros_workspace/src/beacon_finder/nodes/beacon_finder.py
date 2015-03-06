@@ -49,6 +49,7 @@ class BeaconFinder:
         self._beacon_mounting_frame = rospy.get_param("~beacon_mounting_frame",
                 "platform")
         self._world_fixed_frame = rospy.get_param("~world_fixed_frame", "map")
+	self._odometry_frame = rospy.get_param("~odometry_frame", "odom")
 	self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
 	self._beacon_translation = rospy.get_param("~beacon_translation", [0,0,0])
 	self._beacon_rotation = rospy.get_param("~beacon_rotation", [0,0,0, 'rxyz'])
