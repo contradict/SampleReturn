@@ -27,6 +27,7 @@ operator<<(std::ostream &out, const PoseState& st)
     out << "Omega       (" << st.Omega.transpose() << ")\n";
     out << "GyroBias    (" << st.GyroBias.transpose() << ")\n";
     out << "AccelBias   (" << st.AccelBias.transpose() << ")\n";
+    return out;
 }
 
 std::ostream &
