@@ -27,7 +27,7 @@ class BeaconKFNode
 
     private:
         void getCovarianceMatrix(std::string param_name, MatrixWrapper::SymmetricMatrix& m);
-        void odometryCallback( nav_msgs::OdometryConstPtr );
+        void transformBroadcastCallback( const ros::TimerEvent& e );
         void beaconCallback( geometry_msgs::PoseWithCovarianceStampedConstPtr msg );
         void filterUpdateCallback( const ros::TimerEvent& e );
 
@@ -44,6 +44,7 @@ class BeaconKFNode
         ros::Subscriber          _beacon_sub;
         tf::TransformListener    _tf;
         tf::TransformBroadcaster _tf_broadcast;
+        ros::Timer               _transform_broadcast_timer;
         ros::Timer               _update_timer;
 
         std::string _camera_frame_id;
@@ -183,7 +184,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     ROS_INFO("beacon");
     tf::StampedTransform T_beacon_to_camera;
     tf::poseMsgToTF( msg->pose.pose, T_beacon_to_camera);
-    beacon_stamp = msg->header.stamp;
+    ros::Time beacon_stamp = msg->header.stamp;
     T_beacon_to_camera.stamp_ = beacon_stamp;
     _camera_frame_id = msg->header.frame_id;
     ROS_DEBUG_STREAM("T_beacon_to_camera t: (" <<
@@ -212,6 +213,11 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             ")"
             );
 
+    tf::StampedTransform T_base_to_odom;
+    _tf.lookupTransform(_odometry_frame, "base_link", beacon_stamp, T_base_to_odom);            
+            
+            
+    //this is in the reverse of the normal xform direction, for the error xform calc
     tf::StampedTransform T_map_to_beacon;
     _tf.lookupTransform("beacon", _world_fixed_frame, beacon_stamp, T_map_to_beacon);
     ROS_DEBUG_STREAM("T_beacon_to_map t: (" <<
@@ -225,7 +231,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             T_map_to_beacon.getRotation()[3] << ", " <<
             ")"
             );
-
+            
     //T_odom is T_base_to_odom
     ROS_DEBUG_STREAM("T_base_to_odom t: (" <<
             _T_odom.getOrigin()[0] << ", " <<
@@ -239,7 +245,8 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
             ")"
             );
 
-    //This calculates the correction thusly  map->odom->base->camera->measured-beacon * beacon->map
+    //This calculates the correction thusly:
+    //map->odom->base->camera->measured-beacon * beacon->map
     tf::Transform T_map_to_odom = _T_map_to_odom*T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
     ROS_DEBUG_STREAM("T_map_to_odom t: (" <<
             T_map_to_odom.getOrigin()[0] << ", " <<
