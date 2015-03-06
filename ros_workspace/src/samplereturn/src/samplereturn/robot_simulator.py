@@ -663,6 +663,10 @@ class RobotSimulator(object):
             msg.pose.pose = msg_pose.pose
             msg.header = msg_pose.header
             msg.pose.covariance = cov
+            
+            #horrible camera publishing delay!
+            rospy.sleep(1.5)
+            
             self.beacon_pose_pub.publish(msg)
             self.beacon_debug_pose_pub.publish(msg_pose)
         #else:
