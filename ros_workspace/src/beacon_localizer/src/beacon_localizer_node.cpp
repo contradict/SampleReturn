@@ -299,9 +299,9 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     measH(2,1) = 0.0; measH(2,2) = 1.0; measH(2,3) = 0.0;
     measH(3,1) = 0.0; measH(3,2) = 0.0; measH(3,3) = 1.0;
 
-    BFL::LinearAnalyticConditionalGaussian beaconMesurementPdf(measH, measUncertainty);
+    BFL::LinearAnalyticConditionalGaussian beaconMeasurementPdf(measH, measUncertainty);
 
-    BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMesurementPdf);
+    BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMeasurementPdf);
 
 
     _filter->Update(_system_model, &beaconMeasurementModel, measurement);
