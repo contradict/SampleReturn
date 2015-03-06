@@ -10,6 +10,7 @@ add_definitions(-std=c++0x)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
+  geometry_msgs
   cmake_modules
   tf
   eigen_conversions

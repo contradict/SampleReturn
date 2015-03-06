@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/JointState.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <pose_ukf/pose_ukf.hpp>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -94,6 +95,8 @@ class PoseUKFNode
     double large_rotation_jump_, large_steering_jump_;
     double wheel_diameter_;
     std::string base_name_;
+    double publish_period_;
+    int seq_;
 
     std::vector<std::shared_ptr<struct Wheel> > wheels_;
     std::map<std::string, std::shared_ptr<struct Wheel> > steering_values_;
@@ -101,12 +104,16 @@ class PoseUKFNode
 
     void jointStateCallback(sensor_msgs::JointStateConstPtr msg);
     void imuCallback(sensor_msgs::ImuConstPtr msg);
+    void sendPose(const ros::TimerEvent& e);
 
     tf::TransformBroadcaster broadcaster_;
     tf::TransformListener listener_;
 
     ros::Subscriber imu_subscription_;
     ros::Subscriber joint_subscription_;
+
+    ros::Timer publish_timer_;
+    ros::Publisher pose_pub_;
 
     PoseUKF *ukf_;
     ros::Time last_update_;
@@ -134,6 +141,8 @@ PoseUKFNode::PoseUKFNode() :
 
     privatenh.param("base_name", base_name_, std::string("base_link"));
 
+    privatenh.param("publish_period", publish_period_, 0.020);
+
     double alpha, beta, kappa;
     privatenh.param("alpha", alpha, 1e-3);
     privatenh.param("beta", beta, 2.0);
@@ -152,6 +161,10 @@ PoseUKFNode::PoseUKFNode() :
         PoseState st = ukf_->state();
         ukf_->reset(st, initial_covariance);
     }
+
+    pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
+    seq_ = 0;
+    publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PoseUKFNode::sendPose, this);
 }
 
 void
@@ -165,11 +178,11 @@ PoseUKFNode::connect(void)
     imu_subscription_ = nh.subscribe("imu", 1, &PoseUKFNode::imuCallback, this);
     joint_subscription_ = nh.subscribe("joint_state", 1, &PoseUKFNode::jointStateCallback, this);
     ROS_INFO("Subscribers created");
+    publish_timer_.start();
 }
 
 PoseUKFNode::~PoseUKFNode()
 {
-    delete ukf_;
 }
 
 bool
@@ -183,6 +196,20 @@ PoseUKFNode::initialize(void)
             break;
     }
     return success;
+}
+
+void
+PoseUKFNode::sendPose(const ros::TimerEvent& e)
+{
+    (void)e;
+    geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
+
+    msg->header.frame_id = "imu_0";
+    msg->header.stamp = ros::Time::now();
+    msg->header.seq = seq_++;
+    tf::pointEigenToMsg( ukf_->state().Position, msg->pose.position);
+    tf::quaternionEigenToMsg( ukf_->state().Orientation, msg->pose.orientation);
+    pose_pub_.publish(msg);
 }
 
 void
