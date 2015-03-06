@@ -111,6 +111,9 @@ class TestUKF : public UKF::ScaledUKF<struct TestState>
         return noise;
     };
 public:
+    TestUKF(double al, double be, double ka) :
+        ScaledUKF(al, be, ka)
+    {};
     double sigma;
 };
 
@@ -161,9 +164,9 @@ runTest(void)
                return x+normal(generator);
             });
 
-    TestUKF ukf;
+    TestUKF ukf(1e-3, 2.0, 0.0);
     // acceleration noise
-    ukf.sigma = (2*M_PI)*(2*M_PI)/10.;
+    ukf.sigma = (2*M_PI)*(2*M_PI)*10;
     TestState st;
     st.v=0.0;
     Eigen::MatrixXd cov(2,2);
@@ -180,15 +183,19 @@ runTest(void)
                  positions[0] << ", " <<
                  velocities[0] << ", " <<
                  ukf.state().x << ", " <<
+                 sqrt(ukf.covariance()(0,0)) << ", " <<
                  ukf.state().v << ", " <<
+                 sqrt(ukf.covariance()(1,1)) << ", " <<
                  0.0 << std::endl;
+    int correct_every=1;
     for(int i=0;i<N;i++)
     {
-        ukf.predict(dt, mcovs, false);
+        ukf.predict(dt, mcovs, i%correct_every!=0);
         t += dt;
         PositionMeasurement m;
         m.x = noisy_positions[i];
-        ukf.correct(m);
+        if(i%correct_every==0)
+            ukf.correct(m);
         std::cout << t << ", " <<
                      positions[i] << ", " <<
                      velocities[i] << ", " <<
