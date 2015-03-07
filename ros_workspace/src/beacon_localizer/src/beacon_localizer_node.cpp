@@ -187,27 +187,43 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     ros::Time beacon_stamp = msg->header.stamp;
     T_beacon_to_camera.stamp_ = beacon_stamp;
     _camera_frame_id = msg->header.frame_id;
-
-    tf::StampedTransform T_camera_to_base;
-    _tf.lookupTransform("base_link", _camera_frame_id, beacon_stamp, T_camera_to_base);
-
-    tf::StampedTransform T_base_to_odom;
-    _tf.lookupTransform(_odometry_frame, "base_link", beacon_stamp, T_base_to_odom);            
-            
-    //this is in the reverse of the normal xform direction, for the error xform calc
-    tf::StampedTransform T_map_to_beacon;
-    _tf.lookupTransform("beacon", _world_fixed_frame, beacon_stamp, T_map_to_beacon);
-            
-    //This calculates the correction thusly:
-    //map->odom->base->camera->measured-beacon * beacon->map
-    tf::Transform T_map_to_odom = _T_map_to_odom*T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
     
-    //broadcast this T_map_to odom from real map
-    tf::StampedTransform test_map_to_odom(T_map_to_odom,
-                                          msg->header.stamp,
-                                          _world_fixed_frame,
-                                          "beacon_localizer_T");
-    _tf_broadcast.sendTransform( test_map_to_odom );    
+    tf::Transform T_map_to_odom;
+    
+    try {
+        _tf.waitForTransform("base_link", _camera_frame_id,
+                             beacon_stamp, ros::Duration(1.0));
+        
+        tf::StampedTransform T_camera_to_base;
+        _tf.lookupTransform("base_link", _camera_frame_id, beacon_stamp, T_camera_to_base);
+    
+        _tf.waitForTransform(_odometry_frame, "base_link",
+                             beacon_stamp, ros::Duration(1.0));
+    
+        tf::StampedTransform T_base_to_odom;
+        _tf.lookupTransform(_odometry_frame, "base_link", beacon_stamp, T_base_to_odom);            
+                
+        //this is in the reverse of the normal xform direction, for the error xform calc
+        //this is a static xform from beacon_finder, timestamp isn't important
+        tf::StampedTransform T_map_to_beacon;
+        _tf.lookupTransform("beacon", _world_fixed_frame, ros::Time(0), T_map_to_beacon);
+                
+        //This calculates the correction thusly:
+        //map->odom->base->camera->measured-beacon * beacon->map
+        T_map_to_odom = _T_map_to_odom*T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
+        
+        //broadcast this T_map_to odom from real map
+        tf::StampedTransform test_map_to_odom(T_map_to_odom,
+                                              msg->header.stamp,
+                                              _world_fixed_frame,
+                                              "beacon_localizer_T");
+        _tf_broadcast.sendTransform( test_map_to_odom );
+    }
+    catch (tf::TransformException &ex) {
+         ROS_ERROR("BEACON_LOCALIZER transform lookup failure: %s", ex.what());
+         ros::Duration(1.0).sleep();
+         return;
+    }
 
     MatrixWrapper::ColumnVector measurement(3);
 
