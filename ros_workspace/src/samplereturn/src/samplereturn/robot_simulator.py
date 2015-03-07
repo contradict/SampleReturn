@@ -503,9 +503,10 @@ class RobotSimulator(object):
                                                    geometry_msg.Quaternion(*nrp_rot)))
             transforms.append(transform)
 
-            #get the transform between clean and nosiy base_link, in odom
+            #get the transform between clean and noisy base_link, in odom
             mfm = np.dot(nrpt, np.linalg.inv(rpt))
             
+            #this is the actual map->fake_map noise transform
             _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
             mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
 
