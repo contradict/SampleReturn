@@ -133,13 +133,13 @@ void BeaconKFNode::initializeRos( void )
     private_nh.param("broadcast_period", broadcast_period, 0.05);
 
     //timer for broadcasting the map correction xfrom    
-    _transform_broadcast_timer = private_nh.createTimer(ros::Duration(update_period),
-                                           &BeaconKFNode::filterUpdateCallback,
+    _transform_broadcast_timer = private_nh.createTimer(ros::Duration(broadcast_period),
+                                           &BeaconKFNode::transformBroadcastCallback,
                                            this);
     
     //timer for updating the EKF
     _update_timer = private_nh.createTimer(ros::Duration(update_period),
-                                           &BeaconKFNode::transformBroadcastCallback,
+                                           &BeaconKFNode::filterUpdateCallback,
                                            this);
 
 }
