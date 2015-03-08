@@ -121,7 +121,9 @@ public:
 
 template
 void
-UKF::ScaledUKF<struct PoseUKF::TestState>::correct(const struct PoseUKF::PositionMeasurement& measured);
+UKF::ScaledUKF<struct PoseUKF::TestState>::correct(const struct PoseUKF::PositionMeasurement& measured,
+                                                   const std::vector<Eigen::MatrixXd>& measurement_covs
+                                                  );
 
 namespace PoseUKF {
 
@@ -190,12 +192,12 @@ runTest(void)
     int correct_every=1;
     for(int i=0;i<N;i++)
     {
-        ukf.predict(dt, mcovs, i%correct_every!=0);
+        ukf.predict(dt);
         t += dt;
         PositionMeasurement m;
         m.x = noisy_positions[i];
         if(i%correct_every==0)
-            ukf.correct(m);
+            ukf.correct(m, mcovs);
         std::cout << t << ", " << 
                      positions[i] << ", " <<
                      velocities[i] << ", " <<
