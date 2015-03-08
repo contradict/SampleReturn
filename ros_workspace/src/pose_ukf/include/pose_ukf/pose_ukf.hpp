@@ -3,7 +3,8 @@
 
 namespace PoseUKF {
 
-struct PoseState : public UKF::State<struct PoseState> {
+struct PoseState
+{
     Eigen::Vector3d Position;
     Eigen::Vector3d Velocity;
     Eigen::Quaterniond Orientation;
@@ -121,7 +122,7 @@ struct PoseState : public UKF::State<struct PoseState> {
     friend std::ostream& operator<<(std::ostream &, const PoseState &);
 };
 
-struct IMUOrientationMeasurement : UKF::Measurement<struct IMUOrientationMeasurement, struct PoseState>
+struct IMUOrientationMeasurement
 {
     Eigen::Vector3d acceleration;
     Eigen::Vector3d omega;
@@ -170,7 +171,7 @@ struct IMUOrientationMeasurement : UKF::Measurement<struct IMUOrientationMeasure
     friend std::ostream& operator<<(std::ostream &, const IMUOrientationMeasurement &);
 };
 
-struct WheelOdometryMeasurement : UKF::Measurement<struct WheelOdometryMeasurement, struct PoseState>
+struct WheelOdometryMeasurement
 {
     Eigen::MatrixX2d wheel_motions;
     Eigen::MatrixX3d wheel_positions;

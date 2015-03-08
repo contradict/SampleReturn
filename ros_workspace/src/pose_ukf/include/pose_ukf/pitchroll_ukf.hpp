@@ -68,7 +68,8 @@ exp(const Eigen::Vector3d& omega)
             imag_factor*omega.z());
 }
 
-struct PitchRollState : public UKF::State<struct PitchRollState> {
+struct PitchRollState
+{
     Eigen::Quaterniond Orientation;
     Eigen::Vector2d Omega;
     Eigen::Vector2d GyroBias;
@@ -164,7 +165,7 @@ struct PitchRollState : public UKF::State<struct PitchRollState> {
     friend std::ostream& operator<<(std::ostream &, const PitchRollState &);
 };
 
-struct IMUOrientationMeasurement : UKF::Measurement<struct IMUOrientationMeasurement, struct PitchRollState>
+struct IMUOrientationMeasurement
 {
     Eigen::Vector3d acceleration;
     Eigen::Vector2d omega;

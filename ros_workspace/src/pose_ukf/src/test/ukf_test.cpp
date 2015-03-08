@@ -5,7 +5,8 @@
 
 namespace PoseUKF {
 
-struct TestState : public UKF::State<struct TestState> {
+struct TestState
+{
     double x, v;
 
     TestState() :
@@ -58,7 +59,7 @@ struct TestState : public UKF::State<struct TestState> {
     ssize_t ndim(void) const {return 2;};
 };
 
-struct PositionMeasurement : UKF::Measurement<struct PositionMeasurement, struct TestState>
+struct PositionMeasurement
 {
     double x;
 
