@@ -17,16 +17,54 @@
             /io/imu_0/data_raw
             /io/imu_1/data_raw
             /motion/platform_joint_state
+            /motion/odometry
             "
             >
     </node>
+
+
+    <!--
+    <node
+        name="filter"
+        pkg="pose_ukf"
+        type="pitchroll_ukf_node"
+        output="screen"
+        launch-prefix="tmux_new_window gdb -ex run - -args "
+        >
+        <!- -
+        launch-prefix="tmux_new_window gdb - -args "
+        launch-prefix="tmux_new_window gdb -ex run - -args "
+        launch-prefix="tmux_new_window valgrind "
+        - ->
+        <remap from="imu" to="/io/imu_0/data_raw"/>
+        <rosparam param="process_sigma">
+            orientation: [ 0.001, 0.001 ]
+            omega: [ 0.005, 0.005 ]
+            gyro_bias: [ 1e-8, 1e-8 ]
+            accel_bias: [ 1e-8, 1e-8, 1e-8 ]
+        </rosparam>
+        <!- - orientation(r,p), omega(x,y), gyro bias(x,y), accel bias(x,y,z) - ->
+        <rosparam param="initial_covariance">
+            [
+              0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12]
+        </rosparam>
+    </node>
+    -->
 
     <node
         name="filter"
         pkg="pose_ukf"
         type="pose_ukf_node"
         output="screen"
-        launch-prefix="tmux_new_window gdb -ex run --args "
+        launch-prefix="tmux_new_window gdb -ex run - -args "
         >
         <!--
         launch-prefix="tmux_new_window gdb - -args "
@@ -38,14 +76,30 @@
         <param name="wheel_diameter" type="double" value="0.13"/>
         <param name="wheel_forward_noise" type="double" value="0.001"/>
         <param name="wheel_perpendicular_noise" type="double" value="0.0005"/>
-        <rosparam param="process_sigma">
-            position: [ 0.001, 0.001, 0.001 ]
-            velocity: [ 1.0, 1.0, 0.01 ]
-            orientation: [ 0.0001, 0.0001, 0.001 ]
-            omega: [ 0.01, 0.01, 0.5 ]
-            gyro_bias: [ 1e-5, 1e-5, 1e-5 ]
-            accel_bias: [ 1e-5, 1e-5, 1e-5 ]
+        <rosparam param="wheels">
+            -
+                steering_joint_name: port_steering_joint
+                axle_joint_name: port_axle_joint
+                wheel_link: port_wheel
+            -
+                steering_joint_name: starboard_steering_joint
+                axle_joint_name: starboard_axle_joint
+                wheel_link: starboard_wheel
+            -
+                steering_joint_name: stern_steering_joint
+                axle_joint_name: stern_axle_joint
+                wheel_link: stern_wheel
         </rosparam>
+
+        <rosparam param="process_sigma">
+            position: [ 0.001, 0.001, 0.0001 ]
+            velocity: [ 0.5, 0.5, 0.01 ]
+            orientation: [ 0.0005, 0.0005, 0.001 ]
+            omega: [ 0.005, 0.005, 0.01 ]
+            gyro_bias: [ 1e-9, 1e-9, 1e-9 ]
+            accel_bias: [ 1e-9, 1e-9, 1e-9 ]
+        </rosparam>
+
         <!-- position, velocity, orientation(r,p,y), omega, gyro bias, accel bias -->
         <rosparam param="initial_covariance">
             [ 1.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
@@ -56,16 +110,16 @@
               0.00, 0.00, 0.000, 0.00, 0.00, 1.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
               0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.01, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
               0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.01, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.50, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.10, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
               0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
               0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
               0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.001, 0.000, 0.000, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.001, 0.000, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000,
-              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001 ]
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 1e-12, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 1e-12, 0.000, 0.000, 0.000, 0.000,
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 1e-12, 0.000, 0.000, 0.000,
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000,
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000,
+              0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12 ]
         </rosparam>
         <!-- position, velocity, orientation(r,p,y), omega, gyro bias, accel bias -->
         <!--
@@ -90,20 +144,5 @@
               0.00, 0.00, 0.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.000, 0.000, 0.000, 0.000, 0.000, 0.001 ]
         </rosparam>
         -->
-        <rosparam param="wheels">
-            -
-                steering_joint_name: port_steering_joint
-                axle_joint_name: port_axle_joint
-                wheel_link: port_wheel
-            -
-                steering_joint_name: starboard_steering_joint
-                axle_joint_name: starboard_axle_joint
-                wheel_link: starboard_wheel
-            -
-                steering_joint_name: stern_steering_joint
-                axle_joint_name: stern_axle_joint
-                wheel_link: stern_wheel
-        </rosparam>
-
     </node>
 </launch>
