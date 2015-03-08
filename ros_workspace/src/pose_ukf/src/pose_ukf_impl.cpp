@@ -4,11 +4,15 @@
 
 template
 void
-UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::IMUOrientationMeasurement& measured);
+UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::IMUOrientationMeasurement& measured,
+                                            const std::vector<Eigen::MatrixXd>& measurement_covs
+                                           );
 
 template
 void
-UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::WheelOdometryMeasurement& measured);
+UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::WheelOdometryMeasurement& measured,
+                                            const std::vector<Eigen::MatrixXd>& measurement_covs
+                                           );
 
 
 namespace PoseUKF {

@@ -238,9 +238,9 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
         return;
     ROS_INFO_STREAM("Performing IMU update with dt=" << dt << ", delta_t=" << m.delta_t);
     ROS_INFO_STREAM(m);
-    ukf_->predict(dt, meas_covs, false);
+    ukf_->predict(dt);
     last_update_ = msg->header.stamp;
-    ukf_->correct(m);
+    ukf_->correct(m, meas_covs);
     printState();
 }
 
@@ -321,9 +321,9 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         return;
     ROS_INFO_STREAM("Performing joint state update with dt=" << dt);
     ROS_INFO_STREAM(m);
-    ukf_->predict(dt, meas_covs, false);
+    ukf_->predict(dt);
     last_update_ = msg->header.stamp;
-    ukf_->correct(m);
+    ukf_->correct(m, meas_covs);
     wheel_last_pose_ = ukf_->state();
     printState();
 }

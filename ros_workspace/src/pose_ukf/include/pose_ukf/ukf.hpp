@@ -41,68 +41,66 @@ class ScaledUKF {
     S state_;
     Eigen::MatrixXd covariance_;
 
-    std::vector<S> Chistate_;
-    std::vector<S> Chiminus_;
-    std::vector<Eigen::VectorXd> Chinu_;
-    int Lx_, Lnu_, L_;
-    std::vector<double> weights_;
-    std::vector<double> cweights_;
-    S xhatminus_;
-    Eigen::MatrixXd Pminus_;
-    std::vector<Eigen::VectorXd> xdiff_;
-
     void
-    generateSigmaPoints(const std::vector<Eigen::MatrixXd>& covs)
+    generateSigmaPoints(const S& mu,
+                        const Eigen::MatrixXd& cov,
+                        const std::vector<Eigen::MatrixXd>& covs,
+                        std::vector<S>& Chi,
+                        std::vector<Eigen::VectorXd>& nu,
+                        std::vector<double>& weights,
+                        std::vector<double>& cweights
+                        )
     {
-        Lx_ = ndim();
-        Lnu_ = std::accumulate(covs.begin(), covs.end(),
+        int L, Lx, Lnu;
+        Lx = mu.ndim();
+        Lnu = std::accumulate(covs.begin(), covs.end(),
                                     0,
                                     [](int n, const Eigen::MatrixXd& m)
                                     {
                                         return n+m.rows();
                                     });
 
-        L_ = Lx_ + Lnu_;
-        double lambda = alpha_*alpha_*((double)L_ + kappa_) - (double)L_;
-        double w0 = lambda/((double)L_ + lambda);
+        L = Lx + Lnu;
+        double lambda = alpha_*alpha_*((double)L + kappa_) - (double)L;
+        double w0 = lambda/((double)L + lambda);
         double cw0 = w0 + 1.0 - alpha_*alpha_ + beta_;
-        double wi = 1.0/((double)L_ + lambda)/2.0;
+        double wi = 1.0/((double)L + lambda)/2.0;
 
-        Chistate_.clear();
-        Chistate_.push_back(state_);
-        Chinu_.clear();
-        Eigen::VectorXd nuzero(Lnu_);
+        Chi.clear();
+        Chi.push_back(mu);
+        nu.clear();
+        Eigen::VectorXd nuzero(Lnu);
         nuzero.setZero();
-        Chinu_.push_back(nuzero);
-        weights_.clear();
-        weights_.push_back(w0);
-        cweights_.clear();
-        cweights_.push_back(cw0);
+        nu.push_back(nuzero);
+        weights.clear();
+        weights.push_back(w0);
+        cweights.clear();
+        cweights.push_back(cw0);
 
-        Eigen::MatrixXd P(L_, L_);
+        Eigen::MatrixXd P(L, L);
         P.setZero();
-        P.block(0, 0, Lx_, Lx_) = covariance_;
-        int d=Lx_;
+        P.block(0, 0, Lx, Lx) = cov;
+        int d=Lx;
         for(const Eigen::MatrixXd &m : covs)
         {
             P.block(d, d, m.rows(), m.cols()) = m;
             d += m.rows();
         }
 
-        Eigen::LLT<Eigen::MatrixXd> llt(((double)L_+lambda)*P);
+        Eigen::LLT<Eigen::MatrixXd> llt(((double)L+lambda)*P);
         Eigen::MatrixXd Psqrt = llt.matrixL();
-        for(int i=0;i<L_;i++)
+        for(int i=0;i<L;i++)
         {
             Eigen::VectorXd p=Psqrt.col(i);
-            Chistate_.push_back(state_.boxplus(p.segment(0, Lx_)));
-            Chinu_.push_back(p.segment(Lx_, Lnu_));
-            weights_.push_back(wi);
-            cweights_.push_back(wi);
+            Chi.push_back(mu.boxplus(p.segment(0, Lx)));
+            nu.push_back(p.segment(Lx, Lnu));
+            weights.push_back(wi);
+            cweights.push_back(wi);
 
-            Chistate_.push_back(state_.boxplus(-1.0*p.segment(0, Lx_)));
-            Chinu_.push_back(-1.0*p.segment(Lx_, Lnu_));
-            weights_.push_back(wi);
-            cweights_.push_back(wi);
+            Chi.push_back(state_.boxplus(-1.0*p.segment(0, Lx)));
+            nu.push_back(-1.0*p.segment(Lx, Lnu));
+            weights.push_back(wi);
+            cweights.push_back(wi);
         }
     }
 
@@ -130,81 +128,106 @@ class ScaledUKF {
         }
 
         void
-        predict(double dt,
-                const std::vector<Eigen::MatrixXd>& measurement_covs,
-                bool predict_only=false
-                )
+        predict(double dt)
         {
             std::vector<Eigen::MatrixXd> covs;
             covs.push_back(process_noise(dt));
-            covs.insert(covs.end(),
-                    measurement_covs.begin(), measurement_covs.end());
-            generateSigmaPoints(covs);
+            std::vector<S> Chi;
+            std::vector<Eigen::VectorXd> nu;
+            std::vector<double> weights, cweights;
+            generateSigmaPoints(state_, covariance_, covs,
+                    Chi, nu, weights, cweights);
 
-            Chiminus_.clear();
-            for(auto && t: zip_range(Chistate_, Chinu_))
+            std::vector<S> Chiminus;
+            int Lx = state_.ndim();
+            for(auto && t: zip_range(Chi, nu))
             {
                 S chi = boost::get<0>(t);
                 Eigen::VectorXd nu = boost::get<1>(t);
-                S st = chi.advance(dt, nu.segment(0, Lx_));
-                Chiminus_.push_back(st);
+                S st = chi.advance(dt, nu.segment(0, Lx));
+                Chiminus.push_back(st);
             }
-            xhatminus_.mean(weights_, Chiminus_);
+            S xhatminus;
+            xhatminus.mean(weights, Chiminus);
 
-            xdiff_.clear();
-            Pminus_.resize(Lx_, Lx_);
-            Pminus_.setZero();
-            for(auto && t: zip_range(cweights_, Chiminus_))
+            Eigen::MatrixXd Pminus(Lx, Lx);
+            Pminus.setZero();
+            for(auto && t: zip_range(cweights, Chiminus))
             {
                 double w = boost::get<0>(t);
                 S pt = boost::get<1>(t);
-                Eigen::VectorXd diff = pt.boxminus(xhatminus_);
-                xdiff_.push_back(diff);
-                Pminus_ += w * diff * diff.transpose();
+                Eigen::VectorXd diff = pt.boxminus(xhatminus);
+                Pminus += w * diff * diff.transpose();
             }
 
-            if(predict_only)
+            for(int i=0;i<Pminus.size();i++)
             {
-                state_ = xhatminus_;
-                covariance_ = Pminus_;
+                if(isnan(*(Pminus.data()+i)) ||
+                   fabs(*(Pminus.data()+i))>10.0f)
+                {
+                    ROS_ERROR("Silly covariance");
+                }
             }
+            state_ = xhatminus;
+            covariance_ = Pminus;
         }
 
         template <typename M>
         void
-        correct(const M& measured)
+        correct(const M& measured,
+                const std::vector<Eigen::MatrixXd>& measurement_covs
+               )
         {
+            std::vector<Eigen::MatrixXd> covs;
+            covs.insert(covs.end(),
+                    measurement_covs.begin(), measurement_covs.end());
+            std::vector<S> Chi;
+            std::vector<Eigen::VectorXd> nu;
+            std::vector<double> weights, cweights;
+            generateSigmaPoints(state_, covariance_, covs,
+                    Chi, nu, weights, cweights);
+
+
             std::vector<M> Yminus;
-            for(const auto && t:zip_range(Chiminus_, Chinu_))
+            for(const auto && t:zip_range(Chi, nu))
             {
                 S st = boost::get<0>(t);
                 Eigen::VectorXd nu = boost::get<1>(t);
                 Yminus.push_back(measured.measure(st,
-                            nu.segment(Lx_, measured.ndim())));
+                            nu.segment(0, measured.ndim())));
             }
 
             M yhatminus;
-            yhatminus.mean(weights_, Yminus);
+            yhatminus.mean(weights, Yminus);
 
-            Eigen::MatrixXd Pxy(Lx_, yhatminus.ndim());
+            int Lx = state_.ndim();
+            Eigen::MatrixXd Pxy(Lx, yhatminus.ndim());
             Pxy.setZero();
             Eigen::MatrixXd Pyminus(measured.ndim(), measured.ndim());
             Pyminus.setZero();
 
-            for(const auto && t: zip_range(cweights_, xdiff_, Yminus))
+            S chi0 = Chi[0];
+            for(const auto && t: zip_range(cweights, Chi, Yminus))
             {
                 double w = boost::get<0>(t);
-                Eigen::VectorXd xdiff = boost::get<1>(t);
-                M m = boost::get<2>(t);
-                Eigen::VectorXd ydiff = m.boxminus(yhatminus);
+                Eigen::VectorXd xdiff = boost::get<1>(t).boxminus(chi0);
+                Eigen::VectorXd ydiff = boost::get<2>(t).boxminus(yhatminus);
                 Pyminus += w * ydiff * ydiff.transpose();
                 Pxy += w * xdiff * ydiff.transpose();
             }
 
-            Eigen::MatrixXd K(yhatminus.ndim(), Lx_);
+            Eigen::MatrixXd K(yhatminus.ndim(), Lx);
             K = Pxy*Pyminus.inverse();
-            state_ = xhatminus_.boxplus(K*(measured.boxminus(yhatminus)));
-            covariance_ = Pminus_ - K*Pyminus*K.transpose();
+            state_ = state_.boxplus(K*(measured.boxminus(yhatminus)));
+            covariance_ = covariance_ - K*Pyminus*K.transpose();
+            for(int i=0;i<covariance_.size();i++)
+            {
+                if(isnan(*(covariance_.data()+i)) ||
+                   fabs(*(covariance_.data()+i))>10.0f)
+                {
+                    ROS_ERROR("Silly covariance");
+                }
+            }
         }
 
         const S& state(void) {return state_;};
