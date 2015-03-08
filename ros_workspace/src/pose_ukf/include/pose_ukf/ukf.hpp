@@ -9,30 +9,6 @@
 
 namespace UKF {
 
-template <class T, class S>
-struct Measurement {
-    virtual Eigen::VectorXd boxminus(const T& other) const = 0;
-    virtual void mean(const std::vector<double>& weights,
-              const std::vector<T>& Chimeas) = 0;
-
-    virtual T measure(const S& state, const Eigen::VectorXd& noise) const = 0;
-    virtual ssize_t ndim(void) const = 0;
-
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
-
-template <class S>
-struct State {
-    virtual S boxplus(const Eigen::VectorXd& offset) const = 0;
-    virtual Eigen::VectorXd boxminus(const S& other) const = 0;
-    virtual S advance(double dt, const Eigen::VectorXd& Chinu) const = 0;
-    virtual void mean(const std::vector<double>& weights,
-                      const std::vector<S>& Chistate) = 0;
-    virtual ssize_t ndim(void) const = 0;
-
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
-
 template <typename S>
 class ScaledUKF {
 
