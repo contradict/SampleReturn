@@ -176,7 +176,7 @@ runTest(void)
     ukf.reset(st, cov);
 
     Eigen::MatrixXd measurement_noise(1,1);
-    measurement_noise(0,0) = 0.01;
+    measurement_noise(0,0) = 0.02;
     std::vector<Eigen::MatrixXd> mcovs;
     mcovs.push_back(measurement_noise);
 
