@@ -160,8 +160,8 @@ struct IMUOrientationMeasurement : UKF::Measurement<struct IMUOrientationMeasure
     {
         struct IMUOrientationMeasurement m;
         Eigen::Vector3d gravity(0, 0, -littleg);
-        m.omega = st.Omega + st.GyroBias + noise.segment<3>(0);
-        m.acceleration = st.Orientation * (gravity + st.AccelBias) + noise.segment<3>(3);
+        m.acceleration = st.Orientation * (gravity + st.AccelBias) + noise.segment<3>(0);
+        m.omega = st.Omega + st.GyroBias + noise.segment<3>(3);
         return m;
     };
 
