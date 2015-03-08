@@ -113,6 +113,7 @@ include_directories(
 ## Declare a cpp library
 add_library(pose_ukf
    src/pose_ukf_impl.cpp
+   src/pitchroll_ukf_impl.cpp
 )
 
 ## Declare a cpp executable
@@ -123,6 +124,15 @@ target_link_libraries(pose_ukf_node
    ${Boost_LIBRARIES}
    ${eigen_LIBRARIES}
 )
+
+add_executable(pitchroll_ukf_node src/pitchroll_node.cpp)
+target_link_libraries(pitchroll_ukf_node
+    pose_ukf
+   ${catkin_LIBRARIES}
+   ${Boost_LIBRARIES}
+   ${eigen_LIBRARIES}
+)
+
 
 add_executable(test_ukf
     src/test/ukf_test.cpp)
