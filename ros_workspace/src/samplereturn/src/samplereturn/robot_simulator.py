@@ -135,8 +135,8 @@ class RobotSimulator(object):
         pursuit_result_name = "/processes/executive/pursuit_result"
         detected_sample_search_name = "/processes/sample_detection/search/filtered_point"
         detected_sample_manipulator_name = "/processes/sample_detection/manipulator/filtered_point"
-        beacon_pose_name = "/processes/beacon_finder/beacon_pose"
-        beacon_debug_pose_name = "/processes/beacon_finder/beacon_pose_debug"
+        beacon_pose_name = "/processes/beacon/beacon_pose"
+        beacon_debug_pose_name = "/processes/beacon/beacon_pose_debug"
 
         point_cloud_center_name = "/cameras/navigation/center/points2"
         point_cloud_port_name = "/cameras/navigation/port/points2"

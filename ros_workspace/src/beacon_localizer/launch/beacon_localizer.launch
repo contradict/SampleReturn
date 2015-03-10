@@ -13,7 +13,7 @@
 		pkg="beacon_localizer"
 		type="beacon_localizer"
         output="log"
-        ns="/processes/beacon_finder">
+        ns="/processes/beacon">
 
         <param name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
         <param name="odometry_frame" value="$(arg odometry_frame)"/>

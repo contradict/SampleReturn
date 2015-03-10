@@ -12,7 +12,7 @@
 		pkg="beacon_finder"
 		type="beacon_finder.py"
         output="log"
-        ns="/processes/beacon_finder">
+        ns="/processes/beacon">
 
     <param name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
     <param name="num_rows" type="int" value="3"/>
