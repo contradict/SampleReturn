@@ -100,7 +100,6 @@ void BeaconKFNode::createFilter( void)
 
     _system_model = new BFL::LinearAnalyticSystemModelGaussianUncertainty(_system_pdf);
 
-
     MatrixWrapper::ColumnVector priorMu(3);
     priorMu(1) = 0.0;
     priorMu(2) = 0.0;
@@ -181,7 +180,6 @@ void BeaconKFNode::transformBroadcastCallback( const ros::TimerEvent& e )
 
 void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConstPtr msg )
 {
-    ROS_INFO("beacon");
     tf::StampedTransform T_beacon_to_camera;
     tf::poseMsgToTF( msg->pose.pose, T_beacon_to_camera);
     ros::Time beacon_stamp = msg->header.stamp;
@@ -262,7 +260,6 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
        ROS_INFO("[ %f, %f, %f ]", rpointCov[2][0], rpointCov[2][1], rpointCov[2][2]);
        */
 
-
     MatrixWrapper::SymmetricMatrix measNoiseCovariance(3);
     //measNoiseCovariance(1,1) = rpointCov[0][0]; measNoiseCovariance(1,2) = rpointCov[0][1]; measNoiseCovariance(1,3) = 0;
     //measNoiseCovariance(2,1) = rpointCov[1][0]; measNoiseCovariance(2,2) = rpointCov[1][1]; measNoiseCovariance(2,3) = 0;
@@ -285,7 +282,6 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     BFL::LinearAnalyticConditionalGaussian beaconMeasurementPdf(measH, measUncertainty);
 
     BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMeasurementPdf);
-
 
     _filter->Update(_system_model, &beaconMeasurementModel, measurement);
 
