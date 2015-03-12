@@ -156,7 +156,7 @@ class RobotSimulator(object):
         #odometry
         self.odometry_dt = 0.05
         odometry_noise_sigma = np.diag([0.1, 0.1, 0.01, 0.01])
-        self.odometry_noise_mean = [0.0, 0.0, -0.001, 0.0]
+        self.odometry_noise_mean = [0.0, 0.0, 0.0005, 0.0]
         self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
@@ -609,10 +609,10 @@ class RobotSimulator(object):
             return
 
         #get beacon covar and pose from beacon_finder launch
-        beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/frontback_covariance"))
-        beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon_finder/beacon_finder/side_covariance"))
-        beacon_translation = rospy.get_param("/processes/beacon_finder/beacon_finder/beacon_translation")
-        beacon_rotation = rospy.get_param("/processes/beacon_finder/beacon_finder/beacon_rotation")
+        beacon_frontback_covariance = np.diag(rospy.get_param("/processes/beacon/beacon_finder/frontback_covariance"))
+        beacon_side_covariance = np.diag(rospy.get_param("/processes/beacon/beacon_finder/side_covariance"))
+        beacon_translation = rospy.get_param("/processes/beacon/beacon_finder/beacon_translation")
+        beacon_rotation = rospy.get_param("/processes/beacon/beacon_finder/beacon_rotation")
                 
         dist_from_origin = np.hypot(self.robot_pose.pose.position.x,
                                     self.robot_pose.pose.position.y)
