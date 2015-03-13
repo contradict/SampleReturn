@@ -7,3 +7,6 @@
 [submodule "ros_workspace/src/camera1394"]
 	path = ros_workspace/src/camera1394
 	url = https://github.com/zaclizer/camera1394.git
+[submodule "ros_workspace/src/perception_blort"]
+	path = ros_workspace/src/perception_blort
+	url = https://github.com/pal-robotics/perception_blort.git
