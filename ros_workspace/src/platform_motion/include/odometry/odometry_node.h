@@ -80,7 +80,8 @@ class OdometryNode {
         std::string odom_frame_id, child_frame_id;
 
         struct odometry_measurements data;
-
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 }
