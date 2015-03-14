@@ -2,8 +2,8 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
-    <arg name="odometry_frame" value="fake_odom"/>
-    <arg name="world_fixed_frame" value="fake_map"/>
+    <arg name="odometry_frame" value="odom"/>
+    <arg name="world_fixed_frame" value="sim_map"/>
     <arg name="beacon_localization" value="true"/>
 
     <!-- begin test arguments -->
@@ -45,8 +45,8 @@
         type="map_server"
         ns="/processes/planner"
         output="log"
-        args="$(find samplereturn)/$(arg map_config)"
-        >
+        args="$(find samplereturn)/$(arg map_config)" >
+    
     </node>
 
     <node
