@@ -168,7 +168,6 @@ void BeaconKFNode::transformBroadcastCallback( const ros::TimerEvent& e )
     }
     
     //This is the map to odom transform, broadcast it and save it in a variable.
-    //It will be used elsewhere in this class
     _T_map_to_odom = tf::StampedTransform(tf::Transform(odom_orientation, odom_origin),
                                           now,
                                           _world_fixed_frame,
@@ -186,7 +185,8 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     T_beacon_to_camera.stamp_ = beacon_stamp;
     _camera_frame_id = msg->header.frame_id;
     
-    tf::Transform T_map_to_odom;
+    //measured map->odom transform
+    tf::Transform T_measured_mto;
     
     try {
         _tf.waitForTransform("base_link", _camera_frame_id,
@@ -207,11 +207,12 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
         _tf.lookupTransform("beacon", _world_fixed_frame, ros::Time(0), T_map_to_beacon);
                 
         //This calculates the correction thusly:
-        //map->odom->base->camera->measured-beacon * beacon->map
-        T_map_to_odom = _T_map_to_odom*T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
+        //odom->base->camera->measured-beacon * beacon->map
+        T_measured_mto = T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
+        T_measured_mto = T_measured_mto.inverse();
         
         //broadcast this T_map_to odom from real map
-        tf::StampedTransform test_map_to_odom(T_map_to_odom,
+        tf::StampedTransform test_map_to_odom(T_measured_mto,
                                               msg->header.stamp,
                                               _world_fixed_frame,
                                               "beacon_localizer_T");
@@ -225,9 +226,9 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
 
     MatrixWrapper::ColumnVector measurement(3);
 
-    measurement(1) = T_map_to_odom.getOrigin()[0];
-    measurement(2) = T_map_to_odom.getOrigin()[1];
-    measurement(3) = tf::getYaw( T_map_to_odom.getRotation() );
+    measurement(1) = T_measured_mto.getOrigin()[0];
+    measurement(2) = T_measured_mto.getOrigin()[1];
+    measurement(3) = tf::getYaw( T_measured_mto.getRotation() );
     ROS_DEBUG_STREAM("measurement: " << measurement.transpose() );
 
     MatrixWrapper::ColumnVector state =_filter->PostGet()->ExpectedValueGet();
