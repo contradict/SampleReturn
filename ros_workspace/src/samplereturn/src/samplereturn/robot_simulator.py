@@ -51,9 +51,9 @@ class RobotSimulator(object):
         self.publish_beacon = publish_beacon
         self.odometry_is_noisy = True
         self.broadcast_localization = False #fake localization handled by beacon_localizer!
-        self.true_map = 'map'
-        self.sim_map = 'fake_map'
-        self.sim_odom = 'fake_odom'
+        self.reality_frame = 'map'
+        self.sim_map = 'sim_map'
+        self.sim_odom = 'odom'
         
         #simulator state variables and constants            
         self.GPIO_LEVEL_ONE = 0x20
@@ -79,7 +79,7 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
-        self.sample_marker.header = std_msg.Header(0, rospy.Time(0), self.true_map)
+        self.sample_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         self.sample_marker.type = vis_msg.Marker.CYLINDER
         self.sample_marker.scale = geometry_msg.Vector3(.6, .6, .05)
         self.sample_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
@@ -94,7 +94,7 @@ class RobotSimulator(object):
         self.debug_marker.lifetime = rospy.Duration(1.5)
         
         self.path_marker = vis_msg.Marker()
-        self.path_marker.header = std_msg.Header(0, rospy.Time(0), self.true_map)
+        self.path_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         self.path_marker.type = vis_msg.Marker.ARROW
         self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
         self.path_marker.scale = geometry_msg.Vector3(.5, .04, .04)
@@ -304,9 +304,10 @@ class RobotSimulator(object):
                                                   "port_suspension",
                                                   rospy.Time(0),
                                                   rospy.Duration(1.0))
-                print "Waiting for robot_state_publisher transforms"
+                rospy.logdebug("Waiting for robot_state_publisher transforms")
                 break
             except (tf.Exception):
+                rospy.logdebug("No robot_state_publisher transforms")
                 pass
         
         (x, y,_),_ =  self.tf_listener.lookupTransform('base_link', 'port_suspension', rospy.Time(0))
@@ -343,7 +344,7 @@ class RobotSimulator(object):
        
     def publish_path_markers(self, event):
         try:
-            self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, self.true_map).pose
+            self.path_marker.pose = util.get_current_robot_pose(self.tf_listener, self.reality_frame).pose
         except:
             return
         self.path_marker.id = self.path_counter
@@ -370,7 +371,7 @@ class RobotSimulator(object):
         pose_list.append(next_pose)
         
         fake_header = std_msg.Header(0, rospy.Time(0), self.sim_map)
-        header = std_msg.Header(0, rospy.Time(0), self.true_map)
+        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         quat = geometry_msg.Quaternion(0,0,0,1)
         pose =  geometry_msg.PoseStamped(header,
                 geometry_msg.Pose(geometry_msg.Point(15,0,0), quat))
@@ -415,15 +416,15 @@ class RobotSimulator(object):
         #rospy.loginfo("Starting PC generation")
 
         now = event.current_real
-        header = std_msg.Header(0, now, self.true_map)
+        header = std_msg.Header(0, now, self.reality_frame)
         target_frame = 'navigation_center_left_camera'
         try:
-            self.tf_listener.waitForTransform(self.true_map,
+            self.tf_listener.waitForTransform(self.sim_map,
                                               target_frame,
                                               now,
                                               rospy.Duration(0.5))
             current_pose = util.get_current_robot_pose(self.tf_listener,
-                    self.true_map)
+                    self.reality_frame)
             transform = self.tf_listener.asMatrix(target_frame, header)
         except ( tf.Exception ), e:
             #rospy.loginfo("Failed to transform map for PC")
@@ -463,8 +464,8 @@ class RobotSimulator(object):
         transforms.append(transform)
 
         #broadcast the clean base_link in map for comparison
-        transform = TransformStamped(std_msg.Header(0, now, self.true_map),
-                                     'base_link_in_map',
+        transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
+                                     'perfect_odometry_in_static_frame',
                                      Transform(self.robot_pose.pose.position,
                                                self.robot_pose.pose.orientation))
         transforms.append(transform)
@@ -478,7 +479,7 @@ class RobotSimulator(object):
             tn = (self.noisy_robot_pose.pose.position.x,
                   self.noisy_robot_pose.pose.position.y,
                   self.noisy_robot_pose.pose.position.z)
-            nrpt = tf.transformations.compose_matrix(
+            noise_to_odom = tf.transformations.compose_matrix(
                     angles=tf.transformations.euler_from_quaternion(qn),
                     translate=tn)
 
@@ -489,35 +490,65 @@ class RobotSimulator(object):
             tp = (self.robot_pose.pose.position.x,
                   self.robot_pose.pose.position.y,
                   self.robot_pose.pose.position.z)
-            rpt = tf.transformations.compose_matrix(
-                    angles=tf.transformations.euler_from_quaternion(qp),
-                    translate=tp)
+            base_to_odom = tf.transformations.compose_matrix(
+                            angles=tf.transformations.euler_from_quaternion(qp),
+                            translate=tp)
             
             #a transform to show where the integrated noise takes us in real map
-            _,_,nrp_angles, nrp_translate,_ = tf.transformations.decompose_matrix(nrpt)
-            nrp_rot = tf.transformations.quaternion_from_euler(*nrp_angles)
+            _,_,noise_angles, noise_translate,_ = tf.transformations.decompose_matrix(noise_to_odom)
+            noise_rot = tf.transformations.quaternion_from_euler(*noise_angles)
 
-            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
-                                         'base_link_noisy_in_map',
-                                         Transform(geometry_msg.Vector3(*nrp_translate),
-                                                   geometry_msg.Quaternion(*nrp_rot)))
+            transform = TransformStamped(std_msg.Header(0, now, self.sim_map),
+                                         'noisy_odometry_in_sim_map',
+                                         Transform(geometry_msg.Vector3(*noise_translate),
+                                                   geometry_msg.Quaternion(*noise_rot)))
             transforms.append(transform)
 
-            #get the transform between clean and noisy base_link, in odom
-            mfm = np.dot(nrpt, np.linalg.inv(rpt))
+            #calculate the transform between clean and noisy base_link, in odom
+            noise_transform = np.dot(noise_to_odom, np.linalg.inv(base_to_odom))
             
-            #this is the actual map->fake_map noise transform
-            _, _, mfm_angles, mfm_translate, _ = tf.transformations.decompose_matrix(mfm)
-            mfm_rot = tf.transformations.quaternion_from_euler(*mfm_angles)
+            #publish the transform for visualization
+            _, _, nt_angles, nt_translate, _ = tf.transformations.decompose_matrix(noise_transform)
+            nt_rot = tf.transformations.quaternion_from_euler(*nt_angles)
+            transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
+                                         'noise_transform',
+                                         Transform(geometry_msg.Vector3(*nt_translate),
+                                                   geometry_msg.Quaternion(*nt_rot)))
+            transforms.append(transform)
 
-            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+            #get the current correction broadcast by the localizer (map->odom)
+            try:
+                self.tf_listener.waitForTransform(self.sim_odom,
+                                                  self.sim_map,
+                                                  now,
+                                                  rospy.Duration(0.2))
+                pos, quat = self.tf_listener.lookupTransform(self.sim_odom, self.sim_map, now)
+                #get the matrix describing map->odom
+                map_to_odom = tf.transformations.compose_matrix(
+                              angles=tf.transformations.euler_from_quaternion(quat),
+                              translate=pos)
+
+                #apply the correction map->odom
+                error = np.dot(noise_transform, map_to_odom)
+
+            except tf.Exception:
+                #if the transform isn't availabe, no correction applied
+                error = noise_transform
+                rospy.logdebug("NO map->odom transform... we probably just started running")            
+
+            #this is the map->sim_map transform, which should be the error between the
+            #integrated noise and the localization corrections
+            _, _, error_angles, error_translate, _ = tf.transformations.decompose_matrix(error)
+            error_rot = tf.transformations.quaternion_from_euler(*error_angles)
+
+            transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
                                          self.sim_map,
-                                         Transform(geometry_msg.Vector3(*mfm_translate),
-                                                   geometry_msg.Quaternion(*mfm_rot)))
+                                         Transform(geometry_msg.Vector3(*error_translate),
+                                                   geometry_msg.Quaternion(*error_rot)))
             transforms.append(transform)
             
         else:
-            transform = TransformStamped(std_msg.Header(0, now, self.true_map),
+            transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
                                          self.sim_map,
                                          Transform(self.zero_translation,
                                                    self.zero_rotation))
@@ -547,7 +578,7 @@ class RobotSimulator(object):
     def publish_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                header = std_msg.Header(0, rospy.Time.now(), self.true_map)    
+                header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)    
                 self.sample_marker.header = header
                 self.sample_marker.pose.position = sample['point']
                 self.sample_marker.id = sample['id']
@@ -575,7 +606,7 @@ class RobotSimulator(object):
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], 0.5, 0.2):
-                        header = std_msg.Header(0, rospy.Time.now(), self.true_map)
+                        header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
                         msg.point = sample['point']
@@ -583,7 +614,7 @@ class RobotSimulator(object):
                         self.manipulator_sample_pub.publish(msg)
             
     def sample_in_view(self, point, max_x, max_y):
-        header = std_msg.Header(0, rospy.Time(0), self.true_map)
+        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         point_stamped = geometry_msg.PointStamped(header, point)
         try:
             base_relative = self.tf_listener.transformPoint('base_link',
@@ -623,10 +654,10 @@ class RobotSimulator(object):
         angle_to_robot = np.arctan2(self.robot_pose.pose.position.y,
                                     self.robot_pose.pose.position.x)
         # can't see beacon with pi/5 of edge
-        if (abs(angle_to_robot - np.pi/2) < pi/5 or
-            abs(angle_to_robot + np.pi/2) < pi/5):
-            #print ("NO BEACON PUB: on edge, angle_to_robot: %.2f" %(angle_to_robot))
-            return
+        #if (abs(angle_to_robot - np.pi/2) < pi/5 or
+        #    abs(angle_to_robot + np.pi/2) < pi/5):
+        #    #print ("NO BEACON PUB: on edge, angle_to_robot: %.2f" %(angle_to_robot))
+        #    return
         robot_yaw = 2*np.arctan2(self.robot_pose.pose.orientation.z,
                                  self.robot_pose.pose.orientation.w)
         angle_to_origin = util.unwind(angle_to_robot+np.pi-robot_yaw)
@@ -645,11 +676,11 @@ class RobotSimulator(object):
             #then load the beacon pose (in true map), and transform to search_camera_lens
             try:
                 now = self.tf_listener.getLatestCommonTime('search_camera_lens',
-                                                            self.true_map,)
+                                                            self.reality_frame,)
                 msg = geometry_msg.PoseWithCovarianceStamped()
                 msg_pose = geometry_msg.PoseStamped()
-                msg.header = std_msg.Header(0, now, self.true_map)
-                msg_pose.header = std_msg.Header(0, now, self.true_map)
+                msg.header = std_msg.Header(0, now, self.reality_frame)
+                msg_pose.header = std_msg.Header(0, now, self.reality_frame)
                 q = tf.transformations.quaternion_from_euler(*beacon_rotation)
                 msg_pose.pose.orientation.x = q[0]
                 msg_pose.pose.orientation.y = q[1]
