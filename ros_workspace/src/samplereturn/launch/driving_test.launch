@@ -52,7 +52,7 @@
 
     <!-- Launch executive last -->
     <include file="$(find executive)/launch/executive.launch">
-        <arg name="executive_config" value="$(arg executive_config"/>
+        <arg name="executive_config" value="$(arg executive_config)"/>
     </include>
 
 </launch>
