@@ -457,7 +457,7 @@ class StartSamplePursuit(smach.State):
        
         #create return destination
         current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                   frame_id = userdata.odometry_frame)
+                                                   userdata.odometry_frame)
         current_pose.header.stamp = rospy.Time(0)
         goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose)
         userdata.return_goal = goal        

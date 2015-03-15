@@ -27,7 +27,7 @@ class BeaconKFNode
 
     private:
         void getCovarianceMatrix(std::string param_name, MatrixWrapper::SymmetricMatrix& m);
-        void odometryCallback( nav_msgs::OdometryConstPtr );
+        void transformBroadcastCallback( const ros::TimerEvent& e );
         void beaconCallback( geometry_msgs::PoseWithCovarianceStampedConstPtr msg );
         void filterUpdateCallback( const ros::TimerEvent& e );
 
@@ -44,12 +44,14 @@ class BeaconKFNode
         ros::Subscriber          _beacon_sub;
         tf::TransformListener    _tf;
         tf::TransformBroadcaster _tf_broadcast;
+        ros::Timer               _transform_broadcast_timer;
         ros::Timer               _update_timer;
 
         std::string _camera_frame_id;
         ros::Time _last_beacon_time;
 
-        tf::StampedTransform _T_odom;
+        tf::StampedTransform _T_odom;  //base_link in odom
+        tf::StampedTransform _T_map_to_odom;
 };
 
 BeaconKFNode::BeaconKFNode( void ):
@@ -98,7 +100,6 @@ void BeaconKFNode::createFilter( void)
 
     _system_model = new BFL::LinearAnalyticSystemModelGaussianUncertainty(_system_pdf);
 
-
     MatrixWrapper::ColumnVector priorMu(3);
     priorMu(1) = 0.0;
     priorMu(2) = 0.0;
@@ -120,20 +121,35 @@ void BeaconKFNode::initializeRos( void )
 
     private_nh.param("world_fixed_frame", _world_fixed_frame, std::string("map"));
     private_nh.param("odometry_frame", _odometry_frame, std::string("odom"));
-    _odometry_sub = nh.subscribe( "odometry", 1, &BeaconKFNode::odometryCallback, this);
+
+    //beacon message subscriber callback
     _beacon_sub = nh.subscribe( "beacon_pose", 1, &BeaconKFNode::beaconCallback, this);
 
+    //define timer rates
     double update_period;
+    double broadcast_period;
     private_nh.param("update_period", update_period, 1.0);
+    private_nh.param("broadcast_period", broadcast_period, 0.05);
 
-    _update_timer =private_nh.createTimer(ros::Duration(update_period), &BeaconKFNode::filterUpdateCallback, this);
+    //timer for broadcasting the map correction xfrom    
+    _transform_broadcast_timer = private_nh.createTimer(ros::Duration(broadcast_period),
+                                           &BeaconKFNode::transformBroadcastCallback,
+                                           this);
+    
+    //timer for updating the EKF
+    _update_timer = private_nh.createTimer(ros::Duration(update_period),
+                                           &BeaconKFNode::filterUpdateCallback,
+                                           this);
+
 }
 
-void BeaconKFNode::odometryCallback( nav_msgs::OdometryConstPtr odom )
+void BeaconKFNode::transformBroadcastCallback( const ros::TimerEvent& e )
 {
-    tf::poseMsgToTF( odom->pose.pose, _T_odom );
-    _T_odom.stamp_ = odom->header.stamp;
-
+    (void) e; //so the compiler doesn't whine?
+    
+    ros::Time now = ros::Time::now();
+    
+    //ask the filter for the current state
     MatrixWrapper::ColumnVector state = _filter->PostGet()->ExpectedValueGet();
     tf::Vector3 odom_origin;
     tf::Quaternion odom_orientation;
@@ -150,160 +166,126 @@ void BeaconKFNode::odometryCallback( nav_msgs::OdometryConstPtr odom )
         odom_origin.setZ(0);
         odom_orientation = tf::createQuaternionFromYaw( state(3) );
     }
-    tf::StampedTransform T_map_to_odom(
-            tf::Transform( odom_orientation, odom_origin ),
-            odom->header.stamp,
-            _world_fixed_frame,
-            _odometry_frame);
-    _tf_broadcast.sendTransform( T_map_to_odom );
+    
+    //This is the map to odom transform, broadcast it and save it in a variable.
+    _T_map_to_odom = tf::StampedTransform(tf::Transform(odom_orientation, odom_origin),
+                                          now,
+                                          _world_fixed_frame,
+                                          _odometry_frame);
+                                          //"beacon_localizer_correction");
+    _tf_broadcast.sendTransform( _T_map_to_odom );
 
 }
 
 void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConstPtr msg )
 {
-    ROS_INFO("beacon");
     tf::StampedTransform T_beacon_to_camera;
     tf::poseMsgToTF( msg->pose.pose, T_beacon_to_camera);
-    T_beacon_to_camera.stamp_ = msg->header.stamp;
+    ros::Time beacon_stamp = msg->header.stamp;
+    T_beacon_to_camera.stamp_ = beacon_stamp;
     _camera_frame_id = msg->header.frame_id;
-    ROS_DEBUG_STREAM("T_beacon_to_camera t: (" <<
-            T_beacon_to_camera.getOrigin()[0] << ", " <<
-            T_beacon_to_camera.getOrigin()[1] << ", " <<
-            T_beacon_to_camera.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_beacon_to_camera.getRotation()[0] << ", " <<
-            T_beacon_to_camera.getRotation()[1] << ", " <<
-            T_beacon_to_camera.getRotation()[2] << ", " <<
-            T_beacon_to_camera.getRotation()[3] << ", " <<
-            ")"
-            );
-
-    tf::StampedTransform T_camera_to_base;
-    _tf.lookupTransform("base_link", _camera_frame_id, ros::Time(0), T_camera_to_base);
-    ROS_DEBUG_STREAM("T_camera_to_base t: (" <<
-            T_camera_to_base.getOrigin()[0] << ", " <<
-            T_camera_to_base.getOrigin()[1] << ", " <<
-            T_camera_to_base.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_camera_to_base.getRotation()[0] << ", " <<
-            T_camera_to_base.getRotation()[1] << ", " <<
-            T_camera_to_base.getRotation()[2] << ", " <<
-            T_camera_to_base.getRotation()[3] << ", " <<
-            ")"
-            );
-
-    tf::StampedTransform T_map_to_beacon;
-    _tf.lookupTransform("beacon", _world_fixed_frame, ros::Time(0), T_map_to_beacon);
-    ROS_DEBUG_STREAM("T_beacon_to_map t: (" <<
-            T_map_to_beacon.getOrigin()[0] << ", " <<
-            T_map_to_beacon.getOrigin()[1] << ", " <<
-            T_map_to_beacon.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_map_to_beacon.getRotation()[0] << ", " <<
-            T_map_to_beacon.getRotation()[1] << ", " <<
-            T_map_to_beacon.getRotation()[2] << ", " <<
-            T_map_to_beacon.getRotation()[3] << ", " <<
-            ")"
-            );
-
-    //T_odom is T_base_to_odom
-    ROS_DEBUG_STREAM("T_base_to_odom t: (" <<
-            _T_odom.getOrigin()[0] << ", " <<
-            _T_odom.getOrigin()[1] << ", " <<
-            _T_odom.getOrigin()[2] << ") " <<
-            " q: (" <<
-            _T_odom.getRotation()[0] << ", " <<
-            _T_odom.getRotation()[1] << ", " <<
-            _T_odom.getRotation()[2] << ", " <<
-            _T_odom.getRotation()[3] << ", " <<
-            ")"
-            );
-
-    tf::Transform T_map_to_odom = _T_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
-    ROS_DEBUG_STREAM("T_map_to_odom t: (" <<
-            T_map_to_odom.getOrigin()[0] << ", " <<
-            T_map_to_odom.getOrigin()[1] << ", " <<
-            T_map_to_odom.getOrigin()[2] << ") " <<
-            " q: (" <<
-            T_map_to_odom.getRotation()[0] << ", " <<
-            T_map_to_odom.getRotation()[1] << ", " <<
-            T_map_to_odom.getRotation()[2] << ", " <<
-            T_map_to_odom.getRotation()[3] << ", " <<
-            ")"
-            );
+    
+    //measured map->odom transform
+    tf::Transform T_measured_mto;
+    
+    try {
+        _tf.waitForTransform("base_link", _camera_frame_id,
+                             beacon_stamp, ros::Duration(1.0));
+        
+        tf::StampedTransform T_camera_to_base;
+        _tf.lookupTransform("base_link", _camera_frame_id, beacon_stamp, T_camera_to_base);
+    
+        _tf.waitForTransform(_odometry_frame, "base_link",
+                             beacon_stamp, ros::Duration(1.0));
+    
+        tf::StampedTransform T_base_to_odom;
+        _tf.lookupTransform(_odometry_frame, "base_link", beacon_stamp, T_base_to_odom);            
+                
+        //this is in the reverse of the normal xform direction, for the error xform calc
+        //this is a static xform from beacon_finder, timestamp isn't important
+        tf::StampedTransform T_map_to_beacon;
+        _tf.lookupTransform("beacon", _world_fixed_frame, ros::Time(0), T_map_to_beacon);
+                
+        //This calculates the correction thusly:
+        //odom->base->camera->measured-beacon * beacon->map
+        T_measured_mto = T_base_to_odom*T_camera_to_base*T_beacon_to_camera*T_map_to_beacon;
+        T_measured_mto = T_measured_mto.inverse();
+        
+        //broadcast this T_map_to odom from real map
+        tf::StampedTransform test_map_to_odom(T_measured_mto,
+                                              msg->header.stamp,
+                                              _world_fixed_frame,
+                                              "beacon_localizer_T");
+        _tf_broadcast.sendTransform( test_map_to_odom );
+    }
+    catch (tf::TransformException &ex) {
+         ROS_ERROR("BEACON_LOCALIZER transform lookup failure: %s", ex.what());
+         ros::Duration(1.0).sleep();
+         return;
+    }
 
     MatrixWrapper::ColumnVector measurement(3);
 
-    measurement(1) = T_map_to_odom.getOrigin()[0];
-    measurement(2) = T_map_to_odom.getOrigin()[1];
-    measurement(3) = tf::getYaw( T_map_to_odom.getRotation() );
+    measurement(1) = T_measured_mto.getOrigin()[0];
+    measurement(2) = T_measured_mto.getOrigin()[1];
+    measurement(3) = tf::getYaw( T_measured_mto.getRotation() );
     ROS_DEBUG_STREAM("measurement: " << measurement.transpose() );
 
     MatrixWrapper::ColumnVector state =_filter->PostGet()->ExpectedValueGet();
     MatrixWrapper::ColumnVector err = (state-measurement);
     double distance = sqrt(err.transpose()*err);
 
-    if(distance>5)
-    {
-        _prior->ExpectedValueSet( measurement );
-        _filter->Reset(_prior);
-    }
-    else
-    {
+    MatrixWrapper::SymmetricMatrix cov(6);
+    cov(1,1) = msg->pose.covariance[0]; cov(1,2) = msg->pose.covariance[1]; cov(1,3) = msg->pose.covariance[2]; cov(1,4) = msg->pose.covariance[3]; cov(1,5) = msg->pose.covariance[4]; cov(1,6) = msg->pose.covariance[5];
+    cov(2,1) = msg->pose.covariance[6]; cov(2,2) = msg->pose.covariance[7]; cov(2,3) = msg->pose.covariance[8]; cov(2,4) = msg->pose.covariance[9]; cov(2,5) = msg->pose.covariance[10];cov(2,6) = msg->pose.covariance[11];
+    cov(3,1) = msg->pose.covariance[12];cov(3,2) = msg->pose.covariance[13];cov(3,3) = msg->pose.covariance[14];cov(3,4) = msg->pose.covariance[15];cov(3,5) = msg->pose.covariance[16];cov(3,6) = msg->pose.covariance[17];
+    cov(4,1) = msg->pose.covariance[18];cov(4,2) = msg->pose.covariance[19];cov(4,3) = msg->pose.covariance[20];cov(4,4) = msg->pose.covariance[21];cov(4,5) = msg->pose.covariance[22];cov(4,6) = msg->pose.covariance[23];
+    cov(5,1) = msg->pose.covariance[24];cov(5,2) = msg->pose.covariance[25];cov(5,3) = msg->pose.covariance[26];cov(5,4) = msg->pose.covariance[27];cov(5,5) = msg->pose.covariance[28];cov(5,6) = msg->pose.covariance[29];
+    cov(6,1) = msg->pose.covariance[30];cov(6,2) = msg->pose.covariance[31];cov(6,3) = msg->pose.covariance[32];cov(6,4) = msg->pose.covariance[33];cov(6,5) = msg->pose.covariance[34];cov(6,6) = msg->pose.covariance[35];
 
-        MatrixWrapper::SymmetricMatrix cov(6);
-        cov(1,1) = msg->pose.covariance[0]; cov(1,2) = msg->pose.covariance[1]; cov(1,3) = msg->pose.covariance[2]; cov(1,4) = msg->pose.covariance[3]; cov(1,5) = msg->pose.covariance[4]; cov(1,6) = msg->pose.covariance[5];
-        cov(2,1) = msg->pose.covariance[6]; cov(2,2) = msg->pose.covariance[7]; cov(2,3) = msg->pose.covariance[8]; cov(2,4) = msg->pose.covariance[9]; cov(2,5) = msg->pose.covariance[10];cov(2,6) = msg->pose.covariance[11];
-        cov(3,1) = msg->pose.covariance[12];cov(3,2) = msg->pose.covariance[13];cov(3,3) = msg->pose.covariance[14];cov(3,4) = msg->pose.covariance[15];cov(3,5) = msg->pose.covariance[16];cov(3,6) = msg->pose.covariance[17];
-        cov(4,1) = msg->pose.covariance[18];cov(4,2) = msg->pose.covariance[19];cov(4,3) = msg->pose.covariance[20];cov(4,4) = msg->pose.covariance[21];cov(4,5) = msg->pose.covariance[22];cov(4,6) = msg->pose.covariance[23];
-        cov(5,1) = msg->pose.covariance[24];cov(5,2) = msg->pose.covariance[25];cov(5,3) = msg->pose.covariance[26];cov(5,4) = msg->pose.covariance[27];cov(5,5) = msg->pose.covariance[28];cov(5,6) = msg->pose.covariance[29];
-        cov(6,1) = msg->pose.covariance[30];cov(6,2) = msg->pose.covariance[31];cov(6,3) = msg->pose.covariance[32];cov(6,4) = msg->pose.covariance[33];cov(6,5) = msg->pose.covariance[34];cov(6,6) = msg->pose.covariance[35];
+    /*
+       tf::Matrix3x3 pointDevMat(
+       sqrt(cov(1,1)),              0,             0,
+       0.0, sqrt(cov(2,2)),             0,
+       0.0,            0.0, sqrt(cov(3,3)));
+       ROS_INFO("Point deviation");
+       ROS_INFO("[ %f, %f, %f ]", pointDevMat[0][0], pointDevMat[0][1], pointDevMat[0][2]);
+       ROS_INFO("[ %f, %f, %f ]", pointDevMat[1][0], pointDevMat[1][1], pointDevMat[1][2]);
+       ROS_INFO("[ %f, %f, %f ]", pointDevMat[2][0], pointDevMat[2][1], pointDevMat[2][2]);
 
-        /*
-           tf::Matrix3x3 pointDevMat(
-           sqrt(cov(1,1)),              0,             0,
-           0.0, sqrt(cov(2,2)),             0,
-           0.0,            0.0, sqrt(cov(3,3)));
-           ROS_INFO("Point deviation");
-           ROS_INFO("[ %f, %f, %f ]", pointDevMat[0][0], pointDevMat[0][1], pointDevMat[0][2]);
-           ROS_INFO("[ %f, %f, %f ]", pointDevMat[1][0], pointDevMat[1][1], pointDevMat[1][2]);
-           ROS_INFO("[ %f, %f, %f ]", pointDevMat[2][0], pointDevMat[2][1], pointDevMat[2][2]);
+       tf::Matrix3x3 rpointDev = _T_odom.getBasis()*T_camera_to_base.getBasis()*pointDevMat*T_map_to_beacon.getBasis();
+       tf::Matrix3x3 rpointCov = rpointDev*rpointDev;
+       ROS_INFO("rPoint covariance");
+       ROS_INFO("[ %f, %f, %f ]", rpointCov[0][0], rpointCov[0][1], rpointCov[0][2]);
+       ROS_INFO("[ %f, %f, %f ]", rpointCov[1][0], rpointCov[1][1], rpointCov[1][2]);
+       ROS_INFO("[ %f, %f, %f ]", rpointCov[2][0], rpointCov[2][1], rpointCov[2][2]);
+       */
 
-           tf::Matrix3x3 rpointDev = _T_odom.getBasis()*T_camera_to_base.getBasis()*pointDevMat*T_map_to_beacon.getBasis();
-           tf::Matrix3x3 rpointCov = rpointDev*rpointDev;
-           ROS_INFO("rPoint covariance");
-           ROS_INFO("[ %f, %f, %f ]", rpointCov[0][0], rpointCov[0][1], rpointCov[0][2]);
-           ROS_INFO("[ %f, %f, %f ]", rpointCov[1][0], rpointCov[1][1], rpointCov[1][2]);
-           ROS_INFO("[ %f, %f, %f ]", rpointCov[2][0], rpointCov[2][1], rpointCov[2][2]);
-           */
+    MatrixWrapper::SymmetricMatrix measNoiseCovariance(3);
+    //measNoiseCovariance(1,1) = rpointCov[0][0]; measNoiseCovariance(1,2) = rpointCov[0][1]; measNoiseCovariance(1,3) = 0;
+    //measNoiseCovariance(2,1) = rpointCov[1][0]; measNoiseCovariance(2,2) = rpointCov[1][1]; measNoiseCovariance(2,3) = 0;
+    //measNoiseCovariance(3,1) = 0;               measNoiseCovariance(3,2) = 0;               measNoiseCovariance(3,3) = cov(5,5);
+    measNoiseCovariance(1,1) = cov(3,3); measNoiseCovariance(1,2) =      0.0; measNoiseCovariance(1,3) = 0.0;
+    measNoiseCovariance(2,1) =      0.0; measNoiseCovariance(2,2) = cov(3,3); measNoiseCovariance(2,3) = 0.0;
+    measNoiseCovariance(3,1) =      0.0; measNoiseCovariance(3,2) =      0.0; measNoiseCovariance(3,3) = cov(5,5);
+    ROS_INFO_STREAM("measurement noise covariance: " << measNoiseCovariance);
+    MatrixWrapper::ColumnVector measNoiseMu(3); // zeros
+    measNoiseMu(1) = 0.0;
+    measNoiseMu(2) = 0.0;
+    measNoiseMu(3) = 0.0;
+    BFL::Gaussian measUncertainty(measNoiseMu, measNoiseCovariance);
 
+    MatrixWrapper::Matrix measH(3,3);
+    measH(1,1) = 1.0; measH(1,2) = 0.0; measH(1,3) = 0.0;
+    measH(2,1) = 0.0; measH(2,2) = 1.0; measH(2,3) = 0.0;
+    measH(3,1) = 0.0; measH(3,2) = 0.0; measH(3,3) = 1.0;
 
-        MatrixWrapper::SymmetricMatrix measNoiseCovariance(3);
-        //measNoiseCovariance(1,1) = rpointCov[0][0]; measNoiseCovariance(1,2) = rpointCov[0][1]; measNoiseCovariance(1,3) = 0;
-        //measNoiseCovariance(2,1) = rpointCov[1][0]; measNoiseCovariance(2,2) = rpointCov[1][1]; measNoiseCovariance(2,3) = 0;
-        //measNoiseCovariance(3,1) = 0;               measNoiseCovariance(3,2) = 0;               measNoiseCovariance(3,3) = cov(5,5);
-        measNoiseCovariance(1,1) = cov(3,3); measNoiseCovariance(1,2) =      0.0; measNoiseCovariance(1,3) = 0.0;
-        measNoiseCovariance(2,1) =      0.0; measNoiseCovariance(2,2) = cov(3,3); measNoiseCovariance(2,3) = 0.0;
-        measNoiseCovariance(3,1) =      0.0; measNoiseCovariance(3,2) =      0.0; measNoiseCovariance(3,3) = cov(5,5);
-        ROS_INFO_STREAM("measurement noise covariance: " << measNoiseCovariance);
-        MatrixWrapper::ColumnVector measNoiseMu(3); // zeros
-        measNoiseMu(1) = 0.0;
-        measNoiseMu(2) = 0.0;
-        measNoiseMu(3) = 0.0;
-        BFL::Gaussian measUncertainty(measNoiseMu, measNoiseCovariance);
+    BFL::LinearAnalyticConditionalGaussian beaconMeasurementPdf(measH, measUncertainty);
 
-        MatrixWrapper::Matrix measH(3,3);
-        measH(1,1) = 1.0; measH(1,2) = 0.0; measH(1,3) = 0.0;
-        measH(2,1) = 0.0; measH(2,2) = 1.0; measH(2,3) = 0.0;
-        measH(3,1) = 0.0; measH(3,2) = 0.0; measH(3,3) = 1.0;
+    BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMeasurementPdf);
 
-        BFL::LinearAnalyticConditionalGaussian beaconMesurementPdf(measH, measUncertainty);
+    _filter->Update(_system_model, &beaconMeasurementModel, measurement);
 
-        BFL::LinearAnalyticMeasurementModelGaussianUncertainty beaconMeasurementModel(&beaconMesurementPdf);
-
-
-        _filter->Update(_system_model, &beaconMeasurementModel, measurement);
-    }
     ROS_DEBUG_STREAM("State: " << _filter->PostGet()->ExpectedValueGet().transpose() );
     ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
 }

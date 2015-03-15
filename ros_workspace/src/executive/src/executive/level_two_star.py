@@ -546,7 +546,8 @@ class SearchLineManager(smach.State):
             point_in_odom = self.tf_listener.transformPoint(odometry_frame, target_point)
         except tf.Exception:
             rospy.logwarn("LEVEL_TWO failed to transform line manager point %s->%s",
-                          target_point.frame_id, odometry_frame)
+                          target_point.header.frame_id, odometry_frame)
+            return 'aborted'
 
         header = std_msg.Header(0, rospy.Time(0), odometry_frame)
         pose = geometry_msg.Pose(position = point_in_odom.point,

@@ -49,9 +49,13 @@ class BeaconFinder:
         self._beacon_mounting_frame = rospy.get_param("~beacon_mounting_frame",
                 "platform")
         self._world_fixed_frame = rospy.get_param("~world_fixed_frame", "map")
-        self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
-
-        # beacon side params
+	self._odometry_frame = rospy.get_param("~odometry_frame", "odom")
+	self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
+	self._beacon_translation = rospy.get_param("~beacon_translation", [0,0,0])
+	self._beacon_rotation = rospy.get_param("~beacon_rotation", [0,0,0, 'rxyz'])
+        rospy.loginfo("BEACON ROTATION: {!s}".format(self._beacon_rotation))
+	
+	# beacon side params
         self.maxSizeError = rospy.get_param("~max_size_error", 0.1)
         self.maxDistanceError = rospy.get_param("~max_distance_error", 0.05)
         self.maxHorizontalRadians = rospy.get_param("~max_horizontal_radians", 0.1)
@@ -464,28 +468,13 @@ class BeaconFinder:
 
     def broadcast_beacon_tf(self, evt):
         now = rospy.Time.now()
-        #beacon_trans = (0.0, -1.3, -1.0)
-        beacon_trans = (-0.780, 0.0, 0.712)
-        beacon_rot = tf.transformations.quaternion_from_euler(
-                -math.pi/2,
-                -math.pi/2,
-                0.0,
-                'rxyz')
-        self.tf_broadcaster.sendTransform(beacon_trans,
-                beacon_rot,
-                now,
-                '/beacon',
-                '/platform',
-                )
-
-        if self._beacon_mounting_frame != self._world_fixed_frame:
-            zero_translation = (0,0,0)
-            zero_rotation = (0,0,0,1)
-            self.tf_broadcaster.sendTransform(zero_translation,
-                    zero_rotation,
-                    now,
-                    self._beacon_mounting_frame,
-                    self._world_fixed_frame)
+        rot = tf.transformations.quaternion_from_euler(*self._beacon_rotation)
+	self.tf_broadcaster.sendTransform(self._beacon_translation,
+					  rot,
+					  now,
+					  'beacon',
+					  self._world_fixed_frame,
+					  )
 
 if __name__ == '__main__':
     rospy.init_node('beacon_finder')
