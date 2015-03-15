@@ -18,8 +18,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>libusb-1.0-dev</build_depend>
-
-  <run_depend>libusb-1.0</run_depend>
+  <build_depend>libphidgets</build_depend>
+  <run_depend>libphidgets</run_depend>
 
 </package>
