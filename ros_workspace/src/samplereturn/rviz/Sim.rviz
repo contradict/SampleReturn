@@ -6,11 +6,9 @@ Panels:
       Expanded:
         - /Static Map1/Position1
         - /Debug Map1/Status1
-        - /RobotModel1
         - /Map1/Status1
         - /Samples1/Status1
         - /TF1/Frames1
-        - /VFH Debug1
       Splitter Ratio: 0.709977
     Tree Height: 438
   - Class: rviz/Selection
@@ -130,6 +128,14 @@ Visualization Manager:
           Show Trail: false
           Value: true
         fake_laser:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        imu_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        imu_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -349,20 +355,14 @@ Visualization Manager:
         "": true
       Queue Size: 100
       Value: true
-    - Class: rviz/TF
-      Enabled: false
-      Frame Timeout: 15
-      Frames:
-        All Enabled: false
-      Marker Scale: 5
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: true
-      Tree:
-        {}
-      Update Interval: 0
-      Value: false
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /processes/vfh_markers
+      Name: VFH Debug
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
     - Alpha: 1
       Axes Length: 2
       Axes Radius: 0.1
@@ -377,13 +377,178 @@ Visualization Manager:
       Shape: Axes
       Topic: /processes/beacon_finder/beacon_pose_debug
       Value: true
-    - Class: rviz/MarkerArray
+    - Class: rviz/TF
       Enabled: true
-      Marker Topic: /processes/vfh_markers
-      Name: VFH Debug
-      Namespaces:
-        "": true
-      Queue Size: 100
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        base_link:
+          Value: true
+        beacon:
+          Value: false
+        body_triangle:
+          Value: false
+        carousel:
+          Value: false
+        fake_laser:
+          Value: false
+        imu_0:
+          Value: false
+        imu_1:
+          Value: false
+        manipulator_arm:
+          Value: false
+        manipulator_baseline_bar:
+          Value: false
+        manipulator_left_camera:
+          Value: false
+        manipulator_left_camera_lens:
+          Value: false
+        manipulator_right_camera:
+          Value: false
+        manipulator_right_camera_lens:
+          Value: false
+        map:
+          Value: true
+        navigation_center_baseline_bar:
+          Value: false
+        navigation_center_left_camera:
+          Value: false
+        navigation_center_left_camera_lens:
+          Value: false
+        navigation_center_right_camera:
+          Value: false
+        navigation_center_right_camera_lens:
+          Value: false
+        navigation_port_baseline_bar:
+          Value: false
+        navigation_port_left_camera:
+          Value: false
+        navigation_port_left_camera_lens:
+          Value: false
+        navigation_port_right_camera:
+          Value: false
+        navigation_port_right_camera_lens:
+          Value: false
+        navigation_starboard_baseline_bar:
+          Value: false
+        navigation_starboard_left_camera:
+          Value: false
+        navigation_starboard_left_camera_lens:
+          Value: false
+        navigation_starboard_right_camera:
+          Value: false
+        navigation_starboard_right_camera_lens:
+          Value: false
+        noise_transform:
+          Value: false
+        noisy_odometry_in_sim_map:
+          Value: true
+        odom:
+          Value: false
+        perfect_odometry_in_static_frame:
+          Value: true
+        port_suspension:
+          Value: false
+        port_wheel:
+          Value: false
+        port_yoke:
+          Value: false
+        search_camera:
+          Value: false
+        search_camera_lens:
+          Value: false
+        sim_map:
+          Value: true
+        starboard_suspension:
+          Value: false
+        starboard_wheel:
+          Value: false
+        starboard_yoke:
+          Value: false
+        stern_suspension:
+          Value: false
+        stern_wheel:
+          Value: false
+        stern_yoke:
+          Value: false
+        top_triangle:
+          Value: false
+      Marker Scale: 5
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        map:
+          noise_transform:
+            {}
+          perfect_odometry_in_static_frame:
+            {}
+          sim_map:
+            beacon:
+              {}
+            noisy_odometry_in_sim_map:
+              {}
+            odom:
+              base_link:
+                body_triangle:
+                  carousel:
+                    {}
+                  fake_laser:
+                    {}
+                  imu_0:
+                    {}
+                  imu_1:
+                    {}
+                  manipulator_arm:
+                    {}
+                  manipulator_baseline_bar:
+                    manipulator_left_camera:
+                      manipulator_left_camera_lens:
+                        {}
+                    manipulator_right_camera:
+                      manipulator_right_camera_lens:
+                        {}
+                  navigation_center_baseline_bar:
+                    navigation_center_left_camera:
+                      navigation_center_left_camera_lens:
+                        {}
+                    navigation_center_right_camera:
+                      navigation_center_right_camera_lens:
+                        {}
+                  navigation_port_baseline_bar:
+                    navigation_port_left_camera:
+                      navigation_port_left_camera_lens:
+                        {}
+                    navigation_port_right_camera:
+                      navigation_port_right_camera_lens:
+                        {}
+                  navigation_starboard_baseline_bar:
+                    navigation_starboard_left_camera:
+                      navigation_starboard_left_camera_lens:
+                        {}
+                    navigation_starboard_right_camera:
+                      navigation_starboard_right_camera_lens:
+                        {}
+                  port_suspension:
+                    port_yoke:
+                      port_wheel:
+                        {}
+                  search_camera:
+                    search_camera_lens:
+                      {}
+                  starboard_suspension:
+                    starboard_yoke:
+                      starboard_wheel:
+                        {}
+                  stern_suspension:
+                    stern_yoke:
+                      stern_wheel:
+                        {}
+                  top_triangle:
+                    {}
+      Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
@@ -408,7 +573,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.135
+      Angle: 0
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
@@ -417,11 +582,11 @@ Visualization Manager:
         Value: false
       Name: Current View
       Near Clip Distance: 0.01
-      Scale: 27.7375
+      Scale: 32.6145
       Target Frame: base_link
       Value: TopDownOrtho (rviz)
-      X: 3.64596
-      Y: -2.63023
+      X: 5.10442
+      Y: -0.00409971
     Saved: ~
 Window Geometry:
   Displays:
@@ -439,5 +604,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1570
-  X: 55
-  Y: 14
+  X: 65
+  Y: 24

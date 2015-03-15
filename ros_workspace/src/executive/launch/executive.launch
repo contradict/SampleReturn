@@ -8,6 +8,10 @@
     <arg name="odometry_frame" default="odom"/>
     <arg name="planner_mode" value="MODE_PLANNER_TWIST"/>
 
+    <!-- executive behaviour parameters -->
+    <arg name="executive_config"/>
+    <rosparam file="$(arg executive_config)" command="load" ns="processes/executive/"/>  
+    
     <param name="/processes/executive/odometry_frame" value="$(arg odometry_frame)"/>
     <param name="/processes/executive/world_fixed_frame" value="$(arg world_fixed_frame)"/>
 
@@ -51,10 +55,6 @@
         <param name="gpio_servo_id" value="1"/>
         <param name="GPIO_PIN_LEVEL_ONE" value="0x20"/>   
         <param name="GPIO_PIN_LEVEL_TWO" value="0x08"/>   
-
-        <!-- camera ignore params, to allow testing without certain cameras -->
-        <param name="ignore_search_camera" value="True"/>
-        <param name="ignore_manipulator_camera" value="False"/>
         
         <remap from="navigation_port_camera_status" to="/cameras/navigation/port/status"/>
         <remap from="navigation_center_camera_status" to="/cameras/navigation/center/status"/>
@@ -79,29 +79,6 @@
 
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
-        
-        <!-- for search  behaviour, degrees and meters--> 
-        <param name="spoke_count" type="int" value="36"/>
-        <param name="spoke_length" type="int" value="80"/>
-        <param name="first_spoke_offset" type="double" value="0"/>
-        <param name="star_hub_radius" type="int" value="10"/>
-        <param name="min_spin_radius" type="double" value="20"/>
-        <param name="spin_step" type="double" value="30"/>
-        <param name="spin_velocity" type="double" value="0.5"/>
-        
-        <param name="return_time_minutes" type="double" value="100"/>
-
-        <!-- dismount and beacon approach -->
-        <rosparam>
-            dismount_move:
-                {angle: 0, distance: 2.0, velocity: 0.5}
-        </rosparam>
-        <rosparam>
-            beacon_approach_point:
-                {x: 10.0, y: 0}
-        </rosparam>
-        <param name="beacon_mount_step" type="double" value="2"/>
-
     </node>
         
     <node
@@ -117,20 +94,6 @@
 
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
-        
-        <!-- sample approach (pursuit) parameters -->
-        <param name="pursuit_velocity" type="double" value="0.5"/>
-        <param name="max_pursuit_error" type="double" value="0.5"/>
-        <param name="min_pursuit_distance" type="double" value="2.5"/>
-        <param name="max_sample_lost_time" type="double" value="20"/>
-
-        <!-- after min_pursuit reached, we move to check_distance and observe for
-             obstacles.  Then we make the manipulator view approach -->
-        <param name="sample_obstacle_check_width" type="double" value="1.0"/>
-        <param name="final_pursuit_step" type="double" value="0.4"/>
-
-        <param name="square_search_size" type="double" value="0.3"/> 
-        <param name="search_velocity" type="double" value="0.05"/>
        
         <!-- this file loads the velocities and such for servoing onto sample,
              the node must already have a simple_mover up and running -->

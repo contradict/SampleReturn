@@ -396,7 +396,8 @@ class PursueSample(object):
                                                       pose)
                 if (pursuit_error > self.max_pursuit_error):
                     self.state_machine.pursuit_pose = pose
-                    goal = samplereturn_msg.VFHMoveGoal(target_pose = pose)
+                    goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
+                                                        velocity = self.state_machine.userdata.pursuit_velocity)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
@@ -459,7 +460,8 @@ class StartSamplePursuit(smach.State):
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.odometry_frame)
         current_pose.header.stamp = rospy.Time(0)
-        goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose)
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose,
+                                            velocity = userdata.pursuit_velocity)
         userdata.return_goal = goal        
                 
         return 'next'
