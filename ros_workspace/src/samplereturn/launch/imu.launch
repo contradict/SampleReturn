@@ -37,7 +37,7 @@
         output="log"
         ns="/io/microstrain_3dm_gx3_35">
 
-    <param nme="gps_on" value="False"/>
+        <param name="gps_on" value="False"/>
 
     </node>
 
