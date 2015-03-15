@@ -397,7 +397,7 @@ class PursueSample(object):
                 if (pursuit_error > self.max_pursuit_error):
                     self.state_machine.pursuit_pose = pose
                     goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
-                                                        velocity = userdata.pursuit_velocity)
+                                                        velocity = self.state_machine.userdata.pursuit_velocity)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
@@ -510,7 +510,7 @@ class CalculateManipulatorApproach(smach.State):
             #time to look for sample in manipulator view, stop when it is seen
             userdata.stop_on_sample = True
             distance -= userdata.final_pursuit_step
-            userdata.simple_move = Simple(type=SimpleMoveGoal.STRAFE,
+            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                                   angle = yaw,
                                                   distance = distance,
                                                   velocity = userdata.pursuit_velocity)

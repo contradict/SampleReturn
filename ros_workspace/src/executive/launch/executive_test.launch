@@ -5,7 +5,8 @@
     <arg name="odometry_frame" value="odom"/>
     <arg name="world_fixed_frame" value="sim_map"/>
     <arg name="beacon_localization" value="true"/>
-
+    <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
+    
     <!-- begin test arguments -->
     <machine name="search"
              address="localhost"/>
@@ -16,6 +17,7 @@
     <include file="$(find executive)/launch/executive.launch">
         <arg name="odometry_frame" value="$(arg odometry_frame)"/>
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
+        <arg name="executive_config" value="$(arg executive_config)"/>
     </include>
 
     <include file="$(find motion_planning)/launch/motion_planning.launch">
