@@ -531,21 +531,20 @@ class RobotSimulator(object):
                 #apply the correction map->odom
                 error = np.dot(noise_transform, map_to_odom)
 
+                #this is the map->sim_map transform, which should be the error between the
+                #integrated noise and the localization corrections
+                _, _, error_angles, error_translate, _ = tf.transformations.decompose_matrix(error)
+                error_rot = tf.transformations.quaternion_from_euler(*error_angles)
+    
+                transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
+                                             self.sim_map,
+                                             Transform(geometry_msg.Vector3(*error_translate),
+                                                       geometry_msg.Quaternion(*error_rot)))
+                transforms.append(transform)
+
             except tf.Exception:
                 #if the transform isn't availabe, no correction applied
-                error = noise_transform
                 rospy.logdebug("NO map->odom transform... we probably just started running")            
-
-            #this is the map->sim_map transform, which should be the error between the
-            #integrated noise and the localization corrections
-            _, _, error_angles, error_translate, _ = tf.transformations.decompose_matrix(error)
-            error_rot = tf.transformations.quaternion_from_euler(*error_angles)
-
-            transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
-                                         self.sim_map,
-                                         Transform(geometry_msg.Vector3(*error_translate),
-                                                   geometry_msg.Quaternion(*error_rot)))
-            transforms.append(transform)
             
         else:
             transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
