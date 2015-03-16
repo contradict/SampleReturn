@@ -400,7 +400,7 @@ class VFHMoveServer( object ):
             #target point marker
             debug_marker = vis_msg.Marker()
             debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-            debug_marker.type = vis_msg.Marker.CUBE
+            debug_marker.type = vis_msg.Marker.CYLINDER
             debug_marker.color = std_msg.ColorRGBA(1, 0.25, 0, 0.5)
             debug_marker.scale = geometry_msg.Vector3(.3, .3, .3)
             debug_marker.pose = Pose()
