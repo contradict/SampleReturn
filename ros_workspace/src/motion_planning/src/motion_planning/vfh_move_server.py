@@ -151,15 +151,17 @@ class VFHMoveServer( object ):
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
         
         #calculate the stop_distance for stopping once near target pose
-        velocity = goal.velocity if (goal.velocity != 0) else self._mover.max_velocity
-        self.stop_distance = velocity**2/2./self._mover.acceleration
+        spin_velocity = goal.spin_velocity if (goal.spin_velocity != 0) else self._mover.max_velocity
+        move_velocity = goal.move_velocity if (goal.move_velocity != 0) else self._mover.max_velocity
+        self.stop_distance = move_velocity**2/2./self._mover.acceleration
 
         #if the action server is inactive, fire up a movement thread
         if not active:
             rospy.logdebug("VFH Server not active, goal received, starting.")
             self.stop_requested = False
             self.execute_thread = threading.Thread(target=self.execute_movement,
-                                                   args=(velocity,));
+                                                   args=(move_velocity,
+                                                         spin_velocity));
             self.execute_thread.start();
         else:
             rospy.logdebug("VFH Server active, self._goal_odom updated.")
@@ -174,7 +176,7 @@ class VFHMoveServer( object ):
     def is_stop_requested(self):
         return self.stop_requested
 
-    def execute_movement(self, velocity):
+    def execute_movement(self, move_velocity, spin_velocity):
         #store the starting point in odom
         current_pose = util.get_current_robot_pose(self._tf, self.odometry_frame)
         self._start_point = current_pose.pose.position
@@ -187,18 +189,19 @@ class VFHMoveServer( object ):
         if np.abs(dyaw) > self._goal_orientation_tolerance:
             rospy.logdebug("VFH Rotating to heading by %f.", dyaw)
             self._mover.execute_spin(dyaw,
-                    stop_function=self.is_stop_requested)
+                                     max_velocity = spin_velocity,
+                                     stop_function=self.is_stop_requested)
             if self.exit_check(): return
 
         # drive to goal using vfh
         distance = np.hypot(self._goal_local.pose.position.x,
                             self._goal_local.pose.position.y)
-        #use param velocity unless a velocity was included in goal
+        #use param velocity unless a move_velocity was included in goal
         rospy.loginfo("VFH Moving %f meters ahead.", distance)
         self.vfh_running = True
         self._mover.execute_continuous_strafe(0.0,
-                max_velocity = velocity,
-                stop_function=self.is_stop_requested)
+                                              max_velocity = move_velocity,
+                                              stop_function=self.is_stop_requested)
         self.vfh_running = False
         if self.exit_check(): return
 
@@ -207,7 +210,8 @@ class VFHMoveServer( object ):
         if self._orient_at_target and (np.abs(dyaw) > self._goal_orientation_tolerance):
             rospy.logdebug("VFH Rotating to goal yaw %f.", dyaw)
             self._mover.execute_spin(dyaw,
-                    stop_function=self.is_stop_requested)
+                                     spin_velocity,
+                                     stop_function=self.is_stop_requested)
             if self.exit_check(): return
 
         rospy.logdebug("Successfully completed goal.")
