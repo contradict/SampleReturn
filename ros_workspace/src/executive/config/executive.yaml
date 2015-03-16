@@ -22,6 +22,7 @@ level_two_star:
 pursue_sample:
     #sample approach (pursuit) parameters
     pursuit_velocity: 0.5
+    spin_velocity: 0.3
     max_pursuit_error: 0.5
     min_pursuit_distance: 2.5
     max_sample_lost_time: 20
