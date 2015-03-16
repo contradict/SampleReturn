@@ -87,6 +87,10 @@ class LevelTwoStar(object):
     
         self.state_machine.userdata.spokes = self.spokes
         self.state_machine.userdata.star_hub_radius = node_params.star_hub_radius
+        
+        #store the intial planned goal in map, check for the need to replan
+        self.state_machine.userdata.move_point_map = None
+        self.replan_threshold = node_params.replan_threshold
 
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
@@ -369,9 +373,42 @@ class LevelTwoStar(object):
                           sample.header.frame_id, self.odometry_frame)
             
     def beacon_update(self, beacon_pose):
+        #first, update the beacon point
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                  beacon_pose.pose.pose.position)
         self.state_machine.userdata.beacon_point = beacon_point
+        
+        saved_point_map = self.state_machine.userdata.move_point_map
+        
+        #if the VFH server is active, and the beacon correction is large enough, change the goal
+        if saved_point_map is not None:
+
+            goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
+
+            header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+            
+            #take the current planned point, and transform it back to map, and
+            #compare with the map position last time we planned/corrected
+            try:
+                self.tf_listener.waitForTransform(self.odometry_frame,
+                                                  self.world_fixed_frame,
+                                                  rospy.Time(0),
+                                                  rospy.Duration(1.0))
+                saved_point_odom = self.tf_listener.transformPoint(self.odometry_frame, saved_point_map)
+            except tf.Exception:
+                rospy.logwarn("LEVEL_TWO beacon_update failed to transform target point")
+            
+            correction_error = util.point_distance_2d(goal_point_odom,
+                                                      saved_point_odom.point)
+            
+            rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+            
+            if (correction_error > self.replan_threshold):
+                self.announcer.say("Beacon correction.")
+                #update the VFH move goal
+                goal = deepcopy(self.state_machine.userdata.move_goal)
+                goal.target_pose.pose.position = saved_point_odom.point
+                self.state_machine.userdata.move_goal = goal                
 
     def get_hollow_star(self, spoke_count, spoke_length, offset, hub_radius, spin_step):
         #This creates a list of dictionaries.  The yaw entry is a useful piece of information
@@ -513,6 +550,7 @@ class SearchLineManager(smach.State):
                              output_keys = ['move_goal',
                                             'line_points',
                                             'next_line_point',
+                                            'move_point_map',
                                             'beacon_point',
                                             'last_align_time'],
                              outcomes=['move',
@@ -557,6 +595,10 @@ class SearchLineManager(smach.State):
                                             spin_velocity = userdata.spin_velocity,
                                             orient_at_target = False)
         userdata.move_goal = goal
+
+        #store the pose in map, to compare in the beacon update callback
+        userdata.move_point_map = target_point
+        
         return 'move'
             
 class BeaconSearch(smach.State):
