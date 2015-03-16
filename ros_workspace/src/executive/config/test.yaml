@@ -5,8 +5,8 @@ executive_master:
         
 level_two_star:
     #for search  behaviour, degrees and meters
-    move_velocity: 1.8
-    spin_velocity: 0.3
+    move_velocity: 1.5
+    spin_velocity: 1.0
     spoke_count: 36
     spoke_length: 80
     first_spoke_offset: 0
