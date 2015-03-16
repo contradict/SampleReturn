@@ -103,7 +103,6 @@ class LevelTwoStar(object):
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_mount_step = node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
-        self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
         
         #search line parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity

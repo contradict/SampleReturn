@@ -389,7 +389,7 @@ class ServoController(smach.State):
                 point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
                                                              userdata.detected_sample).point
             except tf.Exception:
-                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> odom transform in 1.0 seconds")
+                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform in 1.0 seconds, at time: {!s}".format(sample_frame, sample_time))
                 self.try_count = 0
                 return 'aborted'
             #rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
