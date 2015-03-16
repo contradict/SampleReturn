@@ -508,6 +508,7 @@ class SearchLineManager(smach.State):
                                            'world_fixed_frame',
                                            'odometry_frame',
                                            'move_velocity',
+                                           'spin_velocity',
                                            'beacon_point',
                                            'last_align_time'],
                              output_keys = ['move_goal',
@@ -553,7 +554,8 @@ class SearchLineManager(smach.State):
                                  orientation = geometry_msg.Quaternion())
         target_pose = geometry_msg.PoseStamped(header, pose)
         goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose,
-                                            velocity = userdata.move_velocity,
+                                            move_velocity = userdata.move_velocity,
+                                            spin_velocity = userdata.spin_velocity,
                                             orient_at_target = False)
         userdata.move_goal = goal
         return 'move'
@@ -623,7 +625,8 @@ class BeaconSearch(smach.State):
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
-                                                    velocity = userdata.move_velocity)
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
@@ -637,7 +640,8 @@ class BeaconSearch(smach.State):
                 #invert the approach_point, and try again
                 search_pose.pose.position.x *= -1
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.search_pose,
-                                                    velocity = userdata.move_velocity)
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
@@ -658,14 +662,16 @@ class BeaconSearch(smach.State):
                 #try not to drive through the platform
                 front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.front_pose,
-                                                    velocity = userdata.move_velocity)
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                          
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 return 'move'   
             elif distance_to_approach_point > 2.0:
                 #on correct side of beacon, but far from approach point
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
-                                                    velocity = userdata.move_velocity)
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal       
                 self.announcer.say("Beacon in view. Move ing to approach point")                
                 return 'move'   

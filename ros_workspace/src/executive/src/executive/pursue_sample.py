@@ -83,6 +83,7 @@ class PursueSample(object):
         self.max_pursuit_error = self.node_params.max_pursuit_error
         self.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
+        self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
         self.state_machine.userdata.final_pursuit_step = self.node_params.final_pursuit_step
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
@@ -397,7 +398,8 @@ class PursueSample(object):
                 if (pursuit_error > self.max_pursuit_error):
                     self.state_machine.pursuit_pose = pose
                     goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
-                                                        velocity = self.state_machine.userdata.pursuit_velocity)
+                                                        move_velocity = self.state_machine.userdata.pursuit_velocity,
+                                                        spin_velocity = self.state_machine.userdata.spin_velocity)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
@@ -420,6 +422,7 @@ class StartSamplePursuit(smach.State):
                              outcomes=['next'],
                              input_keys=['action_goal',
                                          'pursuit_velocity',
+                                         'spin_velocity',
                                          'min_pursuit_distance',
                                          'odometry_frame'],
                              output_keys=['return_goal',
@@ -453,7 +456,8 @@ class StartSamplePursuit(smach.State):
 
         #this is the initial vfh goal pose
         goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
-                                            velocity = userdata.pursuit_velocity)
+                                            move_velocity = userdata.pursuit_velocity,
+                                            spin_velocity = userdata.spin_velocity)
         userdata.pursuit_goal = goal
        
         #create return destination
@@ -461,7 +465,8 @@ class StartSamplePursuit(smach.State):
                                                    userdata.odometry_frame)
         current_pose.header.stamp = rospy.Time(0)
         goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose,
-                                            velocity = userdata.pursuit_velocity)
+                                            move_velocity = userdata.pursuit_velocity,
+                                            spin_velocity = userdata.spin_velocity)
         userdata.return_goal = goal        
                 
         return 'next'
