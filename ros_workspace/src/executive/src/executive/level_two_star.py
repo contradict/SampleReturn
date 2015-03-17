@@ -624,6 +624,7 @@ class BeaconSearch(smach.State):
                                          'stop_on_beacon',
                                          'world_fixed_frame'],
                              output_keys=['move_goal',
+                                          'move_point_map',
                                           'simple_move',
                                           'stop_on_sample',
                                           'stop_on_beacon',
@@ -642,7 +643,9 @@ class BeaconSearch(smach.State):
         
         #ignore samples now
         userdata.stop_on_sample = False
-        
+        userdata.move_point_map = None
+        map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
+       
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.world_fixed_frame)        
         
@@ -671,6 +674,8 @@ class BeaconSearch(smach.State):
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
+                userdata.move_point_map = geometry_msg.PointStamped(map_header,
+                                                                    userdata.beacon_approach_pose.pose.position)
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
                                                     move_velocity = userdata.move_velocity,
                                                     spin_velocity = userdata.spin_velocity)
@@ -686,12 +691,16 @@ class BeaconSearch(smach.State):
                 search_pose = deepcopy(userdata.beacon_approach_pose)                
                 #invert the approach_point, and try again
                 search_pose.pose.position.x *= -1
+                #save point
+                userdata.move_point_map = geometry_msg.PointStamped(map_header,
+                                                    search_pose.pose.position)
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.search_pose,
                                                     move_velocity = userdata.move_velocity,
                                                     spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
+                
                 return 'move'               
                 
         else: #beacon is in view
@@ -708,7 +717,7 @@ class BeaconSearch(smach.State):
                 front_pose = deepcopy(userdata.beacon_approach_pose)
                 #try not to drive through the platform
                 front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
-                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.front_pose,
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = front_pose,
                                                     move_velocity = userdata.move_velocity,
                                                     spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                          
