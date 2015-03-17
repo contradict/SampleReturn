@@ -198,7 +198,7 @@ class LevelTwoStar(object):
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'pursue_samples':'true'})
+                                   remapping = {'stop_on_sample':'true'})
             
             smach.StateMachine.add('ANNOUNCE_LINE_BLOCKED',
                                    AnnounceState(self.announcer, 'Line Blocked.'),
@@ -273,7 +273,9 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'stop_on_sample':'true',
+                                                'detected_sample':'beacon_point'})
             
             #return to start along the approach point
             #if the path is ever blocked just give up and return to the level_two search
@@ -286,9 +288,8 @@ class LevelTwoStar(object):
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'pursue_samples':'true',
+                                   remapping = {'stop_on_sample':'true',
                                                 'detected_sample':'beacon_point'})
-            
  
             smach.StateMachine.add('MOUNT_MANAGER',
                                    MountManager(self.tf_listener, self.announcer),

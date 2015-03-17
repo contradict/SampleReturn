@@ -141,7 +141,7 @@ class PursueSample(object):
                                                   'sample_detected':'PUBLISH_FAILURE',
                                                   'preempted':'PUBLISH_FAILURE',
                                                   'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'pursue_samples':'false',
+                                   remapping = {'stop_on_sample':'false',
                                                 'move_goal':'pursuit_goal'})
 
             smach.StateMachine.add('ANNOUNCE_OBSTACLE_CHECK',
