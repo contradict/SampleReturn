@@ -350,6 +350,9 @@ class LevelTwoStar(object):
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
+        #start a timer loop to check for localization updates
+        rospy.Timer(rospy.Duration(5.0), self.localization_check)
+        
         #start action servers and services
         sls.start()
         level_two_server.run_server()
@@ -377,6 +380,8 @@ class LevelTwoStar(object):
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                  beacon_pose.pose.pose.position)
         self.state_machine.userdata.beacon_point = beacon_point
+    
+    def localization_check(self, event):        
         
         saved_point_map = self.state_machine.userdata.move_point_map
         
