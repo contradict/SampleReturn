@@ -51,7 +51,7 @@ class LevelTwoStar(object):
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
-        header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
         point = geometry_msg.Point(node_params.beacon_approach_point['x'],
                                    node_params.beacon_approach_point['y'], 0)
         beacon_facing_orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
@@ -116,6 +116,9 @@ class LevelTwoStar(object):
         self.state_machine.userdata.spin_step = node_params.spin_step
         self.state_machine.userdata.line_yaw = None #IN RADIANS!
         self.state_machine.userdata.outbound = False
+        self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
+        self.state_machine.userdata.blocked_retried = False
+        
         
         #stop function flags
         self.state_machine.userdata.stop_on_sample = False
@@ -202,7 +205,14 @@ class LevelTwoStar(object):
             
             smach.StateMachine.add('ANNOUNCE_LINE_BLOCKED',
                                    AnnounceState(self.announcer, 'Line Blocked.'),
-                                   transitions = {'next':'STAR_MANAGER'})
+                                   transitions = {'next':'RETRY_LINE_MOVE'})
+
+            smach.StateMachine.add('RETRY_LINE_MOVE',
+                                   RetryMove(self.announcer),
+                                   transitions = {'continue':'STAR_MANAGER',
+                                                  'retry':'LINE_MOVE',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
                                    AnnounceState(self.announcer, 'Off Course.'),
@@ -274,7 +284,7 @@ class LevelTwoStar(object):
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'true',
+                                   remapping = {'stop_on_sample':'stop_on_beacon',
                                                 'detected_sample':'beacon_point'})
             
             #return to start along the approach point
@@ -288,7 +298,7 @@ class LevelTwoStar(object):
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'true',
+                                   remapping = {'stop_on_sample':'stop_on_beacon',
                                                 'detected_sample':'beacon_point'})
  
             smach.StateMachine.add('MOUNT_MANAGER',
@@ -470,13 +480,13 @@ class StarManager(smach.State):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
                                            'outbound',
-                                           'spokes',
-                                           'world_fixed_frame'],
+                                           'spokes'],
                              output_keys = ['line_yaw',
                                             'line_points',
                                             'outbound',
                                             'spokes',
-                                            'stop_on_sample'],
+                                            'stop_on_sample',
+                                            'blocked_retried'],
                              outcomes=['next_spoke',
                                        'return_home',
                                        'preempted', 'aborted'])
@@ -487,6 +497,7 @@ class StarManager(smach.State):
     def execute(self, userdata):
 
         userdata.stop_on_sample = True
+        userdata.blocked_retried = False
 
         if len(userdata.spokes) == 0:
             rospy.loginfo("STAR MANAGER finished last spoke")
@@ -550,7 +561,6 @@ class SearchLineManager(smach.State):
                                            'outbound',
                                            'return_time',
                                            'detected_sample',
-                                           'world_fixed_frame',
                                            'odometry_frame',
                                            'move_velocity',
                                            'spin_velocity',
@@ -609,6 +619,37 @@ class SearchLineManager(smach.State):
         userdata.move_point_map = target_point
         
         return 'move'
+
+#for retrying a move after line_blocked.  Probably a terrible hack that should be removed later    
+class RetryMove(smach.State):
+            
+    def __init__(self, announcer):           
+        smach.State.__init__(self,
+                             input_keys = ['blocked_retry_delay',
+                                           'blocked_retried'],
+                             output_keys = ['blocked_retried'],
+                             outcomes=['retry',
+                                       'continue',
+                                       'preempted', 'aborted'])
+        
+        self.announcer = announcer  
+
+    def execute(self, userdata):
+        
+        #if delay is set to zero just continue
+        if userdata.blocked_retry_delay == 0:
+            return 'continue'
+        else:
+            #we already tried here, give up
+            if userdata.blocked_retried:
+                #reset the flag for next try
+                userdata.blocked_retried = False
+                return 'continue'
+            else:
+                self.announcer.say('Recheck ing cost map.')
+                rospy.sleep(userdata.blocked_retry_delay)
+                userdata.blocked_retried = True
+                return 'retry'   
             
 class BeaconSearch(smach.State):
     
@@ -625,7 +666,8 @@ class BeaconSearch(smach.State):
                                          'platform_point',
                                          'beacon_point',
                                          'stop_on_beacon',
-                                         'world_fixed_frame'],
+                                         'world_fixed_frame',
+                                         'odometry_frame'],
                              output_keys=['move_goal',
                                           'move_point_map',
                                           'simple_move',
@@ -644,11 +686,13 @@ class BeaconSearch(smach.State):
             self.service_preempt()
             return 'preempted'
         
-        #ignore samples now
+        #ignore samples after this (applies to mount moves)
+        #clear previous move_point_map
         userdata.stop_on_sample = False
         userdata.move_point_map = None
         map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
        
+        #get our position in map
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.world_fixed_frame)        
         
@@ -730,7 +774,8 @@ class BeaconSearch(smach.State):
                 #on correct side of beacon, but far from approach point
                 goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
                                                     move_velocity = userdata.move_velocity,
-                                                    spin_velocity = userdata.spin_velocity)
+                                                    spin_velocity = userdata.spin_velocity,
+                                                    orient_at_target = True)
                 userdata.move_goal = goal       
                 self.announcer.say("Beacon in view. Move ing to approach point")                
                 return 'move'   
