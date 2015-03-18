@@ -9,11 +9,11 @@ level_two_star:
     spin_velocity: 1.0
     spoke_count: 36
     spoke_length: 80
-    first_spoke_offset: 0
+    first_spoke_offset: 90
     star_hub_radius: 10
     min_spin_radius: 20
     spin_step: 30
-    return_time_minutes: 20
+    return_time_minutes: 2  
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}
