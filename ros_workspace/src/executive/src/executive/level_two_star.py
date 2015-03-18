@@ -520,6 +520,7 @@ class SpinManager(smach.State):
                                          'outbound',
                                          'world_fixed_frame',],
                              output_keys=['simple_move',
+                                          'move_point_map',
                                           'beacon_point',
                                           'distance_to_hub',
                                           'last_align_time',])
@@ -527,6 +528,8 @@ class SpinManager(smach.State):
         self.tf_listener = tf_listener
     
     def execute(self, userdata):
+        #set this to None when not heading somewhere
+        userdata.move_point_map = None 
         #if heading out, and further than spin step, and not on last move, spin
         if userdata.outbound:
             distance = util.get_robot_distance_to_origin(self.tf_listener, userdata.world_fixed_frame)
