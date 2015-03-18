@@ -9,15 +9,15 @@ level_two_star:
     spin_velocity: 1.0
     spoke_count: 36
     spoke_length: 80
-    first_spoke_offset: 90
+    first_spoke_offset: 0
     star_hub_radius: 10
     min_spin_radius: 20
     spin_step: 30
-    return_time_minutes: 2  
+    return_time_minutes: 10  
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}
-    beacon_mount_step: 2
+    beacon_mount_step: 10 
     #if a planned point has changed more than this, replan
     replan_threshold: 2.0
     #for costmap issues, set to zero to disable this

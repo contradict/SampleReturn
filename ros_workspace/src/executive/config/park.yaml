@@ -19,7 +19,7 @@ level_two_star:
     beacon_approach_point: {x: 10.0, y: 0}
     beacon_mount_step: 2
     #if a planned point has changed more than this, replan
-    replan_threshold: 1.0
+    replan_threshold: 2.0
     #for costmap issues, set to zero to disable this
     blocked_retry_delay: 3.0
 
