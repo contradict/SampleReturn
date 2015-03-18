@@ -33,7 +33,7 @@ def get_rosparam(argv, pname):
             var,val = arg.split(":=")
             if var == pname:
                 return val
-    return None
+    return None 
 
 def kill_nodelet_manager(managername):
     stdin, stdout = os.popen2(['pidof', 'nodelet'])
@@ -60,33 +60,32 @@ def kill_nodelet_manager(managername):
     return False
 
 def masacre_nodelets_in_namespace(namespace):
-    stdin, stdout = os.popen2(['pidof', 'nodelet'])
+    _, stdout = os.popen2(['pidof', 'nodelet'])
     pid_str = stdout.read()
-    pids = [int(s) for s in pid_str.split()]
-    killed_some=False
-    for pid in pids:
-        argv = get_argv(pid)
-        if len(argv)<2:
-            continue
-        name=get_rosparam(argv[2:], "__name")
-        if name is None:
-            continue
-        ns=get_envvar(pid, "ROS_NAMESPACE")
-        if ns==namespace:
-            rospy.logerr("Killing -INT pid %d, %s/%s", pid, ns, name)
-            os.system('kill -INT %d'%pid)
-            time.sleep(1.0)
+    pids = [(int(s),
+             get_rosparam(get_argv(s), "__name"),
+             get_envvar(s, "ROS_NAMESPACE")) for s in pid_str.split()]
+    pids = filter(lambda x: x[1] is not None, pids)
+    pids = filter(lambda x: x[2] == namespace, pids)
+    if len(pids) == 0:
+        return False
+    killlevels = ["-INT", "-TERM", "-KILL"]
+    while len(pids) and len(killlevels):
+        sig = killlevels.pop(0)
+        livepids = []
+        for pid, name, ns in pids:
+            rospy.logerr("Killing %s pid %d, %s/%s", sig, pid, ns, name)
+            os.system('kill %s %d'%(sig, pid))
+        time.sleep(0.1)
+        for pid, name, ns in pids:
             if os.system('kill -0 %d'%pid):
-                rospy.loginfo("Killing -TERM pid %d, %s/%s", pid, ns, name)
-                os.system('kill -TERM %d'%pid)
-                time.sleep(1.0)
-                if os.system('kill -0 %d'%pid):
-                    rospy.loginfo("Killing -KILL pid %d, %s/%s", pid, ns, name)
-                    os.system('kill -KILL %d'%pid)
-            killed_some=True
-    return killed_some
-
-
+                rospy.logerr("pid %d %s/%s still running after kill %s",
+                             pid, ns, name, sig)
+                livepids.append(pid)
+        pids = livepids
+    if len(pids):
+        rospy.logerr("Some processes remain after kill -KILL")
+    return True
 
 class image_desync(object):
     def __init__(self):
