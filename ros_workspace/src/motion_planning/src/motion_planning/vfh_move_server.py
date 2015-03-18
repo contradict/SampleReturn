@@ -276,6 +276,7 @@ class VFHMoveServer( object ):
             #rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
             self._action_outcome = VFHMoveResult.COMPLETE
             self._mover.stop()
+            self.vfh_running = False
             return
             
         #if we are too far off the line between start point, and goal, initiate stop
@@ -290,14 +291,16 @@ class VFHMoveServer( object ):
                                                       self._target_point_odom.point))
             self._action_outcome = VFHMoveResult.OFF_COURSE
             self._mover.stop()
+            self.vfh_running = False
+            return
                     
         #if the target is not in the active window, we are probably close to it,
         #but locally blocked: stop!
         if not 0 <= target_index < len(self.sectors):
             self._action_outcome = VFHMoveResult.MISSED_TARGET
             self._mover.stop()
-            if target_index < 0: target_index = 0
-            if target_index >= len(self.sectors): target_index = len(self.sectors)
+            self.vfh_running = False
+            return
         
         obstacle_density = np.zeros(self.sector_count)
         inverse_cost = np.zeros(self.sector_count)
@@ -342,11 +345,13 @@ class VFHMoveServer( object ):
                 inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
                                             + self.u_current*np.abs(self.current_sector_index - index)*self.sector_angle) 
 
-        #stop the mover if the path is blocked.  This is an estop situation!
+        #stop the mover if the path is totally blocked
         if np.all(self.sectors):
             rospy.logdebug("VFH all blocked, estop!")
             self._action_outcome = VFHMoveResult.BLOCKED
-            self._mover.estop()
+            self._mover.stop()
+            self.vfh_running = False
+            return
 
         #find the sector index with the lowest cost index (inverse cost!)
         min_cost_index = np.argmax(inverse_cost)
