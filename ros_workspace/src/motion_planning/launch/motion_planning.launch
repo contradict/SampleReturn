@@ -37,7 +37,7 @@
             vfh_motion_params:
                 max_velocity: 1.5
                 acceleration: 0.5 
-                stop_deceleration: 1.5
+                stop_deceleration: 1.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
         </rosparam>
@@ -62,7 +62,7 @@
             simple_motion_params:
                 max_velocity: 1.5
                 acceleration: 0.5
-                stop_deceleration: 1.5
+                stop_deceleration: 1.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
         </rosparam>
