@@ -11,7 +11,7 @@
           args="manager"
           ns="/cameras/manipulator"
           output="log"
-          respawn_delay="1.0"
+          respawn_delay="2.0"
           respawn="true">
     </node>
 
@@ -23,7 +23,9 @@
               type="nodelet"
               args="load camera1394/driver manager"
               ns="/cameras/manipulator"
-              respawn="true">
+              respawn="true"
+              respawn_delay="5.0"
+              >
 
             <param name="guid" type="string" value="00b09d0100a85650"/>
             <param name="video_mode" value="640x480_mono8"/>
@@ -52,7 +54,9 @@
               type="nodelet"
               args="load camera1394/driver manager"
               ns="/cameras/manipulator"
-              respawn="true">
+              respawn="true"
+              respawn_delay="5.0"
+              >
 
             <param name="guid" type="string" value="00b09d0100a85642"/>
             <param name="video_mode" value="640x480_mono8"/>
@@ -94,7 +98,7 @@
           args="load gpuimageproc/Stereoproc manager"
           ns="/cameras/manipulator"
           output="log"
-          respawn_delay="1.0"
+          respawn_delay="5.0"
           respawn="true">
         <remap from="pointcloud" to="points2"/>
         <param name="approximate_sync" type="bool" value="true"/>
