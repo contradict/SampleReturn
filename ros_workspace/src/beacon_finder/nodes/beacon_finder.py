@@ -53,7 +53,7 @@ class BeaconFinder:
 	self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
 	self._beacon_translation = rospy.get_param("~beacon_translation", [0,0,0])
 	self._beacon_rotation = rospy.get_param("~beacon_rotation", [0,0,0, 'rxyz'])
-        rospy.loginfo("BEACON ROTATION: {!s}".format(self._beacon_rotation))
+        #rospy.loginfo("BEACON ROTATION: {!s}".format(self._beacon_rotation))
 	
 	# beacon side params
         self.maxSizeError = rospy.get_param("~max_size_error", 0.1)
@@ -170,19 +170,17 @@ class BeaconFinder:
         return circles_grid
 
     def look(self, name, image, detector):
-        rospy.loginfo("Looking for %s", name)
+        #rospy.loginfo("Looking for %s", name)
         found, centers = cv2.findCirclesGrid(image,
                 (self._num_rows, self._num_columns),
                 flags=cv2.CALIB_CB_ASYMMETRIC_GRID,
                 blobDetector=detector)
         if found:
-            rospy.loginfo("Found %s", name)
+	    #rospy.loginfo("Found %s", name)
             self._found_queue.put((name, centers, found))
-        else:
-            rospy.loginfo("No circles found in %s.", name)
-
+    
     def sideLook(self, name, image, detector):
-        rospy.loginfo("Looking for %s", name)
+        #rospy.loginfo("Looking for %s", name)
         foundSide = True
         blobs = detector.detect(image)
 
@@ -263,7 +261,7 @@ class BeaconFinder:
                 )
                 self._found_queue.put((name, topThree, foundSide))
 
-                rospy.loginfo('found %s', name)
+                #rospy.loginfo('found %s', name)
                 break
             else:
                 # if we didn't find it, remove one element from sorted blobs and
@@ -347,7 +345,7 @@ class BeaconFinder:
             # Debug image output
             self._beacon_debug_image.publish(self._cv_bridge.cv2_to_imgmsg(self._debug_image_cv, self._image_output_encoding))
 
-        rospy.loginfo("Latency: %f", (rospy.Time.now() - image.header.stamp).to_sec())
+        #rospy.loginfo("Beacon Detection Latency: %f", (rospy.Time.now() - image.header.stamp).to_sec())
 
     def compute_beacon_pose(self, centers, transform):
         # Compute the position and orientation of the beacon
@@ -357,8 +355,8 @@ class BeaconFinder:
                 numpy.asarray(self._camera_model.fullIntrinsicMatrix()),
                 numpy.asarray(self._camera_model.distortionCoeffs()))
 
-        rospy.loginfo("solvePnP inliers: %d", len(inliers))
-        rospy.loginfo("Translation vector: %s", translation_vector)
+        #rospy.loginfo("solvePnP inliers: %d", len(inliers))
+        #rospy.loginfo("Translation vector: %s", translation_vector)
 
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
         pose_matrix = numpy.vstack((rotation_matrix,
