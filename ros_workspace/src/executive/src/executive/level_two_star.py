@@ -118,6 +118,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.outbound = False
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
+        self.state_machine.userdata.last_retry_time = rospy.Time.now()
         
         
         #stop function flags
@@ -417,7 +418,7 @@ class LevelTwoStar(object):
             correction_error = util.point_distance_2d(goal_point_odom,
                                                       saved_point_odom.point)
             
-            rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+            #rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
             
             if (correction_error > self.replan_threshold):
                 self.announcer.say("Beacon correction.")
@@ -485,8 +486,7 @@ class StarManager(smach.State):
                                             'line_points',
                                             'outbound',
                                             'spokes',
-                                            'stop_on_sample',
-                                            'blocked_retried'],
+                                            'stop_on_sample'],
                              outcomes=['next_spoke',
                                        'return_home',
                                        'preempted', 'aborted'])
@@ -497,7 +497,6 @@ class StarManager(smach.State):
     def execute(self, userdata):
 
         userdata.stop_on_sample = True
-        userdata.blocked_retried = False
 
         if len(userdata.spokes) == 0:
             rospy.loginfo("STAR MANAGER finished last spoke")
@@ -620,14 +619,17 @@ class SearchLineManager(smach.State):
         
         return 'move'
 
-#for retrying a move after line_blocked.  Probably a terrible hack that should be removed later    
+#For retrying a move after line_blocked.  Probably a terrible hack that should be removed later.
+#Wait for the delay, then try to move again.  Allow retry after delay time has elapsed since last retry also
 class RetryMove(smach.State):
             
     def __init__(self, announcer):           
         smach.State.__init__(self,
                              input_keys = ['blocked_retry_delay',
-                                           'blocked_retried'],
-                             output_keys = ['blocked_retried'],
+                                           'blocked_retried',
+                                           'last_retry_time'],
+                             output_keys = ['blocked_retried',
+                                            'last_retry_time'],
                              outcomes=['retry',
                                        'continue',
                                        'preempted', 'aborted'])
@@ -640,6 +642,11 @@ class RetryMove(smach.State):
         if userdata.blocked_retry_delay == 0:
             return 'continue'
         else:
+            #reset the flag if it's been a few seconds since we retried
+            time_since_retry = ropsy.Time.now() - userdata.last_retry_time
+            if (time_since_retry > userdata.blocked_retry_delay):
+                userdata.blocked_retried = False
+            
             #we already tried here, give up
             if userdata.blocked_retried:
                 #reset the flag for next try
@@ -649,6 +656,7 @@ class RetryMove(smach.State):
                 self.announcer.say('Recheck ing cost map.')
                 rospy.sleep(userdata.blocked_retry_delay)
                 userdata.blocked_retried = True
+                userdata.last_retry_time = rospy.Time.now()
                 return 'retry'   
             
 class BeaconSearch(smach.State):
