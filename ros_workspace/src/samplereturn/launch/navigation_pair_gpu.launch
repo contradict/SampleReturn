@@ -132,6 +132,8 @@
         <param name="disparity_range" type="int" value="48"/>
         <param name="xsobel" type="bool" value="true"/>
         <param name="refine_disparity" type="bool" value="true"/>
+        <param name="max_speckle_size" type="int" value="800"/>
+        <param name="max_diff" type="double" value="5"/>
     </node>
 
 

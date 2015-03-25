@@ -289,6 +289,23 @@ void Stereoproc::imageCb(
         r_strm.waitForCompletion();
 #if 1
         block_matcher_(l_rect_mono, r_rect_mono, disparity, l_strm);
+        //allocate cpu-side resource
+        filter_buf_.create(l_rect_mono.size(),CV_16SC1);
+        cv::gpu::registerPageLocked(filter_buf_);
+        cv::gpu::GpuMat disparity_16s;
+        //enqueueDownload
+        l_strm.enqueueConvert(disparity, disparity_16s, CV_16SC1, 256);
+        l_strm.enqueueDownload(disparity_16s, filter_buf_);
+        //enqueueHostCallback
+        l_strm.enqueueHostCallback(
+                [](cv::gpu::Stream &l_strm, int status, void *userData)
+                {
+                    static_cast<Stereoproc*>(userData)->filterSpeckles();
+                },
+                (void*)this);
+        //enqueueUpload
+        l_strm.enqueueUpload(filter_buf_,disparity_16s);
+        l_strm.enqueueConvert(disparity_16s, disparity, CV_32FC1, 1/256.);
 #else
         int ndisp=48, iters, levels, nr_plane;
         csbp_.estimateRecommendedParams( l_rect_mono.cols, l_rect_mono.rows,
@@ -474,6 +491,8 @@ void Stereoproc::imageCb(
     r_strm.waitForCompletion();
     if(connected_.Disparity)
         cv::gpu::unregisterPageLocked(disp_msg_data_);
+    if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
+        cv::gpu::unregisterPageLocked(filter_buf_);
     cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(l_cpu_raw) );
     cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(r_cpu_raw) );
 }
@@ -481,6 +500,11 @@ void Stereoproc::imageCb(
 void Stereoproc::sendDisparity(void)
 {
     pub_disparity_.publish(disp_msg_);
+}
+
+void Stereoproc::filterSpeckles(void)
+{
+    cv::filterSpeckles(filter_buf_, 0, maxSpeckleSize_, maxDiff_*256);
 }
 
 void Stereoproc::configCb(Config &config, uint32_t level)
@@ -500,6 +524,9 @@ void Stereoproc::configCb(Config &config, uint32_t level)
     NODELET_INFO("Reconfigure preset:%d winsz:%d ndisp:%d tex:%3.1f",
             block_matcher_.preset, config.correlation_window_size, config.disparity_range,
             config.texture_threshold);
+
+    maxDiff_= config.max_diff;
+    maxSpeckleSize_ = config.max_speckle_size;
 }
 
 } // namespace stereo_image_proc
