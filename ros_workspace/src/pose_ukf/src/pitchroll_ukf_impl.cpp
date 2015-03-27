@@ -34,20 +34,4 @@ operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
     return out;
 }
 
-Eigen::MatrixXd
-PitchRollUKF::process_noise(double dt) const
-{
-    Eigen::MatrixXd noise(ndim(), ndim());
-    noise.setZero();
-
-    // position, velocity, orientation, omega, gyro_bias, accel_bias
-    noise.block<2,2>(0,0).diagonal() = (dt*sigma_orientation).cwiseProduct(dt*sigma_orientation);
-    noise.block<2,2>(0,2).diagonal() = (dt*dt*sigma_omega/2.).cwiseProduct(dt*dt*sigma_omega/2.);
-    noise.block<2,2>(2,0).diagonal() = (dt*dt*sigma_omega/2.).cwiseProduct(dt*dt*sigma_omega/2.);
-    noise.block<2,2>(2,2).diagonal() = (dt*sigma_omega).cwiseProduct(dt*sigma_omega);
-    noise.block<2,2>(4,4).diagonal() = (dt*sigma_gyro_bias).cwiseProduct(dt*sigma_gyro_bias);
-    noise.block<3,3>(6,6).diagonal() = (dt*sigma_accel_bias).cwiseProduct(dt*sigma_accel_bias);
-
-    return noise;
-}
 }

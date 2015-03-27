@@ -80,11 +80,6 @@ class ScaledUKF {
         }
     }
 
-    protected:
-        int ndim(void) const { return state_.ndim(); };
-
-        virtual Eigen::MatrixXd
-        process_noise(double dt) const = 0;
 
     public:
         ScaledUKF(double alpha=1e-1, double beta=2.0, double kappa=0.0) :
@@ -104,10 +99,10 @@ class ScaledUKF {
         }
 
         void
-        predict(double dt)
+        predict(double dt, Eigen::MatrixXd process_noise)
         {
             std::vector<Eigen::MatrixXd> covs;
-            covs.push_back(process_noise(dt));
+            covs.push_back(process_noise);
             std::vector<S> Chi;
             std::vector<Eigen::VectorXd> nu;
             std::vector<double> weights, cweights;
@@ -206,8 +201,10 @@ class ScaledUKF {
             }
         }
 
-        const S& state(void) {return state_;};
-        const Eigen::MatrixXd& covariance(void) {return covariance_;};
+        const S& state(void) const {return state_;};
+        const Eigen::MatrixXd& covariance(void) const {return covariance_;};
+
+        int ndim(void) const { return state_.ndim(); };
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
