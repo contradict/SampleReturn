@@ -102,20 +102,10 @@ struct PositionMeasurement
 
 class TestUKF : public UKF::ScaledUKF<struct TestState>
 {
-    Eigen::MatrixXd
-    process_noise(double dt) const
-    {
-        Eigen::MatrixXd noise(2,2);
-        noise << dt*dt*dt*dt/4.0, dt*dt*dt/2.0,
-                      dt*dt*dt/2.0, dt*dt;
-        noise *= sigma*sigma;
-        return noise;
-    };
 public:
     TestUKF(double al, double be, double ka) :
         ScaledUKF(al, be, ka)
     {};
-    double sigma;
 };
 
 }
@@ -127,6 +117,16 @@ UKF::ScaledUKF<struct PoseUKF::TestState>::correct(const struct PoseUKF::Positio
                                                   );
 
 namespace PoseUKF {
+
+Eigen::MatrixXd
+process_noise(double dt, double sigma)
+{
+    Eigen::MatrixXd noise(2,2);
+    noise << dt*dt*dt*dt/4.0, dt*dt*dt/2.0,
+                  dt*dt*dt/2.0, dt*dt;
+    noise *= sigma*sigma;
+    return noise;
+};
 
 void
 runTest(void)
@@ -169,7 +169,7 @@ runTest(void)
 
     TestUKF ukf(1e-3, 2.0, 0.0);
     // acceleration noise
-    ukf.sigma = (2*M_PI)*(2*M_PI)*10;
+    double sigma = (2*M_PI)*(2*M_PI)*10;
     TestState st;
     st.v=0.0;
     Eigen::MatrixXd cov(2,2);
@@ -193,7 +193,7 @@ runTest(void)
     int correct_every=1;
     for(int i=0;i<N;i++)
     {
-        ukf.predict(dt);
+        ukf.predict(dt, process_noise(dt, sigma));
         t += dt;
         PositionMeasurement m;
         m.x = noisy_positions[i];

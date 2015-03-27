@@ -216,23 +216,12 @@ struct IMUOrientationMeasurement
 
 class PitchRollUKF : public UKF::ScaledUKF<struct PitchRollState>
 {
-    Eigen::MatrixXd
-    process_noise(double dt) const;
 
     public:
-
-    Eigen::Vector2d sigma_orientation;
-    Eigen::Vector2d sigma_omega;
-    Eigen::Vector2d sigma_gyro_bias;
-    Eigen::Vector3d sigma_accel_bias;
 
     PitchRollUKF(double alpha=0.1, double beta=2.0, double kappa=0.0) :
         ::UKF::ScaledUKF<struct PitchRollState>(alpha, beta, kappa)
     {
-        sigma_orientation.setOnes();
-        sigma_omega.setOnes();
-        sigma_gyro_bias.setOnes();
-        sigma_accel_bias.setOnes();
     };
 };
 

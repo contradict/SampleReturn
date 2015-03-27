@@ -122,6 +122,7 @@ class PoseUKFNode
 
     struct PoseState wheel_last_pose_;
 
+    Eigen::MatrixXd process_noise(double dt) const;
     void parseWheelParameters(const ros::NodeHandle& privatenh);
     void parseProcessSigma(const ros::NodeHandle& privatenh);
 
@@ -210,6 +211,28 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     tf::pointEigenToMsg( ukf_->state().Position, msg->pose.position);
     tf::quaternionEigenToMsg( ukf_->state().Orientation, msg->pose.orientation);
     pose_pub_.publish(msg);
+}
+
+Eigen::MatrixXd
+PoseUKFNode::process_noise(double dt) const
+{
+    Eigen::MatrixXd noise(ukf_->ndim(), ukf_->ndim());
+    noise.setZero();
+
+    // position, velocity, orientation, omega, gyro_bias, accel_bias
+    noise.block<2,2>(0,0).diagonal() = (dt*sigma_position_).cwiseProduct(dt*sigma_position_);
+    noise.block<2,2>(0,2).diagonal() = (dt*dt*sigma_velocity_/2.).cwiseProduct(dt*dt*sigma_velocity_/2.);
+    noise.block<2,2>(2,0).diagonal() = (dt*dt*sigma_velocity_/2.).cwiseProduct(dt*dt*sigma_velocity_/2.);
+    noise.block<2,2>(2,2).diagonal() = (dt*sigma_velocity_).cwiseProduct(dt*sigma_velocity_);
+    noise.block<2,2>(4,4).diagonal() = (dt*sigma_velocity_).cwiseProduct(dt*sigma_velocity_);
+    noise.block<3,3>(6,6).diagonal() = (dt*sigma_orientation_).cwiseProduct(dt*sigma_orientation_);
+    noise.block<3,3>(6,9).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
+    noise.block<3,3>(9,6).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
+    noise.block<3,3>(9,9).diagonal() = (dt*sigma_omega_).cwiseProduct(dt*sigma_omega_);
+    noise.block<3,3>(12,12).diagonal() = (dt*sigma_gyro_bias_).cwiseProduct(dt*sigma_gyro_bias_);
+    noise.block<3,3>(15,15).diagonal() = (dt*sigma_accel_bias_).cwiseProduct(dt*sigma_accel_bias_);
+
+    return noise;
 }
 
 void

@@ -36,7 +36,13 @@ class PitchRollUKFNode
     ros::Time last_imu_;
     bool first_update_;
 
+    Eigen::Vector2d sigma_orientation_;
+    Eigen::Vector2d sigma_omega_;
+    Eigen::Vector2d sigma_gyro_bias_;
+    Eigen::Vector3d sigma_accel_bias_;
+
     void parseProcessSigma(const ros::NodeHandle& privatenh);
+    Eigen::MatrixXd process_noise(double dt) const;
 
     public:
         PitchRollUKFNode();
@@ -140,7 +146,7 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
         return;
     ROS_INFO_STREAM("Performing IMU update with dt=" << dt << ", delta_t=" << m.delta_t);
     ROS_INFO_STREAM(m);
-    ukf_->predict(dt);
+    ukf_->predict(dt, process_noise(dt));
     last_update_ = msg->header.stamp;
     ukf_->correct(m, meas_covs);
     printState();
@@ -175,6 +181,23 @@ void listToVec(XmlRpc::XmlRpcValue& list, V *vec)
     }
 }
 
+Eigen::MatrixXd
+PitchRollUKFNode::process_noise(double dt) const
+{
+    Eigen::MatrixXd noise(ukf_->ndim(), ukf_->ndim());
+    noise.setZero();
+
+    // position, velocity, orientation, omega, gyro_bias, accel_bias
+    noise.block<2,2>(0,0).diagonal() = (dt*sigma_orientation_).cwiseProduct(dt*sigma_orientation_);
+    noise.block<2,2>(0,2).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
+    noise.block<2,2>(2,0).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
+    noise.block<2,2>(2,2).diagonal() = (dt*sigma_omega_).cwiseProduct(dt*sigma_omega_);
+    noise.block<2,2>(4,4).diagonal() = (dt*sigma_gyro_bias_).cwiseProduct(dt*sigma_gyro_bias_);
+    noise.block<3,3>(6,6).diagonal() = (dt*sigma_accel_bias_).cwiseProduct(dt*sigma_accel_bias_);
+
+    return noise;
+}
+
 void
 PitchRollUKFNode::parseProcessSigma(const ros::NodeHandle& privatenh)
 {
@@ -189,22 +212,22 @@ PitchRollUKFNode::parseProcessSigma(const ros::NodeHandle& privatenh)
     if(process_sigma.hasMember(std::string("orientation")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("orientation")];
-        listToVec(list, &ukf_->sigma_orientation);
+        listToVec(list, &sigma_orientation_);
     }
     if(process_sigma.hasMember(std::string("omega")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("omega")];
-        listToVec(list, &ukf_->sigma_omega);
+        listToVec(list, &sigma_omega_);
     }
     if(process_sigma.hasMember(std::string("gyro_bias")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("gyro_bias")];
-        listToVec(list, &ukf_->sigma_gyro_bias);
+        listToVec(list, &sigma_gyro_bias_);
     }
     if(process_sigma.hasMember(std::string("accel_bias")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("accel_bias")];
-        listToVec(list, &ukf_->sigma_accel_bias);
+        listToVec(list, &sigma_accel_bias_);
     }
 }
 
