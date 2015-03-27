@@ -17,16 +17,19 @@ UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::WheelOdometryM
 
 namespace PoseUKF {
 
+const double IMUOrientationMeasurement::littleg=9.8066;
+
 std::ostream &
 operator<<(std::ostream &out, const PoseState& st)
 {
     double r, p, y;
     tf::Quaternion q;
-    tf::quaternionEigenToTF(st.Orientation, q);
+    tf::quaternionEigenToTF(st.Orientation.unit_quaternion(), q);
     tf::Matrix3x3 m(q);
     m.getRPY(r, p, y);
     out << "Position    (" << st.Position.transpose() << ")\n";
     out << "Velocity    (" << st.Velocity.transpose() << ")\n";
+    out << "Acceleration(" << st.Acceleration.transpose() << ")\n";
     out << "Orientation (" << r << ", " << p << ", " << y << ")\n";
     out << "Omega       (" << st.Omega.transpose() << ")\n";
     out << "GyroBias    (" << st.GyroBias.transpose() << ")\n";
@@ -45,9 +48,10 @@ operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
 std::ostream &
 operator<<(std::ostream &out, const WheelOdometryMeasurement& m)
 {
-    out << "wheel positions:\n" << m.wheel_positions << std::endl;
-    out << "wheel motions:\n" << m.wheel_motions << std::endl;
-    out << "wheel Velocities: (" << m.wheel_velocities.transpose() << ")" << std::endl;
+    out << "delta yaw: " << m.delta_yaw << std::endl;
+    out << "yaw rate: " << m.yaw_rate << std::endl;
+    out << "delta_pos: " << m.delta_pos.transpose() << std::endl;
+    out << "velocity: " << m.velocity.transpose() << std::endl;
     return out;
 }
 
