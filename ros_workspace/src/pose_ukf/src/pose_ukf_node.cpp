@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <functional>
+#include <sophus/se3.hpp>
 
 
 namespace PoseUKF {
@@ -115,16 +116,30 @@ class PoseUKFNode
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
 
+    tf::StampedTransform imu_transform_;
+    Sophus::SE3d imu_se3_;
+    bool have_imu_transform_;
+
     PoseUKF *ukf_;
     ros::Time last_update_;
-    ros::Time last_joint_state_;
-    ros::Time last_imu_;
+    ros::Time last_joint_stamp_;
+    struct PoseState last_joint_state_;
+    Eigen::MatrixXd last_joint_covariance_;
+    ros::Time last_imu_stamp_;
 
-    struct PoseState wheel_last_pose_;
+    Eigen::Vector2d sigma_position_;
+    Eigen::Vector2d sigma_velocity_;
+    Eigen::Vector2d sigma_acceleration_;
+    Eigen::Vector3d sigma_orientation_;
+    Eigen::Vector3d sigma_omega_;
+    Eigen::Vector3d sigma_gyro_bias_;
+    Eigen::Vector3d sigma_accel_bias_;
 
     Eigen::MatrixXd process_noise(double dt) const;
     void parseWheelParameters(const ros::NodeHandle& privatenh);
     void parseProcessSigma(const ros::NodeHandle& privatenh);
+    //void parseIMUMeasurementSigma(const ros::NodeHandle& privatenh);
+    //void parseOdometryMeasurementSigma(const ros::NodeHandle& privatenh);
 
     public:
         PoseUKFNode();
@@ -135,6 +150,7 @@ class PoseUKFNode
 };
 
 PoseUKFNode::PoseUKFNode() :
+    have_imu_transform_(false),
     ukf_(NULL)
 {
     ros::NodeHandle privatenh("~");
@@ -163,6 +179,10 @@ PoseUKFNode::PoseUKFNode() :
         ukf_->reset(st, initial_covariance);
     }
 
+    parseProcessSigma(privatenh);
+    //parseIMUMeasurementSigma(privatenh);
+    //parseOdometryMeasurementSigma(privatenh);
+
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
     seq_ = 0;
     publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PoseUKFNode::sendPose, this);
@@ -173,9 +193,10 @@ PoseUKFNode::connect(void)
 {
     ros::NodeHandle nh;
     last_update_ = ros::Time::now();
-    last_joint_state_ = last_update_;
-    wheel_last_pose_ = ukf_->state();
-    last_imu_ = last_update_;
+    last_joint_stamp_ = last_update_;
+    last_joint_state_ = ukf_->state();
+    last_joint_covariance_ = ukf_->covariance();
+    last_imu_stamp_ = last_update_;
     imu_subscription_ = nh.subscribe("imu", 1, &PoseUKFNode::imuCallback, this);
     joint_subscription_ = nh.subscribe("joint_state", 1, &PoseUKFNode::jointStateCallback, this);
     ROS_INFO("Subscribers created");
@@ -208,8 +229,12 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     msg->header.frame_id = "imu_0";
     msg->header.stamp = ros::Time::now();
     msg->header.seq = seq_++;
-    tf::pointEigenToMsg( ukf_->state().Position, msg->pose.position);
-    tf::quaternionEigenToMsg( ukf_->state().Orientation, msg->pose.orientation);
+    Eigen::Vector3d pos3d;
+    pos3d.segment<2>(0) = ukf_->state().Position;
+    pos3d(2) = 0;
+    tf::pointEigenToMsg(pos3d, msg->pose.position);
+    tf::quaternionEigenToMsg(ukf_->state().Orientation.unit_quaternion(),
+                             msg->pose.orientation);
     pose_pub_.publish(msg);
 }
 
@@ -238,13 +263,36 @@ PoseUKFNode::process_noise(double dt) const
 void
 PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 {
+
+    if(!have_imu_transform_)
+    {
+        try
+        {
+            listener_.lookupTransform(msg->header.frame_id,
+                    base_name_,
+                    ros::Time(0),
+                    imu_transform_);
+            Eigen::Quaterniond imu_rotation;
+            Eigen::Vector3d imu_translation;
+            tf::quaternionTFToEigen(imu_transform_.getRotation(), imu_rotation);
+            tf::vectorTFToEigen(imu_transform_.getOrigin(), imu_translation);
+            imu_se3_.translation() = imu_translation;
+            imu_se3_.so3() = Sophus::SO3d(imu_rotation);
+            have_imu_transform_ = true;
+        }
+        catch(tf::TransformException ex)
+        {
+            ROS_ERROR_STREAM("Unable to look up imu frame: " << ex.what());
+            return;
+        }
+    }
+
     IMUOrientationMeasurement m;
     tf::vectorMsgToEigen(msg->linear_acceleration,
-                         m.acceleration);
+            m.acceleration);
+    m.acceleration *= m.littleg;
     tf::vectorMsgToEigen(msg->angular_velocity,
-                         m.omega);
-    m.delta_t = (msg->header.stamp - last_imu_).toSec();
-    last_imu_ = msg->header.stamp;
+            m.omega);
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > accel_cov(msg->linear_acceleration_covariance.data());
@@ -259,9 +307,10 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     double dt = (msg->header.stamp - last_update_).toSec();
     if(dt<0)
         return;
-    ROS_INFO_STREAM("Performing IMU update with dt=" << dt << ", delta_t=" << m.delta_t);
+
+    ROS_INFO_STREAM("Performing IMU update with dt=" << dt );
     ROS_INFO_STREAM(m);
-    ukf_->predict(dt);
+    ukf_->predict(dt, process_noise(dt));
     last_update_ = msg->header.stamp;
     ukf_->correct(m, meas_covs);
     printState();
@@ -271,8 +320,9 @@ void
 PoseUKFNode::printState(void)
 {
     ROS_INFO_STREAM("State:\n" << ukf_->state());
-    ROS_INFO_STREAM("position cov:\n" << (ukf_->covariance().block<3,3>(0,0)));
-    ROS_INFO_STREAM("velocity cov:\n" << (ukf_->covariance().block<3,3>(3,3)));
+    ROS_INFO_STREAM("position cov:\n" << (ukf_->covariance().block<2,2>(0,0)));
+    ROS_INFO_STREAM("velocity cov:\n" << (ukf_->covariance().block<2,2>(2,2)));
+    ROS_INFO_STREAM("acceleration cov:\n" << (ukf_->covariance().block<2,2>(4,4)));
     ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<3,3>(6,6)));
     ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<3,3>(9,9)));
     ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<3,3>(12,12)));
@@ -282,7 +332,7 @@ PoseUKFNode::printState(void)
 void
 PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
 {
-    if(wheels_.size() == 0)
+    if(!have_imu_transform_ || wheels_.size() == 0)
         return;
 
     for( auto&& t: zip_range(msg->name, msg->position, msg->velocity) )
@@ -302,52 +352,102 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         }
     }
 
-    struct WheelOdometryMeasurement m;
-
-    m.delta_t = (msg->header.stamp - last_joint_state_).toSec();
-    last_joint_state_ = msg->header.stamp;
-    m.base_state = wheel_last_pose_;
-
-    m.wheel_positions.resize(wheels_.size(), 3);
-    m.wheel_motions.resize(wheels_.size(), 2);
-    m.wheel_velocities.resize(wheels_.size());
-    Eigen::MatrixXd mcov(m.ndim(), m.ndim());
-    mcov.setZero();
     bool good_delta=true;
-    for(size_t i=0; i<wheels_.size(); i++)
+    Eigen::VectorXd wheel_deltas(2*wheels_.size());
+    Eigen::VectorXd wheel_velocities(2*wheels_.size());
+    Eigen::MatrixXd shape(2*wheels_.size(), 3);
+    Eigen::Vector2d direction;
+    Eigen::Matrix2d cross;
+    cross << 0, -1,
+             1,  0;
+    Eigen::Vector2d R;
+    Eigen::MatrixXd measurement_cov(2*wheels_.size(), 2*wheels_.size());
+    measurement_cov.setZero();
+    for(size_t i=0;i<wheels_.size();i++)
     {
         double dphi, dtheta;
         good_delta &= wheels_[i]->delta(&dphi, &dtheta);
-        double phi = wheels_[i]->steering_angle;
-        Eigen::Vector2d motion(cos(phi), sin(phi));
-        motion *= dtheta*wheels_[i]->diameter;
-        m.wheel_motions.row(i) = motion;
-        m.wheel_positions.row(i) = wheels_[i]->position;
-        m.wheel_velocities(i) = wheels_[i]->rotation_velocity*wheels_[i]->diameter;
-        mcov.block<2,2>(3*i, 3*i) << cos(phi)*wheels_[i]->forward_noise, -sin(phi)*wheels_[i]->perpendicular_noise,
-                    sin(phi)*wheels_[i]->forward_noise,  cos(phi)*wheels_[i]->perpendicular_noise;
-        mcov(3*i+2, 3*i+2) = wheels_[i]->velocity_noise;
-        ROS_INFO_STREAM("wheel measurement(" << i << "):\n" << m.wheel_motions.row(i));
-        ROS_INFO_STREAM("wheel measurement covariance(" << i << "):\n" << (mcov.block<2,2>(2*i, 2*i)));
+        direction << cos(wheels_[i]->steering_angle),
+                     sin(wheels_[i]->steering_angle);
+        wheel_deltas.segment<2>(2*i) = wheels_[i]->diameter*dtheta*direction;
+        wheel_velocities.segment<2>(2*i) = wheels_[i]->diameter*wheels_[i]->rotation_velocity*direction;
+        R = wheels_[i]->position.segment<2>(0);
+        shape.block<2,1>(2*i,0) = cross * R;
+        shape.block<2,2>(2*i,1) = Eigen::Matrix2d::Identity();
+        Eigen::Matrix2d wheel_sigma;
+        wheel_sigma << wheels_[i]->forward_noise, 0,
+                       0, wheels_[i]->perpendicular_noise;
+        Eigen::Matrix2d rcov = Eigen::Rotation2Dd(wheels_[i]->steering_angle).toRotationMatrix();
+        measurement_cov.block<2,2>(2*i, 2*i) = rcov*wheel_sigma*wheel_sigma.transpose()*rcov.transpose();
     }
     if(!good_delta)
     {
         ROS_ERROR("Large angle jump, skipping odometry update");
         return;
     }
-    std::vector<Eigen::MatrixXd> meas_covs;
-    meas_covs.push_back(mcov);
 
+    if(!(((measurement_cov-measurement_cov).array() == (measurement_cov-measurement_cov).array()).all()))
+    {
+        ROS_ERROR_STREAM("Covariance not finite\n" << measurement_cov );
+    }
+
+    Eigen::Matrix<double, 3, 6> solution = (shape.transpose()*shape).inverse()*shape.transpose();
+    Eigen::Vector3d motion = solution*wheel_deltas;
+    Eigen::Vector3d velocity = solution*wheel_velocities;
+    Eigen::Matrix3d covariance = (shape.transpose()*measurement_cov.inverse()*shape).inverse();
+
+    if(!(((covariance-covariance).array() == (covariance-covariance).array()).all()))
+    {
+        ROS_ERROR_STREAM("Rotated covariance not finite\n" << covariance );
+    }
+
+
+    Sophus::SE3d odometry_delta_base_link;
+    odometry_delta_base_link.translation() << motion(1), motion(2), 0;
+    odometry_delta_base_link.so3() = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, motion(0)));
+    Sophus::SE3d odometry_delta_imu = imu_se3_*odometry_delta_base_link*imu_se3_.inverse();
+
+    Sophus::SE3d odometry_velocity_base_link;
+    odometry_velocity_base_link.translation() << velocity(1), velocity(2), 0;
+    odometry_velocity_base_link.so3() = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, velocity(0)));
+    Sophus::SE3d odometry_velocity_imu = imu_se3_*odometry_velocity_base_link*imu_se3_.inverse();
+
+    Eigen::Matrix3d odometry_position_covariance_base_link;
+    odometry_position_covariance_base_link.setIdentity();
+    odometry_position_covariance_base_link.block<2,2>(0,0) = covariance.block<2,2>(1,1);
+    Eigen::Matrix3d rot_base_to_imu;
+    tf::matrixTFToEigen(imu_transform_.getBasis(), rot_base_to_imu);
+    Eigen::Matrix3d odometry_position_covariance_imu = rot_base_to_imu*odometry_position_covariance_base_link*rot_base_to_imu.transpose();
+
+    double delta_t = (msg->header.stamp - last_joint_stamp_).toSec();
+    last_joint_stamp_ = msg->header.stamp;
 
     double dt = (msg->header.stamp - last_update_).toSec();
     if(dt<0)
         return;
+
+    WheelOdometryMeasurement m;
+    m.delta_yaw = odometry_delta_imu.so3().log()(2);
+    m.yaw_rate = odometry_velocity_imu.so3().log()(2);
+    m.delta_pos = odometry_delta_imu.translation().segment<2>(0);
+    m.velocity = odometry_velocity_imu.translation().segment<2>(0);
+    m.last_state = last_joint_state_;
+    std::vector<Eigen::MatrixXd> meas_covs;
+    Eigen::MatrixXd meas_cov;
+    meas_cov.resize(m.ndim(), m.ndim());
+    meas_cov.setZero();
+    meas_cov(0,0) = covariance(0,0);
+    meas_cov(1,1) = covariance(0,0)/delta_t/delta_t;
+    meas_cov.block<2,2>(2,2) = odometry_position_covariance_imu.block<2,2>(0,0);
+    meas_cov.block<2,2>(4,4) = odometry_position_covariance_imu.block<2,2>(0,0)/delta_t/delta_t;
+    meas_covs.push_back(meas_cov);
     ROS_INFO_STREAM("Performing joint state update with dt=" << dt);
-    ROS_INFO_STREAM(m);
-    ukf_->predict(dt);
+    ROS_INFO_STREAM("odometry measurement:\n" << m);
+    ROS_INFO_STREAM("odometry measurement covariance:\n" << meas_cov);
+    ukf_->predict(dt, process_noise(dt));
     last_update_ = msg->header.stamp;
     ukf_->correct(m, meas_covs);
-    wheel_last_pose_ = ukf_->state();
+    last_joint_state_ = ukf_->state();
     printState();
 }
 
@@ -467,10 +567,11 @@ PoseUKFNode::parseWheelParameters(const ros::NodeHandle& privatenh)
     }
 }
 
-void listToVec(XmlRpc::XmlRpcValue& list, Eigen::Vector3d *vec)
+template<int N>
+void listToVec(XmlRpc::XmlRpcValue& list, Eigen::Matrix<double, N, 1> *vec)
 {
     ROS_ASSERT(list.getType() == XmlRpc::XmlRpcValue::TypeArray);
-    for(int i=0; i<std::min(3, list.size()); i++)
+    for(int i=0; i<std::min(N, list.size()); i++)
     {
         ROS_ASSERT(list[i].getType() == XmlRpc::XmlRpcValue::TypeDouble ||
                 list[i].getType() == XmlRpc::XmlRpcValue::TypeInt);
@@ -492,32 +593,37 @@ PoseUKFNode::parseProcessSigma(const ros::NodeHandle& privatenh)
     if(process_sigma.hasMember(std::string("position")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("position")];
-        listToVec(list, &ukf_->sigma_position);
+        listToVec(list, &sigma_position_);
     }
     if(process_sigma.hasMember(std::string("velocity")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("velocity")];
-        listToVec(list, &ukf_->sigma_velocity);
+        listToVec(list, &sigma_velocity_);
+    }
+    if(process_sigma.hasMember(std::string("acceleration")))
+    {
+        XmlRpc::XmlRpcValue list = process_sigma[std::string("acceleration")];
+        listToVec(list, &sigma_acceleration_);
     }
     if(process_sigma.hasMember(std::string("orientation")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("orientation")];
-        listToVec(list, &ukf_->sigma_orientation);
+        listToVec(list, &sigma_orientation_);
     }
     if(process_sigma.hasMember(std::string("omega")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("omega")];
-        listToVec(list, &ukf_->sigma_omega);
+        listToVec(list, &sigma_omega_);
     }
     if(process_sigma.hasMember(std::string("gyro_bias")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("gyro_bias")];
-        listToVec(list, &ukf_->sigma_gyro_bias);
+        listToVec(list, &sigma_gyro_bias_);
     }
     if(process_sigma.hasMember(std::string("accel_bias")))
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("accel_bias")];
-        listToVec(list, &ukf_->sigma_accel_bias);
+        listToVec(list, &sigma_accel_bias_);
     }
 }
 
