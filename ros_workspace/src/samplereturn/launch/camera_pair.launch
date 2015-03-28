@@ -16,7 +16,7 @@
               type="nodelet"
               args="load camera1394/driver $(arg manager_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="30.0"
+              respawn_delay="5.0"
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
 
@@ -58,7 +58,7 @@
               type="nodelet"
               args="load camera1394/driver $(arg manager_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="30.0"
+              respawn_delay="5.0"
               respawn="true">
 
             <param name="guid" type="string" value="$(arg right_guid)"/>
@@ -113,7 +113,7 @@
             type="nodelet"
             args="load image_proc/debayer /cameras/navigation/$(arg namespace)/$(arg manager_name)"
             ns="/cameras/navigation/$(arg namespace)/left"
-            respawn_delay="30.0"
+            respawn_delay="5.0"
             respawn="true">
         </node>
         <node name="debayer"
@@ -122,7 +122,7 @@
             type="nodelet"
             args="load image_proc/debayer /cameras/navigation/$(arg namespace)/$(arg manager_name)"
             ns="/cameras/navigation/$(arg namespace)/right"
-            respawn_delay="30.0"
+            respawn_delay="5.0"
             respawn="true">
         </node>
 
@@ -134,7 +134,7 @@
             args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
             ns="/cameras/navigation/$(arg namespace)/left"
             output="log"
-            respawn_delay="30.0"
+            respawn_delay="5.0"
             respawn="true">
             <param name="queue_size" type="int" value="1"/>
         </node>
@@ -145,7 +145,7 @@
             args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
             ns="/cameras/navigation/$(arg namespace)/left"
             output="log"
-            respawn_delay="30.0"
+            respawn_delay="5.0"
             respawn="true">
             <remap from="image_mono" to="image_color"/>
             <remap from="image_rect" to="image_rect_color"/>
@@ -158,7 +158,7 @@
             args="load image_proc/rectify /cameras/navigation/$(arg namespace)/$(arg manager_name)"
             ns="/cameras/navigation/$(arg namespace)/right"
             output="log"
-            respawn_delay="30.0"
+            respawn_delay="5.0"
             respawn="true">
             <param name="queue_size" type="int" value="1"/>
         </node>
@@ -186,7 +186,7 @@
         args="load stereo_image_proc/disparity $(arg manager_name)"
         ns="/cameras/navigation/$(arg namespace)"
         output="log"
-        respawn_delay="30.0"
+        respawn_delay="5.0"
         respawn="true">
         <param name="correlation_window_size" type="int" value="17"/>
         <param name="min_disparity" type="int" value="0"/>

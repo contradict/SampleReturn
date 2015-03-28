@@ -78,14 +78,16 @@ class TriggeredCamera(object):
                 queue_size=2, buff_size=2*5000*4000)
         rospy.Subscriber('pause_state', std_msg.Bool, self.handle_pause)
 
+        self.connect_to_services()
+        self.start_trigger_timer(None)
+
+    def connect_to_services(self):
         self.wait_for_service('gpio_service')
         self.wait_for_service('set_config')
         self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService,
                 persistent=True)
         self.photo_config = rospy.ServiceProxy('set_config', SetConfig,
                 persistent=True)
-
-        self.start_trigger_timer(None)
 
     def wait_for_service(self, name):
         while not rospy.is_shutdown():
@@ -160,9 +162,15 @@ class TriggeredCamera(object):
             self.pause_for_restart_timer.shutdown()
             self.pause_for_restart_timer = None
         rospy.loginfo("starting trigger")
-        self.wait_for_service('set_config')
-        self.photo_config(SetConfigRequest(param="recordingmedia",
-            value="1 SDRAM"))
+        while True:
+            try:
+                self.photo_config(SetConfigRequest(param="recordingmedia",
+                    value="1 SDRAM"))
+                break
+            except rospy.ServiceException:
+                rospy.logerr("config service failed")
+                self.connect_to_services()
+
         self.send_one_trigger()
         self.wait_for_first_image_timer = rospy.Timer(
                 rospy.Duration(2*self.error_timeout),
@@ -183,8 +191,7 @@ class TriggeredCamera(object):
             capture_stamp = self.gpio_service(gpio_req).stamp
         except rospy.ServiceException:
             rospy.logerr("gpio service low failed, reconnecting.")
-            self.wait_for_service('gpio_service')
-            return
+            return False
 
         rospy.sleep(self.pulse_width)
         gpio_req.gpio.new_pin_states = self.gpio_pin
@@ -192,10 +199,10 @@ class TriggeredCamera(object):
             self.gpio_service(gpio_req)
         except rospy.ServiceException:
             rospy.logerr("gpio service high failed, reconnecting.")
-            self.wait_for_service('gpio_service')
-            # this probably resulted in a trigger, keep going!
+            return False
         capture_stamp += rospy.Duration(self.time_offset)
         self.timestamp_queue.put((self.trigger_count, capture_stamp))
+        return True
 
     def trigger_camera(self, evt):
         if not self.enabled or self.paused:
@@ -203,14 +210,25 @@ class TriggeredCamera(object):
                 self.missing_image_timer.shutdown()
                 self.missing_image_timer = None
             return
-        self.send_one_trigger()
+        if not self.send_one_trigger():
+            self.trigger_timer.shutdown()
+            self.connect_to_services()
+            self.start_restart_timer()
+            return
         rospy.logdebug("trigger seq: %d queue: %d", self.trigger_count,
                 self.timestamp_queue.qsize())
         if self.missing_image_timer is None:
             self.missing_image_timer = rospy.Timer(
                     rospy.Duration(self.error_timeout),
-                    lambda evt: self.clear_queue("Image receipt timeout."),
+                    self.no_image_received,
                     oneshot=True)
+
+    def no_image_received(self, evt):
+        self.trigger_timer.shutdown()
+        self.missing_image_timer.shutdown()
+        self.missing_image_timer = None
+        self.clear_queue("Image receipt timeout")
+        self.start_restart_timer()
 
     def clear_queue(self, reason):
         rospy.logerr("Clearing timestamp queue with %d entries: %s",

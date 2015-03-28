@@ -16,7 +16,7 @@
           args="manager"
           ns="/cameras/navigation/$(arg namespace)"
           output="log"
-          respawn_delay="1.0"
+          respawn_delay="2.0"
           respawn="true">
     </node>
     <!-- IEEE1394 camera driver -->
@@ -27,7 +27,7 @@
               type="nodelet"
               args="load camera1394/driver manager"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="1.0"
+              respawn_delay="5.0"
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
 
@@ -69,7 +69,7 @@
               type="nodelet"
               args="load camera1394/driver manager"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="1.0"
+              respawn_delay="5.0"
               respawn="true">
 
             <param name="guid" type="string" value="$(arg right_guid)"/>
@@ -123,7 +123,7 @@
           args="load gpuimageproc/Stereoproc manager"
           ns="/cameras/navigation/$(arg namespace)"
           output="log"
-          respawn_delay="1.0"
+          respawn_delay="5.0"
           respawn="true">
         <remap from="pointcloud" to="points2"/>
         <param name="approximate_sync" type="bool" value="true"/>
