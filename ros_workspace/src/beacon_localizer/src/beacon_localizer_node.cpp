@@ -157,7 +157,7 @@ void BeaconKFNode::transformBroadcastCallback( const ros::TimerEvent& e )
     if( isnan(state(1)) || isnan(state(2)) || isnan(state(3)) ||
         isinf(state(1)) || isinf(state(2)) || isinf(state(3)) )
     {
-        ROS_ERROR("NaN state");
+        ROS_ERROR("BEACON LOCALIZER: NaN state");
     }
     else
     {
@@ -229,7 +229,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     measurement(1) = T_measured_mto.getOrigin()[0];
     measurement(2) = T_measured_mto.getOrigin()[1];
     measurement(3) = tf::getYaw( T_measured_mto.getRotation() );
-    ROS_DEBUG_STREAM("measurement: " << measurement.transpose() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER measurement: " << measurement.transpose() );
 
     MatrixWrapper::ColumnVector state =_filter->PostGet()->ExpectedValueGet();
     MatrixWrapper::ColumnVector err = (state-measurement);
@@ -268,7 +268,7 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     measNoiseCovariance(1,1) = cov(3,3); measNoiseCovariance(1,2) =      0.0; measNoiseCovariance(1,3) = 0.0;
     measNoiseCovariance(2,1) =      0.0; measNoiseCovariance(2,2) = cov(3,3); measNoiseCovariance(2,3) = 0.0;
     measNoiseCovariance(3,1) =      0.0; measNoiseCovariance(3,2) =      0.0; measNoiseCovariance(3,3) = cov(5,5);
-    ROS_INFO_STREAM("measurement noise covariance: " << measNoiseCovariance);
+    ROS_DEBUG_STREAM("BEACON LOCALIZER measurement noise covariance: " << measNoiseCovariance);
     MatrixWrapper::ColumnVector measNoiseMu(3); // zeros
     measNoiseMu(1) = 0.0;
     measNoiseMu(2) = 0.0;
@@ -286,18 +286,18 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
 
     _filter->Update(_system_model, &beaconMeasurementModel, measurement);
 
-    ROS_DEBUG_STREAM("State: " << _filter->PostGet()->ExpectedValueGet().transpose() );
-    ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER State: " << _filter->PostGet()->ExpectedValueGet().transpose() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER Covariance: " << _filter->PostGet()->CovarianceGet() );
 }
 
 void BeaconKFNode::filterUpdateCallback( const ros::TimerEvent& e )
 {
     (void) e;
-    ROS_DEBUG_STREAM("pre-Update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
-    ROS_DEBUG_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER Pre-update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER Covariance: " << _filter->PostGet()->CovarianceGet() );
     _filter->Update(_system_model);
-    ROS_INFO_STREAM("Update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
-    ROS_INFO_STREAM("Covariance: " << _filter->PostGet()->CovarianceGet() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER Update state: " << _filter->PostGet()->ExpectedValueGet().transpose() );
+    ROS_DEBUG_STREAM("BEACON LOCALIZER Covariance: " << _filter->PostGet()->CovarianceGet() );
 }
 
 void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::SymmetricMatrix& m)
@@ -308,12 +308,12 @@ void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::Sy
     private_nh.getParam(param_name, values);
     if( values.getType() != XmlRpc::XmlRpcValue::TypeArray )
     {
-        ROS_ERROR("Unable to read covariance %s, not an array", param_name.c_str());
+        ROS_ERROR("BEACON LOCALIZER Unable to read covariance %s, not an array", param_name.c_str());
         return;
     }
     if( values.size() < 6 )
     {
-        ROS_ERROR("Unable to read covariance %s, array too short: %d", param_name.c_str(), values.size());
+        ROS_ERROR("BEACON LOCALIZER Unable to read covariance %s, array too short: %d", param_name.c_str(), values.size());
         return;
     }
     int i=0;
@@ -324,7 +324,7 @@ void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::Sy
             double x;
             if(i>=values.size())
             {
-                ROS_ERROR("Need at least 6 values, have %d", i);
+                ROS_ERROR("BEACON LOCALIZER Need at least 6 values, have %d", i);
                 return;
             }
             XmlRpc::XmlRpcValue value=values[i++];
@@ -339,7 +339,7 @@ void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::Sy
             else
             {
                 std::string vstr = value;
-                ROS_ERROR("Unable to read covariance matrix %s, value at %d is not a number: %s",
+                ROS_ERROR("BEACON LOCALIZER Unable to read covariance matrix %s, value at %d is not a number: %s",
                         param_name.c_str(), i, vstr.c_str());
                 return;
             }

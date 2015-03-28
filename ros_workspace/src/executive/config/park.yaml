@@ -5,15 +5,15 @@ executive_master:
         
 level_two_star:
     #for search  behaviour, degrees and meters
-    move_velocity: 0.8
-    spin_velocity: 0.3
+    move_velocity: 0.8 
+    spin_velocity: 0.2
     spoke_count: 36
     spoke_length: 80
-    first_spoke_offset: 0
+    first_spoke_offset: 35
     star_hub_radius: 10
     min_spin_radius: 20
-    spin_step: 30
-    return_time_minutes: 100
+    spin_step: 20
+    return_time_minutes: 20
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}

@@ -205,7 +205,6 @@ class ExecuteVFHMove(ExecuteMoveState):
                                                       'sample_detected',
                                                       'preempted','aborted'],
                                             input_keys=['move_goal',
-                                                        'pursue_samples',
                                                         'stop_on_sample',
                                                         'detected_sample',
                                                         'paused',
@@ -229,10 +228,9 @@ class ExecuteVFHMove(ExecuteMoveState):
             if move_state not in util.actionlib_working_states:
                 break
             #Handle sample detection
-            if (userdata.detected_sample is not None) and userdata.pursue_samples:
+            if (userdata.detected_sample is not None) and userdata.stop_on_sample:
                 rospy.loginfo("ExecuteVFHMove detected sample: " + str(userdata.detected_sample))
-                if userdata.stop_on_sample:
-                    self.cancel_move()
+                self.cancel_move()
                 return 'sample_detected'
             #handle goal changes
             if not (goal.target_pose == userdata.move_goal.target_pose):
@@ -389,7 +387,7 @@ class ServoController(smach.State):
                 point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
                                                              userdata.detected_sample).point
             except tf.Exception:
-                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> odom transform in 1.0 seconds")
+                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform in 1.0 seconds, at time: {!s}".format(sample_frame, sample_time))
                 self.try_count = 0
                 return 'aborted'
             #rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
