@@ -85,6 +85,7 @@
         </node>
     </group>
 
+    <!--
     <node name="gpustereo"
           machine="$(arg machine)"
           pkg="nodelet"
@@ -104,6 +105,7 @@
         <param name="max_speckle_size" type="int" value="800"/>
         <param name="max_diff" type="double" value="5"/>
     </node>
+    -->
 
 
 </launch>
