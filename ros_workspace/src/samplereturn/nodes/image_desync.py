@@ -10,14 +10,17 @@ import time
 def get_argv(pid):
     try:
         cmdl = open("/proc/%d/cmdline"%pid).read()
+        rospy.logdebug("Reading cmdline for pid %d: %s", pid, cmdl)
     except Exception,e:
+        rospy.logerr("Unable to read cmdline for pid %d: %s", pid, e);
         return []
     return cmdl.split("\x00")
 
 def get_envvar(pid, name):
     try:
         env = open("/proc/%d/environ"%pid).read()
-    except:
+    except Exception, e:
+        rospy.logerr("Unable to read environ for pid %d: %s", pid, e)
         return None
     for envvar in env.split("\x00"):
         if not '=' in envvar:
@@ -28,10 +31,12 @@ def get_envvar(pid, name):
     return None
 
 def get_rosparam(argv, pname):
+    rospy.logdebug("Looking for %s in %s"%(pname,argv))
     for arg in argv:
         if ":=" in arg:
             var,val = arg.split(":=")
             if var == pname:
+                rospy.logdebug("Found %s", val)
                 return val
     return None 
 
@@ -63,14 +68,18 @@ def masacre_nodelets_in_namespace(namespace):
     _, stdout = os.popen2(['pidof', 'nodelet'])
     pid_str = stdout.read()
     pids = [(int(s),
-             get_rosparam(get_argv(s), "__name"),
-             get_envvar(s, "ROS_NAMESPACE")) for s in pid_str.split()]
+             get_rosparam(get_argv(int(s)), "__name"),
+             get_envvar(int(s), "ROS_NAMESPACE")) for s in pid_str.split()]
+    rospy.logdebug("nodelet processes: %s", pids)
+    rospy.logdebug("Looking for processes in namespace %s", namespace)
     pids = filter(lambda x: x[1] is not None, pids)
     pids = filter(lambda x: x[2] == namespace, pids)
+    rospy.logdebug("Resulting processes: %s", pids)
     if len(pids) == 0:
         return False
     killlevels = ["-INT", "-TERM", "-KILL"]
     while len(pids) and len(killlevels):
+        rospy.loginfo("Still running: %s", pids)
         sig = killlevels.pop(0)
         livepids = []
         for pid, name, ns in pids:
@@ -78,10 +87,12 @@ def masacre_nodelets_in_namespace(namespace):
             os.system('kill %s %d'%(sig, pid))
         time.sleep(0.1)
         for pid, name, ns in pids:
-            if os.system('kill -0 %d'%pid):
+            retcode=os.system('kill -0 %d'%pid)
+            rospy.logdebug("Checking for existence of %d %d", pid, retcode)
+            if retcode == 0:
                 rospy.logerr("pid %d %s/%s still running after kill %s",
                              pid, ns, name, sig)
-                livepids.append(pid)
+                livepids.append((pid, name, ns))
         pids = livepids
     if len(pids):
         rospy.logerr("Some processes remain after kill -KILL")
@@ -100,7 +111,7 @@ class image_desync(object):
         self.restart_on_missing= rospy.get_param("~restart_on_missing", True)
         self.max_desync_count  = rospy.get_param("~max_desync_count",  10)
         self.max_missing_count = rospy.get_param("~max_missing_count", 10)
-        self.startup_delay     = rospy.get_param("~startup_delay", 60)
+        self.startup_delay     = rospy.get_param("~startup_delay", 30)
 
         self.manager_node_name = rospy.get_param("~manager_node_name")
         self.namespace = get_envvar(os.getpid(), "ROS_NAMESPACE")
