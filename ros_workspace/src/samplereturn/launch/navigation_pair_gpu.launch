@@ -34,7 +34,7 @@
               respawn_delay="5.0"
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
-
+            <param name="isMaster" type="bool" value="false"/>
             <param name="reset_on_open" type="bool" value="true"/>
             <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
             <param name="video_mode" type="string" value="640x480_mono8"/>
@@ -49,7 +49,6 @@
                    type="string"
                    value="file://$(find samplereturn)/calibration/ffmv-$(arg namespace)-left-640.yaml" />
             <remap from="camera" to="left" />
-            <remap from="left/camera_params" to="right/camera_params" />
         </node>
         <node name="right"
               machine="$(arg machine)"
@@ -61,7 +60,7 @@
               respawn="true">
 
             <param name="guid" type="string" value="$(arg right_guid)"/>
-
+            <param name="isMaster" type="bool" value="false"/>
             <param name="reset_on_open" type="bool" value="true"/>
             <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
             <param name="video_mode" type="string" value="640x480_mono8"/>
