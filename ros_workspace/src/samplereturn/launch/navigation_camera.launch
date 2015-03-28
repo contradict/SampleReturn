@@ -41,8 +41,8 @@
         <arg name="run_cameras" value="$(arg run_cameras)"/>
         <arg name="run_processing" value="$(arg run_processing)"/>
         <arg name="namespace" value="starboard"/>
-        <arg name="left_guid" value="00b09d0100ca7fdb"/>
-        <arg name="right_guid" value="00b09d0100ca7fd5"/>
+        <arg name="left_guid" value="00b09d0100ca7fd5"/>
+        <arg name="right_guid" value="00b09d0100ca7fdb"/>
         <arg name="strobe" value="true"/>
         <arg name="machine" value="navigate"/>
     </include>
