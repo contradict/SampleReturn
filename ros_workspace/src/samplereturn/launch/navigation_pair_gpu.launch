@@ -2,14 +2,18 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <arg name="run_cameras" default="true"/>
+    <arg name="run_processing" default="true"/>
     <arg name="namespace" default="port"/>
     <arg name="left_guid" default="00b09d0100bb69f3"/>
     <arg name="right_guid" default="00b09d0100a85719"/>
     <arg name="strobe" default="false"/>
     <arg name="machine" default="navigate"/>
+    <arg name="camera_manager_node_name" default="manager"/>
+    <arg name="processing_manager_node_name" default="manager"/>
+    <arg name="running_manager_node_name" default="manager"/>
 
     <!-- Navigation Nodelet Host process -->
-    <node name="manager"
+    <node name="$(arg running_manager_node_name)"
           machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
@@ -25,7 +29,7 @@
               machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
-              args="load camera1394/driver manager"
+              args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
               respawn_delay="5.0"
               respawn="true">
@@ -51,7 +55,7 @@
               machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
-              args="load camera1394/driver manager"
+              args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
               respawn_delay="5.0"
               respawn="true">
@@ -80,32 +84,32 @@
               pkg="samplereturn"
               type="image_desync.py"
               ns="/cameras/navigation/$(arg namespace)">
-            <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/manager"/>
+            <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/$(arg camera_manager_node_name)"/>
             <param name="max_desync" type="double" value="0.033"/>
         </node>
     </group>
 
-    <!--
-    <node name="gpustereo"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load gpuimageproc/Stereoproc manager"
-          ns="/cameras/navigation/$(arg namespace)"
-          output="log"
-          respawn_delay="5.0"
-          respawn="true">
-        <remap from="pointcloud" to="points2"/>
-        <param name="approximate_sync" type="bool" value="true"/>
-        <param name="correlation_window_size" type="int" value="21"/>
-        <param name="texture_threshold" type="int" value="12"/>
-        <param name="disparity_range" type="int" value="48"/>
-        <param name="xsobel" type="bool" value="true"/>
-        <param name="refine_disparity" type="bool" value="true"/>
-        <param name="max_speckle_size" type="int" value="800"/>
-        <param name="max_diff" type="double" value="5"/>
-    </node>
-    -->
+    <group if="$(arg run_processing)">
+        <node name="gpustereo"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load gpuimageproc/Stereoproc $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+            <remap from="pointcloud" to="points2"/>
+            <param name="approximate_sync" type="bool" value="true"/>
+            <param name="correlation_window_size" type="int" value="21"/>
+            <param name="texture_threshold" type="int" value="12"/>
+            <param name="disparity_range" type="int" value="48"/>
+            <param name="xsobel" type="bool" value="true"/>
+            <param name="refine_disparity" type="bool" value="true"/>
+            <param name="max_speckle_size" type="int" value="800"/>
+            <param name="max_diff" type="double" value="5"/>
+        </node>
+    </group>
 
 
 </launch>

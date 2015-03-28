@@ -2,40 +2,34 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <arg name="run_cameras" default="true"/>
+    <arg name="run_processing" default="true"/>
 
     <!-- special-case for port, cameras are plugged in to search -->
-    <!-- this manager runs the port cameras on search -->
-    <node if="$(arg run_cameras)"
-          name="port_search_manager"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="manager"
-          ns="/cameras/navigation/port"
-          output="log"
-          respawn_delay="25.0"
-          respawn="true">
-    </node>
     <!-- load up cameras only on search (run_processing=false) -->
-    <include file="$(find samplereturn)/launch/camera_pair.launch">
+    <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="run_processing" value="false"/>
+        <arg name="running_manager_node_name" value="port_camera_manager"/>
+        <arg name="camera_manager_node_name" value="port_camera_manager"/>
         <arg name="machine" value="search"/>
         <arg name="namespace" value="port"/>
-        <arg name="manager_name" value="port_search_manager"/>
         <arg name="left_guid" value="00b09d0100a85719"/>
         <arg name="right_guid" value="00b09d0100bb69f3"/>
         <arg name="strobe" value="true"/>
-        <arg name="run_processing" value="false"/>
     </include>
     <!-- load up the processing for port -->
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" value="false"/>
+        <arg name="run_processing" value="$(arg run_processing)"/>
+        <arg name="running_manager_node_name" value="port_processing_manager"/>
+        <arg name="processing_manager_node_name" value="port_processing_manager"/>
         <arg name="machine" value="navigate"/>
         <arg name="namespace" value="port"/>
     </include>
 
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="run_processing" value="$(arg run_processing)"/>
         <arg name="namespace" value="center"/>
         <arg name="left_guid" value="00b09d0100bd09ce"/>
         <arg name="right_guid" value="00b09d0100bb69fb"/>
@@ -45,6 +39,7 @@
 
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
+        <arg name="run_processing" value="$(arg run_processing)"/>
         <arg name="namespace" value="starboard"/>
         <arg name="left_guid" value="00b09d0100ca7fdb"/>
         <arg name="right_guid" value="00b09d0100ca7fd5"/>
