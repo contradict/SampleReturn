@@ -643,7 +643,7 @@ class RetryMove(smach.State):
             return 'continue'
         else:
             #reset the flag if it's been a few seconds since we retried
-            time_since_retry = ropsy.Time.now() - userdata.last_retry_time
+            time_since_retry = rospy.Time.now() - userdata.last_retry_time
             if (time_since_retry > userdata.blocked_retry_delay):
                 userdata.blocked_retried = False
             
