@@ -157,6 +157,12 @@ inline bool isValidPoint(const cv::Vec3f& pt)
   return pt[2] != image_geometry::StereoCameraModel::MISSING_Z && !std::isinf(pt[2]);
 }
 
+void Stereoproc::filterSpeckles(void)
+{
+    cv::Mat disp = filter_buf_.createMatHeader();
+    cv::filterSpeckles(disp, 0, maxSpeckleSize_, maxDiff_*256);
+}
+
 void Stereoproc::imageCb(
         const sensor_msgs::ImageConstPtr& l_raw_msg,
         const sensor_msgs::CameraInfoConstPtr& l_info_msg,
@@ -284,38 +290,21 @@ void Stereoproc::imageCb(
     }
 
     cv::gpu::GpuMat disparity;
+    cv::gpu::GpuMat disparity_16s;
     if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
         r_strm.waitForCompletion();
-#if 1
         block_matcher_(l_rect_mono, r_rect_mono, disparity, l_strm);
         //allocate cpu-side resource
-        filter_buf_.create(l_rect_mono.size(),CV_16SC1);
-        cv::gpu::registerPageLocked(filter_buf_);
-        cv::gpu::GpuMat disparity_16s;
+        filter_buf_.create(l_rect_mono.size(), CV_16SC1);
         //enqueueDownload
         l_strm.enqueueConvert(disparity, disparity_16s, CV_16SC1, 256);
         l_strm.enqueueDownload(disparity_16s, filter_buf_);
-        //enqueueHostCallback
-        l_strm.enqueueHostCallback(
-                [](cv::gpu::Stream &l_strm, int status, void *userData)
-                {
-                    static_cast<Stereoproc*>(userData)->filterSpeckles();
-                },
-                (void*)this);
+        l_strm.waitForCompletion();
+        filterSpeckles();
         //enqueueUpload
         l_strm.enqueueUpload(filter_buf_,disparity_16s);
         l_strm.enqueueConvert(disparity_16s, disparity, CV_32FC1, 1/256.);
-#else
-        int ndisp=48, iters, levels, nr_plane;
-        csbp_.estimateRecommendedParams( l_rect_mono.cols, l_rect_mono.rows,
-                ndisp, iters, levels, nr_plane);
-        csbp_.ndisp = ndisp;
-        csbp_.iters = iters;
-        csbp_.levels = levels;
-        csbp_.nr_plane = nr_plane;
-        csbp_(l_rect_mono, r_rect_mono, disparity, l_strm);
-#endif
     }
 
     if(connected_.Disparity)
@@ -491,8 +480,8 @@ void Stereoproc::imageCb(
     r_strm.waitForCompletion();
     if(connected_.Disparity)
         cv::gpu::unregisterPageLocked(disp_msg_data_);
-    if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
-        cv::gpu::unregisterPageLocked(filter_buf_);
+    //if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
+    //    cv::gpu::unregisterPageLocked(filter_buf_);
     cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(l_cpu_raw) );
     cv::gpu::unregisterPageLocked( const_cast<cv::Mat&>(r_cpu_raw) );
 }
@@ -500,11 +489,6 @@ void Stereoproc::imageCb(
 void Stereoproc::sendDisparity(void)
 {
     pub_disparity_.publish(disp_msg_);
-}
-
-void Stereoproc::filterSpeckles(void)
-{
-    cv::filterSpeckles(filter_buf_, 0, maxSpeckleSize_, maxDiff_*256);
 }
 
 void Stereoproc::configCb(Config &config, uint32_t level)

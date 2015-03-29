@@ -33,8 +33,8 @@
     <param name="BUTTON_LIGHTS" value="6"/>
     <param name="BUTTON_SEARCH_CAMERA" value="4"/>
     <!-- Scaling -->
-    <param name="LINEAR_SCALE" value="1.5" type="double"/>
-    <param name="LINEAR_EXP" value="2" type="double"/>
+    <param name="LINEAR_SCALE" value="2.0" type="double"/>
+    <param name="LINEAR_EXP" value="2.5" type="double"/>
     <param name="ANGULAR_SCALE" value="3.14" type="double"/>
     <param name="ANGULAR_EXP" value="2" type="double"/>
 
