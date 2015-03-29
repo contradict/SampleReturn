@@ -40,7 +40,7 @@
             <param name="video_mode" type="string" value="640x480_mono8"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="3"/>
-            <param name="exposure" type="int" value="52"/>
+            <param name="exposure" type="int" value="35"/>
             <param name="auto_shutter" type="int" value="2"/>
             <param name="auto_gain" type="int" value="2"/>
             <param name="auto_brightness" type="int" value="2"/>
@@ -67,7 +67,7 @@
             <param name="video_mode" type="string" value="640x480_mono8"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="3"/>
-            <param name="exposure" type="int" value="52"/>
+            <param name="exposure" type="int" value="35"/>
             <param name="auto_shutter" type="int" value="2"/>
             <param name="auto_gain" type="int" value="2"/>
             <param name="auto_brightness" type="int" value="2"/>
