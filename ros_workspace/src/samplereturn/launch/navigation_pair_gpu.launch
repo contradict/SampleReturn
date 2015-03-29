@@ -87,6 +87,8 @@
               ns="/cameras/navigation/$(arg namespace)">
             <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/$(arg camera_manager_node_name)"/>
             <param name="max_desync" type="double" value="0.033"/>
+            <param name="desync_count" type="int" value="2"/>
+            <param name="startup_delay" type="int" value="15"/>
         </node>
     </group>
 
