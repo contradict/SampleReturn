@@ -53,7 +53,7 @@ class Stereoproc : public nodelet::Nodelet
 
   stereo_msgs::DisparityImagePtr disp_msg_;
   cv::Mat_<float> disp_msg_data_;
-  cv::Mat filter_buf_;
+  cv::gpu::CudaMem filter_buf_;
 
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
