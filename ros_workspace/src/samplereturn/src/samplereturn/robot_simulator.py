@@ -194,9 +194,9 @@ class RobotSimulator(object):
         #camera publishers, status and detections are sent in here.
         #detections are added to a list in their respective check callbacks
         self.search_sample_queue = collections.deque()
-        self.search_sample_delay = rospy.Duration(2.0)
+        self.search_sample_delay = rospy.Duration(3.0)
         self.beacon_pose_queue = collections.deque()
-        self.beacon_pose_delay = rospy.Duration(3.0)
+        self.beacon_pose_delay = rospy.Duration(2.0)
         self.cam_publishers = []
         for topic in cam_status_list:
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
@@ -587,14 +587,14 @@ class RobotSimulator(object):
         if (len(self.search_sample_queue) > 0):
             delay = now - self.search_sample_queue[0].header.stamp
             if (delay > self.search_sample_delay):
-                rospy.loginfo("Publishing Sample: {!s} with delay {!s}".format(self.search_sample_queue[0].header, delay.to_sec()))
+                #rospy.loginfo("Publishing Sample: {!s} with delay {!s}".format(self.search_sample_queue[0].header, delay.to_sec()))
                 self.search_sample_pub.publish(self.search_sample_queue.popleft())
         
         #see if it's time to publish a beacon detection
         if (len(self.beacon_pose_queue) > 0):
             delay = now - self.beacon_pose_queue[0].header.stamp
             if ((now - self.beacon_pose_queue[0].header.stamp) > self.beacon_pose_delay):
-                rospy.loginfo("Publishing Beacon: {!s} at {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
+                #rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
                 self.beacon_pose_pub.publish(self.beacon_pose_queue.popleft())
             
 
@@ -613,7 +613,7 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if self.sample_in_view(sample['point'], 12, 7):
+                    if self.sample_in_view(sample['point'], 1, 12, 7):
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
@@ -629,7 +629,7 @@ class RobotSimulator(object):
         if self.publish_samples:
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
-                     if self.sample_in_view(sample['point'], 0.5, 0.2):
+                     if self.sample_in_view(sample['point'], -0.1, 0.5, 0.2):
                         header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
@@ -637,7 +637,7 @@ class RobotSimulator(object):
                         msg.sample_id = sample['id']
                         self.manipulator_sample_pub.publish(msg)
             
-    def sample_in_view(self, point, max_x, max_y):
+    def sample_in_view(self, point, min_x, max_x, max_y):
         header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         point_stamped = geometry_msg.PointStamped(header, point)
         try:
@@ -647,7 +647,7 @@ class RobotSimulator(object):
             return False
         x = base_relative.point.x
         y = base_relative.point.y
-        return ( ((x > -0.1) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
+        return ( ((x > min_x) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
 
     def handle_pursuit_result(self, msg):
         if msg.success:
