@@ -653,7 +653,6 @@ class RobotSimulator(object):
         return ( ((x > min_x) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
 
     def handle_pursuit_result(self, msg):
-        self.active_sample_id = None
         if msg.success:
             #collected samples are added by the manipulator grab action
             print "Received success message for sample: " + str(self.active_sample_id)
@@ -662,6 +661,8 @@ class RobotSimulator(object):
             self.excluded_ids.append(self.active_sample_id)
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
+        self.active_sample_id = None
+        self.search_sample_queue.clear()
 
     def check_beacon_pose(self, event):
         if not self.publish_beacon:
@@ -820,6 +821,9 @@ class RobotSimulator(object):
         for sample in self.fake_samples:
             sample['point'].x += x
             sample['point'].y += y
+            
+    def set_sample_delay(self, delay):
+        self.search_sample_delay = rospy.Duration(delay)
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
