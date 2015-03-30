@@ -677,6 +677,8 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         pursuit_pose = util.pose_translate_by_quat(current_pose,
                                                    (distance_to_point - min_pursuit_distance),
                                                    pointing_quat)
+        #recalculate the quaternion pointing from goal point to sample point
+        pointing_quat = util.pointing_quaternion_2d(pursuit_pose.pose.position, point_in_frame.point)
         pursuit_pose.pose.orientation = pointing_quat
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
