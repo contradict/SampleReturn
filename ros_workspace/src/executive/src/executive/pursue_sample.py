@@ -457,7 +457,8 @@ class StartSamplePursuit(smach.State):
         #this is the initial vfh goal pose
         goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
                                             move_velocity = userdata.pursuit_velocity,
-                                            spin_velocity = userdata.spin_velocity)
+                                            spin_velocity = userdata.spin_velocity,
+                                            orient_at_target = True)
         userdata.pursuit_goal = goal
        
         #create return destination
@@ -466,7 +467,8 @@ class StartSamplePursuit(smach.State):
         current_pose.header.stamp = rospy.Time(0)
         goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose,
                                             move_velocity = userdata.pursuit_velocity,
-                                            spin_velocity = userdata.spin_velocity)
+                                            spin_velocity = userdata.spin_velocity,
+                                            orient_at_target = False)
         userdata.return_goal = goal        
                 
         return 'next'
