@@ -613,7 +613,10 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if self.sample_in_view(sample['point'], 1, 12, 7):
+                    if (self.sample_in_view(sample['point'], 1, 12, 7)) or \
+                    (sample['id'] == self.active_sample_id):
+                        #keep publishing the active detection id until it is cleared
+                        #hopefully the sim won't have more than one active id...
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
@@ -622,7 +625,7 @@ class RobotSimulator(object):
                         self.active_sample_id = sample['id']
                         #append the detection to the delayed queue
                         self.search_sample_queue.append(msg)
-                        
+                                        
                 self.sample_marker_pub.publish(self.sample_marker)
                 
     def publish_sample_detection_manipulator(self, event):
@@ -650,6 +653,7 @@ class RobotSimulator(object):
         return ( ((x > min_x) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
 
     def handle_pursuit_result(self, msg):
+        self.active_sample_id = None
         if msg.success:
             #collected samples are added by the manipulator grab action
             print "Received success message for sample: " + str(self.active_sample_id)
@@ -785,7 +789,7 @@ class RobotSimulator(object):
     def set_sample_success(self):
         if self.active_sample_id is not None:
             self.collected_ids.append(self.active_sample_id)
-    
+     
     #homing request for wheelpods happens at beginning, zero useful sim values        
     def home_wheelpods(self, goal):
         self.zero_robot()
