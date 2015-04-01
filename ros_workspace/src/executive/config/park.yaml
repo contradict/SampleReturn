@@ -1,0 +1,38 @@
+#camera ignore params, to allow testing without certain cameras
+executive_master:
+    ignore_search_camera: True
+    ignore_manipulator_camera: False
+        
+level_two_star:
+    #for search  behaviour, degrees and meters
+    move_velocity: 0.8 
+    spin_velocity: 0.2
+    spoke_count: 36
+    spoke_length: 80
+    first_spoke_offset: 35
+    star_hub_radius: 10
+    min_spin_radius: 20
+    spin_step: 20
+    return_time_minutes: 20
+    #dismount and beacon approach
+    dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
+    beacon_approach_point: {x: 10.0, y: 0}
+    beacon_mount_step: 2
+    #if a planned point has changed more than this, replan
+    replan_threshold: 2.0
+    #for costmap issues, set to zero to disable this
+    blocked_retry_delay: 3.0
+
+pursue_sample:
+    #sample approach (pursuit) parameters
+    pursuit_velocity: 0.5
+    spin_velocity: 0.3
+    max_pursuit_error: 0.5
+    min_pursuit_distance: 2.5
+    max_sample_lost_time: 20
+    #after min_pursuit reached, we move to check_distance and observe for
+    #obstacles.  Then we make the manipulator view approach.
+    sample_obstacle_check_width: 1.0
+    final_pursuit_step: 0.4
+    square_search_size: 0.3 
+    search_velocity: 0.05

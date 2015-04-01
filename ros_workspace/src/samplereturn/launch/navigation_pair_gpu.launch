@@ -2,21 +2,25 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <arg name="run_cameras" default="true"/>
+    <arg name="run_processing" default="true"/>
     <arg name="namespace" default="port"/>
     <arg name="left_guid" default="00b09d0100bb69f3"/>
     <arg name="right_guid" default="00b09d0100a85719"/>
     <arg name="strobe" default="false"/>
     <arg name="machine" default="navigate"/>
+    <arg name="camera_manager_node_name" default="manager"/>
+    <arg name="processing_manager_node_name" default="manager"/>
+    <arg name="running_manager_node_name" default="manager"/>
 
     <!-- Navigation Nodelet Host process -->
-    <node name="manager"
+    <node name="$(arg running_manager_node_name)"
           machine="$(arg machine)"
           pkg="nodelet"
           type="nodelet"
           args="manager"
           ns="/cameras/navigation/$(arg namespace)"
           output="log"
-          respawn_delay="1.0"
+          respawn_delay="2.0"
           respawn="true">
     </node>
     <!-- IEEE1394 camera driver -->
@@ -25,83 +29,53 @@
               machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
-              args="load camera1394/driver manager"
+              args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="1.0"
+              respawn_delay="5.0"
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
-
-            <param name="strobe" type="bool" value="true" if="$(arg strobe)"/>
-            <param name="external_trigger" type="bool" value="true" unless="$(arg strobe)"/>
-            <param name="isMaster" type="bool" value="true"/>
-
+            <param name="isMaster" type="bool" value="false"/>
             <param name="reset_on_open" type="bool" value="true"/>
-            <param name="video_mode" value="format7_mode0"/>
-            <param name="roi_width" value="752"/>
-            <param name="x_offset" value="0"/>
-            <param name="roi_height" value="480"/>
-            <param name="y_offset" value="0"/>
-            <param name="format7_color_coding" value="raw8"/>
-            <!--
-                 376  - 7.6
-                 752  - 15.2
-                 1128 - 22.8
-                 1504 - 30.5
-            -->
-            <param name="format7_packet_size" value="752" if="$(arg strobe)"/>
-            <param name="format7_packet_size" value="1504" unless="$(arg strobe)"/>
             <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
+            <param name="video_mode" type="string" value="640x480_mono8"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="3"/>
-            <param name="exposure" type="int" value="52"/>
+            <param name="exposure" type="int" value="35"/>
             <param name="auto_shutter" type="int" value="2"/>
             <param name="auto_gain" type="int" value="2"/>
             <param name="auto_brightness" type="int" value="2"/>
+            <param name="frame_rate" type="double" value="30"/>
+            <param name="external_trigger" type="bool" value="false"/>
             <param name="camera_info_url"
                    type="string"
-                   value="file://$(find samplereturn)/calibration/ffmv-$(arg namespace)-left-752.yaml" />
+                   value="file://$(find samplereturn)/calibration/ffmv-$(arg namespace)-left-640.yaml" />
             <remap from="camera" to="left" />
-            <remap from="left/camera_params" to="right/camera_params" />
         </node>
         <node name="right"
               machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
-              args="load camera1394/driver manager"
+              args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="1.0"
+              respawn_delay="5.0"
               respawn="true">
 
             <param name="guid" type="string" value="$(arg right_guid)"/>
-
-            <param name="external_trigger" type="bool" value="true"/>
-
+            <param name="isMaster" type="bool" value="false"/>
             <param name="reset_on_open" type="bool" value="true"/>
-            <param name="video_mode" value="format7_mode0"/>
-            <param name="roi_width" value="752"/>
-            <param name="x_offset" value="0"/>
-            <param name="roi_height" value="480"/>
-            <param name="y_offset" value="0"/>
-            <param name="format7_color_coding" value="raw8"/>
-            <!--
-                 376  - 7.6
-                 752  - 15.2
-                 1128 - 22.8
-                 1504 - 30.5
-            -->
-            <param name="format7_packet_size" value="1504"/>
             <param name="frame_id" value="navigation_$(arg namespace)_left_camera"/>
+            <param name="video_mode" type="string" value="640x480_mono8"/>
             <param name="bayer_pattern" value="rggb"/>
             <param name="auto_exposure" type="int" value="3"/>
-            <param name="auto_gain" type="int" value="3"/>
-            <param name="auto_shutter" type="int" value="3"/>
-            <param name="auto_brightness" type="int" value="3"/>
-            <param name="auto_gamma" type="int" value="3"/>
-            <param name="gain" type="double" value="60.0"/>
-            <param name="shutter" type="double" value="320.0"/>
+            <param name="exposure" type="int" value="35"/>
+            <param name="auto_shutter" type="int" value="2"/>
+            <param name="auto_gain" type="int" value="2"/>
+            <param name="auto_brightness" type="int" value="2"/>
+            <param name="frame_rate" type="double" value="30"/>
+            <param name="external_trigger" type="bool" value="false"/>
             <param name="camera_info_url"
                    type="string"
-                   value="file://$(find samplereturn)/calibration/ffmv-$(arg namespace)-right-752.yaml" />
+                   value="file://$(find samplereturn)/calibration/ffmv-$(arg namespace)-right-640.yaml" />
             <remap from="camera" to="right" />
         </node>
 
@@ -111,28 +85,34 @@
               pkg="samplereturn"
               type="image_desync.py"
               ns="/cameras/navigation/$(arg namespace)">
-            <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/manager"/>
+            <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/$(arg camera_manager_node_name)"/>
             <param name="max_desync" type="double" value="0.033"/>
+            <param name="desync_count" type="int" value="2"/>
+            <param name="startup_delay" type="int" value="15"/>
         </node>
     </group>
 
-    <node name="gpustereo"
-          machine="$(arg machine)"
-          pkg="nodelet"
-          type="nodelet"
-          args="load gpuimageproc/Stereoproc manager"
-          ns="/cameras/navigation/$(arg namespace)"
-          output="log"
-          respawn_delay="1.0"
-          respawn="true">
-        <remap from="pointcloud" to="points2"/>
-        <param name="approximate_sync" type="bool" value="true"/>
-        <param name="correlation_window_size" type="int" value="21"/>
-        <param name="texture_threshold" type="int" value="12"/>
-        <param name="disparity_range" type="int" value="48"/>
-        <param name="xsobel" type="bool" value="true"/>
-        <param name="refine_disparity" type="bool" value="true"/>
-    </node>
+    <group if="$(arg run_processing)">
+        <node name="gpustereo"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load gpuimageproc/Stereoproc $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+            <remap from="pointcloud" to="points2"/>
+            <param name="approximate_sync" type="bool" value="true"/>
+            <param name="correlation_window_size" type="int" value="21"/>
+            <param name="texture_threshold" type="int" value="12"/>
+            <param name="disparity_range" type="int" value="48"/>
+            <param name="xsobel" type="bool" value="true"/>
+            <param name="refine_disparity" type="bool" value="true"/>
+            <param name="max_speckle_size" type="int" value="800"/>
+            <param name="max_diff" type="double" value="5"/>
+        </node>
+    </group>
 
 
 </launch>

@@ -53,6 +53,7 @@ class Stereoproc : public nodelet::Nodelet
 
   stereo_msgs::DisparityImagePtr disp_msg_;
   cv::Mat_<float> disp_msg_data_;
+  cv::gpu::CudaMem filter_buf_;
 
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
@@ -76,6 +77,10 @@ class Stereoproc : public nodelet::Nodelet
   void configCb(Config &config, uint32_t level);
 
   void sendDisparity(void);
+
+  void filterSpeckles(void);
+  int maxSpeckleSize_;
+  double maxDiff_;
 
 public:
   virtual void onInit();

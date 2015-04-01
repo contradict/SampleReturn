@@ -19,6 +19,7 @@ catkin_package(
 
 foreach( d
         launch
+        config
         )
     install(DIRECTORY ${d}
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}

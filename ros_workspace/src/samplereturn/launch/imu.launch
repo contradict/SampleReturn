@@ -2,10 +2,10 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <!--
-    <env name="ROSCONSOLE_CONFIG_FILE" 
+    <env name="ROSCONSOLE_CONFIG_FILE"
          value="$(find samplereturn)/config/custom_rosconsole.conf"/>
     -->
-    <node name="imu_0"
+    <node name="phidget_0"
         machine="navigate"
         respawn="true"
         respawn_delay="60"
@@ -28,27 +28,17 @@
         <!--<param name="linear_acceleration_stdev" value="300.0 * 1e-6 * 9.81"/>-->
     </node>
 
-    <node name="imu_1"
+    <node name="microstrain_3dm_gx3_35"
         machine="navigate"
         respawn="true"
         respawn_delay="60"
-        pkg="phidgets_imu"
-        type="phidgets_imu_node"
+        pkg="microstrain_3dm_gx3_35_driver"
+        type="microstrain_3dm_gx3_35_driver_node"
         output="log"
-        ns="/io">
+        ns="/io/microstrain_3dm_gx3_35">
 
-        <!-- older device, on top of stack -->
-        <param name="serial_number" value="254599"/>
+        <param name="gps_on" value="False"/>
 
-        <!-- supported data rates: 4 8 16 24 32 40 ... 1000 (in ms) -->
-        <param name="period" value="4"/>
-
-        <param name="frame_id" value="imu_1"/>
-
-        <!-- 0.02 deg/s resolution, as per manual -->
-        <!--<param name="angular_velocity_stdev" value="0.02 * (M_PI / 180.0)"/>-->
-        <!-- 300 ug as per manual -->
-        <!--<param name="linear_acceleration_stdev" value="300.0 * 1e-6 * 9.81"/>-->
     </node>
 
 </launch>

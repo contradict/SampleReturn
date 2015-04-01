@@ -81,7 +81,7 @@ def pointing_yaw(pt1, pt2):
 #takes a stamped pose and returns a stamped pose translated by x and y
 #in the base_link frame, returns in /odom by default, useful for translating
 #the robot pose for making new goals
-def translate_base_link(listener, start_pose, dx, dy, frame_id = 'odom'):
+def translate_base_link(listener, start_pose, dx, dy, frame_id):
     rospy.logdebug('start pose: %s', start_pose)
     base_header = std_msg.Header(0, rospy.Time(0), 'base_link')
     base_point = geometry_msg.PointStamped(base_header,
@@ -126,7 +126,7 @@ def pose_rotate(start_pose, angle):
     new_pose = geometry_msg.Pose(start_pose.pose.position, new_orientation)
     return geometry_msg.PoseStamped(start_pose.header, new_pose)    
 
-def get_current_robot_pose(tf_listener, frame_id = 'odom'):
+def get_current_robot_pose(tf_listener, frame_id):
     now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
                                             'base_link',
@@ -138,13 +138,13 @@ def get_current_robot_pose(tf_listener, frame_id = 'odom'):
     return geometry_msg.PoseStamped(header, pose)
 
 #get robot yaw pointing to the specified frame origin
-def get_robot_distance_to_origin(tf_listener, frame_id = 'odom'):
+def get_robot_distance_to_origin(tf_listener, frame_id):
     robot = get_current_robot_pose(tf_listener, frame_id)
     return point_distance_2d(robot.pose.position,
                                 geometry_msg.Point(0,0,0))
 
 #get robot yaw in the specified frame
-def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
+def get_current_robot_yaw(tf_listener, frame_id):
     now = tf_listener.getLatestCommonTime(frame_id, 'base_link')
     pos, quat = tf_listener.lookupTransform(frame_id,
                                             'base_link',
@@ -152,7 +152,7 @@ def get_current_robot_yaw(tf_listener, frame_id = 'odom'):
     return tf.transformations.euler_from_quaternion(quat)[-1]
 
 #get robot yaw pointing to the specified frame origin
-def get_robot_yaw_to_origin(tf_listener, frame_id = 'odom'):
+def get_robot_yaw_to_origin(tf_listener, frame_id):
     robot = get_current_robot_pose(tf_listener, frame_id)
     return pointing_yaw(robot.pose.position,
                         geometry_msg.Point(0,0,0))

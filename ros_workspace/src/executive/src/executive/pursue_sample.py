@@ -83,6 +83,7 @@ class PursueSample(object):
         self.max_pursuit_error = self.node_params.max_pursuit_error
         self.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
+        self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
         self.state_machine.userdata.final_pursuit_step = self.node_params.final_pursuit_step
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
@@ -140,7 +141,7 @@ class PursueSample(object):
                                                   'sample_detected':'PUBLISH_FAILURE',
                                                   'preempted':'PUBLISH_FAILURE',
                                                   'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'pursue_samples':'false',
+                                   remapping = {'stop_on_sample':'false',
                                                 'move_goal':'pursuit_goal'})
 
             smach.StateMachine.add('ANNOUNCE_OBSTACLE_CHECK',
@@ -343,24 +344,6 @@ class PursueSample(object):
                                                  "Returning to search"),
                                    transitions = {'next':'complete'})
 
-            #return to start along the approach point
-            #if the path is ever blocked just give up and return to the level_two search
-            smach.StateMachine.add('RETURN_TO_START',
-                                   ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'complete',
-                                                  'blocked':'ANNOUNCE_RETURN_BLOCKED',
-                                                  'missed_target':'complete',
-                                                  'off_course':'ANNOUNCE_RETURN_BLOCKED',
-                                                  'sample_detected':'complete',
-                                                  'aborted':'PURSUE_SAMPLE_ABORTED'},
-                                   remapping = {'move_goal':'return_goal',
-                                                'pursue_samples':'true'})
-
-            smach.StateMachine.add('ANNOUNCE_RETURN_BLOCKED',
-                                    AnnounceState(self.announcer,
-                                                  "Return blocked, continue ing from here"),
-                                    transitions = {'next':'complete'})
-
             smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
                                    PursueSampleAborted(self.result_pub),
                                    transitions = {'next':'aborted'})
@@ -414,7 +397,9 @@ class PursueSample(object):
                                                       pose)
                 if (pursuit_error > self.max_pursuit_error):
                     self.state_machine.pursuit_pose = pose
-                    goal = samplereturn_msg.VFHMoveGoal(target_pose = pose)
+                    goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
+                                                        move_velocity = self.state_machine.userdata.pursuit_velocity,
+                                                        spin_velocity = self.state_machine.userdata.spin_velocity)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
@@ -437,6 +422,7 @@ class StartSamplePursuit(smach.State):
                              outcomes=['next'],
                              input_keys=['action_goal',
                                          'pursuit_velocity',
+                                         'spin_velocity',
                                          'min_pursuit_distance',
                                          'odometry_frame'],
                              output_keys=['return_goal',
@@ -470,14 +456,17 @@ class StartSamplePursuit(smach.State):
 
         #this is the initial vfh goal pose
         goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
-                                            velocity = userdata.pursuit_velocity)
+                                            move_velocity = userdata.pursuit_velocity,
+                                            spin_velocity = userdata.spin_velocity)
         userdata.pursuit_goal = goal
        
         #create return destination
         current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                   frame_id = userdata.odometry_frame)
+                                                   userdata.odometry_frame)
         current_pose.header.stamp = rospy.Time(0)
-        goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose)
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose,
+                                            move_velocity = userdata.pursuit_velocity,
+                                            spin_velocity = userdata.spin_velocity)
         userdata.return_goal = goal        
                 
         return 'next'

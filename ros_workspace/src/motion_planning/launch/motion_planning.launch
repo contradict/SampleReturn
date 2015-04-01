@@ -20,7 +20,8 @@
         <!-- general params-->
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
         <param name="goal_orientation_tolerance" value="4"/><!--degrees!-->
-        
+        <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
+
         <!--VFH algorithm parameters, angles in degrees -->
         <param name="active_window" value="120"/>
         <param name="sector_angle" value="5"/>
@@ -33,10 +34,10 @@
         <param name="threshold_low" value="1000"/>
 
         <rosparam>
-            simple_motion_params:
-                max_velocity: 0.75
-                acceleration: 1.0 
-                stop_deceleration: 2.0
+            vfh_motion_params:
+                max_velocity: 1.5
+                acceleration: 0.5 
+                stop_deceleration: 1.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
         </rosparam>
@@ -59,9 +60,9 @@
         
         <rosparam>
             simple_motion_params:
-                max_velocity: 0.5
-                acceleration: 1.0
-                stop_deceleration: 2.0
+                max_velocity: 1.5
+                acceleration: 0.5
+                stop_deceleration: 1.0
                 loop_rate: 10 
                 steering_angle_epsilon: 0.01
         </rosparam>

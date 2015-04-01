@@ -4,6 +4,7 @@
 
     <!--Important arg, start the system paused? -->
     <arg name="start_paused" default="False"/>
+    <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
 
     <arg name="user" default="robot"/>
     <arg name="path" default="Desktop"/>
@@ -41,15 +42,17 @@
     <include file="$(find motion_planning)/launch/motion_planning.launch"/>
     <include file="$(find samplereturn)/launch/imu.launch"/>
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
-    <include file="$(find executive)/launch/executive.launch"/>
 
     <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
-
-<!-- Nodes -->
-
+    
     <include file="$(find beacon_localizer)/launch/beacon_localizer.launch"/>
-
     <!--
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
     -->
+
+    <!-- Launch executive last -->
+    <include file="$(find executive)/launch/executive.launch">
+        <arg name="executive_config" value="$(arg executive_config)"/>
+    </include>
+
 </launch>
