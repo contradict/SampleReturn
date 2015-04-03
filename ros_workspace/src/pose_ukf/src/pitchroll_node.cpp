@@ -2,6 +2,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <pose_ukf/PitchRoll.h>
 #include <pose_ukf/pitchroll_ukf.hpp>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -29,11 +30,13 @@ class PitchRollUKFNode
 
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
+    ros::Publisher state_pub_;
 
     PitchRollUKF *ukf_;
     ros::Time last_update_;
     ros::Time last_joint_state_;
     ros::Time last_imu_;
+    std::string imu_frame_;
     bool first_update_;
 
     Eigen::Vector2d sigma_orientation_;
@@ -43,6 +46,7 @@ class PitchRollUKFNode
 
     void parseProcessSigma(const ros::NodeHandle& privatenh);
     Eigen::MatrixXd process_noise(double dt) const;
+    void sendState(void);
 
     public:
         PitchRollUKFNode();
@@ -81,6 +85,7 @@ PitchRollUKFNode::PitchRollUKFNode() :
     }
 
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
+    state_pub_ = nh.advertise<pose_ukf::PitchRoll>("state", 1);
     seq_ = 0;
     publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PitchRollUKFNode::sendPose, this);
 }
@@ -104,12 +109,28 @@ PitchRollUKFNode::sendPose(const ros::TimerEvent& e)
     (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
-    msg->header.frame_id = "imu_0";
+    msg->header.frame_id = imu_frame_;
     msg->header.stamp = ros::Time::now();
     msg->header.seq = seq_++;
     tf::pointEigenToMsg( Eigen::Vector3d::Zero(), msg->pose.position);
     tf::quaternionEigenToMsg( ukf_->state().Orientation, msg->pose.orientation);
     pose_pub_.publish(msg);
+}
+
+void
+PitchRollUKFNode::sendState(void)
+{
+    pose_ukf::PitchRollPtr state(new pose_ukf::PitchRoll());
+    state->header.frame_id = imu_frame_;
+    state->header.stamp = ros::Time::now();
+    tf::quaternionEigenToMsg(ukf_->state().Orientation, state->orientation);
+    state->omega.x = ukf_->state().Omega(0);
+    state->omega.y = ukf_->state().Omega(1);
+    state->omega.z = ukf_->state().Omega(2);
+    //tf::vectorEigenToMsg(ukf_->state().AccelBias, state->accel_bias);
+    state->gyro_bias.x = ukf_->state().GyroBias(0);
+    state->gyro_bias.y = ukf_->state().GyroBias(1);
+    state_pub_.publish(state);
 }
 
 void
@@ -120,6 +141,7 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
         first_update_ = false;
         last_update_ = ros::Time::now();
         last_imu_ = msg->header.stamp;
+        imu_frame_ = msg->header.frame_id;
     }
     IMUOrientationMeasurement m;
     tf::vectorMsgToEigen(msg->linear_acceleration,
