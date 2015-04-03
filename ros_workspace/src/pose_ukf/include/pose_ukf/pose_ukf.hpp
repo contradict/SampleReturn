@@ -63,7 +63,7 @@ struct PoseState
         out.Position = Position + (Orientation.inverse()*deltapos).segment<2>(0) + Chinu.segment<2>(0);
         out.Velocity = Velocity + dt*Acceleration + Chinu.segment<2>(2);
         out.Acceleration = Acceleration + Chinu.segment<2>(4);
-        out.Orientation = Sophus::SO3d::exp(Chinu.segment<3>(6))*Orientation;
+        out.Orientation = Orientation*Sophus::SO3d::exp(Chinu.segment<3>(6));
         out.Omega = Omega + Chinu.segment<3>(9);
         out.GyroBias = GyroBias + Chinu.segment<3>(12);
         out.AccelBias = AccelBias + Chinu.segment<3>(15);
@@ -217,7 +217,7 @@ struct IMUOrientationMeasurement
     {
         struct IMUOrientationMeasurement m;
         Eigen::Vector3d gravity(0, 0, -littleg);
-        m.acceleration = st.Orientation * gravity + st.AccelBias;
+        m.acceleration = st.Orientation.inverse() * gravity + st.AccelBias;
         m.acceleration.segment<2>(0) += st.Acceleration;
         m.acceleration += noise.segment<3>(0);
         m.omega = st.Omega + st.GyroBias + noise.segment<3>(3);
