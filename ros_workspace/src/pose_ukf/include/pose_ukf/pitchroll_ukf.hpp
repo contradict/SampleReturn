@@ -1,6 +1,8 @@
 #include <pose_ukf/ukf.hpp>
 #include <ostream>
 
+#define USE_YAW false
+
 namespace PitchRollUKF {
 
 Eigen::Vector3d
@@ -71,26 +73,38 @@ exp(const Eigen::Vector3d& omega)
 struct PitchRollState
 {
     Eigen::Quaterniond Orientation;
-    Eigen::Vector2d Omega;
+    Eigen::Vector3d Omega;
     Eigen::Vector2d GyroBias;
-    Eigen::Vector3d AccelBias;
+    bool use_yaw_;
+    //Eigen::Vector3d AccelBias;
     PitchRollState()
     {
+        use_yaw_ = USE_YAW;
         Orientation.setIdentity();
         Omega.setZero();
         GyroBias.setZero();
-        AccelBias.setZero();
+        //AccelBias.setZero();
     };
     struct PitchRollState
     boxplus(const Eigen::VectorXd& offset) const
     {
         struct PitchRollState out;
-        Eigen::Vector3d omega(offset(0), offset(1), 0.0);
+        Eigen::Vector3d omega;
+        omega.setZero();
+        if(use_yaw_)
+        {
+            omega = offset.segment<3>(0);
+            out.Omega = Omega + offset.segment<3>(3);
+        }
+        else
+        {
+            omega.segment<2>(0) = offset.segment<2>(0);
+            out.Omega.segment<2>(0) = Omega.segment<2>(0) + offset.segment<2>(2);
+        }
+        out.GyroBias = GyroBias + offset.segment<2>(4);
         Eigen::Quaterniond rot=exp(omega);
         out.Orientation = rot*Orientation;
-        out.Omega = Omega + offset.segment<2>(2);
-        out.GyroBias = GyroBias + offset.segment<2>(4);
-        out.AccelBias = AccelBias + offset.segment<3>(6);
+        //out.AccelBias = AccelBias + offset.segment<3>(6);
         return out;
     };
     Eigen::VectorXd
@@ -100,9 +114,17 @@ struct PitchRollState
 
         Eigen::Quaterniond qdiff = Orientation*other.Orientation.inverse();
         out.segment<3>(0) = log(qdiff);
-        out.segment<2>(2) = Omega - other.Omega;
-        out.segment<2>(4) = GyroBias - other.GyroBias;
-        out.segment<3>(6) = AccelBias - other.AccelBias;
+        if(use_yaw_)
+        {
+            out.segment<3>(3) = Omega - other.Omega;
+            out.segment<2>(6) = GyroBias - other.GyroBias;
+        }
+        else
+        {
+            out.segment<2>(2) = Omega.segment<2>(0) - other.Omega.segment<2>(0);
+            out.segment<2>(4) = GyroBias - other.GyroBias;
+        }
+        //out.segment<3>(6) = AccelBias - other.AccelBias;
 
         return out;
     };
@@ -112,13 +134,22 @@ struct PitchRollState
     {
         struct PitchRollState out;
         Eigen::Vector3d o;
-        o.segment<2>(0) = Omega*dt + Chinu.segment<2>(0);
-        o(2) = 0.0;
+        o.setZero();
+        if(use_yaw_)
+        {
+            o.segment<3>(0) = Omega*dt + Chinu.segment<3>(0);
+            out.Omega = Omega + Chinu.segment<3>(3);
+            out.GyroBias = GyroBias + Chinu.segment<2>(6);
+        }
+        else
+        {
+            o.segment<2>(0) = Omega.segment<2>(0)*dt + Chinu.segment<2>(0);
+            out.Omega.segment<2>(0) = Omega.segment<2>(0) + Chinu.segment<2>(2);
+            out.GyroBias = GyroBias + Chinu.segment<2>(4);
+        }
         Eigen::Quaterniond rot=exp(o);
         out.Orientation = rot*Orientation;
-        out.Omega = Omega + Chinu.segment<2>(2);
-        out.GyroBias = GyroBias + Chinu.segment<2>(4);
-        out.AccelBias = AccelBias + Chinu.segment<3>(6);
+        //out.AccelBias = AccelBias + Chinu.segment<3>(6);
         return out;
     };
     void mean(const std::vector<double> &weights,
@@ -126,7 +157,7 @@ struct PitchRollState
     {
         Omega.setZero();
         GyroBias.setZero();
-        AccelBias.setZero();
+        //AccelBias.setZero();
         Eigen::Matrix4d Q;
         Q.setZero();
         double max_angle=0;
@@ -145,7 +176,7 @@ struct PitchRollState
                     });
             Omega += w*pt.Omega;
             GyroBias += w*pt.GyroBias;
-            AccelBias += w*pt.AccelBias;
+            //AccelBias += w*pt.AccelBias;
         }
         if(max_angle<M_PI_2)
         {
@@ -160,7 +191,7 @@ struct PitchRollState
             Orientation = Chistate.front().Orientation;
         }
     };
-    ssize_t ndim(void) const {return 3*2+3;};
+    ssize_t ndim(void) const {return use_yaw_?2*3+2:3*2;};
 
     friend std::ostream& operator<<(std::ostream &, const PitchRollState &);
 };
@@ -168,11 +199,13 @@ struct PitchRollState
 struct IMUOrientationMeasurement
 {
     Eigen::Vector3d acceleration;
-    Eigen::Vector2d omega;
+    Eigen::Vector3d omega;
     double delta_t;
+    bool use_yaw_;
 
     IMUOrientationMeasurement()
     {
+        use_yaw_=USE_YAW;
         acceleration.setZero();
         omega.setZero();
     };
@@ -181,7 +214,10 @@ struct IMUOrientationMeasurement
     {
         Eigen::VectorXd diff(ndim());
         diff.segment<3>(0) = acceleration - other.acceleration;
-        diff.segment<2>(3) = omega - other.omega;
+        if(use_yaw_)
+            diff.segment<3>(3) = omega - other.omega;
+        else
+            diff.segment<2>(3) = omega.segment<2>(0) - other.omega.segment<2>(0);
         return diff;
     };
 
@@ -204,13 +240,21 @@ struct IMUOrientationMeasurement
     {
         struct IMUOrientationMeasurement m;
         Eigen::Vector3d gravity(0, 0, -littleg);
-        m.acceleration = (st.Orientation * gravity) + st.AccelBias + noise.segment<3>(0);
-        m.omega = st.Omega + st.GyroBias + noise.segment<2>(3);
+        m.acceleration = (st.Orientation * gravity) + noise.segment<3>(0);
+        if(use_yaw_)
+        {
+            Eigen::Vector3d tmpbias(st.GyroBias(0),st.GyroBias(1),0);
+            m.omega = st.Omega + tmpbias + noise.segment<3>(3);
+        }
+        else
+        {
+            m.omega.segment<2>(0) = st.Omega.segment<2>(0) + st.GyroBias.segment<2>(0) + noise.segment<2>(3);
+        }
         return m;
     };
 
-    ssize_t ndim(void) const { return 5; };
-    constexpr static const double littleg=9.8066;
+    ssize_t ndim(void) const { return use_yaw_?6:5; };
+    static const double littleg;
     friend std::ostream& operator<<(std::ostream &, const IMUOrientationMeasurement &);
 };
 

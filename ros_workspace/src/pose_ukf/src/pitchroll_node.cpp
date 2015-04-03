@@ -39,8 +39,8 @@ class PitchRollUKFNode
     std::string imu_frame_;
     bool first_update_;
 
-    Eigen::Vector2d sigma_orientation_;
-    Eigen::Vector2d sigma_omega_;
+    Eigen::Vector3d sigma_orientation_;
+    Eigen::Vector3d sigma_omega_;
     Eigen::Vector2d sigma_gyro_bias_;
     Eigen::Vector3d sigma_accel_bias_;
 
@@ -148,8 +148,7 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
                          m.acceleration);
     Eigen::Vector3d tmpomega;
     tf::vectorMsgToEigen(msg->angular_velocity,
-                         tmpomega);
-    m.omega = tmpomega.segment<2>(0);
+                         m.omega);
     m.delta_t = (msg->header.stamp - last_imu_).toSec();
     last_imu_ = msg->header.stamp;
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
@@ -158,7 +157,14 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     meas_cov.block<3, 3>(0, 0) = accel_cov;
     ROS_INFO_STREAM("imu accel cov:\n" << accel_cov);
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > omega_cov(msg->angular_velocity_covariance.data());
-    meas_cov.block<2, 2>(3, 3) = omega_cov.block<2,2>(0,0);
+    if(m.use_yaw_)
+    {
+        meas_cov.block<3, 3>(3, 3) = omega_cov;
+    }
+    else
+    {
+        meas_cov.block<2, 2>(3, 3) = omega_cov.block<2,2>(0,0);
+    }
     ROS_INFO_STREAM("imu omega cov:\n" << omega_cov);
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
@@ -166,22 +172,35 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     double dt = (msg->header.stamp - last_update_).toSec();
     if(dt<0)
         return;
-    ROS_INFO_STREAM("Performing IMU update with dt=" << dt << ", delta_t=" << m.delta_t);
-    ROS_INFO_STREAM(m);
+    ROS_INFO_STREAM("Performing IMU predict with dt=" << dt << ", delta_t=" << m.delta_t);
+    ROS_INFO_STREAM("process noise:\n" << process_noise(dt));
     ukf_->predict(dt, process_noise(dt));
     last_update_ = msg->header.stamp;
+    ROS_INFO_STREAM("Performing IMU correct with measurement:\n" << m);
+    ROS_INFO_STREAM("Measurement covariance :\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     printState();
+    sendState();
 }
 
 void
 PitchRollUKFNode::printState(void)
 {
     ROS_INFO_STREAM("State:\n" << ukf_->state());
-    ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<2,2>(0,0)));
-    ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<2,2>(2,2)));
-    ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<2,2>(4,4)));
-    ROS_INFO_STREAM("accel bias cov:\n" << (ukf_->covariance().block<3,3>(6,6)));
+    ROS_INFO_STREAM("Covariance:\n" << ukf_->covariance());
+    if(ukf_->state().use_yaw_)
+    {
+        ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<3,3>(0,0)));
+        ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<3,3>(3,3)));
+        ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<2,2>(6,6)));
+    }
+    else
+    {
+        ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<2,2>(0,0)));
+        ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<2,2>(2,2)));
+        ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<2,2>(4,4)));
+    }
+    //ROS_INFO_STREAM("accel bias cov:\n" << (ukf_->covariance().block<3,3>(6,6)));
 }
 
 template <typename V>
@@ -210,12 +229,23 @@ PitchRollUKFNode::process_noise(double dt) const
     noise.setZero();
 
     // position, velocity, orientation, omega, gyro_bias, accel_bias
-    noise.block<2,2>(0,0).diagonal() = (dt*sigma_orientation_).cwiseProduct(dt*sigma_orientation_);
-    noise.block<2,2>(0,2).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
-    noise.block<2,2>(2,0).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
-    noise.block<2,2>(2,2).diagonal() = (dt*sigma_omega_).cwiseProduct(dt*sigma_omega_);
-    noise.block<2,2>(4,4).diagonal() = (dt*sigma_gyro_bias_).cwiseProduct(dt*sigma_gyro_bias_);
-    noise.block<3,3>(6,6).diagonal() = (dt*sigma_accel_bias_).cwiseProduct(dt*sigma_accel_bias_);
+    if(ukf_->state().use_yaw_)
+    {
+        noise.block<3,3>(0,0).diagonal() = (dt*sigma_orientation_).cwiseProduct(dt*sigma_orientation_);
+        noise.block<3,3>(0,3).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
+        noise.block<3,3>(3,0).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
+        noise.block<3,3>(3,3).diagonal() = (dt*sigma_omega_).cwiseProduct(dt*sigma_omega_);
+        noise.block<2,2>(6,6).diagonal() = (dt*sigma_gyro_bias_).cwiseProduct(dt*sigma_gyro_bias_);
+    }
+    else
+    {
+        noise.block<2,2>(0,0).diagonal() = (dt*sigma_orientation_.segment<2>(0)).cwiseProduct(dt*sigma_orientation_.segment<2>(0));
+        noise.block<2,2>(0,2).diagonal() = (dt*dt*sigma_omega_.segment<2>(0)/2.).cwiseProduct(dt*dt*sigma_omega_.segment<2>(0)/2.);
+        noise.block<2,2>(2,0).diagonal() = (dt*dt*sigma_omega_.segment<2>(0)/2.).cwiseProduct(dt*dt*sigma_omega_.segment<2>(0)/2.);
+        noise.block<2,2>(2,2).diagonal() = (dt*sigma_omega_.segment<2>(0)).cwiseProduct(dt*sigma_omega_.segment<2>(0));
+        noise.block<2,2>(4,4).diagonal() = (dt*sigma_gyro_bias_).cwiseProduct(dt*sigma_gyro_bias_);
+    }
+    //noise.block<3,3>(6,6).diagonal() = (dt*sigma_accel_bias_).cwiseProduct(dt*sigma_accel_bias_);
 
     return noise;
 }
