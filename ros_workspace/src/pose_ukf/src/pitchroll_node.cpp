@@ -146,6 +146,7 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     IMUOrientationMeasurement m;
     tf::vectorMsgToEigen(msg->linear_acceleration,
                          m.acceleration);
+    m.acceleration *= m.littleg;
     Eigen::Vector3d tmpomega;
     tf::vectorMsgToEigen(msg->angular_velocity,
                          m.omega);
