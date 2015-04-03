@@ -11,10 +11,12 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   geometry_msgs
+  nav_msgs
   cmake_modules
   tf
   eigen_conversions
   tf_conversions
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -53,11 +55,11 @@ find_package(Eigen REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+   FILES
+   Vector2.msg
+   PitchRoll.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -74,10 +76,12 @@ find_package(Eigen REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   sensor_msgs
-# )
+generate_messages(
+   DEPENDENCIES
+   sensor_msgs
+   geometry_msgs
+   nav_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -124,6 +128,7 @@ target_link_libraries(pose_ukf_node
    ${Boost_LIBRARIES}
    ${eigen_LIBRARIES}
 )
+add_dependencies(pose_ukf_node pose_ukf_generate_messages)
 
 add_executable(pitchroll_ukf_node src/pitchroll_node.cpp)
 target_link_libraries(pitchroll_ukf_node
