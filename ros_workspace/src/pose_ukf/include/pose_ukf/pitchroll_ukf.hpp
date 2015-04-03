@@ -148,7 +148,7 @@ struct PitchRollState
             out.GyroBias = GyroBias + Chinu.segment<2>(4);
         }
         Eigen::Quaterniond rot=exp(o);
-        out.Orientation = rot*Orientation;
+        out.Orientation = Orientation*rot;
         //out.AccelBias = AccelBias + Chinu.segment<3>(6);
         return out;
     };
@@ -240,7 +240,7 @@ struct IMUOrientationMeasurement
     {
         struct IMUOrientationMeasurement m;
         Eigen::Vector3d gravity(0, 0, -littleg);
-        m.acceleration = (st.Orientation * gravity) + noise.segment<3>(0);
+        m.acceleration = (st.Orientation.inverse() * gravity) + noise.segment<3>(0);
         if(use_yaw_)
         {
             Eigen::Vector3d tmpbias(st.GyroBias(0),st.GyroBias(1),0);
