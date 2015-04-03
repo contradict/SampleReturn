@@ -226,7 +226,7 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
-    msg->header.frame_id = "imu_0";
+    msg->header.frame_id = imu_transform_.frame_id_;
     msg->header.stamp = ros::Time::now();
     msg->header.seq = seq_++;
     Eigen::Vector3d pos3d;
