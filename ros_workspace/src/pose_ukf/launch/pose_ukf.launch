@@ -43,7 +43,6 @@
         pkg="pose_ukf"
         type="pose_ukf_node"
         output="screen"
-        launch-prefix="tmux_new_window gdb -ex run --args "
         >
         <!--
         launch-prefix="tmux_new_window gdb - -args "
