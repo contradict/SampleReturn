@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+
+    <param name="use_sim_time" value="false" type="bool"/>
+
+    <!--
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+    -->
+    <machine name="navigate"
+             address="localhost"
+             env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
+             user="$(arg user)"
+             />
+
+    <node
+        name="microstrain_imu_transform"
+        pkg="tf"
+        type="static_transform_publisher"
+        output="screen"
+        args="-0.455 0 0.155 0 3.1416 0 body_triangle imu 10"/>
+
+    <node name="microstrain_3dm_gx3_35"
+        machine="navigate"
+        respawn="true"
+        respawn_delay="60"
+        pkg="microstrain_3dm_gx3_35_driver"
+        type="microstrain_3dm_gx3_35_driver_node"
+        output="log"
+        ns="/io/microstrain_3dm_gx3_35">
+
+        <param name="gps_on" value="False"/>
+        <param name="ahrs_on" value="True"/>
+
+    </node>
+    <!--
+    -->
+
+    <node
+        name="filter"
+        pkg="pose_ukf"
+        type="pitchroll_ukf_node"
+        output="screen"
+        >
+        <!--
+        launch-prefix="tmux_new_window gdb - -args "
+        launch-prefix="tmux_new_window gdb -ex run - -args "
+        launch-prefix="tmux_new_window valgrind "
+        -->
+        <remap from="imu" to="/io/microstrain_3dm_gx3_35/imu"/>
+        <rosparam param="process_sigma">
+            orientation: [ 0.01, 0.01, 1e-8 ]
+            omega: [ 0.5, 0.5, 0.5 ]
+            gyro_bias: [ 1e-8, 1e-8, 1e-8 ]
+            accel_bias: [ 1e-8, 1e-8, 1e-8 ]
+        </rosparam>
+        <!-- orientation(r,p), omega(x,y), gyro bias(x,y), accel bias(x,y,z) -->
+        <rosparam param="initial_covariance">
+            [
+              0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12, 0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1e-12]
+        </rosparam>
+    </node>
+
+    <!-- <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>-->
+
+</launch>
