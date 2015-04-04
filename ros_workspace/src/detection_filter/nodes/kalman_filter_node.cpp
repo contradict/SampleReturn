@@ -14,6 +14,9 @@
 #include <samplereturn_msgs/NamedPoint.h>
 #include <samplereturn_msgs/PursuitResult.h>
 
+#include <dynamic_reconfigure/server.h>
+#include <detection_filter/kalman_filter_paramsConfig.h>
+
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections
  * when the covariance and velocity of a filter fall below a threshold.
@@ -71,9 +74,16 @@ class KalmanDetectionFilter
 
   std::string _filter_frame_id;
 
+  dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig> dr_srv;
+
   public:
   KalmanDetectionFilter()
   {
+    dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig>::CallbackType cb;
+
+    cb = boost::bind(&KalmanDetectionFilter::configCallback, this,  _1, _2);
+    dr_srv.setCallback(cb);
+
     cam_info_topic = "camera_info";
     //cam_info_topic = "/cameras/manipulator/left/camera_info";
     detection_topic = "point";
@@ -130,6 +140,27 @@ class KalmanDetectionFilter
     last_time_.nsec = 0.0;
 
     marker_count_ = 0;
+  }
+
+  /* Dynamic reconfigure callback */
+  void configCallback(detection_filter::kalman_filter_paramsConfig &config, uint32_t level)
+  {
+    ROS_INFO("configCallback");
+    max_dist_ = config.max_dist;
+    max_cov_ = config.max_cov;
+    max_pub_cov_ = config.max_pub_cov;
+    max_pub_vel_ = config.max_pub_vel;
+
+    process_noise_cov_ = config.process_noise_cov;
+    measurement_noise_cov_ = config.measurement_noise_cov;
+    error_cov_post_ = config.error_cov_post;
+    period_ = config.period;
+
+    if(config.clear_filters) {
+      //clear all filters
+      filter_list_.clear();
+      latched_filter_list_.clear();
+    }
   }
 
   /* For incoming detections: assign to filter or create new filter
