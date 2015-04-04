@@ -9,7 +9,7 @@ from tf.transformations import euler_from_quaternion
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from sun_pointing.msg import ComputeAngleResult, ComputeAngleFeedback, ComputeAngleAction
-from samplereturn import simple_motion
+from motion_planning import simple_motion
 
 class ComputeAngle(object):
 
