@@ -47,7 +47,7 @@ class ComputeAngle(object):
 
   def image_callback(self, msg):
     if self.turning:
-      img = np.asarray(self.bridge.imgmsg_to_cv(msg,'bgr8'))
+      img = np.asarray(self.bridge.imgmsg_to_cv2(msg,'bgr8'))
       lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
       self.min_lightness.append(np.min(lab[...,0]))
       self.img_angles.append(self.current_yaw)
