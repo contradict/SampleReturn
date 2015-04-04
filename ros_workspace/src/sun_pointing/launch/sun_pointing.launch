@@ -19,5 +19,6 @@
     </rosparam>
     <remap from="image" to="/cameras/manipulator/left/image_rect_color"/>
     <remap from="odometry" to="/motion/odometry"/>
+    <remap from="twist" to="/motion/servo_command"/>
   </node>
 </launch>
