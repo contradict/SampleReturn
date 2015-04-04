@@ -5,6 +5,7 @@ import numpy as np
 from numpy import trunc,pi,ones_like,zeros,linspace, eye, sin, cos, arctan2
 from copy import deepcopy
 import random
+import collections
 
 import smach
 import smach_ros
@@ -190,11 +191,16 @@ class RobotSimulator(object):
             result_key = 'action_result')
         manipulator_action_server.run_server()
        
-        #camera publishers
+        #camera publishers, status and detections are sent in here.
+        #detections are added to a list in their respective check callbacks
+        self.search_sample_queue = collections.deque()
+        self.search_sample_delay = rospy.Duration(3.0)
+        self.beacon_pose_queue = collections.deque()
+        self.beacon_pose_delay = rospy.Duration(2.0)
         self.cam_publishers = []
         for topic in cam_status_list:
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
-        rospy.Timer(rospy.Duration(0.5), self.publish_cam_status)
+        rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
                 
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
@@ -250,11 +256,11 @@ class RobotSimulator(object):
         self.joint_transforms_available = False
         rospy.Timer(rospy.Duration(self.odometry_dt), self.broadcast_tf_and_motion)
 
-        #sample detection stuff
+        #sample detection publishers
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name,
                                                  samplereturn_msg.NamedPoint,
                                                  queue_size=10)
-        rospy.Timer(rospy.Duration(1.0), self.publish_sample_detection_search)        
+        rospy.Timer(rospy.Duration(1.0), self.check_sample_detection_search)        
 
         self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name,
                                                       samplereturn_msg.NamedPoint,
@@ -331,14 +337,15 @@ class RobotSimulator(object):
         rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
-
+        
+        #beacon publishers
         self.beacon_pose_pub = rospy.Publisher(beacon_pose_name,
                                                geometry_msg.PoseWithCovarianceStamped,
                                                queue_size=2)
         self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
                                                      geometry_msg.PoseStamped,
                                                      queue_size=2)
-        rospy.Timer(rospy.Duration(2.0), self.publish_beacon_pose)
+        rospy.Timer(rospy.Duration(2.0), self.check_beacon_pose)
 
         #rospy.spin()
        
@@ -565,16 +572,33 @@ class RobotSimulator(object):
         #interval = rospy.get_time() - now.to_sec()
         #rospy.loginfo("Finished TF and Odom in: %f"%interval)
 
-    def publish_cam_status(self, event):
+    def publish_camera_messages(self, event):
         if self.cameras_ready:
             msg = 'Ready'
         else:
             msg = 'Error'
         
         for pub in self.cam_publishers:
-            pub.publish(std_msg.String(msg))        
+            pub.publish(std_msg.String(msg))
+        
+        now = rospy.Time.now()
+        
+        #see if it's time to publish a sample detection    
+        if (len(self.search_sample_queue) > 0):
+            delay = now - self.search_sample_queue[0].header.stamp
+            if (delay > self.search_sample_delay):
+                #rospy.loginfo("Publishing Sample: {!s} with delay {!s}".format(self.search_sample_queue[0].header, delay.to_sec()))
+                self.search_sample_pub.publish(self.search_sample_queue.popleft())
+        
+        #see if it's time to publish a beacon detection
+        if (len(self.beacon_pose_queue) > 0):
+            delay = now - self.beacon_pose_queue[0].header.stamp
+            if ((now - self.beacon_pose_queue[0].header.stamp) > self.beacon_pose_delay):
+                #rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
+                self.beacon_pose_pub.publish(self.beacon_pose_queue.popleft())
+            
 
-    def publish_sample_detection_search(self, event):
+    def check_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
                 header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)    
@@ -589,22 +613,26 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if self.sample_in_view(sample['point'], 12, 7):
+                    if (self.sample_in_view(sample['point'], 1, 12, 7)) or \
+                    (sample['id'] == self.active_sample_id):
+                        #keep publishing the active detection id until it is cleared
+                        #hopefully the sim won't have more than one active id...
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
                         msg.point = sample['point']
                         msg.sample_id = sample['id']
-                        self.search_sample_pub.publish(msg)
                         self.active_sample_id = sample['id']
-                        
+                        #append the detection to the delayed queue
+                        self.search_sample_queue.append(msg)
+                                        
                 self.sample_marker_pub.publish(self.sample_marker)
                 
     def publish_sample_detection_manipulator(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
-                     if self.sample_in_view(sample['point'], 0.5, 0.2):
+                     if self.sample_in_view(sample['point'], -0.1, 0.5, 0.2):
                         header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)
                         msg = samplereturn_msg.NamedPoint()
                         msg.header = header
@@ -612,7 +640,7 @@ class RobotSimulator(object):
                         msg.sample_id = sample['id']
                         self.manipulator_sample_pub.publish(msg)
             
-    def sample_in_view(self, point, max_x, max_y):
+    def sample_in_view(self, point, min_x, max_x, max_y):
         header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         point_stamped = geometry_msg.PointStamped(header, point)
         try:
@@ -622,7 +650,7 @@ class RobotSimulator(object):
             return False
         x = base_relative.point.x
         y = base_relative.point.y
-        return ( ((x > -0.1) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
+        return ( ((x > min_x) and (x < max_x)) and (np.abs(base_relative.point.y) < max_y) )        
 
     def handle_pursuit_result(self, msg):
         if msg.success:
@@ -633,8 +661,10 @@ class RobotSimulator(object):
             self.excluded_ids.append(self.active_sample_id)
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
+        self.active_sample_id = None
+        self.search_sample_queue.clear()
 
-    def publish_beacon_pose(self, event):
+    def check_beacon_pose(self, event):
         if not self.publish_beacon:
             return
 
@@ -652,16 +682,13 @@ class RobotSimulator(object):
             return
         angle_to_robot = np.arctan2(self.robot_pose.pose.position.y,
                                     self.robot_pose.pose.position.x)
-        # can't see beacon with pi/5 of edge
-        #if (abs(angle_to_robot - np.pi/2) < pi/5 or
-        #    abs(angle_to_robot + np.pi/2) < pi/5):
-        #    #print ("NO BEACON PUB: on edge, angle_to_robot: %.2f" %(angle_to_robot))
-        #    return
+
         robot_yaw = 2*np.arctan2(self.robot_pose.pose.orientation.z,
                                  self.robot_pose.pose.orientation.w)
         angle_to_origin = util.unwind(angle_to_robot+np.pi-robot_yaw)
-        # within +/- pi/4 of forward
+        # within +/- pi/4 of forward, camera FOV
         if angle_to_origin > -pi/4 and angle_to_origin < pi/4:
+            #now, what side of the beacon do we see
             if ((-pi/4 < angle_to_robot and angle_to_robot < pi/4) or
                 ( 3*pi/4 < angle_to_robot and angle_to_robot < pi) or
                 ( -pi < angle_to_robot and angle_to_robot < -3*pi/4)):
@@ -694,8 +721,8 @@ class RobotSimulator(object):
             msg.pose.pose = msg_pose.pose
             msg.header = msg_pose.header
             msg.pose.covariance = cov
-            
-            self.beacon_pose_pub.publish(msg)
+            #append the detection to the delayed queue
+            self.beacon_pose_queue.append(msg)
             self.beacon_debug_pose_pub.publish(msg_pose)
         #else:
             #print ("NO BEACON PUB: not in search view, angle_to_origin: %.2f" %(angle_to_origin))
@@ -763,7 +790,7 @@ class RobotSimulator(object):
     def set_sample_success(self):
         if self.active_sample_id is not None:
             self.collected_ids.append(self.active_sample_id)
-    
+     
     #homing request for wheelpods happens at beginning, zero useful sim values        
     def home_wheelpods(self, goal):
         self.zero_robot()
@@ -794,6 +821,9 @@ class RobotSimulator(object):
         for sample in self.fake_samples:
             sample['point'].x += x
             sample['point'].y += y
+            
+    def set_sample_delay(self, delay):
+        self.search_sample_delay = rospy.Duration(delay)
         
     def shutdown(self):
         rospy.signal_shutdown("Probably closed from terminal")
