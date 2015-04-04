@@ -206,36 +206,26 @@
     <xacro:stereo_pair name="navigation_port" baseline="0.10" />
     <xacro:stereo_pair name="navigation_center" baseline="0.10" />
     <xacro:stereo_pair name="navigation_starboard" baseline="0.10" />
-    <!-- attach navigation pair -->
+    <!-- attach navigation pairs as follows: -->
+    <!-- macro defines camera with lenses facing along +z -->
+    <!-- rpy is pi/2 + T degrees down tilt -->
+    <!-- year 4 triple nav setup is tilted down 20 degrees -->
+    <!-- in plane of camera centers, side baselines point 47 deg out -->
+    <!-- all nav cameras are .861m off of the lower frame plate-->
     <joint name="navigation_port_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="navigation_port_baseline_bar"/>
-        <!-- macro defines camera with lenses facing along +z -->
-        <!-- rpy is pi/2 + T degrees down tilt -->
-        <!-- year 3 triple nav setup is tilted down 20 degrees -->
-        <!-- in plane of camera centers, baselines point 60 deg apart -->
-        <!-- all nav cameras are 1.303m off dirt by Inventor model (no settling)-->
-        <origin xyz="0.0956 0.1553 0.8085" rpy="-1.919 0 -0.523"/>
+        <origin xyz="0.0761 0.1568 0.8608" rpy="-1.919 0 -0.7505"/>
     </joint>
     <joint name="navigation_center_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="navigation_center_baseline_bar"/>
-        <!-- macro defines camera with lenses facing along +z -->
-        <!-- rpy is pi/2 + T degrees down tilt -->
-        <!-- year 3 triple nav setup is tilted down 20 degrees -->
-        <!-- in plane of camera centers, baselines point 60 deg apart -->
-        <!-- all nav cameras are 1.303m off dirt by Inventor model (no settling)-->
-        <origin xyz="0.1788 0.0 0.8085" rpy="-1.919 0 -1.57"/>
+        <origin xyz="0.141 0.0 0.8608" rpy="-1.919 0 -1.5708"/>
     </joint>
     <joint name="navigation_starboard_stereo_pair_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="navigation_starboard_baseline_bar"/>
-        <!-- macro defines camera with lenses facing along +z -->
-        <!-- rpy is pi/2 + T degrees down tilt -->
-        <!-- year 3 triple nav setup is tilted down 20 degrees -->
-        <!-- in plane of camera centers, baselines point 60 deg apart -->
-        <!-- all nav cameras are 1.303m off dirt by Inventor model (no settling)-->
-         <origin xyz="0.0956 -0.1553 0.8085" rpy="-1.919 0 -2.618"/>
+         <origin xyz="0.0761 -0.1568 0.8608" rpy="-1.919 0 -2.3911"/>
     </joint>
 
 
@@ -303,5 +293,18 @@
         <child link="carousel"/>
         <axis xyz="0 0 1"/>
         <origin xyz="-0.239 0.0 -0.121"/>
+    </joint>
+
+    <link name="imu_0"/>
+    <joint name="imu_0_mount" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="imu_0"/>
+        <origin xyz="-0.445 0 0.0113" rpy="0 3.1416 -1.5708"/>
+    </joint>
+    <link name="imu_1"/>
+    <joint name="imu_1_mount" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="imu_1"/>
+        <origin xyz="-0.445 0 0.0175" rpy="0 3.1416 -1.5708"/>
     </joint>
 </robot>

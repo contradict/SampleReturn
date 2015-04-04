@@ -1,6 +1,9 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
+
+    <arg name="bags"/>
+
     <arg name="user" default="robot"/>
     <arg name="path" default="Desktop"/>
     <arg name="kind" default="install"/>
@@ -11,31 +14,59 @@
         <arg name="replay" default="true"/>
     </include>
 
+<!--
+            /cameras/navigation/starboard/left/camera_info
+            /cameras/navigation/starboard/left/image_raw
+            /cameras/navigation/starboard/right/camera_info
+            /cameras/navigation/starboard/right/image_raw
+            /cameras/manipulator/left/camera_info
+            /cameras/manipulator/left/image_raw
+            /cameras/manipulator/right/camera_info
+            /cameras/manipulator/right/image_raw
+            /cameras/navigation/port/left/camera_info
+            /cameras/navigation/port/left/image_raw
+            /cameras/navigation/port/right/camera_info
+            /cameras/navigation/port/right/image_raw
+-->
+    <node
+        name="replay"
+        pkg="rosbag"
+        type="play"
+        output="screen"
+        args="--clock --pause
+        --topics
+            /cameras/navigation/center/left/camera_info
+            /cameras/navigation/center/left/image_raw
+            /cameras/navigation/center/right/camera_info
+            /cameras/navigation/center/right/image_raw
+            /io/battery_voltage
+            /io/gpio_read
+            /io/gpio_write
+            /io/joy
+            /io/pause_state
+            /io/phidget_0/data_raw
+            /io/phidget_0/mag
+            /io/microstrain_3dm_gx3_35/imu
+            /io/microstrain_3dm_gx3_35/gps
+            /io/microstrain_3dm_gx3_35/magnetometer
+            /motion/CAN/status_word
+            /motion/current_motion_mode
+            /motion/joystick_command
+            /motion/manipulator/motor_states/ttyUSB0
+            /motion/odometry
+            /motion/planner_command
+            /motion/platform_joint_state
+            diagnostics
+            tf
+            /cameras/search/image
+            /cameras/search/info
+            /cameras/search/status
+        --bags $(arg bags)
+        "
+        />
+
+
     <param name="use_sim_time" value="true" type="bool"/>
-
-  <node
-      machine="navigate"
-      pkg="platform_motion"
-      type="EKF_odometry"
-      name="odometry"
-      output="log">
-      <param name="wheel_diameter" type="double" value="0.314"/>
-      <param name="odom_frame_id" type="string" value="/odom"/>
-  </node>
-
-  <param name="robot_description"
-      command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
-
-  <node machine="navigate" pkg="robot_state_publisher" type="robot_state_publisher"
-      name="state_publisher" output="log">
-      <remap from="joint_states" to="platform_joint_state"/>
-      <param name="publish_frequency" type="double" value="10"/>
-  </node>
-
- 
-    <node machine="navigate" pkg="fake_localization" type="fake_localization" name="fake_localization">
-        <remap from="base_pose_ground_truth" to="odometry"/>
-    </node>
 
     <include file="$(find samplereturn)/launch/navigation_camera.launch">
         <arg name="run_cameras" default="false"/>
@@ -43,21 +74,16 @@
     <include file="$(find samplereturn)/launch/manipulator_camera.launch">
         <arg name="run_cameras" default="false"/>
     </include>
-    <include file="$(find samplereturn)/launch/audio.launch"/> 
 
-    <include file="$(find executive)/launch/executive.launch">
-        <arg name="wait_for_cameras" value="false"/>
-    </include>
+    <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
 
-    <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
-
-    <include file="$(find samplereturn)/launch/search_detection.launch">
-        <arg name="replay" value="true"/>
-    </include>
-
-    <include file="$(find visual_servo)/launch/visual_servo.launch"/>
-
-    <include file="$(find samplereturn)/launch/planner.launch"/>
+    <include file="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
+    <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
 
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
+
+    <!--
+    <include file="$(find fence_detection)/launch/fence_detection.launch"/>
+    -->
+
 </launch>

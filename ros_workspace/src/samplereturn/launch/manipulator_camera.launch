@@ -11,6 +11,7 @@
           args="manager"
           ns="/cameras/manipulator"
           output="log"
+          respawn_delay="2.0"
           respawn="true">
     </node>
 
@@ -22,7 +23,9 @@
               type="nodelet"
               args="load camera1394/driver manager"
               ns="/cameras/manipulator"
-              respawn="true">
+              respawn="true"
+              respawn_delay="5.0"
+              >
 
             <param name="guid" type="string" value="00b09d0100a85650"/>
             <param name="video_mode" value="640x480_mono8"/>
@@ -51,7 +54,9 @@
               type="nodelet"
               args="load camera1394/driver manager"
               ns="/cameras/manipulator"
-              respawn="true">
+              respawn="true"
+              respawn_delay="5.0"
+              >
 
             <param name="guid" type="string" value="00b09d0100a85642"/>
             <param name="video_mode" value="640x480_mono8"/>
@@ -84,96 +89,24 @@
             <param name="max_desync" type="double" value="0.02"/>
         </node>
     </group>
-    <!-- Debayer -->
-    <node name="debayer"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/debayer /cameras/manipulator/manager"
-          ns="/cameras/manipulator/left"
-          respawn="true">
-    </node>
-    <node name="debayer"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/debayer /cameras/manipulator/manager"
-          ns="/cameras/manipulator/right"
-          respawn="true">
-    </node>
-    <!-- Rectify images -->
-    <node name="rect"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/manipulator/manager"
-          ns="/cameras/manipulator/left"
-          output="log"
-          respawn="true">
-    </node>
-    <node name="rect_color"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/manipulator/manager"
-          ns="/cameras/manipulator/left"
-          output="log"
-          respawn="true">
-        <remap from="image_mono" to="image_color"/>
-        <remap from="image_rect" to="image_rect_color"/>
-    </node>
-    <node name="rect"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/manipulator/manager"
-          ns="/cameras/manipulator/right"
-          output="log"
-          respawn="true">
-    </node>
-    <node name="rect_color"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load image_proc/rectify /cameras/manipulator/manager"
-          ns="/cameras/manipulator/right"
-          output="log"
-          respawn="true">
-        <remap from="image_mono" to="image_color"/>
-        <remap from="image_rect" to="image_rect_color"/>
-    </node>
 
     <!-- Compute Stereo -->
-    <node name="stereo_image_disparity"
+    <node name="gpustereo"
           machine="search"
           pkg="nodelet"
           type="nodelet"
-          args="load stereo_image_proc/disparity manager"
+          args="load gpuimageproc/Stereoproc manager"
           ns="/cameras/manipulator"
           output="log"
+          respawn_delay="5.0"
           respawn="true">
-        <param name="prefilter_size" type="int" value="13"/>
-        <param name="prefilter_cap" type="int" value="15"/>
-        <param name="correlation_window_size" type="int" value="11"/>
-        <param name="min_disparity" type="int" value="17"/>
-        <param name="disparity_range" type="int" value="96"/>
-        <param name="uniqueness_ratio" type="int" value="5"/>
-        <param name="texture_threshold" type="int" value="500"/>
-        <param name="speckle_size" type="int" value="50"/>
-        <param name="speckle_range" type="int" value="10"/>
+        <remap from="pointcloud" to="points2"/>
         <param name="approximate_sync" type="bool" value="true"/>
-    </node>
-
-    <!-- Compute Stereo Point Cloud -->
-    <node name="stereo_image_points"
-          machine="search"
-          pkg="nodelet"
-          type="nodelet"
-          args="load stereo_image_proc/point_cloud2 manager"
-          ns="/cameras/manipulator"
-          output="log"
-          respawn="true">
-        <param name="approximate_sync" type="bool" value="true"/>
+        <param name="correlation_window_size" type="int" value="21"/>
+        <param name="disparity_range" type="int" value="80"/>
+        <param name="texture_threshold" type="int" value="20"/>
+        <param name="xsobel" type="bool" value="true"/>
+        <param name="refine_disparity" type="bool" value="true"/>
     </node>
 
 </launch>

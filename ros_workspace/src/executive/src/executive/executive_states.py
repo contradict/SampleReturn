@@ -158,8 +158,9 @@ class ExecuteMoveState(smach.State):
             while True:
                 rospy.sleep(0.1)
                 #Must check preempt in pause loop too, no matter how lame it is
-                if self.preempt_requested():
-                    return self.handle_preempt()
+                #If preempted here, exit, and let main loop handle preempt
+                #Do not resend goal! Only resend goal on unpause
+                if self.preempt_requested(): return 
                 if not userdata.paused: break
             self._move_client.send_goal(goal)      
     
@@ -200,10 +201,10 @@ class ExecuteVFHMove(ExecuteMoveState):
                                             outcomes=['complete',
                                                       'blocked',
                                                       'off_course',
+                                                      'missed_target',
                                                       'sample_detected',
                                                       'preempted','aborted'],
                                             input_keys=['move_goal',
-                                                        'pursue_samples',
                                                         'stop_on_sample',
                                                         'detected_sample',
                                                         'paused',
@@ -227,10 +228,9 @@ class ExecuteVFHMove(ExecuteMoveState):
             if move_state not in util.actionlib_working_states:
                 break
             #Handle sample detection
-            if (userdata.detected_sample is not None) and userdata.pursue_samples:
+            if (userdata.detected_sample is not None) and userdata.stop_on_sample:
                 rospy.loginfo("ExecuteVFHMove detected sample: " + str(userdata.detected_sample))
-                if userdata.stop_on_sample:
-                    self.cancel_move()
+                self.cancel_move()
                 return 'sample_detected'
             #handle goal changes
             if not (goal.target_pose == userdata.move_goal.target_pose):
@@ -241,17 +241,22 @@ class ExecuteVFHMove(ExecuteMoveState):
             self.check_pause(userdata, goal)
             
                                     
-        if move_state == action_msg.GoalStatus.SUCCEEDED:
-            result = self._move_client.get_result().outcome
-            if result == VFHMoveResult.COMPLETE:
-                return 'complete'
-            elif result == VFHMoveResult.BLOCKED:
-                return 'blocked'
-            elif result == VFHMoveResult.OFF_COURSE:
-                return 'off_course'
+        if (move_state == action_msg.GoalStatus.SUCCEEDED):
+            if (self._move_client.wait_for_result(timeout = rospy.Duration(2.0))):
+                result = self._move_client.get_result().outcome
+                if result == VFHMoveResult.COMPLETE:
+                    return 'complete'
+                elif result == VFHMoveResult.BLOCKED:
+                    return 'blocked'
+                elif result == VFHMoveResult.OFF_COURSE:
+                    return 'off_course'
+                elif result == VFHMoveResult.MISSED_TARGET:
+                    return 'missed_target'
+                else:
+                    rospy.logwarn("ExecuteVFHMove received unexpected outcome from action server, aborting")
+                    return 'aborted'
             else:
-                rospy.logwarn("ExecuteVFHMove received unexpected outcome from action server, aborting")
-                return 'aborted'
+                rospy.logwarn("ExecuteVFHMove received SUCCEEDED state from action server, but no action result, aborting")
 
         self.cancel_move()
         return 'aborted'
@@ -329,10 +334,14 @@ class SelectMotionMode(smach.State):
 #class for saying something on the speakers
 class AnnounceState(smach.State):
     def __init__(self, announcer, announcement):
-        smach.State.__init__(self, outcomes = ['next'])
+        smach.State.__init__(self,
+                             outcomes = ['next'],
+                             input_keys = ['announcement'])
         self.announcer = announcer
         self.announcement = announcement
     def execute(self, userdata):
+        if self.announcement is None:
+            self.announcement = userdata.announcement
         self.announcer.say(self.announcement)
         return 'next'
 
@@ -342,7 +351,6 @@ class ServoController(smach.State):
         smach.State.__init__(self,
                              outcomes=['move', 'complete', 'point_lost', 'aborted'],
                              input_keys=['detected_sample',
-                                         'settle_time',
                                          'manipulator_correction',
                                          'servo_params',
                                          'simple_move'],
@@ -379,7 +387,7 @@ class ServoController(smach.State):
                 point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
                                                              userdata.detected_sample).point
             except tf.Exception:
-                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> odom transform in 1.0 seconds")
+                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform in 1.0 seconds, at time: {!s}".format(sample_frame, sample_time))
                 self.try_count = 0
                 return 'aborted'
             #rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))

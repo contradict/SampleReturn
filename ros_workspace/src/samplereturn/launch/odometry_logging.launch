@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+     <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+
+    <!-- rosbag record -->
+    <!--
+  -->
+  <node machine="navigate"
+      pkg="rosbag"
+      type="record"
+      name="navigate_record"
+      output="log"
+      args="tf
+            tf_static
+            diagnostics
+            /cameras/navigation/center/right/image_raw
+            /cameras/navigation/center/right/camera_info
+            /cameras/navigation/center/left/image_raw
+            /cameras/navigation/center/left/camera_info
+            /io/battery_voltage
+            /io/gpio_read
+            /io/gpio_write
+            /io/current_motion_mode
+            /io/joy
+            /io/pause_state
+            /io/phidget_0/data_raw
+            /io/phidget_0/is_calibrated
+            /io/phidget_0/mag
+            /io/microstrain_3dm_gx3_35/imu
+            /io/microstrain_3dm_gx3_35/gps
+            /io/microstrain_3dm_gx3_35/magnetometer
+            /motion/odometry
+            /motion/platform_joint_state
+            /motion/carousel/angle
+            /motion/CAN/status_word
+            /motion/carousel/angle
+            /motion/current_motion_mode
+            /motion/joystick_command
+            /motion/manipulator/motor_states/ttyUSB0
+            /motion/planner_command
+            /motion/servo_command
+            "
+      >
+  </node>
+</launch>

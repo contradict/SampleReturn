@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import math
-import collections
 import threading
 import random
 from copy import deepcopy
+from collections import deque
 import numpy as np
 
 import smach
@@ -34,7 +34,6 @@ from executive.executive_states import WaitForFlagState
 import samplereturn.util as util
 import samplereturn.bresenham as bresenham
 
-#this crap is too long to type
 from samplereturn_msgs.msg import (SimpleMoveGoal,
                                    SimpleMoveAction,
                                    SimpleMoveResult,
@@ -45,16 +44,16 @@ class LevelTwoStar(object):
     def __init__(self):
         
         rospy.on_shutdown(self.shutdown_cb)
-        self.node_params = util.get_node_params()
+        node_params = util.get_node_params()
         self.tf_listener = tf.TransformListener()
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
-        header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-        point = geometry_msg.Point(self.node_params.beacon_approach_point['x'],
-                                   self.node_params.beacon_approach_point['y'], 0)
+        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+        point = geometry_msg.Point(node_params.beacon_approach_point['x'],
+                                   node_params.beacon_approach_point['y'], 0)
         beacon_facing_orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
         pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
         self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
@@ -75,9 +74,11 @@ class LevelTwoStar(object):
                                                        samplereturn_msg.SimpleMoveAction)
 
         #get the star shape
-        self.spokes = self.get_hollow_star(self.node_params.spoke_count,
-                                           self.node_params.first_spoke_offset,
-                                           self.node_params.star_hub_radius)
+        self.spokes = self.get_hollow_star(node_params.spoke_count,
+                                           node_params.spoke_length,
+                                           node_params.first_spoke_offset,
+                                           node_params.star_hub_radius,
+                                           node_params.spin_step)
                        
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -85,32 +86,40 @@ class LevelTwoStar(object):
                 output_keys = ['action_result'])
     
         self.state_machine.userdata.spokes = self.spokes
-        self.state_machine.userdata.star_hub_radius = self.node_params.star_hub_radius
-        #sets the default velocity used by ExecuteSimpleMove, if none, use simple_motion default
-        self.state_machine.userdata.velocity = None
+        self.state_machine.userdata.star_hub_radius = node_params.star_hub_radius
+        
+        #store the intial planned goal in map, check for the need to replan
+        self.state_machine.userdata.move_point_map = None
+        self.replan_threshold = node_params.replan_threshold
 
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
-                                                  rospy.Duration(self.node_params.return_time_minutes*60)
+                                                  rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
+        #dismount move
+        self.state_machine.userdata.dismount_move = node_params.dismount_move
+
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
-
-        self.state_machine.userdata.beacon_mount_step = self.node_params.beacon_mount_step
+        self.state_machine.userdata.beacon_mount_step = node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
-        self.state_machine.userdata.target_tolerance = 0.5 #both meters and radians for now!
         
         #search line parameters
-        self.state_machine.userdata.min_spin_radius = self.node_params.min_spin_radius
+        self.state_machine.userdata.move_velocity = node_params.move_velocity
+        self.state_machine.userdata.spin_velocity = node_params.spin_velocity
+        self.state_machine.userdata.min_spin_radius = node_params.min_spin_radius
         self.state_machine.userdata.last_spin_radius = 0
-        self.state_machine.userdata.spin_step = self.node_params.spin_step
-        self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
+        self.state_machine.userdata.spin_step = node_params.spin_step
         self.state_machine.userdata.line_yaw = None #IN RADIANS!
         self.state_machine.userdata.outbound = False
+        self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
+        self.state_machine.userdata.blocked_retried = False
+        self.state_machine.userdata.last_retry_time = rospy.Time.now()
+        
         
         #stop function flags
         self.state_machine.userdata.stop_on_sample = False
@@ -126,7 +135,7 @@ class LevelTwoStar(object):
         self.state_machine.userdata.false = False
     
         #motion mode stuff
-        planner_mode = self.node_params.planner_mode
+        planner_mode = node_params.planner_mode
         MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
         MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
         MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
@@ -134,16 +143,23 @@ class LevelTwoStar(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(input_keys=[],
+                                   StartLeveLTwo(input_keys=['dismount_move'],
                                                  output_keys=['action_result',
-                                                              'dismount_move'],
+                                                              'simple_move'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
-            
+                        
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode'),
-                                   transitions = {'next':'SELECT_PLANNER'})
+                                                 'Enter ing level two mode.  Enable ing search camera.'),
+                                   transitions = {'next':'ENABLE_SEARCH_CAMERA'})
+            
+            smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
+                                    smach_ros.ServiceState('enable_search',
+                                                            platform_srv.Enable,
+                                                            request = platform_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'SELECT_PLANNER',
+                                                    'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
@@ -168,38 +184,56 @@ class LevelTwoStar(object):
                                                   'sample_detected':'STAR_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'dismount_move',
-                                                'stop_on_sample':'false'})
+                                   remapping = {'stop_on_sample':'false'})
             
             smach.StateMachine.add('STAR_MANAGER',
                                    StarManager(self.tf_listener,
                                                self.announcer),
-                                   transitions = {'rotate':'ROTATION_MANAGER',
+                                   transitions = {'next_spoke':'LINE_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME'})
 
             smach.StateMachine.add('LINE_MANAGER',
-                                   SearchLineManager(self.tf_listener,
-                                                     self.vfh_mover,
-                                                     self.announcer),
+                                   SearchLineManager(self.tf_listener),
                                    transitions = {'move':'LINE_MOVE',
-                                                  'spin':'ROTATE',
+                                                  'line_end':'STAR_MANAGER',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('LINE_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'STAR_MANAGER',
-                                                  'blocked':'STAR_MANAGER',
-                                                  'off_course':'STAR_MANAGER',
+                                   transitions = {'complete':'SPIN_MANAGER',
+                                                  'missed_target':'ANNOUNCE_MISSED_TARGET',
+                                                  'blocked':'ANNOUNCE_LINE_BLOCKED',
+                                                  'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'pursue_samples':'true'})
+                                   remapping = {'stop_on_sample':'true'})
             
-            smach.StateMachine.add('ROTATION_MANAGER',
-                                   RotationManager(self.tf_listener, self.simple_mover),
-                                   transitions = {'next':'ROTATE',
+            smach.StateMachine.add('ANNOUNCE_LINE_BLOCKED',
+                                   AnnounceState(self.announcer, 'Line Blocked.'),
+                                   transitions = {'next':'RETRY_LINE_MOVE'})
+
+            smach.StateMachine.add('RETRY_LINE_MOVE',
+                                   RetryMove(self.announcer),
+                                   transitions = {'continue':'STAR_MANAGER',
+                                                  'retry':'LINE_MOVE',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
+                                   AnnounceState(self.announcer, 'Off Course.'),
+                                   transitions = {'next':'STAR_MANAGER'})
+            
+            smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
+                                   AnnounceState(self.announcer, 'Missed Target'),
+                                   transitions = {'next':'SPIN_MANAGER'})
+            
+            smach.StateMachine.add('SPIN_MANAGER',
+                                   SpinManager(self.tf_listener),
+                                   transitions = {'spin':'ROTATE',
+                                                  'move':'LINE_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -218,10 +252,14 @@ class LevelTwoStar(object):
                 goal.input_string = "level_two_pursuit_request"
                 return goal
             
-            @smach.cb_interface(output_keys=['detected_sample'])
+            @smach.cb_interface(input_keys=['line_points','next_line_point'],
+                                output_keys=['line_points','detected_sample'])
             def pursuit_result_cb(userdata, status, result):
                 #clear samples after a pursue action
                 userdata.detected_sample = None
+                #reload the next spoke point, line manager will pop it back
+                #off the array and we will continue to go there
+                userdata.line_points.appendleft(userdata.next_line_point)
                             
             smach.StateMachine.add('PURSUE_SAMPLE',
                                   smach_ros.SimpleActionState('pursue_sample',
@@ -233,8 +271,8 @@ class LevelTwoStar(object):
 
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
-                                                 'Rotate ing to search line'),
-                                   transitions = {'next':'ROTATION_MANAGER'})   
+                                                 'Return ing to search line'),
+                                   transitions = {'next':'LINE_MANAGER'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
@@ -253,7 +291,9 @@ class LevelTwoStar(object):
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'stop_on_sample':'stop_on_beacon',
+                                                'detected_sample':'beacon_point'})
             
             #return to start along the approach point
             #if the path is ever blocked just give up and return to the level_two search
@@ -261,13 +301,13 @@ class LevelTwoStar(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
                                                   'blocked':'BEACON_SEARCH',
+                                                  'missed_target':'BEACON_SEARCH',
                                                   'off_course':'BEACON_SEARCH',
                                                   'sample_detected':'BEACON_SEARCH',
                                                   'preempted':'BEACON_SEARCH',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'pursue_samples':'true',
+                                   remapping = {'stop_on_sample':'stop_on_beacon',
                                                 'detected_sample':'beacon_point'})
-            
  
             smach.StateMachine.add('MOUNT_MANAGER',
                                    MountManager(self.tf_listener, self.announcer),
@@ -329,12 +369,14 @@ class LevelTwoStar(object):
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
+        #start a timer loop to check for localization updates
+        rospy.Timer(rospy.Duration(5.0), self.localization_check)
+        
         #start action servers and services
         sls.start()
         level_two_server.run_server()
         rospy.spin()
         sls.stop()
-                
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -353,27 +395,69 @@ class LevelTwoStar(object):
                           sample.header.frame_id, self.odometry_frame)
             
     def beacon_update(self, beacon_pose):
+        #first, update the beacon point
         beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                  beacon_pose.pose.pose.position)
         self.state_machine.userdata.beacon_point = beacon_point
+    
+    def localization_check(self, event):        
+        
+        saved_point_map = self.state_machine.userdata.move_point_map
+        
+        #if the VFH server is active, and the beacon correction is large enough, change the goal
+        if saved_point_map is not None:
 
-    def get_hollow_star(self, spoke_count, offset, hub_radius):
+            goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
 
+            header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+            
+            #take the current planned point, and transform it back to map, and
+            #compare with the map position last time we planned/corrected
+            try:
+                self.tf_listener.waitForTransform(self.odometry_frame,
+                                                  self.world_fixed_frame,
+                                                  rospy.Time(0),
+                                                  rospy.Duration(1.0))
+                saved_point_odom = self.tf_listener.transformPoint(self.odometry_frame, saved_point_map)
+            except tf.Exception:
+                rospy.logwarn("LEVEL_TWO beacon_update failed to transform target point")
+            
+            correction_error = util.point_distance_2d(goal_point_odom,
+                                                      saved_point_odom.point)
+            
+            #rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+            
+            if (correction_error > self.replan_threshold):
+                self.announcer.say("Beacon correction.")
+                #update the VFH move goal
+                goal = deepcopy(self.state_machine.userdata.move_goal)
+                goal.target_pose.pose.position = saved_point_odom.point
+                self.state_machine.userdata.move_goal = goal                
+
+    def get_hollow_star(self, spoke_count, spoke_length, offset, hub_radius, spin_step):
+        #This creates a list of dictionaries.  The yaw entry is a useful piece of information
+        #for some of the state machine states.  The other entry is the list of points that
+        #the robot should try to achieve along the spoke definied by the yaw
+        
         offset = np.radians(offset)
         yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
         spokes = []
-        
         for yaw in yaws:
             yaw = util.unwind(yaw)
-            starting_point = geometry_msg.Point(hub_radius*math.cos(yaw),
-                                                hub_radius*math.sin(yaw),
-                                                0)
-            spokes.append({'yaw':yaw,'starting_point':starting_point})
+            radius = hub_radius
+            points = deque([])
+            while radius < spoke_length:
+                header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+                pos = geometry_msg.Point(radius*math.cos(yaw),
+                                         radius*math.sin(yaw), 0)
+                point = geometry_msg.PointStamped(header, pos)
+                radius += spin_step
+                if radius > spoke_length: radius = spoke_length
+                points.append(point)
+            spokes.append({'yaw':yaw,
+                           'points':points})
         
-        #last star point is the beacon approach point    
-        spokes.append({'yaw':None, 'starting_point':geometry_msg.Point(hub_radius, 0, 0)})
-        
-        return spokes
+        return deque(spokes)
  
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -393,11 +477,9 @@ class StartLeveLTwo(smach.State):
         
         #create the dismount_move
         move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                              angle = 0,
-                              distance = 2,
-                              velocity = 0.2)
+                              **userdata.dismount_move)
 
-        userdata.dismount_move = move
+        userdata.simple_move = move
 
         return 'next'
 
@@ -406,15 +488,13 @@ class StarManager(smach.State):
         smach.State.__init__(self,
                              input_keys = ['line_yaw',
                                            'outbound',
-                                           'spokes',
-                                           'world_fixed_frame'],
+                                           'spokes'],
                              output_keys = ['line_yaw',
+                                            'line_points',
                                             'outbound',
                                             'spokes',
-                                            'last_spin_radius',
-                                            'within_hub_radius',
                                             'stop_on_sample'],
-                             outcomes=['rotate',
+                             outcomes=['next_spoke',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -424,138 +504,167 @@ class StarManager(smach.State):
     def execute(self, userdata):
 
         userdata.stop_on_sample = True
-        #returning to the center
+
+        if len(userdata.spokes) == 0:
+            rospy.loginfo("STAR MANAGER finished last spoke")
+            return 'return_home'
+
         if not userdata.outbound:
             #just finished inbound spoke, turn around and head outwards again
-            if len(userdata.spokes) == 1:
-                rospy.loginfo("STAR MANAGER finished inbound move, last spoke")
-                return 'return_home'
-            userdata.last_spin_radius = util.get_robot_distance_to_origin(self.tf_listener,
-                                                                          userdata.world_fixed_frame)
-            userdata.line_yaw = userdata.spokes.pop(0)['yaw']
+            spoke = userdata.spokes.popleft()
+            userdata.line_yaw = spoke['yaw']
+            userdata.line_points = deque(spoke['points'])
             userdata.outbound = True
             rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
-            return 'rotate'        
-        #outbound
         else:
-            #just finished outbound spoke, head towards next star point and set offset limit higher.
-            #If inbound, rotation manager calculates the line yaw each time it is asked to make a
-            #rotation. userdata.line_yaw remains the yaw FROM the origin
-            userdata.within_hub_radius = False
+            #just finished outbound spoke, head towards first point in next spoke
             userdata.outbound = False
-            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['starting_point']))
+            userdata.line_points = deque([userdata.spokes[0]['points'].popleft()])
+            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['points'][0]))
             self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-            return 'rotate'
 
+        return 'next_spoke'
 
-class RotationManager(smach.State):
+class SpinManager(smach.State):
 
-    def __init__(self, tf_listener, mover):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             outcomes=['next', 'preempted', 'aborted'],
-                             input_keys=['line_yaw',
-                                         'spokes',
+                             outcomes=['spin', 'move', 'preempted', 'aborted'],
+                             input_keys=['line_points',
+                                         'min_spin_radius',
                                          'spin_velocity',
                                          'outbound',
                                          'world_fixed_frame',],
-                             output_keys=['line_yaw',
-                                          'simple_move',
-                                          'outbound',
-                                          'rotate_pose',
+                             output_keys=['simple_move',
+                                          'move_point_map',
                                           'beacon_point',
                                           'distance_to_hub',
                                           'last_align_time',])
   
         self.tf_listener = tf_listener
-        self.mover = mover
     
     def execute(self, userdata):
-        #if heading out, always move parallel to line yaw
+        #set this to None when not heading somewhere
+        userdata.move_point_map = None 
+        #if heading out, and further than spin step, and not on last move, spin
         if userdata.outbound:
-            map_yaw = deepcopy(userdata.line_yaw)
-        #if inbound, always point to next starting point
-        else:
-            current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                       userdata.world_fixed_frame)
-            map_yaw = util.pointing_yaw(current_pose.pose.position,
-                                                  userdata.spokes[0]['starting_point'])
-            userdata.distance_to_hub = util.point_distance_2d(current_pose.pose.position,
-                                                              userdata.spokes[0]['starting_point'])
-        
-        actual_yaw = util.get_current_robot_yaw(self.tf_listener,
-                userdata.world_fixed_frame)
-        rotate_yaw = util.unwind(map_yaw - actual_yaw)
-        rospy.loginfo("ROTATION MANAGER map_yaw: %.1f, robot_yaw: %.1f, rotate_yaw: %.1f" %(
-                      np.degrees(map_yaw),
-                      np.degrees(actual_yaw),
-                      np.degrees(rotate_yaw)))
-        #create the simple move command
-        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
-                                              angle = rotate_yaw,
-                                              velocity = userdata.spin_velocity)        
+            distance = util.get_robot_distance_to_origin(self.tf_listener, userdata.world_fixed_frame)
+            if (len(userdata.line_points) > 0) and (distance > userdata.min_spin_radius):     
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                      angle = 2.*math.pi,
+                                                      velocity = userdata.spin_velocity)        
+                return 'spin'                
 
-        #clear the beacon points before returning, make sure we respond to new beacon poses
-        userdata.last_align_time = rospy.get_time()
-        userdata.beacon_point = None
-        return 'next'
+        #otherwise, on to next movement        
+        return 'move'    
 
 #drive to detected sample location        
 class SearchLineManager(smach.State):
-    def __init__(self, tf_listener, mover, announcer):
+    def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['line_yaw',
+                             input_keys = ['line_points',
                                            'outbound',
                                            'return_time',
                                            'detected_sample',
-                                           'world_fixed_frame',
                                            'odometry_frame',
-                                           'last_spin_radius',
-                                           'min_spin_radius',
-                                           'spin_step',
-                                           'distance_to_hub',
-                                           'within_hub_radius',
+                                           'move_velocity',
+                                           'spin_velocity',
                                            'beacon_point',
                                            'last_align_time'],
                              output_keys = ['move_goal',
-                                            'last_spin_radius',
+                                            'line_points',
+                                            'next_line_point',
+                                            'move_point_map',
                                             'beacon_point',
                                             'last_align_time'],
                              outcomes=['move',
-                                       'spin',
+                                       'line_end',
                                        'return_home',
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
-        self.mover = mover
-        self.announcer = announcer
 
     def execute(self, userdata):
 
-        self.odometry_frame = userdata.odometry_frame
+        odometry_frame = userdata.odometry_frame
         
         if rospy.Time.now() > userdata.return_time:
             return 'return_home'
         
-        if not userdata.outbound:
-            distance = userdata.distance_to_hub
+        #if len of points is zero we have reached the start or end of a line
+        if len(userdata.line_points) == 0:
+            return 'line_end'
         else:
-            distance = 50
+            target_point = userdata.line_points.popleft()
+            #store the next point in case of interruption by pursuit.
+            userdata.next_line_point = target_point
 
-        current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                   frame_id = self.odometry_frame)
-        target_pose = util.translate_base_link(self.tf_listener,
-                                               current_pose,
-                                               distance, 0,
-                                               frame_id = self.odometry_frame)
-        target_pose.header.stamp = rospy.Time(0)
-        
-        #create destination
-        goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose)
+        try:
+            self.tf_listener.waitForTransform(odometry_frame,
+                                              target_point.header.frame_id,
+                                              target_point.header.stamp,
+                                              rospy.Duration(1.0))
+            point_in_odom = self.tf_listener.transformPoint(odometry_frame, target_point)
+        except tf.Exception:
+            rospy.logwarn("LEVEL_TWO failed to transform line manager point %s->%s",
+                          target_point.header.frame_id, odometry_frame)
+            return 'aborted'
+
+        header = std_msg.Header(0, rospy.Time(0), odometry_frame)
+        pose = geometry_msg.Pose(position = point_in_odom.point,
+                                 orientation = geometry_msg.Quaternion())
+        target_pose = geometry_msg.PoseStamped(header, pose)
+        goal = samplereturn_msg.VFHMoveGoal(target_pose = target_pose,
+                                            move_velocity = userdata.move_velocity,
+                                            spin_velocity = userdata.spin_velocity,
+                                            orient_at_target = False)
         userdata.move_goal = goal
 
+        #store the pose in map, to compare in the beacon update callback
+        userdata.move_point_map = target_point
+        
         return 'move'
-    
+
+#For retrying a move after line_blocked.  Probably a terrible hack that should be removed later.
+#Wait for the delay, then try to move again.  Allow retry after delay time has elapsed since last retry also
+class RetryMove(smach.State):
+            
+    def __init__(self, announcer):           
+        smach.State.__init__(self,
+                             input_keys = ['blocked_retry_delay',
+                                           'blocked_retried',
+                                           'last_retry_time'],
+                             output_keys = ['blocked_retried',
+                                            'last_retry_time'],
+                             outcomes=['retry',
+                                       'continue',
+                                       'preempted', 'aborted'])
+        
+        self.announcer = announcer  
+
+    def execute(self, userdata):
+        
+        #if delay is set to zero just continue
+        if userdata.blocked_retry_delay == 0:
+            return 'continue'
+        else:
+            #reset the flag if it's been a few seconds since we retried
+            time_since_retry = rospy.Time.now() - userdata.last_retry_time
+            if (time_since_retry > userdata.blocked_retry_delay):
+                userdata.blocked_retried = False
+            
+            #we already tried here, give up
+            if userdata.blocked_retried:
+                #reset the flag for next try
+                userdata.blocked_retried = False
+                return 'continue'
+            else:
+                self.announcer.say('Recheck ing cost map.')
+                rospy.sleep(userdata.blocked_retry_delay)
+                userdata.blocked_retried = True
+                userdata.last_retry_time = rospy.Time.now()
+                return 'retry'   
             
 class BeaconSearch(smach.State):
     
@@ -567,12 +676,15 @@ class BeaconSearch(smach.State):
                                        'mount',
                                        'aborted'],
                              input_keys=['beacon_approach_pose',
+                                         'move_velocity',
                                          'spin_velocity',
                                          'platform_point',
                                          'beacon_point',
                                          'stop_on_beacon',
-                                         'world_fixed_frame'],
+                                         'world_fixed_frame',
+                                         'odometry_frame'],
                              output_keys=['move_goal',
+                                          'move_point_map',
                                           'simple_move',
                                           'stop_on_sample',
                                           'stop_on_beacon',
@@ -589,9 +701,13 @@ class BeaconSearch(smach.State):
             self.service_preempt()
             return 'preempted'
         
-        #ignore samples now
+        #ignore samples after this (applies to mount moves)
+        #clear previous move_point_map
         userdata.stop_on_sample = False
-        
+        userdata.move_point_map = None
+        map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
+       
+        #get our position in map
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.world_fixed_frame)        
         
@@ -620,7 +736,11 @@ class BeaconSearch(smach.State):
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
-                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose)
+                userdata.move_point_map = geometry_msg.PointStamped(map_header,
+                                                                    userdata.beacon_approach_pose.pose.position)
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
@@ -633,10 +753,16 @@ class BeaconSearch(smach.State):
                 search_pose = deepcopy(userdata.beacon_approach_pose)                
                 #invert the approach_point, and try again
                 search_pose.pose.position.x *= -1
-                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.search_pose)
+                #save point
+                userdata.move_point_map = geometry_msg.PointStamped(map_header,
+                                                    search_pose.pose.position)
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.search_pose,
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
+                
                 return 'move'               
                 
         else: #beacon is in view
@@ -653,13 +779,18 @@ class BeaconSearch(smach.State):
                 front_pose = deepcopy(userdata.beacon_approach_pose)
                 #try not to drive through the platform
                 front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
-                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.front_pose)
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = front_pose,
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                          
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 return 'move'   
             elif distance_to_approach_point > 2.0:
                 #on correct side of beacon, but far from approach point
-                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose)
+                goal = samplereturn_msg.VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
+                                                    move_velocity = userdata.move_velocity,
+                                                    spin_velocity = userdata.spin_velocity,
+                                                    orient_at_target = True)
                 userdata.move_goal = goal       
                 self.announcer.say("Beacon in view. Move ing to approach point")                
                 return 'move'   

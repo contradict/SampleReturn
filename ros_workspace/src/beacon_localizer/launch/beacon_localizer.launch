@@ -7,19 +7,24 @@
     <arg name="world_fixed_frame" default="map"/>
     <arg name="odometry_frame" default="odom"/>
 
-    <remap from="/processes/beacon_finder/odometry" to="/motion/odometry"/>
     <node
 		machine="search"
 		name="beacon_localizer"
 		pkg="beacon_localizer"
 		type="beacon_localizer"
         output="log"
-        ns="/processes/beacon_finder">
+        ns="/processes/beacon">
 
         <param name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="update_period" value="1.0"/>
+        <param name="broadcast_period" value="0.05"/>
 
-        <rosparam file="$(find beacon_localizer)/config/filter_params.yaml" command="load"/>
+        <rosparam>
+            <!-- system_noise_covariance: [ 2.5e-5, 0, 0, 2.5e-5, 0, 2.5e-6 ] -->
+            system_noise_covariance: [ 1.0e-3, 0, 0, 1.0e-3, 0, 1.0e-3 ]
+        </rosparam>    
+    
     </node>
 
 </launch>

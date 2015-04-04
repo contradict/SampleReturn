@@ -11,8 +11,8 @@
         args="--size 9x6 --square 0.1 -p chessboard --approximate=0.05"
         output="screen"
         >
-        <remap from="right" to="/cameras/$(arg cameras)/right/image_mono"/>
-        <remap from="left" to="/cameras/$(arg cameras)/left/image_mono"/>
+        <remap from="right" to="/cameras/$(arg cameras)/right/image_raw"/>
+        <remap from="left" to="/cameras/$(arg cameras)/left/image_raw"/>
         <remap from="right_camera" to="/cameras/$(arg cameras)/right"/>
         <remap from="left_camera" to="/cameras/$(arg cameras)/left"/>
       </node>

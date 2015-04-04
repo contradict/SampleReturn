@@ -1,0 +1,3 @@
+#!/bin/bash
+CMAKE_PREFIX_PATH=/usr/local/opencv:$CMAKE_PREFIX_PATH \
+catkin_make -DCMAKE_BUILD_TYPE=RelWithDebInfo install
