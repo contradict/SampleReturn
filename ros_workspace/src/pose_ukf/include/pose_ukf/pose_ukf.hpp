@@ -60,10 +60,11 @@ struct PoseState
         Eigen::Vector3d deltapos;
         deltapos.segment<2>(0) = (dt*Velocity + dt*dt*Acceleration/2.);
         deltapos(2) = 0;
-        out.Position = Position + (Orientation.inverse()*deltapos).segment<2>(0) + Chinu.segment<2>(0);
+        out.Position = Position + (Orientation*deltapos).segment<2>(0) + Chinu.segment<2>(0);
         out.Velocity = Velocity + dt*Acceleration + Chinu.segment<2>(2);
         out.Acceleration = Acceleration + Chinu.segment<2>(4);
-        out.Orientation = Orientation*Sophus::SO3d::exp(Chinu.segment<3>(6));
+        Eigen::Vector3d delta_orientation = Omega*dt + Chinu.segment<3>(6);
+        out.Orientation = Orientation*Sophus::SO3d::exp(delta_orientation);
         out.Omega = Omega + Chinu.segment<3>(9);
         out.GyroBias = GyroBias + Chinu.segment<3>(12);
         out.AccelBias = AccelBias + Chinu.segment<3>(15);
