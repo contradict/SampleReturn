@@ -252,7 +252,11 @@ PoseUKFNode::process_noise(double dt) const
     noise.block<2,2>(0,2).diagonal() = (dt*dt*sigma_velocity_/2.).cwiseProduct(dt*dt*sigma_velocity_/2.);
     noise.block<2,2>(2,0).diagonal() = (dt*dt*sigma_velocity_/2.).cwiseProduct(dt*dt*sigma_velocity_/2.);
     noise.block<2,2>(2,2).diagonal() = (dt*sigma_velocity_).cwiseProduct(dt*sigma_velocity_);
-    noise.block<2,2>(4,4).diagonal() = (dt*sigma_velocity_).cwiseProduct(dt*sigma_velocity_);
+    noise.block<2,2>(2,4).diagonal() = (dt*dt*sigma_acceleration_/2.).cwiseProduct(dt*dt*sigma_acceleration_/2.);
+    noise.block<2,2>(4,2).diagonal() = (dt*dt*sigma_acceleration_/2.).cwiseProduct(dt*dt*sigma_acceleration_/2.);
+    noise.block<2,2>(0,4).diagonal() = (dt*dt*dt*sigma_acceleration_/3.).cwiseProduct(dt*dt*dt*sigma_acceleration_/3.);
+    noise.block<2,2>(4,0).diagonal() = (dt*dt*dt*sigma_acceleration_/3.).cwiseProduct(dt*dt*dt*sigma_acceleration_/3.);
+    noise.block<2,2>(4,4).diagonal() = (dt*sigma_acceleration_).cwiseProduct(dt*sigma_acceleration_);
     noise.block<3,3>(6,6).diagonal() = (dt*sigma_orientation_).cwiseProduct(dt*sigma_orientation_);
     noise.block<3,3>(6,9).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
     noise.block<3,3>(9,6).diagonal() = (dt*dt*sigma_omega_/2.).cwiseProduct(dt*dt*sigma_omega_/2.);
