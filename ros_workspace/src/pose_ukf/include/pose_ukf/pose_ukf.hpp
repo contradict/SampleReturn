@@ -1,6 +1,7 @@
 #include <pose_ukf/ukf.hpp>
 #include <ostream>
 #include <sophus/so3.hpp>
+#include <pose_ukf/rotation_average.h>
 
 namespace PoseUKF {
 
@@ -79,11 +80,7 @@ struct PoseState
         Omega.setZero();
         GyroBias.setZero();
         AccelBias.setZero();
-        Eigen::Matrix4d Q;
-        Q.setZero();
-        double max_angle=0;
-        auto rest = Chistate.begin();
-        rest++;
+        RotationAverage ra;
         for(auto && t: zip_range(weights, Chistate))
         {
             double w=t.get<0>();
@@ -91,24 +88,13 @@ struct PoseState
             Position += w*pt.Position;
             Velocity += w*pt.Velocity;
             Acceleration += w*pt.Acceleration;
-            Q += w*(4.0*pt.Orientation.unit_quaternion().coeffs() * pt.Orientation.unit_quaternion().coeffs().transpose() - Eigen::Matrix4d::Identity());
-            max_angle = std::accumulate(rest, Chistate.end(), max_angle,
-                    [&pt](double max, const struct PoseState& other)
-                    {
-                    return std::max(max,
-                        pt.Orientation.unit_quaternion().angularDistance(other.Orientation.unit_quaternion()));
-                    });
+            ra(w, pt.Orientation);
             Omega += w*pt.Omega;
             GyroBias += w*pt.GyroBias;
             AccelBias += w*pt.AccelBias;
         }
-        if(max_angle<M_PI_2)
-        {
-            Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> solver;
-            solver.compute(Q);
-            Eigen::Vector4d::Map(Orientation.data()) = solver.eigenvectors().col(3);
-        }
-        else
+        double error = ra.geodesic(&Orientation);
+        if(error<0)
         {
             Orientation = Chistate.front().Orientation;
         }
