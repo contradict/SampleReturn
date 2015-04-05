@@ -166,6 +166,70 @@ struct WheelOdometryMeasurement
     friend std::ostream& operator<<(std::ostream &, const WheelOdometryMeasurement &);
 };
 
+struct VisualOdometryMeasurement
+{
+    Eigen::Vector2d delta_pos;
+    Eigen::Vector2d velocity;
+    Sophus::SO3d delta_orientation;
+    Eigen::Vector3d omega;
+    struct PoseState last_state;
+
+    VisualOdometryMeasurement()
+    {
+        delta_pos.setZero();
+        velocity.setZero();
+        delta_orientation.setQuaternion(Eigen::Quaterniond::Identity());
+        omega.setZero();
+    }
+
+    Eigen::VectorXd boxminus(const struct VisualOdometryMeasurement& other) const
+    {
+        Eigen::VectorXd diff;
+        diff.resize(10);
+        diff.segment<2>(0) = delta_pos-other.delta_pos;
+        diff.segment<2>(2) = velocity - other.velocity;
+        diff.segment<3>(4) = (delta_orientation*other.delta_orientation.inverse()).log();
+        diff.segment<3>(7) = omega - other.omega;
+        return diff;
+    }
+
+    void mean(const std::vector<double>& weights,
+            const std::vector<struct VisualOdometryMeasurement>& Chimeas)
+    {
+        delta_pos.setZero();
+        velocity.setZero();
+        RotationAverage R;
+        omega.setZero();
+        for(const auto &&t: zip_range(weights, Chimeas))
+        {
+            double w = t.get<0>();
+            struct VisualOdometryMeasurement m = t.get<1>();
+            delta_pos += w*m.delta_pos;
+            velocity += w*m.velocity;
+            R(w, m.delta_orientation);
+            omega += w*m.omega;
+        }
+        if(R.geodesic(&delta_orientation)>M_PI_2)
+        {
+            delta_orientation = Chimeas.front().delta_orientation;
+        }
+    }
+
+    struct VisualOdometryMeasurement
+    measure(const struct PoseState& st, const Eigen::VectorXd& noise) const
+    {
+        struct VisualOdometryMeasurement m;
+        m.delta_pos = st.Position - last_state.Position + noise.segment<2>(0);
+        m.velocity = st.Velocity + noise.segment<2>(2);
+        m.delta_orientation = Sophus::SO3d::exp(noise.segment<3>(4))*st.Orientation*last_state.Orientation.inverse();
+        m.omega = st.Omega + noise.segment<3>(7);
+        return m;
+    }
+
+    ssize_t ndim(void) const { return 10; };
+    friend std::ostream& operator<<(std::ostream &, const VisualOdometryMeasurement &);
+};
+
 struct IMUOrientationMeasurement
 {
     Eigen::Vector3d acceleration;

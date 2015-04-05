@@ -11,6 +11,7 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <functional>
 #include <sophus/se3.hpp>
+#include <nav_msgs/Odometry.h>
 
 
 namespace PoseUKF {
@@ -106,6 +107,7 @@ class PoseUKFNode
 
     void jointStateCallback(sensor_msgs::JointStateConstPtr msg);
     void imuCallback(sensor_msgs::ImuConstPtr msg);
+    void visualOdometryCallback(nav_msgs::OdometryConstPtr msg);
     void sendPose(const ros::TimerEvent& e);
     void sendState(void);
 
@@ -114,21 +116,32 @@ class PoseUKFNode
 
     ros::Subscriber imu_subscription_;
     ros::Subscriber joint_subscription_;
+    ros::Subscriber visual_odometry_subscription_;
 
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
     ros::Publisher state_pub_;
 
-    tf::StampedTransform imu_transform_;
-    Sophus::SE3d imu_se3_;
-    bool have_imu_transform_;
+    tf::StampedTransform imu_base_transform_;
+    Sophus::SE3d imu_base_se3_;
+    bool have_imu_base_transform_;
+
+    tf::StampedTransform imu_camera_transform_;
+    Sophus::SE3d imu_camera_se3_;
+    bool have_imu_camera_transform_;
 
     PoseUKF *ukf_;
     ros::Time last_update_;
+
     ros::Time last_joint_stamp_;
     struct PoseState last_joint_state_;
     Eigen::MatrixXd last_joint_covariance_;
+
     ros::Time last_imu_stamp_;
+
+    nav_msgs::Odometry last_visual_odom_;
+    struct PoseState last_visual_state_;
+    Eigen::MatrixXd last_visual_covariance_;
 
     Eigen::Vector2d sigma_position_;
     Eigen::Vector2d sigma_velocity_;
@@ -138,11 +151,18 @@ class PoseUKFNode
     Eigen::Vector3d sigma_gyro_bias_;
     Eigen::Vector3d sigma_accel_bias_;
 
+    bool use_vo_covariance_;
+    Eigen::Vector3d visual_position_sigma_;
+    Eigen::Vector3d visual_velocity_sigma_;
+    Eigen::Vector3d visual_orientation_sigma_;
+    Eigen::Vector3d visual_omega_sigma_;
+
     Eigen::MatrixXd process_noise(double dt) const;
     void parseWheelParameters(const ros::NodeHandle& privatenh);
     void parseProcessSigma(const ros::NodeHandle& privatenh);
     //void parseIMUMeasurementSigma(const ros::NodeHandle& privatenh);
     //void parseOdometryMeasurementSigma(const ros::NodeHandle& privatenh);
+    void parseVisualMeasurementSigma(const ros::NodeHandle& privatenh);
 
     public:
         PoseUKFNode();
@@ -153,8 +173,10 @@ class PoseUKFNode
 };
 
 PoseUKFNode::PoseUKFNode() :
-    have_imu_transform_(false),
-    ukf_(NULL)
+    have_imu_base_transform_(false),
+    have_imu_camera_transform_(false),
+    ukf_(NULL),
+    use_vo_covariance_(false)
 {
     ros::NodeHandle privatenh("~");
     ros::NodeHandle nh("~");
@@ -185,6 +207,7 @@ PoseUKFNode::PoseUKFNode() :
     parseProcessSigma(privatenh);
     //parseIMUMeasurementSigma(privatenh);
     //parseOdometryMeasurementSigma(privatenh);
+    parseVisualMeasurementSigma(privatenh);
 
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
     state_pub_ = privatenh.advertise<pose_ukf::Pose>("filter_state", 1);
@@ -197,12 +220,18 @@ PoseUKFNode::connect(void)
 {
     ros::NodeHandle nh;
     last_update_ = ros::Time::now();
+
     last_joint_stamp_ = last_update_;
     last_joint_state_ = ukf_->state();
     last_joint_covariance_ = ukf_->covariance();
+
     last_imu_stamp_ = last_update_;
+
+    last_visual_odom_.header.stamp = ros::Time(0);
+
     imu_subscription_ = nh.subscribe("imu", 1, &PoseUKFNode::imuCallback, this);
     joint_subscription_ = nh.subscribe("joint_state", 1, &PoseUKFNode::jointStateCallback, this);
+    visual_odometry_subscription_ = nh.subscribe("visual_odometry", 1, &PoseUKFNode::visualOdometryCallback, this);
     ROS_INFO("Subscribers created");
     publish_timer_.start();
 }
@@ -227,13 +256,13 @@ PoseUKFNode::initialize(void)
 void
 PoseUKFNode::sendPose(const ros::TimerEvent& e)
 {
-    if(!have_imu_transform_)
+    if(!have_imu_base_transform_)
         return;
 
     (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
-    msg->header.frame_id = imu_transform_.frame_id_;
+    msg->header.frame_id = imu_base_transform_.frame_id_;
     msg->header.stamp = last_update_;
     msg->header.seq = seq_++;
     Eigen::Vector3d pos3d;
@@ -251,7 +280,7 @@ PoseUKFNode::sendState(void)
     pose_ukf::PosePtr msg(new pose_ukf::Pose);
 
     msg->header.stamp = last_update_;
-    msg->header.frame_id = imu_transform_.frame_id_;
+    msg->header.frame_id = imu_base_transform_.frame_id_;
 
     msg->Position.x = ukf_->state().Position(0);
     msg->Position.y = ukf_->state().Position(1);
@@ -297,25 +326,24 @@ void
 PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 {
 
-    if(!have_imu_transform_)
+    if(!have_imu_base_transform_)
     {
         try
         {
             listener_.lookupTransform(msg->header.frame_id,
                     base_name_,
                     ros::Time(0),
-                    imu_transform_);
+                    imu_base_transform_);
             Eigen::Quaterniond imu_rotation;
             Eigen::Vector3d imu_translation;
-            tf::quaternionTFToEigen(imu_transform_.getRotation(), imu_rotation);
-            tf::vectorTFToEigen(imu_transform_.getOrigin(), imu_translation);
-            imu_se3_.translation() = imu_translation;
-            imu_se3_.so3() = Sophus::SO3d(imu_rotation);
-            have_imu_transform_ = true;
+            tf::quaternionTFToEigen(imu_base_transform_.getRotation(), imu_rotation);
+            tf::vectorTFToEigen(imu_base_transform_.getOrigin(), imu_translation);
+            imu_base_se3_ = Sophus::SE3d(imu_rotation, imu_translation);
+            have_imu_base_transform_ = true;
         }
         catch(tf::TransformException ex)
         {
-            ROS_ERROR_STREAM("Unable to look up imu frame: " << ex.what());
+            ROS_ERROR_STREAM("Unable to look up imu frame for wheel odometry: " << ex.what());
             return;
         }
     }
@@ -370,7 +398,7 @@ PoseUKFNode::printState(void)
 void
 PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
 {
-    if(!have_imu_transform_ || wheels_.size() == 0)
+    if(!have_imu_base_transform_ || wheels_.size() == 0)
         return;
 
     for( auto&& t: zip_range(msg->name, msg->position, msg->velocity) )
@@ -443,18 +471,18 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     Sophus::SE3d odometry_delta_base_link;
     odometry_delta_base_link.translation() << motion(1), motion(2), 0;
     odometry_delta_base_link.so3() = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, motion(0)));
-    Sophus::SE3d odometry_delta_imu = imu_se3_*odometry_delta_base_link*imu_se3_.inverse();
+    Sophus::SE3d odometry_delta_imu = imu_base_se3_*odometry_delta_base_link*imu_base_se3_.inverse();
 
     Sophus::SE3d odometry_velocity_base_link;
     odometry_velocity_base_link.translation() << velocity(1), velocity(2), 0;
     odometry_velocity_base_link.so3() = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, velocity(0)));
-    Sophus::SE3d odometry_velocity_imu = imu_se3_*odometry_velocity_base_link*imu_se3_.inverse();
+    Sophus::SE3d odometry_velocity_imu = imu_base_se3_*odometry_velocity_base_link*imu_base_se3_.inverse();
 
     Eigen::Matrix3d odometry_position_covariance_base_link;
     odometry_position_covariance_base_link.setIdentity();
     odometry_position_covariance_base_link.block<2,2>(0,0) = covariance.block<2,2>(1,1);
     Eigen::Matrix3d rot_base_to_imu;
-    tf::matrixTFToEigen(imu_transform_.getBasis(), rot_base_to_imu);
+    tf::matrixTFToEigen(imu_base_transform_.getBasis(), rot_base_to_imu);
     Eigen::Matrix3d odometry_position_covariance_imu = rot_base_to_imu*odometry_position_covariance_base_link*rot_base_to_imu.transpose();
 
     double delta_t = (msg->header.stamp - last_joint_stamp_).toSec();
@@ -488,6 +516,136 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     ROS_DEBUG_STREAM("odometry measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     last_joint_state_ = ukf_->state();
+    last_joint_covariance_ = ukf_->covariance();
+    //printState();
+    sendState();
+}
+
+void
+PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
+{
+    if(!have_imu_base_transform_)
+        return;
+
+    if(!have_imu_camera_transform_)
+    {
+        try
+        {
+            listener_.lookupTransform(msg->header.frame_id,
+                    imu_base_transform_.child_frame_id_,
+                    ros::Time(0),
+                    imu_camera_transform_);
+            Eigen::Quaterniond imu_rotation;
+            Eigen::Vector3d imu_translation;
+            tf::quaternionTFToEigen(imu_camera_transform_.getRotation(), imu_rotation);
+            tf::vectorTFToEigen(imu_camera_transform_.getOrigin(), imu_translation);
+            imu_camera_se3_ = Sophus::SE3d(imu_rotation, imu_translation);
+            have_imu_camera_transform_ = true;
+        }
+        catch(tf::TransformException ex)
+        {
+            ROS_ERROR_STREAM("Unable to look up imu frame for VO: " << ex.what());
+            return;
+        }
+    }
+
+    if(last_visual_odom_.header.stamp == ros::Time(0))
+    {
+        last_visual_odom_ = *msg;
+        last_visual_state_ = ukf_->state();
+        last_visual_covariance_ = ukf_->covariance();
+
+        ROS_INFO_STREAM("First VO message at " << msg->header.stamp << ", Initializing.");
+        return;
+    }
+
+    struct VisualOdometryMeasurement m;
+    m.last_state = last_visual_state_;
+
+    Eigen::Quaterniond last_vo_q, this_vo_q;
+    tf::quaternionMsgToEigen(last_visual_odom_.pose.pose.orientation, last_vo_q);
+    tf::quaternionMsgToEigen(msg->pose.pose.orientation, this_vo_q);
+    Eigen::Vector3d last_vo_position, this_vo_position;
+    tf::pointMsgToEigen(last_visual_odom_.pose.pose.position, last_vo_position);
+    tf::pointMsgToEigen(msg->pose.pose.position, this_vo_position);
+    Sophus::SE3d imu_delta = imu_camera_se3_*Sophus::SE3d(this_vo_q*last_vo_q.inverse(),
+                this_vo_position - last_vo_position)*imu_camera_se3_.inverse();
+    m.delta_pos = imu_delta.translation().segment<2>(0);
+    m.delta_orientation = imu_delta.so3();
+
+    Eigen::Vector3d vo_velocity_camera, vo_omega_camera;
+    tf::vectorMsgToEigen(msg->twist.twist.angular, vo_omega_camera);
+    tf::vectorMsgToEigen(msg->twist.twist.linear, vo_velocity_camera);
+    Sophus::SE3d vo_velocity_imu = \
+                           imu_camera_se3_*\
+                           Sophus::SE3d(Sophus::SO3d::exp(vo_omega_camera),
+                                        vo_velocity_camera)*\
+                           imu_camera_se3_.inverse();
+    m.omega = vo_velocity_imu.so3().log();
+    m.velocity = vo_velocity_imu.translation().segment<2>(0);
+
+    Eigen::MatrixXd meas_cov;
+    meas_cov.resize(m.ndim(), m.ndim());
+    meas_cov.setZero();
+    Eigen::Matrix3d rot_camera_to_imu;
+    tf::matrixTFToEigen(imu_camera_transform_.getBasis(), rot_camera_to_imu);
+    Eigen::Matrix<double, 12, 12> cov_rot;
+    cov_rot << rot_camera_to_imu, rot_camera_to_imu,
+               rot_camera_to_imu, rot_camera_to_imu;
+    Eigen::MatrixXd vo_cov_rot;
+    double delta_t = (msg->header.stamp - last_visual_odom_.header.stamp).toSec();
+    if(use_vo_covariance_)
+    {
+        Eigen::Matrix<double, 12, 12> msg_cov;
+        msg_cov.block<6,6>(0,0) = Eigen::Matrix<double, 6,6>::Map(msg->pose.covariance.data());
+        msg_cov.block<6,6>(6,6) = Eigen::Matrix<double, 6,6>::Map(msg->twist.covariance.data());
+        msg_cov.block<3,3>(3,3).swap(msg_cov.block<3,3>(6,6));
+        msg_cov.block<3,3>(0,3).swap(msg_cov.block<3,3>(0,6));
+        msg_cov.block<3,3>(3,0).swap(msg_cov.block<3,3>(6,0));
+        msg_cov.block<3,3>(6,9).swap(msg_cov.block<3,3>(3,9));
+        msg_cov.block<3,3>(9,6).swap(msg_cov.block<3,3>(9,3));
+        vo_cov_rot = cov_rot*msg_cov*cov_rot.transpose();
+    }
+    else
+    {
+        Eigen::MatrixXd vo_cov(4*3, 4*3);
+        vo_cov.block<3,3>(0,0).diagonal() = (delta_t*visual_position_sigma_).cwiseProduct(delta_t*visual_position_sigma_);
+        vo_cov.block<3,3>(3,3).diagonal() = (delta_t*visual_velocity_sigma_).cwiseProduct(delta_t*visual_velocity_sigma_);
+        vo_cov.block<3,3>(0,3).diagonal() = (delta_t*delta_t/2.0*visual_velocity_sigma_).cwiseProduct(delta_t*delta_t/2.0*visual_velocity_sigma_);
+        vo_cov.block<3,3>(3,0).diagonal() = (delta_t*delta_t/2.0*visual_velocity_sigma_).cwiseProduct(delta_t*delta_t/2.0*visual_velocity_sigma_);
+        vo_cov.block<3,3>(6,6).diagonal() = (delta_t*visual_orientation_sigma_).cwiseProduct(delta_t*visual_orientation_sigma_);
+        vo_cov.block<3,3>(9,9).diagonal() = (delta_t*visual_omega_sigma_).cwiseProduct(delta_t*visual_omega_sigma_);
+        vo_cov.block<3,3>(6,9).diagonal() = (delta_t*delta_t/2.0*visual_omega_sigma_).cwiseProduct(delta_t*delta_t/2.0*visual_omega_sigma_);
+        vo_cov.block<3,3>(9,6).diagonal() = (delta_t*delta_t/2.0*visual_omega_sigma_).cwiseProduct(delta_t*delta_t/2.0*visual_omega_sigma_);
+        vo_cov_rot = cov_rot*vo_cov*cov_rot.transpose();
+    }
+
+    meas_cov.block<2,2>(0,0) = vo_cov_rot.block<2,2>(0,0);
+    meas_cov.block<2,2>(0,2) = vo_cov_rot.block<2,2>(0,3);
+    meas_cov.block<2,6>(0,4) = vo_cov_rot.block<2,6>(0,6);
+    meas_cov.block<2,2>(2,0) = vo_cov_rot.block<2,2>(2,0);
+    meas_cov.block<2,2>(2,2) = vo_cov_rot.block<2,2>(3,3);
+    meas_cov.block<2,6>(2,4) = vo_cov_rot.block<2,6>(2,6);
+    meas_cov.block<3,3>(4,4) = vo_cov_rot.block<3,3>(6,6);
+    meas_cov.block<3,3>(7,7) = vo_cov_rot.block<3,3>(9,9);
+    std::vector<Eigen::MatrixXd> meas_covs;
+    meas_covs.push_back(meas_cov);
+
+    double dt = (msg->header.stamp - last_update_).toSec();
+    if(dt>0)
+    {
+        ROS_DEBUG_STREAM("Performing visual predict with dt=" << dt);
+        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
+        ukf_->predict(dt, process_noise(dt));
+        last_update_ = msg->header.stamp;
+    }
+
+    ROS_DEBUG_STREAM("Visual correct:\n" << m);
+    ROS_DEBUG_STREAM("Visual measurement covariance:\n" << meas_cov);
+    ukf_->correct(m, meas_covs);
+    last_visual_state_ = ukf_->state();
+    last_visual_covariance_ = ukf_->covariance();
+    last_visual_odom_ = *msg;
     //printState();
     sendState();
 }
@@ -665,6 +823,39 @@ PoseUKFNode::parseProcessSigma(const ros::NodeHandle& privatenh)
     {
         XmlRpc::XmlRpcValue list = process_sigma[std::string("accel_bias")];
         listToVec(list, &sigma_accel_bias_);
+    }
+}
+
+void
+PoseUKFNode::parseVisualMeasurementSigma(const ros::NodeHandle& privatenh)
+{
+    if(!privatenh.hasParam("visual_sigma"))
+    {
+        use_vo_covariance_ = true;
+        return;
+    }
+    XmlRpc::XmlRpcValue visual_sigma;
+    privatenh.getParam("visual_sigma", visual_sigma);
+    ROS_ASSERT(visual_sigma.getType() == XmlRpc::XmlRpcValue::TypeStruct);
+    if(visual_sigma.hasMember(std::string("position")))
+    {
+        XmlRpc::XmlRpcValue list = visual_sigma[std::string("position")];
+        listToVec(list, &sigma_position_);
+    }
+    if(visual_sigma.hasMember(std::string("velocity")))
+    {
+        XmlRpc::XmlRpcValue list = visual_sigma[std::string("velocity")];
+        listToVec(list, &sigma_velocity_);
+    }
+    if(visual_sigma.hasMember(std::string("orientation")))
+    {
+        XmlRpc::XmlRpcValue list = visual_sigma[std::string("orientation")];
+        listToVec(list, &sigma_orientation_);
+    }
+    if(visual_sigma.hasMember(std::string("omega")))
+    {
+        XmlRpc::XmlRpcValue list = visual_sigma[std::string("omega")];
+        listToVec(list, &sigma_omega_);
     }
 }
 

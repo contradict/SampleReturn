@@ -14,6 +14,12 @@ UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::WheelOdometryM
                                             const std::vector<Eigen::MatrixXd>& measurement_covs
                                            );
 
+template
+void
+UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::VisualOdometryMeasurement& measured,
+                                            const std::vector<Eigen::MatrixXd>& measurement_covs
+                                           );
+
 
 namespace PoseUKF {
 
@@ -48,12 +54,26 @@ operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
 std::ostream &
 operator<<(std::ostream &out, const WheelOdometryMeasurement& m)
 {
-    out << "delta yaw: " << m.delta_yaw << std::endl;
-    out << "yaw rate: " << m.yaw_rate << std::endl;
-    out << "delta_pos: " << m.delta_pos.transpose() << std::endl;
-    out << "velocity: " << m.velocity.transpose() << std::endl;
+    out << "odom delta yaw (" << m.delta_yaw << ")" << std::endl;
+    out << "odom yaw rate  (" << m.yaw_rate << ")" << std::endl;
+    out << "odom delta_pos (" << m.delta_pos.transpose() << ")" << std::endl;
+    out << "odom velocity  (" << m.velocity.transpose() << ")" << std::endl;
     return out;
 }
 
 
+std::ostream &
+operator<<(std::ostream &out, const VisualOdometryMeasurement& m)
+{
+    out << "vo delta_pos      (" << m.delta_pos.transpose() << ")" << std::endl;
+    out << "vo velocity       (" << m.velocity.transpose() << ")" << std::endl;
+    double r, p, y;
+    tf::Quaternion q;
+    tf::quaternionEigenToTF(m.delta_orientation.unit_quaternion(), q);
+    tf::Matrix3x3 R(q);
+    R.getRPY(r, p, y);
+    out << "vo delta_o(r,p,y) (" << r << ", " << p << ", " << y << ")\n";
+    out << "vo omega          (" << m.omega.transpose() << ")" << std::endl;
+    return out;
+}
 }
