@@ -223,11 +223,14 @@ PoseUKFNode::initialize(void)
 void
 PoseUKFNode::sendPose(const ros::TimerEvent& e)
 {
+    if(!have_imu_transform_)
+        return;
+
     (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
     msg->header.frame_id = imu_transform_.frame_id_;
-    msg->header.stamp = ros::Time::now();
+    msg->header.stamp = last_update_;
     msg->header.seq = seq_++;
     Eigen::Vector3d pos3d;
     pos3d.segment<2>(0) = ukf_->state().Position;
