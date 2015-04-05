@@ -119,6 +119,7 @@ include_directories(
 add_library(pose_ukf
    src/pose_ukf_impl.cpp
    src/pitchroll_ukf_impl.cpp
+   src/rotation_average.cpp
 )
 
 ## Declare a cpp executable
