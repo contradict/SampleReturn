@@ -676,8 +676,11 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "PoseUKF");
     PoseUKF::PoseUKFNode n;
-    while(!n.initialize() && ros::isShuttingDown())
+    while(!n.initialize() && !ros::isShuttingDown())
         ros::Duration(1.0).sleep();
-    n.connect();
-    ros::spin();
+    if(!ros::isShuttingDown())
+    {
+        n.connect();
+        ros::spin();
+    }
 }
