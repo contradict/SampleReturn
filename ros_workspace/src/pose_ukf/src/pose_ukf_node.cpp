@@ -304,10 +304,10 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > accel_cov(msg->linear_acceleration_covariance.data());
     meas_cov.block<3, 3>(0, 0) = accel_cov;
-    ROS_INFO_STREAM("imu accel cov:\n" << accel_cov);
+    ROS_DEBUG_STREAM("imu accel cov:\n" << accel_cov);
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > omega_cov(msg->angular_velocity_covariance.data());
     meas_cov.block<3, 3>(3, 3) = omega_cov;
-    ROS_INFO_STREAM("imu omega cov:\n" << omega_cov);
+    ROS_DEBUG_STREAM("imu omega cov:\n" << omega_cov);
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
 
@@ -337,6 +337,7 @@ PoseUKFNode::printState(void)
     ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<3,3>(9,9)));
     ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<3,3>(12,12)));
     ROS_INFO_STREAM("accel bias cov:\n" << (ukf_->covariance().block<3,3>(15,15)));
+    ROS_INFO_STREAM("covariance:\n" << ukf_->covariance());
 }
 
 void
