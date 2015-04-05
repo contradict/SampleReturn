@@ -27,20 +27,20 @@ operator<<(std::ostream &out, const PoseState& st)
     tf::quaternionEigenToTF(st.Orientation.unit_quaternion(), q);
     tf::Matrix3x3 m(q);
     m.getRPY(r, p, y);
-    out << "Position    (" << st.Position.transpose() << ")\n";
-    out << "Velocity    (" << st.Velocity.transpose() << ")\n";
-    out << "Acceleration(" << st.Acceleration.transpose() << ")\n";
-    out << "Orientation (" << r << ", " << p << ", " << y << ")\n";
-    out << "Omega       (" << st.Omega.transpose() << ")\n";
-    out << "GyroBias    (" << st.GyroBias.transpose() << ")\n";
-    out << "AccelBias   (" << st.AccelBias.transpose() << ")\n";
+    out << "Position      (" << st.Position.transpose() << ")\n";
+    out << "Velocity      (" << st.Velocity.transpose() << ")\n";
+    out << "Acceleration  (" << st.Acceleration.transpose() << ")\n";
+    out << "Orient(r,p,y) (" << r << ", " << p << ", " << y << ")\n";
+    out << "Omega         (" << st.Omega.transpose() << ")\n";
+    out << "GyroBias      (" << st.GyroBias.transpose() << ")\n";
+    out << "AccelBias     (" << st.AccelBias.transpose() << ")\n";
     return out;
 }
 
 std::ostream &
 operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
 {
-    out << "IMU acceleration: (" << m.acceleration.transpose() << ")" << std::endl;
+    out << "IMU accel: (" << m.acceleration.transpose() << ")" << std::endl;
     out << "IMU omega: (" << m.omega.transpose() << ")" << std::endl;
     return out;
 }
