@@ -167,12 +167,12 @@ struct PitchRollState
         {
             double w=t.get<0>();
             const struct PitchRollState& pt = t.get<1>();
-            Q += w*(4.0*pt.Orientation.coeffs() * pt.Orientation.coeffs().transpose() - Eigen::Matrix4d::Identity());
+            Q += w*pt.Orientation.coeffs() * pt.Orientation.coeffs().transpose();
             max_angle = std::accumulate(rest, Chistate.end(), max_angle,
                     [&pt](double max, const struct PitchRollState& other)
                     {
                     return std::max(max,
-                        acos((pt.Orientation.inverse()*other.Orientation).w())*2.);
+                        pt.Orientation.angularDistance(other.Orientation));
                     });
             Omega += w*pt.Omega;
             GyroBias += w*pt.GyroBias;
