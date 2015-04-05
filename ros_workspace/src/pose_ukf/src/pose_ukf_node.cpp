@@ -312,13 +312,16 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     meas_covs.push_back(meas_cov);
 
     double dt = (msg->header.stamp - last_update_).toSec();
-    if(dt<0)
-        return;
+    if(dt>0)
+    {
+        ROS_DEBUG_STREAM("Performing IMU predict with dt=" << dt );
+        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
+        ukf_->predict(dt, process_noise(dt));
+        last_update_ = msg->header.stamp;
+    }
 
-    ROS_INFO_STREAM("Performing IMU update with dt=" << dt );
-    ROS_INFO_STREAM(m);
-    ukf_->predict(dt, process_noise(dt));
-    last_update_ = msg->header.stamp;
+    ROS_DEBUG_STREAM("IMU correct:\n" << m);
+    ROS_DEBUG_STREAM("IMU measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     printState();
 }
@@ -430,8 +433,13 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     last_joint_stamp_ = msg->header.stamp;
 
     double dt = (msg->header.stamp - last_update_).toSec();
-    if(dt<0)
-        return;
+    if(dt>0)
+    {
+        ROS_DEBUG_STREAM("Performing odometry predict with dt=" << dt);
+        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
+        ukf_->predict(dt, process_noise(dt));
+        last_update_ = msg->header.stamp;
+    }
 
     WheelOdometryMeasurement m;
     m.delta_yaw = odometry_delta_imu.so3().log()(2);
@@ -448,11 +456,8 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     meas_cov.block<2,2>(2,2) = odometry_position_covariance_imu.block<2,2>(0,0);
     meas_cov.block<2,2>(4,4) = odometry_position_covariance_imu.block<2,2>(0,0)/delta_t/delta_t;
     meas_covs.push_back(meas_cov);
-    ROS_INFO_STREAM("Performing joint state update with dt=" << dt);
-    ROS_INFO_STREAM("odometry measurement:\n" << m);
-    ROS_INFO_STREAM("odometry measurement covariance:\n" << meas_cov);
-    ukf_->predict(dt, process_noise(dt));
-    last_update_ = msg->header.stamp;
+    ROS_DEBUG_STREAM("odometry correct:\n" << m);
+    ROS_DEBUG_STREAM("odometry measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     last_joint_state_ = ukf_->state();
     printState();
