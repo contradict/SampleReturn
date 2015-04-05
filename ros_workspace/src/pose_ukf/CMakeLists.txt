@@ -59,6 +59,7 @@ add_message_files(
    FILES
    Vector2.msg
    PitchRoll.msg
+   Pose.msg
 )
 
 ## Generate services in the 'srv' folder

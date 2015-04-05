@@ -3,6 +3,7 @@
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <pose_ukf/pose_ukf.hpp>
+#include <pose_ukf/Pose.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
@@ -106,6 +107,7 @@ class PoseUKFNode
     void jointStateCallback(sensor_msgs::JointStateConstPtr msg);
     void imuCallback(sensor_msgs::ImuConstPtr msg);
     void sendPose(const ros::TimerEvent& e);
+    void sendState(void);
 
     tf::TransformBroadcaster broadcaster_;
     tf::TransformListener listener_;
@@ -115,6 +117,7 @@ class PoseUKFNode
 
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
+    ros::Publisher state_pub_;
 
     tf::StampedTransform imu_transform_;
     Sophus::SE3d imu_se3_;
@@ -184,6 +187,7 @@ PoseUKFNode::PoseUKFNode() :
     //parseOdometryMeasurementSigma(privatenh);
 
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
+    state_pub_ = privatenh.advertise<pose_ukf::Pose>("filter_state", 1);
     seq_ = 0;
     publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PoseUKFNode::sendPose, this);
 }
@@ -239,6 +243,28 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     tf::quaternionEigenToMsg(ukf_->state().Orientation.unit_quaternion(),
                              msg->pose.orientation);
     pose_pub_.publish(msg);
+}
+
+void
+PoseUKFNode::sendState(void)
+{
+    pose_ukf::PosePtr msg(new pose_ukf::Pose);
+
+    msg->header.stamp = last_update_;
+    msg->header.frame_id = imu_transform_.frame_id_;
+
+    msg->Position.x = ukf_->state().Position(0);
+    msg->Position.y = ukf_->state().Position(1);
+    msg->Velocity.x = ukf_->state().Velocity(0);
+    msg->Velocity.y = ukf_->state().Velocity(1);
+    msg->Acceleration.x = ukf_->state().Acceleration(0);
+    msg->Acceleration.y = ukf_->state().Acceleration(1);
+    tf::quaternionEigenToMsg(ukf_->state().Orientation.unit_quaternion(), msg->Orientation);
+    tf::vectorEigenToMsg(ukf_->state().Omega, msg->Omega);
+    tf::vectorEigenToMsg(ukf_->state().AccelBias, msg->AccelBias);
+    tf::vectorEigenToMsg(ukf_->state().GyroBias, msg->GyroBias);
+
+    state_pub_.publish(msg);
 }
 
 Eigen::MatrixXd
@@ -323,7 +349,8 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     ROS_DEBUG_STREAM("IMU correct:\n" << m);
     ROS_DEBUG_STREAM("IMU measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    printState();
+    //printState();
+    sendState();
 }
 
 void
@@ -461,7 +488,8 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     ROS_DEBUG_STREAM("odometry measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     last_joint_state_ = ukf_->state();
-    printState();
+    //printState();
+    sendState();
 }
 
 void
