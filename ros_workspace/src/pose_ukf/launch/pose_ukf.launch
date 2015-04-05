@@ -7,10 +7,10 @@
         pkg="pose_ukf"
         type="pose_ukf_node"
         output="screen"
-        launch-prefix="tmux_new_window gdb -ex run --args "
         >
         <!--
         launch-prefix="tmux_new_window gdb - -args "
+        launch-prefix="tmux_new_window gdb -ex run - -args "
         launch-prefix="tmux_new_window valgrind "
         -->
         <remap from="imu" to="/io/microstrain_3dm_gx3_35/imu"/>
@@ -37,10 +37,10 @@
             position: [ 0.001, 0.001 ]
             velocity: [ 0.5, 0.5 ]
             acceleration: [ 1.5, 1.5 ]
-            orientation: [ 0.0005, 0.0005, 0.001 ]
-            omega: [ 0.005, 0.005, 0.01 ]
-            gyro_bias: [ 1.0e-9, 1.0e-9, 1.0e-9 ]
-            accel_bias: [ 1.0e-9, 1.0e-9, 1.0e-9 ]
+            orientation: [ 0.001, 0.001, 0.01 ]
+            omega: [ 0.01, 0.01, 0.01 ]
+            gyro_bias: [ 1.0e-12, 1.0e-12, 1.0e-12 ]
+            accel_bias: [ 1.0e-12, 1.0e-12, 1.0e-12 ]
         </rosparam>
 
         <!-- position, velocity, acceleration, orientation(r,p,y), omega, gyro bias, accel bias -->
