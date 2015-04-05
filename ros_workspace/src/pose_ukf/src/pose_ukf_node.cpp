@@ -427,6 +427,7 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     if(!(((measurement_cov-measurement_cov).array() == (measurement_cov-measurement_cov).array()).all()))
     {
         ROS_ERROR_STREAM("Covariance not finite\n" << measurement_cov );
+        return;
     }
 
     Eigen::Matrix<double, 3, 6> solution = (shape.transpose()*shape).inverse()*shape.transpose();
@@ -437,6 +438,7 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     if(!(((covariance-covariance).array() == (covariance-covariance).array()).all()))
     {
         ROS_ERROR_STREAM("Rotated covariance not finite\n" << covariance );
+        return;
     }
 
 
