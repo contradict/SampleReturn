@@ -15,8 +15,7 @@
         <arg name="kind" value="$(arg kind)"/>
     </include>
 
-    <node
-        name="replay"
+    <node name="replay"
         pkg="rosbag"
         type="play"
         output="screen"
@@ -29,16 +28,29 @@
             /io/microstrain_3dm_gx3_35/imu
             /motion/platform_joint_state
             /motion/odometry
+            /cameras/navigation/center/left/image_raw
+            /cameras/navigation/center/left/camera_info
+            /cameras/navigation/center/right/image_raw
+            /cameras/navigation/center/right/camera_info
             "
             >
     </node>
 
-    <node
-        name="microstrain_imu_transform"
+    <node name="microstrain_imu_transform"
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
-        args="0.455 0 0.155 0 3.1416 0 base_link imu 10"/>
+        args="0.455 0 0.155 0 3.1416 0 base_link imu 100"/>
+
+    <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
+        <arg name="run_cameras" default="false"/>
+        <arg name="run_processing" default="true"/>
+        <arg name="namespace" default="center"/>
+        <arg name="machine" default="navigate"/>
+    </include>
 
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
+
+    <include file="$(find pose_ukf)/launch/fovis.launch"/>
+
 </launch>

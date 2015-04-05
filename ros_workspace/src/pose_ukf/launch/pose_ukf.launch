@@ -2,11 +2,12 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
-    <node
-        name="filter"
+    <node name="filter"
+        ns="/processes/odometry"
         pkg="pose_ukf"
         type="pose_ukf_node"
         output="screen"
+        launch-prefix="tmux_new_window gdb --args "
         >
         <!--
         launch-prefix="tmux_new_window gdb - -args "
@@ -88,4 +89,5 @@
         </rosparam>
         -->
     </node>
+
 </launch>
