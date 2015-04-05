@@ -22,7 +22,7 @@ bool lookupTransform(const tf::TransformListener& listener,
         std::string err,
         tf::StampedTransform* transform)
 {
-    std::string errmsg;
+    std::string errmsg("Unknown error");
     if(!listener.waitForTransform(base_name, link_name, ros::Time(0),
                 ros::Duration(5.0), ros::Duration(0.1), &errmsg))
     {
