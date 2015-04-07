@@ -3,7 +3,7 @@ executive_master:
     ignore_search_camera: True
     ignore_manipulator_camera: False
         
-level_two_star:
+level_two:
     #for search  behaviour, degrees and meters
     move_velocity: 1.5
     spin_velocity: 1.0
