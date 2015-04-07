@@ -78,18 +78,16 @@ class LevelTwoWeb(object):
 
         #get the star shape
         self.spokes = self.get_hollow_star(node_params.spoke_count,
-                                           node_params.spoke_length,
+                                           node_params.max_spoke_length,
                                            node_params.first_spoke_offset,
-                                           node_params.star_hub_radius,
-                                           node_params.spin_step)
-                       
+                                           node_params.spoke_hub_radius)
+                                                                  
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
     
         self.state_machine.userdata.spokes = self.spokes
-        self.state_machine.userdata.star_hub_radius = node_params.star_hub_radius
         
         #store the intial planned goal in map, check for the need to replan
         self.state_machine.userdata.move_point_map = None
@@ -111,18 +109,15 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.beacon_mount_step = node_params.beacon_mount_step
         self.state_machine.userdata.platform_point = self.platform_point
         
-        #search line parameters
+        #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
-        self.state_machine.userdata.min_spin_radius = node_params.min_spin_radius
-        self.state_machine.userdata.last_spin_radius = 0
-        self.state_machine.userdata.spin_step = node_params.spin_step
-        self.state_machine.userdata.line_yaw = None #IN RADIANS!
+        self.state_machine.userdata.raster_step = node_params.raster_step
+        self.state_machine.userdata.raster_offset = node_params.raster_offset
         self.state_machine.userdata.outbound = False
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
         self.state_machine.userdata.last_retry_time = rospy.Time.now()
-        
         
         #stop function flags
         self.state_machine.userdata.stop_on_sample = False
@@ -430,31 +425,31 @@ class LevelTwoWeb(object):
                 goal.target_pose.pose.position = saved_point_odom.point
                 self.state_machine.userdata.move_goal = goal                
 
-    def get_hollow_star(self, spoke_count, spoke_length, offset, hub_radius, spin_step):
+    def get_spokes(self, spoke_count, spoke_length, offset, hub_radius):
         #This creates a list of dictionaries.  The yaw entry is a useful piece of information
-        #for some of the state machine states.  The other entry is the list of points that
-        #the robot should try to achieve along the spoke definied by the yaw
+        #for some of the state machine states.  The other entry contains the start and end
+        #points definied by the line yaw
         
         offset = np.radians(offset)
         yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
-        spokes = []
+        #add the starting spoke again, for raster calcs
+        yaws.append(offset)
+        spokes = deque()
         for yaw in yaws:
             yaw = util.unwind(yaw)
-            radius = hub_radius
-            points = deque([])
-            while radius < spoke_length:
-                header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
-                pos = geometry_msg.Point(radius*math.cos(yaw),
-                                         radius*math.sin(yaw), 0)
-                point = geometry_msg.PointStamped(header, pos)
-                radius += spin_step
-                if radius > spoke_length: radius = spoke_length
-                points.append(point)
+            header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+            pos = geometry_msg.Point(hub_radius*math.cos(yaw),
+                                     hub_radius*math.sin(yaw), 0)
+            start_point = geometry_msg.PointStamped(header, pos)
+            pos = geometry_msg.Point(spoke_length*math.cos(yaw),
+                                     spoke_length*math.sin(yaw), 0)    
+            end_point = geometry_msg.PointStamped(header, pos)
             spokes.append({'yaw':yaw,
-                           'points':points})
+                           'start_point':start_point,
+                           'end_point':end_point})
         
-        return deque(spokes)
- 
+        return spokes
+    
     def shutdown_cb(self):
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
