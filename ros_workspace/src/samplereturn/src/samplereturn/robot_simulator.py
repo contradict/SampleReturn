@@ -113,6 +113,7 @@ class RobotSimulator(object):
         enable_carousel_name = "/motion/carousel/enable"
 
         enable_manipulator_detector_name = "/processes/sample_detection/manipulator/enable"
+        enable_search_name = "/cameras/search/enable"
         
         select_motion_name = "/motion/CAN/select_motion_mode"
         
@@ -201,6 +202,13 @@ class RobotSimulator(object):
         for topic in cam_status_list:
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
+        self.search_enable = rospy.Service(enable_search_name,
+                                           platform_srv.Enable,
+                                           self.service_enable_search_request)
+        self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
+                                                         samplereturn_srv.Enable,
+                                                         self.enable_manipulator_detector)
+                                                   
                 
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
@@ -275,10 +283,7 @@ class RobotSimulator(object):
                                                    samplereturn_msg.PursuitResult,
                                                    self.handle_pursuit_result)
         
-        self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
-                                                         samplereturn_srv.Enable,
-                                                         self.enable_manipulator_detector)
-                                           
+
         #visual servo stuff
         self.visual_servo_server = actionlib.SimpleActionServer(visual_servo_name,
                                                            visual_servo_msg.VisualServoAction,
@@ -742,6 +747,10 @@ class RobotSimulator(object):
         self.pause_pub.publish(std_msg.Bool(self.paused))
  
     def enable_manipulator_detector(self, req):
+        rospy.sleep(0.5)
+        return req.state
+    
+    def service_enable_search_request(self, req):
         rospy.sleep(0.5)
         return req.state
         
