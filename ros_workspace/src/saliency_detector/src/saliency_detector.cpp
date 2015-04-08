@@ -139,8 +139,7 @@ class SaliencyDetectorNode
     vector<cv::KeyPoint> kp;
 
     if (blobDetect_on_) {
-      cv::Mat blob_copy;
-      cv::threshold(debug_bms_img_, blob_copy, 30, 255, cv::THRESH_BINARY);
+      cv::Mat blob_copy = debug_bms_img_.clone();
       blob_.detect(blob_copy, kp);
       ROS_INFO("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);

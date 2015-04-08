@@ -77,6 +77,8 @@
         output="log"
         ns="/processes/executive">
 
+        <remap from="enable_search" to="/cameras/search/enable"/>
+        
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
     </node>

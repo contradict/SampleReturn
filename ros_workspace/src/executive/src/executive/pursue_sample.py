@@ -457,7 +457,8 @@ class StartSamplePursuit(smach.State):
         #this is the initial vfh goal pose
         goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
                                             move_velocity = userdata.pursuit_velocity,
-                                            spin_velocity = userdata.spin_velocity)
+                                            spin_velocity = userdata.spin_velocity,
+                                            orient_at_target = True)
         userdata.pursuit_goal = goal
        
         #create return destination
@@ -466,7 +467,8 @@ class StartSamplePursuit(smach.State):
         current_pose.header.stamp = rospy.Time(0)
         goal = samplereturn_msg.VFHMoveGoal(target_pose = current_pose,
                                             move_velocity = userdata.pursuit_velocity,
-                                            spin_velocity = userdata.spin_velocity)
+                                            spin_velocity = userdata.spin_velocity,
+                                            orient_at_target = False)
         userdata.return_goal = goal        
                 
         return 'next'
@@ -675,6 +677,8 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         pursuit_pose = util.pose_translate_by_quat(current_pose,
                                                    (distance_to_point - min_pursuit_distance),
                                                    pointing_quat)
+        #recalculate the quaternion pointing from goal point to sample point
+        pointing_quat = util.pointing_quaternion_2d(pursuit_pose.pose.position, point_in_frame.point)
         pursuit_pose.pose.orientation = pointing_quat
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
