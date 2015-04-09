@@ -77,17 +77,19 @@ class LevelTwoWeb(object):
                                                          SimpleMoveAction)
 
         #get the star shape
-        self.spokes = self.get_hollow_star(node_params.spoke_count,
-                                           node_params.max_spoke_length,
-                                           node_params.first_spoke_offset,
-                                           node_params.spoke_hub_radius)
+        self.spokes = self.get_spokes(node_params.spoke_count,
+                                      node_params.max_spoke_length,
+                                      node_params.first_spoke_offset,
+                                      node_params.spoke_hub_radius)
                                                                   
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
     
+        #lists
         self.state_machine.userdata.spokes = self.spokes
+        self.state_machine.userdata.raster_points = deque()
         
         #store the intial planned goal in map, check for the need to replan
         self.state_machine.userdata.move_point_map = None
@@ -112,12 +114,16 @@ class LevelTwoWeb(object):
         #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
+        self.state_machine.userdata.spoke_hub_radius = node_params.spoke_hub_radius
         self.state_machine.userdata.raster_step = node_params.raster_step
         self.state_machine.userdata.raster_offset = node_params.raster_offset
-        self.state_machine.userdata.outbound = False
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
         self.state_machine.userdata.last_retry_time = rospy.Time.now()
+
+        #web management flags
+        self.state_machine.userdata.outbound = True
+        self.state_machine.userdata.raster_active = False
         
         #stop function flags
         self.state_machine.userdata.stop_on_sample = False
@@ -149,8 +155,15 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode'),
-                                   transitions = {'next':'SELECT_PLANNER'})
+                                                 'Enter ing level two mode.  Enable ing search camera.'),
+                                   transitions = {'next':'ENABLE_SEARCH_CAMERA'})
+            
+            smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
+                                    smach_ros.ServiceState('enable_search',
+                                                            platform_srv.Enable,
+                                                            request = platform_srv.EnableRequest(True)),
+                                    transitions = {'succeeded':'SELECT_PLANNER',
+                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
@@ -171,70 +184,60 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('DISMOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'STAR_MANAGER',
-                                                  'sample_detected':'STAR_MANAGER',
+                                   transitions = {'complete':'WEB_MANAGER',
+                                                  'sample_detected':'WEB_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'false'})
             
-            smach.StateMachine.add('STAR_MANAGER',
-                                   StarManager(self.tf_listener,
-                                               self.announcer),
-                                   transitions = {'next_spoke':'LINE_MANAGER',
-                                                  'return_home':'ANNOUNCE_RETURN_HOME'})
-
-            smach.StateMachine.add('LINE_MANAGER',
-                                   SearchLineManager(self.tf_listener),
-                                   transitions = {'move':'LINE_MOVE',
-                                                  'line_end':'STAR_MANAGER',
+            smach.StateMachine.add('WEB_MANAGER',
+                                   WebManager(self.tf_listener,
+                                              self.announcer),
+                                   transitions = {'move':'CREATE_MOVE_GOAL',
+                                                  'get_raster':'CREATE_RASTER_POINTS',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
-            smach.StateMachine.add('LINE_MOVE',
+            smach.StateMachine.add('CREATE_RASTER_POINTS',
+                                   CreateRasterPoints(self.tf_listener),
+                                   transitions = {'next':'WEB_MANAGER',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
+            smach.StateMachine.add('CREATE_MOVE_GOAL',
+                                   CreateMoveGoal(self.tf_listener),
+                                   transitions = {'next':'MOVE',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
+            smach.StateMachine.add('MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'SPIN_MANAGER',
+                                   transitions = {'complete':'WEB_MANAGER',
                                                   'missed_target':'ANNOUNCE_MISSED_TARGET',
-                                                  'blocked':'ANNOUNCE_LINE_BLOCKED',
+                                                  'blocked':'ANNOUNCE_BLOCKED',
                                                   'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'true'})
-            
-            smach.StateMachine.add('ANNOUNCE_LINE_BLOCKED',
-                                   AnnounceState(self.announcer, 'Line Blocked.'),
-                                   transitions = {'next':'RETRY_LINE_MOVE'})
 
-            smach.StateMachine.add('RETRY_LINE_MOVE',
+            smach.StateMachine.add('ANNOUNCE_BLOCKED',
+                                   AnnounceState(self.announcer, 'Path Blocked.'),
+                                   transitions = {'next':'RETRY_MOVE'})
+
+            smach.StateMachine.add('RETRY_MOVE',
                                    RetryMove(self.announcer),
-                                   transitions = {'continue':'STAR_MANAGER',
-                                                  'retry':'LINE_MOVE',
+                                   transitions = {'continue':'WEB_MANAGER',
+                                                  'retry':'MOVE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
                                    AnnounceState(self.announcer, 'Off Course.'),
-                                   transitions = {'next':'STAR_MANAGER'})
+                                   transitions = {'next':'WEB_MANAGER'})
             
             smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
                                    AnnounceState(self.announcer, 'Missed Target'),
-                                   transitions = {'next':'SPIN_MANAGER'})
-            
-            smach.StateMachine.add('SPIN_MANAGER',
-                                   SpinManager(self.tf_listener),
-                                   transitions = {'spin':'ROTATE',
-                                                  'move':'LINE_MANAGER',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
-            
-            smach.StateMachine.add('ROTATE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'LINE_MANAGER',
-                                                  'sample_detected':'PURSUE_SAMPLE',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'true'})
+                                   transitions = {'next':'WEB_MANAGER'})
+
             
             @smach.cb_interface(input_keys=['detected_sample'])
             def pursuit_goal_cb(userdata, request):
@@ -263,7 +266,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
                                                  'Return ing to search line'),
-                                   transitions = {'next':'LINE_MANAGER'})   
+                                   transitions = {'next':'WEB_MANAGER'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
@@ -428,7 +431,7 @@ class LevelTwoWeb(object):
     def get_spokes(self, spoke_count, spoke_length, offset, hub_radius):
         #This creates a list of dictionaries.  The yaw entry is a useful piece of information
         #for some of the state machine states.  The other entry contains the start and end
-        #points definied by the line yaw
+        #points defined by the line yaw
         
         offset = np.radians(offset)
         yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
@@ -474,18 +477,24 @@ class StartLeveLTwo(smach.State):
 
         return 'next'
 
-class StarManager(smach.State):
+class WebManager(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
-                             input_keys = ['line_yaw',
+                             input_keys = ['spoke_yaw',
                                            'outbound',
-                                           'spokes'],
-                             output_keys = ['line_yaw',
-                                            'line_points',
+                                           'spokes',
+                                           'raster_active',
+                                           'raster_points',
+                                           'world_fixed_frame'],
+                             output_keys = ['spoke_yaw',
                                             'outbound',
                                             'spokes',
+                                            'raster_active',
+                                            'raster_points',
+                                            'move_point',
                                             'stop_on_sample'],
-                             outcomes=['next_spoke',
+                             outcomes=['move',
+                                       'get_raster',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -494,84 +503,119 @@ class StarManager(smach.State):
 
     def execute(self, userdata):
 
-        userdata.stop_on_sample = True
-
-        if len(userdata.spokes) == 0:
-            rospy.loginfo("STAR MANAGER finished last spoke")
-            return 'return_home'
-
-        if not userdata.outbound:
-            #just finished inbound spoke, turn around and head outwards again
-            spoke = userdata.spokes.popleft()
-            userdata.line_yaw = spoke['yaw']
-            userdata.line_points = deque(spoke['points'])
-            userdata.outbound = True
-            rospy.loginfo("STAR_MANAGER starting spoke: %.2f" %(userdata.line_yaw))
-            self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.line_yaw))))
-        else:
-            #just finished outbound spoke, head towards first point in next spoke
-            userdata.outbound = False
-            userdata.line_points = deque([userdata.spokes[0]['points'].popleft()])
-            rospy.loginfo("STAR_MANAGER returning to hub point: %s" %(userdata.spokes[0]['points'][0]))
-            self.announcer.say("Return ing on spoke, Yaw " + str(int(math.degrees(userdata.line_yaw))))
-
-        return 'next_spoke'
-
-class SpinManager(smach.State):
-
-    def __init__(self, tf_listener):
-        smach.State.__init__(self,
-                             outcomes=['spin', 'move', 'preempted', 'aborted'],
-                             input_keys=['line_points',
-                                         'min_spin_radius',
-                                         'spin_velocity',
-                                         'outbound',
-                                         'world_fixed_frame',],
-                             output_keys=['simple_move',
-                                          'move_point_map',
-                                          'beacon_point',
-                                          'distance_to_hub',
-                                          'last_align_time',])
-  
-        self.tf_listener = tf_listener
-    
-    def execute(self, userdata):
-        #set this to None when not heading somewhere
-        userdata.move_point_map = None 
-        #if heading out, and further than spin step, and not on last move, spin
         if userdata.outbound:
-            distance = util.get_robot_distance_to_origin(self.tf_listener, userdata.world_fixed_frame)
-            if (len(userdata.line_points) > 0) and (distance > userdata.min_spin_radius):     
-                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
-                                                      angle = 2.*math.pi,
-                                                      velocity = userdata.spin_velocity)        
-                return 'spin'                
+            #this flag indicates it's time to make an outbound move
+            spoke = userdata.spokes.popleft()
+            #there is an extra spoke at the end
+            if len(userdata.spokes) == 0:
+                rospy.loginfo("SPOKE MANAGER finished last spoke")
+                return 'return_home'            
+            userdata.spoke_yaw = spoke['yaw']
+            userdata.move_point = spoke['end_point']
+            userdata.outbound = False
+            rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
+            self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.spoke_yaw))))
+            return 'move'
+        else:
+            #we are inbound
+            if userdata.raster_active:
+                #still rastering
+                userdata.move_point = userdata.raster_points.popleft()
+                #is this the last point?
+                if len(userdata.raster_points) == 0:
+                    userdata.raster_active = False
+                    userdata.outbound = True #request the next spoke move
+                return 'move'
+            else:
+                #time to start rastering, create the points, and set flag
+                self.announcer.say("Begin ing raster on spoke, Yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
+                userdata.raster_active = True                
+                return 'get_raster'
+        
+        return 'aborted'
 
-        #otherwise, on to next movement        
-        return 'move'    
-
-#drive to detected sample location        
-class SearchLineManager(smach.State):
+class CreateRasterPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['line_points',
-                                           'outbound',
-                                           'return_time',
-                                           'detected_sample',
-                                           'odometry_frame',
+                             input_keys = ['spokes',
+                                           'spoke_yaw',
+                                           'spoke_hub_radius',
+                                           'raster_step',
+                                           'raster_offset',
+                                           'world_fixed_frame'],
+                             output_keys = ['raster_points'],
+                             outcomes=['next',
+                                       'preempted', 'aborted'])
+
+        self.tf_listener = tf_listener
+
+    def execute(self, userdata):
+            
+            raster_points = deque()
+            header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
+            radius = util.get_robot_distance_to_origin(self.tf_listener,
+                                                       userdata.world_fixed_frame)
+                       
+            current_yaw = userdata.spoke_yaw
+            next_yaw = userdata.spokes[0]['yaw']
+            yaw_step = np.abs(next_yaw - current_yaw)
+            raster_offset = userdata.raster_offset
+            #get the sign of the rotation to next yaw
+            spoke_sign = np.sign(next_yaw - current_yaw)
+
+            
+            rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
+                                                                                    current_yaw,
+                                                                                    next_yaw))
+            
+            raster_pos = lambda yaw, offset_sign: \
+                            geometry_msg.Point( \
+                            radius*math.cos(yaw + offset_sign*raster_offset/radius*spoke_sign),
+                            radius*math.sin(yaw + offset_sign*raster_offset/radius*spoke_sign), 0)
+            
+            #generate one ccw-inward-cw-inward set of points per loop
+            while True:
+                #chord move to next yaw
+                raster_points.append(geometry_msg.PointStamped(header,
+                                                               raster_pos(next_yaw, -1)))
+                radius -= userdata.raster_step
+                if (radius <= userdata.spoke_hub_radius): 
+                    #within the hub radius, we're done
+                    break
+                #inward move on next yaw
+                raster_points.append(geometry_msg.PointStamped(header,
+                                                               raster_pos(next_yaw, -1)))               
+                #chord move to current yaw
+                raster_points.append(geometry_msg.PointStamped(header,
+                                                               raster_pos(current_yaw, 1)))               
+                radius -= userdata.raster_step
+                #inward move on current yaw
+                raster_points.append(geometry_msg.PointStamped(header,
+                                                               raster_pos(current_yaw, 1)))                              
+                if (yaw_step*radius) < (3.0*userdata.raster_offset):
+                    raster_points.append(userdata.spokes[0]['start_point'])                    
+                    break
+            
+            
+            
+            userdata.raster_points = raster_points
+            
+            return 'next'
+    
+
+#take a point and create a VFH goal        
+class CreateMoveGoal(smach.State):
+    def __init__(self, tf_listener):
+        smach.State.__init__(self,
+                             input_keys = ['move_point',
                                            'move_velocity',
                                            'spin_velocity',
-                                           'beacon_point',
-                                           'last_align_time'],
+                                           'odometry_frame'],
                              output_keys = ['move_goal',
                                             'line_points',
                                             'next_line_point',
-                                            'move_point_map',
-                                            'beacon_point',
-                                            'last_align_time'],
-                             outcomes=['move',
-                                       'line_end',
-                                       'return_home',
+                                            'move_point_map'],
+                             outcomes=['next',
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
@@ -579,26 +623,18 @@ class SearchLineManager(smach.State):
     def execute(self, userdata):
 
         odometry_frame = userdata.odometry_frame
+   
+        target_point = userdata.move_point
         
-        if rospy.Time.now() > userdata.return_time:
-            return 'return_home'
-        
-        #if len of points is zero we have reached the start or end of a line
-        if len(userdata.line_points) == 0:
-            return 'line_end'
-        else:
-            target_point = userdata.line_points.popleft()
-            #store the next point in case of interruption by pursuit.
-            userdata.next_line_point = target_point
-
         try:
             self.tf_listener.waitForTransform(odometry_frame,
                                               target_point.header.frame_id,
                                               target_point.header.stamp,
-                                              rospy.Duration(1.0))
-            point_in_odom = self.tf_listener.transformPoint(odometry_frame, target_point)
+                                              rospy.Duration(2.0))
+            point_in_odom = self.tf_listener.transformPoint(odometry_frame,
+                                                            target_point)
         except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform line manager point %s->%s",
+            rospy.logwarn("LEVEL_TWO failed to transform goal point %s->%s",
                           target_point.header.frame_id, odometry_frame)
             return 'aborted'
 
@@ -612,10 +648,10 @@ class SearchLineManager(smach.State):
                            orient_at_target = False)
         userdata.move_goal = goal
 
-        #store the pose in map, to compare in the beacon update callback
+        #store the point in map, to compare in the beacon update callback
         userdata.move_point_map = target_point
         
-        return 'move'
+        return 'next'
 
 #For retrying a move after line_blocked.  Probably a terrible hack that should be removed later.
 #Wait for the delay, then try to move again.  Allow retry after delay time has elapsed since last retry also
@@ -655,7 +691,39 @@ class RetryMove(smach.State):
                 rospy.sleep(userdata.blocked_retry_delay)
                 userdata.blocked_retried = True
                 userdata.last_retry_time = rospy.Time.now()
-                return 'retry'   
+                return 'retry'
+            
+class MountManager(smach.State):
+    
+    def __init__(self, tf_listener, announcer):
+
+        smach.State.__init__(self,
+                             outcomes=['move',
+                                       'final',
+                                       'aborted'],
+                             input_keys=['platform_point',
+                                         'beacon_point',
+                                         'beacon_mount_step'],
+                             output_keys=['simple_move',
+                                          'beacon_point'])
+
+        self.tf_listener = tf_listener
+        self.announcer = announcer
+
+    def execute(self, userdata):
+        #disable obstacle checking!
+        rospy.sleep(10.0) #wait a sec for beacon pose to catch up
+        target_point = deepcopy(userdata.platform_point)
+        target_point.header.stamp = rospy.Time(0)
+        yaw, distance = util.get_robot_strafe(self.tf_listener,
+                                             target_point)
+        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                              angle = yaw,
+                              distance = distance,
+                              velocity = 0.5)        
+        userdata.simple_move = move
+        self.announcer.say("Execute ing final mount move")
+        return 'final'
             
 class BeaconSearch(smach.State):
     
