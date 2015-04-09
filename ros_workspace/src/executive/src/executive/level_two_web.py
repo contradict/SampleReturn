@@ -434,7 +434,7 @@ class LevelTwoWeb(object):
         #points defined by the line yaw
         
         offset = np.radians(offset)
-        yaws = list(np.linspace(0 + offset, -2*np.pi + offset, spoke_count, endpoint=False))
+        yaws = list(np.linspace(0 + offset, 2*np.pi + offset, spoke_count, endpoint=False))
         #add the starting spoke again, for raster calcs
         yaws.append(offset)
         spokes = deque()
