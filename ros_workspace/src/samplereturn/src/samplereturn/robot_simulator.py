@@ -158,7 +158,7 @@ class RobotSimulator(object):
         #odometry
         self.odometry_dt = 0.05
         odometry_noise_sigma = np.diag([0.1, 0.1, 0.01, 0.01])
-        self.odometry_noise_mean = [0.0, 0.0, 0.0005, 0.0]
+        self.odometry_noise_mean = [0.0, 0.0, 0.0001, 0.0]
         self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
