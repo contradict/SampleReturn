@@ -8,9 +8,9 @@ level_two:
     move_velocity: 1.5
     spin_velocity: 1.0
     spoke_count: 10 
-    max_spoke_length: 150
+    max_spoke_length: 80
     first_spoke_offset: 0
-    spoke_hub_radius: 10
+    spoke_hub_radius: 15
     #raster step is distance between raster lines
     #raster offset is how close to the spoke we get
     #before we go to the next raster step
