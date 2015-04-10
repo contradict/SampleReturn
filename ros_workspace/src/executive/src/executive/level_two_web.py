@@ -119,6 +119,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.raster_offset = node_params.raster_offset
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
+        self.state_machine.userdata.blocked_limit = 2
         self.state_machine.userdata.last_retry_time = rospy.Time.now()
 
         #web management flags
@@ -487,6 +488,8 @@ class WebManager(smach.State):
                                            'spokes',
                                            'raster_active',
                                            'raster_points',
+                                           'raster_step',
+                                           'vfh_result',
                                            'world_fixed_frame'],
                              output_keys = ['spoke_yaw',
                                             'outbound',
@@ -501,7 +504,8 @@ class WebManager(smach.State):
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
-        self.announcer = announcer  
+        self.announcer = announcer
+        self.last_raster_move = None
 
     def execute(self, userdata):
 
@@ -515,6 +519,7 @@ class WebManager(smach.State):
             userdata.spoke_yaw = spoke['yaw']
             userdata.move_point = spoke['end_point']
             userdata.outbound = False
+            self.blocked_count = 0 
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.spoke_yaw))))
             return 'move'
@@ -522,7 +527,28 @@ class WebManager(smach.State):
             #we are inbound
             if userdata.raster_active:
                 #still rastering
-                userdata.move_point = userdata.raster_points.popleft()['point']
+                next_move = userdata.raster_points.popleft()    
+                
+                #was the last move a chord, and we got blocked?
+                if self.last_raster_move is not None and \
+                   userdata.vfh_result in (VFHMoveResult.BLOCKED, VFHMoveResult.OFF_COURSE) and \
+                   self.last_raster_move['radius'] != -1: 
+                    #yes, then just move radially inwards from here to the next radius
+                    yaw = util.get_robot_yaw_from_origin(self.tf_listener,
+                                                         userdata.world_fixed_frame)
+                    next_radius = self.last_raster_move['radius'] - userdata.raster_step
+                    x = next_radius*math.cos(yaw)
+                    y = next_radius*math.sin(yaw)
+                    header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
+                    pos = geometry_msg.Point(x,y,0)
+                    #replace the next inward point with this
+                    next_move['point'] = geometry_msg.PointStamped(header, pos)
+                    self.announcer.say("Heading inward from short chord.")
+                
+                #load the target into move_point, and save the move
+                userdata.move_point = next_move['point']
+                self.last_raster_move = next_move
+                
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
                     userdata.raster_active = False
@@ -531,7 +557,8 @@ class WebManager(smach.State):
             else:
                 #time to start rastering, create the points, and set flag
                 self.announcer.say("Begin ing raster on spoke, Yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
-                userdata.raster_active = True                
+                userdata.raster_active = True
+                self.last_raster_move = None
                 return 'get_raster'
         
         return 'aborted'
@@ -600,8 +627,6 @@ class CreateRasterPoints(smach.State):
             userdata.raster_points = raster_points
             
             return 'next'
-
-
     
 
 #take a point and create a VFH goal        
@@ -611,6 +636,7 @@ class CreateMoveGoal(smach.State):
                              input_keys = ['move_point',
                                            'move_velocity',
                                            'spin_velocity',
+                                           'blocked_limit',
                                            'vfh_result',
                                            'odometry_frame'],
                              output_keys = ['move_goal',
@@ -621,12 +647,22 @@ class CreateMoveGoal(smach.State):
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
+        self.blocked_count = 0
 
     def execute(self, userdata):
 
         odometry_frame = userdata.odometry_frame
-   
         target_point = userdata.move_point
+        rotate_to_clear = False
+   
+        #count blocked results, and rotate_to_clear if we are blocked several times
+        if userdata.vfh_result == VFHMoveResult.BLOCKED:
+            self.blocked_count += 1 
+            if self.blocked_count > userdata.blocked_limit:
+                rotate_to_clear = True    
+                self.blocked_count = 0
+        else:
+           self.blocked_count = 0    
         
         try:
             self.tf_listener.waitForTransform(odometry_frame,
@@ -647,7 +683,8 @@ class CreateMoveGoal(smach.State):
         goal = VFHMoveGoal(target_pose = target_pose,
                            move_velocity = userdata.move_velocity,
                            spin_velocity = userdata.spin_velocity,
-                           orient_at_target = False)
+                           orient_at_target = False,
+                           rotate_to_clear = rotate_to_clear)
         userdata.move_goal = goal
 
         #store the point in map, to compare in the beacon update callback
