@@ -209,11 +209,13 @@ class ExecuteVFHMove(ExecuteMoveState):
                                                         'detected_sample',
                                                         'paused',
                                                         'odometry_frame'],
-                                            output_keys=['detected_sample'])
+                                            output_keys=['detected_sample',
+                                                         'vfh_result'])
       
     def execute(self, userdata):
         #on entry clear old sample_detections!
         userdata.detected_sample = None
+        userdata.vfh_result = None
         goal = deepcopy(userdata.move_goal)
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self._move_client.send_goal(goal)
@@ -240,10 +242,10 @@ class ExecuteVFHMove(ExecuteMoveState):
             #checks to see if pause requested, and handles this
             self.check_pause(userdata, goal)
             
-                                    
         if (move_state == action_msg.GoalStatus.SUCCEEDED):
             if (self._move_client.wait_for_result(timeout = rospy.Duration(2.0))):
                 result = self._move_client.get_result().outcome
+                userdata.vfh_result = result
                 if result == VFHMoveResult.COMPLETE:
                     return 'complete'
                 elif result == VFHMoveResult.BLOCKED:
