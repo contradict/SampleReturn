@@ -4,7 +4,18 @@ project(fence_detection)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS cv_bridge rospy sensor_msgs)
+find_package(catkin REQUIRED COMPONENTS
+  cv_bridge
+  rospy
+  roslib
+  roscpp
+  samplereturn_msgs
+  cv_bridge
+  dynamic_reconfigure
+  image_geometry
+  cmake_modules
+  stereo_msgs
+  sensor_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -37,6 +48,8 @@ find_package(catkin REQUIRED COMPONENTS cv_bridge rospy sensor_msgs)
 #   sensor_msgs
 # )
 
+generate_dynamic_reconfigure_options(cfg/fence_detector_params.cfg)
+
 ###################################################
 ## Declare things to be passed to other projects ##
 ###################################################
@@ -45,9 +58,9 @@ find_package(catkin REQUIRED COMPONENTS cv_bridge rospy sensor_msgs)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  LIBRARIES fence_detection
-  CATKIN_DEPENDS cv_bridge rospy sensor_msgs
-  DEPENDS system_lib
+  LIBRARIES fence_detection simple_fence_detection
+  CATKIN_DEPENDS cv_bridge rospy roscpp sensor_msgs
+  DEPENDS system_lib opencv2
 )
 
 ###########
@@ -55,23 +68,25 @@ catkin_package(
 ###########
 
 ## Specify additional locations of header files
-# include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+ include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
 ## Declare a cpp library
-# add_library(fence_detection
-#   src/${PROJECT_NAME}/fence_detection.cpp
+# add_library(simple_fence_detection
+#   src/${PROJECT_NAME}/simple_fence_detection.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(fence_detection_node src/fence_detection_node.cpp)
+ add_executable(simple_fence_detection nodes/simple_fence_detection.cpp)
+
+ add_dependencies(simple_fence_detection ${PROJECT_NAME}_gencfg)
 
 ## Add dependencies to the executable
 # add_dependencies(fence_detection_node ${PROJECT_NAME})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(fence_detection_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(simple_fence_detection
+   ${catkin_LIBRARIES}
+ )
 
 #############
 ## Install ##
@@ -86,11 +101,11 @@ catkin_package(
  )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS fence_detection fence_detection_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+ install(TARGETS simple_fence_detection
+   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/

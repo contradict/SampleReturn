@@ -4,7 +4,7 @@
   <version>0.0.0</version>
   <description>The fence_detection package</description>
 
-  <!-- One maintainer tag required, multiple allowed, one person per tag --> 
+  <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="zlizer@todo.todo">zlizer</maintainer>
@@ -40,12 +40,26 @@
   <!-- Use test_depend for packages you need only for testing: -->
   <!--   <test_depend>gtest</test_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
+
   <build_depend>cv_bridge</build_depend>
   <build_depend>rospy</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>opencv2</build_depend>
   <build_depend>sensor_msgs</build_depend>
+  <build_depend>samplereturn_msgs</build_depend>
+  <build_depend>dynamic_reconfigure</build_depend>
+  <build_depend>image_geometry</build_depend>
+  <build_depend>cmake_modules</build_depend>
+
   <run_depend>cv_bridge</run_depend>
   <run_depend>rospy</run_depend>
+  <run_depend>roscpp</run_depend>
   <run_depend>sensor_msgs</run_depend>
+  <run_depend>roslib</run_depend>
+  <run_depend>opencv2</run_depend>
+  <run_depend>samplereturn_msgs</run_depend>
+  <run_depend>dynamic_reconfigure</run_depend>
+  <run_depend>image_geometry</run_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
