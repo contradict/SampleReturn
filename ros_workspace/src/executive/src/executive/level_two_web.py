@@ -138,6 +138,8 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
     
+        self.state_machine.userdata.vfh_result = None
+    
         #motion mode stuff
         planner_mode = node_params.planner_mode
         MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
@@ -520,7 +522,7 @@ class WebManager(smach.State):
             #we are inbound
             if userdata.raster_active:
                 #still rastering
-                userdata.move_point = userdata.raster_points.popleft()
+                userdata.move_point = userdata.raster_points.popleft()['point']
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
                     userdata.raster_active = False
@@ -563,44 +565,43 @@ class CreateRasterPoints(smach.State):
             #get the sign of the rotation to next yaw
             spoke_sign = np.sign(next_yaw - current_yaw)
 
+            def raster_point(yaw, offset_sign, inward): 
+                x = radius*math.cos(yaw + offset_sign*raster_offset/radius*spoke_sign)
+                y = radius*math.sin(yaw + offset_sign*raster_offset/radius*spoke_sign)
+                point = geometry_msg.PointStamped(header, geometry_msg.Point(x,y,0))
+                radius_entry = radius if not inward else -1
+                return {'point':point,'radius':radius_entry}
+
             
             rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
                                                                                     current_yaw,
                                                                                     next_yaw))
             
-            raster_pos = lambda yaw, offset_sign: \
-                            geometry_msg.Point( \
-                            radius*math.cos(yaw + offset_sign*raster_offset/radius*spoke_sign),
-                            radius*math.sin(yaw + offset_sign*raster_offset/radius*spoke_sign), 0)
-            
             #generate one ccw-inward-cw-inward set of points per loop
             while True:
                 #chord move to next yaw
-                raster_points.append(geometry_msg.PointStamped(header,
-                                                               raster_pos(next_yaw, -1)))
+                raster_points.append(raster_point(next_yaw, -1, False))
                 radius -= userdata.raster_step
                 if (radius <= userdata.spoke_hub_radius): 
                     #within the hub radius, we're done
                     break
                 #inward move on next yaw
-                raster_points.append(geometry_msg.PointStamped(header,
-                                                               raster_pos(next_yaw, -1)))               
+                raster_points.append(raster_point(next_yaw, -1, True))
                 #chord move to current yaw
-                raster_points.append(geometry_msg.PointStamped(header,
-                                                               raster_pos(current_yaw, 1)))               
+                raster_points.append(raster_point(current_yaw, 1, False))               
                 radius -= userdata.raster_step
                 #inward move on current yaw
-                raster_points.append(geometry_msg.PointStamped(header,
-                                                               raster_pos(current_yaw, 1)))                              
+                raster_points.append(raster_point(current_yaw, 1, True))                              
                 if (yaw_step*radius) < (3.0*userdata.raster_offset):
-                    raster_points.append(userdata.spokes[0]['start_point'])                    
+                    raster_points.append({'point':userdata.spokes[0]['start_point'],
+                                          'radius':-1})                    
                     break
-            
-            
             
             userdata.raster_points = raster_points
             
             return 'next'
+
+
     
 
 #take a point and create a VFH goal        
@@ -610,6 +611,7 @@ class CreateMoveGoal(smach.State):
                              input_keys = ['move_point',
                                            'move_velocity',
                                            'spin_velocity',
+                                           'vfh_result',
                                            'odometry_frame'],
                              output_keys = ['move_goal',
                                             'line_points',
