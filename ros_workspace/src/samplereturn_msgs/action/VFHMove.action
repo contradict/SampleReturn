@@ -3,6 +3,7 @@ geometry_msgs/PoseStamped target_pose
 float32 move_velocity
 float32 spin_velocity
 bool orient_at_target
+bool rotate_to_clear
 ---
 #result
 int8 COMPLETE = 0
