@@ -158,8 +158,8 @@ def get_robot_yaw_to_origin(tf_listener, frame_id):
                         geometry_msg.Point(0,0,0))
 
 #get robot yaw pointing from the specified frame origin
-def get_robot_yaw_from_origin(tf_listener):
-    robot = get_current_robot_pose(tf_listener)
+def get_robot_yaw_from_origin(tf_listener, frame_id):
+    robot = get_current_robot_pose(tf_listener, frame_id)
     return pointing_yaw(geometry_msg.Point(0,0,0),
                         robot.pose.position)
 
