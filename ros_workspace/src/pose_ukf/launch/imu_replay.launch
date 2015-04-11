@@ -40,7 +40,7 @@
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
-        args="0.455 0 0.155 0 3.1416 0 base_link imu 100"/>
+        args="0 0 0 0 0 0 microstrain imu 5"/>
 
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" default="false"/>
