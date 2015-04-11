@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="bagfile"/> <!-- Your bagfile here -->
+    <arg name="camera" default="/cameras/navigation/center" /> <!-- The namespace where images are published -->
+    <param name="use_sim_time" value="true"/>
+
+    <!-- Run the rosbag -->
+    <node name="rosbag"
+        pkg="rosbag"
+        type="play"
+        output="screen"
+        args="--clock --pause --rate 0.5
+        --topics
+        tf
+        /motion/odometry
+        /cameras/navigation/center/left/image_raw
+        /cameras/navigation/center/left/camera_info
+        /cameras/navigation/center/right/image_raw
+        /cameras/navigation/center/right/camera_info
+        --bags $(arg bagfile)"/>
+
+    <!-- Run the ROS package stereo_image_proc -->
+    <group ns="$(arg camera)" >
+        <node name="stereo_image_proc"
+            pkg="stereo_image_proc"
+            type="stereo_image_proc">
+            <param name="correlation_window_size" type="int" value="17"/>
+            <param name="min_disparity" type="int" value="0"/>
+            <param name="disparity_range" type="int" value="48"/>
+            <param name="uniqueness_ratio" type="int" value="5"/>
+            <param name="texture_threshold" type="int" value="1000"/>
+            <param name="approximate_sync" type="bool" value="true"/>
+        </node>
+    </group>
+
+    <node name="fovis_odometer" 
+        pkg="fovis_ros"
+        type="fovis_stereo_odometer"
+        output="screen"
+        >
+        <remap from="stereo" to="$(arg camera)"/>
+        <remap from="image" to="image_rect"/>
+        <param name="approximate_sync" type="bool" value="True" />
+        <param name="odom_frame_id" type="string" value="fovis_odom"/>
+        <param name="base_link_frame_id" type="string" value="base_link"/>
+        <param name="publish_tf" type="bool" value="false"/>
+        <param name="bucket_height" type="string" value="80"/>
+        <param name="bucket_width" type="string" value="80"/>
+        <param name="clique_inlier_threshold" type="string" value="0.100000"/>
+        <param name="fast_threshold" type="string" value="20"/>
+        <param name="fast_threshold_adaptive_gain" type="string" value="0.005000"/>
+        <param name="feature_search_window" type="string" value="90"/>
+        <param name="feature_window_size" type="string" value="13"/>
+        <param name="inlier_max_reprojection_error" type="string" value="3.0"/>
+        <param name="max_keypoints_per_bucket" type="string" value="25"/>
+        <param name="max_mean_reprojection_error" type="string" value="20.000000"/>
+        <param name="max_pyramid_level" type="string" value="3"/>
+        <param name="min_features_for_estimate" type="string" value="10"/>
+        <param name="min_pyramid_level" type="string" value="0"/>
+        <param name="ref_frame_change_threshold" type="string" value="100"/>
+        <param name="stereo_max_disparity" type="string" value="48"/>
+        <param name="stereo_max_dist_epipolar_line" type="string" value="3.0"/>
+        <param name="stereo_max_refinement_displacement" type="string" value="1.000000"/>
+        <param name="stereo_require_mutual_match" type="string" value="true"/>
+        <param name="target_pixels_per_feature" type="string" value="250"/>
+        <param name="update_target_features_with_refined" type="string" value="false"/>
+        <param name="use_adaptive_threshold" type="string" value="true"/>
+        <param name="use_bucketing" type="string" value="true"/>
+        <param name="use_homography_initialization" type="string" value="true"/>
+        <param name="use_image_normalization" type="string" value="false"/>
+        <param name="use_subpixel_refinement" type="string" value="true"/>
+    </node>
+    
+    <node name="fovis_fake_localization"
+        pkg="tf"
+        type="static_transform_publisher"
+        output="screen"
+        args="0.0 0.0 0.0 0.0 0.0 0.0 map fovis_odom 10"/>
+
+</launch>
