@@ -51,6 +51,9 @@
 
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
 
-    <include file="$(find pose_ukf)/launch/fovis.launch"/>
+    <include file="$(find fovis_ros)/launch/fovis.launch">
+        <arg name="camera" value="/cameras/navigation/center"/>
+        <arg name="image" value="/rect_mono"/>
+    </include>
 
 </launch>
