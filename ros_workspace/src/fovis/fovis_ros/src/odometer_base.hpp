@@ -119,7 +119,7 @@ protected:
     odom_msg_.child_frame_id = base_link_frame_id_;
     
     pose_msg_.header.stamp = image_msg->header.stamp;
-    pose_msg_.header.frame_id = base_link_frame_id_;
+    pose_msg_.header.frame_id = odom_frame_id_;
 
     // on success, start fill message and tf
     fovis::MotionEstimateStatusCode status = 
