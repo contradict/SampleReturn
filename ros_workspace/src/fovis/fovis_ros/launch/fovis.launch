@@ -17,6 +17,7 @@
         <param name="odom_frame_id" type="string" value="fovis_odom"/>
         <param name="base_link_frame_id" type="string" value="base_link"/>
         <param name="publish_tf" type="bool" value="false"/>
+        <param name="send_deltas" type="bool" value="true"/>
         <param name="bucket_height" type="string" value="80"/>
         <param name="bucket_width" type="string" value="80"/>
         <param name="clique_inlier_threshold" type="string" value="0.100000"/>

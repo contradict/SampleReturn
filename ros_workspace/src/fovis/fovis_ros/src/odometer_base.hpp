@@ -169,6 +169,8 @@ protected:
         0.0 : (image_msg->header.stamp - last_time_).toSec();
       if (dt > 0.0)
       {
+          if(send_deltas_)
+              dt = 1.0;
         const Eigen::Isometry3d& motion = visual_odometer_->getMotionEstimate();
         tf::Transform sensor_motion;
         eigenToTF(motion, sensor_motion);
@@ -292,6 +294,7 @@ private:
     nh_local_.param("odom_frame_id", odom_frame_id_, std::string("/odom"));
     nh_local_.param("base_link_frame_id", base_link_frame_id_, std::string("/base_link"));
     nh_local_.param("publish_tf", publish_tf_, true);
+    nh_local_.param("send_deltas", send_deltas_, false);
 
     for (fovis::VisualOdometryOptions::iterator iter = visual_odometer_options_.begin();
         iter != visual_odometer_options_.end();
@@ -370,6 +373,7 @@ private:
   tf::TransformBroadcaster tf_broadcaster_;
   
   // Messages
+  bool send_deltas_;
   nav_msgs::Odometry odom_msg_;
   geometry_msgs::PoseStamped pose_msg_;
 
