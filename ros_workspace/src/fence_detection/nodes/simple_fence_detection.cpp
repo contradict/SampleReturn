@@ -14,6 +14,14 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_geometry/stereo_camera_model.h>
 
+#include <pcl/point_types.h>
+#include <pcl/conversions.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+
 class FenceDetectorNode
 {
   ros::NodeHandle nh;
@@ -175,6 +183,32 @@ class FenceDetectorNode
       }
     }
     points_pub.publish(points_msg);
+
+    /* Time to fit the points */
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    seg.setOptimizeCoefficients (true);
+    seg.setModelType (pcl::SACMODEL_PLANE);
+    seg.setDistanceThreshold (0.1);
+
+    pcl::PCLPointCloud2 pcl_pc;
+    pcl_conversions::toPCL(*points_msg, pcl_pc);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ptr_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::fromPCLPointCloud2(pcl_pc,*ptr_cloud);
+
+    ROS_INFO("Width, Height:%u, %u",ptr_cloud->width,ptr_cloud->height);
+
+    seg.setInputCloud(ptr_cloud);
+    seg.segment (*inliers, *coefficients);
+    if (inliers->indices.size() == 0) {
+      ROS_ERROR("Could not estimate a planar model for given dataset.");
+      return;
+    }
+    ROS_INFO("Model Coefficients: %f, %f, %f, %f",coefficients->values[0],
+                                                  coefficients->values[1],
+                                                  coefficients->values[2],
+                                                  coefficients->values[3]);
   }
 
   /* Dynamic reconfigure callback */

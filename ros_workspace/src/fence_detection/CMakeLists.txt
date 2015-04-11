@@ -15,10 +15,12 @@ find_package(catkin REQUIRED COMPONENTS
   image_geometry
   cmake_modules
   stereo_msgs
+  pcl_conversions
+  pcl_ros
   sensor_msgs)
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(PCL REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and scripts declared therein get installed
@@ -68,7 +70,9 @@ catkin_package(
 ###########
 
 ## Specify additional locations of header files
- include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+ include_directories(include ${catkin_INCLUDE_DIRS}
+   ${PCL_INCLUDE_DIRS}
+   ${Boost_INCLUDE_DIRS})
 
 ## Declare a cpp library
 # add_library(simple_fence_detection
@@ -85,6 +89,7 @@ catkin_package(
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(simple_fence_detection
+   ${PCL_LIBRARIES}
    ${catkin_LIBRARIES}
  )
 
