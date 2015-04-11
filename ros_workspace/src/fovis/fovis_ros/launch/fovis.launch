@@ -2,13 +2,17 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
+    <arg name="camera"/> <!-- The namespace where images are published -->
+    <arg name="image"/>
+
     <node name="fovis_odometer" 
+        ns="/processes/odometry"
         pkg="fovis_ros"
         type="fovis_stereo_odometer"
         output="screen"
         >
         <remap from="stereo" to="$(arg camera)"/>
-        <remap from="image" to="image_rect"/>
+        <remap from="image" to="$(arg image)"/>
         <param name="approximate_sync" type="bool" value="True" />
         <param name="odom_frame_id" type="string" value="fovis_odom"/>
         <param name="base_link_frame_id" type="string" value="base_link"/>
