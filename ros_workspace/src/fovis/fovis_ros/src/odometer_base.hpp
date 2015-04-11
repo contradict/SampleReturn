@@ -132,10 +132,23 @@ protected:
       eigenToTF(pose, sensor_pose);
       // calculate transform of odom to base based on base to sensor 
       // and sensor to sensor
+      if(!have_initial_base_)
+      {
+          have_initial_base_ = getBaseToSensorTransform(info_msg->header.stamp,
+                  info_msg->header.frame_id,
+                  initial_base_to_sensor_);
+      }
       tf::StampedTransform current_base_to_sensor;
-      getBaseToSensorTransform(
-          image_msg->header.stamp, image_msg->header.frame_id, 
-          current_base_to_sensor);
+      if(have_initial_base_)
+      {
+          getBaseToSensorTransform(
+                  image_msg->header.stamp, image_msg->header.frame_id,
+                  current_base_to_sensor);
+      }
+      else
+      {
+          current_base_to_sensor = initial_base_to_sensor_;
+      }
       tf::Transform base_transform = 
         initial_base_to_sensor_ * sensor_pose * current_base_to_sensor.inverse();
 
@@ -253,7 +266,7 @@ private:
       new fovis::VisualOdometry(rectification, visual_odometer_options_);
 
     // store initial transform for later usage
-    getBaseToSensorTransform(info_msg->header.stamp, 
+    have_initial_base_ = getBaseToSensorTransform(info_msg->header.stamp,
         info_msg->header.frame_id,
         initial_base_to_sensor_);
 
@@ -301,7 +314,7 @@ private:
     }
   }
 
-  void getBaseToSensorTransform(const ros::Time& stamp, 
+  bool getBaseToSensorTransform(const ros::Time& stamp,
       const std::string& sensor_frame_id, tf::StampedTransform& base_to_sensor)
   {
     std::string error_msg;
@@ -312,6 +325,7 @@ private:
           base_link_frame_id_,
           sensor_frame_id,
           stamp, base_to_sensor);
+      return true;
     }
     else
     {
@@ -321,6 +335,7 @@ private:
                               sensor_frame_id.c_str());
       ROS_DEBUG("Transform error: %s", error_msg.c_str());
       base_to_sensor.setIdentity();
+      return false;
     }
   }
 
@@ -350,6 +365,7 @@ private:
   std::string base_link_frame_id_;
   bool publish_tf_;
   tf::StampedTransform initial_base_to_sensor_;
+  bool have_initial_base_;
   tf::TransformListener tf_listener_;
   tf::TransformBroadcaster tf_broadcaster_;
   
