@@ -604,11 +604,13 @@ PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
         msg_cov.setZero();
         msg_cov.block<6,6>(0,0) = Eigen::Matrix<double, 6,6>::Map(msg->pose.covariance.data());
         msg_cov.block<6,6>(6,6) = Eigen::Matrix<double, 6,6>::Map(msg->twist.covariance.data());
+        ROS_DEBUG_STREAM("Using vo message covariance:\n" << msg_cov);
         msg_cov.block<3,3>(3,3).swap(msg_cov.block<3,3>(6,6));
         msg_cov.block<3,3>(0,3).swap(msg_cov.block<3,3>(0,6));
         msg_cov.block<3,3>(3,0).swap(msg_cov.block<3,3>(6,0));
         msg_cov.block<3,3>(6,9).swap(msg_cov.block<3,3>(3,9));
         msg_cov.block<3,3>(9,6).swap(msg_cov.block<3,3>(9,3));
+        ROS_DEBUG_STREAM("after velocity swap:\n" << msg_cov);
         vo_cov_rot = cov_rot*msg_cov*cov_rot.transpose();
     }
     else
@@ -622,8 +624,10 @@ PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
         vo_cov.block<3,3>(9,9).diagonal() = (delta_t*visual_omega_sigma_).cwiseProduct(delta_t*visual_omega_sigma_);
         vo_cov.block<3,3>(6,9).diagonal() = (delta_t*delta_t/2.0*visual_omega_sigma_).cwiseProduct(delta_t*delta_t/2.0*visual_omega_sigma_);
         vo_cov.block<3,3>(9,6).diagonal() = (delta_t*delta_t/2.0*visual_omega_sigma_).cwiseProduct(delta_t*delta_t/2.0*visual_omega_sigma_);
+        ROS_DEBUG_STREAM("Using fixed vo covariance:\n" << vo_cov);
         vo_cov_rot = cov_rot*vo_cov*cov_rot.transpose();
     }
+    ROS_DEBUG_STREAM("after rotation:\n" << vo_cov_rot);
 
     meas_cov.block<2,2>(0,0) = vo_cov_rot.block<2,2>(0,0);
     meas_cov.block<2,2>(0,2) = vo_cov_rot.block<2,2>(0,3);
@@ -643,6 +647,10 @@ PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
         ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
+    }
+    else
+    {
+        ROS_DEBUG_STREAM("Skipping visual predict, dt=" << dt);
     }
 
     ROS_DEBUG_STREAM("Visual correct:\n" << m);
