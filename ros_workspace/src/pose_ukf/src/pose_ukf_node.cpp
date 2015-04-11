@@ -592,13 +592,16 @@ PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
     Eigen::Matrix3d rot_camera_to_imu;
     tf::matrixTFToEigen(imu_camera_transform_.getBasis(), rot_camera_to_imu);
     Eigen::Matrix<double, 12, 12> cov_rot;
-    cov_rot << rot_camera_to_imu, rot_camera_to_imu,
-               rot_camera_to_imu, rot_camera_to_imu;
+    cov_rot << rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu,
+               rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu,
+               rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu,
+               rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu, rot_camera_to_imu;
     Eigen::MatrixXd vo_cov_rot;
     double delta_t = (msg->header.stamp - last_visual_odom_.header.stamp).toSec();
     if(use_vo_covariance_)
     {
         Eigen::Matrix<double, 12, 12> msg_cov;
+        msg_cov.setZero();
         msg_cov.block<6,6>(0,0) = Eigen::Matrix<double, 6,6>::Map(msg->pose.covariance.data());
         msg_cov.block<6,6>(6,6) = Eigen::Matrix<double, 6,6>::Map(msg->twist.covariance.data());
         msg_cov.block<3,3>(3,3).swap(msg_cov.block<3,3>(6,6));
