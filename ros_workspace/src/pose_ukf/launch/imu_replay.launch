@@ -38,7 +38,7 @@
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
-        args="0.455 0 0.155 0 3.1416 0 base_link imu 10"/>
+        args="0 0 0 0 0 0 microstrain imu 5"/>
 
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
 </launch>
