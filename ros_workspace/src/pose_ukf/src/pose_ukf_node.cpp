@@ -427,11 +427,13 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         double velocity = boost::get<2>(t);
         if( steering_values_.find(name) != steering_values_.end() )
         {
+            ROS_DEBUG_STREAM("Set steering " << name << " p: " << position << " v: " << velocity);
             steering_values_[name]->steering_angle = position;
             steering_values_[name]->steering_velocity = velocity;
         }
         if( rotation_values_.find(name) != rotation_values_.end() )
         {
+            ROS_DEBUG_STREAM("Set rotation " << name << " p: " << position << " v: " << velocity);
             rotation_values_[name]->rotation_angle = position;
             rotation_values_[name]->rotation_velocity = velocity;
         }
@@ -452,6 +454,7 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     {
         double dphi, dtheta;
         good_delta &= wheels_[i]->delta(&dphi, &dtheta);
+        ROS_DEBUG_STREAM("Wheel[" << i << "] delta (" << dphi << ", " << dtheta << ")");
         direction << cos(wheels_[i]->steering_angle),
                      sin(wheels_[i]->steering_angle);
         wheel_deltas.segment<2>(2*i) = wheels_[i]->diameter*dtheta*direction;
@@ -470,6 +473,8 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         ROS_ERROR("Large angle jump, skipping odometry update");
         return;
     }
+    ROS_DEBUG_STREAM("Joint state deltas: "<<wheel_deltas.transpose());
+    ROS_DEBUG_STREAM("Joint state velocities: "<<wheel_velocities.transpose());
 
     if(!(((measurement_cov-measurement_cov).array() == (measurement_cov-measurement_cov).array()).all()))
     {
@@ -487,6 +492,8 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         ROS_ERROR_STREAM("Rotated covariance not finite\n" << covariance );
         return;
     }
+    ROS_DEBUG_STREAM("Joint state odometry motion: " << motion.transpose());
+    ROS_DEBUG_STREAM("Joint state odometry velocity: " << velocity.transpose());
 
 
     Sophus::SE3d odometry_delta_base_link;
@@ -538,6 +545,7 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     meas_cov.block<2,2>(4,4) = odometry_position_covariance_imu.block<2,2>(0,0)/delta_t/delta_t;
     meas_covs.push_back(meas_cov);
     ROS_DEBUG_STREAM("odometry correct:\n" << m);
+    ROS_DEBUG_STREAM("odometry prediction:\n" << m.measure(ukf_->state(), Eigen::VectorXd::Zero(m.ndim())));
     ROS_DEBUG_STREAM("odometry measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     last_joint_state_ = ukf_->state();
