@@ -139,8 +139,6 @@ class PoseUKFNode
     struct PoseState last_joint_state_;
     Eigen::MatrixXd last_joint_covariance_;
 
-    ros::Time last_imu_stamp_;
-
     nav_msgs::Odometry last_visual_odom_;
     struct PoseState last_visual_state_;
     Eigen::MatrixXd last_visual_covariance_;
@@ -232,9 +230,9 @@ PoseUKFNode::connect(void)
     last_joint_state_ = ukf_->state();
     last_joint_covariance_ = ukf_->covariance();
 
-    last_imu_stamp_ = last_update_;
-
     last_visual_odom_.header.stamp = ros::Time(0);
+    last_visual_state_ = ukf_->state();
+    last_visual_covariance_ = ukf_->covariance();
 
     imu_subscription_ = nh.subscribe("imu", 1, &PoseUKFNode::imuCallback, this);
     joint_subscription_ = nh.subscribe("joint_state", 1, &PoseUKFNode::jointStateCallback, this);
