@@ -383,6 +383,10 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
     }
+    else
+    {
+        ROS_DEBUG_STREAM("Skipping imu predict dt=" << dt);
+    }
 
     ROS_DEBUG_STREAM("IMU correct:\n" << m);
     ROS_DEBUG_STREAM("IMU measurement covariance:\n" << meas_cov);
@@ -512,6 +516,10 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
+    }
+    else
+    {
+        ROS_DEBUG_STREAM("Skipping odometry predict with dt=" << dt);
     }
 
     WheelOdometryMeasurement m;
