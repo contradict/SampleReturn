@@ -122,6 +122,7 @@ class PoseUKFNode
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
     ros::Publisher state_pub_;
+    bool send_on_timer_;
 
     tf::StampedTransform imu_base_transform_;
     Sophus::SE3d imu_base_se3_;
@@ -211,10 +212,14 @@ PoseUKFNode::PoseUKFNode() :
     //parseOdometryMeasurementSigma(privatenh);
     parseVisualMeasurementSigma(privatenh);
 
+    privatenh.param("send_on_timer", send_on_timer_, true);
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
     state_pub_ = privatenh.advertise<pose_ukf::Pose>("filter_state", 1);
     seq_ = 0;
-    publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PoseUKFNode::sendPose, this);
+    if(send_on_timer_)
+    {
+        publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PoseUKFNode::sendPose, this);
+    }
 }
 
 void
@@ -386,6 +391,11 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     ukf_->correct(m, meas_covs);
     //printState();
     sendState();
+    if(!send_on_timer_)
+    {
+        ros::TimerEvent e;
+        sendPose(e);
+    }
 }
 
 void
