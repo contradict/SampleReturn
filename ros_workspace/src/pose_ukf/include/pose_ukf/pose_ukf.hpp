@@ -280,6 +280,58 @@ struct IMUOrientationMeasurement
     friend std::ostream& operator<<(std::ostream &, const IMUOrientationMeasurement &);
 };
 
+struct DifferentialVisualOdometryMeasurement
+{
+    Eigen::Vector2d delta_pos;
+    Sophus::SO3d delta_orientation;
+    struct PoseState last_state;
+
+    DifferentialVisualOdometryMeasurement()
+    {
+        delta_pos.setZero();
+        delta_orientation.setQuaternion(Eigen::Quaterniond::Identity());
+    }
+
+    Eigen::VectorXd boxminus(const struct DifferentialVisualOdometryMeasurement& other) const
+    {
+        Eigen::VectorXd diff;
+        diff.resize(ndim());
+        diff.segment<2>(0) = delta_pos-other.delta_pos;
+        diff.segment<3>(2) = (delta_orientation*other.delta_orientation.inverse()).log();
+        return diff;
+    }
+
+    void mean(const std::vector<double>& weights,
+            const std::vector<struct DifferentialVisualOdometryMeasurement>& Chimeas)
+    {
+        delta_pos.setZero();
+        RotationAverage R;
+        for(const auto &&t: zip_range(weights, Chimeas))
+        {
+            double w = t.get<0>();
+            struct DifferentialVisualOdometryMeasurement m = t.get<1>();
+            delta_pos += w*m.delta_pos;
+            R(w, m.delta_orientation);
+        }
+        if(R.geodesic(&delta_orientation)>M_PI_2)
+        {
+            delta_orientation = Chimeas.front().delta_orientation;
+        }
+    }
+
+    struct DifferentialVisualOdometryMeasurement
+    measure(const struct PoseState& st, const Eigen::VectorXd& noise) const
+    {
+        struct DifferentialVisualOdometryMeasurement m;
+        m.delta_pos = st.Position - last_state.Position + noise.segment<2>(0);
+        m.delta_orientation = Sophus::SO3d::exp(noise.segment<3>(2))*st.Orientation*last_state.Orientation.inverse();
+        return m;
+    }
+
+    ssize_t ndim(void) const { return 5; };
+    friend std::ostream& operator<<(std::ostream &, const DifferentialVisualOdometryMeasurement &);
+};
+
 class PoseUKF : public UKF::ScaledUKF<struct PoseState>
 {
     public:

@@ -109,6 +109,7 @@ class PoseUKFNode
     void jointStateCallback(sensor_msgs::JointStateConstPtr msg);
     void imuCallback(sensor_msgs::ImuConstPtr msg);
     void visualOdometryCallback(nav_msgs::OdometryConstPtr msg);
+    void differentialVisualOdometryCallback(nav_msgs::OdometryConstPtr msg);
     void sendPose(const ros::TimerEvent& e);
     void sendState(void);
 
@@ -118,6 +119,7 @@ class PoseUKFNode
     ros::Subscriber imu_subscription_;
     ros::Subscriber joint_subscription_;
     ros::Subscriber visual_odometry_subscription_;
+    bool use_differential_vo_;
 
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
@@ -210,6 +212,7 @@ PoseUKFNode::PoseUKFNode() :
     //parseOdometryMeasurementSigma(privatenh);
     parseVisualMeasurementSigma(privatenh);
 
+    privatenh.param("use_differential_vo", use_differential_vo_, false);
     privatenh.param("send_on_timer", send_on_timer_, true);
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
     state_pub_ = privatenh.advertise<pose_ukf::Pose>("filter_state", 1);
@@ -236,7 +239,14 @@ PoseUKFNode::connect(void)
 
     imu_subscription_ = nh.subscribe("imu", 1, &PoseUKFNode::imuCallback, this);
     joint_subscription_ = nh.subscribe("joint_state", 1, &PoseUKFNode::jointStateCallback, this);
-    visual_odometry_subscription_ = nh.subscribe("visual_odometry", 1, &PoseUKFNode::visualOdometryCallback, this);
+    if(use_differential_vo_)
+    {
+        visual_odometry_subscription_ = nh.subscribe("differential_visual_odometry", 1, &PoseUKFNode::differentialVisualOdometryCallback, this);
+    }
+    else
+    {
+        visual_odometry_subscription_ = nh.subscribe("visual_odometry", 1, &PoseUKFNode::visualOdometryCallback, this);
+    }
     ROS_INFO("Subscribers created");
     publish_timer_.start();
 }
@@ -686,6 +696,108 @@ PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
     }
 
     ROS_DEBUG_STREAM("Visual correct:\n" << m);
+    ROS_DEBUG_STREAM("Visual measurement covariance:\n" << meas_cov);
+    ukf_->correct(m, meas_covs);
+    last_visual_state_ = ukf_->state();
+    last_visual_covariance_ = ukf_->covariance();
+    last_visual_odom_ = *msg;
+    //printState();
+    sendState();
+}
+
+void
+PoseUKFNode::differentialVisualOdometryCallback(nav_msgs::OdometryConstPtr msg)
+{
+    if(!have_imu_base_transform_)
+        return;
+
+    if(!have_imu_camera_transform_)
+    {
+        try
+        {
+            listener_.lookupTransform(
+                    msg->child_frame_id,
+                    imu_base_transform_.frame_id_,
+                    ros::Time(0),
+                    imu_camera_transform_);
+            Eigen::Quaterniond imu_rotation;
+            Eigen::Vector3d imu_translation;
+            tf::quaternionTFToEigen(imu_camera_transform_.getRotation(), imu_rotation);
+            tf::vectorTFToEigen(imu_camera_transform_.getOrigin(), imu_translation);
+            imu_camera_se3_ = Sophus::SE3d(imu_rotation, imu_translation);
+            have_imu_camera_transform_ = true;
+            ROS_INFO_STREAM("Have imu->camera (" << imu_camera_transform_.frame_id_ << "->"
+                    << imu_camera_transform_.child_frame_id_ << ")");
+        }
+        catch(tf::TransformException ex)
+        {
+            ROS_ERROR_STREAM("Unable to look up imu frame for VO: " << ex.what());
+            return;
+        }
+    }
+
+
+    if(last_visual_odom_.header.stamp == ros::Time(0))
+    {
+        last_visual_state_ = ukf_->state();
+        last_visual_covariance_ = ukf_->covariance();
+        last_visual_odom_ = *msg;
+        return;
+    }
+
+    struct DifferentialVisualOdometryMeasurement m;
+    m.last_state = last_visual_state_;
+
+    Eigen::Vector3d deltaorient, deltapos;
+    tf::vectorMsgToEigen(msg->twist.twist.angular, deltaorient);
+    tf::vectorMsgToEigen(msg->twist.twist.linear, deltapos);
+
+    Sophus::SE3d delta_vo(Sophus::SO3d::exp(deltaorient), deltapos);
+    Sophus::SE3d delta_vo_imu = imu_camera_se3_.inverse()*delta_vo*imu_camera_se3_;
+
+    m.delta_pos = delta_vo_imu.translation().segment<2>(0);
+    m.delta_orientation = delta_vo_imu.so3();
+
+    Eigen::Matrix<double, 6, 6> msg_cov = Eigen::Matrix<double, 6,6>::Map(msg->twist.covariance.data());
+    //ROS_DEBUG_STREAM("Using vo message covariance:\n" << msg_cov);
+
+    Eigen::Matrix3d rot_camera_to_imu;
+    tf::matrixTFToEigen(imu_camera_transform_.getBasis(), rot_camera_to_imu);
+    Eigen::Matrix<double, 6, 6> cov_rot;
+    cov_rot << rot_camera_to_imu,       Eigen::Matrix3d::Zero(),
+               Eigen::Matrix3d::Zero(), rot_camera_to_imu;
+    Eigen::MatrixXd vo_cov_rot = cov_rot.transpose()*msg_cov*cov_rot;
+    //ROS_DEBUG_STREAM("after rotation:\n" << vo_cov_rot);
+
+    Eigen::MatrixXd meas_cov;
+    meas_cov.resize(m.ndim(), m.ndim());
+    meas_cov.setZero();
+    meas_cov.block<2,2>(0,0) = vo_cov_rot.block<2,2>(0,0);
+    meas_cov.block<2,3>(0,2) = vo_cov_rot.block<2,3>(0,3);
+    meas_cov.block<3,2>(2,0) = vo_cov_rot.block<3,2>(3,0);
+    meas_cov.block<3,3>(2,2) = vo_cov_rot.block<3,3>(3,3);
+    std::vector<Eigen::MatrixXd> meas_covs;
+    meas_covs.push_back(meas_cov);
+
+    double delta_t = (msg->header.stamp - last_visual_odom_.header.stamp).toSec();
+    ROS_DEBUG_STREAM("applying vo measurement delta_t=" << delta_t);
+    double dt = (msg->header.stamp - last_update_).toSec();
+    if(dt>0)
+    {
+        ROS_DEBUG_STREAM("Performing visual predict with dt=" << dt);
+        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
+        ukf_->predict(dt, process_noise(dt));
+        last_update_ = msg->header.stamp;
+    }
+    else
+    {
+        ROS_DEBUG_STREAM("Skipping visual predict, dt=" << dt);
+    }
+
+    ROS_DEBUG_STREAM("Visual correct:\n" << m);
+    ROS_DEBUG_STREAM("last_visual_state:\n" << m.last_state);
+    ROS_DEBUG_STREAM("current state:\n" << ukf_->state());
+    ROS_DEBUG_STREAM("Visual prediction:\n" << m.measure(ukf_->state(), Eigen::VectorXd::Zero(m.ndim())));
     ROS_DEBUG_STREAM("Visual measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
     last_visual_state_ = ukf_->state();

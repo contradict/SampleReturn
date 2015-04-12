@@ -13,9 +13,12 @@
         launch-prefix="tmux_new_window gdb -ex run - -args "
         launch-prefix="tmux_new_window valgrind "
         -->
+        <param name="send_on_timer" type="bool" value="false"/>
+
         <remap from="imu" to="/io/microstrain_3dm_gx3_35/imu"/>
 
-        <remap from="visual_odometry" to="fovis_odometer/odometry"/>
+        <remap from="differential_visual_odometry" to="fovis_odometer/odometry"/>
+        <param name="use_differential_vo" type="bool" value="true"/>
 
         <remap from="joint_state" to="/motion/platform_joint_state"/>
         <param name="wheel_diameter" type="double" value="0.314"/>
