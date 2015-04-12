@@ -564,8 +564,9 @@ PoseUKFNode::visualOdometryCallback(nav_msgs::OdometryConstPtr msg)
     {
         try
         {
-            listener_.lookupTransform(msg->header.frame_id,
-                    imu_base_transform_.child_frame_id_,
+            listener_.lookupTransform(
+                    msg->child_frame_id,
+                    imu_base_transform_.frame_id_,
                     ros::Time(0),
                     imu_camera_transform_);
             Eigen::Quaterniond imu_rotation;
