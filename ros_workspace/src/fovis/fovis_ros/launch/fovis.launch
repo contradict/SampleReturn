@@ -15,7 +15,7 @@
         <remap from="image" to="$(arg image)"/>
         <param name="approximate_sync" type="bool" value="True" />
         <param name="odom_frame_id" type="string" value="fovis_odom"/>
-        <param name="base_link_frame_id" type="string" value="base_link"/>
+        <param name="base_link_frame_id" type="string" value="navigation_center_left_camera"/>
         <param name="publish_tf" type="bool" value="false"/>
         <param name="send_deltas" type="bool" value="true"/>
         <param name="bucket_height" type="string" value="80"/>
@@ -49,6 +49,7 @@
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
-        args="0.0 0.0 0.0 0.0 0.0 0.0 map fovis_odom 10"/>
+        args="0.141 0.050 1.339 -1.571 0.000 -1.919 map fovis_odom 10"
+        />
 
 </launch>
