@@ -431,8 +431,8 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         ROS_DEBUG_STREAM("Wheel[" << i << "] delta (" << dphi << ", " << dtheta << ")");
         direction << cos(wheels_[i]->steering_angle),
                      sin(wheels_[i]->steering_angle);
-        wheel_deltas.segment<2>(2*i) = wheels_[i]->diameter*dtheta*direction;
-        wheel_velocities.segment<2>(2*i) = wheels_[i]->diameter*wheels_[i]->rotation_velocity*direction;
+        wheel_deltas.segment<2>(2*i) = wheels_[i]->diameter*dtheta*direction/2.;
+        wheel_velocities.segment<2>(2*i) = wheels_[i]->diameter*wheels_[i]->rotation_velocity*direction/2.;
         R = wheels_[i]->position.segment<2>(0);
         shape.block<2,1>(2*i,0) = cross * R;
         shape.block<2,2>(2*i,1) = Eigen::Matrix2d::Identity();
