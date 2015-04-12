@@ -97,6 +97,7 @@ class PoseUKFNode
     double large_rotation_jump_, large_steering_jump_;
     double wheel_diameter_;
     std::string base_name_;
+    std::string odom_frame_id_;
     double publish_period_;
     int seq_;
 
@@ -160,6 +161,7 @@ PoseUKFNode::PoseUKFNode() :
     ros::NodeHandle nh("~");
 
     privatenh.param("base_name", base_name_, std::string("base_link"));
+    privatenh.param("odom_frame_id", odom_frame_id_, std::string("odom"));
 
     privatenh.param("publish_period", publish_period_, 0.020);
 
@@ -233,15 +235,20 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
-    msg->header.frame_id = imu_transform_.frame_id_;
+    msg->header.frame_id = odom_frame_id_;
     msg->header.stamp = last_update_;
     msg->header.seq = seq_++;
+
+    tf::Quaternion q;
+    tf::quaternionEigenToTF(ukf_->state().Orientation.unit_quaternion(), q);
+    tf::Vector3 v;
     Eigen::Vector3d pos3d;
     pos3d.segment<2>(0) = ukf_->state().Position;
     pos3d(2) = 0;
-    tf::pointEigenToMsg(pos3d, msg->pose.position);
-    tf::quaternionEigenToMsg(ukf_->state().Orientation.unit_quaternion(),
-                             msg->pose.orientation);
+    tf::vectorEigenToTF(pos3d, v);
+    tf::Pose imu_tf(q, v);
+    tf::Pose odom_tf = imu_base_transform_ * imu_tf * imu_base_transform_.inverse();
+    tf::poseTFToMsg( odom_tf, msg->pose);
     pose_pub_.publish(msg);
 }
 
