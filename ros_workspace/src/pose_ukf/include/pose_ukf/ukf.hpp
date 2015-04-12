@@ -189,7 +189,11 @@ class ScaledUKF {
 
             Eigen::MatrixXd K(yhatminus.ndim(), Lx);
             K = Pxy*Pyminus.inverse();
-            state_ = state_.boxplus(K*(measured.boxminus(yhatminus)));
+            Eigen::VectorXd innovation = (measured.boxminus(yhatminus));
+            //ROS_DEBUG_STREAM("Innovation: " << innovation.transpose());
+            Eigen::VectorXd update = K*innovation;
+            //ROS_DEBUG_STREAM("Update: " << update.transpose());
+            state_ = state_.boxplus(update);
             covariance_ = covariance_ - K*Pyminus*K.transpose();
             for(int i=0;i<covariance_.size();i++)
             {
