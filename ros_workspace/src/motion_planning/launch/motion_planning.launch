@@ -18,6 +18,7 @@
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
 
         <!-- general params-->
+        <param name="publish_debug" value="True"/><!-- this is a lot of stuff, turn it off when possible!-->
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
         <param name="goal_orientation_tolerance" value="4"/><!--degrees!-->
         <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->

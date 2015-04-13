@@ -48,7 +48,7 @@ class VFHMoveServer( object ):
         self.shutdown=False
         
         node_params = util.get_node_params()
-        self.publish_debug=True
+        self.publish_debug = node_params.publish_debug
 
         self.odometry_frame = node_params.odometry_frame
         self._mover = SimpleMover("~vfh_motion_params/")
