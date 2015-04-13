@@ -90,13 +90,13 @@ class VFHMoveServer( object ):
         self.sector_angle = np.radians(node_params.sector_angle)
         self.active_window = np.radians(node_params.active_window)
         #cost coefficients
-        self.u_goal = 5 #cost multiplier for angular difference to target_angle
-        self.u_current = 3 #cost multiplier for angular difference from current angle
+        self.u_goal = node_params.u_goal #cost multiplier for angular difference to target_angle
+        self.u_current = node_params.u_current #cost multiplier for angular difference from current angle
         #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
         #so that obstacles produce zero cost at a range of dmax.  Seems like b=1 is fine...
         #so I am replacing this with a=dmax
-        self.max_obstacle_distance = 6.0 #this is dmax
-        self.min_obstacle_distance = 0.5 #min. dist. to consider for obstacles                
+        self.max_obstacle_distance = node_params.max_obstacle_distance #this is dmax
+        self.min_obstacle_distance = node_params.min_obstacle_distance #min. dist. to consider for obstacles                
         
         #setup sectors
         self.sector_count = int(self.active_window/self.sector_angle) + 1
@@ -109,8 +109,8 @@ class VFHMoveServer( object ):
 
         #thresholds at which to set clear, or blocked, a gap for hysteresis
         #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
-        self.threshold_high = 2000
-        self.threshold_low = 1000        
+        self.threshold_highn = node_params.threshold_high
+        self.threshold_low = node_params.threshold_high
         
         #debug marker stuff
         self.debug_marker_pub = rospy.Publisher('vfh_markers',
