@@ -5,11 +5,11 @@ executive_master:
         
 level_two:
     #for search  behaviour, degrees and meters
-    move_velocity: 1.5
-    spin_velocity: 1.0
-    spoke_count: 18 
-    max_spoke_length: 150 
-    first_spoke_offset: -10.0
+    move_velocity: 1.0
+    spin_velocity: 0.5
+    spoke_count: 10 
+    max_spoke_length: 80 
+    first_spoke_offset: 50
     spoke_hub_radius: 15
     #raster step is distance between raster lines
     #raster offset is how close to the spoke we get
