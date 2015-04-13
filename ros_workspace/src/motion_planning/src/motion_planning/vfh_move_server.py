@@ -150,6 +150,10 @@ class VFHMoveServer( object ):
         self._orient_at_target = bool(goal.orient_at_target)
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
+      
+        #publish the target point
+        if self.publish_debug:
+            self.publish_target_marker(self._target_point_odom.point)
         
         #calculate the stop_distance for stopping once near target pose
         spin_velocity = goal.spin_velocity if (goal.spin_velocity != 0) else self._mover.max_velocity
@@ -398,18 +402,6 @@ class VFHMoveServer( object ):
             vfh_debug_array.append(debug_marker)    
  
             #target point marker
-            debug_marker = vis_msg.Marker()
-            debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-            debug_marker.type = vis_msg.Marker.CYLINDER
-            debug_marker.color = std_msg.ColorRGBA(1, 0.25, 0, 0.5)
-            debug_marker.scale = geometry_msg.Vector3(.3, .3, .3)
-            debug_marker.pose = Pose()
-            debug_marker.pose.position = self._target_point_odom.point
-            debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
-            debug_marker.lifetime = rospy.Duration(0) #0 is forever
-            debug_marker.id = self.marker_id
-            self.marker_id += 1
-            vfh_debug_array.append(debug_marker) 
             
             vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
             self.debug_marker_pub.publish(vfh_debug_msg)
@@ -503,6 +495,23 @@ class VFHMoveServer( object ):
         
         return (euler_from_orientation(self._goal_odom.pose.orientation)[-1] -
             euler_from_orientation(current_pose.pose.orientation)[-1])
+
+    def publish_target_marker(self, target_point):
+
+        debug_marker = vis_msg.Marker()
+        debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+        debug_marker.type = vis_msg.Marker.CYLINDER
+        debug_marker.color = std_msg.ColorRGBA(1, 0.25, 0, 0.5)
+        debug_marker.scale = geometry_msg.Vector3(.3, .3, .3)
+        debug_marker.pose = Pose()
+        debug_marker.pose.position = self.target_point
+        debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
+        debug_marker.lifetime = rospy.Duration(0) #0 is forever
+        debug_marker.id = self.marker_id
+        self.marker_id += 1
+
+        vfh_debug_msg = vis_msg.MarkerArray([debug_marker])
+        self.debug_marker_pub.publish(vfh_debug_msg)
 
     def position_error(self):
         """
