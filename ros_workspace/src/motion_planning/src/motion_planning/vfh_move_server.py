@@ -66,11 +66,13 @@ class VFHMoveServer( object ):
         #goal flags and params
         self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
         self._goal_obstacle_radius = node_params.goal_obstacle_radius
+        self._clear_distance = node_params.clear_distance
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
         self._start_point = None
         self._orient_at_target = False
+        self._rotate_to_clear = False
  
         #costmap crap
         self.costmap = None
@@ -109,7 +111,7 @@ class VFHMoveServer( object ):
 
         #thresholds at which to set clear, or blocked, a gap for hysteresis
         #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
-        self.threshold_highn = node_params.threshold_high
+        self.threshold_high = node_params.threshold_high
         self.threshold_low = node_params.threshold_high
         
         #debug marker stuff
@@ -148,6 +150,7 @@ class VFHMoveServer( object ):
         self._goal_local = goal_local
         self._goal_odom = goal_odom
         self._orient_at_target = bool(goal.orient_at_target)
+        self._rotate_to_clear = bool(goal.rotate_to_clear)
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
         self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
       
@@ -188,9 +191,45 @@ class VFHMoveServer( object ):
         #if nothing modifies this... that would be an error!
         self._action_outcome = VFHMoveResult.ERROR
 
+        #if this flag is set, rotate until the forward sector is clear, then move
+        #clear_distance straight ahead, the try to move to the target pose
+        if self._rotate_to_clear:
+            start_dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
+            rot_sign = np.sign(start_dyaw)
+            self._mover.execute_spin(rot_sign*2*np.pi,
+                                     max_velocity = 0.1,
+                                     stop_function=self.clear_check())
+            if self.exit_check(): return
+            dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
+            if (start_dyaw - dyaw) < self._goal_orientation_tolerance:
+                #we spun all the way around +/- a little, so we are trapped
+                self._action_outcome == VFHMoveResult.BLOCKED
+            else:
+                #we found a clear spot, drive clear_distance meters ahead
+                #save the final goal for later
+                saved_odom_point = deepcopy(self._target_point_odom)
+                header = std_msg.Header(0, rospy.Time(0), 'base_link')
+                point = geometry_msg.PointStamped(self._clear_distance, 0, 0)
+                target_point_base = geometry_msg.PointStamped(header, point)
+                try:
+                    self._target_point_odom = transformPoint(self.odometry_frame,
+                                                             target_base_point)
+                except tf.Exception, exc:
+                    rospy.logwarn("VFH MOVE SERVER:could not transform point: %s"%exc)
+                    self._as.set_aborted(result = VFHMoveResult(outcome = VFHMoveResult.ERROR))
+                    return                
+                #make the move
+                self.vfh_running = True
+                self._mover.execute_continuous_strafe(self.clear_distance,
+                                                      max_velocity = move_velocity,
+                                                      stop_function=self.is_stop_requested)
+                self.vfh_running = False
+                if self.exit_check(): return
+                #now try to get to the target goal
+                self._target_point_odom = saved_odom_point
+
+        dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
         # turn to face goal
-        dyaw = np.arctan2( self._goal_local.pose.position.y,
-                           self._goal_local.pose.position.x)
         if np.abs(dyaw) > self._goal_orientation_tolerance:
             rospy.logdebug("VFH Rotating to heading by %f.", dyaw)
             self._mover.execute_spin(dyaw,
@@ -199,8 +238,7 @@ class VFHMoveServer( object ):
             if self.exit_check(): return
 
         # drive to goal using vfh
-        distance = np.hypot(self._goal_local.pose.position.x,
-                            self._goal_local.pose.position.y)
+        yaw, distance = util.get_robot_strafe(self._tf, self._target_point_odom)
         #use param velocity unless a move_velocity was included in goal
         rospy.loginfo("VFH Moving %f meters ahead.", distance)
         #start vfh and wait for one update
@@ -239,6 +277,17 @@ class VFHMoveServer( object ):
             #don't attempt to send preempt result if we are in shutdown
             if not self.shutdown:
                 self._as.set_preempted(result = VFHMoveResult(outcome = VFHMoveResult.EXTERNAL_STOP))
+            return True
+        else:
+            return False
+        
+    def clear_check(self):
+        #check for other stop requests
+        if self.stop_requested(): return True
+        #sector True = blocked
+        self.update_sectors()
+        middle_index = int(len(self.sectors)/2)
+        if not self.sectors[middle_index]:
             return True
         else:
             return False
