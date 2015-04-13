@@ -700,9 +700,11 @@ class RetryMove(smach.State):
         smach.State.__init__(self,
                              input_keys = ['blocked_retry_delay',
                                            'blocked_retried',
-                                           'last_retry_time'],
+                                           'last_retry_time',
+                                           'move_goal'],
                              output_keys = ['blocked_retried',
-                                            'last_retry_time'],
+                                            'last_retry_time',
+                                            'move_goal'],
                              outcomes=['retry',
                                        'continue',
                                        'preempted', 'aborted'])
@@ -729,6 +731,7 @@ class RetryMove(smach.State):
                 self.announcer.say('Recheck ing cost map.')
                 rospy.sleep(userdata.blocked_retry_delay)
                 userdata.blocked_retried = True
+                userdata.move_goal.rotate_to_clear = True
                 userdata.last_retry_time = rospy.Time.now()
                 return 'retry'
             
