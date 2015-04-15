@@ -67,6 +67,7 @@ class VFHMoveServer( object ):
         self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
         self._goal_obstacle_radius = node_params.goal_obstacle_radius
         self._clear_distance = node_params.clear_distance
+        self._course_tolerance = node_params.course_tolerance
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
@@ -138,8 +139,6 @@ class VFHMoveServer( object ):
         
         #this makes it active if it wasn't
         goal = self._as.accept_new_goal()
-        
-        #rospy.loginfo("VFH Goal {!s}".format(goal))
         
         try:
             goal_local = self._tf.transformPose('base_link', goal.target_pose)
@@ -344,15 +343,12 @@ class VFHMoveServer( object ):
 
         #Update the sector states, and return the inverse costs
         self.vfh_sectors, vfh_state = self.update_sectors(self.vfh_sectors, self.sector_angle)
-        
-        rospy.loginfo("VHF State: {!s}".format(vfh_state))
-        
+ 
         #if we are within stop_distance initiate stop
         if vfh_state['distance_to_target'] < self.stop_distance:
-            rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
             return self.stop_with_outcome(VFHMoveResult.COMPLETE)
 
-        if (vfh_state['distance_off_course'] > 5.0):
+        if (vfh_state['distance_off_course'] > self.course_tolerance):
             return self.stop_with_outcome(VFHMoveResult.OFF_COURSE)           
                     
         #if the target is not in the active window, we are probably close to it,
@@ -461,7 +457,6 @@ class VFHMoveServer( object ):
             vfh_debug_marker.scale = geometry_msg.Vector3(arrow_len, .02, .02)
             vfh_debug_marker.lifetime = rospy.Duration(0.2)
             
-            #rospy.loginfo("SECTORS: %s" % (self.sectors))
             for index in range(sector_count):
                 debug_marker = deepcopy(vfh_debug_marker)
                 sector_yaw = robot_yaw + (index - zero_offset) * sector_angle
