@@ -215,22 +215,26 @@ class LevelTwoWeb(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'WEB_MANAGER',
                                                   'missed_target':'ANNOUNCE_MISSED_TARGET',
-                                                  'blocked':'ANNOUNCE_BLOCKED',
-                                                  'started_blocked':'ANNOUNCE_ROTATE_TO_CLEAR',
+                                                  'blocked':'CHECK_RETRY',
+                                                  'started_blocked':'CHECK_RETRY',
                                                   'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'true'})
-
+            
             smach.StateMachine.add('ANNOUNCE_BLOCKED',
                                    AnnounceState(self.announcer, 'Path Blocked.'),
-                                   transitions = {'next':'RETRY_MOVE'})
+                                   transitions = {'next':'WEB_MANAGER'})
+            
+            smach.StateMachine.add('ANNOUNCE_ROTATE_TO_CLEAR',
+                                   AnnounceState(self.announcer, 'Started Blocked.'),
+                                   transitions = {'next':'WEB_MANAGER'})
 
-            smach.StateMachine.add('RETRY_MOVE',
-                                   RetryMove(self.announcer),
-                                   transitions = {'continue':'WEB_MANAGER',
-                                                  'retry':'MOVE',
+            smach.StateMachine.add('CHECK_RETRY',
+                                   CheckRetry(self.announcer),
+                                   transitions = {'blocked':'WEB_MANAGER',
+                                                  'retry':'RETRY_MOVE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -498,6 +502,7 @@ class WebManager(smach.State):
                                             'spokes',
                                             'raster_active',
                                             'raster_points',
+                                            'retry_active',
                                             'move_point',
                                             'stop_on_sample'],
                              outcomes=['move',
@@ -510,6 +515,8 @@ class WebManager(smach.State):
         self.last_raster_move = None
 
     def execute(self, userdata):
+        
+        userdata.retry_active = False
 
         if userdata.outbound:
             #this flag indicates it's time to make an outbound move
@@ -521,7 +528,6 @@ class WebManager(smach.State):
             userdata.spoke_yaw = spoke['yaw']
             userdata.move_point = spoke['end_point']
             userdata.outbound = False
-            self.blocked_count = 0 
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.spoke_yaw))))
             return 'move'
@@ -638,7 +644,6 @@ class CreateMoveGoal(smach.State):
                              input_keys = ['move_point',
                                            'move_velocity',
                                            'spin_velocity',
-                                           'blocked_limit',
                                            'vfh_result',
                                            'odometry_frame'],
                              output_keys = ['move_goal',
@@ -649,7 +654,6 @@ class CreateMoveGoal(smach.State):
                                        'preempted', 'aborted'])
         
         self.tf_listener = tf_listener
-        self.blocked_count = 0
 
     def execute(self, userdata):
 
@@ -657,14 +661,9 @@ class CreateMoveGoal(smach.State):
         target_point = userdata.move_point
         rotate_to_clear = False
    
-        #count blocked results, and rotate_to_clear if we are blocked several times
-        if userdata.vfh_result == VFHMoveResult.BLOCKED:
-            self.blocked_count += 1 
-            if self.blocked_count > userdata.blocked_limit:
+        #if we are back here after starting a move in the blocked condition, try rotate to clear
+        if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
                 rotate_to_clear = True    
-                self.blocked_count = 0
-        else:
-           self.blocked_count = 0    
         
         try:
             self.tf_listener.waitForTransform(odometry_frame,
@@ -696,16 +695,16 @@ class CreateMoveGoal(smach.State):
 
 #For retrying a move after line_blocked.  Probably a terrible hack that should be removed later.
 #Wait for the delay, then try to move again.  Allow retry after delay time has elapsed since last retry also
-class RetryMove(smach.State):
+class CheckRetry(smach.State):
             
     def __init__(self, announcer):           
         smach.State.__init__(self,
-                             input_keys = ['blocked_retry_delay',
-                                           'blocked_retried',
-                                           'last_retry_time',
+                             input_keys = ['retry_active',
+                                           'blocked_retry_delay',
+                                           'vfh_result',
                                            'move_goal'],
-                             output_keys = ['blocked_retried',
-                                            'last_retry_time',
+                             output_keys = ['retry_active',
+                                            'vfh_result',
                                             'move_goal'],
                              outcomes=['retry',
                                        'continue',
@@ -715,27 +714,16 @@ class RetryMove(smach.State):
 
     def execute(self, userdata):
         
-        #if delay is set to zero just continue
-        if userdata.blocked_retry_delay == 0:
+        if userdata.retry_active and (userdata.vfh_result == VFHResult.STARTED_BLOCKED):
+            #if we are retrying a move, starting blocked means the costmap is correct
+            #and we are blocked, so change the STARTED_BLOCKED result to regular old BLOCKED
+            userdata.vfh_result = VFHResult.BLOCKED
             return 'continue'
-        else:
-            #reset the flag if it's been a few seconds since we retried
-            time_since_retry = rospy.Time.now() - userdata.last_retry_time
-            if (time_since_retry > userdata.blocked_retry_delay):
-                userdata.blocked_retried = False
-            
-            #we already tried here, give up
-            if userdata.blocked_retried:
-                #reset the flag for next try
-                userdata.blocked_retried = False
-                return 'continue'
-            else:
-                self.announcer.say('Recheck ing cost map.')
-                rospy.sleep(userdata.blocked_retry_delay)
-                userdata.blocked_retried = True
-                userdata.move_goal.rotate_to_clear = True
-                userdata.last_retry_time = rospy.Time.now()
-                return 'retry'
+                   
+        self.announcer.say('Recheck ing cost map.')
+        rospy.sleep(userdata.blocked_retry_delay)
+        userdata.retry_active = True
+        return 'retry'
             
 class MountManager(smach.State):
     
