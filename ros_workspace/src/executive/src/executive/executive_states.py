@@ -250,6 +250,8 @@ class ExecuteVFHMove(ExecuteMoveState):
                     return 'complete'
                 elif result == VFHMoveResult.BLOCKED:
                     return 'blocked'
+                elif result == VFHMoveResult.STARTED_BLOCKED:
+                    return 'blocked'
                 elif result == VFHMoveResult.OFF_COURSE:
                     return 'off_course'
                 elif result == VFHMoveResult.MISSED_TARGET:
