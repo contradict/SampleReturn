@@ -200,6 +200,7 @@ class ExecuteVFHMove(ExecuteMoveState):
         super(ExecuteVFHMove, self).__init__(move_client,
                                             outcomes=['complete',
                                                       'blocked',
+                                                      'started_blocked',
                                                       'off_course',
                                                       'missed_target',
                                                       'sample_detected',
@@ -251,7 +252,7 @@ class ExecuteVFHMove(ExecuteMoveState):
                 elif result == VFHMoveResult.BLOCKED:
                     return 'blocked'
                 elif result == VFHMoveResult.STARTED_BLOCKED:
-                    return 'blocked'
+                    return 'started_blocked'
                 elif result == VFHMoveResult.OFF_COURSE:
                     return 'off_course'
                 elif result == VFHMoveResult.MISSED_TARGET:

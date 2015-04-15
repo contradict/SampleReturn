@@ -136,6 +136,7 @@ class PursueSample(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'ANNOUNCE_OBSTACLE_CHECK',
                                                   'blocked':'PUBLISH_FAILURE',
+                                                  'started_blocked':'PUBLISH_FAILURE',
                                                   'missed_target':'ANNOUNCE_OBSTACLE_CHECK',
                                                   'off_course':'PUBLISH_FAILURE',
                                                   'sample_detected':'PUBLISH_FAILURE',
