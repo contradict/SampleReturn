@@ -201,7 +201,8 @@ class VFHMoveServer( object ):
 
     def execute_movement(self, move_velocity, spin_velocity):
 
-        #if this flag is set, rotate until the forward sector is clear, then move
+        ##### Begin rotate to clear section
+        #if requested rotate until the forward sector is clear, then move
         #clear_distance straight ahead, then try to move to the target pose
         if self._rotate_to_clear:
             start_dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
@@ -224,14 +225,13 @@ class VFHMoveServer( object ):
                 self._action_outcome == VFHMoveResult.BLOCKED
             else:
                 #we found a clear spot, drive clear_distance meters ahead
-                #save the final goal for later
                 saved_odom_point = deepcopy(self._target_point_odom)
+                #save the final goal for later
                 header = std_msg.Header(0, rospy.Time(0), 'base_link')
                 point = geometry_msg.Point(self._clear_distance, 0, 0)
                 target_point_base = geometry_msg.PointStamped(header, point)
                 self.set_path_points_odom(target_point_base)
                 if self.publish_debug: self.publish_debug_path()
-                #make the move
                 self.vfh_running = True
 
                 self._mover.execute_continuous_strafe(self._clear_distance,
@@ -239,16 +239,15 @@ class VFHMoveServer( object ):
                                                       stop_function=self.is_stop_requested)
                 self.vfh_running = False
                 if self.exit_check(): return
-                #now try to get to the target goal
+                #reload previous goal
                 self.set_path_points_odom(saved_odom_point)
                 if self.publish_debug: self.publish_debug_path()
 
-        #Normal moves after rotate_to_clear
-        #if nothing modifies this... that would be an error!
-        self._action_outcome = VFHMoveResult.ERROR
+        ##### Begin normal movement section
+        self._action_outcome = VFHMoveResult.ERROR #initialize outcome to error
 
+        ##### Turn to face goal
         dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
-        # turn to face goal
         if np.abs(dyaw) > self._goal_orientation_tolerance:
             rospy.loginfo("VFH Rotating to point at goal by: %f.", dyaw)
             self._mover.execute_spin(dyaw,
@@ -256,7 +255,7 @@ class VFHMoveServer( object ):
                                      stop_function=self.is_stop_requested)
             if self.exit_check(): return
 
-        # drive to goal using vfh
+        ##### Strafe to goal pose using VFH
         yaw, distance = util.get_robot_strafe(self._tf, self._target_point_odom)
         #start vfh and wait for one update
         self.vfh_running = True
@@ -265,8 +264,7 @@ class VFHMoveServer( object ):
             rospy.sleep(0.1)
             if self.last_vfh_update > start_time: break
         #If we received a valid goal (not too short, or out of target window), then
-        #the outcome should still be un-set (still ERROR).  Make the move
-        rospy.loginfo("VFH updated once, outcome: {!s}".format(self._action_outcome))
+        #the outcome should still be un-set (still ERROR).
         if self._action_outcome == VFHMoveResult.ERROR:
             rospy.loginfo("VFH Moving %f meters ahead.", distance)
             self._mover.execute_continuous_strafe(0.0,
@@ -284,6 +282,7 @@ class VFHMoveServer( object ):
                                          stop_function=self.is_stop_requested)
                 if self.exit_check(): return
         elif self._action_oucome == VFHMoveResult.BLOCKED:
+            #we found all sectors blocked before we even tried to move
             self._action_outcome = VFHMoveResult.STARTED_BLOCKED
 
         rospy.logdebug("Successfully completed goal.")
