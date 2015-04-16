@@ -553,7 +553,7 @@ class WebManager(smach.State):
                                                                 userdata.world_fixed_frame)
                     robot_radius = util.get_robot_distance_to_origin(self.tf_listener,
                                                                      userdata.world_fixed_frame)
-                    rospy.loginfo("WEB_MANAGER heading inward after blocked chord")
+                    rospy.loginfo("WEB_MANAGER heading to next chord after blocked chord")
                     
                     #prune the raster until we go to the next chord inside our radius
                     #while robot_radius < next_move['radius']:
@@ -574,7 +574,7 @@ class WebManager(smach.State):
                     pos = geometry_msg.Point(x,y,0)
                     #replace the next inward point with this
                     next_move['point'] = geometry_msg.PointStamped(header, pos)
-                    self.announcer.say("Heading inward from short chord.")
+                    self.announcer.say("Head ing to next radius.")
                 
                 #load the target into move_point, and save the move
                 self.last_raster_move = next_move
@@ -584,7 +584,7 @@ class WebManager(smach.State):
                 if next_move['inward']:
                     userdata.course_tolerance = 5.0
                 else:
-                    userdata.course_tolerance = 3.0
+                    userdata.course_tolerance = 2.0
                 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
@@ -615,6 +615,11 @@ class CreateRasterPoints(smach.State):
                                        'preempted', 'aborted'])
 
         self.tf_listener = tf_listener
+        
+        self.debug_marker_pub = rospy.Publisher('/debug_markers',
+                                                vis_msg.MarkerArray,
+                                                queue_size=3)
+        self.marker_id = 0
 
     def execute(self, userdata):
             
@@ -670,8 +675,25 @@ class CreateRasterPoints(smach.State):
                 #if the next chord move < raster offset, go to next spoke
                 if narrow_check(): break
                
-            userdata.raster_points = raster_points
+
             
+            #debug points
+            debug_array = []
+            for point in raster_points:
+                debug_marker = vis_msg.Marker()
+                debug_marker.header = header
+                debug_marker.type = vis_msg.Marker.CYLINDER
+                debug_marker.color = std_msg.ColorRGBA(1, 0, 1, 1)
+                debug_marker.scale = geometry_msg.Vector3(.5, .5, .5)
+                debug_marker.lifetime = rospy.Duration(0)                
+                debug_marker.pose.position = point.point
+                debug_marker.id = self.marker_id
+                self.marker_id += 1                  
+                
+            self.debug_marker_pub.publish(vis_msg.MarkerArray(debug_array))          
+          
+          
+            userdata.raster_points = raster_points
             return 'next'
     
 
