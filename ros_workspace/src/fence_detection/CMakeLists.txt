@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   stereo_msgs
   pcl_conversions
+  eigen_conversions
   pcl_ros
   sensor_msgs)
 
