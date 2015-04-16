@@ -22,7 +22,7 @@
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
         <param name="goal_orientation_tolerance" value="2"/><!--degrees!-->
         <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
-        <param name="clear_distance" value="6.0"/><!-- dist to move after rotating to clear -->
+        <param name="clear_distance" value="4.0"/><!-- dist to move after rotating to clear -->
         <param name="course_tolerance" value="5.0"/>
 
         <!--VFH algorithm parameters, angles in degrees -->
