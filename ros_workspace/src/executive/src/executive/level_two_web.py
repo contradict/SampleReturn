@@ -215,8 +215,8 @@ class LevelTwoWeb(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'WEB_MANAGER',
                                                   'missed_target':'ANNOUNCE_MISSED_TARGET',
-                                                  'blocked':'CHECK_RETRY',
-                                                  'started_blocked':'CHECK_RETRY',
+                                                  'blocked':'RETRY_CHECK',
+                                                  'started_blocked':'RETRY_CHECK',
                                                   'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
@@ -231,10 +231,10 @@ class LevelTwoWeb(object):
                                    AnnounceState(self.announcer, 'Started Blocked.'),
                                    transitions = {'next':'WEB_MANAGER'})
 
-            smach.StateMachine.add('CHECK_RETRY',
-                                   CheckRetry(self.announcer),
-                                   transitions = {'blocked':'WEB_MANAGER',
-                                                  'retry':'RETRY_MOVE',
+            smach.StateMachine.add('RETRY_CHECK',
+                                   RetryCheck(self.announcer),
+                                   transitions = {'continue':'WEB_MANAGER',
+                                                  'retry':'MOVE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -535,18 +535,33 @@ class WebManager(smach.State):
             #we are inbound
             if userdata.raster_active:
                 #still rastering
-                next_move = userdata.raster_points.popleft()    
-                
+                next_move = userdata.raster_points.popleft()
+                                
                 #was the last move a chord, and we got blocked?
                 if self.last_raster_move is not None and \
-                   userdata.vfh_result in (VFHMoveResult.BLOCKED, VFHMoveResult.OFF_COURSE) and \
-                   self.last_raster_move['radius'] != -1: 
-                    #yes, then just move radially inwards from here to the next radius
-                    yaw = util.get_robot_yaw_from_origin(self.tf_listener,
-                                                         userdata.world_fixed_frame)
-                    next_radius = self.last_raster_move['radius'] - userdata.raster_step
-                    x = next_radius*math.cos(yaw)
-                    y = next_radius*math.sin(yaw)
+                        userdata.vfh_result in (VFHMoveResult.BLOCKED,
+                                                VFHMoveResult.OFF_COURSE) and \
+                        self.last_raster_move['radius'] != -1: 
+                    robot_yaw = util.get_robot_yaw_from_origin(self.tf_listener,
+                                                                userdata.world_fixed_frame)
+                    robot_radius = util.get_robot_distance_to_origin(self.tf_listener,
+                                                                     userdata.world_fixed_frame)
+                    rospy.loginfo("WEB_MANAGER heading inward after blocked chord")
+                    #prune the raster until we go to the next chord inside our radius
+                    while robot_radius < next_move['radius']:
+                        #are there more points?
+                        if (len(userdata.raster_points) > 0):
+                            rospy.loginfo("WEB_MANAGER pruning raster.  Robot radius: {:f}, \
+                                          next_move[radius]: {:f}, userdata.raster_points[0]: {!s} \
+                                          ".format(robot_radius,
+                                                   next_move['radius'],
+                                                   userdata.raster_points[0]))
+                            next_move = userdata.raster_points.popleft()
+                        else:                            
+                            break #no more points, just continue
+                    
+                    x = next_move['radius']*math.cos(robot_yaw)
+                    y = next_move['radius']*math.sin(robot_yaw)
                     header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
                     pos = geometry_msg.Point(x,y,0)
                     #replace the next inward point with this
@@ -601,12 +616,20 @@ class CreateRasterPoints(smach.State):
             spoke_sign = np.sign(next_yaw - current_yaw)
 
             def raster_point(yaw, offset_sign, inward): 
-                x = radius*math.cos(yaw + offset_sign*raster_offset/radius*spoke_sign)
-                y = radius*math.sin(yaw + offset_sign*raster_offset/radius*spoke_sign)
+                offset_yaw = util.unwind(yaw + offset_sign*raster_offset/radius*spoke_sign)
+                x = radius*math.cos(offset_yaw)
+                y = radius*math.sin(offset_yaw)
                 point = geometry_msg.PointStamped(header, geometry_msg.Point(x,y,0))
-                radius_entry = radius if not inward else -1
-                return {'point':point,'radius':radius_entry}
+                return {'point':point,'radius':radius,'inward':inward}
 
+            def narrow_check():
+                if (yaw_step*radius) < (3.0*userdata.raster_offset):
+                    raster_points.append({'point':userdata.spokes[0]['start_point'],
+                                          'radius':userdata.spoke_hub_radius,
+                                          'inward':True})
+                    return True
+                else:
+                    return False
             
             rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
                                                                                     current_yaw,
@@ -622,16 +645,16 @@ class CreateRasterPoints(smach.State):
                     break
                 #inward move on next yaw
                 raster_points.append(raster_point(next_yaw, -1, True))
+                #if the next chord move < raster offset, go to next spoke
+                if narrow_check(): break
                 #chord move to current yaw
                 raster_points.append(raster_point(current_yaw, 1, False))               
                 radius -= userdata.raster_step
                 #inward move on current yaw
                 raster_points.append(raster_point(current_yaw, 1, True))                              
-                if (yaw_step*radius) < (3.0*userdata.raster_offset):
-                    raster_points.append({'point':userdata.spokes[0]['start_point'],
-                                          'radius':-1})                    
-                    break
-            
+                #if the next chord move < raster offset, go to next spoke
+                if narrow_check(): break
+               
             userdata.raster_points = raster_points
             
             return 'next'
@@ -695,7 +718,7 @@ class CreateMoveGoal(smach.State):
 
 #For retrying a move after line_blocked.  Probably a terrible hack that should be removed later.
 #Wait for the delay, then try to move again.  Allow retry after delay time has elapsed since last retry also
-class CheckRetry(smach.State):
+class RetryCheck(smach.State):
             
     def __init__(self, announcer):           
         smach.State.__init__(self,
@@ -714,10 +737,10 @@ class CheckRetry(smach.State):
 
     def execute(self, userdata):
         
-        if userdata.retry_active and (userdata.vfh_result == VFHResult.STARTED_BLOCKED):
+        if userdata.retry_active and (userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED):
             #if we are retrying a move, starting blocked means the costmap is correct
             #and we are blocked, so change the STARTED_BLOCKED result to regular old BLOCKED
-            userdata.vfh_result = VFHResult.BLOCKED
+            userdata.vfh_result = VFHMoveResult.BLOCKED
             return 'continue'
                    
         self.announcer.say('Recheck ing cost map.')
