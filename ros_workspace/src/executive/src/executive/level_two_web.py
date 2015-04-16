@@ -509,6 +509,7 @@ class WebManager(smach.State):
                                             'raster_points',
                                             'retry_active',
                                             'move_point',
+                                            'course_tolerance',
                                             'stop_on_sample'],
                              outcomes=['move',
                                        'get_raster',
@@ -533,6 +534,7 @@ class WebManager(smach.State):
             userdata.spoke_yaw = spoke['yaw']
             userdata.move_point = spoke['end_point']
             userdata.outbound = False
+            userdata.course_tolerance = 5.0
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
             self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.spoke_yaw))))
             return 'move'
@@ -574,8 +576,14 @@ class WebManager(smach.State):
                     self.announcer.say("Heading inward from short chord.")
                 
                 #load the target into move_point, and save the move
-                userdata.move_point = next_move['point']
                 self.last_raster_move = next_move
+                userdata.move_point = next_move['point']
+                
+                #use tighter course tolerance for chord moves (no point in getting into next chord)
+                if next_move['inward']:
+                    userdata.course_tolerance = 5.0
+                else:
+                    userdata.course_tolerance = 3.0
                 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
@@ -673,6 +681,7 @@ class CreateMoveGoal(smach.State):
                              input_keys = ['move_point',
                                            'move_velocity',
                                            'spin_velocity',
+                                           'course_tolerance',
                                            'vfh_result',
                                            'odometry_frame'],
                              output_keys = ['move_goal',
@@ -713,6 +722,7 @@ class CreateMoveGoal(smach.State):
         goal = VFHMoveGoal(target_pose = target_pose,
                            move_velocity = userdata.move_velocity,
                            spin_velocity = userdata.spin_velocity,
+                           course_tolerance = userdata.course_tolerance,
                            orient_at_target = False,
                            rotate_to_clear = rotate_to_clear)
         userdata.move_goal = goal
