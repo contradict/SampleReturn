@@ -236,7 +236,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('RETRY_CHECK',
                                    RetryCheck(self.announcer),
                                    transitions = {'continue':'WEB_MANAGER',
-                                                  'retry':'MOVE',
+                                                  'retry':'CREATE_MOVE_GOAL',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -584,7 +584,7 @@ class WebManager(smach.State):
                 if next_move['inward']:
                     userdata.course_tolerance = 5.0
                 else:
-                    userdata.course_tolerance = 2.0
+                    userdata.course_tolerance = 3.0
                 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
@@ -674,28 +674,25 @@ class CreateRasterPoints(smach.State):
                 raster_points.append(raster_point(current_yaw, 1, True))                              
                 #if the next chord move < raster offset, go to next spoke
                 if narrow_check(): break
-               
-
-            
+ 
             #debug points
             debug_array = []
-            for point in raster_points:
+            for raster_point in raster_points:
                 debug_marker = vis_msg.Marker()
                 debug_marker.header = header
                 debug_marker.type = vis_msg.Marker.CYLINDER
-                debug_marker.color = std_msg.ColorRGBA(1, 0, 1, 1)
+                debug_marker.color = std_msg.ColorRGBA(1, 1, 0, 1)
                 debug_marker.scale = geometry_msg.Vector3(.5, .5, .5)
                 debug_marker.lifetime = rospy.Duration(0)                
-                debug_marker.pose.position = point.point
+                debug_marker.pose.position = raster_point['point'].point
                 debug_marker.id = self.marker_id
+                debug_array.append(debug_marker)
                 self.marker_id += 1                  
                 
             self.debug_marker_pub.publish(vis_msg.MarkerArray(debug_array))          
           
-          
             userdata.raster_points = raster_points
             return 'next'
-    
 
 #take a point and create a VFH goal        
 class CreateMoveGoal(smach.State):
@@ -783,7 +780,11 @@ class RetryCheck(smach.State):
             #and we are blocked, so change the STARTED_BLOCKED result to regular old BLOCKED
             if userdata.retry_active:
                 userdata.vfh_result = VFHMoveResult.BLOCKED
-            return 'continue'
+                return 'continue'
+            else:
+                self.announcer.say('Rotate to clear')
+                userdata.retry_active = True
+                return 'retry'
         
         #If we got here as a result of BLOCKED, movement occured
         #since last time. So, go ahead and retry
