@@ -2,6 +2,7 @@
 geometry_msgs/PoseStamped target_pose
 float32 move_velocity
 float32 spin_velocity
+float32 course_tolerance
 bool orient_at_target
 bool rotate_to_clear
 ---
