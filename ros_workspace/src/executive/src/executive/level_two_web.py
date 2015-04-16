@@ -554,18 +554,19 @@ class WebManager(smach.State):
                     robot_radius = util.get_robot_distance_to_origin(self.tf_listener,
                                                                      userdata.world_fixed_frame)
                     rospy.loginfo("WEB_MANAGER heading inward after blocked chord")
+                    
                     #prune the raster until we go to the next chord inside our radius
-                    while robot_radius < next_move['radius']:
+                    #while robot_radius < next_move['radius']:
                         #are there more points?
-                        if (len(userdata.raster_points) > 0):
-                            rospy.loginfo("WEB_MANAGER pruning raster.  Robot radius: {:f}, \
-                                          next_move[radius]: {:f}, userdata.raster_points[0]: {!s} \
-                                          ".format(robot_radius,
-                                                   next_move['radius'],
-                                                   userdata.raster_points[0]))
-                            next_move = userdata.raster_points.popleft()
-                        else:                            
-                            break #no more points, just continue
+                    #    if (len(userdata.raster_points) > 0):
+                    #        rospy.loginfo("WEB_MANAGER pruning raster.  Robot radius: {:f}, \
+                    #                      next_move[radius]: {:f}, userdata.raster_points[0]: {!s} \
+                    #                      ".format(robot_radius,
+                    #                               next_move['radius'],
+                    #                               userdata.raster_points[0]))
+                    #        next_move = userdata.raster_points.popleft()
+                    #    else:                            
+                    #        break #no more points, just continue
                     
                     x = next_move['radius']*math.cos(robot_yaw)
                     y = next_move['radius']*math.sin(robot_yaw)
