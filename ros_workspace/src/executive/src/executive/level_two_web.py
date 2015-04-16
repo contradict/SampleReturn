@@ -80,7 +80,8 @@ class LevelTwoWeb(object):
         self.spokes = self.get_spokes(node_params.spoke_count,
                                       node_params.max_spoke_length,
                                       node_params.first_spoke_offset,
-                                      node_params.spoke_hub_radius)
+                                      node_params.spoke_hub_radius,
+                                      node_params.next_spoke_sign)
                                                                   
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
@@ -115,6 +116,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.move_velocity = node_params.move_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
         self.state_machine.userdata.spoke_hub_radius = node_params.spoke_hub_radius
+        self.state_machine.userdata.next_spoke_sign = node_params.next_spoke_sign
         self.state_machine.userdata.raster_step = node_params.raster_step
         self.state_machine.userdata.raster_offset = node_params.raster_offset
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
@@ -437,13 +439,16 @@ class LevelTwoWeb(object):
                 goal.target_pose.pose.position = saved_point_odom.point
                 self.state_machine.userdata.move_goal = goal                
 
-    def get_spokes(self, spoke_count, spoke_length, offset, hub_radius):
+    def get_spokes(self, spoke_count, spoke_length, offset, hub_radius, direction):
         #This creates a list of dictionaries.  The yaw entry is a useful piece of information
         #for some of the state machine states.  The other entry contains the start and end
         #points defined by the line yaw
         
         offset = np.radians(offset)
-        yaws = list(np.linspace(0 + offset, 2*np.pi + offset, spoke_count, endpoint=False))
+        yaws = list(np.linspace(0 + offset,
+                                direction*2*np.pi + offset,
+                                spoke_count,
+                                endpoint=False))
         #add the starting spoke again, for raster calcs
         yaws.append(offset)
         spokes = deque()
@@ -594,6 +599,7 @@ class CreateRasterPoints(smach.State):
                                            'spoke_hub_radius',
                                            'raster_step',
                                            'raster_offset',
+                                           'next_spoke_sign',
                                            'world_fixed_frame'],
                              output_keys = ['raster_points'],
                              outcomes=['next',
@@ -610,10 +616,10 @@ class CreateRasterPoints(smach.State):
                        
             current_yaw = userdata.spoke_yaw
             next_yaw = userdata.spokes[0]['yaw']
-            yaw_step = np.abs(next_yaw - current_yaw)
+            yaw_step = np.abs(util.unwind(next_yaw - current_yaw))
             raster_offset = userdata.raster_offset
             #get the sign of the rotation to next yaw
-            spoke_sign = np.sign(next_yaw - current_yaw)
+            spoke_sign = userdata.next_spoke_sign
 
             def raster_point(yaw, offset_sign, inward): 
                 offset_yaw = util.unwind(yaw + offset_sign*raster_offset/radius*spoke_sign)

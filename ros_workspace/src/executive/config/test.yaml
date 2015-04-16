@@ -9,7 +9,8 @@ level_two:
     spin_velocity: 0.5
     spoke_count: 10 
     max_spoke_length: 80 
-    first_spoke_offset: 50
+    first_spoke_offset: 55 
+    next_spoke_sign: 1 # 1 for ccw, -1 for cw
     spoke_hub_radius: 15
     #raster step is distance between raster lines
     #raster offset is how close to the spoke we get
