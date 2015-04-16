@@ -85,15 +85,7 @@ class RobotSimulator(object):
         self.sample_marker.scale = geometry_msg.Vector3(.6, .6, .05)
         self.sample_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
         self.sample_marker.lifetime = rospy.Duration(1.5)
-        
-        self.debug_marker = vis_msg.Marker()
-        self.debug_marker.header = std_msg.Header(0, rospy.Time(0), self.sim_odom)
-        self.debug_marker.type = vis_msg.Marker.CYLINDER
-        self.debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
-        self.debug_marker.scale = geometry_msg.Vector3(.05, .05, .5)
-        self.debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
-        self.debug_marker.lifetime = rospy.Duration(1.5)
-        
+         
         self.path_marker = vis_msg.Marker()
         self.path_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         self.path_marker.type = vis_msg.Marker.ARROW
@@ -330,11 +322,6 @@ class RobotSimulator(object):
 
         self.joint_transforms_available = True
         
-        self.debug_marker_pub = rospy.Publisher('debug_markers',
-                                                vis_msg.Marker,
-                                                queue_size=100)
-        rospy.Timer(rospy.Duration(0.5), self.publish_debug_markers)
-        
         self.path_counter = 0
         self.path_marker_pub = rospy.Publisher('path_markers',
                                                vis_msg.Marker,
@@ -362,56 +349,7 @@ class RobotSimulator(object):
         self.path_marker.id = self.path_counter
         self.path_counter += 1
         self.path_marker_pub.publish(self.path_marker)
-        
-    def publish_debug_markers(self, event):
-
-        pose_list = []
-        square_step = 2.0
-
-        start_pose = util.get_current_robot_pose(self.tf_listener, self.sim_odom)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5,
-                0.2, self.sim_odom)
-        pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0.5,
-                -0.2, self.sim_odom)
-        pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0,
-                0.2, self.sim_odom)
-        pose_list.append(next_pose)
-        next_pose = util.translate_base_link(self.tf_listener, start_pose, 0,
-                -.2, self.sim_odom)
-        pose_list.append(next_pose)
-        
-        fake_header = std_msg.Header(0, rospy.Time(0), self.sim_map)
-        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
-        quat = geometry_msg.Quaternion(0,0,0,1)
-        pose =  geometry_msg.PoseStamped(header,
-                geometry_msg.Pose(geometry_msg.Point(15,0,0), quat))
-        pose_list.append(pose)
-        pose =  geometry_msg.PoseStamped(fake_header,
-                geometry_msg.Pose(geometry_msg.Point(15,0,0), quat))        
-        pose_list.append(pose)        
-        pose =  geometry_msg.PoseStamped(header,
-                geometry_msg.Pose(geometry_msg.Point(15,5,0), quat))        
-        pose_list.append(pose)        
-        pose =  geometry_msg.PoseStamped(fake_header,
-                geometry_msg.Pose(geometry_msg.Point(15,5,0), quat))        
-        pose_list.append(pose)        
-        pose =  geometry_msg.PoseStamped(header,
-                geometry_msg.Pose(geometry_msg.Point(15,-5,0), quat))        
-        pose_list.append(pose)        
-        pose =  geometry_msg.PoseStamped(fake_header,
-                geometry_msg.Pose(geometry_msg.Point(15,-5,0), quat))        
-        pose_list.append(pose)        
-        
-        i = 0
-        for pose in pose_list:
-            self.debug_marker.header = pose.header
-            self.debug_marker.pose.position = pose.pose.position
-            self.debug_marker.id = i
-            self.debug_marker_pub.publish(self.debug_marker)        
-            i += 1
-        
+ 
     def handle_planner(self, twist):
         if self.motion_mode == platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST:
             self.command_twist = twist
