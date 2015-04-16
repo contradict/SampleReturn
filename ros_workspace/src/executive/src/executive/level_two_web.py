@@ -702,7 +702,8 @@ class CreateMoveGoal(smach.State):
    
         #if we are back here after starting a move in the blocked condition, try rotate to clear
         if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
-                rotate_to_clear = True    
+            rospy.loginfo("LEVEL_TWO_WEB setting rotate_to_clear = True")
+            rotate_to_clear = True    
         
         try:
             self.tf_listener.waitForTransform(odometry_frame,
@@ -754,12 +755,16 @@ class RetryCheck(smach.State):
 
     def execute(self, userdata):
         
-        if userdata.retry_active and (userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED):
+        #we only get here if BLOCKED or STARTED_BLOCKED
+        if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
             #if we are retrying a move, starting blocked means the costmap is correct
             #and we are blocked, so change the STARTED_BLOCKED result to regular old BLOCKED
-            userdata.vfh_result = VFHMoveResult.BLOCKED
+            if userdata.retry_active:
+                userdata.vfh_result = VFHMoveResult.BLOCKED
             return 'continue'
-                   
+        
+        #If we got here as a result of BLOCKED, movement occured
+        #since last time. So, go ahead and retry
         self.announcer.say('Recheck ing cost map.')
         rospy.sleep(userdata.blocked_retry_delay)
         userdata.retry_active = True
