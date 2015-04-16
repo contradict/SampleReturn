@@ -67,6 +67,7 @@ class VFHMoveServer( object ):
         self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
         self._goal_obstacle_radius = node_params.goal_obstacle_radius
         self._clear_distance = node_params.clear_distance
+        self._default_course_tolerance = node_params.course_tolerance
         self._course_tolerance = node_params.course_tolerance
         self._goal_odom = None
         self._goal_local = None
@@ -161,7 +162,8 @@ class VFHMoveServer( object ):
         #load goal parameters, or use defaults
         spin_velocity = goal.spin_velocity if (goal.spin_velocity != 0) else self._mover.max_velocity
         move_velocity = goal.move_velocity if (goal.move_velocity != 0) else self._mover.max_velocity
-        course_tolerance = goal.course_tolerance if (goal.course_tolerance != 0) else self._course_tolerance
+        self._course_tolerance = goal.course_tolerance if (goal.course_tolerance != 0) \
+                                 else self._default_course_tolerance
         #calculate the stop_distance for stopping once near target pose
         self.stop_distance = move_velocity**2/2./self._mover.acceleration
 
@@ -171,8 +173,7 @@ class VFHMoveServer( object ):
             self.stop_requested = False
             self.execute_thread = threading.Thread(target=self.execute_movement,
                                                    args=(move_velocity,
-                                                         spin_velocity,
-                                                         course_tolerance));
+                                                         spin_velocity));
             self.execute_thread.start();
         else:
             rospy.loginfo("VFH Server active, self._goal_odom updated.")
