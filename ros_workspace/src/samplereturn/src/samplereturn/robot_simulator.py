@@ -98,7 +98,7 @@ class RobotSimulator(object):
         self.path_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         self.path_marker.type = vis_msg.Marker.ARROW
         self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
-        self.path_marker.scale = geometry_msg.Vector3(.5, .04, .04)
+        self.path_marker.scale = geometry_msg.Vector3(.5, .1, .1)
         self.path_marker.lifetime = rospy.Duration(0)
                                                         
         self.joint_state_seq = 0
@@ -339,7 +339,7 @@ class RobotSimulator(object):
         self.path_marker_pub = rospy.Publisher('path_markers',
                                                vis_msg.Marker,
                                                queue_size=10)
-        rospy.Timer(rospy.Duration(5.0), self.publish_path_markers)
+        rospy.Timer(rospy.Duration(3.0), self.publish_path_markers)
 
         rospy.Timer(rospy.Duration(0.15), self.publish_point_cloud)        
         
