@@ -280,7 +280,8 @@ class VFHMoveServer( object ):
                                          spin_velocity,
                                          stop_function=self.is_stop_requested)
                 if self.exit_check(): return
-        elif self._action_oucome == VFHMoveResult.BLOCKED:
+        elif self._action_outcome == VFHMoveResult.BLOCKED:
+            rospy.loginfo("VFH reporting STARTED_BLOCKED")
             #we found all sectors blocked before we even tried to move
             self._action_outcome = VFHMoveResult.STARTED_BLOCKED
 
@@ -348,7 +349,7 @@ class VFHMoveServer( object ):
         if vfh_state['distance_to_target'] < self.stop_distance:
             return self.stop_with_outcome(VFHMoveResult.COMPLETE)
 
-        if (vfh_state['distance_off_course'] > self.course_tolerance):
+        if (vfh_state['distance_off_course'] > self._course_tolerance):
             return self.stop_with_outcome(VFHMoveResult.OFF_COURSE)           
                     
         #if the target is not in the active window, we are probably close to it,
