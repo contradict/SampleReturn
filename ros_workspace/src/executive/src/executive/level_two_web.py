@@ -501,6 +501,7 @@ class WebManager(smach.State):
                                            'raster_points',
                                            'raster_step',
                                            'vfh_result',
+                                           'return_time',
                                            'world_fixed_frame'],
                              output_keys = ['spoke_yaw',
                                             'outbound',
@@ -508,7 +509,7 @@ class WebManager(smach.State):
                                             'raster_active',
                                             'raster_points',
                                             'retry_active',
-                                            'move_point',
+                                            'web_move',
                                             'course_tolerance',
                                             'stop_on_sample'],
                              outcomes=['move',
@@ -518,11 +519,15 @@ class WebManager(smach.State):
         
         self.tf_listener = tf_listener
         self.announcer = announcer
-        self.last_raster_move = None
+        self.last_web_move = None
+        self.blocked_set = [VFHMoveResult.BLOCKED, VFHMoveResult.OFF_COURSE]
 
     def execute(self, userdata):
         
         userdata.retry_active = False
+        
+        if rospy.Time.now() > userdata.return_time:
+            return 'return_home'
 
         if userdata.outbound:
             #this flag indicates it's time to make an outbound move
@@ -530,25 +535,26 @@ class WebManager(smach.State):
             #there is an extra spoke at the end
             if len(userdata.spokes) == 0:
                 rospy.loginfo("SPOKE MANAGER finished last spoke")
-                return 'return_home'            
+                return 'return_home'
             userdata.spoke_yaw = spoke['yaw']
-            userdata.move_point = spoke['end_point']
+            next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
+            userdata.web_move = next_move
+            self.last_web_move = next_move
             userdata.outbound = False
             userdata.course_tolerance = 5.0
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
-            self.announcer.say("Start ing on spoke, Yaw %s" % (int(math.degrees(userdata.spoke_yaw))))
+            remaining_minutes = (userdata.return_time - rospy.Time.now()).to_secs()/60
+            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(int(math.degrees(userdata.spoke_yaw)),
+                                                                                         remaining_minutes))
             return 'move'
         else:
             #we are inbound
             if userdata.raster_active:
                 #still rastering
                 next_move = userdata.raster_points.popleft()
-                                
                 #was the last move a chord, and we got blocked?
-                if self.last_raster_move is not None and \
-                        userdata.vfh_result in (VFHMoveResult.BLOCKED,
-                                                VFHMoveResult.OFF_COURSE) and \
-                        self.last_raster_move['radius'] != -1: 
+                if (userdata.vfh_result in self.blocked_set) and \
+                        not self.last_web_move['radial']: 
                     robot_yaw = util.get_robot_yaw_from_origin(self.tf_listener,
                                                                 userdata.world_fixed_frame)
                     robot_radius = util.get_robot_distance_to_origin(self.tf_listener,
@@ -577,11 +583,11 @@ class WebManager(smach.State):
                     self.announcer.say("Head ing to next radius.")
                 
                 #load the target into move_point, and save the move
-                self.last_raster_move = next_move
-                userdata.move_point = next_move['point']
+                self.last_web_move = next_move
+                userdata.web_move = next_move
                 
                 #use tighter course tolerance for chord moves (no point in getting into next chord)
-                if next_move['inward']:
+                if next_move['radial']:
                     userdata.course_tolerance = 5.0
                 else:
                     userdata.course_tolerance = 3.0
@@ -595,7 +601,6 @@ class WebManager(smach.State):
                 #time to start rastering, create the points, and set flag
                 self.announcer.say("Begin ing raster on spoke, Yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
                 userdata.raster_active = True
-                self.last_raster_move = None
                 return 'get_raster'
         
         return 'aborted'
@@ -640,13 +645,13 @@ class CreateRasterPoints(smach.State):
                 x = radius*math.cos(offset_yaw)
                 y = radius*math.sin(offset_yaw)
                 point = geometry_msg.PointStamped(header, geometry_msg.Point(x,y,0))
-                return {'point':point,'radius':radius,'inward':inward}
+                return {'point':point,'radius':radius,'radial':inward}
 
-            def narrow_check():
-                if (yaw_step*radius) < (3.0*userdata.raster_offset):
+            def too_narrow():
+                if (yaw_step*radius) < (2*userdata.raster_offset + 2.0):
                     raster_points.append({'point':userdata.spokes[0]['start_point'],
                                           'radius':userdata.spoke_hub_radius,
-                                          'inward':True})
+                                          'radial':True})
                     return True
                 else:
                     return False
@@ -656,25 +661,21 @@ class CreateRasterPoints(smach.State):
                                                                                     next_yaw))
             
             #generate one ccw-inward-cw-inward set of points per loop
-            while True:
+            #if the next chord move < raster offset, go to next spoke
+            while not too_narrow():
                 #chord move to next yaw
                 raster_points.append(raster_point(next_yaw, -1, False))
                 radius -= userdata.raster_step
-                if (radius <= userdata.spoke_hub_radius): 
-                    #within the hub radius, we're done
-                    break
                 #inward move on next yaw
                 raster_points.append(raster_point(next_yaw, -1, True))
                 #if the next chord move < raster offset, go to next spoke
-                if narrow_check(): break
-                #chord move to current yaw
+                if too_narrow(): break
+                #chord move back to current yaw
                 raster_points.append(raster_point(current_yaw, 1, False))               
                 radius -= userdata.raster_step
                 #inward move on current yaw
                 raster_points.append(raster_point(current_yaw, 1, True))                              
-                #if the next chord move < raster offset, go to next spoke
-                if narrow_check(): break
- 
+                 
             #debug points
             debug_array = []
             for raster_point in raster_points:
@@ -698,7 +699,7 @@ class CreateRasterPoints(smach.State):
 class CreateMoveGoal(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['move_point',
+                             input_keys = ['web_move',
                                            'move_velocity',
                                            'spin_velocity',
                                            'course_tolerance',
@@ -716,7 +717,7 @@ class CreateMoveGoal(smach.State):
     def execute(self, userdata):
 
         odometry_frame = userdata.odometry_frame
-        target_point = userdata.move_point
+        target_point = userdata.web_move['point']
         rotate_to_clear = False
    
         #if we are back here after starting a move in the blocked condition, try rotate to clear
@@ -761,6 +762,7 @@ class RetryCheck(smach.State):
         smach.State.__init__(self,
                              input_keys = ['retry_active',
                                            'blocked_retry_delay',
+                                           'web_move',
                                            'vfh_result',
                                            'move_goal'],
                              output_keys = ['retry_active',
@@ -776,9 +778,10 @@ class RetryCheck(smach.State):
         
         #we only get here if BLOCKED or STARTED_BLOCKED
         if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
-            #if we are retrying a move, starting blocked means the costmap is correct
+            #If we are retrying a move, starting blocked means the costmap is correct
             #and we are blocked, so change the STARTED_BLOCKED result to regular old BLOCKED
-            if userdata.retry_active:
+            #Also, if we are making a chord move just return with blocked
+            if userdata.retry_active or not userdata.web_move['radial']:
                 userdata.vfh_result = VFHMoveResult.BLOCKED
                 return 'continue'
             else:
