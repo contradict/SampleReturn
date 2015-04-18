@@ -400,7 +400,8 @@ class PursueSample(object):
                     self.state_machine.pursuit_pose = pose
                     goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
                                                         move_velocity = self.state_machine.userdata.pursuit_velocity,
-                                                        spin_velocity = self.state_machine.userdata.spin_velocity)
+                                                        spin_velocity = self.state_machine.userdata.spin_velocity,
+                                                        orient_at_target = True)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
