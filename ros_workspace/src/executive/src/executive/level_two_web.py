@@ -256,15 +256,11 @@ class LevelTwoWeb(object):
                 goal.input_string = "level_two_pursuit_request"
                 return goal
             
-            @smach.cb_interface(input_keys=['line_points','next_line_point'],
-                                output_keys=['line_points','detected_sample'])
+            @smach.cb_interface(output_keys=['detected_sample'])
             def pursuit_result_cb(userdata, status, result):
                 #clear samples after a pursue action
                 userdata.detected_sample = None
-                #reload the next spoke point, line manager will pop it back
-                #off the array and we will continue to go there
-                userdata.line_points.appendleft(userdata.next_line_point)
-                            
+                                            
             smach.StateMachine.add('PURSUE_SAMPLE',
                                   smach_ros.SimpleActionState('pursue_sample',
                                   samplereturn_msg.GeneralExecutiveAction,
@@ -276,7 +272,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
                                                  'Return ing to search line'),
-                                   transitions = {'next':'WEB_MANAGER'})   
+                                   transitions = {'next':'CREATE_MOVE_GOAL'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
@@ -543,7 +539,7 @@ class WebManager(smach.State):
             userdata.outbound = False
             userdata.course_tolerance = 5.0
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
-            remaining_minutes = (userdata.return_time - rospy.Time.now()).to_secs()/60
+            remaining_minutes = int((userdata.return_time - rospy.Time.now()).to_sec()/60)
             self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(int(math.degrees(userdata.spoke_yaw)),
                                                                                          remaining_minutes))
             return 'move'
