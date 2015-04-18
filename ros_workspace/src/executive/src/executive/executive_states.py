@@ -388,11 +388,11 @@ class ServoController(smach.State):
             sample_frame = userdata.detected_sample.header.frame_id
             try:
                 self.tf_listener.waitForTransform('manipulator_arm',
-                        sample_frame, sample_time, rospy.Duration(1.0))
+                        sample_frame, sample_time, rospy.Duration(3.0))
                 point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
                                                              userdata.detected_sample).point
-            except tf.Exception:
-                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform in 1.0 seconds, at time: {!s}".format(sample_frame, sample_time))
+            except tf.Exception, exc:
+                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform in 1.0 seconds.  Exception: {!s}".format(sample_frame, exc))
                 self.try_count = 0
                 return 'aborted'
             #rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
