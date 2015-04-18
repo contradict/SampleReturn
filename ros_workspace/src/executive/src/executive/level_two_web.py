@@ -249,11 +249,14 @@ class LevelTwoWeb(object):
                                    transitions = {'next':'WEB_MANAGER'})
 
             
-            @smach.cb_interface(input_keys=['detected_sample'])
+            @smach.cb_interface(input_keys=['detected_sample'],
+                                output_keys=['move_point_map'])
             def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
                 goal.input_point = userdata.detected_sample
                 goal.input_string = "level_two_pursuit_request"
+                #disable localization checks while in pursuit
+                userdata.move_point_map = None
                 return goal
             
             @smach.cb_interface(output_keys=['detected_sample'])
