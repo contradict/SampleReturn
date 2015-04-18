@@ -435,7 +435,7 @@ class KalmanDetectionFilter
       visualization_msgs::Marker cov;
       cov.type = visualization_msgs::Marker::SPHERE;
       cov.id = marker_count_;
-      cov.header.frame_id = "/map";
+      cov.header.frame_id = "odom";
       cov.header.stamp = ros::Time::now();
       cov.color.r = 1.0;
       cov.color.g = 1.0;
@@ -462,7 +462,7 @@ class KalmanDetectionFilter
           std::get<2>(exclusion_list_[i])*px_per_meter, cv::Scalar(255,255,255));
     }
 
-    printFilterState();
+    //printFilterState();
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",img).toImageMsg();
     pub_debug_img.publish(debug_img_msg);
