@@ -390,7 +390,7 @@ class PursueSample(object):
             
             #always update the target_sample
             self.state_machine.userdata.target_sample = point
-            
+                                   
             #if the pursuit_goal is None, we are not actively in pursuit
             if self.state_machine.userdata.pursuit_goal is not None:
                 #if the desired pursuit pose changes too much, update the state_machine's pose
@@ -682,6 +682,9 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         #recalculate the quaternion pointing from goal point to sample point
         pointing_quat = util.pointing_quaternion_2d(pursuit_pose.pose.position, point_in_frame.point)
         pursuit_pose.pose.orientation = pointing_quat
+        
+        rospy.loginfo("CALCULATE PURSUIT: pursuit_point: {!s}, point_in_frame: {!s}, pursuit_pose: {!s}".format(pursuit_point, point_in_frame, pursuit_pose))
+        
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
            rospy.logwarn("PURSUE_SAMPLE failed to transform pursuit point %s->%s: %s",

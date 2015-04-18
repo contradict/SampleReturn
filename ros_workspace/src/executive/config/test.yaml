@@ -7,7 +7,7 @@ level_two:
     #for search  behaviour, degrees and meters
     move_velocity: 1.0
     spin_velocity: 0.5
-    spoke_count: 15 
+    spoke_count: 20 
     max_spoke_length: 150 
     first_spoke_offset: 0 
     next_spoke_sign: 1 # 1 for ccw, -1 for cw
