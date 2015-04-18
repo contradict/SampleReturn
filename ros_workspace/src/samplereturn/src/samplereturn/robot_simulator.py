@@ -71,10 +71,10 @@ class RobotSimulator(object):
         self.fake_samples = [{'point':geometry_msg.Point(74, -3.0, 0),'id':1},
                              {'point':geometry_msg.Point(6, -28, 0),'id':5},
                              {'point':geometry_msg.Point(-47, 10, 0), 'id':3},
-                             {'point':geometry_msg.Point(-65, 20, 0), 'id':7},
+                             {'point':geometry_msg.Point(-70, 62, 0), 'id':7},
                              {'point':geometry_msg.Point(-104, 45, 0), 'id':9},
                              {'point':geometry_msg.Point(70, -52, 0), 'id':10},
-                             {'point':geometry_msg.Point(10, 0, 0), 'id':2},
+                             {'point':geometry_msg.Point(120, 28, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
                              {'point':geometry_msg.Point(10.8, 30.6, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
@@ -89,8 +89,8 @@ class RobotSimulator(object):
         self.path_marker = vis_msg.Marker()
         self.path_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         self.path_marker.type = vis_msg.Marker.ARROW
-        self.path_marker.color = std_msg.ColorRGBA(0, 0, 254, 1)
-        self.path_marker.scale = geometry_msg.Vector3(.5, .1, .1)
+        self.path_marker.color = std_msg.ColorRGBA(0, 0, 1, 1)
+        self.path_marker.scale = geometry_msg.Vector3(1.0, .2, .2)
         self.path_marker.lifetime = rospy.Duration(0)
                                                         
         self.joint_state_seq = 0

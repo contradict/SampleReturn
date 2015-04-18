@@ -7,17 +7,17 @@ level_two:
     #for search  behaviour, degrees and meters
     move_velocity: 1.0
     spin_velocity: 0.5
-    spoke_count: 10 
-    max_spoke_length: 80 
-    first_spoke_offset: 55 
+    spoke_count: 15 
+    max_spoke_length: 150 
+    first_spoke_offset: 0 
     next_spoke_sign: 1 # 1 for ccw, -1 for cw
     spoke_hub_radius: 15
     #raster step is distance between raster lines
     #raster offset is how close to the spoke we get
     #before we go to the next raster step
-    raster_step: 5
-    raster_offset: 5
-    return_time_minutes: 100  
+    raster_step: 6
+    raster_offset: 6
+    return_time_minutes: 110  
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}
