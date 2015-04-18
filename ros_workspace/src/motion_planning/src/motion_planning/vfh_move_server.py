@@ -275,7 +275,15 @@ class VFHMoveServer( object ):
                                                   stop_function=self.is_stop_requested)
             self.vfh_running = False
             if self.exit_check(): return
+            
+        elif self._action_outcome == VFHMoveResult.BLOCKED:
+            rospy.loginfo("VFH reporting STARTED_BLOCKED")
+            #we found all sectors blocked before we even tried to move
+            self._action_outcome = VFHMoveResult.STARTED_BLOCKED
 
+        #if we got to the goal(ish), turn and face in requested orientation
+        if self._action_outcome in [VFHMoveResult.COMPLETE,
+                                    VFHMoveResult.MISSED_TARGET]:
             # turn to requested orientation
             dyaw = self.yaw_error()
             if self._orient_at_target and (np.abs(dyaw) > self._goal_orientation_tolerance):
@@ -284,10 +292,6 @@ class VFHMoveServer( object ):
                                          spin_velocity,
                                          stop_function=self.is_stop_requested)
                 if self.exit_check(): return
-        elif self._action_outcome == VFHMoveResult.BLOCKED:
-            rospy.loginfo("VFH reporting STARTED_BLOCKED")
-            #we found all sectors blocked before we even tried to move
-            self._action_outcome = VFHMoveResult.STARTED_BLOCKED
 
         rospy.logdebug("Successfully completed goal.")
         self._as.set_succeeded(result =
