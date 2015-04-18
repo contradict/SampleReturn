@@ -21,6 +21,7 @@ restart_delay with no images, then restart first trigger.
 import rospy
 import yaml
 import Queue
+import threading
 
 import std_msgs.msg as std_msg
 from sensor_msgs.msg import Image, CameraInfo
@@ -79,19 +80,49 @@ class TriggeredCamera(object):
         rospy.Subscriber('pause_state', std_msg.Bool, self.handle_pause)
 
         self.connect_to_services()
+        self.try_to_set_recordingmedia()
         self.start_trigger_timer(None)
 
     def connect_to_services(self):
         self.wait_for_service('gpio_service')
-        self.wait_for_service('set_config')
         self.gpio_service = rospy.ServiceProxy('gpio_service', GPIOService,
                 persistent=True)
-        self.photo_config = rospy.ServiceProxy('set_config', SetConfig,
-                persistent=True)
+
+    def try_to_set_recordingmedia(self):
+        success = False
+        def doit(photo_config):
+            try:
+                rospy.logdebug("Setting recording media")
+                photo_config(SetConfigRequest(param="recordingmedia",
+                    value="1 SDRAM"))
+                success = True
+                rospy.loginfo("Set recording media to SDRAM")
+            except rospy.ServiceException:
+                rospy.logerr("config service failed")
+        def worker():
+            while not rospy.is_shutdown() and not success:
+                try:
+                    rospy.logdebug("Connecting to service set_config")
+                    rospy.wait_for_service("set_config", 20.0)
+                except rospy.ROSException:
+                    rospy.logerr("Cannot contact set_config, retrying.")
+                    continue
+                except rospy.ROSInterrupException:
+                    rospy.logerr("Never found set_config, exiting for shutdown.")
+                    break
+                photo_config = rospy.ServiceProxy('set_config', SetConfig)
+                threading.Thread(target=lambda:doit(photo_config)).start()
+                rospy.sleep(10.0)
+                try:
+                    photo_config.close()
+                except:
+                    pass
+        threading.Thread(target=worker).start()
 
     def wait_for_service(self, name):
         while not rospy.is_shutdown():
             try:
+                rospy.logdebug("Connecting to service %s", name)
                 rospy.wait_for_service(name, 20.0)
                 break
             except rospy.ROSException:
@@ -102,9 +133,11 @@ class TriggeredCamera(object):
 
     def handle_pause(self, msg):
         self.paused = msg.data
+        rospy.logdebug("Pause: %s", self.paused)
 
     def handle_image(self, msg):
         if self.missing_image_timer is not None:
+            rospy.logdebug("Missing image timer canceled")
             self.missing_image_timer.shutdown()
             self.missing_image_timer = None
 
@@ -131,6 +164,7 @@ class TriggeredCamera(object):
         msg.header.stamp = stamp
         msg.header.seq = seq
         msg.header.frame_id = self.frame_id
+        rospy.logdebug("Publish image")
         self.output.publish(msg)
         if self.info is not None:
             self.info.header.stamp = stamp
@@ -147,11 +181,14 @@ class TriggeredCamera(object):
     def enable_callback(self, req):
         self.enabled = req.state
         resp = EnableResponse(self.enabled)
+        rospy.logdebug("Enable: %s", self.enabled)
         return resp
 
     def start_restart_timer(self):
         if self.pause_for_restart_timer is not None:
+            rospy.logdebug("Canceling existing restart timer")
             self.pause_for_restart_timer.shutdown()
+        rospy.logdebug("Starting restart timer %f", self.restart_delay)
         self.pause_for_restart_timer = rospy.Timer(
                 rospy.Duration(self.restart_delay),
                 self.start_trigger_timer,
@@ -159,19 +196,12 @@ class TriggeredCamera(object):
 
     def start_trigger_timer(self, evt):
         if self.pause_for_restart_timer is not None:
+            rospy.logdebug("Canceling restart timer")
             self.pause_for_restart_timer.shutdown()
             self.pause_for_restart_timer = None
         rospy.loginfo("starting trigger")
-        while True:
-            try:
-                self.photo_config(SetConfigRequest(param="recordingmedia",
-                    value="1 SDRAM"))
-                break
-            except rospy.ServiceException:
-                rospy.logerr("config service failed")
-                self.connect_to_services()
-
         self.send_one_trigger()
+        rospy.logdebug("Start first image wait timer")
         self.wait_for_first_image_timer = rospy.Timer(
                 rospy.Duration(2*self.error_timeout),
                 self.no_first_image,
@@ -183,6 +213,7 @@ class TriggeredCamera(object):
         self.start_trigger_timer(None)
 
     def send_one_trigger(self):
+        rospy.logdebug("Send one trigger")
         self.trigger_count += 1
         gpio_req = GPIOServiceRequest(GPIO(servo_id=self.gpio_servo_id,
                                    new_pin_states=0,
@@ -205,6 +236,8 @@ class TriggeredCamera(object):
         return True
 
     def trigger_camera(self, evt):
+        rospy.logdebug("Trigger camera enabled: %s paused: %s",
+                self.enabled, self.paused)
         if not self.enabled or self.paused:
             if self.missing_image_timer is not None:
                 self.missing_image_timer.shutdown()
@@ -218,6 +251,7 @@ class TriggeredCamera(object):
         rospy.logdebug("trigger seq: %d queue: %d", self.trigger_count,
                 self.timestamp_queue.qsize())
         if self.missing_image_timer is None:
+            rospy.logdebug("Start missing image timer")
             self.missing_image_timer = rospy.Timer(
                     rospy.Duration(self.error_timeout),
                     self.no_image_received,

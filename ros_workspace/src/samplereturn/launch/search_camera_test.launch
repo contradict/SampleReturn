@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="devel"/>
+        <arg name="replay" value="false"/>
+    </include>
+ 
+    <include file="$(find samplereturn)/launch/search_camera.launch"/>
+    <include file="$(find samplereturn)/launch/motion.launch">
+        <arg name="start_paused" value="true"/>
+    </include>
+</launch>
