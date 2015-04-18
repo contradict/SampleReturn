@@ -13,6 +13,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
 #include <samplereturn_msgs/PursuitResult.h>
+#include <geometry_msgs/PolygonStamped.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
@@ -33,6 +34,7 @@ class KalmanDetectionFilter
   ros::Publisher pub_img_detection;
   ros::Publisher pub_debug_img;
   ros::Publisher pub_filter_marker_array;
+  ros::Publisher pub_frustum_poly;
 
   ros::Subscriber sub_ack;
 
@@ -44,6 +46,7 @@ class KalmanDetectionFilter
   std::string ack_topic;
   std::string debug_img_topic;
   std::string filter_marker_array_topic;
+  std::string frustum_poly_topic;
 
   std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
   // Exclusion sites are centers and radii (x,y,r)
@@ -91,6 +94,7 @@ class KalmanDetectionFilter
     filtered_img_detection_topic = "filtered_img_point";
     debug_img_topic = "debug_img";
     filter_marker_array_topic = "filter_markers";
+    frustum_poly_topic = "frustum_polygon";
 
     ack_topic = "ack";
 
@@ -130,6 +134,9 @@ class KalmanDetectionFilter
 
     pub_filter_marker_array =
       nh.advertise<visualization_msgs::MarkerArray>(filter_marker_array_topic.c_str(), 3);
+
+    pub_frustum_poly =
+      nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
 
     if(accumulate_) {
       sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
@@ -365,8 +372,10 @@ class KalmanDetectionFilter
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        filter_list_[i]->predict();
-        filter_list_[i]->errorCovPre.copyTo(filter_list_[i]->errorCovPost);;
+        if (isInView(filter_list_[i])) {
+          filter_list_[i]->predict();
+          filter_list_[i]->errorCovPre.copyTo(filter_list_[i]->errorCovPost);;
+        }
       }
     }
     checkFilterAges();
@@ -375,6 +384,44 @@ class KalmanDetectionFilter
     if (accumulate_) {
       publishTop();
     }
+  }
+
+  /* This will check if each hypothesis is in view currently */
+  bool isInView (std::shared_ptr<cv::KalmanFilter> kf) {
+    ROS_DEBUG("Is In View Check");
+    /* This is in base_link, transform it to odom */
+    cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
+        1.75, -1.21, 21.75, -13.21, 21.75, 13.21, 1.75, 1.21);
+    cv::Mat DSLR_frustum_odom(4,2,CV_32FC1);
+    geometry_msgs::PointStamped temp_msg, temp_msg_odom;
+    geometry_msgs::PolygonStamped frustum_poly;
+    frustum_poly.header.frame_id = "odom";
+    frustum_poly.header.stamp = ros::Time::now();
+    temp_msg.header.frame_id = "base_link";
+    temp_msg.header.stamp = ros::Time::now();
+    for (int i=0; i<4; i++) {
+      temp_msg.point.x = DSLR_frustum.at<float>(i,0);
+      temp_msg.point.y = DSLR_frustum.at<float>(i,1);
+      temp_msg.point.z = 0.0;
+      try {
+        listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
+      }
+      catch (tf::TransformException e) {
+        ROS_ERROR_STREAM("Aww shit " << e.what());
+      }
+      listener_.transformPoint("odom",temp_msg,temp_msg_odom);
+      DSLR_frustum_odom.at<float>(i,0) = temp_msg_odom.point.x;
+      DSLR_frustum_odom.at<float>(i,1) = temp_msg_odom.point.y;
+      geometry_msgs::Point32 temp_point;
+      temp_point.x = temp_msg_odom.point.x;
+      temp_point.y = temp_msg_odom.point.y;
+      temp_point.z = 0.0;
+      frustum_poly.polygon.points.push_back(temp_point);
+    }
+    pub_frustum_poly.publish(frustum_poly);
+    double retval = cv::pointPolygonTest(DSLR_frustum_odom,
+        cv::Point2f(kf->statePost.at<float>(0),kf->statePost.at<float>(1)), false);
+    return (retval == 1);
   }
 
   bool isOld (std::shared_ptr<cv::KalmanFilter> kf) {
