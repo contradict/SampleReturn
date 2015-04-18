@@ -46,7 +46,6 @@ class KalmanDetectionFilter
   std::string filter_marker_array_topic;
 
   std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
-  std::vector<std::shared_ptr<cv::KalmanFilter> > latched_filter_list_;
   // Exclusion sites are centers and radii (x,y,r)
   std::vector<std::tuple<float,float,float> > exclusion_list_;
 
@@ -159,7 +158,6 @@ class KalmanDetectionFilter
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
-      latched_filter_list_.clear();
     }
   }
 
@@ -172,8 +170,8 @@ class KalmanDetectionFilter
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
   {
     float x,y,r;
-    x = latched_filter_list_[0]->statePost.at<float>(0);
-    y = latched_filter_list_[0]->statePost.at<float>(1);
+    x = filter_list_[0]->statePost.at<float>(0);
+    y = filter_list_[0]->statePost.at<float>(1);
     if (msg.success) {
       r = pos_exclusion_radius_;
     }
@@ -182,7 +180,7 @@ class KalmanDetectionFilter
     }
     exclusion_list_.push_back(std::make_tuple(x,y,r));
 
-    latched_filter_list_.erase(latched_filter_list_.begin());
+    filter_list_.erase(filter_list_.begin());
   }
 
   void imgDetectionCallback(const samplereturn_msgs::NamedPoint& msg)
@@ -193,7 +191,7 @@ class KalmanDetectionFilter
 
   void detectionCallback(const samplereturn_msgs::NamedPoint& msg)
   {
-    if (filter_list_.size() == 0 && latched_filter_list_.size()==0) {
+    if (filter_list_.size() == 0) {
       addFilter(msg);
       return;
     }
@@ -206,29 +204,24 @@ class KalmanDetectionFilter
 
     checkObservation(msg);
 
-    if (!accumulate_) {
-      publishFilteredDetections(msg);
-    }
-    else {
-      processFilters();
-    }
+    publishFilteredDetections(msg);
   }
 
   void publishTop() {
-    if (latched_filter_list_.size() > 0) {
+    if (filter_list_.size() > 0) {
       samplereturn_msgs::NamedPoint point_msg;
       point_msg.header.frame_id = _filter_frame_id;
       point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = latched_filter_list_[0]->statePost.at<float>(0);
-      point_msg.point.y = latched_filter_list_[0]->statePost.at<float>(1);
+      point_msg.point.x = filter_list_[0]->statePost.at<float>(0);
+      point_msg.point.y = filter_list_[0]->statePost.at<float>(1);
       point_msg.point.z = 0;
       pub_detection.publish(point_msg);
 
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
-        xyz_point.x = double(latched_filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(latched_filter_list_[0]->statePost.at<float>(1));
-        xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
+        xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
         cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         img_point_msg.header.frame_id = "";
@@ -328,15 +321,10 @@ class KalmanDetectionFilter
     checkObservation(msg);
   }
 
-  void addMeasurement(const cv::Mat meas_state, int filter_index, bool latched)
+  void addMeasurement(const cv::Mat meas_state, int filter_index)
   {
     ROS_DEBUG("Adding measurement to filter: %i", filter_index);
-    if (latched) {
-      latched_filter_list_[filter_index]->correct(meas_state);
-    }
-    else {
-      filter_list_[filter_index]->correct(meas_state);
-    }
+    filter_list_[filter_index]->correct(meas_state);
   }
 
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
@@ -354,23 +342,11 @@ class KalmanDetectionFilter
       }
     }
 
-    if (accumulate_) {
-      for (int i=0; i<latched_filter_list_.size(); i++) {
-        cv::Mat dist = (latched_filter_list_[i]->measurementMatrix)*
-          (latched_filter_list_[i]->statePost) - meas_state;
-        if (abs(cv::sum(dist)[0]) < max_dist_) {
-          latched_filter_list_[i]->predict();
-          addMeasurement(meas_state, i, true);
-          return;
-        }
-      }
-    }
-
     for (int i=0; i<filter_list_.size(); i++) {
       cv::Mat dist = (filter_list_[i]->measurementMatrix)*(filter_list_[i]->statePost)
         - meas_state;
       if (abs(cv::sum(dist)[0]) < max_dist_) {
-        addMeasurement(meas_state, i, false);
+        addMeasurement(meas_state, i);
         return;
       }
     }
@@ -383,7 +359,7 @@ class KalmanDetectionFilter
     if (!cam_model_.initialized()) {
       cam_model_.fromCameraInfo(msg);
     }
-    if (filter_list_.size()==0 && latched_filter_list_.size()==0) {
+    if (filter_list_.size()==0) {
       return;
     }
     if (last_time_ < msg.header.stamp) {
@@ -429,29 +405,8 @@ class KalmanDetectionFilter
         filter_list_.end());
   }
 
-  void processFilters()
-  {
-    std::vector<int> count;
-    for (int i=0; i<filter_list_.size(); i++) {
-      cv::Mat eigenvalues;
-      cv::eigen(filter_list_[i]->errorCovPost, eigenvalues);
-      if (eigenvalues.at<float>(0)+eigenvalues.at<float>(1) < max_pub_cov_) {
-        latched_filter_list_.push_back(filter_list_[i]);
-        count.push_back(i);
-      }
-    }
-
-    for (int i=0; i<count.size(); i++) {
-      filter_list_.erase(filter_list_.begin()+count[i]);
-    }
-    count.clear();
-  }
-
   void drawFilterStates() {
     ROS_DEBUG("Number of Filters: %lu", filter_list_.size());
-    if (accumulate_) {
-      ROS_DEBUG("Number of Latched Filters: %lu", latched_filter_list_.size());
-    }
 
     visualization_msgs::MarkerArray marker_array;
 
@@ -500,37 +455,6 @@ class KalmanDetectionFilter
       marker_array.markers.push_back(cov);
       marker_count_ += 1;
     }
-    for (auto filter_ptr : latched_filter_list_) {
-      cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
-          filter_ptr->statePost.at<float>(1) * px_per_meter);
-      float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
-      float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
-      cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,255,0));
-      cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
-
-      visualization_msgs::Marker cov;
-      cov.type = visualization_msgs::Marker::SPHERE;
-      cov.id = marker_count_;
-      cov.header.frame_id = "/map";
-      cov.header.stamp = ros::Time::now();
-      cov.color.r = 0.0;
-      cov.color.g = 1.0;
-      cov.color.b = 0.0;
-      cov.color.a = 0.5;
-      cov.pose.position.x = filter_ptr->statePost.at<float>(0);
-      cov.pose.position.y = filter_ptr->statePost.at<float>(1);
-      cov.pose.position.z = 0.0;
-      cov.pose.orientation.x = 0;
-      cov.pose.orientation.y = 0;
-      cov.pose.orientation.z = 0;
-      cov.pose.orientation.w = 1;
-      cov.scale.x = filter_ptr->errorCovPost.at<float>(0,0);
-      cov.scale.y = filter_ptr->errorCovPost.at<float>(1,1);
-      cov.scale.z = 0.01;
-      cov.lifetime = ros::Duration();
-      marker_array.markers.push_back(cov);
-      marker_count_ += 1;
-    }
 
     for (int i=0; i<exclusion_list_.size(); i++) {
       cv::circle(img, cv::Point(std::get<0>(exclusion_list_[i])*px_per_meter,
@@ -548,10 +472,7 @@ class KalmanDetectionFilter
 
   void printFilterState() {
     for (auto filter_ptr : filter_list_) {
-      //std::cout << "State: " << filter_ptr->statePost << std::endl;
-    }
-    for (auto filter_ptr : latched_filter_list_) {
-      //std::cout << "Latched State: " << filter_ptr->statePost << std::endl;
+      std::cout << "State: " << filter_ptr->statePost << std::endl;
     }
   }
 
