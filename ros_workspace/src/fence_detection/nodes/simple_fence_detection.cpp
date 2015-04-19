@@ -52,6 +52,7 @@ class FenceDetectorNode
   double a_channel_threshold_, b_channel_threshold_, x_edge_threshold_, y_edge_threshold_, sum_threshold_;
   double max_range_, min_height_;
   int dilate_iterations_, erode_iterations_;
+  double ransac_distance_threshold_;
 
   sensor_msgs::CameraInfo r_cam_info_;
   image_geometry::StereoCameraModel cam_model_;
@@ -78,6 +79,7 @@ class FenceDetectorNode
     private_node_handle_.param("sum_threshold",sum_threshold_,double(85));
     private_node_handle_.param("dilate_iterations",dilate_iterations_,int(14));
     private_node_handle_.param("erode_iterations",erode_iterations_,int(20));
+    private_node_handle_.param("ransac_distance_threshold",ransac_distance_threshold_,double(0.1));
 
     color_img_sub =
       nh.subscribe(color_img_topic.c_str(), 3, &FenceDetectorNode::imageCallback, this);
@@ -208,7 +210,6 @@ class FenceDetectorNode
         }
       }
     }
-    //points_pub.publish(points_msg);
 
     /* Transform points to base_link frame */
     sensor_msgs::PointCloud2 base_link_points_msg;
@@ -263,7 +264,7 @@ class FenceDetectorNode
     pcl::SACSegmentation<pcl::PointXYZ> seg;
     seg.setOptimizeCoefficients (true);
     seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setDistanceThreshold (0.1);
+    seg.setDistanceThreshold (ransac_distance_threshold_);
 
     ROS_INFO("Width, Height:%u, %u",ptr_cloud->width,ptr_cloud->height);
 
@@ -338,6 +339,7 @@ class FenceDetectorNode
     erode_iterations_ = config.erode_iterations;
     min_height_ = config.min_height;
     max_range_ = config.max_range;
+    ransac_distance_threshold_ = config.ransac_distance_threshold;
   }
 
 };
