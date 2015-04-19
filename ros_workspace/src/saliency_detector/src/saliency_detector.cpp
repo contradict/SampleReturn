@@ -48,6 +48,9 @@ class SaliencyDetectorNode
   double bms_top_trim_;
   double bms_img_width_;
 
+  XmlRpc::XmlRpcValue interior_colors_, exterior_colors_;
+  std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
+
   image_geometry::PinholeCameraModel cam_model_;
   cv::Mat inv_K_;
 
@@ -70,6 +73,16 @@ class SaliencyDetectorNode
     private_node_handle_.param("sub_mask_debug_topic", sub_mask_debug_topic, string("sub_mask"));
     private_node_handle_.param("named_point_topic", named_point_topic, string("named_point"));
     private_node_handle_.param("camera_info_topic", sub_camera_info_topic, string("/cameras/search/info"));
+
+    private_node_handle_.getParam("interior_colors",interior_colors_);
+    private_node_handle_.getParam("exterior_colors",exterior_colors_);
+
+    for (int i=0; i<interior_colors_.size(); i++) {
+      interior_colors_vec_.push_back(static_cast<std::string>(interior_colors_[i]));
+    }
+    for (int i=0; i<exterior_colors_.size(); i++) {
+      exterior_colors_vec_.push_back(static_cast<std::string>(exterior_colors_[i]));
+    }
 
     sub_img =
       nh.subscribe(img_topic.c_str(), 3, &SaliencyDetectorNode::messageCallback, this);
@@ -174,11 +187,13 @@ class SaliencyDetectorNode
       cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
           CV_RGB(100,100,100));
 
+      std::vector<std::string>::iterator in_it, ex_it;
+      in_it = std::find(interior_colors_vec_.begin(),interior_colors_vec_.end(),dominant_color);
+      ex_it = std::find(exterior_colors_vec_.begin(),exterior_colors_vec_.end(),dominant_exterior_color);
+
       if (cam_model_.initialized()
-          && dominant_color != "green" && dominant_color != "brown"
-          && dominant_exterior_color == "green"
-          && dominant_color != "gray" && dominant_color != "black"
-          && dominant_color != "blue" ) {
+          && in_it != interior_colors_vec_.end()
+          && ex_it != exterior_colors_vec_.end()){
         cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
         cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
             CV_RGB(0,255,0));

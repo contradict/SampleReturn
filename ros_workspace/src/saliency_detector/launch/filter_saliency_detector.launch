@@ -8,6 +8,10 @@
     machine="search"
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/image"/>
+    <rosparam param="interior_colors">[red, pink, purple, orange, yellow, blue, brown, white]
+    </rosparam>
+    <rosparam param="exterior_colors">[green]
+    </rosparam>
   </node>
 
   <node
