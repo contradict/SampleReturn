@@ -474,6 +474,9 @@ class KalmanDetectionFilter
         filter_list_[i].color = msg.name;
         return;
       }
+      else if (abs(cv::sum(dist)[0]) < max_dist_ && not checkColor(filter_list_[i].color,msg.name)) {
+        return;
+      }
     }
     addFilter(msg);
   }
