@@ -441,6 +441,16 @@ class KalmanDetectionFilter
     filter_list_[filter_index].filter->correct(meas_state);
   }
 
+  bool checkColor(std::string filter_color, std::string obs_color)
+  {
+    std::vector<std::string>::iterator color_it;
+    color_it = std::find(color_transitions_map_[filter_color].begin(),
+                          color_transitions_map_[filter_color].end(),
+                          obs_color);
+    return (color_it != color_transitions_map_[filter_color].end());
+  }
+
+
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
     cv::Mat meas_state(3, 1, CV_32F);
@@ -459,8 +469,9 @@ class KalmanDetectionFilter
     for (int i=0; i<filter_list_.size(); i++) {
       cv::Mat dist = (filter_list_[i].filter->measurementMatrix)*(filter_list_[i].filter->statePost)
         - meas_state;
-      if (abs(cv::sum(dist)[0]) < max_dist_) {
+      if (abs(cv::sum(dist)[0]) < max_dist_ && checkColor(filter_list_[i].color,msg.name)) {
         addMeasurement(meas_state, i);
+        filter_list_[i].color = msg.name;
         return;
       }
     }
