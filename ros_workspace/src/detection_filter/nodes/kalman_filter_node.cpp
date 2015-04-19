@@ -337,7 +337,7 @@ class KalmanDetectionFilter
     KF->statePost.at<float>(5) = 0;
 
     KF->predict();
-    filter_list_.push_back(ColoredKF(KF,"red"));
+    filter_list_.push_back(ColoredKF(KF,msg.name));
     checkObservation(msg);
   }
 
