@@ -152,12 +152,19 @@ class ManipulatorJointController(JointControllerMX):
         self.paused = req.state
         if self.paused:
             self.unblock()
+            self.clear_check_flags()
             self.set_torque_enable(False)
             self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) # position mode
             self.set_torque_limit(self.initial_torque_limit)
             self.set_torque_enable(True)
             self.go_to_position(self.joint_state.current_pos)
-        return self.paused    
+        return self.paused
+    
+    def clear_check_flags(self):
+        self.check_for_move = False
+        self.check_for_stop = False
+        self.check_for_position = False
+        self.check_current = None
           
     def process_motor_states(self, state_list):
         JointControllerMX.process_motor_states(self, state_list)
