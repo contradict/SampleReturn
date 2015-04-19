@@ -84,7 +84,7 @@ class ManipulatorJointController(JointControllerMX):
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
         self.set_speed(0)
-        self.set_angle_limits(self.cw_limit, self.ccw_limit) #back to position mode
+        self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) #back to position mode
         self.set_torque_limit(self.torque_limit)
         self.set_speed(self.joint_speed)
         self.set_position(standoff_pos)
