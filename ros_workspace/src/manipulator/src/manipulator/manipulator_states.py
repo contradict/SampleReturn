@@ -22,6 +22,8 @@ class ProcessGoal(smach.State):
     fb = ManipulatorFeedback()
     fb.current_state = "START_MANIPULATOR"
     userdata.action_feedback = fb
+    #insert error into userdata as None
+    userdata.error = None
 
     mgr = ManipulatorResult()      
     userdata.action_result = mgr #this seems kinda lame, but set result to 
@@ -35,7 +37,6 @@ class ProcessGoal(smach.State):
       mgr.result = 'grab complete'
      
     # ensure that the goal is valid 
-    userdata.error = None
     if userdata.action_goal.wrist_angle > 1.7: 
       userdata.error = 'invalid_goal'
       return 'aborted'

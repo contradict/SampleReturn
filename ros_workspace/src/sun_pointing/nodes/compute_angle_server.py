@@ -9,7 +9,7 @@ from tf.transformations import euler_from_quaternion
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from sun_pointing.msg import ComputeAngleResult, ComputeAngleFeedback, ComputeAngleAction
-from samplereturn import simple_motion
+from motion_planning import simple_motion
 
 class ComputeAngle(object):
 
@@ -20,7 +20,7 @@ class ComputeAngle(object):
     self.action_server = actionlib.SimpleActionServer('sun_pointing_action', ComputeAngleAction, self.run_compute_angle_action, False)
 
     self.bridge = CvBridge()
-    self.max_indices = []
+    self.min_lightness = []
     self.img_angles = []
 
     self.turning = False
@@ -47,11 +47,9 @@ class ComputeAngle(object):
 
   def image_callback(self, msg):
     if self.turning:
-      img = np.asarray(self.bridge.imgmsg_to_cv(msg,'bgr8'))
-      gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-      hist = cv2.calcHist([gray],[0],None,[256],[0,256])
-      max_index = np.argmax(hist)
-      self.max_indices.append(max_index)
+      img = np.asarray(self.bridge.imgmsg_to_cv2(msg,'bgr8'))
+      lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+      self.min_lightness.append(np.min(lab[...,0]))
       self.img_angles.append(self.current_yaw)
 
   def run_compute_angle_action(self, goal):
@@ -66,7 +64,7 @@ class ComputeAngle(object):
     if self.action_server.is_preempt_requested():
       return
     self.turning = False
-    best_angle_index = np.argmax(self.max_indices)
+    best_angle_index = np.argmax(self.min_lightness)
     best_angle = self.img_angles[best_angle_index]
     # Return best angle
     # Turn to it in sub-180 degree moves
@@ -79,7 +77,7 @@ class ComputeAngle(object):
       self.mover.execute_spin(final_spin+np.pi)
     else:
       self.mover.execute_spin(final_spin)
-    self.max_indices = []
+    self.min_lightness = []
     self.img_angles = []
     self.action_server.set_succeeded(ComputeAngleResult(best_angle))
 
