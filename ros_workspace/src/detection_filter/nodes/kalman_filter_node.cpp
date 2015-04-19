@@ -91,6 +91,9 @@ class KalmanDetectionFilter
 
   dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig> dr_srv;
 
+  XmlRpc::XmlRpcValue color_transitions_;
+  std::map<std::string,std::vector<std::string> > color_transitions_map_;
+
   public:
   KalmanDetectionFilter()
   {
@@ -126,6 +129,97 @@ class KalmanDetectionFilter
     private_node_handle_.param("error_cov_post", error_cov_post_, double(0.5));
     private_node_handle_.param("period", period_, double(2));
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
+
+    private_node_handle_.getParam("color_transitions",color_transitions_);
+    if (color_transitions_.hasMember(std::string("red"))){
+      std::vector<std::string> red_vec;
+      for (int i=0; i<color_transitions_[std::string("red")].size(); i++) {
+        red_vec.push_back(static_cast<std::string>(color_transitions_[std::string("red")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("red",red_vec));
+    }
+    if (color_transitions_.hasMember(std::string("orange"))){
+      std::vector<std::string> orange_vec;
+      for (int i=0; i<color_transitions_[std::string("orange")].size(); i++) {
+        orange_vec.push_back(static_cast<std::string>(color_transitions_[std::string("orange")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("orange",orange_vec));
+    }
+    if (color_transitions_.hasMember(std::string("yellow"))){
+      std::vector<std::string> yellow_vec;
+      for (int i=0; i<color_transitions_[std::string("yellow")].size(); i++) {
+        yellow_vec.push_back(static_cast<std::string>(color_transitions_[std::string("yellow")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("yellow",yellow_vec));
+    }
+    if (color_transitions_.hasMember(std::string("green"))){
+      std::vector<std::string> green_vec;
+      for (int i=0; i<color_transitions_[std::string("green")].size(); i++) {
+        green_vec.push_back(static_cast<std::string>(color_transitions_[std::string("green")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("green",green_vec));
+    }
+    if (color_transitions_.hasMember(std::string("blue"))){
+      std::vector<std::string> blue_vec;
+      for (int i=0; i<color_transitions_[std::string("blue")].size(); i++) {
+        blue_vec.push_back(static_cast<std::string>(color_transitions_[std::string("blue")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("blue",blue_vec));
+    }
+    if (color_transitions_.hasMember(std::string("purple"))){
+      std::vector<std::string> purple_vec;
+      for (int i=0; i<color_transitions_[std::string("purple")].size(); i++) {
+        purple_vec.push_back(static_cast<std::string>(color_transitions_[std::string("purple")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("purple",purple_vec));
+    }
+    if (color_transitions_.hasMember(std::string("pink"))){
+      std::vector<std::string> pink_vec;
+      for (int i=0; i<color_transitions_[std::string("pink")].size(); i++) {
+        pink_vec.push_back(static_cast<std::string>(color_transitions_[std::string("pink")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("pink",pink_vec));
+    }
+    if (color_transitions_.hasMember(std::string("brown"))){
+      std::vector<std::string> brown_vec;
+      for (int i=0; i<color_transitions_[std::string("brown")].size(); i++) {
+        brown_vec.push_back(static_cast<std::string>(color_transitions_[std::string("brown")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("brown",brown_vec));
+    }
+    if (color_transitions_.hasMember(std::string("white"))){
+      std::vector<std::string> white_vec;
+      for (int i=0; i<color_transitions_[std::string("white")].size(); i++) {
+        white_vec.push_back(static_cast<std::string>(color_transitions_[std::string("white")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("white",white_vec));
+    }
+    if (color_transitions_.hasMember(std::string("gray"))){
+      std::vector<std::string> gray_vec;
+      for (int i=0; i<color_transitions_[std::string("gray")].size(); i++) {
+        gray_vec.push_back(static_cast<std::string>(color_transitions_[std::string("gray")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("gray",gray_vec));
+    }
+    if (color_transitions_.hasMember(std::string("black"))){
+      std::vector<std::string> black_vec;
+      for (int i=0; i<color_transitions_[std::string("black")].size(); i++) {
+        black_vec.push_back(static_cast<std::string>(color_transitions_[std::string("black")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("black",black_vec));
+    }
+
 
     sub_cam_info =
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);

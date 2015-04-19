@@ -41,5 +41,18 @@
     <param name="process_noise_cov" type="double" value="0.01"/>
     <param name="measurement_noise_cov" type="double" value="0.1"/>
     <param name="period" type="double" value="0.5"/>
+    <rosparam param="color_transitions">
+        white: [gray, blue, green, white, pink]
+        black: []
+        gray: [white, blue]
+        brown: [orange, red]
+        pink: [red, purple, white]
+        red: [pink, purple, orange, brown]
+        orange: [yellow, red, brown]
+        yellow: [orange]
+        green: [white]
+        blue: [gray, white]
+        purple: [red]
+    </rosparam>
   </node>
 </launch>
