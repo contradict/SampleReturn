@@ -37,6 +37,8 @@ class ManipulatorJointController(JointControllerMX):
     def __init__(self, dxl_io, controller_namespace, port_namespace):
         JointControllerMX.__init__(self, dxl_io, controller_namespace, port_namespace)
       
+        self.name = controller_namespace
+        
         self.velocity_standoff_service = rospy.Service(self.controller_namespace + '/velocity_standoff', VelocityStandoff, self.velocity_standoff)
         self.torque_standoff_service = rospy.Service(self.controller_namespace + '/torque_standoff', TorqueStandoff, self.torque_standoff)
         self.torque_hold_service = rospy.Service(self.controller_namespace + '/torque_hold', TorqueHold, self.torque_hold)
@@ -86,6 +88,8 @@ class ManipulatorJointController(JointControllerMX):
         self.set_speed(velocity)
         time.sleep(.5) #allow .5 seconds for dynamixel to move
         self.check_for_stop = True
+        rospy.loginfo("VELOCITY STANDOFF ({!s}) waiting for stop at: {:f.2}".format(self.name,
+                                                                                   rospy.get_time()))
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
         self.set_speed(0)
@@ -94,7 +98,9 @@ class ManipulatorJointController(JointControllerMX):
         self.set_speed(previous_velocity)
         self.set_position(standoff_pos)
         self.check_for_position = True
+        rospy.loginfo("VELOCITY STANDOFF ({!s}) waiting for position at: {:f.2} ".format(self.name))
         yield self.block()
+        
     
     @check_pause           
     def torque_standoff(self, req):
@@ -107,6 +113,8 @@ class ManipulatorJointController(JointControllerMX):
         self.set_goal_torque(torque)
         time.sleep(.5) #allow .5 seconds for dynamixel to move
         self.check_for_stop = True
+        rospy.loginfo("TORQUE STANDOFF ({!s}) waiting for stop at: {:f.2}".format(self.name,
+                                                                                  rospy.get_time()))
         yield self.block()
         self.set_torque_control_mode_enable(False)
         yield self.go_to_position(self.joint_state.current_pos + standoff)
@@ -117,8 +125,12 @@ class ManipulatorJointController(JointControllerMX):
         self.set_torque_control_mode_enable(True)
         self.set_goal_torque(torque)
         self.check_current = torque * 0.9 
+        rospy.loginfo("TORQUE HOLD ({!s}) waiting for torque at: {:f.2}".format(self.name,
+                                                                                  rospy.get_time()))
         yield self.block()
         self.check_for_stop = True
+        rospy.loginfo("TORQUE HOLD ({!s}) waiting for stop at: {:f.2}".format(self.name,
+                                                                                  rospy.get_time()))
         yield self.block()
         yield ("succeeded", self.joint_state.current_pos)
     
@@ -128,6 +140,8 @@ class ManipulatorJointController(JointControllerMX):
         if self.torque_control_mode: self.set_torque_control_mode_enable(False)
         self.set_position(position)            
         self.check_for_position = True
+        rospy.loginfo("GO TO POSITION ({!s}) waiting for position at: {:f.2}".format(self.name,
+                                                                                     rospy.get_time()))
         yield self.block()
                 
     def service_go_to_position(self, req):
@@ -184,6 +198,9 @@ class ManipulatorJointController(JointControllerMX):
         self.waitCV.wait()
         paused = "preempted" if self.paused else None
         self.waitCV.release()
+        rospy.loginfo("BLOCK RELEASED ({!s}) paused={!s} at {:f.2}".format(self.name,
+                                                                           paused,
+                                                                           rospy.get_time()))
         return paused
 
     def unblock(self):
