@@ -74,10 +74,6 @@ class ManipulatorJointController(JointControllerMX):
             standoff = req.distance * -1
         else:
             standoff = req.distance
-        previous_velocity = self.joint_speed
-        previous_torque_limit = self.torque_limit
-        previous_cw_limit = self.cw_limit
-        previous_ccw_limit = self.ccw_limit
         self.set_torque_limit(torque_limit)
         self.set_angle_limits(0, 0) #enable wheel mode!
         self.set_speed(velocity)
@@ -88,9 +84,9 @@ class ManipulatorJointController(JointControllerMX):
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
         self.set_speed(0)
-        self.set_angle_limits(previous_cw_limit, previous_ccw_limit) #back to position mode
-        self.set_torque_limit(previous_torque_limit)
-        self.set_speed(previous_velocity)
+        self.set_angle_limits(self.cw_limit, self.ccw_limit) #back to position mode
+        self.set_torque_limit(self.torque_limit)
+        self.set_speed(self.joint_speed)
         self.set_position(standoff_pos)
         self.check_for_position = True
         rospy.logwarn("VELOCITY STANDOFF ({!s}) waiting for position at: {:.2f} ".format(self.name))
@@ -151,6 +147,7 @@ class ManipulatorJointController(JointControllerMX):
             self.set_torque_enable(False)
             self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) # position mode
             self.set_torque_limit(self.initial_torque_limit)
+            self.set_speed(self.joint_speed)
             self.set_torque_enable(True)
             self.go_to_position(self.joint_state.current_pos)
         return self.paused
