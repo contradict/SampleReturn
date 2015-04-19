@@ -448,17 +448,6 @@ class KalmanDetectionFilter
     return false;
   }
 
-  bool isGood (std::shared_ptr<cv::KalmanFilter> kf) {
-    cv::Mat eigenvalues;
-    cv::eigen(kf->errorCovPost, eigenvalues);
-    for (int i=0; i<eigenvalues.rows; i++) {
-      if (eigenvalues.at<float>(i) < max_pub_cov_) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   void checkFilterAges() {
     filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
         std::bind1st(std::mem_fun(&KalmanDetectionFilter::isOld),this)),
