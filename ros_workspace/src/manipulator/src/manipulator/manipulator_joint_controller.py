@@ -1,8 +1,3 @@
-
-import roslib
-roslib.load_manifest('dynamixel_controllers')
-roslib.load_manifest('manipulator')
-
 import rospy
 import threading
 import array
