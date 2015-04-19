@@ -89,7 +89,8 @@ class ManipulatorJointController(JointControllerMX):
         self.set_speed(self.joint_speed)
         self.set_position(standoff_pos)
         self.check_for_position = True
-        rospy.logwarn("VELOCITY STANDOFF ({!s}) waiting for position at: {:.2f} ".format(self.name))
+        rospy.logwarn("VELOCITY STANDOFF ({!s}) waiting for position at: {:.2f} ".format(self.name,
+                                                                                         rospy.get_time()))
         yield self.block()
         
     
