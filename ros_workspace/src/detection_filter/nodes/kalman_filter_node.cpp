@@ -24,6 +24,19 @@
  * It will also age out filters that have too large a convariance.
  */
 
+class ColoredKF
+{
+  public:
+    std::shared_ptr<cv::KalmanFilter> filter;
+    std::string color;
+    ColoredKF(std::shared_ptr<cv::KalmanFilter>, std::string);
+};
+
+ColoredKF::ColoredKF (std::shared_ptr<cv::KalmanFilter> kf, std::string c) {
+  filter = kf;
+  color = c;
+}
+
 class KalmanDetectionFilter
 {
   ros::NodeHandle nh;
@@ -48,7 +61,7 @@ class KalmanDetectionFilter
   std::string filter_marker_array_topic;
   std::string frustum_poly_topic;
 
-  std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
+  std::vector<ColoredKF> filter_list_;
   // Exclusion sites are centers and radii (x,y,r)
   std::vector<std::tuple<float,float,float> > exclusion_list_;
 
@@ -177,8 +190,8 @@ class KalmanDetectionFilter
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
   {
     float x,y,r;
-    x = filter_list_[0]->statePost.at<float>(0);
-    y = filter_list_[0]->statePost.at<float>(1);
+    x = filter_list_[0].filter->statePost.at<float>(0);
+    y = filter_list_[0].filter->statePost.at<float>(1);
     if (msg.success) {
       r = pos_exclusion_radius_;
     }
@@ -205,7 +218,7 @@ class KalmanDetectionFilter
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        filter_list_[i]->predict();
+        filter_list_[i].filter->predict();
       }
     }
 
@@ -219,16 +232,16 @@ class KalmanDetectionFilter
       samplereturn_msgs::NamedPoint point_msg;
       point_msg.header.frame_id = _filter_frame_id;
       point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = filter_list_[0]->statePost.at<float>(0);
-      point_msg.point.y = filter_list_[0]->statePost.at<float>(1);
+      point_msg.point.x = filter_list_[0].filter->statePost.at<float>(0);
+      point_msg.point.y = filter_list_[0].filter->statePost.at<float>(1);
       point_msg.point.z = 0;
       pub_detection.publish(point_msg);
 
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
-        xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
-        xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
+        xyz_point.x = double(filter_list_[0].filter->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0].filter->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0].filter->statePost.at<float>(2));
         cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         img_point_msg.header.frame_id = "";
@@ -244,29 +257,29 @@ class KalmanDetectionFilter
   void publishFilteredDetections(const samplereturn_msgs::NamedPoint& msg) {
     for (auto filter_ptr : filter_list_) {
       cv::Mat eigenvalues;
-      cv::eigen(filter_ptr->errorCovPost, eigenvalues);
+      cv::eigen(filter_ptr.filter->errorCovPost, eigenvalues);
       for (int i=0; i<eigenvalues.rows; i++) {
         if (eigenvalues.at<float>(i) > max_pub_cov_) {
           break;
         }
       }
-      if (filter_ptr->statePost.at<float>(3) < max_pub_vel_ ||
-          filter_ptr->statePost.at<float>(4) < max_pub_vel_) {
+      if (filter_ptr.filter->statePost.at<float>(3) < max_pub_vel_ ||
+          filter_ptr.filter->statePost.at<float>(4) < max_pub_vel_) {
         samplereturn_msgs::NamedPoint point_msg;
         point_msg.header.frame_id = _filter_frame_id;
         point_msg.header.stamp = ros::Time::now();
         point_msg.grip_angle = msg.grip_angle;
         point_msg.sample_id = msg.sample_id;
-        point_msg.point.x = filter_ptr->statePost.at<float>(0);
-        point_msg.point.y = filter_ptr->statePost.at<float>(1);
+        point_msg.point.x = filter_ptr.filter->statePost.at<float>(0);
+        point_msg.point.y = filter_ptr.filter->statePost.at<float>(1);
         point_msg.point.z = 0;
         pub_detection.publish(point_msg);
       }
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
-        xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
-        xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
+        xyz_point.x = double(filter_list_[0].filter->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0].filter->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0].filter->statePost.at<float>(2));
         geometry_msgs::PointStamped odom_point;
         odom_point.header = msg.header;
         odom_point.point.x = xyz_point.x;
@@ -324,14 +337,14 @@ class KalmanDetectionFilter
     KF->statePost.at<float>(5) = 0;
 
     KF->predict();
-    filter_list_.push_back(KF);
+    filter_list_.push_back(ColoredKF(KF,"red"));
     checkObservation(msg);
   }
 
   void addMeasurement(const cv::Mat meas_state, int filter_index)
   {
     ROS_DEBUG("Adding measurement to filter: %i", filter_index);
-    filter_list_[filter_index]->correct(meas_state);
+    filter_list_[filter_index].filter->correct(meas_state);
   }
 
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
@@ -350,7 +363,7 @@ class KalmanDetectionFilter
     }
 
     for (int i=0; i<filter_list_.size(); i++) {
-      cv::Mat dist = (filter_list_[i]->measurementMatrix)*(filter_list_[i]->statePost)
+      cv::Mat dist = (filter_list_[i].filter->measurementMatrix)*(filter_list_[i].filter->statePost)
         - meas_state;
       if (abs(cv::sum(dist)[0]) < max_dist_) {
         addMeasurement(meas_state, i);
@@ -372,9 +385,9 @@ class KalmanDetectionFilter
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        if (isInView(filter_list_[i])) {
-          filter_list_[i]->predict();
-          filter_list_[i]->errorCovPre.copyTo(filter_list_[i]->errorCovPost);;
+        if (isInView(filter_list_[i].filter)) {
+          filter_list_[i].filter->predict();
+          filter_list_[i].filter->errorCovPre.copyTo(filter_list_[i].filter->errorCovPost);;
         }
       }
     }
@@ -424,9 +437,9 @@ class KalmanDetectionFilter
     return (retval == 1);
   }
 
-  bool isOld (std::shared_ptr<cv::KalmanFilter> kf) {
+  bool isOld (ColoredKF ckf) {
     cv::Mat eigenvalues;
-    cv::eigen(kf->errorCovPost, eigenvalues);
+    cv::eigen(ckf.filter->errorCovPost, eigenvalues);
     for (int i=0; i<eigenvalues.rows; i++) {
       if (eigenvalues.at<float>(i) > max_cov_) {
         return true;
@@ -472,10 +485,10 @@ class KalmanDetectionFilter
     float px_per_meter = 50.0;
     float offset = 250;
     for (auto filter_ptr : filter_list_){
-      cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
-          filter_ptr->statePost.at<float>(1) * px_per_meter);
-      float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
-      float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
+      cv::Point mean(filter_ptr.filter->statePost.at<float>(0) * px_per_meter,
+          filter_ptr.filter->statePost.at<float>(1) * px_per_meter);
+      float rad_x = filter_ptr.filter->errorCovPost.at<float>(0,0) * px_per_meter;
+      float rad_y = filter_ptr.filter->errorCovPost.at<float>(1,1) * px_per_meter;
       cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
       cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
 
@@ -488,15 +501,15 @@ class KalmanDetectionFilter
       cov.color.g = 1.0;
       cov.color.b = 1.0;
       cov.color.a = 0.5;
-      cov.pose.position.x = filter_ptr->statePost.at<float>(0);
-      cov.pose.position.y = filter_ptr->statePost.at<float>(1);
+      cov.pose.position.x = filter_ptr.filter->statePost.at<float>(0);
+      cov.pose.position.y = filter_ptr.filter->statePost.at<float>(1);
       cov.pose.position.z = 0.0;
       cov.pose.orientation.x = 0;
       cov.pose.orientation.y = 0;
       cov.pose.orientation.z = 0;
       cov.pose.orientation.w = 1;
-      cov.scale.x = filter_ptr->errorCovPost.at<float>(0,0);
-      cov.scale.y = filter_ptr->errorCovPost.at<float>(1,1);
+      cov.scale.x = filter_ptr.filter->errorCovPost.at<float>(0,0);
+      cov.scale.y = filter_ptr.filter->errorCovPost.at<float>(1,1);
       cov.scale.z = 0.01;
       cov.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
@@ -519,7 +532,7 @@ class KalmanDetectionFilter
 
   void printFilterState() {
     for (auto filter_ptr : filter_list_) {
-      std::cout << "State: " << filter_ptr->statePost << std::endl;
+      std::cout << "State: " << filter_ptr.filter->statePost << std::endl;
     }
   }
 
