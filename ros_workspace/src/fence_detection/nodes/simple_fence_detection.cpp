@@ -238,7 +238,22 @@ class FenceDetectorNode
     extract.setNegative (false);
     extract.filter (*clipped_cloud);
 
-    pcl::toPCLPointCloud2(*clipped_cloud,pcl_pc);
+    /*Trim far points */
+    Eigen::Vector4f far_plane;
+    far_plane.setZero();
+    far_plane[0] = -1.0;
+    far_plane[3] = max_range_;
+    pcl::PlaneClipper3D<pcl::PointXYZ> far_clipper(far_plane);
+    pcl::PointIndices::Ptr far_clipped (new pcl::PointIndices);
+    std::vector<int> far_indices;
+    far_clipper.clipPointCloud3D(*clipped_cloud,far_clipped->indices,far_indices);
+    pcl::ExtractIndices<pcl::PointXYZ> far_extract;
+    far_extract.setInputCloud (clipped_cloud);
+    far_extract.setIndices (far_clipped);
+    far_extract.setNegative (false);
+    far_extract.filter (*far_clipped_cloud);
+
+    pcl::toPCLPointCloud2(*far_clipped_cloud,pcl_pc);
     pcl_conversions::fromPCL(pcl_pc,base_link_points_msg);
     points_pub.publish(base_link_points_msg);
 
@@ -252,7 +267,7 @@ class FenceDetectorNode
 
     ROS_INFO("Width, Height:%u, %u",ptr_cloud->width,ptr_cloud->height);
 
-    seg.setInputCloud(clipped_cloud);
+    seg.setInputCloud(far_clipped_cloud);
     //seg.setInputCloud(ptr_cloud);
     seg.segment (*inliers, *coefficients);
     if (inliers->indices.size() == 0) {
