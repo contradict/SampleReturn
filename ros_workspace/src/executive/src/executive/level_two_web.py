@@ -559,20 +559,6 @@ class WebManager(smach.State):
                     robot_radius = util.get_robot_distance_to_origin(self.tf_listener,
                                                                      userdata.world_fixed_frame)
                     rospy.loginfo("WEB_MANAGER heading to next chord after blocked chord")
-                    
-                    #prune the raster until we go to the next chord inside our radius
-                    #while robot_radius < next_move['radius']:
-                        #are there more points?
-                    #    if (len(userdata.raster_points) > 0):
-                    #        rospy.loginfo("WEB_MANAGER pruning raster.  Robot radius: {:f}, \
-                    #                      next_move[radius]: {:f}, userdata.raster_points[0]: {!s} \
-                    #                      ".format(robot_radius,
-                    #                               next_move['radius'],
-                    #                               userdata.raster_points[0]))
-                    #        next_move = userdata.raster_points.popleft()
-                    #    else:                            
-                    #        break #no more points, just continue
-                    
                     x = next_move['radius']*math.cos(robot_yaw)
                     y = next_move['radius']*math.sin(robot_yaw)
                     header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
@@ -593,12 +579,13 @@ class WebManager(smach.State):
                 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
+                    self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
                     userdata.raster_active = False
                     userdata.outbound = True #request the next spoke move
                 return 'move'
             else:
                 #time to start rastering, create the points, and set flag
-                self.announcer.say("Begin ing raster on spoke, Yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
+                self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
                 userdata.raster_active = True
                 return 'get_raster'
         
