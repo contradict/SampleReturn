@@ -623,8 +623,7 @@ class RobotSimulator(object):
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
         self.active_sample_id = None
-        self.search_sample_queue.clear()
-
+        
     def check_beacon_pose(self, event):
         if not self.publish_beacon:
             return
@@ -741,8 +740,6 @@ class RobotSimulator(object):
             if fake_distance <= 0:
                 servo_result.success = True
                 self.visual_servo_server.set_succeeded(result=servo_result)
-                #mark the servoed sample off the list
-                self.collected_ids.append(self.active_sample_id)
                 break
             else:
                 servo_feedback.state = visual_servo_msg.VisualServoFeedback.MOVE_FORWARD
@@ -755,6 +752,9 @@ class RobotSimulator(object):
     def set_sample_success(self):
         if self.active_sample_id is not None:
             self.collected_ids.append(self.active_sample_id)
+            self.search_sample_queue.clear()
+            rospy.sleep(1.0)
+            #ensure that the publisher is finished
      
     #homing request for wheelpods happens at beginning, zero useful sim values        
     def home_wheelpods(self, goal):
