@@ -29,7 +29,6 @@ import manipulator_msgs.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
 import move_base_msgs.msg as move_base_msg
 import visual_servo_msgs.msg as visual_servo_msg
-import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn_msgs.srv as samplereturn_srv
 import visualization_msgs.msg as vis_msg
 
@@ -38,7 +37,8 @@ import sensor_msgs.point_cloud2 as pc2
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
 
-from geometry_msgs.msg import TransformStamped, Transform
+from geometry_msgs.msg import Point, PointStamped, TransformStamped, Transform
+from samplereturn_msgs.msg import NamedPoint, PursuitResult
 
 
 class RobotSimulator(object):
@@ -258,12 +258,12 @@ class RobotSimulator(object):
 
         #sample detection publishers
         self.search_sample_pub = rospy.Publisher(detected_sample_search_name,
-                                                 samplereturn_msg.NamedPoint,
+                                                 NamedPoint,
                                                  queue_size=10)
         rospy.Timer(rospy.Duration(1.0), self.check_sample_detection_search)        
 
         self.manipulator_sample_pub = rospy.Publisher(detected_sample_manipulator_name,
-                                                      samplereturn_msg.NamedPoint,
+                                                      NamedPoint,
                                                       queue_size=1)
         rospy.Timer(rospy.Duration(0.1), self.publish_sample_detection_manipulator)         
         
@@ -272,7 +272,7 @@ class RobotSimulator(object):
                                                  queue_size=30)
         
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
-                                                   samplereturn_msg.PursuitResult,
+                                                   PursuitResult,
                                                    self.handle_pursuit_result)
         
 
@@ -537,7 +537,7 @@ class RobotSimulator(object):
         if (len(self.beacon_pose_queue) > 0):
             delay = now - self.beacon_pose_queue[0].header.stamp
             if ((now - self.beacon_pose_queue[0].header.stamp) > self.beacon_pose_delay):
-                #rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
+                rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
                 self.beacon_pose_pub.publish(self.beacon_pose_queue.popleft())
             
 
@@ -561,12 +561,21 @@ class RobotSimulator(object):
                         #keep publishing the active detection id until it is cleared
                         #hopefully the sim won't have more than one active id...
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
-                        msg = samplereturn_msg.NamedPoint()
-                        msg.header = header
-                        msg.point = sample['point']
-                        msg.sample_id = sample['id']
-                        self.active_sample_id = sample['id']
+                        sample_in_map = PointStamped(header, sample['point'])
+                        try:
+                            self.tf_listener.waitForTransform(self.sim_odom,
+                                                              header.frame_id,
+                                                              header.stamp,
+                                                              rospy.Duration(1.0))
+                            sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
+                        except tf.Exception:
+                            rospy.logwarn("SIMULATOR failed to transform search detection point")
+
                         #append the detection to the delayed queue
+                        msg = NamedPoint(header = sample_point_odom.header,
+                                         point = sample_point_odom.point,
+                                         sample_id = sample['id'])
+                        self.active_sample_id = sample['id']
                         self.search_sample_queue.append(msg)
                                         
                 self.sample_marker_pub.publish(self.sample_marker)
@@ -577,10 +586,19 @@ class RobotSimulator(object):
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], -0.1, 0.5, 0.2):
                         header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)
-                        msg = samplereturn_msg.NamedPoint()
-                        msg.header = header
-                        msg.point = sample['point']
-                        msg.sample_id = sample['id']
+                        sample_in_map = PointStamped(header, sample['point'])
+                        try:
+                            self.tf_listener.waitForTransform(self.sim_odom,
+                                                              header.frame_id,
+                                                              header.stamp,
+                                                              rospy.Duration(1.0))
+                            sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
+                        except tf.Exception:
+                            rospy.logwarn("SIMULATOR failed to transform manipulator detection point")
+
+                        msg = NamedPoint(header = sample_point_odom.header,
+                                         point = sample_point_odom.point,
+                                         sample_id = sample['id'])
                         self.manipulator_sample_pub.publish(msg)
             
     def sample_in_view(self, point, min_x, max_x, max_y):
