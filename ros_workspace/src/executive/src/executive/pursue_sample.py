@@ -682,8 +682,7 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         #recalculate the quaternion pointing from goal point to sample point
         pointing_quat = util.pointing_quaternion_2d(pursuit_pose.pose.position, point_in_frame.point)
         pursuit_pose.pose.orientation = pointing_quat
-        
-        rospy.loginfo("CALCULATE PURSUIT: pursuit_point: {!s}, point_in_frame: {!s}, pursuit_pose: {!s}".format(pursuit_point, point_in_frame, pursuit_pose))
+        #rospy.loginfo("CALCULATE PURSUIT: pursuit_point: {!s}, point_in_frame: {!s}, pursuit_pose: {!s}".format(pursuit_point, point_in_frame, pursuit_pose))
         
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
