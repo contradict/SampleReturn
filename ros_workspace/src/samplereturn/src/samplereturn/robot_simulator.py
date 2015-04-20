@@ -537,7 +537,7 @@ class RobotSimulator(object):
         if (len(self.beacon_pose_queue) > 0):
             delay = now - self.beacon_pose_queue[0].header.stamp
             if ((now - self.beacon_pose_queue[0].header.stamp) > self.beacon_pose_delay):
-                rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
+                #rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
                 self.beacon_pose_pub.publish(self.beacon_pose_queue.popleft())
             
 
@@ -620,6 +620,7 @@ class RobotSimulator(object):
             print "Collected IDs: %s" % (self.collected_ids)
         else:
             self.excluded_ids.append(self.active_sample_id)
+            self.search_sample_queue.clear()
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
         self.active_sample_id = None
