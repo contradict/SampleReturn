@@ -917,7 +917,7 @@ class BeaconSearch(smach.State):
                 #save point
                 userdata.move_point_map = geometry_msg.PointStamped(map_header,
                                                     search_pose.pose.position)
-                goal = VFHMoveGoal(target_pose = userdata.search_pose,
+                goal = VFHMoveGoal(target_pose = search_pose,
                                    move_velocity = userdata.move_velocity,
                                    spin_velocity = userdata.spin_velocity)
                 userdata.move_goal = goal                        
