@@ -635,18 +635,24 @@ class RobotSimulator(object):
         beacon_translation = rospy.get_param("/processes/beacon/beacon_finder/beacon_translation")
         beacon_rotation = rospy.get_param("/processes/beacon/beacon_finder/beacon_rotation")
                 
-        dist_from_origin = np.hypot(self.robot_pose.pose.position.x,
-                                    self.robot_pose.pose.position.y)
-        # can't see beacon closer than 10 meters or farther than 40
+
+        #get distances and yaws from reality frame origin
+        reality_origin = PointStamped(std_msg.Header(0, rospy.Time.now(), self.reality_frame),
+                                                     Point(0,0,0))
+        angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
+                                                                  reality_origin)        # can't see beacon closer than 10 meters or farther than 40
+        angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
+                                                        self.reality_frame)
+
+        #rospy.loginfo("BEACON CHECK, dist_to_origin, angle_to_robot, angle_to_origin:\
+        #              {!s}, {!s}, {!s}".format(dist_from_origin,
+        #                                np.degrees(angle_to_robot),
+        #                                np.degrees(angle_to_origin)))
+
         if dist_from_origin < 5.0 or dist_from_origin > 60.0:
             #print ("NO BEACON PUB: outside beacon view distance: %.2f" %(dist_from_origin))
             return
-        angle_to_robot = np.arctan2(self.robot_pose.pose.position.y,
-                                    self.robot_pose.pose.position.x)
-
-        robot_yaw = 2*np.arctan2(self.robot_pose.pose.orientation.z,
-                                 self.robot_pose.pose.orientation.w)
-        angle_to_origin = util.unwind(angle_to_robot+np.pi-robot_yaw)
+        
         # within +/- pi/4 of forward, camera FOV
         if angle_to_origin > -pi/4 and angle_to_origin < pi/4:
             #now, what side of the beacon do we see
