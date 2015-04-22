@@ -1,8 +1,7 @@
 IMG, SAMPLE, X, Y, SIZE_X, SIZE_Y, LIGHTING
-frame0000, red_puck, 1810, 1590, 35, 10, shade
-frame0000, leaf, 355, 1922, 125, 75, shade
-frame0000, leaf, 2187, 1571, 45, 35, sun
-frame0009, leaf, 2650, 2250, 155, 100, shade
-frame0033, leaf, 2485, 2320, 195, 120, sun
-frame0051, leaf, 1140, 2305, 150, 110, sun
-frame0055, leaf, 465, 1680, 145, 65, sun
+frame0000,leaf,355,1922,125,75,shade
+frame0000,leaf,2187,1571,45,35,sun
+frame0009,leaf,2650,2250,155,100,shade
+frame0033,leaf,2485,2320,195,120,sun
+frame0051,leaf,1140,2305,150,110,sun
+frame0055,leaf,465,1680,145,65,sun
