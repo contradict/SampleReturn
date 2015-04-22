@@ -7,6 +7,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <visualization_msgs/Marker.h>
+#include <geometry_msgs/PolygonStamped.h>
 #include <tf/transform_listener.h>
 
 #include <dynamic_reconfigure/server.h>
@@ -39,6 +40,7 @@ class FenceDetectorNode
   ros::Publisher points_pub;
   ros::Publisher marker_pub;
   ros::Publisher line_marker_pub;
+  ros::Publisher fence_line_pub;
 
   std::string color_img_topic = "color_image";
   std::string disparity_img_topic = "disparity_image";
@@ -48,6 +50,7 @@ class FenceDetectorNode
   std::string points_pub_topic = "points";
   std::string marker_pub_topic = "plane_marker";
   std::string line_marker_pub_topic = "line_marker";
+  std::string fence_line_pub_topic = "fence_line";
 
   double a_channel_threshold_, b_channel_threshold_, x_edge_threshold_, y_edge_threshold_, sum_threshold_;
   double max_range_, min_height_;
@@ -104,6 +107,9 @@ class FenceDetectorNode
 
     line_marker_pub =
       nh.advertise<visualization_msgs::Marker>(line_marker_pub_topic.c_str(), 3);
+
+    fence_line_pub =
+      nh.advertise<geometry_msgs::Polygon>(fence_line_pub_topic.c_str(), 3);
 
   }
 
@@ -324,6 +330,20 @@ class FenceDetectorNode
     line_mark.points.push_back(p);
     line_marker_pub.publish(line_mark);
 
+    geometry_msgs::PolygonStamped fence_line;
+    fence_line.header = msg.header;
+    fence_line.header.frame_id = "/base_link";
+    geometry_msgs::Point32 p1;
+    p1.y = -5.0;
+    p1.x = (coefficients->values[3] - coefficients->values[1]*p1.y)/coefficients->values[0];
+    p1.z = 0.0;
+    fence_line.polygon.points.push_back(p1);
+    geometry_msgs::Point32 p2;
+    p2.y = -5.0;
+    p2.x = (coefficients->values[3] - coefficients->values[1]*p2.y)/coefficients->values[0];
+    p2.z = 0.0;
+    fence_line.polygon.points.push_back(p2);
+    fence_line_pub.publish(fence_line);
   }
 
   /* Dynamic reconfigure callback */
