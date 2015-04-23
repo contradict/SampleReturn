@@ -142,6 +142,9 @@ class VFHMoveServer( object ):
         goal = self._as.accept_new_goal()
         
         try:
+            self._tf.waitForTransform('base_link', goal.target_pose.header.frame_id,
+                                      goal.target_pose.header.stamp,
+                                      rospy.Duration(1.0))
             goal_local = self._tf.transformPose('base_link', goal.target_pose)
             goal_odom = self._tf.transformPose(self.odometry_frame, goal.target_pose)
         except tf.Exception, exc:
