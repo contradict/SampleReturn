@@ -829,6 +829,7 @@ class BeaconSearch(smach.State):
                                          'platform_point',
                                          'beacon_point',
                                          'stop_on_beacon',
+                                         'vfh_result',
                                          'world_fixed_frame',
                                          'odometry_frame'],
                              output_keys=['move_goal',
@@ -864,6 +865,11 @@ class BeaconSearch(smach.State):
         distance_to_approach_point = util.point_distance_2d(current_pose.pose.position,
                                                             userdata.beacon_approach_pose.pose.position)
 
+        rotate_to_clear = False
+        if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
+            rospy.loginfo("LEVEL_TWO beacon search setting rotate_to_clear = True")
+            rotate_to_clear = True
+
         #if we have been ignoring beacon detections prior to this,
         #we should clear them here, and wait for a fresh detection
         if not userdata.stop_on_beacon:
@@ -888,7 +894,9 @@ class BeaconSearch(smach.State):
                                                                     userdata.beacon_approach_pose.pose.position)
                 goal = VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
                                    move_velocity = userdata.move_velocity,
-                                   spin_velocity = userdata.spin_velocity)
+                                   spin_velocity = userdata.spin_velocity,
+                                   rotate_to_clear = rotate_to_clear,
+                                   orient_at_target = True)
                 userdata.move_goal = goal                
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
@@ -906,7 +914,9 @@ class BeaconSearch(smach.State):
                                                     search_pose.pose.position)
                 goal = VFHMoveGoal(target_pose = search_pose,
                                    move_velocity = userdata.move_velocity,
-                                   spin_velocity = userdata.spin_velocity)
+                                   spin_velocity = userdata.spin_velocity,
+                                   rotate_to_clear = rotate_to_clear,
+                                   orient_at_target = True)
                 userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
@@ -938,6 +948,7 @@ class BeaconSearch(smach.State):
                 goal = VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
                                    move_velocity = userdata.move_velocity,
                                    spin_velocity = userdata.spin_velocity,
+                                   rotate_to_clear = rotate_to_clear,
                                    orient_at_target = True)
                 userdata.move_goal = goal       
                 self.announcer.say("Beacon in view. Move ing to approach point")                
