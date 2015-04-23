@@ -5,3 +5,12 @@ frame0009,leaf,2650,2250,155,100,shade
 frame0033,leaf,2485,2320,195,120,sun
 frame0051,leaf,1140,2305,150,110,sun
 frame0055,leaf,465,1680,145,65,sun
+frame0015,leaf,190,1890,110,50,sun
+frame0017,leaf,1860,2130,80,50,sun
+frame0017,leaf,3105,2295,60,55,sun
+frame0035,leaf,2085,2235,95,75,sun
+frame0049,leaf,2105,2105,100,100,sun
+frame0049,leaf,760,2095,90,60,sun
+frame0064,leaf,2100,2045,90,65,sun
+frame0064,leaf,3400,2130,105,50,sun
+frame0068,leaf,2155,2340,90,60,sun
