@@ -14,3 +14,17 @@ frame0049,leaf,760,2095,90,60,sun
 frame0064,leaf,2100,2045,90,65,sun
 frame0064,leaf,3400,2130,105,50,sun
 frame0068,leaf,2155,2340,90,60,sun
+frame0012,leaf,555,2130,100,70,sun
+frame0012,leaf,3185,1805,60,50,sun
+frame0019,leaf,180,1815,135,60,sun
+frame0021,leaf,1510,1995,140,95,sun
+frame0028,leaf,2095,2285,130,80,sun
+frame0033,leaf,550,1985,140,80,sun
+frame0041,leaf,2235,2120,90,75,sun
+frame0046,leaf,2510,1655,80,50,sun
+frame0046,leaf,3210,2175,110,85,sun
+frame0051,leaf,3395,1770,80,45,sun
+frame0061,leaf,1515,1620,100,50,sun
+frame0061,leaf,2525,1695,60,45,sun
+frame0065,leaf,3650,1885,100,90,sun
+frame0073,leaf,1990,1835,110,60,shade
