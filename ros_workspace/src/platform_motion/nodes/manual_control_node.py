@@ -143,8 +143,7 @@ class ManualController(object):
             smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled'),
-                                   transitions = {'next':'SELECT_JOYSTICK'})   
-            
+                                   transitions = {'next':'SELECT_JOYSTICK'})
  
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
@@ -159,17 +158,12 @@ class ManualController(object):
             
             smach.StateMachine.add('MANIPULATOR_GRAB',
                                    InterruptibleActionClientState(
-                                       'manipulator_action',
-                                       manipulator_msg.ManipulatorAction,
-                                       None,
-                                       grab_msg_cb,
-                                       None,
-                                       self.announcer,
-                                       "Manipulator unavailable",
-                                       "Grabbing",
-                                       30.0,
-                                       "Manipulator grab timed out"),
+                                       actionname = 'manipulator_action',
+                                       actionspec = manipulator_msg.ManipulatorAction,
+                                       goal_cb = grab_msg_cb,
+                                       timeout = 30.0),
                                     transitions = {'complete':'ANNOUNCE_GRAB_COMPLETE',
+                                                   'timeout':'ANNOUNCE_GRAB_CANCELED',
                                                    'canceled':'ANNOUNCE_GRAB_CANCELED',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
@@ -199,25 +193,24 @@ class ManualController(object):
             smach.StateMachine.add('SELECT_HOME',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_HOME),
-                                   transitions = {'next':'PERFORM_HOME',
+                                   transitions = {'next':'ANNOUNCE_HOMING',
                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
+            
+            smach.StateMachine.add('ANNOUNCE_HOMING',
+                                   AnnounceState(self.announcer, 'Home ing.'),
+                                   transitions = {'next':'PERFORM_HOME'})
 
             home_goal = platform_msg.HomeGoal()
             home_goal.home_count = 3
             smach.StateMachine.add('PERFORM_HOME',
                                    InterruptibleActionClientState(
-                                       'wheel_pods/home',
-                                       platform_msg.HomeAction,
-                                       home_goal,
-                                       None,
-                                       None,
-                                       self.announcer,
-                                       "Home ing unavailable",
-                                       "Home ing",
-                                       30.0,
-                                       "Home ing timed out"),
+                                       actionname = 'wheel_pods/home',
+                                       actionspec = platform_msg.HomeAction,
+                                       goal = home_goal,
+                                       timeout = 30.0),
                                     transitions = {'complete':'SELECT_JOYSTICK',
+                                                   'timeout':'SELECT_JOYSTICK',
                                                    'canceled':'SELECT_JOYSTICK',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
@@ -450,24 +443,16 @@ class WaitForJoystickButton(smach.State):
                              )
 
         self.joy_state = joy_state
-
         self.button = button
-
         self.announcer = announcer
-
         self.timeout = timeout
 
     def execute(self, userdata):
         button_state = self.joy_state.button( self.button )
-
         debounce_count = 5
-
         debounce = debounce_count
-
         outcome = None
-
         timeout = self.timeout
-
         dt = 0.1
 
         rate = rospy.Rate( 1./dt )
@@ -495,40 +480,30 @@ class WaitForJoystickButton(smach.State):
 
         return outcome
 
-
 class InterruptibleActionClientState(smach.State):
     def __init__(self, actionname, actionspec,
             goal = None,
             goal_cb = None,
             feedback_cb = None,
-            announcer=None,
-            unavailable_msg=None,
-            active_msg=None,
-            timeout=None,
-            timeout_msg=None,
-            ):
+            timeout= None):
+        
         smach.State.__init__(self,
                              input_keys=['button_cancel', 'detected_sample'],
-                             outcomes=['complete', 'canceled', 'preempted', 'aborted'])
+                             outcomes=['complete', 'timeout', 'canceled',
+                                       'preempted', 'aborted'])
 
         self.actionname = actionname
         self.actionspec = actionspec
         self.goal = goal
         self.goal_cb = goal_cb
         self.feedback_cb = feedback_cb
-        self.announcer = announcer
-        self.unavailable_msg = unavailable_msg
-        self.active_msg = active_msg
         self.timeout = timeout
-        self.timeout_msg = timeout_msg
 
     def execute(self, userdata):
         action_client = actionlib.SimpleActionClient(self.actionname,
                 self.actionspec)
 
         if not action_client.wait_for_server(timeout=rospy.Duration(1.0)) :
-            if self.unavailable_msg is not None:
-                self.announcer.say( self.unavailable_msg )
             return 'aborted'
 
         #if goal_cb is defined, it overwrites goal!
@@ -537,17 +512,14 @@ class InterruptibleActionClientState(smach.State):
 
         action_client.send_goal( self.goal,
                 done_cb = self.goal_done,
-                active_cb = self.goal_active,
                 feedback_cb = self.goal_feedback
                 )
 
-        self.outcome = None
+        self.action_outcome = None
 
         def timeoutcancel(evt):
             action_client.cancel_all_goals()
-            if self.timeout_msg is not None:
-                self.announcer.say( self.timeout_msg )
-            self.outcome = 'canceled'
+            self.action_outcome = 'timeout'
 
         if self.timeout is not None:
             timer = rospy.Timer( rospy.Duration( self.timeout ),
@@ -555,38 +527,32 @@ class InterruptibleActionClientState(smach.State):
                     oneshot=True )
 
         rate = rospy.Rate( 0.1 )
-        while self.outcome == None:
+        while self.action_outcome == None:
             if userdata.button_cancel:
                 action_client.cancel_all_goals()
-                self.outcome = 'canceled'
+                self.action_outcome = 'canceled'
             if self.preempt_requested():
                 action_client.cancel_all_goals()
-                self.outcome = 'preempted'
+                self.action_outcome = 'preempted'
             rate.sleep()
 
         timer.shutdown()
 
-        return self.outcome
-
-    def goal_active(self):
-        if self.active_msg is not None:
-            self.announcer.say( self.active_msg )
-
-
+        return self.action_outcome
+ 
     def goal_done(self, state, result):
         if state == action_msg.GoalStatus.SUCCEEDED:
-            self.outcome = 'complete'
+            self.action_outcome = 'complete'
         if state == action_msg.GoalStatus.PREEMPTED:
-            self.outcome = 'canceled'
+            self.action_outcome = 'canceled'
         if state == action_msg.GoalStatus.ABORTED:
-            self.outcome = 'aborted'
+            self.action_outcome = 'aborted'
         
     def goal_feedback(self, feedback):
         if self.feedback_cb is not None:
             result = self.feedback_cb(feedback, self.announcer)
             if result is not None:
-                self.outcome = result
-
+                self.action_outcome = result
 
 class ManualPreempted(smach.State):
     def __init__(self, CAN_interface, search_camera_enable):
@@ -603,7 +569,6 @@ class ManualPreempted(smach.State):
         except (rospy.ServiceException,
                 rospy.ROSSerializationException, TypeError), e:
             rospy.logerr("Unable to re-enable search camera: %s", e)
-
 
         #we are preempted by the top state machine
         #set motion mode to None and exit
