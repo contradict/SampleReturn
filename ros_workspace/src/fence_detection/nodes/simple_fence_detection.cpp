@@ -317,13 +317,13 @@ class FenceDetectorNode
     line_mark.color.b = 0.0;
     line_mark.scale.x = 0.4;
     geometry_msgs::Point p;
-    line_mark.pose.position.x = 2.0* -coefficients->values[3]/coefficients->values[0];
+    //line_mark.pose.position.x = 2.0* -coefficients->values[3]/coefficients->values[0];
     p.z = 0.0;
     p.y = -5.0;
-    p.x = (coefficients->values[3] - coefficients->values[1]*p.y)/coefficients->values[0];
+    p.x = (-coefficients->values[3] - coefficients->values[1]*p.y)/coefficients->values[0];
     line_mark.points.push_back(p);
     p.y = 5.0;
-    p.x = (coefficients->values[3] - coefficients->values[1]*p.y)/coefficients->values[0];
+    p.x = (-coefficients->values[3] - coefficients->values[1]*p.y)/coefficients->values[0];
     line_mark.points.push_back(p);
     line_marker_pub.publish(line_mark);
 
@@ -332,12 +332,12 @@ class FenceDetectorNode
     fence_line.header.frame_id = "/base_link";
     geometry_msgs::Point32 p1;
     p1.y = -5.0;
-    p1.x = (coefficients->values[3] - coefficients->values[1]*p1.y)/coefficients->values[0];
+    p1.x = (-coefficients->values[3] - coefficients->values[1]*p1.y)/coefficients->values[0];
     p1.z = 0.0;
     fence_line.polygon.points.push_back(p1);
     geometry_msgs::Point32 p2;
     p2.y = -5.0;
-    p2.x = (coefficients->values[3] - coefficients->values[1]*p2.y)/coefficients->values[0];
+    p2.x = (-coefficients->values[3] - coefficients->values[1]*p2.y)/coefficients->values[0];
     p2.z = 0.0;
     fence_line.polygon.points.push_back(p2);
     fence_line_pub.publish(fence_line);
