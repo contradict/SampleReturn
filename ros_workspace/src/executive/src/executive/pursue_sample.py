@@ -337,12 +337,12 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
-                                                 "Continue ing search"),
+                                                 "Exit ing pursuit."),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN',
                                    AnnounceState(self.announcer,
-                                                 "Returning to search"),
+                                                 "Exit ing pursuit."),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
@@ -654,7 +654,7 @@ class PublishFailure(smach.State):
         userdata.stop_on_sample = False
         userdata.detected_sample = None
         userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
-        self.result_pub.publish(samplereturn_msg.PursuitResult(False))        
+        self.result_pub.publish(samplereturn_msg.PursuitResult(False))
         return 'next'
 
 class PursueSampleAborted(smach.State):
