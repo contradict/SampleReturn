@@ -40,7 +40,6 @@ import dynamic_reconfigure.msg as dynmsg
 from geometry_msgs.msg import Point, PointStamped, TransformStamped, Transform
 from samplereturn_msgs.msg import NamedPoint, PursuitResult
 
-
 class RobotSimulator(object):
     
     def __init__(self, mode='level_two', publish_samples=True, publish_beacon=True):
@@ -570,7 +569,8 @@ class RobotSimulator(object):
                             sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
                         except tf.Exception:
                             rospy.logwarn("SIMULATOR failed to transform search detection point")
-
+                            break
+                            
                         #append the detection to the delayed queue
                         msg = NamedPoint(header = sample_point_odom.header,
                                          point = sample_point_odom.point,
@@ -619,7 +619,8 @@ class RobotSimulator(object):
             print "Received success message for sample: " + str(self.active_sample_id)
             print "Collected IDs: %s" % (self.collected_ids)
         else:
-            self.excluded_ids.append(self.active_sample_id)
+            if self.active_sample_id is not None:
+                self.excluded_ids.append(self.active_sample_id)
             self.search_sample_queue.clear()
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
@@ -723,7 +724,17 @@ class RobotSimulator(object):
         if req.mode == platform_srv.SelectMotionModeRequest.MODE_QUERY:
             return self.motion_mode
         else:
-            self.motion_mode = req.mode
+            save_modes = [platform_srv.SelectMotionModeRequest.MODE_HOME,
+                          platform_srv.SelectMotionModeRequest.MODE_JOYSTICK,
+                          platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST,
+                          platform_srv.SelectMotionModeRequest.MODE_SERVO,
+                          platform_srv.SelectMotionModeRequest.MODE_ENABLE]
+            if req.mode in save_modes:
+                self.saved_motion_mode = req.mode
+            if req.mode == platform_srv.SelectMotionModeRequest.MODE_RESUME:
+                self.motion_mode = self.saved_motion_mode
+            else:
+                self.motion_mode = req.mode
             return self.motion_mode
     
     def service_enable_wheelpods(self, req):
