@@ -110,25 +110,22 @@ class FenceDetectorNode
       nh.advertise<visualization_msgs::Marker>(line_marker_pub_topic.c_str(), 3);
 
     fence_line_pub =
-      nh.advertise<geometry_msgs::Polygon>(fence_line_pub_topic.c_str(), 3);
+      nh.advertise<geometry_msgs::PolygonStamped>(fence_line_pub_topic.c_str(), 3);
 
   }
 
   void l_cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
-    ROS_INFO("Left Camera Info Callback");
     cam_model_.fromCameraInfo(msg,r_cam_info_);
   }
 
   void r_cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
-    ROS_INFO("Right Camera Info Callback");
     r_cam_info_ = msg;
   }
 
   void disparityCallback(const stereo_msgs::DisparityImage& msg)
   {
-    ROS_INFO("Disparity Callback");
     cv::Mat_<float> dmat(msg.image.height, msg.image.width,
         (float*)&msg.image.data[0], msg.image.step);
     cam_model_.projectDisparityImageTo3d(dmat, points_mat_, true);
@@ -136,7 +133,6 @@ class FenceDetectorNode
 
   void imageCallback(const sensor_msgs::Image& msg)
   {
-    ROS_INFO("Image Callback");
     cv_bridge::CvImagePtr cv_ptr;
     try {
       cv_ptr = cv_bridge::toCvCopy(msg, "");
@@ -273,7 +269,7 @@ class FenceDetectorNode
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setDistanceThreshold (ransac_distance_threshold_);
 
-    ROS_INFO("Width, Height:%u, %u",ptr_cloud->width,ptr_cloud->height);
+    ROS_DEBUG("Width, Height:%u, %u",ptr_cloud->width,ptr_cloud->height);
 
     seg.setInputCloud(far_clipped_cloud);
     //seg.setInputCloud(ptr_cloud);
@@ -282,7 +278,7 @@ class FenceDetectorNode
       ROS_ERROR("Could not estimate a planar model for given dataset.");
       return;
     }
-    ROS_INFO("Model Coefficients: %f, %f, %f, %f",coefficients->values[0],
+    ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",coefficients->values[0],
                                                   coefficients->values[1],
                                                   coefficients->values[2],
                                                   coefficients->values[3]);
@@ -350,7 +346,7 @@ class FenceDetectorNode
   /* Dynamic reconfigure callback */
   void configCallback(fence_detection::fence_detector_paramsConfig &config, uint32_t level)
   {
-    ROS_INFO("configCallback");
+    ROS_DEBUG("configCallback");
     x_edge_threshold_ = config.x_edge_threshold;
     y_edge_threshold_ = config.y_edge_threshold;
     a_channel_threshold_ = config.a_channel_threshold;

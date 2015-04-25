@@ -9,8 +9,7 @@
         pkg="fence_detection"
         type="simple_fence_detection"
         name="fence_detection"
-        ns="/processes/fence_detection"
-        output="screen">
+        ns="/processes/fence_detection">
         <remap from="color_image" to="/cameras/navigation/center/left/rect_color"/>
         <remap from="disparity_image" to="/cameras/navigation/center/disparity"/>
         <remap from="left/camera_info" to="/cameras/navigation/center/left/camera_info"/>
