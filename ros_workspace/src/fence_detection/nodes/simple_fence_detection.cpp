@@ -56,6 +56,7 @@ class FenceDetectorNode
   double max_range_, min_height_;
   int dilate_iterations_, erode_iterations_;
   double ransac_distance_threshold_;
+  int min_inliers_;
 
   sensor_msgs::CameraInfo r_cam_info_;
   image_geometry::StereoCameraModel cam_model_;
@@ -277,7 +278,7 @@ class FenceDetectorNode
     seg.setInputCloud(far_clipped_cloud);
     //seg.setInputCloud(ptr_cloud);
     seg.segment (*inliers, *coefficients);
-    if (inliers->indices.size() == 0) {
+    if (inliers->indices.size() <= min_inliers_) {
       ROS_ERROR("Could not estimate a planar model for given dataset.");
       return;
     }
@@ -360,6 +361,7 @@ class FenceDetectorNode
     min_height_ = config.min_height;
     max_range_ = config.max_range;
     ransac_distance_threshold_ = config.ransac_distance_threshold;
+    min_inliers_ = config.min_inliers;
   }
 
 };
