@@ -29,6 +29,7 @@
     <param name="BUTTON_GRAB" value="3"/>
     <param name="BUTTON_SERVO" value="1"/>
     <param name="BUTTON_CANCEL" value="2"/>
+    <param name="BUTTON_PURSUE" value="5"/>
     <param name="BUTTON_LOCK" value="0"/>
     <param name="BUTTON_LIGHTS" value="6"/>
     <param name="BUTTON_SEARCH_CAMERA" value="4"/>
