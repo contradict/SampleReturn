@@ -262,6 +262,7 @@ class LevelTwoWeb(object):
             @smach.cb_interface(output_keys=['detected_sample'])
             def pursuit_result_cb(userdata, status, result):
                 #clear samples after a pursue action
+                rospy.sleep(2.0) #wait 2 seconds for detector/filter to clear for sure
                 userdata.detected_sample = None
                                             
             smach.StateMachine.add('PURSUE_SAMPLE',
