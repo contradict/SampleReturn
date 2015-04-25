@@ -336,7 +336,7 @@ class FenceDetectorNode
     p1.z = 0.0;
     fence_line.polygon.points.push_back(p1);
     geometry_msgs::Point32 p2;
-    p2.y = -5.0;
+    p2.y = 5.0;
     p2.x = (-coefficients->values[3] - coefficients->values[1]*p2.y)/coefficients->values[0];
     p2.z = 0.0;
     fence_line.polygon.points.push_back(p2);
