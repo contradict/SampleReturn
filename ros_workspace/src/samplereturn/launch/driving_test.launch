@@ -11,7 +11,7 @@
     <arg name="kind" default="install"/>
 
     <param name="use_sim_time" value="False" type="bool"/>
-    
+
     <!-- Launch Files -->
     <include file="$(find samplereturn)/launch/machine_definitions.launch">
         <arg name="user" value="$(arg user)"/>
@@ -44,11 +44,9 @@
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
 
     <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
-    
+
     <include file="$(find beacon_localizer)/launch/beacon_localizer.launch"/>
-    <!--
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
-    -->
 
     <!-- Launch executive last -->
     <include file="$(find executive)/launch/executive.launch">

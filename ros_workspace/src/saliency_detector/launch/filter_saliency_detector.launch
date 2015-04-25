@@ -22,6 +22,7 @@
     name="ray_to_points"
     machine="search"
     ns="/processes/sample_detection/search">
+    <remap from="fence_line" to "/processes/fence_detection/fence_line"/>
   </node>
 
   <node
