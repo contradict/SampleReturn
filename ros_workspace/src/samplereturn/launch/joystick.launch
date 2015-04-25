@@ -46,6 +46,7 @@
     <!-- Remaps -->
     <remap from="joystick_command" to="/motion/joystick_command"/>
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
+    <remap from="detected_sample_search" to="/processes/sample_detection/search/filtered_point"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>

@@ -231,7 +231,7 @@ class ManualController(object):
 
             smach.StateMachine.add('ANNOUNCE_LOCK',
                                    AnnounceState(self.announcer,
-                                                 'Wheel lock selected'),
+                                                 'Wheels locked'),
                                    transitions = {'next':'WAIT_FOR_UNLOCK'})
 
             smach.StateMachine.add('WAIT_FOR_UNLOCK',
@@ -370,6 +370,7 @@ class JoystickListen(smach.State):
     def __init__(self, CAN_interface, joy_state):
         smach.State.__init__(self,
                              outcomes=['visual_servo_requested',
+                                       'pursuit_requested',
                                        'manipulator_grab_requested',
                                        'home_wheelpods_requested',
                                        'lock_wheelpods_requested',
@@ -417,12 +418,14 @@ class JoystickListen(smach.State):
         
         if self.allow_manipulator:
             if self.joy_state.button('BUTTON_SERVO'):
-                self.set_outcome( 'visual_servo_requested' )
+                self.set_outcome('visual_servo_requested')
                 return
             if self.joy_state.button('BUTTON_GRAB'):
-                self.set_outcome( 'manipulator_grab_requested' )
+                self.set_outcome('manipulator_grab_requested')
                 return
-
+            if self.joy_state.button('BUTTON_PURSUE'):
+                self.set_outcome('pursuit_requested')
+                return
         
         if self.allow_driving:
             if self.joy_state.button('BUTTON_HOME'):
@@ -473,7 +476,7 @@ class WaitForJoystickButton(smach.State):
                 if timeout <= 0:
                     outcome = 'timeout'
 
-        self.announcer.say( "Release to unlock." )
+        self.announcer.say( "Wheels unlocked." )
 
         while self.joy_state.button(self.button):
             rate.sleep()
