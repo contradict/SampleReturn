@@ -317,12 +317,16 @@ class SelectMotionMode(smach.State):
         self.motion_mode = motion_mode
 
     def execute(self, userdata):
+        valid_pause_transitions = [platform_srv.SelectMotionModeRequest.MODE_RESUME,
+                                   platform_srv.SelectMotionModeRequest.MODE_ENABLE,
+                                   platform_srv.SelectMotionModeRequest.MODE_LOCK,
+                                   platform_srv.SelectMotionModeRequest.MODE_PAUSE]
         try:
             current_mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
             if current_mode.mode == self.motion_mode:
                 return 'next'
             elif current_mode.mode == platform_srv.SelectMotionModeRequest.MODE_PAUSE \
-                    and self.motion_mode != platform_srv.SelectMotionModeRequest.MODE_RESUME:
+                    and self.motion_mode not in valid_pause_transitions:
                 return 'paused'
         except rospy.ServiceException:
             rospy.logerr( "Unable to query present motion mode")
