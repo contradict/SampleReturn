@@ -45,6 +45,7 @@ class ManualController(object):
                 persistent=True)
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
+        self.odometry_frame = 'odom'
  
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
@@ -56,6 +57,7 @@ class ManualController(object):
         
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         self.state_machine.userdata.detected_sample = None
+        self.state_machine.userdata.manipulator_sample = None
         self.state_machine.userdata.paused = False
         self.state_machine.userdata.light_state = False
         self.state_machine.userdata.search_camera_state = True
@@ -105,14 +107,50 @@ class ManualController(object):
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
-                                   transitions = {'visual_servo_requested':'SELECT_PLANNER',
+                                   transitions = {'visual_servo_requested':'SELECT_SERVO_MODE',
+                                                  'pursuit_requested':'CONFIRM_SAMPLE_PRESENT',
                                                   'manipulator_grab_requested':'MANIPULATOR_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
                                                   'aborted':'MANUAL_ABORTED'})           
+
+            smach.StateMachine.add('CONFIRM_SAMPLE_PRESENT',
+                                   ConfirmSamplePresent(self.announcer),
+                                   transitions = {'no_sample':'JOYSTICK_LISTEN',
+                                                  'pursue':'SELECT_PURSUE_MODE',
+                                                  'aborted':'MANUAL_ABORTED'})
+
+            smach.StateMachine.add('SELECT_PURSUE_MODE',
+                                   SelectMotionMode(self.CAN_interface,
+                                                    MODE_PLANNER),
+                                   transitions = {'next':'PURSUE_SAMPLE',
+                                                  'paused':'WAIT_FOR_UNPAUSE',
+                                                  'failed':'SELECT_JOYSTICK'})            
+
+            @smach.cb_interface(input_keys=['detected_sample'])
+            def pursuit_goal_cb(userdata, request):
+                goal = samplereturn_msg.GeneralExecutiveGoal()
+                goal.input_point = userdata.detected_sample
+                goal.input_string = "level_two_pursuit_request"
+                #disable localization checks while in pursuit
+                return goal
             
-            smach.StateMachine.add('SELECT_PLANNER',
+            @smach.cb_interface(output_keys=['detected_sample'])
+            def pursuit_result_cb(userdata, status, result):
+                #clear samples after a pursue action
+                rospy.sleep(2.0) #wait 2 seconds for detector/filter to clear for sure
+                userdata.detected_sample = None
+                                            
+            smach.StateMachine.add('PURSUE_SAMPLE',
+                                  smach_ros.SimpleActionState('/processes/executive/pursue_sample',
+                                  samplereturn_msg.GeneralExecutiveAction,
+                                  goal_cb = pursuit_goal_cb,
+                                  result_cb = pursuit_result_cb),
+                                  transitions = {'succeeded':'SELECT_JOYSTICK',
+                                                 'aborted':'SELECT_JOYSTICK'})
+            
+            smach.StateMachine.add('SELECT_SERVO_MODE',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PLANNER),
                                    transitions = {'next':'VISUAL_SERVO',
@@ -131,8 +169,7 @@ class ManualController(object):
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
                                                   'sample_detected':'VISUAL_SERVO',
-                                                  'aborted':'MANUAL_ABORTED',
-                                                  },
+                                                  'aborted':'MANUAL_ABORTED'},
                                    remapping = {'stop_on_sample':'false'})
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
@@ -144,16 +181,19 @@ class ManualController(object):
                                    AnnounceState(self.announcer,
                                                  'Servo canceled'),
                                    transitions = {'next':'SELECT_JOYSTICK'})
+            
+            
  
+            @smach.cb_interface(input_keys = ['manipulator_sample'])
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
                 grab_msg.type = grab_msg.GRAB
                 grab_msg.grip_torque = 0.7
                 grab_msg.target_bin = 1
                 grab_msg.wrist_angle = 0
-                if userdata.detected_sample is not None:
-                    grab_msg.wrist_angle = userdata.detected_sample.grip_angle
-                    grab_msg.target_bin = userdata.detected_sample.sample_id
+                if userdata.manipulator_sample is not None:
+                    grab_msg.wrist_angle = userdata.manipulator_sample.grip_angle
+                    grab_msg.target_bin = userdata.manipulator_sample.sample_id
                 return grab_msg
             
             smach.StateMachine.add('MANIPULATOR_GRAB',
@@ -167,6 +207,7 @@ class ManualController(object):
                                                    'canceled':'ANNOUNCE_GRAB_CANCELED',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
+                                
 
             smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
                                    AnnounceState(self.announcer,
@@ -258,7 +299,6 @@ class ManualController(object):
 
              #end with state_machine
 
-
         #action server wrapper    
         manual_control_server = smach_ros.ActionServerWrapper(
             'manual_control', platform_msg.ManualControlAction,
@@ -278,9 +318,13 @@ class ManualController(object):
         
         joy_sub = rospy.Subscriber("joy", sensor_msg.Joy, self.joy_callback)
         
-        self.sample_sub_manipulator = rospy.Subscriber('detected_sample_manipulator',
-                                                        samplereturn_msg.NamedPoint,
-                                                        self.sample_detection_manipulator)
+        rospy.Subscriber('detected_sample_search',
+                        samplereturn_msg.NamedPoint,
+                        self.sample_update)        
+        
+        rospy.Subscriber('detected_sample_manipulator',
+                          samplereturn_msg.NamedPoint,
+                          self.sample_detection_manipulator)
         
         #start action servers and services
         manual_control_server.run_server()
@@ -307,7 +351,20 @@ class ManualController(object):
         self.state_machine.userdata.paused = msg.data
         
     def sample_detection_manipulator(self, sample):
-        self.state_machine.userdata.detected_sample = sample
+        self.state_machine.userdata.manipulator_sample = sample
+
+    def sample_update(self, sample):
+        try:
+            self.tf.waitForTransform(self.odometry_frame,
+                                              sample.header.frame_id,
+                                              sample.header.stamp,
+                                              rospy.Duration(1.0))
+            point_in_frame = self.tf.transformPoint(self.odometry_frame, sample)
+            sample.point = point_in_frame.point
+            self.state_machine.userdata.detected_sample = sample
+        except tf.Exception:
+            rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
+                          sample.header.frame_id, self.odometry_frame)
 
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -365,6 +422,28 @@ class ProcessGoal(smach.State):
             rospy.logerr("Unable to disable search camera: %s", e)
 
         return 'valid_goal'
+
+class ConfirmSamplePresent(smach.State):
+    def __init__(self, announcer):
+        smach.State.__init__(self,
+                             outcomes=['no_sample',
+                                       'pursue',
+                                       'aborted'],
+                             input_keys=['detected_sample'],
+                             output_keys=['detected_sample'])
+
+        self.announcer = announcer
+
+    def execute(self, userdata):
+        
+        #wait for 3 seconds, see if sample is present in view
+        userdata.detected_sample = None
+        rospy.sleep(3.0)
+        if userdata.detected_sample is None:
+            self.announcer.say("No sample in view.")
+            return 'no_sample'
+        else:
+            return 'pursue'
 
 class JoystickListen(smach.State):
     def __init__(self, CAN_interface, joy_state):
@@ -491,7 +570,7 @@ class InterruptibleActionClientState(smach.State):
             timeout= None):
         
         smach.State.__init__(self,
-                             input_keys=['button_cancel', 'detected_sample'],
+                             input_keys=['button_cancel', 'sample'],
                              outcomes=['complete', 'timeout', 'canceled',
                                        'preempted', 'aborted'])
 
