@@ -48,6 +48,9 @@ class SaliencyDetectorNode
   double bms_top_trim_;
   double bms_img_width_;
 
+  XmlRpc::XmlRpcValue interior_colors_, exterior_colors_;
+  std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
+
   image_geometry::PinholeCameraModel cam_model_;
   cv::Mat inv_K_;
 
@@ -70,6 +73,16 @@ class SaliencyDetectorNode
     private_node_handle_.param("sub_mask_debug_topic", sub_mask_debug_topic, string("sub_mask"));
     private_node_handle_.param("named_point_topic", named_point_topic, string("named_point"));
     private_node_handle_.param("camera_info_topic", sub_camera_info_topic, string("/cameras/search/info"));
+
+    private_node_handle_.getParam("interior_colors",interior_colors_);
+    private_node_handle_.getParam("exterior_colors",exterior_colors_);
+
+    for (int i=0; i<interior_colors_.size(); i++) {
+      interior_colors_vec_.push_back(static_cast<std::string>(interior_colors_[i]));
+    }
+    for (int i=0; i<exterior_colors_.size(); i++) {
+      exterior_colors_vec_.push_back(static_cast<std::string>(exterior_colors_[i]));
+    }
 
     sub_img =
       nh.subscribe(img_topic.c_str(), 3, &SaliencyDetectorNode::messageCallback, this);
@@ -103,7 +116,7 @@ class SaliencyDetectorNode
 
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& msg)
   {
-    ROS_INFO("Camera Info Callback");
+    ROS_DEBUG("Camera Info Callback");
     cam_model_.fromCameraInfo(msg);
     cv::Mat K = cv::Mat(cam_model_.intrinsicMatrix());
     inv_K_ = K.inv();
@@ -112,7 +125,7 @@ class SaliencyDetectorNode
   void messageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     saliency_mutex_.lock();
-    ROS_INFO("messageCallback");
+    ROS_DEBUG("messageCallback");
     cv_bridge::CvImagePtr cv_ptr;
     try {
       cv_ptr = cv_bridge::toCvCopy(msg, "");
@@ -130,7 +143,7 @@ class SaliencyDetectorNode
     debug_bms_img_ = bms_.getSaliencyMap().clone();
 
     if (bms_thresh_on_) {
-      ROS_INFO("Thresholding");
+      ROS_DEBUG("Thresholding");
       cv::threshold(debug_bms_img_, debug_bms_img_, bms_thresh_, 255, cv::THRESH_BINARY);
     }
 
@@ -141,7 +154,7 @@ class SaliencyDetectorNode
     if (blobDetect_on_) {
       cv::Mat blob_copy = debug_bms_img_.clone();
       blob_.detect(blob_copy, kp);
-      ROS_INFO("Keypoints Detected: %lu", kp.size());
+      ROS_DEBUG("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
       for (size_t i=0; i < kp.size(); i++)
       {
@@ -174,11 +187,13 @@ class SaliencyDetectorNode
       cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
           CV_RGB(100,100,100));
 
+      std::vector<std::string>::iterator in_it, ex_it;
+      in_it = std::find(interior_colors_vec_.begin(),interior_colors_vec_.end(),dominant_color);
+      ex_it = std::find(exterior_colors_vec_.begin(),exterior_colors_vec_.end(),dominant_exterior_color);
+
       if (cam_model_.initialized()
-          && dominant_color != "green" && dominant_color != "brown"
-          && dominant_exterior_color == "green"
-          && dominant_color != "gray" && dominant_color != "black"
-          && dominant_color != "blue" ) {
+          && in_it != interior_colors_vec_.end()
+          && ex_it != exterior_colors_vec_.end()){
         cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
         cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
             CV_RGB(0,255,0));
@@ -232,7 +247,7 @@ class SaliencyDetectorNode
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
     pub_bms_img.publish(debug_img_msg);
 
-    ROS_INFO("messageCallback ended");
+    ROS_DEBUG("messageCallback ended");
     saliency_mutex_.unlock();
   }
 
@@ -240,7 +255,7 @@ class SaliencyDetectorNode
   void configCallback(saliency_detector::saliency_detector_paramsConfig &config, uint32_t level)
   {
     saliency_mutex_.lock();
-    ROS_INFO("configCallback");
+    ROS_DEBUG("configCallback");
     // Construct BMS
     bms_ = BMS(config.bms_dilation_width_1, config.bms_opening_width,
         config.bms_normalize, config.bms_handle_border);

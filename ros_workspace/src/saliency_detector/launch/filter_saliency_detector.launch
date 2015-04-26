@@ -8,6 +8,10 @@
     machine="search"
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/image"/>
+    <rosparam param="interior_colors">[red, pink, purple, orange, yellow, blue, brown, white]
+    </rosparam>
+    <rosparam param="exterior_colors">[green]
+    </rosparam>
   </node>
 
   <node
@@ -34,8 +38,21 @@
     <param name="positive_exclusion_radius" type="double" value="10.0"/>
     <param name="negative_exclusion_radius" type="double" value="1.5"/>
     <param name="error_cov_post" type="double" value="0.3"/>
-    <param name="process_noise_cov" type="double" value="0.05"/>
+    <param name="process_noise_cov" type="double" value="0.01"/>
     <param name="measurement_noise_cov" type="double" value="0.1"/>
-    <param name="period" type="double" value="2"/>
+    <param name="period" type="double" value="0.5"/>
+    <rosparam param="color_transitions">
+        white: [gray, blue, green, white, pink]
+        black: []
+        gray: [gray, white, blue]
+        brown: [brown, orange, red]
+        pink: [pink, red, purple, white]
+        red: [red, pink, purple, orange, brown]
+        orange: [orange, yellow, red, brown]
+        yellow: [yellow, orange]
+        green: [green, white]
+        blue: [blue, gray, white]
+        purple: [purple, red,pink]
+    </rosparam>
   </node>
 </launch>
