@@ -295,6 +295,7 @@ class KalmanDetectionFilter
     exclusion_list_.push_back(std::make_tuple(x,y,r));
 
     filter_list_.erase(filter_list_.begin());
+    drawFilterStates();
   }
 
   void imgDetectionCallback(const samplereturn_msgs::NamedPoint& msg)
@@ -319,6 +320,7 @@ class KalmanDetectionFilter
     checkObservation(msg);
 
     publishFilteredDetections(msg);
+    drawFilterStates();
   }
 
   void publishTop() {
