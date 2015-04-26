@@ -109,7 +109,7 @@ class ManualController(object):
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'SELECT_SERVO_MODE',
                                                   'pursuit_requested':'CONFIRM_SAMPLE_PRESENT',
-                                                  'manipulator_grab_requested':'MANIPULATOR_GRAB',
+                                                  'manipulator_grab_requested':'ANNOUNCE_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
@@ -163,7 +163,8 @@ class ManualController(object):
                                    transitions = {'move':'SERVO_MOVE',
                                                   'complete':'SELECT_JOYSTICK',
                                                   'point_lost':'ANNOUNCE_NO_SAMPLE',
-                                                  'aborted':'SELECT_JOYSTICK'})
+                                                  'aborted':'SELECT_JOYSTICK'},
+                                   remapping = {'detected_sample':'manipulator_sample'})
 
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -174,16 +175,19 @@ class ManualController(object):
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
-                                                 'No sample in view, cancel in'),
+                                                 'Servo canceled.'),
                                    transitions = {'next':'SELECT_JOYSTICK'})
             
             smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
                                    AnnounceState(self.announcer,
-                                                 'Servo canceled'),
+                                                 'Servo canceled.'),
                                    transitions = {'next':'SELECT_JOYSTICK'})
             
-            
- 
+            smach.StateMachine.add('ANNOUNCE_GRAB',
+                                   AnnounceState(self.announcer,
+                                                 'Start ing, grab.'),
+                                   transitions = {'next':'MANIPULATOR_GRAB'})            
+             
             @smach.cb_interface(input_keys = ['manipulator_sample'])
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
@@ -194,6 +198,7 @@ class ManualController(object):
                 if userdata.manipulator_sample is not None:
                     grab_msg.wrist_angle = userdata.manipulator_sample.grip_angle
                     grab_msg.target_bin = userdata.manipulator_sample.sample_id
+                rospy.sleep(3.0)
                 return grab_msg
             
             smach.StateMachine.add('MANIPULATOR_GRAB',
@@ -520,9 +525,7 @@ class WaitForJoystickButton(smach.State):
         smach.State.__init__(self,
                              outcomes=['pressed',
                                        'timeout',
-                                       'preempted',
-                                       ],
-                             )
+                                       'preempted'])
 
         self.joy_state = joy_state
         self.button = button
@@ -555,7 +558,7 @@ class WaitForJoystickButton(smach.State):
                 if timeout <= 0:
                     outcome = 'timeout'
 
-        self.announcer.say( "Wheels unlocked." )
+        self.announcer.say( "Wheels released." )
 
         while self.joy_state.button(self.button):
             rate.sleep()
@@ -580,6 +583,11 @@ class InterruptibleActionClientState(smach.State):
         self.goal_cb = goal_cb
         self.feedback_cb = feedback_cb
         self.timeout = timeout
+
+        #get keys from goal callback
+        if smach.has_smach_interface(goal_cb): 
+            self.register_input_keys(goal_cb.get_registered_input_keys()) 
+            self.register_output_keys(goal_cb.get_registered_output_keys()) 
 
     def execute(self, userdata):
         action_client = actionlib.SimpleActionClient(self.actionname,

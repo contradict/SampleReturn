@@ -384,7 +384,7 @@ class ServoController(smach.State):
             return 'complete'
         
         if userdata.detected_sample is None:
-            self.announcer.say("Sample lost")
+            self.announcer.say("No sample in view")
             self.try_count = 0
             return 'point_lost'
         else:
