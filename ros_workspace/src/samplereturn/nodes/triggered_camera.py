@@ -89,35 +89,35 @@ class TriggeredCamera(object):
                 persistent=True)
 
     def try_to_set_recordingmedia(self):
-        success = False
-        def doit(photo_config):
+        self.recording_media_success = False
+        def doit(self, photo_config):
             try:
                 rospy.logdebug("Setting recording media")
                 photo_config(SetConfigRequest(param="recordingmedia",
                     value="1 SDRAM"))
-                success = True
+                self.recording_media_success = True
                 rospy.loginfo("Set recording media to SDRAM")
             except rospy.ServiceException:
                 rospy.logerr("config service failed")
-        def worker():
-            while not rospy.is_shutdown() and not success:
+        def worker(self):
+            while not rospy.is_shutdown() and not self.recording_media_success:
                 try:
                     rospy.logdebug("Connecting to service set_config")
                     rospy.wait_for_service("set_config", 20.0)
+                except rospy.ROSInterruptException:
+                    rospy.logerr("Never found set_config, exiting for shutdown.")
+                    break
                 except rospy.ROSException:
                     rospy.logerr("Cannot contact set_config, retrying.")
                     continue
-                except rospy.ROSInterrupException:
-                    rospy.logerr("Never found set_config, exiting for shutdown.")
-                    break
                 photo_config = rospy.ServiceProxy('set_config', SetConfig)
-                threading.Thread(target=lambda:doit(photo_config)).start()
+                threading.Thread(target=lambda: doit(self, photo_config)).start()
                 rospy.sleep(10.0)
                 try:
                     photo_config.close()
                 except:
                     pass
-        threading.Thread(target=worker).start()
+        threading.Thread(target=lambda: worker(self)).start()
 
     def wait_for_service(self, name):
         while not rospy.is_shutdown():
