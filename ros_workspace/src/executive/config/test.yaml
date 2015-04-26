@@ -5,13 +5,13 @@ executive_master:
         
 level_two:
     #for search  behaviour, degrees and meters
-    move_velocity: 1.0
+    move_velocity: 0.8
     spin_velocity: 0.2
     spoke_count: 20 
     max_spoke_length: 200 
     first_spoke_offset: 100 
     next_spoke_sign: 1 # 1 for ccw, -1 for cw
-    spoke_hub_radius: 15
+    spoke_hub_radius: 10
     #raster step is distance between raster lines
     #raster offset is how close to the spoke we get
     #before we go to the next raster step
