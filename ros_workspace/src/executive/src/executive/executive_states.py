@@ -200,6 +200,7 @@ class ExecuteVFHMove(ExecuteMoveState):
         super(ExecuteVFHMove, self).__init__(move_client,
                                             outcomes=['complete',
                                                       'blocked',
+                                                      'started_blocked',
                                                       'off_course',
                                                       'missed_target',
                                                       'sample_detected',
@@ -209,11 +210,13 @@ class ExecuteVFHMove(ExecuteMoveState):
                                                         'detected_sample',
                                                         'paused',
                                                         'odometry_frame'],
-                                            output_keys=['detected_sample'])
+                                            output_keys=['detected_sample',
+                                                         'vfh_result'])
       
     def execute(self, userdata):
         #on entry clear old sample_detections!
         userdata.detected_sample = None
+        userdata.vfh_result = None
         goal = deepcopy(userdata.move_goal)
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
         self._move_client.send_goal(goal)
@@ -240,14 +243,16 @@ class ExecuteVFHMove(ExecuteMoveState):
             #checks to see if pause requested, and handles this
             self.check_pause(userdata, goal)
             
-                                    
         if (move_state == action_msg.GoalStatus.SUCCEEDED):
             if (self._move_client.wait_for_result(timeout = rospy.Duration(2.0))):
                 result = self._move_client.get_result().outcome
+                userdata.vfh_result = result
                 if result == VFHMoveResult.COMPLETE:
                     return 'complete'
                 elif result == VFHMoveResult.BLOCKED:
                     return 'blocked'
+                elif result == VFHMoveResult.STARTED_BLOCKED:
+                    return 'started_blocked'
                 elif result == VFHMoveResult.OFF_COURSE:
                     return 'off_course'
                 elif result == VFHMoveResult.MISSED_TARGET:
@@ -312,12 +317,16 @@ class SelectMotionMode(smach.State):
         self.motion_mode = motion_mode
 
     def execute(self, userdata):
+        valid_pause_transitions = [platform_srv.SelectMotionModeRequest.MODE_RESUME,
+                                   platform_srv.SelectMotionModeRequest.MODE_ENABLE,
+                                   platform_srv.SelectMotionModeRequest.MODE_LOCK,
+                                   platform_srv.SelectMotionModeRequest.MODE_PAUSE]
         try:
             current_mode = self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_QUERY)
             if current_mode.mode == self.motion_mode:
                 return 'next'
             elif current_mode.mode == platform_srv.SelectMotionModeRequest.MODE_PAUSE \
-                    and self.motion_mode != platform_srv.SelectMotionModeRequest.MODE_RESUME:
+                    and self.motion_mode not in valid_pause_transitions:
                 return 'paused'
         except rospy.ServiceException:
             rospy.logerr( "Unable to query present motion mode")
@@ -375,21 +384,23 @@ class ServoController(smach.State):
             return 'complete'
         
         if userdata.detected_sample is None:
-            self.announcer.say("Sample lost")
+            self.announcer.say("No sample in view")
             self.try_count = 0
             return 'point_lost'
         else:
             sample_time = userdata.detected_sample.header.stamp
             sample_frame = userdata.detected_sample.header.frame_id
-            try:
-                self.tf_listener.waitForTransform('manipulator_arm',
-                        sample_frame, sample_time, rospy.Duration(1.0))
-                point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
-                                                             userdata.detected_sample).point
-            except tf.Exception:
-                rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform in 1.0 seconds, at time: {!s}".format(sample_frame, sample_time))
-                self.try_count = 0
-                return 'aborted'
+            while not rospy.core.is_shutdown_requested():
+                try:
+                    self.tf_listener.waitForTransform('manipulator_arm',
+                            sample_frame, sample_time, rospy.Duration(1.0))
+                    point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
+                                                                 userdata.detected_sample).point
+                    break
+                except tf.Exception, exc:
+                    rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform.  Exception: {!s}".format(sample_frame, exc))
+                    self.try_count = 0
+                    return 'aborted'
             #rospy.loginfo("SERVO correction %s: " % (userdata.manipulator_correction))
             rospy.loginfo("SERVO point in manipulator before correction %s: " %(point_in_manipulator))
             point_in_manipulator.x += userdata.manipulator_correction['x']

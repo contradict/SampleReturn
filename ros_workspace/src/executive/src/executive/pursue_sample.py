@@ -136,6 +136,7 @@ class PursueSample(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'ANNOUNCE_OBSTACLE_CHECK',
                                                   'blocked':'PUBLISH_FAILURE',
+                                                  'started_blocked':'PUBLISH_FAILURE',
                                                   'missed_target':'ANNOUNCE_OBSTACLE_CHECK',
                                                   'off_course':'PUBLISH_FAILURE',
                                                   'sample_detected':'PUBLISH_FAILURE',
@@ -336,12 +337,12 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
-                                                 "Continue ing search"),
+                                                 "Exit ing pursuit."),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN',
                                    AnnounceState(self.announcer,
-                                                 "Returning to search"),
+                                                 "Exit ing pursuit."),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
@@ -389,7 +390,7 @@ class PursueSample(object):
             
             #always update the target_sample
             self.state_machine.userdata.target_sample = point
-            
+                                   
             #if the pursuit_goal is None, we are not actively in pursuit
             if self.state_machine.userdata.pursuit_goal is not None:
                 #if the desired pursuit pose changes too much, update the state_machine's pose
@@ -399,7 +400,8 @@ class PursueSample(object):
                     self.state_machine.pursuit_pose = pose
                     goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
                                                         move_velocity = self.state_machine.userdata.pursuit_velocity,
-                                                        spin_velocity = self.state_machine.userdata.spin_velocity)
+                                                        spin_velocity = self.state_machine.userdata.spin_velocity,
+                                                        orient_at_target = True)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
@@ -652,7 +654,7 @@ class PublishFailure(smach.State):
         userdata.stop_on_sample = False
         userdata.detected_sample = None
         userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
-        self.result_pub.publish(samplereturn_msg.PursuitResult(False))        
+        self.result_pub.publish(samplereturn_msg.PursuitResult(False))
         return 'next'
 
 class PursueSampleAborted(smach.State):
@@ -680,6 +682,9 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         #recalculate the quaternion pointing from goal point to sample point
         pointing_quat = util.pointing_quaternion_2d(pursuit_pose.pose.position, point_in_frame.point)
         pursuit_pose.pose.orientation = pointing_quat
+        pursuit_pose.header.stamp = rospy.Time(0)
+        #rospy.loginfo("CALCULATE PURSUIT: pursuit_point: {!s}, point_in_frame: {!s}, pursuit_pose: {!s}".format(pursuit_point, point_in_frame, pursuit_pose))
+        
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
            rospy.logwarn("PURSUE_SAMPLE failed to transform pursuit point %s->%s: %s",
