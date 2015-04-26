@@ -448,6 +448,7 @@ class KalmanDetectionFilter
                           color_transitions_map_[filter_color].end(),
                           obs_color);
     return (color_it != color_transitions_map_[filter_color].end());
+    ROS_DEBUG("Color Check: Filter Color:%s Obs Color:%s",filter_color.c_str(),obs_color.c_str());
   }
 
 
@@ -470,11 +471,13 @@ class KalmanDetectionFilter
       cv::Mat dist = (filter_list_[i].filter->measurementMatrix)*(filter_list_[i].filter->statePost)
         - meas_state;
       if (abs(cv::sum(dist)[0]) < max_dist_ && checkColor(filter_list_[i].color,msg.name)) {
+        ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, i);
         filter_list_[i].color = msg.name;
         return;
       }
       else if (abs(cv::sum(dist)[0]) < max_dist_ && not checkColor(filter_list_[i].color,msg.name)) {
+        ROS_DEBUG("Color Check Failed");
         return;
       }
     }
