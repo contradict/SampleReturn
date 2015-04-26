@@ -447,8 +447,8 @@ class KalmanDetectionFilter
     color_it = std::find(color_transitions_map_[filter_color].begin(),
                           color_transitions_map_[filter_color].end(),
                           obs_color);
-    return (color_it != color_transitions_map_[filter_color].end());
     ROS_INFO("Color Check: Filter Color:%s Obs Color:%s",filter_color.c_str(),obs_color.c_str());
+    return (color_it != color_transitions_map_[filter_color].end());
   }
 
 
