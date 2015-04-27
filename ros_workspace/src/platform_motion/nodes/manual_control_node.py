@@ -132,7 +132,7 @@ class ManualController(object):
             def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
                 goal.input_point = userdata.detected_sample
-                goal.input_string = "level_two_pursuit_request"
+                goal.input_string = "manual_control_pursuit_request"
                 #disable localization checks while in pursuit
                 return goal
             
