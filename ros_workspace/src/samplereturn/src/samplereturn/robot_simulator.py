@@ -555,8 +555,8 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if (self.sample_in_view(sample['point'], 1, 12, 7)) or \
-                    (sample['id'] == self.active_sample_id):
+                    if (self.sample_in_view(sample['point'], 1, 12, 7)) \
+                    or (sample['id'] == self.active_sample_id):
                         #keep publishing the active detection id until it is cleared
                         #hopefully the sim won't have more than one active id...
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
@@ -574,6 +574,7 @@ class RobotSimulator(object):
                         #append the detection to the delayed queue
                         msg = NamedPoint(header = sample_point_odom.header,
                                          point = sample_point_odom.point,
+                                         filter_id = sample['id'] + 100,
                                          sample_id = sample['id'])
                         self.active_sample_id = sample['id']
                         self.search_sample_queue.append(msg)
@@ -779,6 +780,7 @@ class RobotSimulator(object):
         self.zero_robot()
         self.collected_ids = []
         self.excluded_ids = []
+        self.active_sample_id = None
         fake_result = platform_msg.HomeResult([True,True,True])
         rospy.sleep(1.0)
         self.home_wheelpods_server.set_succeeded(result=fake_result)
