@@ -251,7 +251,7 @@ class ManualController(object):
             home_goal.home_count = 3
             smach.StateMachine.add('PERFORM_HOME',
                                    InterruptibleActionClientState(
-                                       actionname = 'wheel_pods/home',
+                                       actionname = 'home_wheel_pods',
                                        actionspec = platform_msg.HomeAction,
                                        goal = home_goal,
                                        timeout = 30.0),
@@ -534,11 +534,11 @@ class WaitForJoystickButton(smach.State):
 
     def execute(self, userdata):
         button_state = self.joy_state.button( self.button )
-        debounce_count = 5
+        debounce_count = 3
         debounce = debounce_count
         outcome = None
         timeout = self.timeout
-        dt = 0.1
+        dt = 0.05
 
         rate = rospy.Rate( 1./dt )
         while outcome == None:
@@ -593,7 +593,8 @@ class InterruptibleActionClientState(smach.State):
         action_client = actionlib.SimpleActionClient(self.actionname,
                 self.actionspec)
 
-        if not action_client.wait_for_server(timeout=rospy.Duration(1.0)) :
+        if not action_client.wait_for_server(timeout=rospy.Duration(1.0)):
+            rospy.logwarn("MANUAL_CONTROL action client not responding: {!s}".format(self.actionname))
             return 'aborted'
 
         #if goal_cb is defined, it overwrites goal!
@@ -602,8 +603,7 @@ class InterruptibleActionClientState(smach.State):
 
         action_client.send_goal( self.goal,
                 done_cb = self.goal_done,
-                feedback_cb = self.goal_feedback
-                )
+                feedback_cb = self.goal_feedback)
 
         self.action_outcome = None
 
