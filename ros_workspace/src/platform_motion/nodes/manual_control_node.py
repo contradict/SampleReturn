@@ -18,6 +18,7 @@ import visual_servo_msgs.msg as visual_servo_msg
 import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
+import samplereturn_msgs.srv as samplereturn_srv
 import samplereturn.util as util
 
 from samplereturn_msgs.msg import VoiceAnnouncement
