@@ -891,8 +891,7 @@ class BeaconSearch(smach.State):
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
-                userdata.move_point_map = geometry_msg.PointStamped(map_header,
-                                                                    userdata.beacon_approach_pose.pose.position)
+                
                 goal = VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
                                    move_velocity = userdata.move_velocity,
                                    spin_velocity = userdata.spin_velocity,
@@ -901,6 +900,9 @@ class BeaconSearch(smach.State):
                 userdata.move_goal = goal                
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
+                #set move_point_map to enable localization correction
+                userdata.move_point_map = geometry_msg.PointStamped(map_header,
+                                                                    userdata.beacon_approach_pose.pose.position)
                 return 'move'
             else:
                 #gotta add some heroic shit here
@@ -910,9 +912,6 @@ class BeaconSearch(smach.State):
                 search_pose = deepcopy(userdata.beacon_approach_pose)                
                 #invert the approach_point, and try again
                 search_pose.pose.position.x *= -1
-                #save point
-                userdata.move_point_map = geometry_msg.PointStamped(map_header,
-                                                    search_pose.pose.position)
                 goal = VFHMoveGoal(target_pose = search_pose,
                                    move_velocity = userdata.move_velocity,
                                    spin_velocity = userdata.spin_velocity,
@@ -921,11 +920,12 @@ class BeaconSearch(smach.State):
                 userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
-                
+                #set move_point_map to enable localization correction
+                userdata.move_point_map = geometry_msg.PointStamped(map_header,
+                                                    search_pose.pose.position)
                 return 'move'               
                 
         else: #beacon is in view
-            #need to add some stuff here to get to other side of beacon if viewing back
             current_yaw = util.get_current_robot_yaw(self.tf_listener,
                                                      userdata.world_fixed_frame)
             yaw_to_platform = util.pointing_yaw(current_pose.pose.position,
