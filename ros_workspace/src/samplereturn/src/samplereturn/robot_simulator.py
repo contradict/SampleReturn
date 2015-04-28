@@ -637,14 +637,17 @@ class RobotSimulator(object):
         beacon_translation = rospy.get_param("/processes/beacon/beacon_finder/beacon_translation")
         beacon_rotation = rospy.get_param("/processes/beacon/beacon_finder/beacon_rotation")
                 
-
-        #get distances and yaws from reality frame origin
-        reality_origin = PointStamped(std_msg.Header(0, rospy.Time.now(), self.reality_frame),
-                                                     Point(0,0,0))
-        angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
-                                                                  reality_origin)        # can't see beacon closer than 10 meters or farther than 40
-        angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
-                                                        self.reality_frame)
+        try:
+            #get distances and yaws from reality frame origin
+            reality_origin = PointStamped(std_msg.Header(0, rospy.Time.now(), self.reality_frame),
+                                                         Point(0,0,0))
+            angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
+                                                                      reality_origin)        # can't see beacon closer than 10 meters or farther than 40
+            angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
+                                                            self.reality_frame)
+        except tf.Exception, exc:
+                print("Transforms not available in publish beacon: {!s}".format(exc))
+                return
 
         #rospy.loginfo("BEACON CHECK, dist_to_origin, angle_to_robot, angle_to_origin:\
         #              {!s}, {!s}, {!s}".format(dist_from_origin,
