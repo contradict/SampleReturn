@@ -198,7 +198,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager(self.tf_listener,
                                               self.announcer),
-                                   transitions = {'move':'CREATE_MOVE_GOAL',
+                                   transitions = {'move':'CREATE_WEB_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -208,7 +208,7 @@ class LevelTwoWeb(object):
                                    transitions = {'next':'WEB_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
-            smach.StateMachine.add('CREATE_MOVE_GOAL',
+            smach.StateMachine.add('CREATE_WEB_GOAL',
                                    CreateMoveGoal(self.tf_listener),
                                    transitions = {'next':'MOVE',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -236,7 +236,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('RETRY_CHECK',
                                    RetryCheck(self.announcer),
                                    transitions = {'continue':'WEB_MANAGER',
-                                                  'retry':'CREATE_MOVE_GOAL',
+                                                  'retry':'CREATE_WEB_GOAL',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
@@ -275,18 +275,18 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
-                                                 'Return ing to search line'),
-                                   transitions = {'next':'CREATE_MOVE_GOAL'})   
+                                                 'Return ing to search.'),
+                                   transitions = {'next':'CREATE_WEB_GOAL'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
-                                                 'Return ing to home platform'),
+                                                 'Return ing to home platform.'),
                                    transitions = {'next':'BEACON_SEARCH'})
  
             smach.StateMachine.add('BEACON_SEARCH',
                                    BeaconSearch(self.tf_listener, self.announcer),
                                    transitions = {'mount':'MOUNT_MANAGER',
-                                                  'move':'BEACON_SEARCH_MOVE',
+                                                  'move':'CREATE_BEACON_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
@@ -299,8 +299,11 @@ class LevelTwoWeb(object):
                                    remapping = {'stop_on_sample':'stop_on_beacon',
                                                 'detected_sample':'beacon_point'})
             
-            #return to start along the approach point
-            #if the path is ever blocked just give up and return to the level_two search
+            smach.StateMachine.add('CREATE_BEACON_GOAL',
+                                   CreateMoveGoal(self.tf_listener),
+                                   transitions = {'next':'BEACON_SEARCH_MOVE',
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
+
             smach.StateMachine.add('BEACON_SEARCH_MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'BEACON_SEARCH',
@@ -510,6 +513,7 @@ class WebManager(smach.State):
                                             'raster_points',
                                             'retry_active',
                                             'web_move',
+                                            'move_point',
                                             'course_tolerance',
                                             'stop_on_sample'],
                              outcomes=['move',
@@ -539,14 +543,13 @@ class WebManager(smach.State):
             userdata.spoke_yaw = spoke['yaw']
             next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
             userdata.web_move = next_move
-            self.last_web_move = next_move
+            userdata.move_point = next_move['point']
             userdata.outbound = False
-            userdata.course_tolerance = 5.0
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
             remaining_minutes = int((userdata.return_time - rospy.Time.now()).to_sec()/60)
             self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(int(math.degrees(userdata.spoke_yaw)),
                                                                                          remaining_minutes))
-            return 'move'
+            return self.load_move(next_move, userdata)
         else:
             #we are inbound
             if userdata.raster_active:
@@ -567,23 +570,14 @@ class WebManager(smach.State):
                     #replace the next inward point with this
                     next_move['point'] = geometry_msg.PointStamped(header, pos)
                     self.announcer.say("Head ing to next radius.")
-                
-                #load the target into move_point, and save the move
-                self.last_web_move = next_move
-                userdata.web_move = next_move
-                
-                #use tighter course tolerance for chord moves (no point in getting into next chord)
-                if next_move['radial']:
-                    userdata.course_tolerance = 5.0
-                else:
-                    userdata.course_tolerance = 3.0
-                
+                                
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
                     self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
                     userdata.raster_active = False
                     userdata.outbound = True #request the next spoke move
-                return 'move'
+                
+                return self.load_move(next_move, userdata)
             else:
                 #time to start rastering, create the points, and set flag
                 self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
@@ -591,6 +585,21 @@ class WebManager(smach.State):
                 return 'get_raster'
         
         return 'aborted'
+    
+    def load_move(self, next_move, userdata):
+        #use tighter course tolerance for chord moves (no point in getting into next chord)
+        if next_move['radial']:
+            userdata.course_tolerance = 5.0
+        else:
+            userdata.course_tolerance = 3.0
+        #load the target into move_point, and save the move
+        #move_point is consumed by the general move_goal transformer,
+        #and web_move is used to do retry_checks, etc.
+        self.last_web_move = next_move
+        userdata.web_move = next_move
+        userdata.move_point = next_move['point']
+    
+        return 'move'
 
 class CreateRasterPoints(smach.State):
     def __init__(self, tf_listener):
@@ -686,15 +695,13 @@ class CreateRasterPoints(smach.State):
 class CreateMoveGoal(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['web_move',
+                             input_keys = ['move_point',
                                            'move_velocity',
                                            'spin_velocity',
                                            'course_tolerance',
                                            'vfh_result',
                                            'odometry_frame'],
                              output_keys = ['move_goal',
-                                            'line_points',
-                                            'next_line_point',
                                             'move_point_map'],
                              outcomes=['next',
                                        'preempted', 'aborted'])
@@ -704,12 +711,12 @@ class CreateMoveGoal(smach.State):
     def execute(self, userdata):
 
         odometry_frame = userdata.odometry_frame
-        target_point = userdata.web_move['point']
+        target_point = userdata.move_point
         rotate_to_clear = False
    
         #if we are back here after starting a move in the blocked condition, try rotate to clear
         if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
-            rospy.loginfo("LEVEL_TWO_WEB setting rotate_to_clear = True")
+            rospy.loginfo("LEVEL_TWO setting rotate_to_clear = True")
             rotate_to_clear = True    
         
         try:
@@ -833,7 +840,7 @@ class BeaconSearch(smach.State):
                                          'vfh_result',
                                          'world_fixed_frame',
                                          'odometry_frame'],
-                             output_keys=['move_goal',
+                             output_keys=['move_point',
                                           'move_point_map',
                                           'simple_move',
                                           'stop_on_sample',
@@ -891,38 +898,23 @@ class BeaconSearch(smach.State):
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Search ing")
-                
-                goal = VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
-                                   move_velocity = userdata.move_velocity,
-                                   spin_velocity = userdata.spin_velocity,
-                                   rotate_to_clear = rotate_to_clear,
-                                   orient_at_target = True)
-                userdata.move_goal = goal                
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
                 #set move_point_map to enable localization correction
-                userdata.move_point_map = geometry_msg.PointStamped(map_header,
-                                                                    userdata.beacon_approach_pose.pose.position)
+                userdata.move_point = geometry_msg.PointStamped(map_header,
+                                                                userdata.beacon_approach_pose.pose.position)
                 return 'move'
             else:
-                #gotta add some heroic shit here
                 #we think we're near the beacon, but we don't see it
                 #right now, that is just to move 30 m on other side of the beacon that we don't know about
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
                 search_pose = deepcopy(userdata.beacon_approach_pose)                
                 #invert the approach_point, and try again
                 search_pose.pose.position.x *= -1
-                goal = VFHMoveGoal(target_pose = search_pose,
-                                   move_velocity = userdata.move_velocity,
-                                   spin_velocity = userdata.spin_velocity,
-                                   rotate_to_clear = rotate_to_clear,
-                                   orient_at_target = True)
-                userdata.move_goal = goal                        
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
-                #set move_point_map to enable localization correction
-                userdata.move_point_map = geometry_msg.PointStamped(map_header,
-                                                    search_pose.pose.position)
+                userdata.move_point = geometry_msg.PointStamped(map_header,
+                                                                search_pose.pose.position)
                 return 'move'               
                 
         else: #beacon is in view
@@ -935,24 +927,18 @@ class BeaconSearch(smach.State):
             self.tried_spin = False            
             #on the back side
             if current_pose.pose.position.x < 0:
-                front_pose = deepcopy(userdata.beacon_approach_pose)
                 #try not to drive through the platform
-                front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
-                goal = VFHMoveGoal(target_pose = front_pose,
-                                   move_velocity = userdata.move_velocity,
-                                   spin_velocity = userdata.spin_velocity)
-                userdata.move_goal = goal                          
                 self.announcer.say("Back of beacon in view. Move ing to front")
+                front_pose = deepcopy(userdata.beacon_approach_pose)
+                front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
+                userdata.move_point = geometry_msg.PointStamped(map_header,
+                                                                front_pose.pose.position)
                 return 'move'   
             elif distance_to_approach_point > 2.0:
                 #on correct side of beacon, but far from approach point
-                goal = VFHMoveGoal(target_pose = userdata.beacon_approach_pose,
-                                   move_velocity = userdata.move_velocity,
-                                   spin_velocity = userdata.spin_velocity,
-                                   rotate_to_clear = rotate_to_clear,
-                                   orient_at_target = True)
-                userdata.move_goal = goal       
                 self.announcer.say("Beacon in view. Move ing to approach point")                
+                userdata.move_point = geometry_msg.PointStamped(map_header,
+                                                                userdata.beacon_approach_pose.pose.position)
                 return 'move'   
             elif np.abs(yaw_error) > .2:
                 #this means beacon is in view and we are within 1 meter of approach point
