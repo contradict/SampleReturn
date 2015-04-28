@@ -56,6 +56,7 @@
     <remap from="joy" to="/io/joy"/>
     <remap from="search_lights" to="/io/search_lights"/>
     <remap from="enable_search" to="/cameras/search/enable"/>
+    <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
 
 </node>
 
