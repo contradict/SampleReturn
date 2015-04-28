@@ -513,7 +513,7 @@ class WebManager(smach.State):
                                             'raster_points',
                                             'retry_active',
                                             'web_move',
-                                            'move_point',
+                                            'move_target',
                                             'course_tolerance',
                                             'stop_on_sample'],
                              outcomes=['move',
@@ -542,8 +542,6 @@ class WebManager(smach.State):
                 return 'return_home'
             userdata.spoke_yaw = spoke['yaw']
             next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
-            userdata.web_move = next_move
-            userdata.move_point = next_move['point']
             userdata.outbound = False
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
             remaining_minutes = int((userdata.return_time - rospy.Time.now()).to_sec()/60)
@@ -597,7 +595,7 @@ class WebManager(smach.State):
         #and web_move is used to do retry_checks, etc.
         self.last_web_move = next_move
         userdata.web_move = next_move
-        userdata.move_point = next_move['point']
+        userdata.move_target = next_move['point']
     
         return 'move'
 
@@ -695,7 +693,7 @@ class CreateRasterPoints(smach.State):
 class CreateMoveGoal(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['move_point',
+                             input_keys = ['move_target',
                                            'move_velocity',
                                            'spin_velocity',
                                            'course_tolerance',
@@ -711,8 +709,9 @@ class CreateMoveGoal(smach.State):
     def execute(self, userdata):
 
         odometry_frame = userdata.odometry_frame
-        target_point = userdata.move_point
+        target = userdata.move_target
         rotate_to_clear = False
+        orient_at_target = False
    
         #if we are back here after starting a move in the blocked condition, try rotate to clear
         if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
@@ -720,31 +719,39 @@ class CreateMoveGoal(smach.State):
             rotate_to_clear = True    
         
         try:
+            #do all movement transforms with latest information
+            target.header.stamp = rospy.Time(0) 
             self.tf_listener.waitForTransform(odometry_frame,
-                                              target_point.header.frame_id,
-                                              target_point.header.stamp,
+                                              target.header.frame_id,
+                                              target.header.stamp,
                                               rospy.Duration(2.0))
-            point_in_odom = self.tf_listener.transformPoint(odometry_frame,
-                                                            target_point)
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform goal point %s->%s",
-                          target_point.header.frame_id, odometry_frame)
-            return 'aborted'
-
-        header = std_msg.Header(0, rospy.Time(0), odometry_frame)
-        pose = geometry_msg.Pose(position = point_in_odom.point,
+            if isinstance(target, geometry_msg.PoseStamped):
+                target_pose = self._tf.transformPose(odometry_frame, target)                 
+                orient_at_target = True
+            elif isinstance(target, geometry_msg.PointStamped):
+                pt_odom = self.tf_listener.transformPoint(odometry_frame, target)
+                pose = geometry_msg.Pose(position = pt_odom.point,
                                  orientation = geometry_msg.Quaternion())
-        target_pose = geometry_msg.PoseStamped(header, pose)
+                target_pose = geometry_msg.PoseStamped(pt_odom.header, pose)
+            else:
+                rospy.logwarn("LEVEL_TWO invalid move target in CreateMoveGoal")
+            
+        except tf.Exception, exc:
+            rospy.logwarn("LEVEL_TWO failed to transform move: {!s}".format(exc))
+            return 'aborted'
+        
         goal = VFHMoveGoal(target_pose = target_pose,
                            move_velocity = userdata.move_velocity,
                            spin_velocity = userdata.spin_velocity,
                            course_tolerance = userdata.course_tolerance,
-                           orient_at_target = False,
+                           orient_at_target = orient_at_target,
                            rotate_to_clear = rotate_to_clear)
         userdata.move_goal = goal
 
         #store the point in map, to compare in the beacon update callback
-        userdata.move_point_map = target_point
+        userdata.move_point_map = geometry_msg.PointStamped(target_pose.header,
+                                                            target_pose.pose.position)
+        
         
         return 'next'
 
@@ -840,7 +847,7 @@ class BeaconSearch(smach.State):
                                          'vfh_result',
                                          'world_fixed_frame',
                                          'odometry_frame'],
-                             output_keys=['move_point',
+                             output_keys=['move_target',
                                           'move_point_map',
                                           'simple_move',
                                           'stop_on_sample',
@@ -901,8 +908,7 @@ class BeaconSearch(smach.State):
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
                 #set move_point_map to enable localization correction
-                userdata.move_point = geometry_msg.PointStamped(map_header,
-                                                                userdata.beacon_approach_pose.pose.position)
+                userdata.move_target = userdata.beacon_approach_pose
                 return 'move'
             else:
                 #we think we're near the beacon, but we don't see it
@@ -913,8 +919,7 @@ class BeaconSearch(smach.State):
                 search_pose.pose.position.x *= -1
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
-                userdata.move_point = geometry_msg.PointStamped(map_header,
-                                                                search_pose.pose.position)
+                userdata.move_target = search_pose
                 return 'move'               
                 
         else: #beacon is in view
@@ -931,14 +936,12 @@ class BeaconSearch(smach.State):
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 front_pose = deepcopy(userdata.beacon_approach_pose)
                 front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
-                userdata.move_point = geometry_msg.PointStamped(map_header,
-                                                                front_pose.pose.position)
+                userdata.move_target = front_pose
                 return 'move'   
             elif distance_to_approach_point > 2.0:
                 #on correct side of beacon, but far from approach point
                 self.announcer.say("Beacon in view. Move ing to approach point")                
-                userdata.move_point = geometry_msg.PointStamped(map_header,
-                                                                userdata.beacon_approach_pose.pose.position)
+                userdata.move_target = userdata.beacon_approach_pose
                 return 'move'   
             elif np.abs(yaw_error) > .2:
                 #this means beacon is in view and we are within 1 meter of approach point
