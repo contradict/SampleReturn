@@ -726,7 +726,7 @@ class CreateMoveGoal(smach.State):
                                               target.header.stamp,
                                               rospy.Duration(2.0))
             if isinstance(target, geometry_msg.PoseStamped):
-                target_pose = self._tf.transformPose(odometry_frame, target)                 
+                target_pose = self.tf_listener.transformPose(odometry_frame, target)                 
                 orient_at_target = True
             elif isinstance(target, geometry_msg.PointStamped):
                 pt_odom = self.tf_listener.transformPoint(odometry_frame, target)
