@@ -193,13 +193,14 @@ class RobotSimulator(object):
         for topic in cam_status_list:
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
+        
         self.search_enable = rospy.Service(enable_search_name,
                                            platform_srv.Enable,
                                            self.service_enable_search_request)
         self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
                                                          samplereturn_srv.Enable,
                                                          self.enable_manipulator_detector)
-                                                   
+        self.manipulator_detector_enabled = False                                           
                 
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
@@ -582,7 +583,7 @@ class RobotSimulator(object):
                 self.sample_marker_pub.publish(self.sample_marker)
                 
     def publish_sample_detection_manipulator(self, event):
-        if self.publish_samples:
+        if self.publish_samples and self.manipulator_detector_enabled:
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], -0.1, 0.5, 0.2):
@@ -714,6 +715,7 @@ class RobotSimulator(object):
         self.pause_pub.publish(std_msg.Bool(self.paused))
  
     def enable_manipulator_detector(self, req):
+        self.manipulator_detector_enabled = req.state
         rospy.sleep(0.5)
         return req.state
     
