@@ -366,13 +366,10 @@ class RobotSimulator(object):
         #rospy.loginfo("Starting PC generation")
 
         now = event.current_real
-        header = std_msg.Header(0, now, self.reality_frame)
+        #get latest available transforms to map
+        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         target_frame = 'navigation_center_left_camera'
         try:
-            self.tf_listener.waitForTransform(self.sim_map,
-                                              target_frame,
-                                              now,
-                                              rospy.Duration(0.5))
             current_pose = util.get_current_robot_pose(self.tf_listener,
                     self.reality_frame)
             transform = self.tf_listener.asMatrix(target_frame, header)
@@ -380,6 +377,7 @@ class RobotSimulator(object):
             #rospy.loginfo("Failed to transform map for PC")
             #rospy.loginfo("Exception: %s"%e)
             return
+        header.stamp = now #set broadcasted transform time to now
         center_cloud = self.get_pointcloud2(self.global_map,
                                             current_pose.pose.position,
                                             target_frame,
@@ -468,11 +466,7 @@ class RobotSimulator(object):
 
             #get the current correction broadcast by the localizer (map->odom)
             try:
-                self.tf_listener.waitForTransform(self.sim_odom,
-                                                  self.sim_map,
-                                                  now,
-                                                  rospy.Duration(0.2))
-                pos, quat = self.tf_listener.lookupTransform(self.sim_odom, self.sim_map, now)
+                pos, quat = self.tf_listener.lookupTransform(self.sim_odom, self.sim_map, rospy.Time(0))
                 #get the matrix describing map->odom
                 map_to_odom = tf.transformations.compose_matrix(
                               angles=tf.transformations.euler_from_quaternion(quat),
@@ -492,10 +486,10 @@ class RobotSimulator(object):
                                                        geometry_msg.Quaternion(*error_rot)))
                 transforms.append(transform)
 
-            except tf.Exception:
+            except tf.Exception, exc:
                 #if the transform isn't availabe, no correction applied
-                rospy.logdebug("NO map->odom transform... we probably just started running")            
-            
+                rospy.logdebug("NO map->odom transform: {!s}".format(exc))            
+                            
         else:
             transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
                                          self.sim_map,
@@ -544,7 +538,8 @@ class RobotSimulator(object):
     def check_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)    
+                #get headers in Time(0) for latest transforms
+                header = std_msg.Header(0, rospy.Time(0), self.reality_frame)    
                 self.sample_marker.header = header
                 self.sample_marker.pose.position = sample['point']
                 self.sample_marker.id = sample['id']
@@ -563,16 +558,13 @@ class RobotSimulator(object):
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         sample_in_map = PointStamped(header, sample['point'])
                         try:
-                            self.tf_listener.waitForTransform(self.sim_odom,
-                                                              header.frame_id,
-                                                              header.stamp,
-                                                              rospy.Duration(1.0))
                             sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
                         except tf.Exception:
                             rospy.logwarn("SIMULATOR failed to transform search detection point")
                             break
                             
-                        #append the detection to the delayed queue
+                        #append the detection to the delayed queue, with a now timestamp
+                        header.stamp = rospy.Time.now()
                         msg = NamedPoint(header = sample_point_odom.header,
                                          point = sample_point_odom.point,
                                          filter_id = sample['id'] + 100,
@@ -587,17 +579,13 @@ class RobotSimulator(object):
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], -0.1, 0.5, 0.2):
-                        header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)
+                        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
                         sample_in_map = PointStamped(header, sample['point'])
                         try:
-                            self.tf_listener.waitForTransform(self.sim_odom,
-                                                              header.frame_id,
-                                                              header.stamp,
-                                                              rospy.Duration(1.0))
                             sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
                         except tf.Exception:
                             rospy.logwarn("SIMULATOR failed to transform manipulator detection point")
-
+                        header.stamp = rospy.Time.now()
                         msg = NamedPoint(header = sample_point_odom.header,
                                          point = sample_point_odom.point,
                                          sample_id = sample['id'])
@@ -640,7 +628,7 @@ class RobotSimulator(object):
                 
         try:
             #get distances and yaws from reality frame origin
-            reality_origin = PointStamped(std_msg.Header(0, rospy.Time.now(), self.reality_frame),
+            reality_origin = PointStamped(std_msg.Header(0, rospy.Time(0), self.reality_frame),
                                                          Point(0,0,0))
             angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
                                                                       reality_origin)        # can't see beacon closer than 10 meters or farther than 40
