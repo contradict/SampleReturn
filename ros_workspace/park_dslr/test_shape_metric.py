@@ -5,7 +5,6 @@ import sys
 import csv
 
 def compute_shape_metrics(labels):
-    #reader = csv.reader(open(sys.argv[1]))
     reader = csv.reader(open(labels))
 
     results = None
@@ -28,10 +27,7 @@ def compute_shape_metrics(labels):
       lab = cv2.cvtColor(img,cv2.COLOR_BGR2LAB)
       win = img[y-y_size:y+y_size,x-x_size:x+x_size]
       lab_win = lab[y-y_size:y+y_size,x-x_size:x+x_size]
-      #cv2.imshow("test",lab_win[...,1])
-      #cv2.waitKey(-1)
       mid = (float(np.max(lab_win[...,1]))+float(np.min(lab_win[...,1])))/2.
-      #print mid, np.max(lab_win[...,1]), np.min(lab_win[...,1]), lab_win.dtype
       thresh = cv2.threshold(lab_win[...,1],mid,255,cv2.THRESH_BINARY)[1]
       # Contours
       contours, hier = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
@@ -48,15 +44,23 @@ def compute_shape_metrics(labels):
       # Perimeter Difference
       perimeter_ratio = cv2.arcLength(hull_pts,True)/cv2.arcLength(largest_contour,True)
       # Area Difference
-      area_ratio = cv2.contourArea(hull_pts)/cv2.contourArea(largest_contour)
+      area_ratio = cv2.contourArea(largest_contour)/cv2.contourArea(hull_pts)
       # Max Convexity Defect
       defects = cv2.convexityDefects(largest_contour,hull)
+      depth = np.max(defects[...,-1])/256.0
+      rect = cv2.boundingRect(hull_pts)
+      defect_ratio = depth/np.max(rect[2:])
       # Combined Score
-      print perimeter_ratio,area_ratio,np.max(defects[...,-1]),np.sum(defects[...,-1]),row[-1],row[1]
+      print perimeter_ratio,area_ratio,defect_ratio,np.sum(defects[...,-1]),row[-1],row[1]
+      #print perimeter_ratio,area_ratio,np.max(defects[...,-1]),np.sum(defects[...,-1]),row[-1],row[1]
       if results == None:
-          results = np.array([perimeter_ratio,area_ratio])#,np.max(defects[...,-1]),np.sum(defects[...,-1])])
+          results = np.array([perimeter_ratio,area_ratio,defect_ratio,])
+          #results = np.array([perimeter_ratio,area_ratio,defect_ratio,np.sum(defects[...,-1])])
+          #results = np.array([perimeter_ratio,area_ratio,np.max(defects[...,-1]),np.sum(defects[...,-1])])
       else:
-          results = np.vstack((results,np.array([perimeter_ratio,area_ratio])))#,np.max(defects[...,-1]),np.sum(defects[...,-1])])))
+          results = np.vstack((results,np.array([perimeter_ratio,area_ratio,defect_ratio])))
+          #results = np.vstack((results,np.array([perimeter_ratio,area_ratio,defect_ratio,np.sum(defects[...,-1])])))
+          #results = np.vstack((results,np.array([perimeter_ratio,area_ratio,np.max(defects[...,-1]),np.sum(defects[...,-1])])))
     return results
 
 
