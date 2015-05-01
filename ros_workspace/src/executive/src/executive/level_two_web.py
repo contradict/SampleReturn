@@ -9,6 +9,7 @@ import numpy as np
 import smach
 import smach_ros
 import rospy
+import rosparam
 import actionlib
 import tf
 
@@ -17,6 +18,7 @@ import actionlib_msgs.msg as action_msg
 import nav_msgs.msg as nav_msg
 import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
+import samplereturn_msgs.srv as samplereturn_srv
 import move_base_msgs.msg as move_base_msg
 import geometry_msgs.msg as geometry_msg
 import platform_motion_msgs.msg as platform_msg
@@ -344,11 +346,18 @@ class LevelTwoWeb(object):
                                                      MODE_PAUSE),
                                     transitions = {'next':'complete',
                                                    'paused':'LEVEL_TWO_ABORTED',
-                                                   'failed':'LEVEL_TWO_ABORTED'})   
+                                                   'failed':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('RECOVERY_MANAGER',
+                                   RecoveryManager(self.announcer, self.tf_listener),
+                                   transitions = {'move':'MOVE',
+                                                  'beacon_search':'BEACON_SEARCH',
+                                                  'web_manager':'WEB_MANAGER'})
     
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
-                                   transitions = {'next':'preempted'})
+                                   transitions = {'recovery':'RECOVERY_MANAGER',
+                                                  'exit':'preempted'})
             
             smach.StateMachine.add('LEVEL_TWO_ABORTED',
                                    LevelTwoAborted(),
@@ -379,6 +388,8 @@ class LevelTwoWeb(object):
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
+        rospy.Service("start_recovery", samplereturn_srv.RecoveryParameters, self.start_recovery)
+        
         #start a timer loop to check for localization updates
         rospy.Timer(rospy.Duration(5.0), self.localization_check)
         
@@ -387,6 +398,19 @@ class LevelTwoWeb(object):
         level_two_server.run_server()
         rospy.spin()
         sls.stop()
+    
+    def start_recovery(self, req):
+        try:
+            params = rosparam.load_file(req.file)
+            rospy.loginfo("START_RECOVERY received params: {!s}".format(params))
+        except Exception, exc:
+            rospy.loginfo("START_RECOVERY failed to parse params: {!s}".format(exc))
+            return False
+            
+        self.state_machine.userdata.recovery_requested = True
+        self.state_machine.userdata.recovery_parameters = params
+        self.state_machine.request_preempt()
+        return True
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -798,14 +822,43 @@ class RetryCheck(smach.State):
         rospy.sleep(userdata.blocked_retry_delay)
         userdata.retry_active = True
         return 'retry'
-    
-class LevelTwoPreempted(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['next'])
+
+class RecoveryManager(smach.State):
+    def __init__(self, announcer, tf_listener):
+        smach.State.__init__(self,
+                             input_keys = ['recovery_parameters'],
+                             output_keys = ['recovery_parameters',
+                                            'pursue_samples'],
+                             outcomes=['move',
+                                       'beacon_search',
+                                       'web_manager',
+                                       'aborted'])
+               
+        self.announcer = announcer
+        self.tf_listener = tf_listener
         
     def execute(self, userdata):
         
-        return 'next'
+        self.announcer.say("Enter ing recovery state")
+        rospy.sleep(2.0)
+        
+        return 'web_manager'
+    
+class LevelTwoPreempted(smach.State):
+    def __init__(self):
+        smach.State.__init__(self,
+                             input_keys = ['recovery_requested'],
+                             output_keys = ['recovery_requested'],
+                             outcomes=['recovery','exit'])
+               
+        
+    def execute(self, userdata):
+        
+        if userdata.recovery_requested:
+            userdata.recovery_requested = False
+            return 'recovery'
+        
+        return 'exit'
 
 class LevelTwoAborted(smach.State):
     def __init__(self):
