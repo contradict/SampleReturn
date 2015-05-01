@@ -1,0 +1,14 @@
+#recovery configuration file
+parameters: |
+    moves:
+        rotate: -45.0
+        distance: 10.0
+        rotate: 90.0
+        distance: 20.0
+
+    pursue_samples: False
+
+    spoke_to_remove: 1
+
+    terminal_outcome: web_manager  
+
