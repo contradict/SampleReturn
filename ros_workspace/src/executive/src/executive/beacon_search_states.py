@@ -21,7 +21,7 @@ import samplereturn.util as util
             
 class BeaconSearch(smach.State):
     
-    def __init__(self, tf_listener, announcer):
+    def __init__(self, label, tf_listener, announcer):
 
         smach.State.__init__(self,
                              outcomes=['move',
@@ -35,21 +35,25 @@ class BeaconSearch(smach.State):
                                          'beacon_point',
                                          'stop_on_beacon',
                                          'vfh_result',
+                                         'manager_dict',
                                          'world_fixed_frame',
                                          'odometry_frame'],
                              output_keys=['move_target',
                                           'move_point_map',
                                           'simple_move',
-                                          'stop_on_sample',
                                           'stop_on_beacon',
+                                          'active_manager',
                                           'beacon_point',
                                           'outbound'])
         
+        self.label = label
         self.tf_listener = tf_listener
         self.announcer = announcer
         self.tried_spin = False
 
     def execute(self, userdata):
+        #set the move manager key for the move mux
+        userdata.active_manager = userdata.manager_dict[self.label]
         
         if self.preempt_requested():
             self.service_preempt()
@@ -57,7 +61,6 @@ class BeaconSearch(smach.State):
         
         #ignore samples after this (applies to mount moves)
         #clear previous move_point_map
-        userdata.stop_on_sample = False
         userdata.move_point_map = None
         map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
        
@@ -142,7 +145,7 @@ class BeaconSearch(smach.State):
                                                       velocity = userdata.spin_velocity)                   
                 return 'spin'
             else:    
-                self.announcer.say("Initiate ing platform mount")
+                self.announcer.say("Measure ing beacon position.")
                 userdata.stop_on_beacon = False
                 return 'mount'
         
@@ -160,6 +163,7 @@ class MountManager(smach.State):
                                          'beacon_point',
                                          'beacon_mount_step'],
                              output_keys=['simple_move',
+                                          'stop_on_sample',
                                           'beacon_point'])
 
         self.tf_listener = tf_listener
@@ -177,5 +181,6 @@ class MountManager(smach.State):
                               distance = distance,
                               velocity = 0.5)        
         userdata.simple_move = move
-        self.announcer.say("Execute ing final mount move")
+        userdata.stop_on_sample = False
+        self.announcer.say("Initiate ing mount move.")
         return 'final'

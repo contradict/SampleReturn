@@ -145,7 +145,16 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
     
+        #move management
         self.state_machine.userdata.vfh_result = None
+        self.state_machine.userdata.active_manager = None
+        #list of manager outcomes, and their corresponding labels
+        manager_dict = {'WEB_MANAGER':'web_manager',
+                        'RETURN_MANAGER':'return_manager',
+                        'RECOVERY_MANAGER':'recovery_manager'}
+        self.state_machine.userdata.manager_dict = manager_dict
+        #get inverted version for the transition dict of the mux
+        manager_transitions = dict([[v,k] for k,v in manager_dict.items()])
     
         #motion mode stuff
         planner_mode = node_params.planner_mode
@@ -158,6 +167,8 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(input_keys=['dismount_move'],
                                                  output_keys=['action_result',
+                                                              'stop_on_sample',
+                                                              'pursue_samples',
                                                               'simple_move'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
@@ -200,9 +211,10 @@ class LevelTwoWeb(object):
                                    remapping = {'stop_on_sample':'false'})
             
             smach.StateMachine.add('WEB_MANAGER',
-                                   WebManager(self.tf_listener,
+                                   WebManager('WEB_MANAGER',
+                                              self.tf_listener,
                                               self.announcer),
-                                   transitions = {'move':'CREATE_WEB_GOAL',
+                                   transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -212,46 +224,48 @@ class LevelTwoWeb(object):
                                    transitions = {'next':'WEB_MANAGER',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
-            smach.StateMachine.add('CREATE_WEB_GOAL',
+            smach.StateMachine.add('CREATE_MOVE_GOAL',
                                    CreateMoveGoal(self.tf_listener),
                                    transitions = {'next':'MOVE',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('MOVE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'WEB_MANAGER',
+                                   transitions = {'complete':'MOVE_MUX',
                                                   'missed_target':'ANNOUNCE_MISSED_TARGET',
                                                   'blocked':'RETRY_CHECK',
                                                   'started_blocked':'RETRY_CHECK',
                                                   'off_course':'ANNOUNCE_OFF_COURSE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'true'})
-            
-            smach.StateMachine.add('ANNOUNCE_BLOCKED',
-                                   AnnounceState(self.announcer, 'Path Blocked.'),
-                                   transitions = {'next':'WEB_MANAGER'})
-            
-            smach.StateMachine.add('ANNOUNCE_ROTATE_TO_CLEAR',
-                                   AnnounceState(self.announcer, 'Started Blocked.'),
-                                   transitions = {'next':'WEB_MANAGER'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('RETRY_CHECK',
                                    RetryCheck(self.announcer),
-                                   transitions = {'continue':'WEB_MANAGER',
-                                                  'retry':'CREATE_WEB_GOAL',
+                                   transitions = {'continue':'MOVE_MUX',
+                                                  'retry':'CREATE_MOVE_GOAL',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
             
+            smach.StateMachine.add('ANNOUNCE_BLOCKED',
+                                   AnnounceState(self.announcer, 'Path Blocked.'),
+                                   transitions = {'next':'MOVE_MUX'})
+            
+            smach.StateMachine.add('ANNOUNCE_ROTATE_TO_CLEAR',
+                                   AnnounceState(self.announcer, 'Started Blocked.'),
+                                   transitions = {'next':'MOVE_MUX'})
+            
             smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
                                    AnnounceState(self.announcer, 'Off Course.'),
-                                   transitions = {'next':'WEB_MANAGER'})
+                                   transitions = {'next':'MOVE_MUX'})
             
             smach.StateMachine.add('ANNOUNCE_MISSED_TARGET',
                                    AnnounceState(self.announcer, 'Missed Target'),
-                                   transitions = {'next':'WEB_MANAGER'})
+                                   transitions = {'next':'MOVE_MUX'})
 
+            smach.StateMachine.add('MOVE_MUX',
+                                   MoveMUX(manager_transitions.keys()),
+                                   transitions = manager_transitions)
             
             @smach.cb_interface(input_keys=['detected_sample'],
                                 output_keys=['move_point_map'])
@@ -280,47 +294,31 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('ANNOUNCE_RETURN_TO_SEARCH',
                                    AnnounceState(self.announcer,
                                                  'Return ing to search.'),
-                                   transitions = {'next':'CREATE_WEB_GOAL'})   
+                                   transitions = {'next':'CREATE_MOVE_GOAL'})   
 
             smach.StateMachine.add('ANNOUNCE_RETURN_HOME',
                                    AnnounceState(self.announcer,
                                                  'Return ing to home platform.'),
-                                   transitions = {'next':'BEACON_SEARCH'})
+                                   transitions = {'next':'RETURN_MANAGER'})
  
-            smach.StateMachine.add('BEACON_SEARCH',
-                                   BeaconSearch(self.tf_listener, self.announcer),
+            smach.StateMachine.add('RETURN_MANAGER',
+                                   BeaconSearch('RETURN_MANAGER',
+                                                self.tf_listener,
+                                                self.announcer),
                                    transitions = {'mount':'MOUNT_MANAGER',
-                                                  'move':'CREATE_BEACON_GOAL',
+                                                  'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('BEACON_SEARCH_SPIN',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'BEACON_SEARCH',
-                                                  'sample_detected':'BEACON_SEARCH',
+                                   transitions = {'complete':'RETURN_MANAGER',
+                                                  'sample_detected':'RETURN_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_sample':'stop_on_beacon',
                                                 'detected_sample':'beacon_point'})
-            
-            smach.StateMachine.add('CREATE_BEACON_GOAL',
-                                   CreateMoveGoal(self.tf_listener),
-                                   transitions = {'next':'BEACON_SEARCH_MOVE',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
 
-            smach.StateMachine.add('BEACON_SEARCH_MOVE',
-                                   ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'BEACON_SEARCH',
-                                                  'blocked':'BEACON_SEARCH',
-                                                  'started_blocked':'BEACON_SEARCH',
-                                                  'missed_target':'BEACON_SEARCH',
-                                                  'off_course':'BEACON_SEARCH',
-                                                  'sample_detected':'BEACON_SEARCH',
-                                                  'preempted':'BEACON_SEARCH',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'stop_on_beacon',
-                                                'detected_sample':'beacon_point'})
- 
             smach.StateMachine.add('MOUNT_MANAGER',
                                    MountManager(self.tf_listener, self.announcer),
                                    transitions = {'move':'MOUNT_MOVE',
@@ -349,9 +347,11 @@ class LevelTwoWeb(object):
                                                    'failed':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('RECOVERY_MANAGER',
-                                   RecoveryManager(self.announcer, self.tf_listener),
+                                   RecoveryManager('RECOVERY_MANAGER',
+                                                   self.announcer,
+                                                   self.tf_listener),
                                    transitions = {'move':'MOVE',
-                                                  'beacon_search':'BEACON_SEARCH',
+                                                  'beacon_search':'RETURN_MANAGER',
                                                   'web_manager':'WEB_MANAGER'})
     
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
@@ -517,11 +517,14 @@ class StartLeveLTwo(smach.State):
                               **userdata.dismount_move)
 
         userdata.simple_move = move
+        
+        userdata.pursue_samples = True
+        userdata.stop_on_sample = True
 
         return 'next'
 
 class WebManager(smach.State):
-    def __init__(self, tf_listener, announcer):
+    def __init__(self, label, tf_listener, announcer):
         smach.State.__init__(self,
                              input_keys = ['spoke_yaw',
                                            'outbound',
@@ -530,6 +533,7 @@ class WebManager(smach.State):
                                            'raster_points',
                                            'raster_step',
                                            'vfh_result',
+                                           'manager_dict',
                                            'return_time',
                                            'world_fixed_frame'],
                              output_keys = ['spoke_yaw',
@@ -541,7 +545,9 @@ class WebManager(smach.State):
                                             'web_move',
                                             'move_target',
                                             'course_tolerance',
-                                            'stop_on_sample'],
+                                            'stop_on_sample',
+                                            'pursue_samples',
+                                            'active_manager'],
                              outcomes=['move',
                                        'get_raster',
                                        'return_home',
@@ -549,14 +555,17 @@ class WebManager(smach.State):
         
         self.tf_listener = tf_listener
         self.announcer = announcer
+        self.label = label
         self.last_web_move = None
         self.blocked_set = [VFHMoveResult.BLOCKED, VFHMoveResult.OFF_COURSE]
 
     def execute(self, userdata):
-        
-        userdata.retry_active = False
+        #set the move manager key for the move mux
+        userdata.active_manager = userdata.manager_dict[self.label]        
         
         if rospy.Time.now() > userdata.return_time:
+            userdata.stop_on_sample = False
+            userdata.pursue_samples = False
             return 'return_home'
 
         if userdata.outbound:
@@ -822,27 +831,44 @@ class RetryCheck(smach.State):
         rospy.sleep(userdata.blocked_retry_delay)
         userdata.retry_active = True
         return 'retry'
+    
 
 class RecoveryManager(smach.State):
-    def __init__(self, announcer, tf_listener):
+    def __init__(self, label, announcer, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['recovery_parameters'],
+                             input_keys = ['recovery_parameters',
+                                           'manager_dict'],
                              output_keys = ['recovery_parameters',
+                                            'active_manager',
                                             'pursue_samples'],
                              outcomes=['move',
                                        'beacon_search',
                                        'web_manager',
                                        'aborted'])
-               
+        
+        self.label = label       
         self.announcer = announcer
         self.tf_listener = tf_listener
         
     def execute(self, userdata):
+        #set the move manager key for the move mux
+        userdata.active_manager = userdata.manager_dict[self.label]
         
         self.announcer.say("Enter ing recovery state")
         rospy.sleep(2.0)
         
         return 'web_manager'
+
+class MoveMUX(smach.State):
+    def __init__(self, manager_list):
+        smach.State.__init__(self,
+                             input_keys = ['active_manager'],
+                             output_keys = ['retry_active'],
+                             outcomes = manager_list)
+        
+    def execute(self, userdata):
+        userdata.retry_active = False
+        return userdata.active_manager
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
