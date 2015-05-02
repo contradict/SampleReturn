@@ -335,6 +335,7 @@ class KalmanDetectionFilter
       point_msg.point.x = filter_list_[0].filter->statePost.at<float>(0);
       point_msg.point.y = filter_list_[0].filter->statePost.at<float>(1);
       point_msg.point.z = 0;
+      point_msg.filter_id = filter_list_[0].filter_id;
       pub_detection.publish(point_msg);
 
       if (cam_model_.initialized()) {
