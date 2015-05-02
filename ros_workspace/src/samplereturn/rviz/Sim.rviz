@@ -124,15 +124,15 @@ Visualization Manager:
       Marker Topic: /fake_samples
       Name: Samples
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /debug_markers
-      Name: Debug Markers
+      Marker Topic: /processes/executive/web_markers
+      Name: Executive Debug Markers
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -385,9 +385,9 @@ Visualization Manager:
         base_link:
           Value: true
         beacon:
-          Value: false
+          Value: true
         beacon_localizer_T:
-          Value: false
+          Value: true
         body_triangle:
           Value: false
         carousel:
@@ -445,9 +445,9 @@ Visualization Manager:
         noise_transform:
           Value: false
         noisy_odometry_in_sim_map:
-          Value: false
-        odom:
           Value: true
+        odom:
+          Value: false
         perfect_odometry_in_static_frame:
           Value: false
         port_suspension:
@@ -461,7 +461,7 @@ Visualization Manager:
         search_camera_lens:
           Value: false
         sim_map:
-          Value: false
+          Value: true
         starboard_suspension:
           Value: false
         starboard_wheel:
@@ -586,11 +586,11 @@ Visualization Manager:
         Value: false
       Name: Current View
       Near Clip Distance: 0.01
-      Scale: 19.8172
+      Scale: 15.3096
       Target Frame: base_link
       Value: TopDownOrtho (rviz)
-      X: -4.07903
-      Y: -3.83224
+      X: -17.8377
+      Y: -8.10322
     Saved: ~
 Window Geometry:
   Displays:
