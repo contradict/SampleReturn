@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS tf rospy
   roscpp
   sensor_msgs
   cv_bridge
+  dynamic_reconfigure
   image_geometry
   samplereturn_msgs)
 
@@ -44,6 +45,8 @@ catkin_python_setup()
 #   sensor_msgs
 # )
 
+generate_dynamic_reconfigure_options(cfg/kalman_filter_params.cfg)
+
 ###################################################
 ## Declare things to be passed to other projects ##
 ###################################################
@@ -76,6 +79,8 @@ add_definitions( -std=gnu++0x )
 
 ## Declare a cpp executable
  add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
+
+ add_dependencies(kalman_filter_node ${PROJECT_NAME}_gencfg)
 
 ## Add dependencies to the executable
  add_dependencies(kalman_filter_node samplereturn_msgs_gencpp)

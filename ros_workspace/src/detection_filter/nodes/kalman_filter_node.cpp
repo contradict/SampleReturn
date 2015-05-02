@@ -10,14 +10,32 @@
 #include <ros/time.h>
 #include <ros/console.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
 #include <samplereturn_msgs/PursuitResult.h>
+#include <geometry_msgs/PolygonStamped.h>
+
+#include <dynamic_reconfigure/server.h>
+#include <detection_filter/kalman_filter_paramsConfig.h>
 
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections
  * when the covariance and velocity of a filter fall below a threshold.
  * It will also age out filters that have too large a convariance.
  */
+
+class ColoredKF
+{
+  public:
+    std::shared_ptr<cv::KalmanFilter> filter;
+    std::string color;
+    ColoredKF(std::shared_ptr<cv::KalmanFilter>, std::string);
+};
+
+ColoredKF::ColoredKF (std::shared_ptr<cv::KalmanFilter> kf, std::string c) {
+  filter = kf;
+  color = c;
+}
 
 class KalmanDetectionFilter
 {
@@ -28,6 +46,8 @@ class KalmanDetectionFilter
   ros::Publisher pub_detection;
   ros::Publisher pub_img_detection;
   ros::Publisher pub_debug_img;
+  ros::Publisher pub_filter_marker_array;
+  ros::Publisher pub_frustum_poly;
 
   ros::Subscriber sub_ack;
 
@@ -38,9 +58,10 @@ class KalmanDetectionFilter
   std::string filtered_img_detection_topic;
   std::string ack_topic;
   std::string debug_img_topic;
+  std::string filter_marker_array_topic;
+  std::string frustum_poly_topic;
 
-  std::vector<std::shared_ptr<cv::KalmanFilter> > filter_list_;
-  std::vector<std::shared_ptr<cv::KalmanFilter> > latched_filter_list_;
+  std::vector<ColoredKF> filter_list_;
   // Exclusion sites are centers and radii (x,y,r)
   std::vector<std::tuple<float,float,float> > exclusion_list_;
 
@@ -61,14 +82,26 @@ class KalmanDetectionFilter
   double error_cov_post_;
   double period_;
 
+  int32_t marker_count_;
+
   image_geometry::PinholeCameraModel cam_model_;
   tf::TransformListener listener_;
 
   std::string _filter_frame_id;
 
+  dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig> dr_srv;
+
+  XmlRpc::XmlRpcValue color_transitions_;
+  std::map<std::string,std::vector<std::string> > color_transitions_map_;
+
   public:
   KalmanDetectionFilter()
   {
+    dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig>::CallbackType cb;
+
+    cb = boost::bind(&KalmanDetectionFilter::configCallback, this,  _1, _2);
+    dr_srv.setCallback(cb);
+
     cam_info_topic = "camera_info";
     //cam_info_topic = "/cameras/manipulator/left/camera_info";
     detection_topic = "point";
@@ -76,6 +109,8 @@ class KalmanDetectionFilter
     filtered_detection_topic = "filtered_point";
     filtered_img_detection_topic = "filtered_img_point";
     debug_img_topic = "debug_img";
+    filter_marker_array_topic = "filter_markers";
+    frustum_poly_topic = "frustum_polygon";
 
     ack_topic = "ack";
 
@@ -95,6 +130,97 @@ class KalmanDetectionFilter
     private_node_handle_.param("period", period_, double(2));
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
 
+    private_node_handle_.getParam("color_transitions",color_transitions_);
+    if (color_transitions_.hasMember(std::string("red"))){
+      std::vector<std::string> red_vec;
+      for (int i=0; i<color_transitions_[std::string("red")].size(); i++) {
+        red_vec.push_back(static_cast<std::string>(color_transitions_[std::string("red")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("red",red_vec));
+    }
+    if (color_transitions_.hasMember(std::string("orange"))){
+      std::vector<std::string> orange_vec;
+      for (int i=0; i<color_transitions_[std::string("orange")].size(); i++) {
+        orange_vec.push_back(static_cast<std::string>(color_transitions_[std::string("orange")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("orange",orange_vec));
+    }
+    if (color_transitions_.hasMember(std::string("yellow"))){
+      std::vector<std::string> yellow_vec;
+      for (int i=0; i<color_transitions_[std::string("yellow")].size(); i++) {
+        yellow_vec.push_back(static_cast<std::string>(color_transitions_[std::string("yellow")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("yellow",yellow_vec));
+    }
+    if (color_transitions_.hasMember(std::string("green"))){
+      std::vector<std::string> green_vec;
+      for (int i=0; i<color_transitions_[std::string("green")].size(); i++) {
+        green_vec.push_back(static_cast<std::string>(color_transitions_[std::string("green")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("green",green_vec));
+    }
+    if (color_transitions_.hasMember(std::string("blue"))){
+      std::vector<std::string> blue_vec;
+      for (int i=0; i<color_transitions_[std::string("blue")].size(); i++) {
+        blue_vec.push_back(static_cast<std::string>(color_transitions_[std::string("blue")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("blue",blue_vec));
+    }
+    if (color_transitions_.hasMember(std::string("purple"))){
+      std::vector<std::string> purple_vec;
+      for (int i=0; i<color_transitions_[std::string("purple")].size(); i++) {
+        purple_vec.push_back(static_cast<std::string>(color_transitions_[std::string("purple")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("purple",purple_vec));
+    }
+    if (color_transitions_.hasMember(std::string("pink"))){
+      std::vector<std::string> pink_vec;
+      for (int i=0; i<color_transitions_[std::string("pink")].size(); i++) {
+        pink_vec.push_back(static_cast<std::string>(color_transitions_[std::string("pink")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("pink",pink_vec));
+    }
+    if (color_transitions_.hasMember(std::string("brown"))){
+      std::vector<std::string> brown_vec;
+      for (int i=0; i<color_transitions_[std::string("brown")].size(); i++) {
+        brown_vec.push_back(static_cast<std::string>(color_transitions_[std::string("brown")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("brown",brown_vec));
+    }
+    if (color_transitions_.hasMember(std::string("white"))){
+      std::vector<std::string> white_vec;
+      for (int i=0; i<color_transitions_[std::string("white")].size(); i++) {
+        white_vec.push_back(static_cast<std::string>(color_transitions_[std::string("white")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("white",white_vec));
+    }
+    if (color_transitions_.hasMember(std::string("gray"))){
+      std::vector<std::string> gray_vec;
+      for (int i=0; i<color_transitions_[std::string("gray")].size(); i++) {
+        gray_vec.push_back(static_cast<std::string>(color_transitions_[std::string("gray")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("gray",gray_vec));
+    }
+    if (color_transitions_.hasMember(std::string("black"))){
+      std::vector<std::string> black_vec;
+      for (int i=0; i<color_transitions_[std::string("black")].size(); i++) {
+        black_vec.push_back(static_cast<std::string>(color_transitions_[std::string("black")][i]));
+      }
+      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
+          ("black",black_vec));
+    }
+
+
     sub_cam_info =
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
 
@@ -113,12 +239,40 @@ class KalmanDetectionFilter
     pub_debug_img =
       nh.advertise<sensor_msgs::Image>(debug_img_topic.c_str(), 3);
 
+    pub_filter_marker_array =
+      nh.advertise<visualization_msgs::MarkerArray>(filter_marker_array_topic.c_str(), 3);
+
+    pub_frustum_poly =
+      nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
+
     if(accumulate_) {
       sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
     }
 
     last_time_.sec = 0.0;
     last_time_.nsec = 0.0;
+
+    marker_count_ = 0;
+  }
+
+  /* Dynamic reconfigure callback */
+  void configCallback(detection_filter::kalman_filter_paramsConfig &config, uint32_t level)
+  {
+    ROS_INFO("configCallback");
+    max_dist_ = config.max_dist;
+    max_cov_ = config.max_cov;
+    max_pub_cov_ = config.max_pub_cov;
+    max_pub_vel_ = config.max_pub_vel;
+
+    process_noise_cov_ = config.process_noise_cov;
+    measurement_noise_cov_ = config.measurement_noise_cov;
+    error_cov_post_ = config.error_cov_post;
+    period_ = config.period;
+
+    if(config.clear_filters) {
+      //clear all filters
+      filter_list_.clear();
+    }
   }
 
   /* For incoming detections: assign to filter or create new filter
@@ -130,8 +284,8 @@ class KalmanDetectionFilter
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
   {
     float x,y,r;
-    x = latched_filter_list_[0]->statePost.at<float>(0);
-    y = latched_filter_list_[0]->statePost.at<float>(1);
+    x = filter_list_[0].filter->statePost.at<float>(0);
+    y = filter_list_[0].filter->statePost.at<float>(1);
     if (msg.success) {
       r = pos_exclusion_radius_;
     }
@@ -140,7 +294,8 @@ class KalmanDetectionFilter
     }
     exclusion_list_.push_back(std::make_tuple(x,y,r));
 
-    latched_filter_list_.erase(latched_filter_list_.begin());
+    filter_list_.erase(filter_list_.begin());
+    drawFilterStates();
   }
 
   void imgDetectionCallback(const samplereturn_msgs::NamedPoint& msg)
@@ -151,42 +306,38 @@ class KalmanDetectionFilter
 
   void detectionCallback(const samplereturn_msgs::NamedPoint& msg)
   {
-    if (filter_list_.size() == 0 && latched_filter_list_.size()==0) {
+    if (filter_list_.size() == 0) {
       addFilter(msg);
       return;
     }
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        filter_list_[i]->predict();
+        filter_list_[i].filter->predict();
       }
     }
 
     checkObservation(msg);
 
-    if (!accumulate_) {
-      publishFilteredDetections(msg);
-    }
-    else {
-      processFilters();
-    }
+    publishFilteredDetections(msg);
+    drawFilterStates();
   }
 
   void publishTop() {
-    if (latched_filter_list_.size() > 0) {
+    if (filter_list_.size() > 0) {
       samplereturn_msgs::NamedPoint point_msg;
       point_msg.header.frame_id = _filter_frame_id;
       point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = latched_filter_list_[0]->statePost.at<float>(0);
-      point_msg.point.y = latched_filter_list_[0]->statePost.at<float>(1);
+      point_msg.point.x = filter_list_[0].filter->statePost.at<float>(0);
+      point_msg.point.y = filter_list_[0].filter->statePost.at<float>(1);
       point_msg.point.z = 0;
       pub_detection.publish(point_msg);
 
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
-        xyz_point.x = double(latched_filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(latched_filter_list_[0]->statePost.at<float>(1));
-        xyz_point.z = double(latched_filter_list_[0]->statePost.at<float>(2));
+        xyz_point.x = double(filter_list_[0].filter->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0].filter->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0].filter->statePost.at<float>(2));
         cv::Point2d uv_point = cam_model_.project3dToPixel(xyz_point);
         samplereturn_msgs::NamedPoint img_point_msg;
         img_point_msg.header.frame_id = "";
@@ -202,29 +353,29 @@ class KalmanDetectionFilter
   void publishFilteredDetections(const samplereturn_msgs::NamedPoint& msg) {
     for (auto filter_ptr : filter_list_) {
       cv::Mat eigenvalues;
-      cv::eigen(filter_ptr->errorCovPost, eigenvalues);
+      cv::eigen(filter_ptr.filter->errorCovPost, eigenvalues);
       for (int i=0; i<eigenvalues.rows; i++) {
         if (eigenvalues.at<float>(i) > max_pub_cov_) {
           break;
         }
       }
-      if (filter_ptr->statePost.at<float>(3) < max_pub_vel_ ||
-          filter_ptr->statePost.at<float>(4) < max_pub_vel_) {
+      if (filter_ptr.filter->statePost.at<float>(3) < max_pub_vel_ ||
+          filter_ptr.filter->statePost.at<float>(4) < max_pub_vel_) {
         samplereturn_msgs::NamedPoint point_msg;
         point_msg.header.frame_id = _filter_frame_id;
         point_msg.header.stamp = ros::Time::now();
         point_msg.grip_angle = msg.grip_angle;
         point_msg.sample_id = msg.sample_id;
-        point_msg.point.x = filter_ptr->statePost.at<float>(0);
-        point_msg.point.y = filter_ptr->statePost.at<float>(1);
+        point_msg.point.x = filter_ptr.filter->statePost.at<float>(0);
+        point_msg.point.y = filter_ptr.filter->statePost.at<float>(1);
         point_msg.point.z = 0;
         pub_detection.publish(point_msg);
       }
       if (cam_model_.initialized()) {
         cv::Point3d xyz_point;
-        xyz_point.x = double(filter_list_[0]->statePost.at<float>(0));
-        xyz_point.y = double(filter_list_[0]->statePost.at<float>(1));
-        xyz_point.z = double(filter_list_[0]->statePost.at<float>(2));
+        xyz_point.x = double(filter_list_[0].filter->statePost.at<float>(0));
+        xyz_point.y = double(filter_list_[0].filter->statePost.at<float>(1));
+        xyz_point.z = double(filter_list_[0].filter->statePost.at<float>(2));
         geometry_msgs::PointStamped odom_point;
         odom_point.header = msg.header;
         odom_point.point.x = xyz_point.x;
@@ -282,20 +433,26 @@ class KalmanDetectionFilter
     KF->statePost.at<float>(5) = 0;
 
     KF->predict();
-    filter_list_.push_back(KF);
+    filter_list_.push_back(ColoredKF(KF,msg.name));
     checkObservation(msg);
   }
 
-  void addMeasurement(const cv::Mat meas_state, int filter_index, bool latched)
+  void addMeasurement(const cv::Mat meas_state, int filter_index)
   {
-    ROS_DEBUG("Adding measurement to filter: %i", filter_index);
-    if (latched) {
-      latched_filter_list_[filter_index]->correct(meas_state);
-    }
-    else {
-      filter_list_[filter_index]->correct(meas_state);
-    }
+    ROS_INFO("Adding measurement to filter: %i", filter_index);
+    filter_list_[filter_index].filter->correct(meas_state);
   }
+
+  bool checkColor(std::string filter_color, std::string obs_color)
+  {
+    std::vector<std::string>::iterator color_it;
+    color_it = std::find(color_transitions_map_[filter_color].begin(),
+                          color_transitions_map_[filter_color].end(),
+                          obs_color);
+    ROS_INFO("Color Check: Filter Color:%s Obs Color:%s",filter_color.c_str(),obs_color.c_str());
+    return (color_it != color_transitions_map_[filter_color].end());
+  }
+
 
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
@@ -312,23 +469,17 @@ class KalmanDetectionFilter
       }
     }
 
-    if (accumulate_) {
-      for (int i=0; i<latched_filter_list_.size(); i++) {
-        cv::Mat dist = (latched_filter_list_[i]->measurementMatrix)*
-          (latched_filter_list_[i]->statePost) - meas_state;
-        if (abs(cv::sum(dist)[0]) < max_dist_) {
-          latched_filter_list_[i]->predict();
-          addMeasurement(meas_state, i, true);
-          return;
-        }
-      }
-    }
-
     for (int i=0; i<filter_list_.size(); i++) {
-      cv::Mat dist = (filter_list_[i]->measurementMatrix)*(filter_list_[i]->statePost)
+      cv::Mat dist = (filter_list_[i].filter->measurementMatrix)*(filter_list_[i].filter->statePost)
         - meas_state;
-      if (abs(cv::sum(dist)[0]) < max_dist_) {
-        addMeasurement(meas_state, i, false);
+      if (abs(cv::sum(dist)[0]) < max_dist_ && checkColor(filter_list_[i].color,msg.name)) {
+        ROS_INFO("Color Check Passed");
+        addMeasurement(meas_state, i);
+        filter_list_[i].color = msg.name;
+        return;
+      }
+      else if (abs(cv::sum(dist)[0]) < max_dist_ && not checkColor(filter_list_[i].color,msg.name)) {
+        ROS_INFO("Color Check Failed");
         return;
       }
     }
@@ -341,14 +492,16 @@ class KalmanDetectionFilter
     if (!cam_model_.initialized()) {
       cam_model_.fromCameraInfo(msg);
     }
-    if (filter_list_.size()==0 && latched_filter_list_.size()==0) {
+    if (filter_list_.size()==0) {
       return;
     }
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        filter_list_[i]->predict();
-        filter_list_[i]->errorCovPre.copyTo(filter_list_[i]->errorCovPost);;
+        if (isInView(filter_list_[i].filter)) {
+          filter_list_[i].filter->predict();
+          filter_list_[i].filter->errorCovPre.copyTo(filter_list_[i].filter->errorCovPost);;
+        }
       }
     }
     checkFilterAges();
@@ -359,9 +512,47 @@ class KalmanDetectionFilter
     }
   }
 
-  bool isOld (std::shared_ptr<cv::KalmanFilter> kf) {
+  /* This will check if each hypothesis is in view currently */
+  bool isInView (std::shared_ptr<cv::KalmanFilter> kf) {
+    ROS_INFO("Is In View Check");
+    /* This is in base_link, transform it to odom */
+    cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
+        1.75, -1.21, 21.75, -13.21, 21.75, 13.21, 1.75, 1.21);
+    cv::Mat DSLR_frustum_odom(4,2,CV_32FC1);
+    geometry_msgs::PointStamped temp_msg, temp_msg_odom;
+    geometry_msgs::PolygonStamped frustum_poly;
+    frustum_poly.header.frame_id = "odom";
+    frustum_poly.header.stamp = ros::Time::now();
+    temp_msg.header.frame_id = "base_link";
+    temp_msg.header.stamp = ros::Time::now();
+    for (int i=0; i<4; i++) {
+      temp_msg.point.x = DSLR_frustum.at<float>(i,0);
+      temp_msg.point.y = DSLR_frustum.at<float>(i,1);
+      temp_msg.point.z = 0.0;
+      try {
+        listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
+      }
+      catch (tf::TransformException e) {
+        ROS_ERROR_STREAM("Aww shit " << e.what());
+      }
+      listener_.transformPoint("odom",temp_msg,temp_msg_odom);
+      DSLR_frustum_odom.at<float>(i,0) = temp_msg_odom.point.x;
+      DSLR_frustum_odom.at<float>(i,1) = temp_msg_odom.point.y;
+      geometry_msgs::Point32 temp_point;
+      temp_point.x = temp_msg_odom.point.x;
+      temp_point.y = temp_msg_odom.point.y;
+      temp_point.z = 0.0;
+      frustum_poly.polygon.points.push_back(temp_point);
+    }
+    pub_frustum_poly.publish(frustum_poly);
+    double retval = cv::pointPolygonTest(DSLR_frustum_odom,
+        cv::Point2f(kf->statePost.at<float>(0),kf->statePost.at<float>(1)), false);
+    return (retval == 1);
+  }
+
+  bool isOld (ColoredKF ckf) {
     cv::Mat eigenvalues;
-    cv::eigen(kf->errorCovPost, eigenvalues);
+    cv::eigen(ckf.filter->errorCovPost, eigenvalues);
     for (int i=0; i<eigenvalues.rows; i++) {
       if (eigenvalues.at<float>(i) > max_cov_) {
         return true;
@@ -370,64 +561,61 @@ class KalmanDetectionFilter
     return false;
   }
 
-  bool isGood (std::shared_ptr<cv::KalmanFilter> kf) {
-    cv::Mat eigenvalues;
-    cv::eigen(kf->errorCovPost, eigenvalues);
-    for (int i=0; i<eigenvalues.rows; i++) {
-      if (eigenvalues.at<float>(i) < max_pub_cov_) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   void checkFilterAges() {
     filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
         std::bind1st(std::mem_fun(&KalmanDetectionFilter::isOld),this)),
         filter_list_.end());
   }
 
-  void processFilters()
-  {
-    std::vector<int> count;
-    for (int i=0; i<filter_list_.size(); i++) {
-      cv::Mat eigenvalues;
-      cv::eigen(filter_list_[i]->errorCovPost, eigenvalues);
-      if (eigenvalues.at<float>(0)+eigenvalues.at<float>(1) < max_pub_cov_) {
-        latched_filter_list_.push_back(filter_list_[i]);
-        count.push_back(i);
-      }
-    }
-
-    for (int i=0; i<count.size(); i++) {
-      filter_list_.erase(filter_list_.begin()+count[i]);
-    }
-    count.clear();
-  }
-
   void drawFilterStates() {
     ROS_DEBUG("Number of Filters: %lu", filter_list_.size());
-    if (accumulate_) {
-      ROS_DEBUG("Number of Latched Filters: %lu", latched_filter_list_.size());
+
+    visualization_msgs::MarkerArray marker_array;
+
+    for (int i=0; i<marker_count_; i++) {
+      visualization_msgs::Marker clear_marker;
+      clear_marker.header.frame_id = "/map";
+      clear_marker.header.stamp = ros::Time::now();
+      clear_marker.id = i;
+      clear_marker.action = visualization_msgs::Marker::DELETE;
+      marker_array.markers.push_back(clear_marker);
     }
+    pub_filter_marker_array.publish(marker_array);
+    marker_array.markers.clear();
+
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
     float px_per_meter = 50.0;
     float offset = 250;
     for (auto filter_ptr : filter_list_){
-      cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
-          filter_ptr->statePost.at<float>(1) * px_per_meter);
-      float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
-      float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
+      cv::Point mean(filter_ptr.filter->statePost.at<float>(0) * px_per_meter,
+          filter_ptr.filter->statePost.at<float>(1) * px_per_meter);
+      float rad_x = filter_ptr.filter->errorCovPost.at<float>(0,0) * px_per_meter;
+      float rad_y = filter_ptr.filter->errorCovPost.at<float>(1,1) * px_per_meter;
       cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
       cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
-    }
-    for (auto filter_ptr : latched_filter_list_) {
-      cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
-          filter_ptr->statePost.at<float>(1) * px_per_meter);
-      float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
-      float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
-      cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,255,0));
-      cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,0,255));
+
+      visualization_msgs::Marker cov;
+      cov.type = visualization_msgs::Marker::SPHERE;
+      cov.id = marker_count_;
+      cov.header.frame_id = "odom";
+      cov.header.stamp = ros::Time::now();
+      cov.color.r = 1.0;
+      cov.color.g = 1.0;
+      cov.color.b = 1.0;
+      cov.color.a = 0.5;
+      cov.pose.position.x = filter_ptr.filter->statePost.at<float>(0);
+      cov.pose.position.y = filter_ptr.filter->statePost.at<float>(1);
+      cov.pose.position.z = 0.0;
+      cov.pose.orientation.x = 0;
+      cov.pose.orientation.y = 0;
+      cov.pose.orientation.z = 0;
+      cov.pose.orientation.w = 1;
+      cov.scale.x = filter_ptr.filter->errorCovPost.at<float>(0,0);
+      cov.scale.y = filter_ptr.filter->errorCovPost.at<float>(1,1);
+      cov.scale.z = 0.01;
+      cov.lifetime = ros::Duration();
+      marker_array.markers.push_back(cov);
+      marker_count_ += 1;
     }
 
     for (int i=0; i<exclusion_list_.size(); i++) {
@@ -436,21 +624,17 @@ class KalmanDetectionFilter
           std::get<2>(exclusion_list_[i])*px_per_meter, cv::Scalar(255,255,255));
     }
 
-    printFilterState();
-    //cv::imshow("Filter States", img);
-    //cv::waitKey(10);
+    //printFilterState();
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",img).toImageMsg();
     pub_debug_img.publish(debug_img_msg);
 
+    pub_filter_marker_array.publish(marker_array);
   }
 
   void printFilterState() {
     for (auto filter_ptr : filter_list_) {
-      //std::cout << "State: " << filter_ptr->statePost << std::endl;
-    }
-    for (auto filter_ptr : latched_filter_list_) {
-      //std::cout << "Latched State: " << filter_ptr->statePost << std::endl;
+      std::cout << "State: " << filter_ptr.filter->statePost << std::endl;
     }
   }
 
