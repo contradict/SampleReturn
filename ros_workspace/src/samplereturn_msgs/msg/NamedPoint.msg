@@ -18,4 +18,3 @@ string name
 int8 sample_id
 int16 filter_id
 float32 grip_angle
-int16 filter_id
