@@ -82,7 +82,7 @@ class BeaconSearch(smach.State):
         #we should clear them here, and wait for a fresh detection
         if not userdata.stop_on_beacon:
             userdata.beacon_point = None
-            rospy.sleep(4.0)
+            rospy.sleep(8.0)
         
         if userdata.beacon_point is None: #beacon not in view
             #first hope, we can spin slowly and see the beacon
