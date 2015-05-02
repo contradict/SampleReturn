@@ -735,7 +735,8 @@ class CreateMoveGoal(smach.State):
                                            'spin_velocity',
                                            'course_tolerance',
                                            'vfh_result',
-                                           'odometry_frame'],
+                                           'odometry_frame',
+                                           'world_fixed_frame'],
                              output_keys = ['move_goal',
                                             'move_point_map'],
                              outcomes=['next',
@@ -772,7 +773,12 @@ class CreateMoveGoal(smach.State):
                 target_pose = geometry_msg.PoseStamped(pt_odom.header, pose)
             else:
                 rospy.logwarn("LEVEL_TWO invalid move target in CreateMoveGoal")
+                return 'aborted'
             
+            #input point could be in any frame (definitely baselink sometimes)
+            map_pose = self.tf_listener.transformPose(userdata.world_fixed_frame,
+                                                      target_pose)
+                
         except tf.Exception, exc:
             rospy.logwarn("LEVEL_TWO failed to transform move: {!s}".format(exc))
             return 'aborted'
@@ -786,8 +792,8 @@ class CreateMoveGoal(smach.State):
         userdata.move_goal = goal
 
         #store the point in map, to compare in the beacon update callback
-        userdata.move_point_map = geometry_msg.PointStamped(target_pose.header,
-                                                            target_pose.pose.position)
+        userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
+                                                            map_pose.pose.position)
         
         
         return 'next'
