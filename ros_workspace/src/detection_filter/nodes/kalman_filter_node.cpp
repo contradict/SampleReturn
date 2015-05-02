@@ -29,12 +29,14 @@ class ColoredKF
   public:
     std::shared_ptr<cv::KalmanFilter> filter;
     std::string color;
-    ColoredKF(std::shared_ptr<cv::KalmanFilter>, std::string);
+    int16_t filter_id;
+    ColoredKF(std::shared_ptr<cv::KalmanFilter>, std::string, int16_t);
 };
 
-ColoredKF::ColoredKF (std::shared_ptr<cv::KalmanFilter> kf, std::string c) {
+ColoredKF::ColoredKF (std::shared_ptr<cv::KalmanFilter> kf, std::string c, int16_t id) {
   filter = kf;
   color = c;
+  filter_id = id;
 }
 
 class KalmanDetectionFilter
@@ -83,6 +85,7 @@ class KalmanDetectionFilter
   double period_;
 
   int32_t marker_count_;
+  int16_t filter_id_count_;
 
   image_geometry::PinholeCameraModel cam_model_;
   tf::TransformListener listener_;
@@ -253,6 +256,7 @@ class KalmanDetectionFilter
     last_time_.nsec = 0.0;
 
     marker_count_ = 0;
+    filter_id_count_ = 0;
   }
 
   /* Dynamic reconfigure callback */
@@ -331,6 +335,7 @@ class KalmanDetectionFilter
       point_msg.point.x = filter_list_[0].filter->statePost.at<float>(0);
       point_msg.point.y = filter_list_[0].filter->statePost.at<float>(1);
       point_msg.point.z = 0;
+      point_msg.filter_id = filter_list_[0].filter_id;
       pub_detection.publish(point_msg);
 
       if (cam_model_.initialized()) {
@@ -433,7 +438,8 @@ class KalmanDetectionFilter
     KF->statePost.at<float>(5) = 0;
 
     KF->predict();
-    filter_list_.push_back(ColoredKF(KF,msg.name));
+    filter_list_.push_back(ColoredKF(KF,msg.name,filter_id_count_));
+    filter_id_count_++;
     checkObservation(msg);
   }
 
