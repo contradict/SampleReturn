@@ -350,7 +350,7 @@ class LevelTwoWeb(object):
                                    RecoveryManager('RECOVERY_MANAGER',
                                                    self.announcer,
                                                    self.tf_listener),
-                                   transitions = {'move':'MOVE',
+                                   transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'beacon_search':'RETURN_MANAGER',
                                                   'web_manager':'WEB_MANAGER'})
     
@@ -403,6 +403,8 @@ class LevelTwoWeb(object):
         try:
             params = rosparam.load_file(req.file)
             rospy.loginfo("START_RECOVERY received params: {!s}".format(params))
+            #get first namespace, and the first tuple entry (the param dict)
+            params = params[0][0]
         except Exception, exc:
             rospy.loginfo("START_RECOVERY failed to parse params: {!s}".format(exc))
             return False
@@ -837,9 +839,14 @@ class RecoveryManager(smach.State):
     def __init__(self, label, announcer, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['recovery_parameters',
-                                           'manager_dict'],
+                                           'recovery_requested',
+                                           'manager_dict',
+                                           'raster_points'],
                              output_keys = ['recovery_parameters',
+                                            'recovery_requested',
                                             'active_manager',
+                                            'raster_points',
+                                            'move_target',
                                             'pursue_samples'],
                              outcomes=['move',
                                        'beacon_search',
@@ -854,10 +861,28 @@ class RecoveryManager(smach.State):
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
         
-        self.announcer.say("Enter ing recovery state")
-        rospy.sleep(2.0)
+        rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
         
-        return 'web_manager'
+        if userdata.recovery_requested == True:
+            #first time through
+            self.announcer.say("Enter ing recovery state")
+            userdata.recovery_requested = False
+            userdata.pursue_samples = userdata.recovery_parameters['pursue_samples']
+            if userdata.recovery_parameters['spokes_to_remove'] > 0:
+                if len(userdata.raster_points) > 0:
+                    userdata.raster_points = [userdata.raster_points[-1]]
+        
+        if len(userdata.recovery_parameters['moves']) > 0:
+            move = userdata.recovery_parameters['moves'].pop(0)
+            base_header = std_msg.Header(0, rospy.Time(0), 'base_link')            
+            base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
+            userdata.move_target = util.pose_translate_by_yaw(base_pose_stamped,
+                                                              move['distance'],
+                                                              np.radians(move['rotate']))
+            return 'move'
+        else:
+            return userdata.recovery_parameters['terminal_outcome']
+        
 
 class MoveMUX(smach.State):
     def __init__(self, manager_list):
@@ -874,14 +899,13 @@ class LevelTwoPreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested'],
-                             output_keys = ['recovery_requested'],
                              outcomes=['recovery','exit'])
                
         
     def execute(self, userdata):
         
         if userdata.recovery_requested:
-            userdata.recovery_requested = False
+            
             return 'recovery'
         
         return 'exit'

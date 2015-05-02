@@ -1,14 +1,12 @@
 #recovery configuration file
-parameters: |
-    moves:
-        rotate: -45.0
-        distance: 10.0
-        rotate: 90.0
-        distance: 20.0
+moves:
+    - { rotate: -45, distance: 10 }
+    - { rotate: 90, distance: 10 }
+    - { rotate: -90, distance: 0 }
 
-    pursue_samples: False
+pursue_samples: False
 
-    spoke_to_remove: 1
+spokes_to_remove: 0 
 
-    terminal_outcome: web_manager  
+terminal_outcome: web_manager  
 
