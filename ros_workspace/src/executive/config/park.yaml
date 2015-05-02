@@ -5,19 +5,23 @@ executive_master:
         
 level_two:
     #for search  behaviour, degrees and meters
-    move_velocity: 0.8 
+    move_velocity: 0.8
     spin_velocity: 0.2
-    spoke_count: 36
-    spoke_length: 80
-    first_spoke_offset: 35
-    star_hub_radius: 10
-    min_spin_radius: 20
-    spin_step: 20
-    return_time_minutes: 20
+    spoke_count: 20 
+    max_spoke_length: 100 
+    first_spoke_offset: 0 
+    next_spoke_sign: 1 # 1 for ccw, -1 for cw
+    spoke_hub_radius: 8
+    #raster step is distance between raster lines
+    #raster offset is how close to the spoke we get
+    #before we go to the next raster step
+    raster_step: 6
+    raster_offset: 6
+    return_time_minutes: 60 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}
-    beacon_mount_step: 2
+    beacon_mount_step: 10 
     #if a planned point has changed more than this, replan
     replan_threshold: 2.0
     #for costmap issues, set to zero to disable this
