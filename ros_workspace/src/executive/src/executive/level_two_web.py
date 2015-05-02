@@ -461,7 +461,7 @@ class LevelTwoWeb(object):
             correction_error = util.point_distance_2d(goal_point_odom,
                                                       saved_point_odom.point)
             
-            #rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+            rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
             
             if (correction_error > self.replan_threshold):
                 self.announcer.say("Beacon correction.")
@@ -652,7 +652,7 @@ class CreateRasterPoints(smach.State):
 
         self.tf_listener = tf_listener
         
-        self.debug_marker_pub = rospy.Publisher('/debug_markers',
+        self.debug_marker_pub = rospy.Publisher('web_markers',
                                                 vis_msg.MarkerArray,
                                                 queue_size=3)
         self.marker_id = 0
