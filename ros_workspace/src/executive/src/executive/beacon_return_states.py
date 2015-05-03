@@ -104,7 +104,7 @@ class BeaconReturn(smach.State):
             else:
                 #we think we're looking at the beacon, but we don't see it, this is probably real bad
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
-                search_pose = deepcopy(userdata.current_pose)                
+                search_pose = deepcopy(current_pose)                
                 #try a random position nearby-ish, ignore facing
                 search_pose.pose.position.x += random.randrange(-50, 50, 15) 
                 search_pose.pose.position.y += random.randrange(-50, 50, 15)
