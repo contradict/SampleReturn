@@ -351,7 +351,7 @@ class LevelTwoWeb(object):
                                                    self.announcer,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
-                                                  'beacon_search':'RETURN_MANAGER',
+                                                  'return_manager':'RETURN_MANAGER',
                                                   'web_manager':'WEB_MANAGER'})
     
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
@@ -855,7 +855,7 @@ class RecoveryManager(smach.State):
                                             'move_target',
                                             'pursue_samples'],
                              outcomes=['move',
-                                       'beacon_search',
+                                       'return_manager',
                                        'web_manager',
                                        'aborted'])
         
