@@ -18,6 +18,7 @@ import visual_servo_msgs.msg as visual_servo_msg
 import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
+import samplereturn_msgs.srv as samplereturn_srv
 import samplereturn.util as util
 
 from samplereturn_msgs.msg import VoiceAnnouncement
@@ -107,7 +108,7 @@ class ManualController(object):
             
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
-                                   transitions = {'visual_servo_requested':'SELECT_SERVO_MODE',
+                                   transitions = {'visual_servo_requested':'ENABLE_MANIPULATOR_DETECTOR',
                                                   'pursuit_requested':'CONFIRM_SAMPLE_PRESENT',
                                                   'manipulator_grab_requested':'ANNOUNCE_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
@@ -132,7 +133,7 @@ class ManualController(object):
             def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
                 goal.input_point = userdata.detected_sample
-                goal.input_string = "level_two_pursuit_request"
+                goal.input_string = "manual_control_pursuit_request"
                 #disable localization checks while in pursuit
                 return goal
             
@@ -150,6 +151,13 @@ class ManualController(object):
                                   transitions = {'succeeded':'SELECT_JOYSTICK',
                                                  'aborted':'SELECT_JOYSTICK'})
             
+            smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'SELECT_SERVO_MODE',
+                                                    'aborted':'SELECT_JOYSTICK'})            
+            
             smach.StateMachine.add('SELECT_SERVO_MODE',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PLANNER),
@@ -161,9 +169,9 @@ class ManualController(object):
             smach.StateMachine.add('VISUAL_SERVO',
                                    ServoController(self.tf, self.announcer),
                                    transitions = {'move':'SERVO_MOVE',
-                                                  'complete':'SELECT_JOYSTICK',
+                                                  'complete':'DISABLE_MANIPULATOR_DETECTOR',
                                                   'point_lost':'ANNOUNCE_NO_SAMPLE',
-                                                  'aborted':'SELECT_JOYSTICK'},
+                                                  'aborted':'DISABLE_MANIPULATOR_DETECTOR'},
                                    remapping = {'detected_sample':'manipulator_sample'})
 
             smach.StateMachine.add('SERVO_MOVE',
@@ -176,12 +184,20 @@ class ManualController(object):
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled.'),
-                                   transitions = {'next':'SELECT_JOYSTICK'})
+                                   transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
+            
             
             smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled.'),
-                                   transitions = {'next':'SELECT_JOYSTICK'})
+                                   transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
+           
+            smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'SELECT_JOYSTICK',
+                                                    'aborted':'SELECT_JOYSTICK'})           
             
             smach.StateMachine.add('ANNOUNCE_GRAB',
                                    AnnounceState(self.announcer,
@@ -251,7 +267,7 @@ class ManualController(object):
             home_goal.home_count = 3
             smach.StateMachine.add('PERFORM_HOME',
                                    InterruptibleActionClientState(
-                                       actionname = 'wheel_pods/home',
+                                       actionname = 'home_wheel_pods',
                                        actionspec = platform_msg.HomeAction,
                                        goal = home_goal,
                                        timeout = 30.0),
@@ -534,11 +550,11 @@ class WaitForJoystickButton(smach.State):
 
     def execute(self, userdata):
         button_state = self.joy_state.button( self.button )
-        debounce_count = 5
+        debounce_count = 3
         debounce = debounce_count
         outcome = None
         timeout = self.timeout
-        dt = 0.1
+        dt = 0.05
 
         rate = rospy.Rate( 1./dt )
         while outcome == None:
@@ -593,7 +609,8 @@ class InterruptibleActionClientState(smach.State):
         action_client = actionlib.SimpleActionClient(self.actionname,
                 self.actionspec)
 
-        if not action_client.wait_for_server(timeout=rospy.Duration(1.0)) :
+        if not action_client.wait_for_server(timeout=rospy.Duration(1.0)):
+            rospy.logwarn("MANUAL_CONTROL action client not responding: {!s}".format(self.actionname))
             return 'aborted'
 
         #if goal_cb is defined, it overwrites goal!
@@ -602,8 +619,7 @@ class InterruptibleActionClientState(smach.State):
 
         action_client.send_goal( self.goal,
                 done_cb = self.goal_done,
-                feedback_cb = self.goal_feedback
-                )
+                feedback_cb = self.goal_feedback)
 
         self.action_outcome = None
 

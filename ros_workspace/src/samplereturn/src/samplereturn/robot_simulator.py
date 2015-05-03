@@ -193,13 +193,14 @@ class RobotSimulator(object):
         for topic in cam_status_list:
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
+        
         self.search_enable = rospy.Service(enable_search_name,
                                            platform_srv.Enable,
                                            self.service_enable_search_request)
         self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
                                                          samplereturn_srv.Enable,
                                                          self.enable_manipulator_detector)
-                                                   
+        self.manipulator_detector_enabled = False                                           
                 
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
@@ -365,13 +366,10 @@ class RobotSimulator(object):
         #rospy.loginfo("Starting PC generation")
 
         now = event.current_real
-        header = std_msg.Header(0, now, self.reality_frame)
+        #get latest available transforms to map
+        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
         target_frame = 'navigation_center_left_camera'
         try:
-            self.tf_listener.waitForTransform(self.sim_map,
-                                              target_frame,
-                                              now,
-                                              rospy.Duration(0.5))
             current_pose = util.get_current_robot_pose(self.tf_listener,
                     self.reality_frame)
             transform = self.tf_listener.asMatrix(target_frame, header)
@@ -379,6 +377,7 @@ class RobotSimulator(object):
             #rospy.loginfo("Failed to transform map for PC")
             #rospy.loginfo("Exception: %s"%e)
             return
+        header.stamp = now #set broadcasted transform time to now
         center_cloud = self.get_pointcloud2(self.global_map,
                                             current_pose.pose.position,
                                             target_frame,
@@ -467,11 +466,7 @@ class RobotSimulator(object):
 
             #get the current correction broadcast by the localizer (map->odom)
             try:
-                self.tf_listener.waitForTransform(self.sim_odom,
-                                                  self.sim_map,
-                                                  now,
-                                                  rospy.Duration(0.2))
-                pos, quat = self.tf_listener.lookupTransform(self.sim_odom, self.sim_map, now)
+                pos, quat = self.tf_listener.lookupTransform(self.sim_odom, self.sim_map, rospy.Time(0))
                 #get the matrix describing map->odom
                 map_to_odom = tf.transformations.compose_matrix(
                               angles=tf.transformations.euler_from_quaternion(quat),
@@ -491,10 +486,10 @@ class RobotSimulator(object):
                                                        geometry_msg.Quaternion(*error_rot)))
                 transforms.append(transform)
 
-            except tf.Exception:
+            except tf.Exception, exc:
                 #if the transform isn't availabe, no correction applied
-                rospy.logdebug("NO map->odom transform... we probably just started running")            
-            
+                rospy.logdebug("NO map->odom transform: {!s}".format(exc))            
+                            
         else:
             transform = TransformStamped(std_msg.Header(0, now, self.reality_frame),
                                          self.sim_map,
@@ -543,7 +538,8 @@ class RobotSimulator(object):
     def check_sample_detection_search(self, event):
         if self.publish_samples:
             for sample in self.fake_samples:
-                header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)    
+                #get headers in Time(0) for latest transforms
+                header = std_msg.Header(0, rospy.Time(0), self.reality_frame)    
                 self.sample_marker.header = header
                 self.sample_marker.pose.position = sample['point']
                 self.sample_marker.id = sample['id']
@@ -555,25 +551,23 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if (self.sample_in_view(sample['point'], 1, 12, 7)) or \
-                    (sample['id'] == self.active_sample_id):
+                    if (self.sample_in_view(sample['point'], 1, 12, 7)) \
+                    or (sample['id'] == self.active_sample_id):
                         #keep publishing the active detection id until it is cleared
                         #hopefully the sim won't have more than one active id...
                         self.sample_marker.color = std_msg.ColorRGBA(254, 0, 254, 1)
                         sample_in_map = PointStamped(header, sample['point'])
                         try:
-                            self.tf_listener.waitForTransform(self.sim_odom,
-                                                              header.frame_id,
-                                                              header.stamp,
-                                                              rospy.Duration(1.0))
                             sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
                         except tf.Exception:
                             rospy.logwarn("SIMULATOR failed to transform search detection point")
                             break
                             
-                        #append the detection to the delayed queue
+                        #append the detection to the delayed queue, with a now timestamp
+                        header.stamp = rospy.Time.now()
                         msg = NamedPoint(header = sample_point_odom.header,
                                          point = sample_point_odom.point,
+                                         filter_id = sample['id'] + 100,
                                          sample_id = sample['id'])
                         self.active_sample_id = sample['id']
                         self.search_sample_queue.append(msg)
@@ -581,21 +575,17 @@ class RobotSimulator(object):
                 self.sample_marker_pub.publish(self.sample_marker)
                 
     def publish_sample_detection_manipulator(self, event):
-        if self.publish_samples:
+        if self.publish_samples and self.manipulator_detector_enabled:
             for sample in self.fake_samples:
                 if not sample['id'] in self.collected_ids:
                      if self.sample_in_view(sample['point'], -0.1, 0.5, 0.2):
-                        header = std_msg.Header(0, rospy.Time.now(), self.reality_frame)
+                        header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
                         sample_in_map = PointStamped(header, sample['point'])
                         try:
-                            self.tf_listener.waitForTransform(self.sim_odom,
-                                                              header.frame_id,
-                                                              header.stamp,
-                                                              rospy.Duration(1.0))
                             sample_point_odom = self.tf_listener.transformPoint(self.sim_odom, sample_in_map)
                         except tf.Exception:
                             rospy.logwarn("SIMULATOR failed to transform manipulator detection point")
-
+                        header.stamp = rospy.Time.now()
                         msg = NamedPoint(header = sample_point_odom.header,
                                          point = sample_point_odom.point,
                                          sample_id = sample['id'])
@@ -636,14 +626,17 @@ class RobotSimulator(object):
         beacon_translation = rospy.get_param("/processes/beacon/beacon_finder/beacon_translation")
         beacon_rotation = rospy.get_param("/processes/beacon/beacon_finder/beacon_rotation")
                 
-
-        #get distances and yaws from reality frame origin
-        reality_origin = PointStamped(std_msg.Header(0, rospy.Time.now(), self.reality_frame),
-                                                     Point(0,0,0))
-        angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
-                                                                  reality_origin)        # can't see beacon closer than 10 meters or farther than 40
-        angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
-                                                        self.reality_frame)
+        try:
+            #get distances and yaws from reality frame origin
+            reality_origin = PointStamped(std_msg.Header(0, rospy.Time(0), self.reality_frame),
+                                                         Point(0,0,0))
+            angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
+                                                                      reality_origin)        # can't see beacon closer than 10 meters or farther than 40
+            angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
+                                                            self.reality_frame)
+        except tf.Exception, exc:
+                print("Transforms not available in publish beacon: {!s}".format(exc))
+                return
 
         #rospy.loginfo("BEACON CHECK, dist_to_origin, angle_to_robot, angle_to_origin:\
         #              {!s}, {!s}, {!s}".format(dist_from_origin,
@@ -710,6 +703,7 @@ class RobotSimulator(object):
         self.pause_pub.publish(std_msg.Bool(self.paused))
  
     def enable_manipulator_detector(self, req):
+        self.manipulator_detector_enabled = req.state
         rospy.sleep(0.5)
         return req.state
     
@@ -779,6 +773,7 @@ class RobotSimulator(object):
         self.zero_robot()
         self.collected_ids = []
         self.excluded_ids = []
+        self.active_sample_id = None
         fake_result = platform_msg.HomeResult([True,True,True])
         rospy.sleep(1.0)
         self.home_wheelpods_server.set_succeeded(result=fake_result)

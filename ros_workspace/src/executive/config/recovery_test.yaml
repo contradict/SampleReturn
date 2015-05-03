@@ -1,0 +1,12 @@
+#recovery configuration file
+moves:
+    - { rotate: -45, distance: 10 }
+    - { rotate: 90, distance: 10 }
+    - { rotate: -90, distance: 0 }
+
+pursue_samples: False
+
+spokes_to_remove: 0 
+
+terminal_outcome: web_manager  
+
