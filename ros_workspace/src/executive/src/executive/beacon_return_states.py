@@ -4,6 +4,7 @@ import threading
 import collections
 from copy import deepcopy
 import numpy as np
+import random
 
 import rospy
 import tf
@@ -19,7 +20,7 @@ from samplereturn_msgs.msg import (VFHMoveGoal,
                                    VFHMoveFeedback)
 import samplereturn.util as util
             
-class BeaconSearch(smach.State):
+class BeaconReturn(smach.State):
     
     def __init__(self, label, tf_listener, announcer):
 
@@ -29,12 +30,11 @@ class BeaconSearch(smach.State):
                                        'mount',
                                        'aborted'],
                              input_keys=['beacon_approach_pose',
-                                         'move_velocity',
+                                         'beacon_observation_delay',
                                          'spin_velocity',
                                          'platform_point',
                                          'beacon_point',
                                          'stop_on_beacon',
-                                         'vfh_result',
                                          'manager_dict',
                                          'world_fixed_frame',
                                          'odometry_frame'],
@@ -43,8 +43,7 @@ class BeaconSearch(smach.State):
                                           'simple_move',
                                           'stop_on_beacon',
                                           'active_manager',
-                                          'beacon_point',
-                                          'outbound'])
+                                          'beacon_point'])
         
         self.label = label
         self.tf_listener = tf_listener
@@ -68,22 +67,21 @@ class BeaconSearch(smach.State):
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.world_fixed_frame)        
         
-        #this is possibly a highly inaccurate number.   If we get to the approach point,
-        #and don't see the beacon, the map is probably messed up
+        #hopeful distance to approach point
         distance_to_approach_point = util.point_distance_2d(current_pose.pose.position,
                                                             userdata.beacon_approach_pose.pose.position)
-
-        rotate_to_clear = False
-        if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
-            rospy.loginfo("LEVEL_TWO beacon search setting rotate_to_clear = True")
-            rotate_to_clear = True
 
         #if we have been ignoring beacon detections prior to this,
         #we should clear them here, and wait for a fresh detection
         if not userdata.stop_on_beacon:
             userdata.beacon_point = None
-            rospy.sleep(8.0)
-        
+            start_time = rospy.Time.now()
+            while not rospy.core.is_shutdown_requested():
+                rospy.sleep(0.5)
+                if (userdata.beacon_point is not None) \
+                or ((rospy.Time.now() - start_time) > userdata.beacon_observation_delay):
+                    break
+                
         if userdata.beacon_point is None: #beacon not in view
             #first hope, we can spin slowly and see the beacon
             if not self.tried_spin:
@@ -97,22 +95,23 @@ class BeaconSearch(smach.State):
             #already tried a spin, drive towards beacon_approach_point, stopping on detection
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
-                self.announcer.say("Beacon not in view. Search ing")
+                self.announcer.say("Beacon not in view. Moving to approach point.")
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
                 #set move_point_map to enable localization correction
                 userdata.move_target = userdata.beacon_approach_pose
                 return 'move'
             else:
-                #we think we're near the beacon, but we don't see it
-                #right now, that is just to move 30 m on other side of the beacon that we don't know about
+                #we think we're looking at the beacon, but we don't see it, this is probably real bad
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
-                search_pose = deepcopy(userdata.beacon_approach_pose)                
-                #invert the approach_point, and try again
-                search_pose.pose.position.x *= -1
+                search_pose = deepcopy(current_pose)                
+                #try a random position nearby-ish, ignore facing
+                search_pose.pose.position.x += random.randrange(-50, 50, 15) 
+                search_pose.pose.position.y += random.randrange(-50, 50, 15)
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
-                userdata.move_target = search_pose
+                userdata.move_target = geometry_msg.PointStamped(search_pose.header,
+                                                                 search_pose.pose.position)
                 return 'move'               
                 
         else: #beacon is in view
@@ -151,27 +150,24 @@ class BeaconSearch(smach.State):
         
         return 'aborted'
    
-class MountManager(smach.State):
+class CalculateMountMove(smach.State):
     
     def __init__(self, tf_listener, announcer):
 
         smach.State.__init__(self,
                              outcomes=['move',
-                                       'final',
                                        'aborted'],
                              input_keys=['platform_point',
-                                         'beacon_point',
-                                         'beacon_mount_step'],
+                                         'beacon_observation_delay'],
                              output_keys=['simple_move',
-                                          'stop_on_sample',
-                                          'beacon_point'])
+                                          'stop_on_sample'])
 
         self.tf_listener = tf_listener
         self.announcer = announcer
 
     def execute(self, userdata):
-        #disable obstacle checking!
-        rospy.sleep(10.0) #wait a sec for beacon pose to catch up
+        #wait a sec for beacon pose to adjust the localization filter
+        rospy.sleep(userdata.beacon_observation_delay) 
         target_point = deepcopy(userdata.platform_point)
         target_point.header.stamp = rospy.Time(0)
         yaw, distance = util.get_robot_strafe(self.tf_listener,
@@ -183,4 +179,4 @@ class MountManager(smach.State):
         userdata.simple_move = move
         userdata.stop_on_sample = False
         self.announcer.say("Initiate ing mount move.")
-        return 'final'
+        return 'move'
