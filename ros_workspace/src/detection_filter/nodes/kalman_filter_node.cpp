@@ -337,7 +337,9 @@ class KalmanDetectionFilter
 
     checkObservation(msg);
 
-    publishFilteredDetections(msg);
+    if (!accumulate_) {
+      publishFilteredDetections(msg);
+    }
     drawFilterStates();
   }
 
