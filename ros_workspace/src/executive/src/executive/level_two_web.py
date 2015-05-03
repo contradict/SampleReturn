@@ -140,6 +140,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.paused = False        
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.beacon_point = None
+        self.state_machine.userdata.recovery_requested = False
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
