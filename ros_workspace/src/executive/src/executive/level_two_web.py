@@ -326,8 +326,8 @@ class LevelTwoWeb(object):
  
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'CALCULATE_MOUNT_MOVE',
-                                                  'sample_detected':'CALCULATE_MOUNT_MOVE',
+                                   transitions = {'complete':'DESELECT_PLANNER',
+                                                  'sample_detected':'RETURN_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
