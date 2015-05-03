@@ -885,8 +885,8 @@ class RecoveryManager(smach.State):
             target_pose = util.pose_translate_by_yaw(base_pose_stamped,
                                                      move['distance'],
                                                      np.radians(move['rotate']))
-            userdata.move_target = geometry_msg.PoseStamped(target_pose.header,
-                                                            target_pose.pose.position)
+            userdata.move_target = geometry_msg.PointStamped(target_pose.header,
+                                                             target_pose.pose.position)
             
             return 'move'
         else:
