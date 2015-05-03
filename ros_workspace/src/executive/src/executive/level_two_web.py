@@ -161,7 +161,7 @@ class LevelTwoWeb(object):
         planner_mode = node_params.planner_mode
         MODE_PLANNER = getattr(platform_srv.SelectMotionModeRequest, planner_mode)
         MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
-        MODE_PAUSE = platform_srv.SelectMotionModeRequest.MODE_PAUSE
+        MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
     
         with self.state_machine:
             
@@ -333,7 +333,7 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
-                                                     MODE_PAUSE),
+                                                     MODE_ENABLE),
                                     transitions = {'next':'complete',
                                                    'paused':'LEVEL_TWO_ABORTED',
                                                    'failed':'LEVEL_TWO_ABORTED'})
