@@ -32,8 +32,8 @@ from executive.executive_states import AnnounceState
 from executive.executive_states import ExecuteSimpleMove
 from executive.executive_states import ExecuteVFHMove
 from executive.executive_states import WaitForFlagState
-from executive.beacon_search_states import BeaconSearch
-from executive.beacon_search_states import MountManager
+from executive.beacon_return_states import BeaconReturn
+from executive.beacon_return_states import CalculateMountMove
 
 import samplereturn.util as util
 
@@ -113,7 +113,7 @@ class LevelTwoWeb(object):
 
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
-        self.state_machine.userdata.beacon_mount_step = node_params.beacon_mount_step
+        self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
         self.state_machine.userdata.platform_point = self.platform_point
         
         #search parameters
@@ -126,7 +126,6 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
         self.state_machine.userdata.blocked_limit = 2
-        self.state_machine.userdata.last_retry_time = rospy.Time.now()
 
         #web management flags
         self.state_machine.userdata.outbound = True
@@ -305,7 +304,7 @@ class LevelTwoWeb(object):
                                    BeaconSearch('RETURN_MANAGER',
                                                 self.tf_listener,
                                                 self.announcer),
-                                   transitions = {'mount':'MOUNT_MANAGER',
+                                   transitions = {'mount':'CALCULATE_MOUNT_MOVE',
                                                   'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
@@ -319,10 +318,9 @@ class LevelTwoWeb(object):
                                    remapping = {'stop_on_sample':'stop_on_beacon',
                                                 'detected_sample':'beacon_point'})
 
-            smach.StateMachine.add('MOUNT_MANAGER',
+            smach.StateMachine.add('CALCULATE_MOUNT_MOVE',
                                    MountManager(self.tf_listener, self.announcer),
                                    transitions = {'move':'MOUNT_MOVE',
-                                                  'final':'MOUNT_FINAL',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_MOVE',

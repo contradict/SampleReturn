@@ -4,6 +4,7 @@ import threading
 import collections
 from copy import deepcopy
 import numpy as np
+import random
 
 import rospy
 import tf
@@ -29,6 +30,7 @@ class BeaconReturn(smach.State):
                                        'mount',
                                        'aborted'],
                              input_keys=['beacon_approach_pose',
+                                         'beacon_observation_delay',
                                          'spin_velocity',
                                          'platform_point',
                                          'beacon_point',
@@ -41,8 +43,7 @@ class BeaconReturn(smach.State):
                                           'simple_move',
                                           'stop_on_beacon',
                                           'active_manager',
-                                          'beacon_point',
-                                          'outbound'])
+                                          'beacon_point'])
         
         self.label = label
         self.tf_listener = tf_listener
@@ -66,8 +67,7 @@ class BeaconReturn(smach.State):
         current_pose = util.get_current_robot_pose(self.tf_listener,
                                                    userdata.world_fixed_frame)        
         
-        #this is possibly a highly inaccurate number.   If we get to the approach point,
-        #and don't see the beacon, the map is probably messed up
+        #hopeful distance to approach point
         distance_to_approach_point = util.point_distance_2d(current_pose.pose.position,
                                                             userdata.beacon_approach_pose.pose.position)
 
@@ -75,8 +75,13 @@ class BeaconReturn(smach.State):
         #we should clear them here, and wait for a fresh detection
         if not userdata.stop_on_beacon:
             userdata.beacon_point = None
-            rospy.sleep(8.0)
-        
+            start_time = rospy.Time.now()
+            while not rospy.core.is_shutdown_requested():
+                rospy.sleep(0.5)
+                if (userdata.beacon_point is not None) \
+                or ((rospy.Time.now() - start_time) > userdata.beacon_observation_delay):
+                    break
+                
         if userdata.beacon_point is None: #beacon not in view
             #first hope, we can spin slowly and see the beacon
             if not self.tried_spin:
@@ -97,15 +102,16 @@ class BeaconReturn(smach.State):
                 userdata.move_target = userdata.beacon_approach_pose
                 return 'move'
             else:
-                #we think we're near the beacon, but we don't see it
-                #right now, that is just to move 30 m on other side of the beacon that we don't know about
+                #we think we're looking at the beacon, but we don't see it, this is probably real bad
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
-                search_pose = deepcopy(userdata.beacon_approach_pose)                
-                #invert the approach_point, and try again
-                search_pose.pose.position.x *= -1
+                search_pose = deepcopy(userdata.current_pose)                
+                #try a random position nearby-ish, ignore facing
+                search_pose.pose.position.x += random.randrange(-50, 50, 15) 
+                search_pose.pose.position.y += random.randrange(-50, 50, 15)
                 userdata.stop_on_beacon = True
                 self.tried_spin = False
-                userdata.move_target = search_pose
+                userdata.move_target = geometry_msg.PointStamped(search_pose.header,
+                                                                 search_pose.pose.position)
                 return 'move'               
                 
         else: #beacon is in view
