@@ -119,6 +119,7 @@ class LevelTwoWeb(object):
         #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
+        self.state_machine.userdata.course_tolerance = None
         self.state_machine.userdata.spoke_hub_radius = node_params.spoke_hub_radius
         self.state_machine.userdata.next_spoke_sign = node_params.next_spoke_sign
         self.state_machine.userdata.raster_step = node_params.raster_step
@@ -301,9 +302,8 @@ class LevelTwoWeb(object):
                                    transitions = {'next':'RETURN_MANAGER'})
  
             smach.StateMachine.add('RETURN_MANAGER',
-                                   BeaconSearch('RETURN_MANAGER',
-                                                self.tf_listener,
-                                                self.announcer),
+                                   BeaconReturn('RETURN_MANAGER',
+                                                self.tf_listener, self.announcer),
                                    transitions = {'mount':'CALCULATE_MOUNT_MOVE',
                                                   'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
@@ -319,21 +319,14 @@ class LevelTwoWeb(object):
                                                 'detected_sample':'beacon_point'})
 
             smach.StateMachine.add('CALCULATE_MOUNT_MOVE',
-                                   MountManager(self.tf_listener, self.announcer),
+                                   CalculateMountMove(self.tf_listener, self.announcer),
                                    transitions = {'move':'MOUNT_MOVE',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
  
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'MOUNT_MANAGER',
-                                                  'sample_detected':'MOUNT_MANAGER',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
- 
-            smach.StateMachine.add('MOUNT_FINAL',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'DESELECT_PLANNER',
-                                                  'sample_detected':'MOUNT_MANAGER',                                                  
+                                   transitions = {'complete':'CALCULATE_MOUNT_MOVE',
+                                                  'sample_detected':'CALCULATE_MOUNT_MOVE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
@@ -542,9 +535,9 @@ class WebManager(smach.State):
                                             'raster_active',
                                             'raster_points',
                                             'retry_active',
-                                            'web_move',
                                             'move_target',
                                             'course_tolerance',
+                                            'allow_rotate_to_clear',
                                             'stop_on_sample',
                                             'pursue_samples',
                                             'active_manager'],
@@ -566,6 +559,7 @@ class WebManager(smach.State):
         if rospy.Time.now() > userdata.return_time:
             userdata.stop_on_sample = False
             userdata.pursue_samples = False
+            userdata.allow_rotate_to_clear = True
             return 'return_home'
 
         if userdata.outbound:
@@ -622,14 +616,14 @@ class WebManager(smach.State):
     def load_move(self, next_move, userdata):
         #use tighter course tolerance for chord moves (no point in getting into next chord)
         if next_move['radial']:
-            userdata.course_tolerance = 5.0
+            userdata.allow_rotate_to_clear = True
         else:
             userdata.course_tolerance = 3.0
+            userdata.allow_rotate_to_clear = False
         #load the target into move_point, and save the move
         #move_point is consumed by the general move_goal transformer,
         #and web_move is used to do retry_checks, etc.
         self.last_web_move = next_move
-        userdata.web_move = next_move
         userdata.move_target = next_move['point']
     
         return 'move'
@@ -736,7 +730,8 @@ class CreateMoveGoal(smach.State):
                                            'odometry_frame',
                                            'world_fixed_frame'],
                              output_keys = ['move_goal',
-                                            'move_point_map'],
+                                            'move_point_map',
+                                            'course_tolerance'],
                              outcomes=['next',
                                        'preempted', 'aborted'])
         
@@ -746,13 +741,7 @@ class CreateMoveGoal(smach.State):
 
         odometry_frame = userdata.odometry_frame
         target = userdata.move_target
-        rotate_to_clear = False
         orient_at_target = False
-   
-        #if we are back here after starting a move in the blocked condition, try rotate to clear
-        if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
-            rospy.loginfo("LEVEL_TWO setting rotate_to_clear = True")
-            rotate_to_clear = True    
         
         try:
             #do all movement transforms with latest information
@@ -781,30 +770,38 @@ class CreateMoveGoal(smach.State):
             rospy.logwarn("LEVEL_TWO failed to transform move: {!s}".format(exc))
             return 'aborted'
         
+        #create goal, modify default fields as specified
         goal = VFHMoveGoal(target_pose = target_pose,
                            move_velocity = userdata.move_velocity,
                            spin_velocity = userdata.spin_velocity,
-                           course_tolerance = userdata.course_tolerance,
-                           orient_at_target = orient_at_target,
-                           rotate_to_clear = rotate_to_clear)
+                           orient_at_target = orient_at_target)
+        #special course_tolerance requested?
+        if userdata.course_tolerance is not None:
+            goal.course_tolerance = userdata.course_tolerance
+        #if we are back here after starting a move in the blocked condition, try rotate to clear
+        if userdata.vfh_result == VFHMoveResult.STARTED_BLOCKED:
+            rospy.loginfo("LEVEL_TWO setting rotate_to_clear = True")
+            goal.rotate_to_clear = True    
+
         userdata.move_goal = goal
+        
+        #reset to default course tolerance after every move
+        userdata.course_tolerance = None
 
         #store the point in map, to compare in the beacon update callback
         userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
                                                             map_pose.pose.position)
         
-        
         return 'next'
 
-#For retrying a move after line_blocked.  Probably a terrible hack that should be removed later.
-#Wait for the delay, then try to move again.  Allow retry after delay time has elapsed since last retry also
+#For retrying a move after blocked result, to ensure it wasn't a costmap glitch.
 class RetryCheck(smach.State):
             
     def __init__(self, announcer):           
         smach.State.__init__(self,
                              input_keys = ['retry_active',
                                            'blocked_retry_delay',
-                                           'web_move',
+                                           'allow_rotate_to_clear',
                                            'vfh_result',
                                            'move_goal'],
                              output_keys = ['retry_active',
@@ -823,7 +820,7 @@ class RetryCheck(smach.State):
             #If we are retrying a move, starting blocked means the costmap is correct
             #and we are blocked, so change the STARTED_BLOCKED result to regular old BLOCKED
             #Also, if we are making a chord move just return with blocked
-            if userdata.retry_active or not userdata.web_move['radial']:
+            if userdata.retry_active or not userdata.allow_rotate_to_clear:
                 userdata.vfh_result = VFHMoveResult.BLOCKED
                 return 'continue'
             else:
@@ -837,7 +834,7 @@ class RetryCheck(smach.State):
         rospy.sleep(userdata.blocked_retry_delay)
         userdata.retry_active = True
         return 'retry'
-    
+
 
 class RecoveryManager(smach.State):
     def __init__(self, label, announcer, tf_listener):
@@ -884,8 +881,7 @@ class RecoveryManager(smach.State):
                                                      move['distance'],
                                                      np.radians(move['rotate']))
             userdata.move_target = geometry_msg.PointStamped(target_pose.header,
-                                                             target_pose.pose.position)
-            
+                                                             target_pose.pose.position)            
             return 'move'
         else:
             return userdata.recovery_parameters['terminal_outcome']
@@ -907,12 +903,10 @@ class LevelTwoPreempted(smach.State):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested'],
                              outcomes=['recovery','exit'])
-               
         
     def execute(self, userdata):
         
         if userdata.recovery_requested:
-            
             return 'recovery'
         
         return 'exit'
