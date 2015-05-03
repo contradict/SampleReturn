@@ -882,9 +882,12 @@ class RecoveryManager(smach.State):
             move = userdata.recovery_parameters['moves'].pop(0)
             base_header = std_msg.Header(0, rospy.Time(0), 'base_link')            
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
-            userdata.move_target = util.pose_translate_by_yaw(base_pose_stamped,
-                                                              move['distance'],
-                                                              np.radians(move['rotate']))
+            target_pose = util.pose_translate_by_yaw(base_pose_stamped,
+                                                     move['distance'],
+                                                     np.radians(move['rotate']))
+            userdata.move_target = geometry_msg.PoseStamped(target_pose.header,
+                                                            target_pose.pose.position)
+            
             return 'move'
         else:
             return userdata.recovery_parameters['terminal_outcome']
