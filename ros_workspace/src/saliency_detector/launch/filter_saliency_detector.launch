@@ -24,7 +24,7 @@
 
   <node
     pkg="detection_filter"
-    type="kalman_filter_node"
+    type="dslr_kalman_filter_node"
     name="kalman_filter_node"
     machine="search"
     ns="/processes/sample_detection/search">

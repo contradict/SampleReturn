@@ -22,7 +22,7 @@
   <node
     machine="search"
     pkg="detection_filter"
-    type="kalman_filter_node"
+    type="manipulator_kalman_filter_node"
     name="linemod_kalman_filter_node"
     ns="/processes/sample_detection/manipulator">
     <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
