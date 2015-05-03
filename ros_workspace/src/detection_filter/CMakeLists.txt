@@ -79,14 +79,20 @@ add_definitions( -std=gnu++0x )
 
 ## Declare a cpp executable
  add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
+ add_executable(dslr_kalman_filter_node nodes/dslr_kalman_filter_node.cpp)
 
  add_dependencies(kalman_filter_node ${PROJECT_NAME}_gencfg)
+ add_dependencies(dslr_kalman_filter_node ${PROJECT_NAME}_gencfg)
 
 ## Add dependencies to the executable
  add_dependencies(kalman_filter_node samplereturn_msgs_gencpp)
+ add_dependencies(dslr_kalman_filter_node samplereturn_msgs_gencpp)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(kalman_filter_node
+   ${catkin_LIBRARIES}
+ )
+ target_link_libraries(dslr_kalman_filter_node
    ${catkin_LIBRARIES}
  )
 
@@ -107,7 +113,7 @@ install(PROGRAMS
 #)
 
 ## Mark executables and/or libraries for installation
-install(TARGETS kalman_filter_node
+install(TARGETS kalman_filter_node dslr_kalman_filter_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
