@@ -8,5 +8,5 @@ pursue_samples: False
 
 spokes_to_remove: 0 
 
-terminal_outcome: web_manager  
+terminal_outcome: return_manager  
 
