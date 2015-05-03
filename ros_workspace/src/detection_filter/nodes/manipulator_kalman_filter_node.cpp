@@ -269,12 +269,6 @@ class KalmanDetectionFilter
    * Publish closest point to inspect
    * When done, delete and add exclusion zone, deleting other filters and inspection points
    */
-  void ackCallback(const samplereturn_msgs::PursuitResult& msg)
-  {
-    filter_list_.erase(filter_list_.begin());
-    drawFilterStates();
-  }
-
   void detectionCallback(const samplereturn_msgs::NamedPoint& msg)
   {
     if (filter_list_.size() == 0) {
@@ -303,7 +297,7 @@ class KalmanDetectionFilter
           break;
         }
       }
-      if (filter_ptr.filter->statePost.at<float>(3) < max_pub_vel_ ||
+      if (filter_ptr.filter->statePost.at<float>(3) < max_pub_vel_ &&
           filter_ptr.filter->statePost.at<float>(4) < max_pub_vel_) {
         samplereturn_msgs::NamedPoint point_msg;
         point_msg.header.frame_id = _filter_frame_id;
