@@ -54,24 +54,21 @@ class KalmanDetectionFilter
 
   std::string cam_info_topic;
   std::string detection_topic;
+  std::string img_detection_topic;
   std::string filtered_detection_topic;
+  std::string filtered_img_detection_topic;
   std::string ack_topic;
   std::string debug_img_topic;
   std::string filter_marker_array_topic;
   std::string frustum_poly_topic;
 
   std::vector<ColoredKF> filter_list_;
-  // Exclusion sites are centers and radii (x,y,r)
-  std::vector<std::tuple<float,float,float> > exclusion_list_;
 
   ros::Time last_time_;
   double max_dist_;
   double max_cov_;
   double max_pub_cov_;
   double max_pub_vel_;
-
-  double pos_exclusion_radius_;
-  double neg_exclusion_radius_;
 
   double process_noise_cov_;
   double measurement_noise_cov_;
@@ -117,9 +114,6 @@ class KalmanDetectionFilter
     private_node_handle_.param("max_cov", max_cov_, double(10.0));
     private_node_handle_.param("max_pub_cov", max_pub_cov_, double(0.1));
     private_node_handle_.param("max_pub_vel", max_pub_vel_, double(0.02));
-
-    private_node_handle_.param("positive_exclusion_radius", pos_exclusion_radius_, double(10.0));
-    private_node_handle_.param("negative_exclusion_radius", neg_exclusion_radius_, double(1.5));
 
     private_node_handle_.param("process_noise_cov", process_noise_cov_, double(0.05));
     private_node_handle_.param("measurement_noise_cov", measurement_noise_cov_, double(0.5));
@@ -239,8 +233,6 @@ class KalmanDetectionFilter
     pub_frustum_poly =
       nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
 
-    sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
-
     last_time_.sec = 0.0;
     last_time_.nsec = 0.0;
 
@@ -274,23 +266,11 @@ class KalmanDetectionFilter
 
   /* For incoming detections: assign to filter or create new filter
    * For each filter, predict, (update), check for deletion
-   * If accumulate_, move to list of points to inspect
    * Publish closest point to inspect
    * When done, delete and add exclusion zone, deleting other filters and inspection points
    */
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
   {
-    float x,y,r;
-    x = filter_list_[0].filter->statePost.at<float>(0);
-    y = filter_list_[0].filter->statePost.at<float>(1);
-    if (msg.success) {
-      r = pos_exclusion_radius_;
-    }
-    else {
-      r = neg_exclusion_radius_;
-    }
-    exclusion_list_.push_back(std::make_tuple(x,y,r));
-
     filter_list_.erase(filter_list_.begin());
     drawFilterStates();
   }
@@ -309,19 +289,32 @@ class KalmanDetectionFilter
     }
 
     checkObservation(msg);
+
+    publishFilteredDetections(msg);
     drawFilterStates();
   }
 
-  void publishTop() {
-    if (filter_list_.size() > 0) {
-      samplereturn_msgs::NamedPoint point_msg;
-      point_msg.header.frame_id = _filter_frame_id;
-      point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = filter_list_[0].filter->statePost.at<float>(0);
-      point_msg.point.y = filter_list_[0].filter->statePost.at<float>(1);
-      point_msg.point.z = 0;
-      point_msg.filter_id = filter_list_[0].filter_id;
-      pub_detection.publish(point_msg);
+  void publishFilteredDetections(const samplereturn_msgs::NamedPoint& msg) {
+    for (auto filter_ptr : filter_list_) {
+      cv::Mat eigenvalues;
+      cv::eigen(filter_ptr.filter->errorCovPost, eigenvalues);
+      for (int i=0; i<eigenvalues.rows; i++) {
+        if (eigenvalues.at<float>(i) > max_pub_cov_) {
+          break;
+        }
+      }
+      if (filter_ptr.filter->statePost.at<float>(3) < max_pub_vel_ ||
+          filter_ptr.filter->statePost.at<float>(4) < max_pub_vel_) {
+        samplereturn_msgs::NamedPoint point_msg;
+        point_msg.header.frame_id = _filter_frame_id;
+        point_msg.header.stamp = ros::Time::now();
+        point_msg.grip_angle = msg.grip_angle;
+        point_msg.sample_id = msg.sample_id;
+        point_msg.point.x = filter_ptr.filter->statePost.at<float>(0);
+        point_msg.point.y = filter_ptr.filter->statePost.at<float>(1);
+        point_msg.point.z = 0;
+        pub_detection.publish(point_msg);
+      }
     }
   }
 
@@ -380,14 +373,6 @@ class KalmanDetectionFilter
     meas_state.at<float>(1) = msg.point.y;
     meas_state.at<float>(2) = msg.point.z;
 
-    for (int i=0; i<exclusion_list_.size(); i++) {
-      float dist = sqrt(pow((std::get<0>(exclusion_list_[i]) - msg.point.x),2) +
-        pow((std::get<1>(exclusion_list_[i]) - msg.point.y),2));
-      if (dist < std::get<2>(exclusion_list_[i])) {
-        return;
-      }
-    }
-
     for (int i=0; i<filter_list_.size(); i++) {
       cv::Mat dist = (filter_list_[i].filter->measurementMatrix)*(filter_list_[i].filter->statePost)
         - meas_state;
@@ -423,8 +408,6 @@ class KalmanDetectionFilter
     }
     checkFilterAges();
     drawFilterStates();
-
-    publishTop();
   }
 
   /* This will check if each hypothesis is in view currently */
@@ -531,12 +514,6 @@ class KalmanDetectionFilter
       cov.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
       marker_count_ += 1;
-    }
-
-    for (int i=0; i<exclusion_list_.size(); i++) {
-      cv::circle(img, cv::Point(std::get<0>(exclusion_list_[i])*px_per_meter,
-            std::get<1>(exclusion_list_[i])*px_per_meter),
-          std::get<2>(exclusion_list_[i])*px_per_meter, cv::Scalar(255,255,255));
     }
 
     //printFilterState();
