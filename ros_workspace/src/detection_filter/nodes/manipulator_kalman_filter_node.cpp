@@ -9,10 +9,8 @@
 #include <ros/time.h>
 #include <ros/console.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <visualization_msgs/MarkerArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
 #include <samplereturn_msgs/PursuitResult.h>
-#include <geometry_msgs/PolygonStamped.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
@@ -47,8 +45,6 @@ class KalmanDetectionFilter
   ros::Subscriber sub_cam_info;
   ros::Publisher pub_detection;
   ros::Publisher pub_debug_img;
-  ros::Publisher pub_filter_marker_array;
-  ros::Publisher pub_frustum_poly;
 
   ros::Subscriber sub_ack;
 
@@ -59,8 +55,6 @@ class KalmanDetectionFilter
   std::string filtered_img_detection_topic;
   std::string ack_topic;
   std::string debug_img_topic;
-  std::string filter_marker_array_topic;
-  std::string frustum_poly_topic;
 
   std::vector<ColoredKF> filter_list_;
 
@@ -75,7 +69,6 @@ class KalmanDetectionFilter
   double error_cov_post_;
   double period_;
 
-  int32_t marker_count_;
   int16_t filter_id_count_;
   int16_t current_published_id_;
 
@@ -104,8 +97,6 @@ class KalmanDetectionFilter
     detection_topic = "point";
     filtered_detection_topic = "filtered_point";
     debug_img_topic = "debug_img";
-    filter_marker_array_topic = "filter_markers";
-    frustum_poly_topic = "frustum_polygon";
 
     ack_topic = "ack";
 
@@ -227,16 +218,9 @@ class KalmanDetectionFilter
     pub_debug_img =
       nh.advertise<sensor_msgs::Image>(debug_img_topic.c_str(), 3);
 
-    pub_filter_marker_array =
-      nh.advertise<visualization_msgs::MarkerArray>(filter_marker_array_topic.c_str(), 3);
-
-    pub_frustum_poly =
-      nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
-
     last_time_.sec = 0.0;
     last_time_.nsec = 0.0;
 
-    marker_count_ = 0;
     filter_id_count_ = 0;
   }
 
@@ -422,19 +406,6 @@ class KalmanDetectionFilter
   void drawFilterStates() {
     ROS_DEBUG("Number of Filters: %lu", filter_list_.size());
 
-    visualization_msgs::MarkerArray marker_array;
-
-    for (int i=0; i<marker_count_; i++) {
-      visualization_msgs::Marker clear_marker;
-      clear_marker.header.frame_id = "/map";
-      clear_marker.header.stamp = ros::Time::now();
-      clear_marker.id = i;
-      clear_marker.action = visualization_msgs::Marker::DELETE;
-      marker_array.markers.push_back(clear_marker);
-    }
-    pub_filter_marker_array.publish(marker_array);
-    marker_array.markers.clear();
-
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
     float px_per_meter = 50.0;
     float offset = 250;
@@ -445,37 +416,12 @@ class KalmanDetectionFilter
       float rad_y = filter_ptr.filter->errorCovPost.at<float>(1,1) * px_per_meter;
       cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
       cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
-
-      visualization_msgs::Marker cov;
-      cov.type = visualization_msgs::Marker::SPHERE;
-      cov.id = marker_count_;
-      cov.header.frame_id = "odom";
-      cov.header.stamp = ros::Time::now();
-      cov.color.r = 1.0;
-      cov.color.g = 1.0;
-      cov.color.b = 1.0;
-      cov.color.a = 0.5;
-      cov.pose.position.x = filter_ptr.filter->statePost.at<float>(0);
-      cov.pose.position.y = filter_ptr.filter->statePost.at<float>(1);
-      cov.pose.position.z = 0.0;
-      cov.pose.orientation.x = 0;
-      cov.pose.orientation.y = 0;
-      cov.pose.orientation.z = 0;
-      cov.pose.orientation.w = 1;
-      cov.scale.x = filter_ptr.filter->errorCovPost.at<float>(0,0);
-      cov.scale.y = filter_ptr.filter->errorCovPost.at<float>(1,1);
-      cov.scale.z = 0.01;
-      cov.lifetime = ros::Duration();
-      marker_array.markers.push_back(cov);
-      marker_count_ += 1;
     }
 
     //printFilterState();
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",img).toImageMsg();
     pub_debug_img.publish(debug_img_msg);
-
-    pub_filter_marker_array.publish(marker_array);
   }
 
   void printFilterState() {
