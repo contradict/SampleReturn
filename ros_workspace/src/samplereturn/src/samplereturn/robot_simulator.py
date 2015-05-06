@@ -128,6 +128,7 @@ class RobotSimulator(object):
         pursuit_result_name = "/processes/executive/pursuit_result"
         detected_sample_search_name = "/processes/sample_detection/search/filtered_point"
         detected_sample_manipulator_name = "/processes/sample_detection/manipulator/filtered_point"
+        search_verify_name = "/processes/sample_detection/search/close_range_verify"
         beacon_pose_name = "/processes/beacon/beacon_pose"
         beacon_debug_pose_name = "/processes/beacon/beacon_pose_debug"
 
@@ -194,12 +195,15 @@ class RobotSimulator(object):
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
         
-        self.search_enable = rospy.Service(enable_search_name,
-                                           platform_srv.Enable,
-                                           self.service_enable_search_request)
-        self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
-                                                         samplereturn_srv.Enable,
-                                                         self.enable_manipulator_detector)
+        rospy.Service(enable_search_name,
+                      platform_srv.Enable,
+                      self.service_enable_search_request)
+        rospy.Service(search_verify_name,
+                      samplereturn_srv.Verify,
+                      self.service_search_verify_request)
+        rospy.Service(enable_manipulator_detector_name,
+                      samplereturn_srv.Enable,
+                      self.enable_manipulator_detector)
         self.manipulator_detector_enabled = False                                           
                 
         #io publishers
@@ -210,15 +214,15 @@ class RobotSimulator(object):
 
 
         #platform motion publishers, services, and action servers
-        self.select_motion_mode = rospy.Service(select_motion_name,
-                                                platform_srv.SelectMotionMode,
-                                                self.service_motion_mode_request)
-        self.enable_wheelpods = rospy.Service(enable_wheelpods_name,
-                                              platform_srv.Enable,
-                                              self.service_enable_wheelpods)
-        self.enable_carousel = rospy.Service(enable_carousel_name,
-                                             platform_srv.Enable,
-                                             self.service_enable_wheelpods)
+        rospy.Service(select_motion_name,
+                      platform_srv.SelectMotionMode,
+                      self.service_motion_mode_request)
+        rospy.Service(enable_wheelpods_name,
+                      platform_srv.Enable,
+                      self.service_enable_wheelpods)
+        rospy.Service(enable_carousel_name,
+                      platform_srv.Enable,
+                      self.service_enable_wheelpods)
         
         self.home_wheelpods_server = actionlib.SimpleActionServer(home_wheelpods_name,
                                                                   platform_msg.HomeAction,
@@ -710,6 +714,11 @@ class RobotSimulator(object):
     def service_enable_search_request(self, req):
         rospy.sleep(0.5)
         return req.state
+    
+    #fail 1 out of 3 times to verify a sample
+    def service_search_verify_request(self, req):
+        rospy.sleep(0.5)
+        return random.choice([True, True, False])
         
     def service_motion_mode_request(self, req):
         rospy.sleep(0.2)
