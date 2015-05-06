@@ -393,53 +393,13 @@ class KalmanDetectionFilter
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        if (isInView(filter_list_[i].filter)) {
-          filter_list_[i].filter->predict();
-          filter_list_[i].filter->errorCovPre.copyTo(filter_list_[i].filter->errorCovPost);;
-          filter_list_[i].certainty -= certainty_dec_;
-        }
+        filter_list_[i].filter->predict();
+        filter_list_[i].filter->errorCovPre.copyTo(filter_list_[i].filter->errorCovPost);;
+        filter_list_[i].certainty -= certainty_dec_;
       }
     }
     checkFilterAges();
     drawFilterStates();
-  }
-
-  /* This will check if each hypothesis is in view currently */
-  bool isInView (std::shared_ptr<cv::KalmanFilter> kf) {
-    ROS_INFO("Is In View Check");
-    /* This is in base_link, transform it to odom */
-    cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
-        1.75, -1.21, 21.75, -13.21, 21.75, 13.21, 1.75, 1.21);
-    cv::Mat DSLR_frustum_odom(4,2,CV_32FC1);
-    geometry_msgs::PointStamped temp_msg, temp_msg_odom;
-    geometry_msgs::PolygonStamped frustum_poly;
-    frustum_poly.header.frame_id = "odom";
-    frustum_poly.header.stamp = ros::Time::now();
-    temp_msg.header.frame_id = "base_link";
-    temp_msg.header.stamp = ros::Time::now();
-    for (int i=0; i<4; i++) {
-      temp_msg.point.x = DSLR_frustum.at<float>(i,0);
-      temp_msg.point.y = DSLR_frustum.at<float>(i,1);
-      temp_msg.point.z = 0.0;
-      try {
-        listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
-      }
-      catch (tf::TransformException e) {
-        ROS_ERROR_STREAM("Aww shit " << e.what());
-      }
-      listener_.transformPoint("odom",temp_msg,temp_msg_odom);
-      DSLR_frustum_odom.at<float>(i,0) = temp_msg_odom.point.x;
-      DSLR_frustum_odom.at<float>(i,1) = temp_msg_odom.point.y;
-      geometry_msgs::Point32 temp_point;
-      temp_point.x = temp_msg_odom.point.x;
-      temp_point.y = temp_msg_odom.point.y;
-      temp_point.z = 0.0;
-      frustum_poly.polygon.points.push_back(temp_point);
-    }
-    pub_frustum_poly.publish(frustum_poly);
-    double retval = cv::pointPolygonTest(DSLR_frustum_odom,
-        cv::Point2f(kf->statePost.at<float>(0),kf->statePost.at<float>(1)), false);
-    return (retval == 1);
   }
 
   bool isOld (ColoredKF ckf) {
