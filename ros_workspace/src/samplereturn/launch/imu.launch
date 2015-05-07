@@ -38,6 +38,7 @@
         ns="/io/microstrain_3dm_gx3_35">
 
         <param name="gps_on" value="False"/>
+        <param name="imu_frame" value="microstrain"/>
 
     </node>
 

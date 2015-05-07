@@ -307,4 +307,10 @@
         <child link="imu_1"/>
         <origin xyz="-0.445 0 0.0175" rpy="0 3.1416 -1.5708"/>
     </joint>
+    <link name="microstrain"/>
+    <joint name="microstrain_mount" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="microstrain"/>
+        <origin xyz="-0.455 0 0.155" rpy="0 3.1416 0"/>
+    </joint>
 </robot>
