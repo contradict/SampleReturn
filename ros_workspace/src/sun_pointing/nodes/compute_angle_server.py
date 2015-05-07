@@ -10,14 +10,28 @@ from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from sun_pointing.msg import ComputeAngleResult, ComputeAngleFeedback, ComputeAngleAction
 from motion_planning import simple_motion
+import samplereturn.util as util
+import samplereturn_msgs.msg as samplereturn_msg
+from samplereturn_msgs.msg import SimpleMoveGoal
 
 class ComputeAngle(object):
 
   def __init__(self):
-    rospy.Subscriber('image', Image, self.image_callback, None, 1)
-    rospy.Subscriber('odometry', Odometry, self.odometry_callback, None, 1)
 
-    self.action_server = actionlib.SimpleActionServer('sun_pointing_action', ComputeAngleAction, self.run_compute_angle_action, False)
+    node_params = util.get_node_params()
+    self.odometry_frame = node_params.odometry_frame
+
+
+    self.action_server = actionlib.SimpleActionServer('sun_pointing_action',
+                                                      ComputeAngleAction,
+                                                      self.run_compute_angle_action,
+                                                      False)
+
+    self.simple_mover = actionlib.SimpleActionClient("simple_move",
+                                                     samplereturn_msg.SimpleMoveAction)
+    
+    self.spin_goal = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                    velocity = node_params.spin_velocity)  
 
     self.bridge = CvBridge()
     self.min_lightness = []
@@ -25,24 +39,18 @@ class ComputeAngle(object):
 
     self.turning = False
     self.starting_yaw = None
+    self.current_yaw = None
 
-    self.mover = simple_motion.SimpleMover('~compute_sun_angle_params/')
+    rospy.Timer(rospy.Duration(node_params.yaw_update_period),
+                self.update_yaw)                
+
+    rospy.Subscriber('image', Image, self.image_callback, None, 1)
 
     self.action_server.start()
 
-  def odometry_callback(self, msg):
-    quaternion = np.zeros(4)
-    quaternion[0] = msg.pose.pose.orientation.x
-    quaternion[1] = msg.pose.pose.orientation.y
-    quaternion[2] = msg.pose.pose.orientation.z
-    quaternion[3] = msg.pose.pose.orientation.w
-
-    if self.starting_yaw == None:
-      self.starting_yaw = euler_from_quaternion(quaternion)[-1]
-
-    self.current_yaw = euler_from_quaternion(quaternion)[-1]
-
+  def update_yaw(self, msg):
     if self.turning:
+      self.current_yaw = util.get_current_robot_yaw(self.odom_frame)
       self.action_server.publish_feedback(ComputeAngleFeedback(self.current_yaw))
 
   def image_callback(self, msg):
@@ -53,34 +61,24 @@ class ComputeAngle(object):
       self.img_angles.append(self.current_yaw)
 
   def run_compute_angle_action(self, goal):
-    self.starting_yaw = None
-    # First half of spin
+    self.starting_yaw = util.get_current_robot_yaw(self.odom_frame)
+    #spin all the way around
     self.turning = True
-    self.mover.execute_spin(np.pi)
+    self.spin_goal.angle = 2*np.pi
+    self.simple_mover.send_goal(self.spin_goal)
     if self.action_server.is_preempt_requested():
-      return
-    # Second half of spin
-    self.mover.execute_spin(np.pi)
-    if self.action_server.is_preempt_requested():
+      self.action_server.set_preempted()
       return
     self.turning = False
     best_angle_index = np.argmax(self.min_lightness)
     best_angle = self.img_angles[best_angle_index]
-    # Return best angle
-    # Turn to it in sub-180 degree moves
-    final_spin = best_angle-self.starting_yaw
-    if final_spin > np.pi:
-      self.mover.execute_spin(np.pi)
-      self.mover.execute_spin(final_spin-np.pi)
-    elif final_spin < -np.pi:
-      self.mover.execute_spin(-np.pi)
-      self.mover.execute_spin(final_spin+np.pi)
-    else:
-      self.mover.execute_spin(final_spin)
+    #return to best angle
+    self.spin_goal.angle = util.unwind(best_angle-self.starting_yaw)
+    self.simple_mover.send_goal(self.spin_goal)
     self.min_lightness = []
     self.img_angles = []
+    #return the value of best angle in odometry_frame
     self.action_server.set_succeeded(ComputeAngleResult(best_angle))
-
 
 if __name__ == "__main__":
   rospy.init_node('sun_pointing')
