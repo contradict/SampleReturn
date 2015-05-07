@@ -510,7 +510,9 @@ class KalmanDetectionFilter
       cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
 
       visualization_msgs::Marker cov;
-      cov.type = visualization_msgs::Marker::SPHERE;
+      cov.type = visualization_msgs::Marker::CYLINDER;
+      /* The radius of the marker is positional covariance, the height
+       * is the certainty of the observation */
       cov.id = marker_count_;
       cov.header.frame_id = "odom";
       cov.header.stamp = ros::Time::now();
@@ -527,7 +529,7 @@ class KalmanDetectionFilter
       cov.pose.orientation.w = 1;
       cov.scale.x = filter_ptr.filter->errorCovPost.at<float>(0,0);
       cov.scale.y = filter_ptr.filter->errorCovPost.at<float>(1,1);
-      cov.scale.z = 0.01;
+      cov.scale.z = filter_ptr.certainty;
       cov.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
       marker_count_ += 1;
