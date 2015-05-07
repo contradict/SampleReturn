@@ -142,10 +142,10 @@ class PursueSample(object):
  
             smach.StateMachine.add('APPROACH_SAMPLE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'ANNOUNCE_OBSTACLE_CHECK',
+                                   transitions = {'complete':'SAMPLE_VERIFY',
                                                   'blocked':'PUBLISH_FAILURE',
                                                   'started_blocked':'PUBLISH_FAILURE',
-                                                  'missed_target':'ANNOUNCE_OBSTACLE_CHECK',
+                                                  'missed_target':'SAMPLE_VERIFY',
                                                   'off_course':'PUBLISH_FAILURE',
                                                   'sample_detected':'PUBLISH_FAILURE',
                                                   'preempted':'PUBLISH_FAILURE',
@@ -153,12 +153,37 @@ class PursueSample(object):
                                    remapping = {'stop_on_sample':'false',
                                                 'move_goal':'pursuit_goal'})
 
-            smach.StateMachine.add('ANNOUNCE_OBSTACLE_CHECK',
-                                   AnnounceState(self.announcer,
-                                                 'Check ing for obstacles in sample area'),
-                                   transitions = {'next':'CALCULATE_MANIPULATOR_APPROACH'})
+            @smach.cb_interface(outcomes=['verified','not_verified'])
+            def sample_verify_resp(userdata, response):
+                if response.verified:
+                    return 'verified'
+                else:
+                    return 'not_verified'
+            
+            @smach.cb_interface(input_keys=['latched_filter_id'])
+            def sample_verify_req(userdata, request):
+                return samplereturn_srv.VerifyRequest(id = userdata.latched_filter_id)
+            
+            smach.StateMachine.add('SAMPLE_VERIFY',
+                smach_ros.ServiceState('close_range_verify', samplereturn_srv.Verify,
+                request_cb = sample_verify_req,
+                response_cb = sample_verify_resp),
+                transitions = {'verified':'ANNOUNCE_VERIFIED',
+                               'not_verified':'ANNOUNCE_NOT_VERIFIED',
+                               'succeeded':'PUBLISH_FAILURE', #means cb error I think
+                               'aborted':'PUBLISH_FAILURE'})
 
-            #calculate the final strafe move to the sample, this gets us the yaw for the obstacle check
+            smach.StateMachine.add('ANNOUNCE_VERIFIED',
+                                   AnnounceState(self.announcer,
+                                                 'Sample verified.  Prepare ing final approach.'),
+                                   transitions = {'next':'CALCULATE_MANIPULATOR_APPROACH'})    
+
+            smach.StateMachine.add('ANNOUNCE_NOT_VERIFIED',
+                                   AnnounceState(self.announcer,
+                                                 'Sample not verified.'),
+                                   transitions = {'next':'PUBLISH_FAILURE'})    
+
+             #calculate the final strafe move to the sample, this gets us the yaw for the obstacle check
             smach.StateMachine.add('CALCULATE_MANIPULATOR_APPROACH',
                                    CalculateManipulatorApproach(self.tf_listener),
                                    transitions = {'move':'OBSTACLE_CHECK',
@@ -170,7 +195,7 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  'Sample not in tolerance, retry ing approach'),
                                    transitions = {'next':'APPROACH_SAMPLE'})            
-  
+
             @smach.cb_interface(outcomes=['clear','blocked'])
             def obstacle_check_resp(userdata, response):
                 if response.obstacle:
@@ -191,20 +216,20 @@ class PursueSample(object):
                 request_cb = obstacle_check_req,
                 response_cb = obstacle_check_resp),
                 transitions = {'blocked':'ANNOUNCE_BLOCKED',
-                               'clear':'ANNOUNCE_MANIPULATOR_APPROACH',
+                               'clear':'ANNOUNCE_CLEAR',
                                'succeeded':'PUBLISH_FAILURE', #means cb error I think
-                               'aborted':'PUBLISH_FAILURE'}
-            )
+                               'aborted':'PUBLISH_FAILURE'})
     
             smach.StateMachine.add('ANNOUNCE_BLOCKED',
                                    AnnounceState(self.announcer,
-                                                 'Obstacles in sample area. Abort ing'),
-                                   transitions = {'next':'PUBLISH_FAILURE'})   
-           
-            smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
+                                                 'Obstacles in sample area.'),
+                                   transitions = {'next':'PUBLISH_FAILURE'})
+            
+            smach.StateMachine.add('ANNOUNCE_CLEAR',
                                    AnnounceState(self.announcer,
-                                                 'Clear. Begin ing manipulator approach'),
-                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})                
+                                                 'Area clear. Begin ing.'),
+                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})
+
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
@@ -334,7 +359,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_POINT_LOST',
                                    AnnounceState(self.announcer,
-                                                 "Sample lost, abort ing"),
+                                                 "Sample lost. abort ing"),
                                    transitions = {'next':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('PUBLISH_FAILURE',
@@ -650,7 +675,7 @@ class ConfirmSampleAcquired(smach.State):
         else:
             if userdata.detected_sample.sample_id == userdata.latched_sample.sample_id:
                 if userdata.grab_count > userdata.grab_count_limit:
-                    self.announcer.say("Sample acquisition failed. Abort ing")
+                    self.announcer.say("Sample acquisition failed.")
                     return 'aborted'
                 else:
                     self.announcer.say("Sample acquisition failed. Retry ing")

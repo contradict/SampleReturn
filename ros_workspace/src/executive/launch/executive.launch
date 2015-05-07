@@ -93,6 +93,7 @@
 
         <!-- remaps -->
         <remap from="search_lights" to="search_lights"/>
+        <remap from="close_range_verify" to="/processes/sample_detection/search/close_range_verify"/>
 
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
