@@ -15,6 +15,7 @@ import actionlib
 import tf
 import tf2_ros
 import tf_conversions
+from cv_bridge import CvBridge, CvBridgeError
 
 import samplereturn.util as util
 
@@ -22,6 +23,7 @@ import actionlib_msgs.msg as action_msg
 import std_msgs.msg as std_msg
 import sensor_msgs.msg as sensor_msg
 import nav_msgs.msg as nav_msg
+import sensor_msgs.msg as sensor_msg
 import nav_msgs.srv as nav_srv
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
@@ -132,6 +134,8 @@ class RobotSimulator(object):
         beacon_pose_name = "/processes/beacon/beacon_pose"
         beacon_debug_pose_name = "/processes/beacon/beacon_pose_debug"
 
+        manipulator_image_name = "/cameras/manipulator/left/rect_color"
+       
         point_cloud_center_name = "/cameras/navigation/center/points2"
         point_cloud_port_name = "/cameras/navigation/port/points2"
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
@@ -204,8 +208,17 @@ class RobotSimulator(object):
         rospy.Service(enable_manipulator_detector_name,
                       samplereturn_srv.Enable,
                       self.enable_manipulator_detector)
-        self.manipulator_detector_enabled = False                                           
-                
+        self.manipulator_detector_enabled = False
+        
+        #publisher for blank images to sun_pointing
+        self.cv_bridge = CvBridge()
+        self.manipulator_image_publisher = rospy.Publisher(manipulator_image_name,
+                                                           sensor_msg.Image,
+                                                           queue_size = 1)
+        self.empty_image_data = np.zeros((480,640,3), dtype='uint8')
+        
+        rospy.Timer(rospy.Duration(1.0/30.0), self.publish_manipulator_image)
+                                            
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
@@ -537,7 +550,13 @@ class RobotSimulator(object):
             if ((now - self.beacon_pose_queue[0].header.stamp) > self.beacon_pose_delay):
                 #rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
                 self.beacon_pose_pub.publish(self.beacon_pose_queue.popleft())
-            
+    
+    def publish_manipulator_image(self, event):
+        now = event.current_real
+        header = std_msg.Header(0, now, 'manipulator_left_camera')
+        msg = self.cv_bridge.cv2_to_imgmsg(self.empty_image_data, "bgr8")
+        msg.header = header
+        self.manipulator_image_publisher.publish(msg)
 
     def check_sample_detection_search(self, event):
         if self.publish_samples:
