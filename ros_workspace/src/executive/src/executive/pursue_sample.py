@@ -27,6 +27,7 @@ import samplereturn.util as util
 import motion_planning.simple_motion as simple_motion
 from motion_planning.simple_motion import TimeoutException
 from samplereturn_msgs.msg import SimpleMoveGoal
+from sun_pointing.msg import ComputeAngleAction, ComputeAngleGoal
 
 from executive.executive_states import WaitForFlagState
 from executive.executive_states import AnnounceState
@@ -227,7 +228,7 @@ class PursueSample(object):
             
             smach.StateMachine.add('ANNOUNCE_CLEAR',
                                    AnnounceState(self.announcer,
-                                                 'Area clear. Begin ing.'),
+                                                 'Area clear. Begin ing approach.'),
                                    transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})
 
 
@@ -247,11 +248,24 @@ class PursueSample(object):
             
             smach.StateMachine.add('MANIPULATOR_FINAL_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'HANDLE_SEARCH',
+                                   transitions = {'complete':'ANNOUNCE_SUN_POINTING',
                                                   'sample_detected':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'simple_move':'final_move',
                                                 'stop_on_sample':'true'})
+            
+            smach.StateMachine.add('ANNOUNCE_SUN_POINTING',
+                                   AnnounceState(self.announcer,
+                                                 "No sample detected, rotate ing to optimal light condition."),
+                                   transitions = {'next':'SUN_POINTING_ROTATION'})            
+            
+            smach.StateMachine.add('SUN_POINTING_ROTATION',
+                                   smach_ros.SimpleActionState('sun_pointing',
+                                   ComputeAngleAction,
+                                   goal = ComputeAngleGoal(True)),
+                                   transitions = {'succeeded':'HANDLE_SEARCH',
+                                                  'preempted':'PUBLISH_FAILURE',
+                                                  'aborted':'PUBLISH_FAILURE'})            
             
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
@@ -627,7 +641,7 @@ class HandleSearch(smach.State):
                     square_step, -square_step, userdata.odometry_frame)
             point_list.append(next_pose.pose.position)
             userdata.point_list = point_list
-            self.announcer.say("No sample detected. Search ing area")           
+            self.announcer.say("Search ing area")           
             userdata.search_count += 1
             return 'sample_search'
             
