@@ -50,6 +50,7 @@ class RobotSimulator(object):
 
         #IMPORTANT SWITCHES!        
         self.publish_samples = publish_samples
+        self.random_sample_verify = False
         self.publish_beacon = publish_beacon
         self.odometry_is_noisy = True
         self.broadcast_localization = False #fake localization handled by beacon_localizer!
@@ -737,7 +738,10 @@ class RobotSimulator(object):
     #fail 1 out of 3 times to verify a sample
     def service_search_verify_request(self, req):
         rospy.sleep(0.5)
-        return random.choice([True, True, False])
+        if self.random_sample_verify:
+            return random.choice([True, True, False])
+        else:
+            return True
         
     def service_motion_mode_request(self, req):
         rospy.sleep(0.2)
