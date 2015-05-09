@@ -501,10 +501,26 @@ class KalmanDetectionFilter
     cv::eigen(ckf->filter.errorCovPost, eigenvalues);
     for (int i=0; i<eigenvalues.rows; i++) {
       if (eigenvalues.at<float>(i) > max_cov_) {
+        clearMarker(ckf);
         return true;
       }
     }
+    if (ckf->certainty < -1.0) {
+      clearMarker(ckf);
+      return true;
+    }
     return false;
+  }
+
+  void clearMarker(std::shared_ptr<ColoredKF> ckf) {
+    visualization_msgs::MarkerArray marker_array;
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = ros::Time::now();
+    marker.id = ckf->filter_id;
+    marker.action = visualization_msgs::Marker::DELETE;
+    marker_array.markers.push_back(marker);
+    pub_filter_marker_array.publish(marker_array);
   }
 
   void checkFilterAges() {
@@ -518,16 +534,16 @@ class KalmanDetectionFilter
 
     visualization_msgs::MarkerArray marker_array;
 
-    for (int i=0; i<marker_count_; i++) {
-      visualization_msgs::Marker clear_marker;
-      clear_marker.header.frame_id = "/map";
-      clear_marker.header.stamp = ros::Time::now();
-      clear_marker.id = i;
-      clear_marker.action = visualization_msgs::Marker::DELETE;
-      marker_array.markers.push_back(clear_marker);
-    }
-    pub_filter_marker_array.publish(marker_array);
-    marker_array.markers.clear();
+    //for (int i=0; i<marker_count_; i++) {
+    //  visualization_msgs::Marker clear_marker;
+    //  clear_marker.header.frame_id = "/map";
+    //  clear_marker.header.stamp = ros::Time::now();
+    //  clear_marker.id = i;
+    //  clear_marker.action = visualization_msgs::Marker::DELETE;
+    //  marker_array.markers.push_back(clear_marker);
+    //}
+    //pub_filter_marker_array.publish(marker_array);
+    //marker_array.markers.clear();
 
     marker_count_ = 0;
 
