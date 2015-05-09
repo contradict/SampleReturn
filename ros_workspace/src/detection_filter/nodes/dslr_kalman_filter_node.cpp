@@ -342,15 +342,17 @@ class KalmanDetectionFilter
       }
     }
 
-    current_published_id_ = nearest_id;
-    samplereturn_msgs::NamedPoint point_msg;
-    point_msg.header.frame_id = _filter_frame_id;
-    point_msg.header.stamp = ros::Time::now();
-    point_msg.point.x = nearest_filter->filter.statePost.at<float>(0);
-    point_msg.point.y = nearest_filter->filter.statePost.at<float>(1);
-    point_msg.point.z = 0;
-    point_msg.filter_id = nearest_filter->filter_id;
-    pub_detection.publish(point_msg);
+    if (nearest_id != 0) {
+      current_published_id_ = nearest_id;
+      samplereturn_msgs::NamedPoint point_msg;
+      point_msg.header.frame_id = _filter_frame_id;
+      point_msg.header.stamp = ros::Time::now();
+      point_msg.point.x = nearest_filter->filter.statePost.at<float>(0);
+      point_msg.point.y = nearest_filter->filter.statePost.at<float>(1);
+      point_msg.point.z = 0;
+      point_msg.filter_id = nearest_filter->filter_id;
+      pub_detection.publish(point_msg);
+    }
   }
 
   void addFilter(const samplereturn_msgs::NamedPoint& msg)
@@ -418,15 +420,15 @@ class KalmanDetectionFilter
     }
 
     for (int i=0; i<filter_list_.size(); i++) {
-      cv::Mat dist = (filter_list_[i]->filter.measurementMatrix)*(filter_list_[i]->filter.statePost)
-        - meas_state;
-      if (abs(cv::sum(dist)[0]) < max_dist_ && checkColor(filter_list_[i]->color,msg.name)) {
+      double dist = cv::norm(((filter_list_[i]->filter.measurementMatrix)*(filter_list_[i]->filter.statePost)
+        - meas_state));
+      if ((dist < max_dist_) && checkColor(filter_list_[i]->color,msg.name)) {
         ROS_INFO("Color Check Passed");
         addMeasurement(meas_state, i);
         filter_list_[i]->color = msg.name;
         return;
       }
-      else if (abs(cv::sum(dist)[0]) < max_dist_ && not checkColor(filter_list_[i]->color,msg.name)) {
+      else if ((dist < max_dist_) && not checkColor(filter_list_[i]->color,msg.name)) {
         ROS_INFO("Color Check Failed");
         return;
       }
