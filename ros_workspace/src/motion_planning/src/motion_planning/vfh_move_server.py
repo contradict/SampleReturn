@@ -585,8 +585,10 @@ class VFHMoveServer( object ):
         current_pose = util.get_current_robot_pose(self._tf,
                                                    self.odometry_frame)             
         
-        return (euler_from_orientation(self._goal_odom.pose.orientation)[-1] -
-            euler_from_orientation(current_pose.pose.orientation)[-1])
+        raw_error = euler_from_orientation(self._goal_odom.pose.orientation)[-1] - \
+                    euler_from_orientation(current_pose.pose.orientation)[-1]
+        
+        return util.unwind(raw_error)
 
     def publish_debug_path(self):
 
