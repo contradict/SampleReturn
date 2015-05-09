@@ -253,7 +253,6 @@ class KalmanDetectionFilter
   /* Dynamic reconfigure callback */
   void configCallback(detection_filter::kalman_filter_paramsConfig &config, uint32_t level)
   {
-    ROS_INFO("configCallback");
     max_dist_ = config.max_dist;
     max_cov_ = config.max_cov;
     max_pub_cov_ = config.max_pub_cov;
@@ -318,11 +317,12 @@ class KalmanDetectionFilter
   }
 
   void publishTop() {
-    geometry_msgs::Twist twist;
-    listener_.lookupTwist("odom", "base_link", ros::Time(0), ros::Duration(0), twist);
+    ROS_DEBUG("Publish Top");
+    tf::StampedTransform transform;
+    listener_.lookupTransform("odom", "base_link", ros::Time(0), transform);
     float nearest_dist = 10000;
     float dist;
-    int nearest_id;
+    int nearest_id = 0;
     std::shared_ptr<ColoredKF> nearest_filter;
     /* Walk list to find nearest good filter */
     if (filter_list_.size() > 0) {
@@ -330,8 +330,11 @@ class KalmanDetectionFilter
         for (auto filter_ptr : filter_list_) {
           if ((filter_ptr->certainty > certainty_thresh_) &&
               (filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_)) {
-            dist = sqrt(pow((twist.linear.x-filter_ptr->filter.statePost.at<float>(0)),2) +
-                   pow((twist.linear.y-filter_ptr->filter.statePost.at<float>(1)),2));
+            dist = sqrt(pow((transform.getOrigin().x()-filter_ptr->filter.statePost.at<float>(0)),2) +
+                   pow((transform.getOrigin().y()-filter_ptr->filter.statePost.at<float>(1)),2));
+            ROS_DEBUG("Transform X: %f, Transform Y: %f",
+                transform.getOrigin().x(),transform.getOrigin().y());
+            ROS_DEBUG("Filter Distance: %f",dist);
             if (dist < nearest_dist) {
               nearest_dist = dist;
               nearest_id = filter_ptr->filter_id;
@@ -388,7 +391,7 @@ class KalmanDetectionFilter
 
   void addMeasurement(const cv::Mat meas_state, int filter_index)
   {
-    ROS_INFO("Adding measurement to filter: %i", filter_index);
+    ROS_DEBUG("Adding measurement to filter: %i", filter_index);
     filter_list_[filter_index]->filter.correct(meas_state);
     filter_list_[filter_index]->certainty += (certainty_inc_+certainty_dec_);
   }
@@ -399,7 +402,7 @@ class KalmanDetectionFilter
     color_it = std::find(color_transitions_map_[filter_color].begin(),
                           color_transitions_map_[filter_color].end(),
                           obs_color);
-    ROS_INFO("Color Check: Filter Color:%s Obs Color:%s",filter_color.c_str(),obs_color.c_str());
+    ROS_DEBUG("Color Check: Filter Color:%s Obs Color:%s",filter_color.c_str(),obs_color.c_str());
     return (color_it != color_transitions_map_[filter_color].end());
   }
 
@@ -423,13 +426,13 @@ class KalmanDetectionFilter
       double dist = cv::norm(((filter_list_[i]->filter.measurementMatrix)*(filter_list_[i]->filter.statePost)
         - meas_state));
       if ((dist < max_dist_) && checkColor(filter_list_[i]->color,msg.name)) {
-        ROS_INFO("Color Check Passed");
+        ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, i);
         filter_list_[i]->color = msg.name;
         return;
       }
       else if ((dist < max_dist_) && not checkColor(filter_list_[i]->color,msg.name)) {
-        ROS_INFO("Color Check Failed");
+        ROS_DEBUG("Color Check Failed");
         return;
       }
     }
@@ -460,7 +463,7 @@ class KalmanDetectionFilter
 
   /* This will check if each hypothesis is in view currently */
   bool isInView (cv::KalmanFilter kf) {
-    ROS_INFO("Is In View Check");
+    ROS_DEBUG("Is In View Check");
     /* This is in base_link, transform it to odom */
     cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
         1.75, -1.21, 21.75, -13.21, 21.75, 13.21, 1.75, 1.21);
@@ -470,18 +473,19 @@ class KalmanDetectionFilter
     frustum_poly.header.frame_id = "odom";
     frustum_poly.header.stamp = ros::Time::now();
     temp_msg.header.frame_id = "base_link";
-    temp_msg.header.stamp = ros::Time::now();
+    temp_msg.header.stamp = ros::Time(0);
     for (int i=0; i<4; i++) {
       temp_msg.point.x = DSLR_frustum.at<float>(i,0);
       temp_msg.point.y = DSLR_frustum.at<float>(i,1);
       temp_msg.point.z = 0.0;
       try {
-        listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
+        //listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
+        listener_.transformPoint("odom",temp_msg,temp_msg_odom);
       }
       catch (tf::TransformException e) {
         ROS_ERROR_STREAM("Aww shit " << e.what());
+        return false;
       }
-      listener_.transformPoint("odom",temp_msg,temp_msg_odom);
       DSLR_frustum_odom.at<float>(i,0) = temp_msg_odom.point.x;
       DSLR_frustum_odom.at<float>(i,1) = temp_msg_odom.point.y;
       geometry_msgs::Point32 temp_point;
