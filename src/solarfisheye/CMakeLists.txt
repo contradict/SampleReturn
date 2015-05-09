@@ -1,0 +1,7 @@
+set( CMAKE_BUILD_TYPE Debug )
+#set( CMAKE_PREFIX_PATH /usr/local/opencv ${CMAKE_PREFIX_PATH} )
+cmake_minimum_required(VERSION 2.8)
+project( solarfisheye )
+find_package( OpenCV REQUIRED )
+add_executable( solarfisheye solarfisheye.cpp )
+target_link_libraries( solarfisheye ${OpenCV_LIBS} )
