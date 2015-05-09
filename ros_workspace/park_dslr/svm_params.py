@@ -38,7 +38,7 @@ for g in [-5,-4,-3,-2,-1,0,1,2,3,4,5]:
       res = svm.predict(test_data[i])
       if res != test_labels[i]:
         error += 1.0
-    print "Gamma:",params['gamma'],"C:",params['C']
+    print "Gamma:",test_params['gamma'],"C:",test_params['C']
     print "Error rate: ",(error/test_data.shape[0])
     for i in range(training_data.shape[0]):
       res = svm.predict(training_data[i])
