@@ -168,9 +168,11 @@ class LevelTwoWeb(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(input_keys=['dismount_move'],
+                                   StartLeveLTwo(input_keys=['dismount_move',
+                                                             'spin_velocity'],
                                                  output_keys=['action_result',
-                                                              'simple_move'],
+                                                              'simple_move',
+                                                              'half_turn'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -205,11 +207,20 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('DISMOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'LOOK_AT_BEACON',
+                                                  'object_detected':'LOOK_AT_BEACON',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'stop_on_detection':'false'})
+
+            smach.StateMachine.add('LOOK_AT_BEACON',
+                                   ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'WEB_MANAGER',
                                                   'object_detected':'WEB_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_detection':'false'})
+                                   remapping = {'simple_move':'half_turn',
+                                                'stop_on_detection':'false'})
             
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
@@ -511,10 +522,12 @@ class StartLeveLTwo(smach.State):
         userdata.action_result = result
         
         #create the dismount_move
-        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                              **userdata.dismount_move)
-
-        userdata.simple_move = move
+        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                              **userdata.dismount_move)
+        
+        userdata.half_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                             angle = np.pi,
+                                             velocity = userdata.spin_velocity)
 
         return 'next'
 
