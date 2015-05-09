@@ -326,13 +326,12 @@ class LevelTwoWeb(object):
  
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'complete',
+                                   transitions = {'complete':'DESELECT_PLANNER',
                                                   'object_detected':'RETURN_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_detection':'false'})
 
-            #do not deselect planner, until we modify the motion.cpp state machine    
             smach.StateMachine.add('DESELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_ENABLE),
