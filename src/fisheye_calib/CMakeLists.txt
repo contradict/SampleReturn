@@ -1,0 +1,7 @@
+set( CMAKE_BUILD_TYPE Debug )
+#set( CMAKE_PREFIX_PATH /usr/local/opencv ${CMAKE_PREFIX_PATH} )
+cmake_minimum_required(VERSION 2.8)
+project( fisheye_calibration )
+find_package( OpenCV REQUIRED )
+add_executable( fisheye_calibration calibration.cpp )
+target_link_libraries( fisheye_calibration ${OpenCV_LIBS} )
