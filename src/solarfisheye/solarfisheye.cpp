@@ -163,8 +163,10 @@ void thresh_callback(int, void* )
   pts.push_back(mc);
   vector<Point3f> undist_pts;
   unprojectPointsFisheye(pts, undist_pts, cameraMatrix, distCoeffs, Mat(), Mat());
-  cout << pts <<endl;
-  cout << undist_pts <<endl;
+  cout << pts << endl;
+  cout << undist_pts << endl;
+  printf("intensity: %i\n", src_thr.at<uint8_t>(mc));
+  //cout << src_thr.at<uint8_t>(mc) << endl;
 
   /// Show in a window
   namedWindow( "Threshold", WINDOW_AUTOSIZE );
