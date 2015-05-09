@@ -217,7 +217,7 @@ class SimpleMover(object):
     while not rospy.is_shutdown():
       rospy.sleep(0.1)
       if (self.current_omega < self.velocity_epsilon) \
-      and (self.current_velocity < self.velocity_epsilon):
+      and (self.current_speed < self.velocity_epsilon):
         break
       rospy.logwarn("SIMPLE_MOTION waited 0.1 seconds for odometry to report < epsilon velocity")
 
