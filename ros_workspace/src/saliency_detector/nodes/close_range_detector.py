@@ -7,12 +7,14 @@ import cv2
 from copy import deepcopy
 
 from cv_bridge import CvBridge, CvBridgeError
-from tf.transformations import euler_from_quaternion,TransformListener
+from tf.transformations import euler_from_quaternion
+from tf import TransformListener
 from dynamic_reconfigure.server import Server
 
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import Image, CameraInfo
-from samplereturn_msgs.msg import NamedPoint, Verify, VerifyResponse
+from samplereturn_msgs.msg import NamedPoint
+from samplereturn_msgs.srv import Verify, VerifyResponse
 
 # Subscribe to dslr image and current pursuit target
 # When asked, take target location and get it in img coords
@@ -22,6 +24,8 @@ from samplereturn_msgs.msg import NamedPoint, Verify, VerifyResponse
 class CloseRangeDetector(object):
 
     def __init__(self):
+        rospy.init_node('close_range_detector',log_level=rospy.DEBUG)
+
         self.dslr_sub = rospy.Subscriber('image', Image, self.image_callback, None, 1)
         self.dslr_info_sub = rospy.Subscriber('cam_info', CameraInfo, self.cam_info_callback, None, 1)
         self.pursuit_sub = rospy.Subscriber('target_point', NamedPoint, self.target_point_callback, None, 1)
@@ -38,7 +42,7 @@ class CloseRangeDetector(object):
         rospack = rospkg.RosPack()
 
         self.classifier = cv2.SVM()
-        self.classifier.load(rospack.get_path('saliency_detector')+'/config/trained_svm'))
+        self.classifier.load(rospack.get_path('saliency_detector')+'/config/trained_svm')
 
     def verify_callback(self, req):
         if self.img_point is not None and self.last_img is not None:
@@ -64,17 +68,19 @@ class CloseRangeDetector(object):
         # then project into image coords (u,v)
         self.target_point.header.stamp = Image.header.stamp
         search_camera_point = self.tf.transformPoint("search_camera",self.target_point)
+        point_3d = np.array([search_camera_point.point.x,search_camera_point.point.y,\
+                            search_camera_point.point.z])
         if self.cam_model is not None:
-            self.img_point = self.cam_model.project3dToPixel(search_camera_point)
+            self.img_point = self.cam_model.project3dToPixel(point_3d)
 
         img = np.asarray(self.bridge.imgmsg_to_cv(Image,'rgb8'))
         lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
         self.last_img = lab.copy()
 
-    def extract_window(self, image);
+    def extract_window(self, image):
         # Take the image, grab the widow around the img_point, handling borders
-        win = image[self.img_point[]-self.win_size:self.img_point[]+self.win_size,\
-                self.img_point[]-self.win_size:self.img_point[]+self.win_size]
+        win = image[self.img_point[0]-self.win_size:self.img_point[0]+self.win_size,\
+                self.img_point[1]-self.win_size:self.img_point[1]+self.win_size]
 
     def compute_shape_metrics(self, img):
         mid = (float(np.max(img))+float(np.min(img)))/2.

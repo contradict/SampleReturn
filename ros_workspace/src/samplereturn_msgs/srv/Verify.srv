@@ -1,0 +1,4 @@
+#request
+uint16 id
+---
+bool verified
