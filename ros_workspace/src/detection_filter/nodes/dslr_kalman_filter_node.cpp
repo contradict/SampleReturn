@@ -248,6 +248,7 @@ class KalmanDetectionFilter
 
     marker_count_ = 0;
     filter_id_count_ = 1;
+    current_published_id_ = 0;
   }
 
   /* Dynamic reconfigure callback */
@@ -270,6 +271,7 @@ class KalmanDetectionFilter
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
+      current_published_id_ = 0;
     }
   }
 
