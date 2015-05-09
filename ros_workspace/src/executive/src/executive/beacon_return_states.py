@@ -131,6 +131,9 @@ class BeaconReturn(smach.State):
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 front_pose = deepcopy(userdata.beacon_approach_pose)
                 front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
+                pointing_quat = util.pointing_quaternion_2d(front_pose.pose.position,
+                                                            userdata.platform_point.point)
+                front_pose.pose.orientation = pointing_quat
                 userdata.move_target = front_pose
                 return 'move'   
             elif distance_to_approach_point > 2.0:
