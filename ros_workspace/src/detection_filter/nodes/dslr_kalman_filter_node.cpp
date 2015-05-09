@@ -534,17 +534,6 @@ class KalmanDetectionFilter
 
     visualization_msgs::MarkerArray marker_array;
 
-    //for (int i=0; i<marker_count_; i++) {
-    //  visualization_msgs::Marker clear_marker;
-    //  clear_marker.header.frame_id = "/map";
-    //  clear_marker.header.stamp = ros::Time::now();
-    //  clear_marker.id = i;
-    //  clear_marker.action = visualization_msgs::Marker::DELETE;
-    //  marker_array.markers.push_back(clear_marker);
-    //}
-    //pub_filter_marker_array.publish(marker_array);
-    //marker_array.markers.clear();
-
     marker_count_ = 0;
 
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
@@ -565,10 +554,18 @@ class KalmanDetectionFilter
       cov.id = filter_ptr->filter_id;
       cov.header.frame_id = "odom";
       cov.header.stamp = ros::Time::now();
-      cov.color.r = 1.0;
-      cov.color.g = 1.0;
-      cov.color.b = 1.0;
-      cov.color.a = 0.5;
+      if (filter_ptr->filter_id == current_published_id_) {
+        cov.color.r = 0.0;
+        cov.color.g = 1.0;
+        cov.color.b = 0.0;
+        cov.color.a = 1.0;
+      }
+      else {
+        cov.color.r = 1.0;
+        cov.color.g = 1.0;
+        cov.color.b = 1.0;
+        cov.color.a = 0.5;
+      }
       cov.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
       cov.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
       cov.pose.position.z = 0.0;
