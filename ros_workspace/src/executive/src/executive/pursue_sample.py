@@ -77,6 +77,8 @@ class PursueSample(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.target_sample = None
         self.state_machine.userdata.pursuit_goal = None
+            #latched sample is the sample information returned from the servo controller, which
+            #is hopefully the identification made by the manipulator detector
         self.state_machine.latched_sample = None
         
         #pursuit params
@@ -88,7 +90,13 @@ class PursueSample(object):
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
         self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        
+        self.state_machine.userdata.sample_yaw_tolerance = np.pi/4
         self.sample_obstacle_check_width = self.node_params.sample_obstacle_check_width
+            #latched filter id is the id of the hypothesis that triggered this pursuit
+            #if it ever disappears or becomes impossible to get to, etc, publish failure
+        self.state_machine.userdata.latched_filter_id = None
+
+
         
         #stop function check flags        
         self.state_machine.userdata.check_pursuit_distance = False
@@ -136,6 +144,7 @@ class PursueSample(object):
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'ANNOUNCE_OBSTACLE_CHECK',
                                                   'blocked':'PUBLISH_FAILURE',
+                                                  'started_blocked':'PUBLISH_FAILURE',
                                                   'missed_target':'ANNOUNCE_OBSTACLE_CHECK',
                                                   'off_course':'PUBLISH_FAILURE',
                                                   'sample_detected':'PUBLISH_FAILURE',
@@ -153,8 +162,14 @@ class PursueSample(object):
             smach.StateMachine.add('CALCULATE_MANIPULATOR_APPROACH',
                                    CalculateManipulatorApproach(self.tf_listener),
                                    transitions = {'move':'OBSTACLE_CHECK',
+                                                  'retry_approach':'ANNOUNCE_RETRY_APPROACH',
                                                   'point_lost':'ANNOUNCE_POINT_LOST',
                                                   'aborted':'PURSUE_SAMPLE_ABORTED'})
+            
+            smach.StateMachine.add('ANNOUNCE_RETRY_APPROACH',
+                                   AnnounceState(self.announcer,
+                                                 'Sample not in tolerance, retry ing approach'),
+                                   transitions = {'next':'APPROACH_SAMPLE'})            
   
             @smach.cb_interface(outcomes=['clear','blocked'])
             def obstacle_check_resp(userdata, response):
@@ -336,12 +351,12 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
-                                                 "Continue ing search"),
+                                                 "Exit ing pursuit."),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('ANNOUNCE_RETURN',
                                    AnnounceState(self.announcer,
-                                                 "Returning to search"),
+                                                 "Exit ing pursuit."),
                                    transitions = {'next':'complete'})
 
             smach.StateMachine.add('PURSUE_SAMPLE_ABORTED',
@@ -382,14 +397,18 @@ class PursueSample(object):
         sls.stop()
 
     def sample_detection_search(self, sample):
+        #don't bother with this unless a latched filter id is active,
+        #and it matches the one we have been tasked with pursuing
+        latched_filter_id = self.state_machine.userdata.latched_filter_id
+        if (latched_filter_id is not None) and (latched_filter_id == sample.filter_id):    
+
             point, pose = calculate_pursuit(self.tf_listener,
                                             sample,
                                             self.min_pursuit_distance,
                                             self.odometry_frame)
             
-            #always update the target_sample
             self.state_machine.userdata.target_sample = point
-            
+                                   
             #if the pursuit_goal is None, we are not actively in pursuit
             if self.state_machine.userdata.pursuit_goal is not None:
                 #if the desired pursuit pose changes too much, update the state_machine's pose
@@ -399,7 +418,8 @@ class PursueSample(object):
                     self.state_machine.pursuit_pose = pose
                     goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
                                                         move_velocity = self.state_machine.userdata.pursuit_velocity,
-                                                        spin_velocity = self.state_machine.userdata.spin_velocity)
+                                                        spin_velocity = self.state_machine.userdata.spin_velocity,
+                                                        orient_at_target = True)
                     self.state_machine.userdata.pursuit_goal = goal
          
     def sample_detection_manipulator(self, sample):
@@ -425,7 +445,8 @@ class StartSamplePursuit(smach.State):
                                          'spin_velocity',
                                          'min_pursuit_distance',
                                          'odometry_frame'],
-                             output_keys=['return_goal',
+                             output_keys=['latched_filter_id',
+                                          'return_goal',
                                           'pursuit_goal',
                                           'stop_on_sample',
                                           'action_result',
@@ -448,6 +469,9 @@ class StartSamplePursuit(smach.State):
         userdata.grab_count = 0
 
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))        
+        
+        #store the filter_id on entry, this instance of pursuit will only try to pick up this hypothesis
+        userdata.latched_filter_id = userdata.action_goal.input_point.filter_id
         
         point, pose = calculate_pursuit(self.tf_listener,
                                         userdata.action_goal.input_point,
@@ -478,9 +502,10 @@ class StartSamplePursuit(smach.State):
 class CalculateManipulatorApproach(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             outcomes=['move', 'complete', 'point_lost', 'aborted'],
+                             outcomes=['move', 'retry_approach', 'complete', 'point_lost', 'aborted'],
                              input_keys=['target_sample',
                                          'settle_time',
+                                         'sample_yaw_tolerance',
                                          'final_pursuit_step',
                                          'pursuit_velocity',
                                          'search_velocity',
@@ -509,6 +534,9 @@ class CalculateManipulatorApproach(smach.State):
                 rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
                 return 'aborted'
             rospy.loginfo("MANIPULATOR_APPROACH calculated with distance: {:f}, yaw: {:f} ".format(distance, yaw))
+            #if, for some bizarre reason, the sample is now in a way different spot, re-approach
+            if np.abs(yaw) > userdata.sample_yaw_tolerance:
+                return 'retry_approach'
             #load sample distance and yaw for obstacle check      
             userdata.target_yaw = robot_yaw + yaw
             userdata.target_distance = distance
@@ -652,7 +680,7 @@ class PublishFailure(smach.State):
         userdata.stop_on_sample = False
         userdata.detected_sample = None
         userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
-        self.result_pub.publish(samplereturn_msg.PursuitResult(False))        
+        self.result_pub.publish(samplereturn_msg.PursuitResult(False))
         return 'next'
 
 class PursueSampleAborted(smach.State):
@@ -680,6 +708,9 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         #recalculate the quaternion pointing from goal point to sample point
         pointing_quat = util.pointing_quaternion_2d(pursuit_pose.pose.position, point_in_frame.point)
         pursuit_pose.pose.orientation = pointing_quat
+        pursuit_pose.header.stamp = rospy.Time(0)
+        #rospy.loginfo("CALCULATE PURSUIT: pursuit_point: {!s}, point_in_frame: {!s}, pursuit_pose: {!s}".format(pursuit_point, point_in_frame, pursuit_pose))
+        
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
            rospy.logwarn("PURSUE_SAMPLE failed to transform pursuit point %s->%s: %s",

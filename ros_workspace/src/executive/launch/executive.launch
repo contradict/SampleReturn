@@ -72,7 +72,7 @@
     <node
         pkg="executive"
         type="level_two_node.py"
-        name="level_two_star"
+        name="level_two"
         machine="navigate"
         output="log"
         ns="/processes/executive">

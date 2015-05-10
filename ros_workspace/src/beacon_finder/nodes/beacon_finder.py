@@ -17,13 +17,15 @@ from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import Vector3, Quaternion, PoseStamped, PoseWithCovarianceStamped
 from tf.transformations import quaternion_from_matrix, quaternion_inverse, quaternion_multiply
 from image_geometry import PinholeCameraModel
+from visualization_msgs.msg import Marker
+from std_msgs.msg import ColorRGBA
 
 class BeaconFinder:
     """A class to locate the beacon in an image and publish a vector in the camera's frame from the robot to the beacon"""
 
     def __init__(self):
         self._beacon_pose_publisher = rospy.Publisher('beacon_pose', PoseWithCovarianceStamped, queue_size=1)
-        self._beacon_debug_pose_publisher = rospy.Publisher('beacon_pose_debug', PoseStamped, queue_size=1)
+        self._beacon_debug_pose_publisher = rospy.Publisher('beacon_pose_debug', Marker, queue_size=1)
         self._beacon_debug_image = rospy.Publisher('beacon_debug_img', Image, queue_size=1)
         self._cv_bridge = CvBridge()
 
@@ -443,9 +445,15 @@ class BeaconFinder:
         beacon_pose.pose.covariance = covariance_matrix
         self._beacon_pose_publisher.publish(beacon_pose)
 
-        debug_pose = PoseStamped()
-        debug_pose.pose = beacon_pose.pose.pose
+        debug_pose = Marker()
         debug_pose.header = header
+        debug_pose.id = 1
+        debug_pose.type = Marker.ARROW
+        debug_pose.action = Marker.MODIFY
+        debug_pose.pose = beacon_pose.pose.pose
+        debug_pose.scale = Vector3(5.0, 1.0, 1.0)
+        debug_pose.color = ColorRGBA(0.0, 1.0, 0.0, 0.8)
+        debug_pose.lifetime = rospy.Duration(1.0)
         self._beacon_debug_pose_publisher.publish(debug_pose)
 
     def draw_debug_keypoints_image(self, keypoints):
