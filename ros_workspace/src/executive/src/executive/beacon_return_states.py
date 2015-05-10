@@ -77,6 +77,7 @@ class BeaconReturn(smach.State):
         #if we have been ignoring beacon detections prior to this,
         #we should clear them here, and wait for a fresh detection
         if not userdata.stop_on_detection:
+            self.announcer.say("Wait ing for beacon.")
             userdata.beacon_point = None
             start_time = rospy.Time.now()
             while not rospy.core.is_shutdown_requested():
