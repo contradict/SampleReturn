@@ -189,7 +189,7 @@ class CalculateMountMove(smach.State):
                 correction_error = util.point_distance_2d(platform_point_odom.point,
                                                           saved_point_odom.point)
                 saved_point_odom = platform_point_odom
-                if (correction_error < 0.05):
+                if (correction_error < 0.02):
                     break
                 else:
                     self.announcer.say("Correction. {:.2f}".format(correction_error))
