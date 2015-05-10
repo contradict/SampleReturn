@@ -215,13 +215,13 @@ class VFHMoveServer( object ):
             rot_sign = np.sign(start_dyaw)
             #first try rotating toward the target 120 degrees or so
             error = self._mover.execute_spin(rot_sign*np.pi*0.6,
-                                             max_velocity = 0.2,
+                                             max_velocity = spin_velocity,
                                              stop_function=self.clear_check)
             if self.exit_check(): return
             #if that doesn't work, spin all the way around
             if np.abs(error) < self._goal_orientation_tolerance:
                 self._mover.execute_spin(-2.6*rot_sign*np.pi,
-                                        max_velocity = 0.2,
+                                        max_velocity = spin_velocity,
                                         stop_function=self.clear_check)
             if self.exit_check(): return
             dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
