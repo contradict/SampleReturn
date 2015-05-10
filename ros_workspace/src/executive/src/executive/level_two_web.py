@@ -120,10 +120,12 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.move_velocity = node_params.move_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
         self.state_machine.userdata.course_tolerance = None
+        self.state_machine.userdata.chord_course_tolerance = node_params.chord_course_tolerance
         self.state_machine.userdata.spoke_hub_radius = node_params.spoke_hub_radius
         self.state_machine.userdata.next_spoke_sign = node_params.next_spoke_sign
         self.state_machine.userdata.raster_step = node_params.raster_step
         self.state_machine.userdata.raster_offset = node_params.raster_offset
+        self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
         self.state_machine.userdata.blocked_limit = 2
@@ -540,6 +542,8 @@ class WebManager(smach.State):
                                            'raster_active',
                                            'raster_points',
                                            'raster_step',
+                                           'raster_tolerance',
+                                           'chord_course_tolerance',
                                            'vfh_result',
                                            'manager_dict',
                                            'detection_message',
@@ -615,12 +619,20 @@ class WebManager(smach.State):
                     #replace the next inward point with this
                     next_move['point'] = geometry_msg.PointStamped(header, pos)
                     self.announcer.say("Head ing to next radius.")
-                                
+
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
                     self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
                     userdata.raster_active = False
                     userdata.outbound = True #request the next spoke move
+                else:
+                #if not, do we happen to aleady be close enough to the next point
+                #that planning to it is just a waste of time?
+                    yaw, distance = util.get_robot_strafe(self.tf_listener,
+                                                          next_move['point'])
+                    if distance < userdata.raster_tolerance:
+                        self.announcer.say("Already with in raster tolerance")
+                        next_move = userdata.raster_points.popleft()
                 
                 return self.load_move(next_move, userdata)
             else:
@@ -636,7 +648,7 @@ class WebManager(smach.State):
         if next_move['radial']:
             userdata.allow_rotate_to_clear = True
         else:
-            userdata.course_tolerance = 3.0
+            userdata.course_tolerance = userdata.chord_course_tolerance
             userdata.allow_rotate_to_clear = False
         #load the target into move_point, and save the move
         #move_point is consumed by the general move_goal transformer,
