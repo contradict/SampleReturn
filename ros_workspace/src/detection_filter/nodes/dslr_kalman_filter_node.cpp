@@ -283,6 +283,9 @@ class KalmanDetectionFilter
    */
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
   {
+    if (current_published_id_ == 0) {
+      return;
+    }
     float x,y,r;
     x = current_published_filter_->filter.statePost.at<float>(0);
     y = current_published_filter_->filter.statePost.at<float>(1);
@@ -373,6 +376,7 @@ class KalmanDetectionFilter
 
     if (nearest_id != 0) {
       current_published_id_ = nearest_id;
+      current_published_filter_ = nearest_filter;
       samplereturn_msgs::NamedPoint point_msg;
       point_msg.header.frame_id = _filter_frame_id;
       point_msg.header.stamp = ros::Time::now();
