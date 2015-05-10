@@ -176,6 +176,7 @@ class CalculateMountMove(smach.State):
     def execute(self, userdata):
         #wait a sec for beacon pose to adjust the localization filter
         saved_point_odom = None
+        try_count = 0
         while not rospy.core.is_shutdown_requested():
             rospy.sleep(4.0)    
             try:
@@ -189,7 +190,9 @@ class CalculateMountMove(smach.State):
                 correction_error = util.point_distance_2d(platform_point_odom.point,
                                                           saved_point_odom.point)
                 saved_point_odom = platform_point_odom
-                if (correction_error < 0.02):
+                try_count += 1
+                #if (correction_error < 0.02):
+                if try_count > 10:
                     break
                 else:
                     self.announcer.say("Correction. {:.2f}".format(correction_error))
