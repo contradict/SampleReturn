@@ -558,6 +558,7 @@ class WebManager(smach.State):
                                             'course_tolerance',
                                             'allow_rotate_to_clear',
                                             'report_sample',
+                                            'stop_on_detection',
                                             'active_manager'],
                              outcomes=['move',
                                        'get_raster',
@@ -575,10 +576,12 @@ class WebManager(smach.State):
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
         userdata.report_sample = True #always act on samples if this manager is working
+        userdata.stop_on_detection = True
       
         if rospy.Time.now() > userdata.return_time:
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
+            userdata.stop_on_detection = False
             return 'return_home'
         
         if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
@@ -918,6 +921,7 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)            
             return 'move'
         else:
+            userdata.stop_on_detection = False
             return userdata.recovery_parameters['terminal_outcome']
         
 
