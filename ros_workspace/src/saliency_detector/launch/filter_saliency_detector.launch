@@ -24,7 +24,7 @@
 
   <node
     pkg="saliency_detector"
-    type="close_range_detector"
+    type="close_range_detector.py"
     name="close_range_detector"
     machine="search"
     ns="/processes/sample_detection/search">
