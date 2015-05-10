@@ -26,18 +26,19 @@ class CloseRangeDetector(object):
     def __init__(self):
         rospy.init_node('close_range_detector',log_level=rospy.DEBUG)
 
-        self.dslr_sub = rospy.Subscriber('image', Image, self.image_callback, None, 1)
-        self.dslr_info_sub = rospy.Subscriber('cam_info', CameraInfo, self.cam_info_callback, None, 1)
-        self.pursuit_sub = rospy.Subscriber('target_point', NamedPoint, self.target_point_callback, None, 1)
+        self.img_sub = rospy.Subscriber('image', Image, self.image_callback, None, 1)
+        self.cam_info_sub = rospy.Subscriber('cam_info', CameraInfo, self.cam_info_callback, None, 1)
 
-        rospy.Service("close_range_confirm",Verify,self.verify_callback)
+        self.debug_img_pub = rospy.Publisher('close_detector_debug_img', Image)
+
+        rospy.Service("close_range_verify",Verify,self.verify_callback)
 
         self.bridge = CvBridge()
         self.tf = TransformListener()
         self.cam_model = None
-        self.img_point = None
-        self.target_point = None
         self.last_img = None
+
+        self.win_size = 200
 
         rospack = rospkg.RosPack()
 
@@ -45,46 +46,48 @@ class CloseRangeDetector(object):
         self.classifier.load(rospack.get_path('saliency_detector')+'/config/trained_svm')
 
     def verify_callback(self, req):
-        if self.img_point is not None and self.last_img is not None:
-            win = self.extract_window(self.last_img)
-            shape = self.compute_shape_metrics
-            ret = self.classifier.predict(shape)
-            resp = VerifyResponse(ret)
+        # When a point request is received, take the last image, transform the point
+        # from odom to search_camera, project into pixel space, compute shape metrics
+        if self.cam_model is None or self.last_img is None:
+            rospy.logerr("Verification Request with no image or camera model")
+            resp = VerifyResponse(False)
             return resp
         else:
-            rospy.logerror("Verification Request with no image or target point")
-            resp = VerifyResponse(False)
-            return
+            req.target.header.stamp = self.last_img.header.stamp
+            search_camera_point = self.tf.transformPoint("search_camera",req.target)
+            point_3d = np.array([search_camera_point.point.x,search_camera_point.point.y,\
+                                search_camera_point.point.z])
+            img_point = self.cam_model.project3dToPixel(point_3d)
+            rospy.logdebug("Image Point: %f, %f",img_point[0],img_point[1])
+            img = np.asarray(self.bridge.imgmsg_to_cv2(self.last_img,'rgb8'))
+            lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+            win = self.extract_window(lab, img_point)
+            shape = self.compute_shape_metrics(win[...,1])
+            ret = self.classifier.predict(shape)
+            rospy.logdebug("SVM class %f",ret)
+            if ret == -1.0:
+                resp = VerifyResponse(False)
+            else:
+                resp = VerifyResponse(True)
+            return resp
 
     def cam_info_callback(self, CameraInfo):
-        self.cam_model = CameraInfo()
+        self.cam_model = PinholeCameraModel()
         self.cam_model.fromCameraInfo(CameraInfo)
 
-    def target_point_callback(self, NamedPoint):
-        self.target_point = deepcopy(NamedPoint)
-
     def image_callback(self, Image):
-        # Transform pursuit target from tracking frame to camera xyz,
-        # then project into image coords (u,v)
-        self.target_point.header.stamp = Image.header.stamp
-        search_camera_point = self.tf.transformPoint("search_camera",self.target_point)
-        point_3d = np.array([search_camera_point.point.x,search_camera_point.point.y,\
-                            search_camera_point.point.z])
-        if self.cam_model is not None:
-            self.img_point = self.cam_model.project3dToPixel(point_3d)
+        self.last_img = deepcopy(Image)
 
-        img = np.asarray(self.bridge.imgmsg_to_cv(Image,'rgb8'))
-        lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
-        self.last_img = lab.copy()
-
-    def extract_window(self, image):
+    def extract_window(self, image, img_point):
         # Take the image, grab the widow around the img_point, handling borders
-        win = image[self.img_point[0]-self.win_size:self.img_point[0]+self.win_size,\
-                self.img_point[1]-self.win_size:self.img_point[1]+self.win_size]
+        win = image[img_point[1]-self.win_size:img_point[1]+self.win_size,\
+                img_point[0]-self.win_size:img_point[0]+self.win_size]
+        return win
 
     def compute_shape_metrics(self, img):
         mid = (float(np.max(img))+float(np.min(img)))/2.
         thresh = cv2.threshold(img,mid,255,cv2.THRESH_BINARY)[1]
+        self.debug_img_pub.publish(self.bridge.cv2_to_imgmsg(thresh,'mono8'))
         contours, hier = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         largest_area = 0
         largest_contour = 0
@@ -101,7 +104,9 @@ class CloseRangeDetector(object):
         depth = np.max(defects[...,-1])/256.0
         rect = cv2.boundingRect(hull_pts)
         defect_ratio = depth/np.max(rect[2:])
-        return np.array([perimeter_ratio,area_ratio,defect_ratio])
+        rospy.logdebug("Shape metrics: %f, %f, %f",perimeter_ratio,area_ratio,defect_ratio)
+        rospy.logdebug("Contour Area: %f",cv2.contourArea(largest_contour))
+        return np.array([perimeter_ratio,area_ratio,defect_ratio],dtype=np.float32)
 
 if __name__=="__main__":
   try:
