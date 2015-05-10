@@ -195,16 +195,13 @@ class CalculateMountMove(smach.State):
                 if try_count > 10:
                     break
                 else:
-                    self.announcer.say("Correction. {:.2f}".format(correction_error))
+                    self.announcer.say("Correction. {:.3f}".format(correction_error))
             
-        target_point = deepcopy(userdata.platform_point)
-               
         yaw, distance = util.get_robot_strafe(self.tf_listener,
-                                             target_point)
-        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                              angle = yaw,
-                              distance = distance,
-                              velocity = 0.5)        
-        userdata.simple_move = move
+                                             userdata.platform_point)
+        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                              angle = yaw,
+                                              distance = distance,
+                                              velocity = 0.5)        
         self.announcer.say("Initiate ing mount move.")
         return 'move'
