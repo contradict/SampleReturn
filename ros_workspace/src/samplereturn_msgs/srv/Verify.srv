@@ -1,4 +1,4 @@
 # request
-uint16 id
+geometry_msgs/PointStamped target
 ---
 bool verified
