@@ -160,9 +160,9 @@ class PursueSample(object):
                 else:
                     return 'not_verified'
             
-            @smach.cb_interface(input_keys=['latched_filter_id'])
+            @smach.cb_interface(input_keys=['target_sample'])
             def sample_verify_req(userdata, request):
-                return samplereturn_srv.VerifyRequest(id = userdata.latched_filter_id)
+                return samplereturn_srv.VerifyRequest(target = userdata.target_sample)
             
             smach.StateMachine.add('SAMPLE_VERIFY',
                 smach_ros.ServiceState('close_range_verify', samplereturn_srv.Verify,
