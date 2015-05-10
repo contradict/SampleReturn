@@ -319,7 +319,31 @@ class KalmanDetectionFilter
   }
 
   void publishTop() {
+    /* If current_published_id_ is nonzero and still viable, keep publishing it
+     * Otherwise, publish the nearest viable filter and set it to current */
     ROS_DEBUG("Publish Top");
+    if (current_published_id_ != 0) {
+      for (auto filter_ptr : filter_list_) {
+        if (filter_ptr->filter_id == current_published_id_) {
+          if (filter_ptr->certainty > certainty_thresh_ &&
+              filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_) {
+            samplereturn_msgs::NamedPoint point_msg;
+            point_msg.header.frame_id = _filter_frame_id;
+            point_msg.header.stamp = ros::Time::now();
+            point_msg.point.x = filter_ptr->filter.statePost.at<float>(0);
+            point_msg.point.y = filter_ptr->filter.statePost.at<float>(1);
+            point_msg.point.z = 0;
+            point_msg.filter_id = filter_ptr->filter_id;
+            pub_detection.publish(point_msg);
+            return;
+          }
+          else {
+            current_published_id_ = 0;
+          }
+        }
+      }
+    }
+
     tf::StampedTransform transform;
     listener_.lookupTransform("odom", "base_link", ros::Time(0), transform);
     float nearest_dist = 10000;
