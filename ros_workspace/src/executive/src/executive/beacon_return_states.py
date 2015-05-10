@@ -165,6 +165,8 @@ class CalculateMountMove(smach.State):
                              outcomes=['move',
                                        'aborted'],
                              input_keys=['platform_point',
+                                         'odometry_frame',
+                                         'world_fixed_frame',
                                          'beacon_observation_delay'],
                              output_keys=['simple_move'])
 
@@ -173,9 +175,27 @@ class CalculateMountMove(smach.State):
 
     def execute(self, userdata):
         #wait a sec for beacon pose to adjust the localization filter
-        rospy.sleep(userdata.beacon_observation_delay) 
+        saved_point_odom = None
+        while not rospy.core.is_shutdown_requested():
+            rospy.sleep(4.0)    
+            try:
+                platform_point_odom = self.tf_listener.transformPoint(userdata.odometry_frame,
+                                                                      userdata.platform_point)
+            except tf.Exception:
+                rospy.logwarn("LEVEL_TWO calculate_mount failed to transform platform point")
+            if saved_point_odom is None:
+                saved_point_odom = platform_point_odom
+            else:
+                correction_error = util.point_distance_2d(platform_point_odom.point,
+                                                          saved_point_odom.point)
+                saved_point_odom = platform_point_odom
+                if (correction_error < 0.05):
+                    break
+                else:
+                    self.announcer.say("Correction. {:.2f}".format(correction_error))
+            
         target_point = deepcopy(userdata.platform_point)
-        target_point.header.stamp = rospy.Time(0)
+               
         yaw, distance = util.get_robot_strafe(self.tf_listener,
                                              target_point)
         move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
