@@ -23,6 +23,16 @@
   </node>
 
   <node
+    pkg="saliency_detector"
+    type="close_range_detector"
+    name="close_range_detector"
+    machine="search"
+    ns="/processes/sample_detection/search">
+    <remap from="camera_info" to="/cameras/search/info"/>
+    <remap from="image" to="/cameras/search/image"/>
+  </node>
+
+  <node
     pkg="detection_filter"
     type="kalman_filter_node"
     name="kalman_filter_node"
