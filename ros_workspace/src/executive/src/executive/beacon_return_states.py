@@ -28,6 +28,7 @@ class BeaconReturn(smach.State):
                              outcomes=['move',
                                        'spin',
                                        'mount',
+                                       'preempted',
                                        'aborted'],
                              input_keys=['beacon_approach_pose',
                                          'beacon_observation_delay',

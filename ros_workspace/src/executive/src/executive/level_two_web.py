@@ -322,6 +322,7 @@ class LevelTwoWeb(object):
                                    transitions = {'mount':'CALCULATE_MOUNT_MOVE',
                                                   'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'beacon_point':'detection_message'})
  
