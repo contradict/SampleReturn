@@ -220,7 +220,6 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     }
     catch (tf::TransformException &ex) {
          ROS_ERROR("BEACON_LOCALIZER transform lookup failure: %s", ex.what());
-         ros::Duration(1.0).sleep();
          return;
     }
 
