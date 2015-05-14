@@ -3,7 +3,7 @@
 #include <image_geometry/pinhole_camera_model.h>
 #include <cv_bridge/cv_bridge.h>
 #include <nav_msgs/Odometry.h>
-#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 #include <fovis_ros/FovisInfo.h>
 
@@ -36,7 +36,8 @@ protected:
   {
     loadParams();
     odom_pub_ = nh_local_.advertise<nav_msgs::Odometry>("odometry", 1);
-    pose_pub_ = nh_local_.advertise<geometry_msgs::PoseStamped>("pose", 1);
+    pose_pub_ = nh_local_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose", 1);
+    pose_vis_pub_ = nh_local_.advertise<geometry_msgs::PoseStamped>("pose_vis", 1);
     info_pub_ = nh_local_.advertise<FovisInfo>("info", 1);
     features_pub_ = it_.advertise("features", 1);
   }
@@ -120,6 +121,7 @@ protected:
     
     pose_msg_.header.stamp = image_msg->header.stamp;
     pose_msg_.header.frame_id = odom_frame_id_;
+    pose_vis_msg_.header = pose_msg_.header;
 
     // on success, start fill message and tf
     fovis::MotionEstimateStatusCode status = 
@@ -162,7 +164,8 @@ protected:
 
       // fill odometry and pose msg
       tf::poseTFToMsg(base_transform, odom_msg_.pose.pose);
-      pose_msg_.pose = odom_msg_.pose.pose;
+      pose_msg_.pose.pose = odom_msg_.pose.pose;
+      pose_vis_msg_.pose = odom_msg_.pose.pose;
 
       // can we calculate velocities?
       double dt = last_time_.isZero() ? 
@@ -194,7 +197,10 @@ protected:
         const Eigen::MatrixXd& motion_cov = visual_odometer_->getMotionEstimateCov();
         for (int i=0;i<6;i++)
           for (int j=0;j<6;j++)
+          {
             odom_msg_.twist.covariance[j*6+i] = motion_cov(i,j);
+            pose_msg_.pose.covariance[j*6+i] = motion_cov(i,j);
+          }
       }
       // TODO integrate covariance for pose covariance
       last_time_ = image_msg->header.stamp;
@@ -208,6 +214,7 @@ protected:
     }
     odom_pub_.publish(odom_msg_);
     pose_pub_.publish(pose_msg_);
+    pose_vis_pub_.publish(pose_vis_msg_);
 
     // create and publish fovis info msg
     FovisInfo fovis_info_msg;
@@ -375,13 +382,15 @@ private:
   // Messages
   bool send_deltas_;
   nav_msgs::Odometry odom_msg_;
-  geometry_msgs::PoseStamped pose_msg_;
+  geometry_msgs::PoseWithCovarianceStamped pose_msg_;
+  geometry_msgs::PoseStamped pose_vis_msg_;
 
   ros::NodeHandle nh_local_;
 
   // publisher
   ros::Publisher odom_pub_;
   ros::Publisher pose_pub_;
+  ros::Publisher pose_vis_pub_;
   ros::Publisher info_pub_;
   image_transport::Publisher features_pub_;
   image_transport::ImageTransport it_;
