@@ -18,6 +18,7 @@
         /cameras/navigation/center/left/camera_info
         /cameras/navigation/center/right/image_raw
         /cameras/navigation/center/right/camera_info
+        /io/microstrain_3dm_gx3_35/imu
         --bags $(arg bagfile)"/>
 
     <!-- Run the ROS package stereo_image_proc -->
