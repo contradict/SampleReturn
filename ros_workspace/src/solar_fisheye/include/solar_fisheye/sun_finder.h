@@ -12,6 +12,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <solar_fisheye/SolarFisheyeConfig.h>
+#include <solar_fisheye/SunSensor.h>
 
 namespace solar_fisheye {
 
@@ -22,7 +23,7 @@ class SunFinder
     image_transport::ImageTransport *it_;
     image_transport::CameraSubscriber sub_;
     image_geometry::PinholeCameraModel model_;
-
+    ros::Publisher meas_pub_;
 
     SolarFisheyeConfig config_;
     dynamic_reconfigure::Server<solar_fisheye::SolarFisheyeConfig> reconfigure_server_;

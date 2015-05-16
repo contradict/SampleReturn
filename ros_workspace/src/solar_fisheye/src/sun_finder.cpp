@@ -99,8 +99,10 @@ void unprojectPointsFisheye( cv::InputArray distorted, cv::OutputArray undistort
 SunFinder::SunFinder()
 {
     ros::NodeHandle nh("~");
-    it_ = new image_transport::ImageTransport(nh);
-    sub_ = it_->subscribeCamera("image", 1, &SunFinder::imageCallback, this);
+    ros::NodeHandle cam_nh("~/camera");
+    it_ = new image_transport::ImageTransport(cam_nh);
+    sub_ = it_->subscribeCamera("image_raw", 0, &SunFinder::imageCallback, this);
+    meas_pub_ = nh.advertise<solar_fisheye::SunSensor>("measurement", 3);
 
     reconfigure_server_.setCallback(boost::bind(&SunFinder::configure, this, _1, _2));
 }
@@ -134,10 +136,15 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
     std::vector<cv::Point3f> undist_pts;
 
     unprojectPointsFisheye(pts, undist_pts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), cv::Mat(), cv::Mat());
-    std::cout << pts << std::endl;
-    std::cout << undist_pts << std::endl;
-    printf("intensity: %i\n", img_thr.at<uint8_t>(mc));
-    //cout << src_thr.at<uint8_t>(mc) << endl;
+    solar_fisheye::SunSensor meas;
+    meas.header = info_msg->header;
+    meas.measurement.x = undist_pts[0].x;
+    meas.measurement.y = undist_pts[0].y;
+    meas.measurement.z = undist_pts[0].z;
+    meas.reference.x = 0;
+    meas.reference.y = 1;
+    meas.reference.z = 0;
+    meas_pub_.publish(meas);
 }
 
 }
