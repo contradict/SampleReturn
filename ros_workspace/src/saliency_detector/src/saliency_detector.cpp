@@ -269,6 +269,16 @@ class SaliencyDetectorNode
 
     blobDetect_on_ = config.blobDetect_on;
 
+    blob_params_.filterByArea = config.filterByArea;
+    blob_params_.minArea = config.minArea;
+    blob_params_.maxArea = config.maxArea;
+
+    blob_params_.filterByConvexity = config.filterByConvexity;
+    blob_params_.minConvexity = config.minConvexity;
+    blob_params_.maxConvexity = config.maxConvexity;
+
+    blob_ = cv::SimpleBlobDetector(blob_params_);
+
     saliency_mutex_.unlock();
   }
 
