@@ -24,6 +24,7 @@ level_two:
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}
     beacon_observation_delay: 10 
+    beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan
     replan_threshold: 2.0
     #for costmap issues, set to zero to disable this
