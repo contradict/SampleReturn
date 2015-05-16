@@ -79,7 +79,8 @@ find_package(Eigen REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
-generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
+generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg
+                                     cfg/close_range_detector_params.cfg)
 
 ###################################
 ## catkin specific configuration ##

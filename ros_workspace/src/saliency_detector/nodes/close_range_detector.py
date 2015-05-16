@@ -10,6 +10,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from tf.transformations import euler_from_quaternion
 from tf import TransformListener
 from dynamic_reconfigure.server import Server
+from saliency_detector.cfg import close_range_detector_paramsConfig
 
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import Image, CameraInfo
@@ -45,6 +46,18 @@ class CloseRangeDetector(object):
         self.classifier = cv2.SVM()
         self.classifier.load(rospack.get_path('saliency_detector')+'/config/trained_svm')
 
+        self.server = Server(close_range_detector_paramsConfig, self.config_callback)
+
+    def config_callback(self, config, level):
+        self.use_SVM = config["use_SVM_classifier"]
+        self.min_perimeter_ratio = config["min_perimeter_ratio"]
+        self.max_perimeter_ratio = config["max_perimeter_ratio"]
+        self.min_area_ratio = config["min_area_ratio"]
+        self.max_area_ratio = config["max_area_ratio"]
+        self.min_defect_ratio = config["min_defect_ratio"]
+        self.max_defect_ratio = config["max_defect_ratio"]
+        return config
+
     def verify_callback(self, req):
         # When a point request is received, take the last image, transform the point
         # from odom to search_camera, project into pixel space, compute shape metrics
@@ -62,9 +75,19 @@ class CloseRangeDetector(object):
             img = np.asarray(self.bridge.imgmsg_to_cv2(self.last_img,'rgb8'))
             lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
             win = self.extract_window(lab, img_point)
-            shape = self.compute_shape_metrics(win[...,1])
-            ret = self.classifier.predict(shape)
-            rospy.logdebug("SVM class %f",ret)
+            range_a = np.max(win[...,1]) - np.min(win[...,1])
+            range_b = np.max(win[...,0]) - np.min(win[...,0])
+            if range_a > range_b:
+                shape = self.compute_shape_metrics(win[...,1])
+            else:
+                shape = self.compute_shape_metrics(win[...,2])
+            if self.use_SVM:
+                ret = self.classifier.predict(shape)
+                rospy.logdebug("SVM class %f",ret)
+            else:
+                ret = (self.min_perimeter_ratio<ret[0]<self.max_perimeter_ratio) and\
+                (self.min_area_ratio<ret[1]<self.min_area_ratio) and\
+                (self.min_defect_ratio<ret[2]<self.min_defect_ratio)
             if ret == -1.0:
                 resp = VerifyResponse(False)
             else:
