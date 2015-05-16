@@ -10,6 +10,10 @@
 #include <geometry_msgs/PolygonStamped.h>
 #include <tf/transform_listener.h>
 
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
+
 #include <dynamic_reconfigure/server.h>
 #include <fence_detection/fence_detector_paramsConfig.h>
 
@@ -32,20 +36,20 @@
 class FenceDetectorNode
 {
   ros::NodeHandle nh;
-  ros::Subscriber color_img_sub;
-  ros::Subscriber disparity_img_sub;
-  ros::Subscriber l_camera_info_sub;
-  ros::Subscriber r_camera_info_sub;
+  message_filters::Subscriber<sensor_msgs::Image> color_img_sub;
+  message_filters::Subscriber<stereo_msgs::DisparityImage> disparity_img_sub;
+  message_filters::Subscriber<sensor_msgs::CameraInfo> l_camera_info_sub;
+  message_filters::Subscriber<sensor_msgs::CameraInfo> r_camera_info_sub;
+  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image,
+          stereo_msgs::DisparityImage, sensor_msgs::CameraInfo,
+          sensor_msgs::CameraInfo> StereoSyncPolicy;
+
   ros::Publisher mask_pub;
   ros::Publisher points_pub;
   ros::Publisher marker_pub;
   ros::Publisher line_marker_pub;
   ros::Publisher fence_line_pub;
 
-  std::string color_img_topic = "color_image";
-  std::string disparity_img_topic = "disparity_image";
-  std::string l_camera_info_topic = "left/camera_info";
-  std::string r_camera_info_topic = "right/camera_info";
   std::string mask_pub_topic = "fence_mask";
   std::string points_pub_topic = "points";
   std::string marker_pub_topic = "plane_marker";
@@ -85,17 +89,14 @@ class FenceDetectorNode
     private_node_handle_.param("erode_iterations",erode_iterations_,int(20));
     private_node_handle_.param("ransac_distance_threshold",ransac_distance_threshold_,double(0.1));
 
-    color_img_sub =
-      nh.subscribe(color_img_topic.c_str(), 3, &FenceDetectorNode::imageCallback, this);
+    color_img_sub.subscribe(nh,"color_image",1);
+    disparity_img_sub.subscribe(nh,"disparity_image",1);
+    l_camera_info_sub.subscribe(nh,"left/camera_info",1);
+    r_camera_info_sub.subscribe(nh,"right/camera_info",1);
 
-    disparity_img_sub =
-      nh.subscribe(disparity_img_topic.c_str(), 3, &FenceDetectorNode::disparityCallback, this);
-
-    l_camera_info_sub =
-      nh.subscribe(l_camera_info_topic.c_str(), 3, &FenceDetectorNode::l_cameraInfoCallback, this);
-
-    r_camera_info_sub =
-      nh.subscribe(r_camera_info_topic.c_str(), 3, &FenceDetectorNode::r_cameraInfoCallback, this);
+    message_filters::Synchronizer<StereoSyncPolicy> sync(StereoSyncPolicy(1), color_img_sub,
+                                        disparity_img_sub, l_camera_info_sub, r_camera_info_sub);
+    sync.registerCallback(boost::bind(&FenceDetectorNode::syncCallback, this, _1, _2, _3, _4));
 
     mask_pub =
       nh.advertise<sensor_msgs::Image>(mask_pub_topic.c_str(), 3);
@@ -114,28 +115,19 @@ class FenceDetectorNode
 
   }
 
-  void l_cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  void syncCallback(const sensor_msgs::ImageConstPtr& color_img,
+                    const stereo_msgs::DisparityImageConstPtr& disparity_img,
+                    const sensor_msgs::CameraInfoConstPtr& l_camera_info,
+                    const sensor_msgs::CameraInfoConstPtr& r_camera_info)
   {
-    cam_model_.fromCameraInfo(msg,r_cam_info_);
-  }
-
-  void r_cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
-  {
-    r_cam_info_ = msg;
-  }
-
-  void disparityCallback(const stereo_msgs::DisparityImage& msg)
-  {
-    cv::Mat_<float> dmat(msg.image.height, msg.image.width,
-        (float*)&msg.image.data[0], msg.image.step);
+    cam_model_.fromCameraInfo(l_camera_info,r_camera_info);
+    cv::Mat_<float> dmat(disparity_img->image.height, disparity_img->image.width,
+        (float*)&disparity_img->image.data[0], disparity_img->image.step);
     cam_model_.projectDisparityImageTo3d(dmat, points_mat_, true);
-  }
 
-  void imageCallback(const sensor_msgs::Image& msg)
-  {
     cv_bridge::CvImagePtr cv_ptr;
     try {
-      cv_ptr = cv_bridge::toCvCopy(msg, "");
+      cv_ptr = cv_bridge::toCvCopy(color_img, "");
     }
     catch (cv_bridge::Exception& e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
@@ -184,7 +176,7 @@ class FenceDetectorNode
     mask_pub.publish(debug_img_msg);
 
     sensor_msgs::PointCloud2Ptr points_msg = boost::make_shared<sensor_msgs::PointCloud2>();
-    points_msg->header = msg.header;
+    points_msg->header = color_img->header;
     points_msg->height = points_mat_.rows;
     points_msg->width = points_mat_.cols;
     points_msg->is_bigendian = false;
@@ -284,10 +276,8 @@ class FenceDetectorNode
                                                   coefficients->values[3]);
     Eigen::Vector3d centroid;
     centroid.setZero();
-    //for(size_t i=0; i<inliers->indices.size(); i++) {
-    //  centroid += inliers->points[
     visualization_msgs::Marker mark;
-    mark.header = msg.header;
+    mark.header = color_img->header;
     mark.header.frame_id = "/base_link";
     Eigen::Quaterniond orientation;
     Eigen::Vector3d xhat;
@@ -309,7 +299,7 @@ class FenceDetectorNode
     marker_pub.publish(mark);
 
     visualization_msgs::Marker line_mark;
-    line_mark.header = msg.header;
+    line_mark.header = color_img->header;
     line_mark.header.frame_id = "/base_link";
     line_mark.color.a = 1.0;
     line_mark.color.r = 1.0;
@@ -328,7 +318,7 @@ class FenceDetectorNode
     line_marker_pub.publish(line_mark);
 
     geometry_msgs::PolygonStamped fence_line;
-    fence_line.header = msg.header;
+    fence_line.header = color_img->header;
     fence_line.header.frame_id = "/base_link";
     geometry_msgs::Point32 p1;
     p1.y = -5.0;
