@@ -841,7 +841,7 @@ class RobotSimulator(object):
     def zero_robot(self):
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
-        self.comman_twist = geometry_msg.Twist()
+        self.command_twist = geometry_msg.Twist()
         self.noisy_robot_pose = self.initial_pose()
         self.noisy_robot_odometry = self.initial_odometry()
         
