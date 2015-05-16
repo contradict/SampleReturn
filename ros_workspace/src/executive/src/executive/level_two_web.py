@@ -284,14 +284,12 @@ class LevelTwoWeb(object):
                                    MoveMUX(manager_transitions.keys()),
                                    transitions = manager_transitions)
             
-            @smach.cb_interface(input_keys=['detection_message'],
-                                output_keys=['move_point_map'])
+            @smach.cb_interface(input_keys=['detection_message'])
             def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
                 goal.input_point = userdata.detection_message
                 goal.input_string = "level_two_pursuit_request"
                 #disable localization checks while in pursuit
-                userdata.move_point_map = None
                 return goal
             
             @smach.cb_interface(output_keys=['detection_message'])
@@ -915,7 +913,7 @@ class RecoveryManager(smach.State):
         
         if len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
-            base_header = std_msg.Header(0, rospy.Time(0), 'base_link')            
+            base_header = std_msg.Header(0, rospy.Time(0), self.local_frame)            
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
             target_pose = util.pose_translate_by_yaw(base_pose_stamped,
                                                      move['distance'],
@@ -932,11 +930,14 @@ class MoveMUX(smach.State):
     def __init__(self, manager_list):
         smach.State.__init__(self,
                              input_keys = ['active_manager'],
-                             output_keys = ['retry_active'],
+                             output_keys = ['retry_active',
+                                            'move_point_map'],
                              outcomes = manager_list)
         
     def execute(self, userdata):
+        #clear and reset flags after all moves!
         userdata.retry_active = False
+        userdata.move_point_map = None
         return userdata.active_manager
     
 class LevelTwoPreempted(smach.State):
