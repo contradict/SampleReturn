@@ -104,6 +104,7 @@ class LevelTwoWeb(object):
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
+        self.state_machine.userdata.local_frame = self.local_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(node_params.return_time_minutes*60)
@@ -451,7 +452,8 @@ class LevelTwoWeb(object):
         saved_point_map = self.state_machine.userdata.move_point_map
         
         #if the VFH server is active, and the beacon correction is large enough, change the goal
-        if saved_point_map is not None:
+        if (saved_point_map is not None) \
+        and self.vfh_mover.get_state() in util.actionlib_working_states:
 
             goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
 
@@ -762,7 +764,8 @@ class CreateMoveGoal(smach.State):
                                            'course_tolerance',
                                            'vfh_result',
                                            'odometry_frame',
-                                           'world_fixed_frame'],
+                                           'world_fixed_frame',
+                                           'local_frame'],
                              output_keys = ['move_goal',
                                             'move_point_map',
                                             'course_tolerance'],
@@ -823,8 +826,10 @@ class CreateMoveGoal(smach.State):
         userdata.course_tolerance = None
 
         #store the point in map, to compare in the beacon update callback
-        userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
-                                                            map_pose.pose.position)
+        #unless the requested move was in local_frame
+        if target.header.frame_id != userdata.local_frame:
+            userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
+                                                                map_pose.pose.position)
         
         return 'next'
 
