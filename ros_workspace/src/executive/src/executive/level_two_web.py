@@ -56,6 +56,7 @@ class LevelTwoWeb(object):
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
+        self.local_frame = 'base_link'
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
@@ -114,6 +115,7 @@ class LevelTwoWeb(object):
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
+        self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
         
         #search parameters
