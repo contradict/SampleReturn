@@ -10,7 +10,9 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   sensor_msgs
   cv_bridge
+  image_geometry
   dynamic_reconfigure
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -48,11 +50,10 @@ add_definitions(-std=c++11)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+    FILES
+    SunSensor.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -69,10 +70,11 @@ add_definitions(-std=c++11)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geometry_msgs#   std_msgs
-# )
+generate_messages(
+    DEPENDENCIES
+    geometry_msgs
+    std_msgs
+)
 
 # dynamic reconfigure
 generate_dynamic_reconfigure_options(
