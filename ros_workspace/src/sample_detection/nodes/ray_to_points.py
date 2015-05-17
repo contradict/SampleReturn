@@ -67,6 +67,8 @@ class ray_to_points(object):
       # and the cast DSLR detection. If there is an intersection, and it lies
       # between base_link and the detection, reject the detection
       fence_line_msg = self.cache.getElemAfterTime(ground_named_point.header.stamp)
+      if fence_line_msg is None:
+          return False
       x1,y1 = 0.0,0.0
       x2,y2 = ground_named_point.point.x,ground_named_point.point.y
       x3,y3 = fence_line_msg.polygon.points[0].x,fence_line_msg.polygon.points[0].y
