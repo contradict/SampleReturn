@@ -52,17 +52,19 @@ void Stereoproc::onInit()
     ros::SubscriberStatusCallback connect_cb = boost::bind(&Stereoproc::connectCb, this);
     // Make sure we don't enter connectCb() between advertising and assigning to pub_disparity_
     boost::lock_guard<boost::mutex> lock(connect_mutex_);
-    pub_mono_left_ = nh.advertise<sensor_msgs::Image>("left/image_mono", 1, connect_cb, connect_cb);
-    pub_mono_right_ = nh.advertise<sensor_msgs::Image>("right/image_mono", 1, connect_cb, connect_cb);
-    pub_color_left_ = nh.advertise<sensor_msgs::Image>("left/image_color", 1, connect_cb, connect_cb);
-    pub_color_right_ = nh.advertise<sensor_msgs::Image>("right/image_color", 1, connect_cb, connect_cb);
-    pub_mono_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_mono", 1, connect_cb, connect_cb);
-    pub_color_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_color", 1, connect_cb, connect_cb);
-    pub_mono_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_mono", 1, connect_cb, connect_cb);
-    pub_color_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_color", 1, connect_cb, connect_cb);
-    pub_disparity_ = nh.advertise<stereo_msgs::DisparityImage>("disparity", 1, connect_cb, connect_cb);
-    pub_disparity_vis_ = nh.advertise<sensor_msgs::Image>("disparity_vis", 1, connect_cb, connect_cb);
-    pub_pointcloud_ = nh.advertise<sensor_msgs::PointCloud2>("pointcloud", 1, connect_cb, connect_cb);
+    int publisher_queue_size;
+    private_nh.param("publisher_queue_size", publisher_queue_size, 1);
+    pub_mono_left_ = nh.advertise<sensor_msgs::Image>("left/image_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_right_ = nh.advertise<sensor_msgs::Image>("right/image_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_left_ = nh.advertise<sensor_msgs::Image>("left/image_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_right_ = nh.advertise<sensor_msgs::Image>("right/image_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_disparity_ = nh.advertise<stereo_msgs::DisparityImage>("disparity", publisher_queue_size, connect_cb, connect_cb);
+    pub_disparity_vis_ = nh.advertise<sensor_msgs::Image>("disparity_vis", publisher_queue_size, connect_cb, connect_cb);
+    pub_pointcloud_ = nh.advertise<sensor_msgs::PointCloud2>("pointcloud", publisher_queue_size, connect_cb, connect_cb);
 
     cv::gpu::printShortCudaDeviceInfo(cv::gpu::getDevice());
 }
