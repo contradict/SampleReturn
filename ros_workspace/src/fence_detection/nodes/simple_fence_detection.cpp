@@ -43,6 +43,8 @@ class FenceDetectorNode
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,
           stereo_msgs::DisparityImage, sensor_msgs::CameraInfo,
           sensor_msgs::CameraInfo> StereoSyncPolicy;
+  typedef message_filters::Synchronizer<StereoSyncPolicy> ApproximateSync;
+  boost::shared_ptr<ApproximateSync> approximate_sync_;
 
   ros::Publisher mask_pub;
   ros::Publisher points_pub;
@@ -94,9 +96,10 @@ class FenceDetectorNode
     l_camera_info_sub.subscribe(nh,"left/camera_info",1);
     r_camera_info_sub.subscribe(nh,"right/camera_info",1);
 
-    message_filters::Synchronizer<StereoSyncPolicy> sync(StereoSyncPolicy(10), color_img_sub,
-                                        disparity_img_sub, l_camera_info_sub, r_camera_info_sub);
-    sync.registerCallback(boost::bind(&FenceDetectorNode::syncCallback, this, _1, _2, _3, _4));
+    approximate_sync_.reset( new ApproximateSync(StereoSyncPolicy(10), color_img_sub,
+                disparity_img_sub, l_camera_info_sub, r_camera_info_sub));
+    approximate_sync_->registerCallback(boost::bind(&FenceDetectorNode::syncCallback,
+                this, _1, _2, _3, _4));
 
     mask_pub =
       nh.advertise<sensor_msgs::Image>(mask_pub_topic.c_str(), 3);
