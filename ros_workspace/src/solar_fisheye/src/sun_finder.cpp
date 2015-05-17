@@ -124,27 +124,30 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
 
     // do cool stuff with imageMat and info_msg
     cv::Mat img_thr = cv::Mat::zeros( imageMat.size(), CV_8UC1 );
-    cv::threshold(img_thr, imageMat, config_.noise_threshold, 255, cv::THRESH_TOZERO);
+    cv::threshold(imageMat, img_thr, config_.noise_threshold, 255, cv::THRESH_TOZERO);
 
     /// Get the moments
     cv::Moments mu = cv::moments(img_thr, false );
     ///  Get the mass center:
     cv::Point2f mc = cv::Point2f( static_cast<float>(mu.m10/mu.m00) , static_cast<float>(mu.m01/mu.m00) );
 
-    std::vector<cv::Point2f> pts;
-    pts.push_back(mc);
-    std::vector<cv::Point3f> undist_pts;
+    if ( (img_thr.at<uint8_t>(mc) >= config_.min_centroid)
+    ) {
+        std::vector<cv::Point2f> pts;
+        pts.push_back(mc);
+        std::vector<cv::Point3f> undist_pts;
 
-    unprojectPointsFisheye(pts, undist_pts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), cv::Mat(), cv::Mat());
-    solar_fisheye::SunSensor meas;
-    meas.header = info_msg->header;
-    meas.measurement.x = undist_pts[0].x;
-    meas.measurement.y = undist_pts[0].y;
-    meas.measurement.z = undist_pts[0].z;
-    meas.reference.x = 0;
-    meas.reference.y = 1;
-    meas.reference.z = 0;
-    meas_pub_.publish(meas);
+        unprojectPointsFisheye(pts, undist_pts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), cv::Mat(), cv::Mat());
+        solar_fisheye::SunSensor meas;
+        meas.header = info_msg->header;
+        meas.measurement.x = undist_pts[0].x;
+        meas.measurement.y = undist_pts[0].y;
+        meas.measurement.z = undist_pts[0].z;
+        meas.reference.x = 0;
+        meas.reference.y = 1;
+        meas.reference.z = 0;
+        meas_pub_.publish(meas);
+    }
 }
 
 }
