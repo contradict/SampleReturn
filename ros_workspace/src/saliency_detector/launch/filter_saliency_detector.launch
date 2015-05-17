@@ -68,7 +68,7 @@
         yellow: [yellow, orange]
         green: [green, white]
         blue: [blue, gray, white]
-        purple: [purple, red,pink]
+        purple: [purple, red, pink]
     </rosparam>
   </node>
 </launch>
