@@ -129,7 +129,14 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
     /// Get the moments
     cv::Moments mu = cv::moments(img_thr, false );
     ///  Get the mass center:
-    cv::Point2f mc = cv::Point2f( static_cast<float>(mu.m10/mu.m00) , static_cast<float>(mu.m01/mu.m00) );
+    cv::Point2f mc;
+    if (mu.m00 != 0) {
+        mc.x = static_cast<float>(mu.m10/mu.m00);
+        mc.y = static_cast<float>(mu.m01/mu.m00);
+    } else {
+        mc.x = 0;
+        mc.y = 0;
+    }
 
     if ( (img_thr.at<uint8_t>(mc) >= config_.min_centroid)
     ) {
