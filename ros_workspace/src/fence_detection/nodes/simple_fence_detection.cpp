@@ -62,6 +62,7 @@ class FenceDetectorNode
   double max_range_, min_height_;
   int dilate_iterations_, erode_iterations_;
   double ransac_distance_threshold_;
+  double period_;
   int min_inliers_;
 
   sensor_msgs::CameraInfo r_cam_info_;
@@ -72,6 +73,7 @@ class FenceDetectorNode
   dynamic_reconfigure::Server<fence_detection::fence_detector_paramsConfig> dr_srv;
 
   tf::TransformListener listener_;
+  ros::Time last_time_;
 
   public:
   FenceDetectorNode() {
@@ -90,6 +92,7 @@ class FenceDetectorNode
     private_node_handle_.param("dilate_iterations",dilate_iterations_,int(14));
     private_node_handle_.param("erode_iterations",erode_iterations_,int(20));
     private_node_handle_.param("ransac_distance_threshold",ransac_distance_threshold_,double(0.1));
+    private_node_handle_.param("period",period_,double(1.0));
 
     color_img_sub.subscribe(nh,"color_image",1);
     disparity_img_sub.subscribe(nh,"disparity_image",1);
@@ -116,6 +119,8 @@ class FenceDetectorNode
     fence_line_pub =
       nh.advertise<geometry_msgs::PolygonStamped>(fence_line_pub_topic.c_str(), 3);
 
+    last_time_.sec = 0.0;
+    last_time_.nsec = 0.0;
   }
 
   void syncCallback(const sensor_msgs::ImageConstPtr& color_img,
@@ -124,6 +129,12 @@ class FenceDetectorNode
                     const sensor_msgs::CameraInfoConstPtr& r_camera_info)
   {
     ROS_DEBUG("synCallback");
+    if ((l_camera_info->header.stamp - last_time_) < ros::Duration(period_)) {
+      return;
+    }
+    else {
+      last_time_ = l_camera_info->header.stamp;
+    }
     cam_model_.fromCameraInfo(l_camera_info,r_camera_info);
     cv::Mat_<float> dmat(disparity_img->image.height, disparity_img->image.width,
         (float*)&disparity_img->image.data[0], disparity_img->image.step);
