@@ -105,6 +105,7 @@ class KalmanDetectionFilter
   double odometry_tick_dist_;
 
   double exclusion_zone_range_;
+  bool is_manipulator_;
 
   tf::TransformListener listener_;
 
@@ -152,6 +153,8 @@ class KalmanDetectionFilter
     private_node_handle_.param("certainty_inc", certainty_inc_, double(1.0));
     private_node_handle_.param("certainty_dec", certainty_dec_, double(0.7));
     private_node_handle_.param("certainty_thresh", certainty_thresh_, double(3.0));
+
+    private_node_handle_.param("is_manipulator", is_manipulator_, false);
 
     private_node_handle_.getParam("color_transitions",color_transitions_);
     if (color_transitions_.hasMember(std::string("red"))){
@@ -597,6 +600,9 @@ class KalmanDetectionFilter
   /* This will check if each hypothesis is in view currently */
   bool isInView (cv::KalmanFilter kf) {
     ROS_DEBUG("Is In View Check");
+    if (is_manipulator_) {
+      return true;
+    }
     /* This is in base_link, transform it to odom */
     cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
         1.75, -1.21, 21.75, -13.21, 21.75, 13.21, 1.75, 1.21);
