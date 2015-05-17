@@ -30,13 +30,15 @@ class ColoredKF
     std::shared_ptr<cv::KalmanFilter> filter;
     std::string color;
     int16_t filter_id;
-    ColoredKF(std::shared_ptr<cv::KalmanFilter>, std::string, int16_t);
+    float certainty;
+    ColoredKF(std::shared_ptr<cv::KalmanFilter>, std::string, int16_t, float);
 };
 
-ColoredKF::ColoredKF (std::shared_ptr<cv::KalmanFilter> kf, std::string c, int16_t id) {
+ColoredKF::ColoredKF (std::shared_ptr<cv::KalmanFilter> kf, std::string c, int16_t id, float cert) {
   filter = kf;
   color = c;
   filter_id = id;
+  certainty = cert;
 }
 
 class KalmanDetectionFilter
@@ -87,6 +89,10 @@ class KalmanDetectionFilter
   int32_t marker_count_;
   int16_t filter_id_count_;
 
+  double certainty_inc_;
+  double certainty_dec_;
+  double certainty_thresh_;
+
   image_geometry::PinholeCameraModel cam_model_;
   tf::TransformListener listener_;
 
@@ -132,6 +138,10 @@ class KalmanDetectionFilter
     private_node_handle_.param("error_cov_post", error_cov_post_, double(0.5));
     private_node_handle_.param("period", period_, double(2));
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
+
+    private_node_handle_.param("certainty_inc", certainty_inc_, double(1.0));
+    private_node_handle_.param("certainty_dec", certainty_dec_, double(0.7));
+    private_node_handle_.param("certainty_thresh", certainty_thresh_, double(3.0));
 
     private_node_handle_.getParam("color_transitions",color_transitions_);
     if (color_transitions_.hasMember(std::string("red"))){
@@ -273,6 +283,10 @@ class KalmanDetectionFilter
     error_cov_post_ = config.error_cov_post;
     period_ = config.period;
 
+    certainty_inc_ = config.certainty_inc;
+    certainty_dec_ = config.certainty_dec;
+    certainty_thresh_ = config.certainty_thresh;
+
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
@@ -323,7 +337,9 @@ class KalmanDetectionFilter
 
     checkObservation(msg);
 
-    publishFilteredDetections(msg);
+    if (!accumulate_) {
+      publishFilteredDetections(msg);
+    }
     drawFilterStates();
   }
 
@@ -438,7 +454,7 @@ class KalmanDetectionFilter
     KF->statePost.at<float>(5) = 0;
 
     KF->predict();
-    filter_list_.push_back(ColoredKF(KF,msg.name,filter_id_count_));
+    filter_list_.push_back(ColoredKF(KF,msg.name,filter_id_count_,0));
     filter_id_count_++;
     checkObservation(msg);
   }
@@ -447,6 +463,7 @@ class KalmanDetectionFilter
   {
     ROS_INFO("Adding measurement to filter: %i", filter_index);
     filter_list_[filter_index].filter->correct(meas_state);
+    filter_list_[filter_index].certainty += (certainty_inc_+certainty_dec_);
   }
 
   bool checkColor(std::string filter_color, std::string obs_color)
@@ -507,6 +524,7 @@ class KalmanDetectionFilter
         if (isInView(filter_list_[i].filter)) {
           filter_list_[i].filter->predict();
           filter_list_[i].filter->errorCovPre.copyTo(filter_list_[i].filter->errorCovPost);;
+          filter_list_[i].certainty -= certainty_dec_;
         }
       }
     }

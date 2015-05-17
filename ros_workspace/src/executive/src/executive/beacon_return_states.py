@@ -28,20 +28,23 @@ class BeaconReturn(smach.State):
                              outcomes=['move',
                                        'spin',
                                        'mount',
+                                       'preempted',
                                        'aborted'],
                              input_keys=['beacon_approach_pose',
                                          'beacon_observation_delay',
                                          'spin_velocity',
                                          'platform_point',
                                          'beacon_point',
-                                         'stop_on_beacon',
+                                         'stop_on_detection',
                                          'manager_dict',
                                          'world_fixed_frame',
                                          'odometry_frame'],
                              output_keys=['move_target',
                                           'move_point_map',
                                           'simple_move',
-                                          'stop_on_beacon',
+                                          'report_beacon',
+                                          'stop_on_detection',
+                                          'report_sample',
                                           'active_manager',
                                           'beacon_point'])
         
@@ -53,12 +56,13 @@ class BeaconReturn(smach.State):
     def execute(self, userdata):
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
+        userdata.report_sample = False
+        userdata.report_beacon = True
         
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
         
-        #ignore samples after this (applies to mount moves)
         #clear previous move_point_map
         userdata.move_point_map = None
         map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
@@ -73,7 +77,8 @@ class BeaconReturn(smach.State):
 
         #if we have been ignoring beacon detections prior to this,
         #we should clear them here, and wait for a fresh detection
-        if not userdata.stop_on_beacon:
+        if not userdata.stop_on_detection:
+            self.announcer.say("Wait ing for beacon.")
             userdata.beacon_point = None
             start_time = rospy.Time.now()
             while not rospy.core.is_shutdown_requested():
@@ -89,14 +94,14 @@ class BeaconReturn(smach.State):
                 userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
                                                       angle = np.pi*2,
                                                       velocity = userdata.spin_velocity)        
-                userdata.stop_on_beacon = True
+                userdata.stop_on_detection = True
                 self.tried_spin = True
                 return 'spin'
             #already tried a spin, drive towards beacon_approach_point, stopping on detection
             elif distance_to_approach_point > 5.0:
                 #we think we're far from approach_point, so try to go there
                 self.announcer.say("Beacon not in view. Moving to approach point.")
-                userdata.stop_on_beacon = True
+                userdata.stop_on_detection = True
                 self.tried_spin = False
                 #set move_point_map to enable localization correction
                 userdata.move_target = userdata.beacon_approach_pose
@@ -108,7 +113,7 @@ class BeaconReturn(smach.State):
                 #try a random position nearby-ish, ignore facing
                 search_pose.pose.position.x += random.randrange(-50, 50, 15) 
                 search_pose.pose.position.y += random.randrange(-50, 50, 15)
-                userdata.stop_on_beacon = True
+                userdata.stop_on_detection = True
                 self.tried_spin = False
                 userdata.move_target = geometry_msg.PointStamped(search_pose.header,
                                                                  search_pose.pose.position)
@@ -120,7 +125,7 @@ class BeaconReturn(smach.State):
             yaw_to_platform = util.pointing_yaw(current_pose.pose.position,
                                                 userdata.platform_point.point)
             yaw_error = util.unwind(yaw_to_platform - current_yaw)
-            userdata.stop_on_beacon = False
+            userdata.stop_on_detection = False
             self.tried_spin = False            
             #on the back side
             if current_pose.pose.position.x < 0:
@@ -128,6 +133,9 @@ class BeaconReturn(smach.State):
                 self.announcer.say("Back of beacon in view. Move ing to front")
                 front_pose = deepcopy(userdata.beacon_approach_pose)
                 front_pose.pose.position.y = 5.0 * np.sign(current_pose.pose.position.y)
+                pointing_quat = util.pointing_quaternion_2d(front_pose.pose.position,
+                                                            userdata.platform_point.point)
+                front_pose.pose.orientation = pointing_quat
                 userdata.move_target = front_pose
                 return 'move'   
             elif distance_to_approach_point > 2.0:
@@ -145,7 +153,7 @@ class BeaconReturn(smach.State):
                 return 'spin'
             else:    
                 self.announcer.say("Measure ing beacon position.")
-                userdata.stop_on_beacon = False
+                userdata.stop_on_detection = False
                 return 'mount'
         
         return 'aborted'
@@ -158,25 +166,43 @@ class CalculateMountMove(smach.State):
                              outcomes=['move',
                                        'aborted'],
                              input_keys=['platform_point',
+                                         'odometry_frame',
+                                         'world_fixed_frame',
                                          'beacon_observation_delay'],
-                             output_keys=['simple_move',
-                                          'stop_on_sample'])
+                             output_keys=['simple_move'])
 
         self.tf_listener = tf_listener
         self.announcer = announcer
 
     def execute(self, userdata):
         #wait a sec for beacon pose to adjust the localization filter
-        rospy.sleep(userdata.beacon_observation_delay) 
-        target_point = deepcopy(userdata.platform_point)
-        target_point.header.stamp = rospy.Time(0)
+        saved_point_odom = None
+        try_count = 0
+        while not rospy.core.is_shutdown_requested():
+            rospy.sleep(4.0)    
+            try:
+                platform_point_odom = self.tf_listener.transformPoint(userdata.odometry_frame,
+                                                                      userdata.platform_point)
+            except tf.Exception:
+                rospy.logwarn("LEVEL_TWO calculate_mount failed to transform platform point")
+            if saved_point_odom is None:
+                saved_point_odom = platform_point_odom
+            else:
+                correction_error = util.point_distance_2d(platform_point_odom.point,
+                                                          saved_point_odom.point)
+                saved_point_odom = platform_point_odom
+                try_count += 1
+                #if (correction_error < 0.02):
+                if try_count > 10:
+                    break
+                else:
+                    self.announcer.say("Correction. {:.3f}".format(correction_error))
+            
         yaw, distance = util.get_robot_strafe(self.tf_listener,
-                                             target_point)
-        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                              angle = yaw,
-                              distance = distance,
-                              velocity = 0.5)        
-        userdata.simple_move = move
-        userdata.stop_on_sample = False
+                                             userdata.platform_point)
+        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                              angle = yaw,
+                                              distance = distance,
+                                              velocity = 0.5)        
         self.announcer.say("Initiate ing mount move.")
         return 'move'

@@ -90,6 +90,7 @@ add_service_files(
         ObstacleCheck.srv
         SimpleMotion.srv
         RecoveryParameters.srv
+        Verify.srv
 )
 
 ## Generate services in the 'srv' folder
