@@ -168,7 +168,7 @@ class CalculateMountMove(smach.State):
                              input_keys=['platform_point',
                                          'odometry_frame',
                                          'world_fixed_frame',
-                                         'beacon_observation_delay'],
+                                         'beacon_mount_tolerance'],
                              output_keys=['simple_move'])
 
         self.tf_listener = tf_listener
@@ -177,9 +177,11 @@ class CalculateMountMove(smach.State):
     def execute(self, userdata):
         #wait a sec for beacon pose to adjust the localization filter
         saved_point_odom = None
-        try_count = 0
+        #wait for a maximum of one minute, then mount anyway
+        timeout_time = rospy.Time.now() + rospy.Duration(60.0)
+        in_tolerance_count = 0
         while not rospy.core.is_shutdown_requested():
-            rospy.sleep(4.0)    
+            rospy.sleep(3.0)    
             try:
                 platform_point_odom = self.tf_listener.transformPoint(userdata.odometry_frame,
                                                                       userdata.platform_point)
@@ -191,9 +193,15 @@ class CalculateMountMove(smach.State):
                 correction_error = util.point_distance_2d(platform_point_odom.point,
                                                           saved_point_odom.point)
                 saved_point_odom = platform_point_odom
-                try_count += 1
-                #if (correction_error < 0.02):
-                if try_count > 10:
+                if correction_error < userdata.beacon_mount_tolerance:
+                    in_tolerance_count += 1
+                else:
+                    in_tolerance_count = 0
+                #if we get 3 in_tolerance corrections, mount
+                if in_tolerance_count > 2:
+                    break
+                if rospy.Time.now() > timeout_time:
+                    self.announcer.say("Beacon correction did not converge.")
                     break
                 else:
                     self.announcer.say("Correction. {:.3f}".format(correction_error))

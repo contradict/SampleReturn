@@ -56,6 +56,7 @@ class LevelTwoWeb(object):
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
+        self.local_frame = 'base_link'
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
@@ -103,6 +104,7 @@ class LevelTwoWeb(object):
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
+        self.state_machine.userdata.local_frame = self.local_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(node_params.return_time_minutes*60)
@@ -114,6 +116,7 @@ class LevelTwoWeb(object):
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
+        self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
         
         #search parameters
@@ -282,14 +285,12 @@ class LevelTwoWeb(object):
                                    MoveMUX(manager_transitions.keys()),
                                    transitions = manager_transitions)
             
-            @smach.cb_interface(input_keys=['detection_message'],
-                                output_keys=['move_point_map'])
+            @smach.cb_interface(input_keys=['detection_message'])
             def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
                 goal.input_point = userdata.detection_message
                 goal.input_string = "level_two_pursuit_request"
                 #disable localization checks while in pursuit
-                userdata.move_point_map = None
                 return goal
             
             @smach.cb_interface(output_keys=['detection_message'])
@@ -451,7 +452,7 @@ class LevelTwoWeb(object):
         saved_point_map = self.state_machine.userdata.move_point_map
         
         #if the VFH server is active, and the beacon correction is large enough, change the goal
-        if saved_point_map is not None:
+        if (saved_point_map is not None):
 
             goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
 
@@ -473,7 +474,8 @@ class LevelTwoWeb(object):
             
             rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
             
-            if (correction_error > self.replan_threshold):
+            if (correction_error > self.replan_threshold) \
+            and self.vfh_mover.get_state() in util.actionlib_working_states:
                 self.announcer.say("Beacon correction.")
                 #update the VFH move goal
                 goal = deepcopy(self.state_machine.userdata.move_goal)
@@ -762,7 +764,8 @@ class CreateMoveGoal(smach.State):
                                            'course_tolerance',
                                            'vfh_result',
                                            'odometry_frame',
-                                           'world_fixed_frame'],
+                                           'world_fixed_frame',
+                                           'local_frame'],
                              output_keys = ['move_goal',
                                             'move_point_map',
                                             'course_tolerance'],
@@ -823,8 +826,10 @@ class CreateMoveGoal(smach.State):
         userdata.course_tolerance = None
 
         #store the point in map, to compare in the beacon update callback
-        userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
-                                                            map_pose.pose.position)
+        #unless the requested move was in local_frame
+        if target.header.frame_id != userdata.local_frame:
+            userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
+                                                                map_pose.pose.position)
         
         return 'next'
 
@@ -876,7 +881,8 @@ class RecoveryManager(smach.State):
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
                                            'manager_dict',
-                                           'raster_points'],
+                                           'raster_points',
+                                           'local_frame'],
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
@@ -913,7 +919,7 @@ class RecoveryManager(smach.State):
         
         if len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
-            base_header = std_msg.Header(0, rospy.Time(0), 'base_link')            
+            base_header = std_msg.Header(0, rospy.Time(0), userdata.local_frame)            
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
             target_pose = util.pose_translate_by_yaw(base_pose_stamped,
                                                      move['distance'],
@@ -930,22 +936,27 @@ class MoveMUX(smach.State):
     def __init__(self, manager_list):
         smach.State.__init__(self,
                              input_keys = ['active_manager'],
-                             output_keys = ['retry_active'],
+                             output_keys = ['retry_active',
+                                            'move_point_map'],
                              outcomes = manager_list)
         
     def execute(self, userdata):
+        #clear and reset flags after all moves!
         userdata.retry_active = False
+        userdata.move_point_map = None
         return userdata.active_manager
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested'],
+                             output_keys = ['move_point_map'],
                              outcomes=['recovery','exit'])
         
     def execute(self, userdata):
         
         if userdata.recovery_requested:
+            userdata.move_point_map = None
             return 'recovery'
         
         return 'exit'
