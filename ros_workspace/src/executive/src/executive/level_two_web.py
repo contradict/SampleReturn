@@ -452,8 +452,7 @@ class LevelTwoWeb(object):
         saved_point_map = self.state_machine.userdata.move_point_map
         
         #if the VFH server is active, and the beacon correction is large enough, change the goal
-        if (saved_point_map is not None) \
-        and self.vfh_mover.get_state() in util.actionlib_working_states:
+        if (saved_point_map is not None):
 
             goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
 
@@ -475,7 +474,8 @@ class LevelTwoWeb(object):
             
             rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
             
-            if (correction_error > self.replan_threshold):
+            if (correction_error > self.replan_threshold) \
+            and self.vfh_mover.get_state() in util.actionlib_working_states:
                 self.announcer.say("Beacon correction.")
                 #update the VFH move goal
                 goal = deepcopy(self.state_machine.userdata.move_goal)
@@ -881,7 +881,8 @@ class RecoveryManager(smach.State):
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
                                            'manager_dict',
-                                           'raster_points'],
+                                           'raster_points',
+                                           'local_frame'],
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
@@ -918,7 +919,7 @@ class RecoveryManager(smach.State):
         
         if len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
-            base_header = std_msg.Header(0, rospy.Time(0), self.local_frame)            
+            base_header = std_msg.Header(0, rospy.Time(0), userdata.local_frame)            
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
             target_pose = util.pose_translate_by_yaw(base_pose_stamped,
                                                      move['distance'],
@@ -949,11 +950,13 @@ class LevelTwoPreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested'],
+                             output_keys = ['move_point_map'],
                              outcomes=['recovery','exit'])
         
     def execute(self, userdata):
         
         if userdata.recovery_requested:
+            userdata.move_point_map = None
             return 'recovery'
         
         return 'exit'
