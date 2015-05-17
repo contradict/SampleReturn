@@ -12,7 +12,7 @@
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
-#include <message_filters/sync_policies/exact_time.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <fence_detection/fence_detector_paramsConfig.h>
@@ -40,7 +40,7 @@ class FenceDetectorNode
   message_filters::Subscriber<stereo_msgs::DisparityImage> disparity_img_sub;
   message_filters::Subscriber<sensor_msgs::CameraInfo> l_camera_info_sub;
   message_filters::Subscriber<sensor_msgs::CameraInfo> r_camera_info_sub;
-  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image,
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,
           stereo_msgs::DisparityImage, sensor_msgs::CameraInfo,
           sensor_msgs::CameraInfo> StereoSyncPolicy;
 
@@ -94,7 +94,7 @@ class FenceDetectorNode
     l_camera_info_sub.subscribe(nh,"left/camera_info",1);
     r_camera_info_sub.subscribe(nh,"right/camera_info",1);
 
-    message_filters::Synchronizer<StereoSyncPolicy> sync(StereoSyncPolicy(1), color_img_sub,
+    message_filters::Synchronizer<StereoSyncPolicy> sync(StereoSyncPolicy(10), color_img_sub,
                                         disparity_img_sub, l_camera_info_sub, r_camera_info_sub);
     sync.registerCallback(boost::bind(&FenceDetectorNode::syncCallback, this, _1, _2, _3, _4));
 
@@ -120,6 +120,7 @@ class FenceDetectorNode
                     const sensor_msgs::CameraInfoConstPtr& l_camera_info,
                     const sensor_msgs::CameraInfoConstPtr& r_camera_info)
   {
+    ROS_DEBUG("synCallback");
     cam_model_.fromCameraInfo(l_camera_info,r_camera_info);
     cv::Mat_<float> dmat(disparity_img->image.height, disparity_img->image.width,
         (float*)&disparity_img->image.data[0], disparity_img->image.step);
