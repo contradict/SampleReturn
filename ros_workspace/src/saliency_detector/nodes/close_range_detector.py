@@ -86,8 +86,8 @@ class CloseRangeDetector(object):
                 rospy.logdebug("SVM class %f",ret)
             else:
                 ret = (self.min_perimeter_ratio<shape[0]<self.max_perimeter_ratio) and\
-                (self.min_area_ratio<shape[1]<self.min_area_ratio) and\
-                (self.min_defect_ratio<shape[2]<self.min_defect_ratio)
+                (self.min_area_ratio<shape[1]<self.max_area_ratio) and\
+                (self.min_defect_ratio<shape[2]<self.max_defect_ratio)
             if ret == -1.0 or ret == False:
                 resp = VerifyResponse(False)
             else:
