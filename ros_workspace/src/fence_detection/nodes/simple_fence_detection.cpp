@@ -303,6 +303,7 @@ class FenceDetectorNode
     marker_pub.publish(mark);
 
     visualization_msgs::Marker line_mark;
+    line_mark.lifetime = ros::Duration(1.0);
     line_mark.header = color_img->header;
     line_mark.header.frame_id = "/base_link";
     line_mark.color.a = 1.0;
