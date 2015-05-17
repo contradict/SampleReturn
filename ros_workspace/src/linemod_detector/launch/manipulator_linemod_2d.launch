@@ -22,7 +22,7 @@
   <node
     machine="search"
     pkg="detection_filter"
-    type="manipulator_kalman_filter_node"
+    type="dslr_kalman_filter_node"
     name="linemod_kalman_filter_node"
     ns="/processes/sample_detection/manipulator">
     <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
@@ -30,7 +30,7 @@
     <param name="max_cov" type="double" value="0.4"/>
     <param name="max_pub_cov" type="double" value="0.05"/>
     <param name="max_pub_vel" type="double" value="0.02"/>
-    <param name="accumulate" type="bool" value="false"/>
+    <param name="is_manipulator" type="bool" value="true"/>
     <param name="error_cov_post" type="double" value="0.1"/>
     <param name="process_noise_cov" type="double" value="0.001"/>
     <param name="measurement_noise_cov" type="double" value="0.02"/>
@@ -46,7 +46,7 @@
         yellow: [yellow, orange]
         green: [green, white]
         blue: [blue, gray, white]
-        purple: [purple, red,pink]
+        purple: [purple, red, pink]
     </rosparam>
   </node>
 </launch>
