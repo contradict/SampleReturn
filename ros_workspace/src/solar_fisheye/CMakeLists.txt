@@ -114,6 +114,7 @@ include_directories(
 ## Declare a cpp library
 add_library( ${PROJECT_NAME}
    src/sun_finder.cpp
+   src/solpos.c
 )
 
 ## Declare a cpp executable

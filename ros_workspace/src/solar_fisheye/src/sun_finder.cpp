@@ -1,8 +1,57 @@
 #include "solar_fisheye/sun_finder.h"
 
+#include <math.h>
+#include <time.h>
 #include <opencv2/opencv.hpp>
 
+#include "solpos00.h"
+
 namespace solar_fisheye {
+
+static double degrees(double radians) {
+    return radians*180.0/M_PI;
+}
+static double radians(double degrees) {
+    return degrees/180.0*M_PI;
+}
+
+// convert a lat/lon/time to a Vec3d in local NED co-ords
+void compute_sunvec(double lat, double lon, ros::Time t, cv::Point3d & sunvec)
+{
+    struct posdata pdat;
+    long retval;
+
+    S_init(&pdat);
+    pdat.latitude = lat;
+    pdat.longitude = lon;
+
+    //convert ros time to ymd-hms
+    time_t utctime = t.toSec();
+    struct tm * ymdhms = gmtime(&utctime);
+    pdat.year = 1900+ymdhms->tm_year;
+    pdat.daynum = 1+ymdhms->tm_yday;
+    pdat.hour = ymdhms->tm_hour;
+    pdat.minute = ymdhms->tm_min;
+    pdat.second = ymdhms->tm_sec;
+    pdat.timezone = 0; //GMT/UTC
+
+    pdat.aspect = 0.0; //north up
+    pdat.tilt = 0.0;
+
+    pdat.function |= S_SOLAZM | S_REFRAC;
+
+    retval = S_solpos (&pdat);  /* S_solpos function call */
+    S_decode(retval, &pdat);    /* ALWAYS look at the return code! */
+
+    if (retval == 0) {
+        double zen = radians(pdat.zenref); /* 0 = up */
+        double azi = radians(pdat.azim); /* N=0 E=90 S=180 W=270 */
+        zen = M_PI - zen; //convert to NED */
+        sunvec.z = std::cos(zen);
+        sunvec.x = std::cos(azi)*std::sin(zen);
+        sunvec.y = std::sin(azi)*std::sin(zen);
+    }
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// taken from cv::fisheye::undistortPoints
@@ -150,9 +199,12 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
         meas.measurement.x = undist_pts[0].x;
         meas.measurement.y = undist_pts[0].y;
         meas.measurement.z = undist_pts[0].z;
-        meas.reference.x = 0;
-        meas.reference.y = 1;
-        meas.reference.z = 0;
+
+        cv::Point3d sun;
+        compute_sunvec(config_.lat, config_.lon, image_msg->header.stamp, sun);
+        meas.reference.x = sun.x;
+        meas.reference.y = sun.y;
+        meas.reference.z = sun.z;
         meas_pub_.publish(meas);
     }
 }
