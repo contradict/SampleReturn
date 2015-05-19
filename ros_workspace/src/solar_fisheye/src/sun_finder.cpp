@@ -113,28 +113,24 @@ void unprojectPointsFisheye( cv::InputArray distorted, cv::OutputArray undistort
         cv::Vec2d pi = sdepth == CV_32F ? (cv::Vec2d)srcf[i] : srcd[i];  // image point
         cv::Vec2d pw((pi[0] - c[0])/f[0], (pi[1] - c[1])/f[1]);      // world point
 
-        double scale = 1.0;
-
         double theta_d = sqrt(pw[0]*pw[0] + pw[1]*pw[1]);
+        double theta = theta_d;
         if (theta_d > 1e-8)
         {
             // compensate distortion iteratively
-            double theta = theta_d;
             for(int j = 0; j < 10; j++ )
             {
                 double theta2 = theta*theta, theta4 = theta2*theta2, theta6 = theta4*theta2, theta8 = theta6*theta2;
                 theta = theta_d / (1 + k[0] * theta2 + k[1] * theta4 + k[2] * theta6 + k[3] * theta8);
             }
-
-            //scale = std::tan(theta) / theta_d;
-            scale = theta / theta_d;
         }
+        double z = std::cos(theta);
+        double r = std::sin(theta);
 
-        cv::Vec2d pu = pw * scale; //undistorted point
+        cv::Vec3d pu = cv::Vec3d(r*pw[0], r*pw[1], z); //undistorted point
 
         // reproject
-        cv::Vec3d pr = RR * cv::Vec3d(pu[0], pu[1], 1.0); // rotated point optionally multiplied by new camera matrix
-        //Vec2d fi(pr[0]/pr[2], pr[1]/pr[2]);       // final
+        cv::Vec3d pr = RR * pu; // rotated point optionally multiplied by new camera matrix
         cv::Vec3d fi;       // final
         normalize(pr, fi);
 
