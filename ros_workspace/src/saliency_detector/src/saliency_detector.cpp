@@ -100,7 +100,7 @@ class SaliencyDetectorNode
       nh.advertise<sensor_msgs::Image>(sub_mask_debug_topic.c_str(), 3);
 
     pub_named_point =
-      nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 3);
+      nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 12);
 
     blob_params_.blobColor = 255;
     blob_params_.minArea = 15;
