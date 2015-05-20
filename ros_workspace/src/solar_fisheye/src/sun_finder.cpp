@@ -55,6 +55,7 @@ void compute_sunvec(double lat, double lon, ros::Time t, cv::Point3d & sunvec)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// taken from cv::fisheye::undistortPoints
+/// output is X->right, Y->down, Z->out the lens
 
 void unprojectPointsFisheye( cv::InputArray distorted, cv::OutputArray undistorted, cv::InputArray K, cv::InputArray D, cv::InputArray R, cv::InputArray P)
 {
@@ -182,8 +183,14 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
         mc.x = 0;
         mc.y = 0;
     }
+    //clamp centroid to be on image
+    mc.x = std::min(float(imageMat.size().width), std::max(mc.x, 0.0f));
+    mc.y = std::min(float(imageMat.size().height), std::max(mc.y, 0.0f));
 
     if ( (img_thr.at<uint8_t>(mc) >= config_.min_centroid)
+            && (sqrt(mu.mu20) <= config_.max_dev)
+            //&& (sqrt(mu.mu11) <= config_.max_dev)
+            && (sqrt(mu.mu02) <= config_.max_dev)
     ) {
         std::vector<cv::Point2f> pts;
         pts.push_back(mc);
