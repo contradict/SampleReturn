@@ -371,7 +371,7 @@ class KalmanDetectionFilter
     }
 
     tf::StampedTransform transform;
-    listener_.lookupTransform("odom", "base_link", ros::Time(0), transform);
+    listener_.lookupTransform(_filter_frame_id, "base_link", ros::Time(0), transform);
     float nearest_dist = 10000;
     float dist;
     int nearest_id = 0;
@@ -501,7 +501,7 @@ class KalmanDetectionFilter
     cv::Mat DSLR_frustum_odom(4,2,CV_32FC1);
     geometry_msgs::PointStamped temp_msg, temp_msg_odom;
     geometry_msgs::PolygonStamped frustum_poly;
-    frustum_poly.header.frame_id = "odom";
+    frustum_poly.header.frame_id = _filter_frame_id;
     frustum_poly.header.stamp = ros::Time::now();
     temp_msg.header.frame_id = "base_link";
     temp_msg.header.stamp = ros::Time(0);
@@ -511,7 +511,7 @@ class KalmanDetectionFilter
       temp_msg.point.z = 0.0;
       try {
         //listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
-        listener_.transformPoint("odom",temp_msg,temp_msg_odom);
+        listener_.transformPoint(_filter_frame_id,temp_msg,temp_msg_odom);
       }
       catch (tf::TransformException e) {
         ROS_ERROR_STREAM("Aww shit " << e.what());
@@ -585,7 +585,7 @@ class KalmanDetectionFilter
       /* The radius of the marker is positional covariance, the height
        * is the certainty of the observation */
       cov.id = filter_ptr->filter_id;
-      cov.header.frame_id = "odom";
+      cov.header.frame_id = _filter_frame_id;
       cov.header.stamp = ros::Time::now();
       if (filter_ptr->filter_id == current_published_id_) {
         cov.color.r = 0.0;
