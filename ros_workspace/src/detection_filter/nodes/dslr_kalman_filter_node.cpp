@@ -310,7 +310,10 @@ class KalmanDetectionFilter
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        filter_list_[i]->filter.predict();
+        if (isInView(filter_list_[i]->filter)) {
+          filter_list_[i]->filter.predict();
+          filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
+          filter_list_[i]->certainty -= certainty_dec_;
       }
     }
 
