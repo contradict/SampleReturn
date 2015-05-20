@@ -225,7 +225,7 @@ class KalmanDetectionFilter
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
 
     sub_detection =
-      nh.subscribe(detection_topic.c_str(), 3, &KalmanDetectionFilter::detectionCallback, this);
+      nh.subscribe(detection_topic.c_str(), 12, &KalmanDetectionFilter::detectionCallback, this);
 
     pub_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_detection_topic.c_str(), 3);
