@@ -314,11 +314,34 @@ class KalmanDetectionFilter
           filter_list_[i]->filter.predict();
           filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
           filter_list_[i]->certainty -= certainty_dec_;
+        }
       }
     }
 
     checkObservation(msg);
     drawFilterStates();
+  }
+
+  /* The process tick for all filters */
+  void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  {
+    if (filter_list_.size()==0) {
+      return;
+    }
+    if (last_time_ < msg.header.stamp) {
+      last_time_ = msg.header.stamp;
+      for (int i=0; i<filter_list_.size(); i++) {
+        if (isInView(filter_list_[i]->filter)) {
+          filter_list_[i]->filter.predict();
+          filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
+          filter_list_[i]->certainty -= certainty_dec_;
+        }
+      }
+    }
+    checkFilterAges();
+    drawFilterStates();
+
+    publishTop();
   }
 
   void publishTop() {
@@ -469,28 +492,6 @@ class KalmanDetectionFilter
     addFilter(msg);
   }
 
-  /* The process tick for all filters */
-  void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
-  {
-    if (filter_list_.size()==0) {
-      return;
-    }
-    if (last_time_ < msg.header.stamp) {
-      last_time_ = msg.header.stamp;
-      for (int i=0; i<filter_list_.size(); i++) {
-        if (isInView(filter_list_[i]->filter)) {
-          filter_list_[i]->filter.predict();
-          filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
-          filter_list_[i]->certainty -= certainty_dec_;
-        }
-      }
-    }
-    checkFilterAges();
-    drawFilterStates();
-
-    publishTop();
-  }
-
   /* This will check if each hypothesis is in view currently */
   bool isInView (cv::KalmanFilter kf) {
     ROS_DEBUG("Is In View Check");
@@ -530,6 +531,12 @@ class KalmanDetectionFilter
     return (retval == 1);
   }
 
+  void checkFilterAges() {
+    filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
+        std::bind1st(std::mem_fun(&KalmanDetectionFilter::isOld),this)),
+        filter_list_.end());
+  }
+
   bool isOld (std::shared_ptr<ColoredKF> ckf) {
     cv::Mat eigenvalues;
     cv::eigen(ckf->filter.errorCovPost, eigenvalues);
@@ -555,12 +562,6 @@ class KalmanDetectionFilter
     marker.action = visualization_msgs::Marker::DELETE;
     marker_array.markers.push_back(marker);
     pub_filter_marker_array.publish(marker_array);
-  }
-
-  void checkFilterAges() {
-    filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
-        std::bind1st(std::mem_fun(&KalmanDetectionFilter::isOld),this)),
-        filter_list_.end());
   }
 
   void drawFilterStates() {
