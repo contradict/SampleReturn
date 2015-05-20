@@ -61,8 +61,8 @@ class KalmanDetectionFilter
   std::string frustum_poly_topic;
 
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
-  // Exclusion sites are centers and radii (x,y,r)
-  std::vector<std::tuple<float,float,float> > exclusion_list_;
+  // Exclusion sites are center,radius,id (x,y,r,id)
+  std::vector<std::tuple<float,float,float,int16_t> > exclusion_list_;
 
   ros::Time last_time_;
   double max_dist_;
@@ -81,6 +81,8 @@ class KalmanDetectionFilter
   int16_t filter_id_count_;
   int16_t current_published_id_;
   std::shared_ptr<ColoredKF> current_published_filter_;
+
+  int16_t exclusion_count_;
 
   double certainty_inc_;
   double certainty_dec_;
@@ -246,6 +248,7 @@ class KalmanDetectionFilter
 
     filter_id_count_ = 1;
     current_published_id_ = 0;
+    exclusion_count_ = 0;
   }
 
   /* Dynamic reconfigure callback */
@@ -268,6 +271,7 @@ class KalmanDetectionFilter
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
+      exclusion_list_.clear();
       current_published_id_ = 0;
     }
   }
@@ -292,7 +296,8 @@ class KalmanDetectionFilter
     else {
       r = neg_exclusion_radius_;
     }
-    exclusion_list_.push_back(std::make_tuple(x,y,r));
+    exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_));
+    exclusion_count_ += 1;
 
     auto new_end = std::remove_if(filter_list_.begin(), filter_list_.end(),
         [&](std::shared_ptr<ColoredKF> ckf) {return ckf->filter_id == current_published_id_;});
@@ -617,6 +622,28 @@ class KalmanDetectionFilter
       cv::circle(img, cv::Point(std::get<0>(exclusion_list_[i])*px_per_meter,
             std::get<1>(exclusion_list_[i])*px_per_meter),
           std::get<2>(exclusion_list_[i])*px_per_meter, cv::Scalar(255,255,255));
+      visualization_msgs::Marker cov;
+      cov.type = visualization_msgs::Marker::CYLINDER;
+      cov.id = std::get<3>(exclusion_list_[i]);
+      cov.ns = "exclusion";
+      cov.header.frame_id = "map";
+      cov.header.stamp = ros::Time::now();
+      cov.color.r = 1.0;
+      cov.color.g = 0.0;
+      cov.color.b = 0.0;
+      cov.color.a = 1.0;
+      cov.pose.position.x = std::get<0>(exclusion_list_[i]);
+      cov.pose.position.y = std::get<1>(exclusion_list_[i]);
+      cov.pose.position.z = 0.0;
+      cov.pose.orientation.x = 0;
+      cov.pose.orientation.y = 0;
+      cov.pose.orientation.z = 0;
+      cov.pose.orientation.w = 1;
+      cov.scale.x = std::get<2>(exclusion_list_[i]);
+      cov.scale.y = std::get<2>(exclusion_list_[i]);
+      cov.scale.z = 0.0;
+      cov.lifetime = ros::Duration();
+      marker_array.markers.push_back(cov);
     }
 
     //printFilterState();
