@@ -27,7 +27,6 @@ class ColoredKF
 {
   public:
     cv::KalmanFilter filter;
-    //std::shared_ptr<cv::KalmanFilter> filter;
     std::string color;
     int16_t filter_id;
     float certainty;
@@ -79,7 +78,6 @@ class KalmanDetectionFilter
   double error_cov_post_;
   double period_;
 
-  int32_t marker_count_;
   int16_t filter_id_count_;
   int16_t current_published_id_;
   std::shared_ptr<ColoredKF> current_published_filter_;
@@ -246,7 +244,6 @@ class KalmanDetectionFilter
     last_time_.sec = 0.0;
     last_time_.nsec = 0.0;
 
-    marker_count_ = 0;
     filter_id_count_ = 1;
     current_published_id_ = 0;
   }
@@ -568,8 +565,6 @@ class KalmanDetectionFilter
 
     visualization_msgs::MarkerArray marker_array;
 
-    marker_count_ = 0;
-
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
     float px_per_meter = 50.0;
     float offset = 250;
@@ -612,7 +607,6 @@ class KalmanDetectionFilter
       cov.scale.z = filter_ptr->certainty;
       cov.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
-      marker_count_ += 1;
     }
 
     for (int i=0; i<exclusion_list_.size(); i++) {
