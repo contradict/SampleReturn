@@ -299,6 +299,9 @@ class KalmanDetectionFilter
     exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_));
     exclusion_count_ += 1;
 
+    // Clear this Marker from Rviz
+    clearMarker(current_published_filter_);
+
     auto new_end = std::remove_if(filter_list_.begin(), filter_list_.end(),
         [&](std::shared_ptr<ColoredKF> ckf) {return ckf->filter_id == current_published_id_;});
     filter_list_.erase(new_end, filter_list_.end());
