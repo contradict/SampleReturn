@@ -67,6 +67,7 @@ class VFHMoveServer( object ):
         self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
         self._goal_obstacle_radius = node_params.goal_obstacle_radius
         self._clear_distance = node_params.clear_distance
+        self._clear_first_angle = np.radians(node_params.clear_first_angle)
         self._default_course_tolerance = node_params.course_tolerance
         self._course_tolerance = node_params.course_tolerance
         self._goal_odom = None
@@ -214,13 +215,13 @@ class VFHMoveServer( object ):
             start_dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
             rot_sign = np.sign(start_dyaw)
             #first try rotating toward the target 120 degrees or so
-            error = self._mover.execute_spin(rot_sign*np.pi*0.6,
+            error = self._mover.execute_spin(rot_sign*self._clear_first_angle,
                                              max_velocity = spin_velocity,
                                              stop_function=self.clear_check)
             if self.exit_check(): return
             #if that doesn't work, spin all the way around
             if np.abs(error) < self._goal_orientation_tolerance:
-                self._mover.execute_spin(-2.6*rot_sign*np.pi,
+                self._mover.execute_spin(-1*rot_sign*2*np.pi,
                                         max_velocity = spin_velocity,
                                         stop_function=self.clear_check)
             if self.exit_check(): return
@@ -239,8 +240,7 @@ class VFHMoveServer( object ):
                 self.set_path_points_odom(target_point_base)
                 if self.publish_debug: self.publish_debug_path()
                 self.vfh_running = True
-
-                self._mover.execute_continuous_strafe(self._clear_distance,
+                self._mover.execute_continuous_strafe(0.0,
                                                       max_velocity = move_velocity,
                                                       stop_function=self.is_stop_requested)
                 self.vfh_running = False
