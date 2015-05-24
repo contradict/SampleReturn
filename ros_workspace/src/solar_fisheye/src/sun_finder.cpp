@@ -144,10 +144,12 @@ void unprojectPointsFisheye( cv::InputArray distorted, cv::OutputArray undistort
 
 SunFinder::SunFinder()
 {
-    ros::NodeHandle nh("~");
-    ros::NodeHandle cam_nh("~/camera");
-    it_ = new image_transport::ImageTransport(cam_nh);
-    sub_ = it_->subscribeCamera("image_raw", 0, &SunFinder::imageCallback, this);
+    ros::NodeHandle nh;
+    std::string camera_ns = nh.resolveName("camera");
+    //ROS_INFO_STREAM("camera_ns: " << camera_ns);
+
+    it_ = new image_transport::ImageTransport(nh);
+    sub_ = it_->subscribeCamera(camera_ns + "/image_raw", 0, &SunFinder::imageCallback, this);
     meas_pub_ = nh.advertise<solar_fisheye::SunSensor>("measurement", 3);
 
     reconfigure_server_.setCallback(boost::bind(&SunFinder::configure, this, _1, _2));
