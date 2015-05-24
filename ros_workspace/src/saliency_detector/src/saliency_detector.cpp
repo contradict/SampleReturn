@@ -277,6 +277,11 @@ class SaliencyDetectorNode
     blob_params_.minConvexity = config.minConvexity;
     blob_params_.maxConvexity = config.maxConvexity;
 
+    blob_params_.minThreshold = config.minThreshold;
+    blob_params_.maxThreshold = config.maxThreshold;
+    blob_params_.thresholdStep = config.thresholdStep;
+    blob_params_.minRepeatability = config.minRepeatability;
+
     blob_ = cv::SimpleBlobDetector(blob_params_);
 
     saliency_mutex_.unlock();
