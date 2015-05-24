@@ -7,7 +7,7 @@
         <param name="pixel_format" type="string" value="yuyv"/>
         <param name="io_method" type="string" value="mmap"/>
         <param name="gain" type="int" value="1"/>
-        <param name="autoexposure" type="string" value="false"/>
+        <param name="autoexposure" type="bool" value="false"/>
         <param name="exposure" type="int" value="1"/>
     </node>
     <node name="sun_finder" pkg="solar_fisheye" type="solar_fisheye_node" ns="/processes" output="screen">
