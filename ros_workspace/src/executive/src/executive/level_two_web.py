@@ -468,6 +468,7 @@ class LevelTwoWeb(object):
                 saved_point_odom = self.tf_listener.transformPoint(self.odometry_frame, saved_point_map)
             except tf.Exception:
                 rospy.logwarn("LEVEL_TWO beacon_update failed to transform target point")
+                return
             
             correction_error = util.point_distance_2d(goal_point_odom,
                                                       saved_point_odom.point)
