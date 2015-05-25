@@ -5,7 +5,7 @@
 #Use with extreme caution, no obstacle checking.
 #example: - { angle: 45, distance: 2.0, velocity: 0.2 }
 simple_moves: [
-     #- { angle: 45, distance: 2.0, velocity: 0.2 }
+    { angle: 45, distance: 2.0, velocity: 0.2 }
 ]
 
 #These moves are executed with VFH control. Rotations

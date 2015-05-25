@@ -363,10 +363,19 @@ class LevelTwoWeb(object):
                                                    self.announcer,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
+                                                  'simple_move':'RECOVERY_SIMPLE_MOVE',
                                                   'return_manager':'RETURN_MANAGER',
                                                   'web_manager':'WEB_MANAGER',
                                                   'wait_for_preempt':'WAIT_FOR_PREEMPT'})
     
+            smach.StateMachine.add('RECOVERY_SIMPLE_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'RECOVERY_MANAGER',
+                                                  'object_detected':'RECOVERY_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'stop_on_detection':'false'})
+            
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
                                    transitions = {'recovery':'RECOVERY_MANAGER',
@@ -894,10 +903,12 @@ class RecoveryManager(smach.State):
                                             'active_manager',
                                             'raster_points',
                                             'move_target',
+                                            'simple_move',
                                             'report_sample',
                                             'report_beacon',
                                             'stop_on_detection'],
                              outcomes=['move',
+                                       'simple_move',
                                        'return_manager',
                                        'web_manager',
                                        'wait_for_preempt',
@@ -923,6 +934,14 @@ class RecoveryManager(smach.State):
             if userdata.recovery_parameters['spokes_to_remove'] > 0:
                 if len(userdata.raster_points) > 0:
                     userdata.raster_points = [userdata.raster_points[-1]]
+        
+        if len(userdata.recovery_parameters['simple_moves']) > 0:
+            simple_move = userdata.recovery_parameters['simple_moves'].pop(0)
+            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                  angle = simple_move['angle'],
+                                                  distance = simple_move['distance'],
+                                                  velocity = simple_move['velocity'])
+            return 'simple_move'
         
         if len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
