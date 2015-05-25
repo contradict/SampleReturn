@@ -13,6 +13,7 @@
 #include <samplereturn_msgs/NamedPoint.h>
 #include <samplereturn_msgs/PursuitResult.h>
 #include <geometry_msgs/PolygonStamped.h>
+#include <nav_msgs/Odometry.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
@@ -45,17 +46,20 @@ class KalmanDetectionFilter
   ros::NodeHandle nh;
   ros::Subscriber sub_detection;
   ros::Subscriber sub_cam_info;
+  ros::Subscriber sub_ack;
+  ros::Subscriber sub_odometry;
+
   ros::Publisher pub_detection;
   ros::Publisher pub_debug_img;
   ros::Publisher pub_filter_marker_array;
   ros::Publisher pub_frustum_poly;
 
-  ros::Subscriber sub_ack;
-
-  std::string cam_info_topic;
   std::string detection_topic;
-  std::string filtered_detection_topic;
+  std::string cam_info_topic;
   std::string ack_topic;
+  std::string odometry_topic;
+
+  std::string filtered_detection_topic;
   std::string debug_img_topic;
   std::string filter_marker_array_topic;
   std::string frustum_poly_topic;
@@ -88,6 +92,13 @@ class KalmanDetectionFilter
   double certainty_dec_;
   double certainty_thresh_;
 
+  double last_x_;
+  double last_y_;
+  bool odometry_received_;
+  double odometer_;
+  double last_odometry_tick_;
+  double odometry_tick_dist_;
+
   tf::TransformListener listener_;
 
   std::string _filter_frame_id;
@@ -107,12 +118,13 @@ class KalmanDetectionFilter
 
     cam_info_topic = "camera_info";
     detection_topic = "point";
+    ack_topic = "ack";
+    odometry_topic = "odometry";
+
     filtered_detection_topic = "filtered_point";
     debug_img_topic = "debug_img";
     filter_marker_array_topic = "filter_markers";
     frustum_poly_topic = "frustum_polygon";
-
-    ack_topic = "ack";
 
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("max_dist", max_dist_, double(0.1));
@@ -229,6 +241,11 @@ class KalmanDetectionFilter
     sub_detection =
       nh.subscribe(detection_topic.c_str(), 12, &KalmanDetectionFilter::detectionCallback, this);
 
+    sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
+
+    sub_odometry =
+      nh.subscribe(odometry_topic.c_str(), 3, &KalmanDetectionFilter::odometryCallback, this);
+
     pub_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_detection_topic.c_str(), 3);
 
@@ -241,14 +258,18 @@ class KalmanDetectionFilter
     pub_frustum_poly =
       nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
 
-    sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
-
     last_time_.sec = 0.0;
     last_time_.nsec = 0.0;
 
     filter_id_count_ = 1;
     current_published_id_ = 0;
     exclusion_count_ = 0;
+
+    odometry_received_ = false;
+    last_x_ = 0.0;
+    last_y_ = 0.0;
+    odometer_ = 0.0;
+    last_odometry_tick_ = 0.0;
   }
 
   /* Dynamic reconfigure callback */
@@ -268,12 +289,34 @@ class KalmanDetectionFilter
     certainty_dec_ = config.certainty_dec;
     certainty_thresh_ = config.certainty_thresh;
 
+    odometry_tick_dist_ = config.odometry_tick_dist;
+
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
       exclusion_list_.clear();
       current_published_id_ = 0;
     }
+  }
+
+  /* This is going to inflate the out-of-view filters as the robot moves.
+   * This reflects the increasing uncertainty in the position of those
+   * hypotheses relative to the robot. Since odometry is absolute,
+   * we will differentiate incoming messages and trigger a predict when a
+   * distance threshold is reached
+   */
+  void odometryCallback(const nav_msgs::Odometry& msg)
+  {
+    if (!odometry_received_) {
+      odometry_received_ = true;
+      last_x_ = msg.pose.pose.position.x;
+      last_y_ = msg.pose.pose.position.y;
+    }
+    float delta_x = msg.pose.pose.position.x - last_x_;
+    float delta_y = msg.pose.pose.position.y - last_y_;
+    last_x_ = msg.pose.pose.position.x;
+    last_y_= msg.pose.pose.position.y;
+    odometer_ += sqrt(pow(delta_x,2)+pow(delta_y,2));
   }
 
   /* For incoming detections: assign to filter or create new filter
@@ -339,12 +382,16 @@ class KalmanDetectionFilter
     if (last_time_ < msg.header.stamp) {
       last_time_ = msg.header.stamp;
       for (int i=0; i<filter_list_.size(); i++) {
-        if (isInView(filter_list_[i]->filter)) {
+        if (isInView(filter_list_[i]->filter) or
+            ((odometer_-last_odometry_tick_)>odometry_tick_dist_)) {
           filter_list_[i]->filter.predict();
           filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
           filter_list_[i]->certainty -= certainty_dec_;
         }
       }
+    }
+    if ((odometer_-last_odometry_tick_) > odometry_tick_dist_) {
+      last_odometry_tick_ = odometer_;
     }
     checkFilterAges();
     drawFilterStates();
