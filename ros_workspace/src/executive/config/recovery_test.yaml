@@ -8,5 +8,9 @@ pursue_samples: False
 
 spokes_to_remove: 0 
 
+#available outcomes:
+#web_manager = go back to the web search
+#return_manager = begin beacon return
+#wait_for_preempt = end level two behavior
 terminal_outcome: return_manager  
 
