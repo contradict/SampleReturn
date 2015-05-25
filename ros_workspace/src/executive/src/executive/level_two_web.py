@@ -342,18 +342,21 @@ class LevelTwoWeb(object):
  
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'DESELECT_PLANNER',
+                                   transitions = {'complete':'WAIT_FOR_PREEMPT',
                                                   'object_detected':'RETURN_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_detection':'false'})
-
-            smach.StateMachine.add('DESELECT_PLANNER',
-                                    SelectMotionMode(self.CAN_interface,
-                                                     MODE_ENABLE),
-                                    transitions = {'next':'complete',
-                                                   'paused':'LEVEL_TWO_ABORTED',
-                                                   'failed':'LEVEL_TWO_ABORTED'})
+            
+            smach.StateMachine.add('WAIT_FOR_PREEMPT',
+                                   WaitForFlagState('false',
+                                                    flag_trigger_value = 'manual',
+                                                    timeout = 20,
+                                                    announcer = self.announcer,
+                                                    start_message ='Level two complete.'),
+                                   transitions = {'next':'WAIT_FOR_PREEMPT',
+                                                  'timeout':'WAIT_FOR_PREEMPT',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})            
             
             smach.StateMachine.add('RECOVERY_MANAGER',
                                    RecoveryManager('RECOVERY_MANAGER',
@@ -361,7 +364,8 @@ class LevelTwoWeb(object):
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'return_manager':'RETURN_MANAGER',
-                                                  'web_manager':'WEB_MANAGER'})
+                                                  'web_manager':'WEB_MANAGER',
+                                                  'wait_for_preempt':'WAIT_FOR_PREEMPT'})
     
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
@@ -896,6 +900,7 @@ class RecoveryManager(smach.State):
                              outcomes=['move',
                                        'return_manager',
                                        'web_manager',
+                                       'wait_for_preempt',
                                        'aborted'])
         
         self.label = label       
