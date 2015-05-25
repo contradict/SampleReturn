@@ -2,6 +2,7 @@
 import math
 import threading
 import random
+import yaml
 from copy import deepcopy
 from collections import deque
 import numpy as np
@@ -409,10 +410,10 @@ class LevelTwoWeb(object):
     
     def start_recovery(self, req):
         try:
-            params = rosparam.load_file(req.file)
-            rospy.loginfo("START_RECOVERY received params: {!s}".format(params))
+            params = yaml.load(req.yaml)
+            rospy.loginfo("START_RECOVERY received yaml params: {!s}".format(params))
             #get first namespace, and the first tuple entry (the param dict)
-            params = params[0][0]
+            #params = params[0][0]
         except Exception, exc:
             rospy.loginfo("START_RECOVERY failed to parse params: {!s}".format(exc))
             return False
