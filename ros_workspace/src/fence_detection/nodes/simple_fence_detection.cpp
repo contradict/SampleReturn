@@ -52,11 +52,11 @@ class FenceDetectorNode
   ros::Publisher line_marker_pub;
   ros::Publisher fence_line_pub;
 
-  std::string mask_pub_topic = "fence_mask";
-  std::string points_pub_topic = "points";
-  std::string marker_pub_topic = "plane_marker";
-  std::string line_marker_pub_topic = "line_marker";
-  std::string fence_line_pub_topic = "fence_line";
+  std::string mask_pub_topic;
+  std::string points_pub_topic;
+  std::string marker_pub_topic;
+  std::string line_marker_pub_topic;
+  std::string fence_line_pub_topic;
 
   double a_channel_threshold_, b_channel_threshold_, x_edge_threshold_, y_edge_threshold_, sum_threshold_;
   double max_range_, min_height_;
@@ -82,6 +82,12 @@ class FenceDetectorNode
 
     cb = boost::bind(&FenceDetectorNode::configCallback, this,  _1, _2);
     dr_srv.setCallback(cb);
+
+    mask_pub_topic = "fence_mask";
+    points_pub_topic = "points";
+    marker_pub_topic = "plane_marker";
+    line_marker_pub_topic = "line_marker";
+    fence_line_pub_topic = "fence_line";
 
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("a_channel_threshold",a_channel_threshold_,double(170));
