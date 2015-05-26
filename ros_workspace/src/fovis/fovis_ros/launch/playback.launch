@@ -19,7 +19,10 @@
         /cameras/navigation/center/right/image_raw
         /cameras/navigation/center/right/camera_info
         /io/microstrain_3dm_gx3_35/imu
+        /motion/platform_joint_state
         --bags $(arg bagfile)"/>
+    <!--
+         -->
 
     <!-- Run the ROS package stereo_image_proc -->
     <group ns="$(arg camera)" >
@@ -39,5 +42,15 @@
         <arg name="camera" value="/cameras/navigation/center"/>
         <arg name="image" value="/image_rect"/>
     </include>
+
+    <node name="wheel_odometry"
+        ns="/processes/odometry"
+        pkg="platform_motion"
+        type="lls_odometry"
+        output="screen"
+        >
+        <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        <remap from="odometry" to="lls_odometry"/>
+    </node>
 
 </launch>
