@@ -39,8 +39,6 @@ class CloseRangeDetector(object):
         self.cam_model = None
         self.last_img = None
 
-        self.win_size = 200
-
         rospack = rospkg.RosPack()
 
         self.classifier = cv2.SVM()
@@ -56,6 +54,8 @@ class CloseRangeDetector(object):
         self.max_area_ratio = config["max_area_ratio"]
         self.min_defect_ratio = config["min_defect_ratio"]
         self.max_defect_ratio = config["max_defect_ratio"]
+
+        self.win_size = config["window_size"]
         return config
 
     def verify_callback(self, req):
