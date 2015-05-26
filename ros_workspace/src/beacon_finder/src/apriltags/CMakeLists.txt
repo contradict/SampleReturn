@@ -9,6 +9,7 @@ find_package (Threads REQUIRED)
 set(SRC_DIR apriltags-c)
 
 include_directories(${SRC_DIR}/ ${SRC_DIR}/common)
+set(apriltags_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_DIR}/ ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_DIR}/common PARENT_SCOPE)
 
 ## Declare a cpp library
 set(APRILTAGS_C_SOURCES
