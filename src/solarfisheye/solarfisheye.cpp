@@ -167,6 +167,8 @@ void thresh_callback(int, void* )
   cout << pts << endl;
   cout << undist_pts << endl;
   printf("intensity: %i\n", src_thr.at<uint8_t>(mc));
+  printf("[[%lf\t%lf]\n[%lf\t%lf]]\n", mu.mu20, mu.mu11, mu.mu11, mu.mu02);
+  printf("%lf - <%lf,%lf>\n", mu.m00, sqrt(mu.mu20), sqrt(mu.mu02));
   //cout << src_thr.at<uint8_t>(mc) << endl;
 
   /// Show in a window
