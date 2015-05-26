@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node name="fovis_pose_filter"
+        ns="/processes/odometry/filter"
+        pkg="msf_updates"
+        type="wheel_visual_sensor"
+        clear_params="true"
+        output="screen"
+        launch-prefix="tmux_new_window gdb -ex run --args"
+        >
+        <!--
+        launch-prefix="gdb -ex run - -args"
+        launch-prefix="tmux_new_window gdb -ex run - -args"
+             -->
+        <!--remap from="msf_core/imu_state_input" to="/imu0" /-->
+        <!--remap from="msf_core/imu_state_input" to="/bluebird/fcu/imu" /-->
+        <!--remap from="msf_core/imu_state_input" to="/auk/fcu/imu" /-->
+        <!--remap from="msf_core/imu_state_input" to="/mav1/fcu/imu" /-->
+        <remap from="msf_core/imu_state_input" to="/io/microstrain_3dm_gx3_35/imu"/>
+
+        <!--remap from="msf_updates/pose_with_covariance_input" to="/bluebird/down/vslam/pose" /-->
+        <!--remap from="msf_updates/pose_with_covariance_input" to="/auk/down/vslam/pose" /-->
+        <remap from="msf_updates/pose_with_covariance_input" to="/processes/odometry/fovis_odometer/pose" />
+
+        <remap from="msf_updates/odometry_input" to="/processes/odometry/lls_odometry"/>
+
+        <rosparam file="$(find msf_updates)/odometry_sensor_fix.yaml"/>
+        <!--
+        -->
+    </node>
+
+    <!-- Set scale to 1.0 on startup, needed to get the filter going -->
+    <!--node name="initialize"
+        ns="/processes/odometry/filter"
+        pkg="rosservice"
+        type="rosservice"
+        args="call - -wait msf_pose_sensor/pose_sensor/initialize_msf_scale 1"/-->
+</launch>
