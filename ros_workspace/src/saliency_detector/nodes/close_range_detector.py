@@ -19,7 +19,8 @@ from samplereturn_msgs.srv import Verify, VerifyResponse
 
 # Subscribe to dslr image and current pursuit target
 # When asked, take target location and get it in img coords
-# Extract window, find contour, compute shape and classify
+# Extract window, find contour, check that center pixel is positive,
+# compute bounding rectangle, check size and aspect ratio relative to color.
 # Emit yes or no
 
 class CloseRangeDetector(object):
@@ -78,20 +79,23 @@ class CloseRangeDetector(object):
             range_a = np.max(win[...,1]) - np.min(win[...,1])
             range_b = np.max(win[...,0]) - np.min(win[...,0])
             if range_a > range_b:
-                shape = self.compute_shape_metrics(win[...,1])
+                #shape = self.compute_shape_metrics(win[...,1])
+                rect = self.get_rectangle(win[...,1])
             else:
-                shape = self.compute_shape_metrics(win[...,2])
-            if self.use_SVM:
-                ret = self.classifier.predict(shape)
-                rospy.logdebug("SVM class %f",ret)
-            else:
-                ret = (self.min_perimeter_ratio<shape[0]<self.max_perimeter_ratio) and\
-                (self.min_area_ratio<shape[1]<self.max_area_ratio) and\
-                (self.min_defect_ratio<shape[2]<self.max_defect_ratio)
-            if ret == -1.0 or ret == False:
-                resp = VerifyResponse(False)
-            else:
-                resp = VerifyResponse(True)
+                #shape = self.compute_shape_metrics(win[...,2])
+                rect = self.get_rectangle(win[...,2])
+            #if self.use_SVM:
+            #    ret = self.classifier.predict(shape)
+            #    rospy.logdebug("SVM class %f",ret)
+            #else:
+            #    ret = (self.min_perimeter_ratio<shape[0]<self.max_perimeter_ratio) and\
+            #    (self.min_area_ratio<shape[1]<self.max_area_ratio) and\
+            #    (self.min_defect_ratio<shape[2]<self.max_defect_ratio)
+            #if ret == -1.0 or ret == False:
+            #    resp = VerifyResponse(False)
+            #else:
+            #    resp = VerifyResponse(True)
+            resp = VerifyResponse(check_rectangle(rect,point_3d))
             return resp
 
     def cam_info_callback(self, CameraInfo):
@@ -100,6 +104,48 @@ class CloseRangeDetector(object):
 
     def image_callback(self, Image):
         self.last_img = deepcopy(Image)
+
+    def check_rectangle(self, rect, point_3d):
+        # Get length and width, project using camera_point, check size
+        P = np.array(cam_info.P).reshape((3, 4))
+        left = np.arctan(P[0, 2]/P[0, 0])
+        right = np.arctan((cam_info.width-P[0, 2])/P[0, 0])
+        arc_per_px = (left+right)/cam_info.width
+        if (rect[1][1] > rect[1][0]):
+            length = rect[1][1]
+            width = rect[1][0]
+        else:
+            length = rect[1][0]
+            width = rect[1][1]
+        rospy.logdebug("Length (px): %f, Width (px): %f",length,width)
+        length *= (arc_per_px*cv2.norm(point_3d))
+        width *= (arc_per_px*cv2.norm(point_3d))
+        rospy.logdebug("Length (m): %f, Width (m): %f",length,width)
+        if (length > 0.2) or (width > 0.2):
+            return False
+        elif (length < 0.02) and (width < 0.02):
+            return False
+        elif:
+            return True
+
+    def get_rectangle(self, image):
+        mid = (float(np.max(img))+float(np.min(img)))/2.
+        thresh = cv2.threshold(img,mid,255,cv2.THRESH_BINARY)[1]
+        if thresh[int(thresh.shape[0]/2.),int(thresh.shape[1]/2.)] == 0:
+            thresh = cv2.threshold(img,mid,255,cv2.THRESH_BINARY_INV)[1]
+        contours, hier = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        largest_area = 0
+        largest_contour = 0
+        for i in contours:
+            area = cv2.contourArea(i)
+            if area > largest_area:
+                largest_area = area
+                largest_contour = i
+        rect = cv2.minAreaRect(largest_contour)
+        box = np.int0(cv2.cv.BoxPoints(rect))
+        cv2.drawContours(image,[box],0,(255,0,0),2)
+        self.debug_img_pub.publish(self.bridge.cv2_to_imgmsg(image,'rgb8'))
+        return rect
 
     def extract_window(self, image, img_point):
         # Take the image, grab the widow around the img_point, handling borders
