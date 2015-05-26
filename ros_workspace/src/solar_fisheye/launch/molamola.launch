@@ -1,6 +1,14 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <node name="sun_cam" pkg="usb_cam" type="usb_cam_node" ns="/cameras" respawn="true" output="screen">
-        <param name="camera_info_url" type="string" value="file:///home/james/Documents/samplereturn/repo/ros_workspace/src/samplereturn/calibration/cheap-fisheye.yaml"/>
+    <node name="sun_cam"
+        pkg="usb_cam"
+        type="usb_cam_node"
+        ns="/cameras"
+        machine="search"
+        respawn="true"
+        output="screen">
+        <param name="camera_info_url" type="string" value="$(find samplereturn)/calibration/cheap-fisheye.yaml"/>
         <param name="video_device" type="string" value="/dev/video0"/>
         <param name="image_width" type="int" value="1920"/>
         <param name="image_height" type="int" value="1080"/>
@@ -10,7 +18,12 @@
         <param name="autoexposure" type="bool" value="false"/>
         <param name="exposure" type="int" value="1"/>
     </node>
-    <node name="sun_finder" pkg="solar_fisheye" type="solar_fisheye_node" ns="/processes" output="screen">
+    <node name="sun_finder"
+        pkg="solar_fisheye"
+        type="solar_fisheye_node"
+        ns="/processes"
+        machine="search"
+        output="log">
         <remap from="camera" to="/cameras/sun_cam" />
 
         <!--"Centroid minimum intensity to report a measurement"-->
