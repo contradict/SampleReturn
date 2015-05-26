@@ -1,6 +1,11 @@
 #include <ros/ros.h>
 
+#include <image_transport/image_transport.h>
+#include <image_transport/camera_subscriber.h>
+#include <image_geometry/pinhole_camera_model.h>
 #include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <boost/foreach.hpp>
 #include <geometry_msgs/PoseStamped.h>
@@ -41,7 +46,6 @@ class BeaconAprilDetector{
   image_transport::Publisher image_pub_;
   ros::Publisher detections_pub_;
   ros::Publisher pose_pub_;
-  tf::TransformBroadcaster tf_pub_;
   //tag detector declaration
   //boost::shared_ptr<AprilTags::TagDetector> tag_detector_;
 };
@@ -69,7 +73,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     //tag_detector_= boost::shared_ptr<AprilTags::TagDetector>(new AprilTags::TagDetector(tag_codes));
   image_sub_ = it_.subscribeCamera("image_rect", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
-  detections_pub_ = nh.advertise<AprilTagDetectionArray>("tag_detections", 1);
+  detections_pub_ = nh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
   pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tag_detections_pose", 1);
 }
 
@@ -89,7 +93,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   cv::Mat gray;
   cv::cvtColor(cv_ptr->image, gray, CV_BGR2GRAY);
   
-  std::vector<AprilTags::TagDetection> detections
+  //std::vector<AprilTags::TagDetection> detections;
   //send image to detector
     //std::vector<AprilTags::TagDetection>	detections = tag_detector_->extractTags(gray);
     //ROS_DEBUG("%d tag detected", (int)detections.size());
@@ -102,10 +106,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   if(!sensor_frame_id_.empty())
     cv_ptr->header.frame_id = sensor_frame_id_;
 
-  AprilTagDetectionArray tag_detection_array;
+  beacon_finder::AprilTagDetectionArray tag_detection_array;
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
 
+  /*
   BOOST_FOREACH(AprilTags::TagDetection detection, detections){
     std::map<int, AprilTagDescription>::const_iterator description_itr = descriptions_.find(detection.id);
     if(description_itr == descriptions_.end()){
@@ -141,13 +146,14 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tf::poseStampedMsgToTF(tag_pose, tag_transform);
     tf_pub_.sendTransform(tf::StampedTransform(tag_transform, tag_transform.stamp_, tag_transform.frame_id_, description.frame_name()));
   }
+  */
   detections_pub_.publish(tag_detection_array);
   pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
 }
 
 
-std::map<int, AprilTagDescription> AprilTagDetector::parse_tag_descriptions(XmlRpc::XmlRpcValue& tag_descriptions){
+std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(XmlRpc::XmlRpcValue& tag_descriptions){
   std::map<int, AprilTagDescription> descriptions;
   ROS_ASSERT(tag_descriptions.getType() == XmlRpc::XmlRpcValue::TypeArray);
   for (int32_t i = 0; i < tag_descriptions.size(); ++i) {
@@ -184,6 +190,6 @@ int main(int argc, char **argv){
   ros::init(argc, argv, "apriltag_detector");
   ros::NodeHandle nh;
   ros::NodeHandle pnh("~");
-  apriltags_ros::AprilTagDetector detector(nh, pnh);
+  beacon_april_node::BeaconAprilDetector detector(nh, pnh);
   ros::spin();
 }
