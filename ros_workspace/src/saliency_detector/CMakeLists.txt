@@ -8,6 +8,7 @@ set(CMAKE_BUILD_TYPE Debug)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  rospy
   roslib
   sensor_msgs
   samplereturn_msgs
@@ -94,7 +95,7 @@ catkin_package(
     include
     ${Eigen_INCLUDE_DIRS}
     LIBRARIES BMS color_naming saliency_detector_core
-  CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
+  CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
 
@@ -154,10 +155,10 @@ add_library(color_naming
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+ install(PROGRAMS
+   nodes/close_range_detector.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
 
 ## Mark executables and/or libraries for installation
 install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node

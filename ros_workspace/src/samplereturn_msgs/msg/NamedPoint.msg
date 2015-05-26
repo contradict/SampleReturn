@@ -16,4 +16,5 @@ Header header
 geometry_msgs/Point point
 string name
 int8 sample_id
+int16 filter_id
 float32 grip_angle

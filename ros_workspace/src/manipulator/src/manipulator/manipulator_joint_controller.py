@@ -1,8 +1,3 @@
-
-import roslib
-roslib.load_manifest('dynamixel_controllers')
-roslib.load_manifest('manipulator')
-
 import rospy
 import threading
 import array
@@ -37,6 +32,8 @@ class ManipulatorJointController(JointControllerMX):
     def __init__(self, dxl_io, controller_namespace, port_namespace):
         JointControllerMX.__init__(self, dxl_io, controller_namespace, port_namespace)
       
+        self.name = controller_namespace
+        
         self.velocity_standoff_service = rospy.Service(self.controller_namespace + '/velocity_standoff', VelocityStandoff, self.velocity_standoff)
         self.torque_standoff_service = rospy.Service(self.controller_namespace + '/torque_standoff', TorqueStandoff, self.torque_standoff)
         self.torque_hold_service = rospy.Service(self.controller_namespace + '/torque_hold', TorqueHold, self.torque_hold)
@@ -77,10 +74,6 @@ class ManipulatorJointController(JointControllerMX):
             standoff = req.distance * -1
         else:
             standoff = req.distance
-        previous_velocity = self.joint_speed
-        previous_torque_limit = self.torque_limit
-        previous_cw_limit = self.cw_limit
-        previous_ccw_limit = self.ccw_limit
         self.set_torque_limit(torque_limit)
         self.set_angle_limits(0, 0) #enable wheel mode!
         self.set_speed(velocity)
@@ -89,12 +82,13 @@ class ManipulatorJointController(JointControllerMX):
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
         self.set_speed(0)
-        self.set_angle_limits(previous_cw_limit, previous_ccw_limit) #back to position mode
-        self.set_torque_limit(previous_torque_limit)
-        self.set_speed(previous_velocity)
+        self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) #back to position mode
+        self.set_torque_limit(self.torque_limit)
+        self.set_speed(self.joint_speed)
         self.set_position(standoff_pos)
         self.check_for_position = True
         yield self.block()
+        
     
     @check_pause           
     def torque_standoff(self, req):
@@ -124,26 +118,32 @@ class ManipulatorJointController(JointControllerMX):
     
     @check_pause    
     def go_to_position(self, position):
-        #rospy.loginfo("TORQUE CONTROL STATUS: " + str(self.torque_control_mode))
         if self.torque_control_mode: self.set_torque_control_mode_enable(False)
         self.set_position(position)            
         self.check_for_position = True
         yield self.block()
                 
     def service_go_to_position(self, req):
-        #rospy.loginfo("Servicing go_to_position request {0:f}".format(req.position))
         return self.go_to_position(req.position)
 
     def service_pause(self, req):
         self.paused = req.state
         if self.paused:
             self.unblock()
+            self.clear_check_flags()
             self.set_torque_enable(False)
             self.set_angle_limits(self.min_cw_limit, self.max_ccw_limit) # position mode
             self.set_torque_limit(self.initial_torque_limit)
+            self.set_speed(self.joint_speed)
             self.set_torque_enable(True)
             self.go_to_position(self.joint_state.current_pos)
-        return self.paused    
+        return self.paused
+    
+    def clear_check_flags(self):
+        self.check_for_move = False
+        self.check_for_stop = False
+        self.check_for_position = False
+        self.check_current = None
           
     def process_motor_states(self, state_list):
         JointControllerMX.process_motor_states(self, state_list)

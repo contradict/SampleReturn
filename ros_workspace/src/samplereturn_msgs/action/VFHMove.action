@@ -2,15 +2,18 @@
 geometry_msgs/PoseStamped target_pose
 float32 move_velocity
 float32 spin_velocity
+float32 course_tolerance
 bool orient_at_target
+bool rotate_to_clear
 ---
 #result
 int8 COMPLETE = 0
 int8 BLOCKED = 1
 int8 OFF_COURSE = 2
 int8 MISSED_TARGET = 3
-int8 EXTERNAL_STOP = 4
-int8 ERROR = 5
+int8 STARTED_BLOCKED = 4
+int8 EXTERNAL_STOP = 5
+int8 ERROR = 6
 
 int8 outcome
 geometry_msgs/Point position_error
