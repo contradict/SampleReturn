@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
      
      cv_bridge
      image_transport
+     cmake_modules
      )
 
 ## System dependencies are found with CMake's conventions
@@ -80,9 +81,11 @@ catkin_package(
 ## Build ##
 ###########
 
+add_subdirectory(src/apriltags)
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${apriltags_INCLUDE_DIRS})
 
 ## Declare a cpp library
 # add_library(sample_detection_filter
@@ -107,7 +110,7 @@ add_dependencies(beacon_april_node beacon_finder_generate_messages_cpp)
 
 target_link_libraries(beacon_april_node
       ${catkin_LIBRARIES}
-      #apriltag_detector
+      apriltags
 )
 
 

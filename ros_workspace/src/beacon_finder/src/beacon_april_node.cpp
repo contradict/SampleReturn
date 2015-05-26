@@ -12,6 +12,15 @@
 #include <geometry_msgs/PoseArray.h>
 #include <XmlRpcException.h>
 
+extern "C" {
+#include "apriltag.h"
+#include "tag36h11.h"
+#include "tag36h10.h"
+#include "tag36artoolkit.h"
+#include "tag25h9.h"
+#include "tag25h7.h"
+}
+
 #include <beacon_finder/AprilTagDetection.h>
 #include <beacon_finder/AprilTagDetectionArray.h>
 
@@ -48,6 +57,9 @@ class BeaconAprilDetector{
   ros::Publisher pose_pub_;
   //tag detector declaration
   //boost::shared_ptr<AprilTags::TagDetector> tag_detector_;
+ protected:
+  apriltag_family_t *tag_fam_;
+  apriltag_detector_t *tag_det_;
 };
 
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh): it_(nh){
@@ -68,9 +80,40 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     sensor_frame_id_ = "";
   }
 
-  //need new detector  
-    //AprilTags::TagCodes tag_codes = AprilTags::tagCodes36h11;
-    //tag_detector_= boost::shared_ptr<AprilTags::TagDetector>(new AprilTags::TagDetector(tag_codes));
+  //get tag family parametre
+  std::string famname;
+  nh.param("tag_family", famname, std::string("tag36h11"));
+  if (!famname.compare("tag36h11"))
+    this->tag_fam_ = tag36h11_create();
+  else if (!famname.compare("tag36h10"))
+    this->tag_fam_ = tag36h10_create();
+  else if (!famname.compare("tag36artoolkit"))
+    this->tag_fam_ = tag36artoolkit_create();
+  else if (!famname.compare("tag25h9"))
+    this->tag_fam_ = tag25h9_create();
+  else if (!famname.compare("tag25h7"))
+    this->tag_fam_ = tag25h7_create();
+  else
+    ROS_ERROR("Unrecognized tag family name. Use e.g. \"tag36h11\".\n");
+  int border;
+  nh.param("border", border, 1);
+  this->tag_fam_->black_border = border;
+
+  //setup tag detector
+  this->tag_det_ = apriltag_detector_create();
+  apriltag_detector_add_family(this->tag_det_, this->tag_fam_);
+  //these defaults taken from apriltag_demo.c
+  double decim, blur;
+  nh.param("decimate", decim, 1.0);
+  this->tag_det_->quad_decimate = decim;
+  nh.param("blur", blur, 0.0);
+  this->tag_det_->quad_sigma = blur;
+  nh.param("threads", this->tag_det_->nthreads, 4);
+  nh.param("debug", this->tag_det_->debug, 0);
+  nh.param("refine-edges", this->tag_det_->refine_edges, 1);
+  nh.param("refine-decode", this->tag_det_->refine_decode, 0);
+  nh.param("refine-pose", this->tag_det_->refine_pose, 0);
+
   image_sub_ = it_.subscribeCamera("image_rect", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
   detections_pub_ = nh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
