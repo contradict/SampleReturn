@@ -364,8 +364,9 @@ class LevelTwoWeb(object):
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'simple_move':'RECOVERY_SIMPLE_MOVE',
+                                                  'sample_detected':'PURSUE_SAMPLE',
                                                   'return_manager':'RETURN_MANAGER',
-                                                  'web_manager':'WEB_MANAGER',
+                                                  'web_manager':'CREATE_MOVE_GOAL',
                                                   'wait_for_preempt':'WAIT_FOR_PREEMPT'})
     
             smach.StateMachine.add('RECOVERY_SIMPLE_MOVE',
@@ -896,18 +897,24 @@ class RecoveryManager(smach.State):
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
                                            'manager_dict',
+                                           'move_target',
                                            'raster_points',
+                                           'spokes',
+                                           'detection_message',
                                            'local_frame'],
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
                                             'raster_points',
+                                            'spokes',
                                             'move_target',
                                             'simple_move',
                                             'report_sample',
                                             'report_beacon',
+                                            'detection_message',
                                             'stop_on_detection'],
                              outcomes=['move',
+                                       'sample_detected',
                                        'simple_move',
                                        'return_manager',
                                        'web_manager',
@@ -917,23 +924,45 @@ class RecoveryManager(smach.State):
         self.label = label       
         self.announcer = announcer
         self.tf_listener = tf_listener
+        self.exit_move = None
         
     def execute(self, userdata):
-        #set the move manager key for the move mux
-        userdata.active_manager = userdata.manager_dict[self.label]
-        
-        rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
         
         if userdata.recovery_requested == True:
             #first time through
+            rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
             self.announcer.say("Enter ing recovery state")
+            #save these in case we are returning to the web manager
+            self.exit_move = userdata.move_target
+            userdata.detection_message = False
             userdata.recovery_requested = False
             userdata.report_beacon = False
             userdata.stop_on_detection = True
             userdata.report_sample = userdata.recovery_parameters['pursue_samples']
-            if userdata.recovery_parameters['spokes_to_remove'] > 0:
-                if len(userdata.raster_points) > 0:
-                    userdata.raster_points = [userdata.raster_points[-1]]
+            
+            #prune requested spokes
+            spokes_to_remove = userdata.recovery_parameters['spokes_to_remove']
+            while spokes_to_remove > 0:
+                #current spoke is already popped, so load the start of the next one first
+                self.exit_move = userdata.spokes[0]['start_point']
+                spokes_to_remove -=1
+                #if there are more spokes to remove, pop 1
+                if (spokes_to_remove > 0):
+                    if (len(userdata.spokes) > 1):
+                        userdata.spokes.popleft()    
+                    else:
+                        #unless there aren't enough spokes left
+                        rospy.loginfo("RECOVERY_MANAGER requested to prune too many spokes")
+                        break
+        
+        #set the move manager key for the move mux
+        userdata.active_manager = userdata.manager_dict[self.label]
+        
+        #if a sample is detected, cancel recovery and exit to pursuit
+        if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
+            userdata.active_manager = userdata.recovery_parameters['terminal_outcome'] 
+            userdata.move_target = self.exit_move
+            return 'sample_detected'
         
         if len(userdata.recovery_parameters['simple_moves']) > 0:
             simple_move = userdata.recovery_parameters['simple_moves'].pop(0)
@@ -955,8 +984,12 @@ class RecoveryManager(smach.State):
             return 'move'
         else:
             userdata.stop_on_detection = False
-            return userdata.recovery_parameters['terminal_outcome']
-        
+            #setting the active manager is for the return to web_manager
+            #it's the only way I could think of to return to the previous goal
+            #exiting to the return_manager will overwrite this stuff
+            userdata.active_manager = userdata.recovery_parameters['terminal_outcome'] 
+            userdata.move_target = self.exit_move
+            return userdata.recovery_parameters['terminal_outcome'] 
 
 class MoveMUX(smach.State):
     def __init__(self, manager_list):
