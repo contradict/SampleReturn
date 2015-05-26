@@ -40,6 +40,8 @@ class CloseRangeDetector(object):
         self.cam_model = None
         self.last_img = None
 
+        self.win_draw = None
+
         rospack = rospkg.RosPack()
 
         self.classifier = cv2.SVM()
@@ -76,13 +78,16 @@ class CloseRangeDetector(object):
             img = np.asarray(self.bridge.imgmsg_to_cv2(self.last_img,'rgb8'))
             lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
             win = self.extract_window(lab, img_point)
+            self.win_draw = win.copy()
             range_a = np.max(win[...,1]) - np.min(win[...,1])
-            range_b = np.max(win[...,0]) - np.min(win[...,0])
+            range_b = np.max(win[...,2]) - np.min(win[...,2])
             if range_a > range_b:
                 #shape = self.compute_shape_metrics(win[...,1])
+                rospy.logdebug("Using A* Channel")
                 rect = self.get_rectangle(win[...,1])
             else:
                 #shape = self.compute_shape_metrics(win[...,2])
+                rospy.logdebug("Using B* Channel")
                 rect = self.get_rectangle(win[...,2])
             #if self.use_SVM:
             #    ret = self.classifier.predict(shape)
@@ -95,7 +100,7 @@ class CloseRangeDetector(object):
             #    resp = VerifyResponse(False)
             #else:
             #    resp = VerifyResponse(True)
-            resp = VerifyResponse(check_rectangle(rect,point_3d))
+            resp = VerifyResponse(self.check_rectangle(rect,point_3d))
             return resp
 
     def cam_info_callback(self, CameraInfo):
@@ -107,10 +112,10 @@ class CloseRangeDetector(object):
 
     def check_rectangle(self, rect, point_3d):
         # Get length and width, project using camera_point, check size
-        P = np.array(cam_info.P).reshape((3, 4))
+        P = np.array(self.cam_model.P).reshape((3, 4))
         left = np.arctan(P[0, 2]/P[0, 0])
-        right = np.arctan((cam_info.width-P[0, 2])/P[0, 0])
-        arc_per_px = (left+right)/cam_info.width
+        right = np.arctan((self.cam_model.width-P[0, 2])/P[0, 0])
+        arc_per_px = (left+right)/self.cam_model.width
         if (rect[1][1] > rect[1][0]):
             length = rect[1][1]
             width = rect[1][0]
@@ -125,14 +130,15 @@ class CloseRangeDetector(object):
             return False
         elif (length < 0.02) and (width < 0.02):
             return False
-        elif:
+        else:
             return True
 
     def get_rectangle(self, image):
-        mid = (float(np.max(img))+float(np.min(img)))/2.
-        thresh = cv2.threshold(img,mid,255,cv2.THRESH_BINARY)[1]
+        mid = (float(np.max(image))+float(np.min(image)))/2.
+        thresh = cv2.threshold(image,mid,255,cv2.THRESH_BINARY)[1]
         if thresh[int(thresh.shape[0]/2.),int(thresh.shape[1]/2.)] == 0:
-            thresh = cv2.threshold(img,mid,255,cv2.THRESH_BINARY_INV)[1]
+            thresh = cv2.threshold(image,mid,255,cv2.THRESH_BINARY_INV)[1]
+        self.debug_img_pub.publish(self.bridge.cv2_to_imgmsg(thresh,'mono8'))
         contours, hier = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         largest_area = 0
         largest_contour = 0
@@ -143,8 +149,8 @@ class CloseRangeDetector(object):
                 largest_contour = i
         rect = cv2.minAreaRect(largest_contour)
         box = np.int0(cv2.cv.BoxPoints(rect))
-        cv2.drawContours(image,[box],0,(255,0,0),2)
-        self.debug_img_pub.publish(self.bridge.cv2_to_imgmsg(image,'rgb8'))
+        cv2.drawContours(self.win_draw,[box],0,(255,0,0),2)
+        #self.debug_img_pub.publish(self.bridge.cv2_to_imgmsg(self.win_draw,'rgb8'))
         return rect
 
     def extract_window(self, image, img_point):
