@@ -13,14 +13,23 @@
         <remap from="/cameras/search/camera_info" to="/cameras/search/info"/>
 
         <rosparam param="tag_descriptions">
-         - 
-             id: 407
-             size: .8128
-             corners: [-1, -1, 0,
-                        1, -1, 0,
-                        1,  1, 0,
-                       -1,  1, 0]
-             frame_id: beacon_front
+         [{
+            id: 407,
+            size: 0.8128,
+            corners: [-0.4064, -0.4064, 0,
+                       0.4064, -0.4064, 0,
+                       0.4064,  0.4064, 0,
+                      -0.4064,  0.4064, 0],
+            frame_id: beacon_front},
+          {
+            id: 409,
+            size: 0.8128,
+            corners: [ 0.4064, -0.4064, -0.3937,
+                      -0.4064, -0.4064, -0.3937,
+                      -0.4064,  0.4064, -0.3937,
+                       0.4064,  0.4064, -0.3937],
+            frame_id: beacon_right}
+         ]
         </rosparam>
     </node>
 </launch>
