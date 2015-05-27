@@ -244,24 +244,33 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
       frame_name_stream << "tag_" << id;
       frame_name = frame_name_stream.str();
     }
-    double *c_ar;
+    cv::Mat corners(4,3, CV_64F);
     if(tag_description.hasMember("corners")) {
         ROS_ASSERT(tag_description["corners"].getType() == XmlRpc::XmlRpcValue::TypeArray);
         XmlRpc::XmlRpcValue v = tag_description["corners"];
-        double c[4*3];
         for(int i =0; i < v.size(); i++)
         {
-            ROS_ASSERT(v[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
-            c[i] = (double)v[i];
+            if(v[i].getType() == XmlRpc::XmlRpcValue::TypeDouble)
+            {
+                corners.at<double>(i) = (double)v[i];
+            }
+            else if(v[i].getType() == XmlRpc::XmlRpcValue::TypeInt)
+            {
+                corners.at<double>(i) = (int)v[i];
+            }
+            else
+            {
+                ROS_ERROR_STREAM("Non-numeric type in corners at index " << i << ": " << v[i].getType());
+            }
         }
     }
     else {
-        double c[] = {-size/2, -size/2, 0,
-            size/2, -size/2, 0,
-            size/2, size/2, 0,
-            -size/2, size/2, 0};
+        double c[4][3] = {{-size/2, -size/2, 0},
+                          {size/2, -size/2, 0},
+                          {size/2, size/2, 0},
+                          {-size/2, size/2, 0}};
+        corners = cv::Mat(4,3, CV_64F, c);
     }
-    cv::Mat corners(4,3, CV_64F, c_ar);
     AprilTagDescription description(id, size, frame_name, corners);
     ROS_INFO_STREAM("Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);
     descriptions.insert(std::make_pair(id, description));
