@@ -278,11 +278,18 @@ class FenceDetectorNode
 
     ROS_DEBUG("Width, Height:%u, %u",ptr_cloud->width,ptr_cloud->height);
 
+    // Check if cloud is empty //
+    if (far_clipped_cloud->points.size() <= min_inliers_) {
+      ROS_DEBUG("Could not estimate a planar model for given dataset, not\
+          enough points at input.");
+      return;
+    }
     seg.setInputCloud(far_clipped_cloud);
     //seg.setInputCloud(ptr_cloud);
     seg.segment (*inliers, *coefficients);
     if (inliers->indices.size() <= min_inliers_) {
-      ROS_ERROR("Could not estimate a planar model for given dataset.");
+      ROS_DEBUG("Could not estimate a planar model for given dataset, not\
+          enough inliers");
       return;
     }
     ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",coefficients->values[0],

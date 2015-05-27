@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <!-- Calibration tool -->
+
+    <arg name="camera" default="/cameras/search"/>
+    <arg name="image" default="image"/>
+    <node
+        pkg="camera_calibration"
+        type="cameracalibrator.py"
+        name="calibrator"
+        args="--size 9x6 --square 0.1 -p chessboard --approximate=0.05"
+        output="screen"
+        >
+        <remap from="image" to="$(arg camera)/$(arg image)"/>
+      </node>
+
+</launch>
