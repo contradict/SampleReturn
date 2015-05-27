@@ -12,14 +12,12 @@
 #include <geometry_msgs/PoseArray.h>
 #include <XmlRpcException.h>
 
-extern "C" {
 #include "apriltag.h"
 #include "tag36h11.h"
 #include "tag36h10.h"
 #include "tag36artoolkit.h"
 #include "tag25h9.h"
 #include "tag25h7.h"
-}
 
 #include <beacon_finder/AprilTagDetection.h>
 #include <beacon_finder/AprilTagDetectionArray.h>
@@ -49,20 +47,21 @@ class BeaconAprilDetector{
 
  private:
   std::map<int, AprilTagDescription> descriptions_;
-  std::string sensor_frame_id_;
   image_transport::ImageTransport it_;
   image_transport::CameraSubscriber image_sub_;
   image_transport::Publisher image_pub_;
   ros::Publisher detections_pub_;
   ros::Publisher pose_pub_;
-  //tag detector declaration
-  //boost::shared_ptr<AprilTags::TagDetector> tag_detector_;
  protected:
+  std::string famname_;
   apriltag_family_t *tag_fam_;
   apriltag_detector_t *tag_det_;
 };
 
-BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh): it_(nh){
+BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
+    it_(nh),
+    tag_det_(NULL)
+{
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
   if(!pnh.getParam("tag_descriptions", april_tag_descriptions)){
@@ -76,25 +75,24 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     }
   }
 
-  if(!pnh.getParam("sensor_frame_id", sensor_frame_id_)){
-    sensor_frame_id_ = "";
-  }
 
   //get tag family parametre
-  std::string famname;
-  nh.param("tag_family", famname, std::string("tag36h11"));
-  if (!famname.compare("tag36h11"))
+  nh.param("tag_family", famname_, std::string("tag36h11"));
+  if (!famname_.compare("tag36h11"))
     this->tag_fam_ = tag36h11_create();
-  else if (!famname.compare("tag36h10"))
+  else if (!famname_.compare("tag36h10"))
     this->tag_fam_ = tag36h10_create();
-  else if (!famname.compare("tag36artoolkit"))
+  else if (!famname_.compare("tag36artoolkit"))
     this->tag_fam_ = tag36artoolkit_create();
-  else if (!famname.compare("tag25h9"))
+  else if (!famname_.compare("tag25h9"))
     this->tag_fam_ = tag25h9_create();
-  else if (!famname.compare("tag25h7"))
+  else if (!famname_.compare("tag25h7"))
     this->tag_fam_ = tag25h7_create();
-  else
-    ROS_ERROR("Unrecognized tag family name. Use e.g. \"tag36h11\".\n");
+  else {
+    ROS_ERROR("Unrecognized tag family name %s. Use e.g. \"tag36h11\".", famname_.c_str());
+    return;
+  }
+
   int border;
   nh.param("border", border, 1);
   this->tag_fam_->black_border = border;
@@ -110,9 +108,9 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   this->tag_det_->quad_sigma = blur;
   nh.param("threads", this->tag_det_->nthreads, 4);
   nh.param("debug", this->tag_det_->debug, 0);
-  nh.param("refine-edges", this->tag_det_->refine_edges, 1);
-  nh.param("refine-decode", this->tag_det_->refine_decode, 0);
-  nh.param("refine-pose", this->tag_det_->refine_pose, 0);
+  nh.param("refine_edges", this->tag_det_->refine_edges, 1);
+  nh.param("refine_decode", this->tag_det_->refine_decode, 0);
+  nh.param("refine_pose", this->tag_det_->refine_pose, 0);
 
   image_sub_ = it_.subscribeCamera("image_rect", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
@@ -122,9 +120,25 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
 
 BeaconAprilDetector::~BeaconAprilDetector(){
   image_sub_.shutdown();
+  if(tag_det_ != NULL)
+  {
+      apriltag_detector_destroy(tag_det_);
+      if (!famname_.compare("tag36h11"))
+          tag36h11_destroy(tag_fam_);
+      else if (!famname_.compare("tag36h10"))
+          tag36h10_destroy(tag_fam_);
+      else if (!famname_.compare("tag36artoolkit"))
+          tag36artoolkit_destroy(tag_fam_);
+      else if (!famname_.compare("tag25h9"))
+          tag25h9_destroy(tag_fam_);
+      else if (!famname_.compare("tag25h7"))
+          tag25h7_destroy(tag_fam_);
+  }
 }
 
 void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const sensor_msgs::CameraInfoConstPtr& cam_info){
+  if(tag_det_ == NULL)
+    return;
   cv_bridge::CvImagePtr cv_ptr;
   try{
     cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
@@ -133,42 +147,43 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     ROS_ERROR("cv_bridge exception: %s", e.what());
     return;
   }
-  cv::Mat gray;
-  cv::cvtColor(cv_ptr->image, gray, CV_BGR2GRAY);
   
-  //std::vector<AprilTags::TagDetection> detections;
-  //send image to detector
-    //std::vector<AprilTags::TagDetection>	detections = tag_detector_->extractTags(gray);
-    //ROS_DEBUG("%d tag detected", (int)detections.size());
+  image_u8_t *apr_image = image_u8_create(msg->width, msg->height);
+  cv::Mat gray(msg->height, msg->width, CV_8UC1, apr_image->buf, apr_image->stride);
+  cv::cvtColor(cv_ptr->image, gray, CV_BGR2GRAY);
 
+  zarray_t *detections;
+  detections = apriltag_detector_detect(tag_det_, apr_image);
   double fx = cam_info->K[0];
   double fy = cam_info->K[4];
   double px = cam_info->K[2];
   double py = cam_info->K[5];
 
-  if(!sensor_frame_id_.empty())
-    cv_ptr->header.frame_id = sensor_frame_id_;
-
   beacon_finder::AprilTagDetectionArray tag_detection_array;
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
 
-  /*
-  BOOST_FOREACH(AprilTags::TagDetection detection, detections){
-    std::map<int, AprilTagDescription>::const_iterator description_itr = descriptions_.find(detection.id);
-    if(description_itr == descriptions_.end()){
-      ROS_WARN_THROTTLE(10.0, "Found tag: %d, but no description was found for it", detection.id);
-      continue;
-    }
-    AprilTagDescription description = description_itr->second;
-    double tag_size = description.size();
+  ROS_INFO("Found %d tags.", zarray_size(detections));
 
+  for (int i = 0; i < zarray_size(detections); i++) {
+      apriltag_detection_t *det;
+      zarray_get(detections, i, &det);
+      std::map<int, AprilTagDescription>::const_iterator description_itr = descriptions_.find(det->id);
+      if(description_itr == descriptions_.end()){
+          ROS_WARN_THROTTLE(10.0, "Found tag: %d, but no description was found for it", det->id);
+          continue;
+      }
+      AprilTagDescription description = description_itr->second;
+      double tag_size = description.size();
+
+      /*
     detection.draw(cv_ptr->image);
     Eigen::Matrix4d transform = detection.getRelativeTransform(tag_size, fx, fy, px, py);
     Eigen::Matrix3d rot = transform.block(0,0,3,3);
     Eigen::Quaternion<double> rot_quaternion = Eigen::Quaternion<double>(rot);
-
+    */
     geometry_msgs::PoseStamped tag_pose;
+    /*
     tag_pose.pose.position.x = transform(0,3);
     tag_pose.pose.position.y = transform(1,3);
     tag_pose.pose.position.z = transform(2,3);
@@ -176,20 +191,17 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_pose.pose.orientation.y = rot_quaternion.y();
     tag_pose.pose.orientation.z = rot_quaternion.z();
     tag_pose.pose.orientation.w = rot_quaternion.w();
+    */
     tag_pose.header = cv_ptr->header;
 
-    AprilTagDetection tag_detection;
+    beacon_finder::AprilTagDetection tag_detection;
     tag_detection.pose = tag_pose;
-    tag_detection.id = detection.id;
+    tag_detection.id = det->id;
     tag_detection.size = tag_size;
     tag_detection_array.detections.push_back(tag_detection);
     tag_pose_array.poses.push_back(tag_pose.pose);
 
-    tf::Stamped<tf::Transform> tag_transform;
-    tf::poseStampedMsgToTF(tag_pose, tag_transform);
-    tf_pub_.sendTransform(tf::StampedTransform(tag_transform, tag_transform.stamp_, tag_transform.frame_id_, description.frame_name()));
   }
-  */
   detections_pub_.publish(tag_detection_array);
   pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
