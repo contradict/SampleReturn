@@ -206,6 +206,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_pose_array.poses.push_back(tag_pose.pose);
 
   }
+  //free up detections memory
+  apriltag_detections_destroy(detections);
+
   detections_pub_.publish(tag_detection_array);
   pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
