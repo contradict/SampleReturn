@@ -199,9 +199,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_pose.pose.position.x = tvec[0];
     tag_pose.pose.position.y = tvec[1];
     tag_pose.pose.position.z = tvec[2];
-    tag_pose.pose.orientation.x = axis[0]/sin(th/2);
-    tag_pose.pose.orientation.y = axis[1]/sin(th/2);
-    tag_pose.pose.orientation.z = axis[2]/sin(th/2);
+    tag_pose.pose.orientation.x = axis[0]*sin(th/2);
+    tag_pose.pose.orientation.y = axis[1]*sin(th/2);
+    tag_pose.pose.orientation.z = axis[2]*sin(th/2);
     tag_pose.pose.orientation.w = cos(th/2);
     tag_pose.header = cv_ptr->header;
 
