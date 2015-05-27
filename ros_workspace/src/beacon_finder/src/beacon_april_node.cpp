@@ -180,12 +180,19 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       AprilTagDescription description = description_itr->second;
       double tag_size = description.size();
 
-      /*
-    detection.draw(cv_ptr->image);
-    Eigen::Matrix4d transform = detection.getRelativeTransform(tag_size, fx, fy, px, py);
-    Eigen::Matrix3d rot = transform.block(0,0,3,3);
-    Eigen::Quaternion<double> rot_quaternion = Eigen::Quaternion<double>(rot);
-    */
+    cv::Mat imgPts(4, 2, CV_64F, det->p, 2*sizeof(det->p[0][0]));
+    double tp[4][2] = {
+            {-tag_size/2, -tag_size/2},
+            {tag_size/2, -tag_size/2},
+            {tag_size/2, tag_size/2},
+            {-tag_size/2, tag_size/2}
+        };
+    cv::Mat tagPts(4, 2, CV_64F, tp);
+    cv::Vec3d rvec;
+    cv::Vec3d tvec;
+    if (cv::solvePnP(tagPts, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
+        continue;
+
     geometry_msgs::PoseStamped tag_pose;
     /*
     tag_pose.pose.position.x = transform(0,3);
