@@ -181,7 +181,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       AprilTagDescription description = description_itr->second;
       double tag_size = description.size();
 
-    cv::Mat imgPts(4, 2, CV_64F, det->p, 2*sizeof(det->p[0][0]));
+    cv::Mat imgPts(4, 2, CV_64F, det->p);
     cv::Vec3d rvec;
     cv::Vec3d tvec;
     if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
