@@ -56,6 +56,7 @@ class BeaconAprilDetector{
   std::string famname_;
   apriltag_family_t *tag_fam_;
   apriltag_detector_t *tag_det_;
+  image_geometry::PinholeCameraModel model_;
 };
 
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
@@ -154,10 +155,13 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
   zarray_t *detections;
   detections = apriltag_detector_detect(tag_det_, apr_image);
+  /*
   double fx = cam_info->K[0];
   double fy = cam_info->K[4];
   double px = cam_info->K[2];
   double py = cam_info->K[5];
+  */
+  model_.fromCameraInfo(cam_info);
 
   beacon_finder::AprilTagDetectionArray tag_detection_array;
   geometry_msgs::PoseArray tag_pose_array;
