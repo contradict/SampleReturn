@@ -187,16 +187,18 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
         continue;
 
+
     geometry_msgs::PoseStamped tag_pose;
-    /*
-    tag_pose.pose.position.x = transform(0,3);
-    tag_pose.pose.position.y = transform(1,3);
-    tag_pose.pose.position.z = transform(2,3);
-    tag_pose.pose.orientation.x = rot_quaternion.x();
-    tag_pose.pose.orientation.y = rot_quaternion.y();
-    tag_pose.pose.orientation.z = rot_quaternion.z();
-    tag_pose.pose.orientation.w = rot_quaternion.w();
-    */
+    double th = cv::norm(rvec);
+    cv::Vec3d axis;
+    cv::normalize(rvec, axis);
+    tag_pose.pose.position.x = tvec[0];
+    tag_pose.pose.position.y = tvec[1];
+    tag_pose.pose.position.z = tvec[2];
+    tag_pose.pose.orientation.x = axis[0]/sin(th/2);
+    tag_pose.pose.orientation.y = axis[1]/sin(th/2);
+    tag_pose.pose.orientation.z = axis[2]/sin(th/2);
+    tag_pose.pose.orientation.w = cos(th/2);
     tag_pose.header = cv_ptr->header;
 
     beacon_finder::AprilTagDetection tag_detection;
