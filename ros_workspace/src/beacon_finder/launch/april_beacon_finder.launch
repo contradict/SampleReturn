@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+<launch>
+
+    <node name="april_beacon_finder"
+        type="beacon_april_node"
+        pkg="beacon_finder"
+        ns="/processes/beacon"
+        machine="search"
+        >
+        <remap from="image_rect" to="/cameras/search/image"/>
+        <remap from="/cameras/search/camera_info" to="/cameras/search/info"/>
+
+        <rosparam param="tag_descriptions">
+         - 
+             id: 407
+             size: .8128
+             corners: [-1, -1, 0,
+                        1, -1, 0,
+                        1,  1, 0,
+                       -1,  1, 0]
+             frame_id: beacon_front
+        </rosparam>
+    </node>
+</launch>
