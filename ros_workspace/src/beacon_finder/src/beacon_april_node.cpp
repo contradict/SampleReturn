@@ -185,7 +185,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::Vec3d rvec;
     cv::Vec3d tvec;
     if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
+    {
+        ROS_ERROR("Unable to solve for tag pose.");
+        ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
         continue;
+    }
 
 
     geometry_msgs::PoseStamped tag_pose;
