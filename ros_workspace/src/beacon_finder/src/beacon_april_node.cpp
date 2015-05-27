@@ -26,10 +26,11 @@ namespace beacon_april_node{
  
 class AprilTagDescription{
  public:
-  AprilTagDescription(int id, double size, std::string &frame_name):id_(id), size_(size), frame_name_(frame_name){}
+  AprilTagDescription(int id, double size, std::string &frame_name, cv::Mat &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
   double size(){return size_;}
   int id(){return id_;} 
-  std::string& frame_name(){return frame_name_;} 
+  std::string& frame_name(){return frame_name_;}
+  cv::Mat corners;
  private:
   int id_;
   double size_;
@@ -181,16 +182,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       double tag_size = description.size();
 
     cv::Mat imgPts(4, 2, CV_64F, det->p, 2*sizeof(det->p[0][0]));
-    double tp[4][2] = {
-            {-tag_size/2, -tag_size/2},
-            {tag_size/2, -tag_size/2},
-            {tag_size/2, tag_size/2},
-            {-tag_size/2, tag_size/2}
-        };
-    cv::Mat tagPts(4, 2, CV_64F, tp);
     cv::Vec3d rvec;
     cv::Vec3d tvec;
-    if (cv::solvePnP(tagPts, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
+    if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
         continue;
 
     geometry_msgs::PoseStamped tag_pose;
@@ -244,7 +238,25 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
       frame_name_stream << "tag_" << id;
       frame_name = frame_name_stream.str();
     }
-    AprilTagDescription description(id, size, frame_name);
+    double *c_ar;
+    if(tag_description.hasMember("corners")) {
+        ROS_ASSERT(tag_description["corners"].getType() == XmlRpc::XmlRpcValue::TypeArray);
+        XmlRpc::XmlRpcValue v = tag_description["corners"];
+        double c[4*3];
+        for(int i =0; i < v.size(); i++)
+        {
+            ROS_ASSERT(v[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
+            c[i] = (double)v[i];
+        }
+    }
+    else {
+        double c[] = {-size/2, -size/2, 0,
+            size/2, -size/2, 0,
+            size/2, size/2, 0,
+            -size/2, size/2, 0};
+    }
+    cv::Mat corners(4,3, CV_64F, c_ar);
+    AprilTagDescription description(id, size, frame_name, corners);
     ROS_INFO_STREAM("Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);
     descriptions.insert(std::make_pair(id, description));
   }
