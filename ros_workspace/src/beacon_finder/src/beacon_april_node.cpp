@@ -311,7 +311,7 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
                           {size/2, -size/2, 0},
                           {size/2, size/2, 0},
                           {-size/2, size/2, 0}};
-        corners = cv::Mat(4,3, CV_64F, c);
+        corners = cv::Mat(4,3, CV_64F, c).clone();
     }
     AprilTagDescription description(id, size, frame_name, corners);
     ROS_INFO_STREAM("Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);
