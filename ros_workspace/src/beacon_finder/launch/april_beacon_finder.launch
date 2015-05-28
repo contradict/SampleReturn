@@ -61,4 +61,16 @@
             ]
         </rosparam>
     </node>
+
+    <param name="/processes/beacon/robot_description" textfile="$(find samplereturn)/urdf/beacon.urdf"/>
+
+    <node name="beacon_publisher"
+          machine="search" 
+          pkg="robot_state_publisher" 
+          type="robot_state_publisher"
+          output="log"
+          ns="/processes/beacon/">
+        <param name="publish_frequency" type="double" value="1"/>
+    </node>
+
 </launch>
