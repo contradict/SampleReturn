@@ -259,7 +259,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
   detections_pub_.publish(tag_detection_array);
   tag_pose_pub_.publish(tag_pose_array);
-  beacon_pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
 }
 
