@@ -1,3 +1,4 @@
+std_msgs/Header header
 int32 id
 float64 size
-geometry_msgs/PoseStamped pose
+geometry_msgs/Pose pose

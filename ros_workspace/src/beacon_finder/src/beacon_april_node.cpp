@@ -206,7 +206,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_pose.header = cv_ptr->header;
 
     beacon_finder::AprilTagDetection tag_detection;
-    tag_detection.pose = tag_pose;
+    tag_detection.header = cv_ptr->header;
+    tag_detection.pose = tag_pose.pose;
     tag_detection.id = det->id;
     tag_detection.size = tag_size;
     tag_detection_array.detections.push_back(tag_detection);
