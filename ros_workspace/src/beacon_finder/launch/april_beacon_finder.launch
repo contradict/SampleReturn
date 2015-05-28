@@ -22,14 +22,34 @@
                       -0.4064,  0.4064, 0],
             frame_id: beacon_front},
           {
-            id: 409,
-            size: 0.8128,
+            id: 408,
+            size: 0.3048,
             corners: [ 0.4064, -0.4064, -0.3937,
                       -0.4064, -0.4064, -0.3937,
                       -0.4064,  0.4064, -0.3937,
                        0.4064,  0.4064, -0.3937],
-            frame_id: beacon_right}
-         ]
+            frame_id: beacon_right},
+          {
+            id: 409,
+            size: 0.8128,
+            corners: [],
+            frame_id: beacon_back},
+          {
+            id: 410,
+            size: 0.3048,
+            corners: [],
+            frame_id: beacon_left},
+          {
+            id: 411,
+            size: 0.2032,
+            corners: [],
+            frame_id: beacon_front_right),
+          {
+            id: 412,
+            size: 0.2032,
+            corners: [],
+            frame_id: beacon_front_left}
+        ]
         </rosparam>
     </node>
 </launch>
