@@ -125,12 +125,17 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     ROS_ERROR("No covariance specified");
   }
 
-
   image_sub_ = it_.subscribeCamera("image", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
   detections_pub_ = pnh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
   pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tag_detections_pose", 1);
   beacon_pose_pub_ = pnh.advertise<geometry_msgs::PoseWithCovarianceStamped>("beacon_pose", 10);
+
+  //wait for the beacon_publisher to start up  
+  _tf.waitForTransform("map", "beacon",
+                        ros::Time(0),
+                        ros::Duration(30.0));
+
 }
 
 BeaconAprilDetector::~BeaconAprilDetector(){
