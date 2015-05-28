@@ -58,11 +58,13 @@ class BeaconAprilDetector{
   apriltag_family_t *tag_fam_;
   apriltag_detector_t *tag_det_;
   image_geometry::PinholeCameraModel model_;
+  std::vector<double> covariance_;
 };
 
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
     it_(nh),
-    tag_det_(NULL)
+    tag_det_(NULL),
+    covariance_(36,0.0)
 {
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
@@ -113,6 +115,11 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pnh.param("refine_edges", this->tag_det_->refine_edges, 1);
   pnh.param("refine_decode", this->tag_det_->refine_decode, 0);
   pnh.param("refine_pose", this->tag_det_->refine_pose, 0);
+  if (!pnh.getParam("covariance", this->covariance_))
+  {
+    ROS_ERROR("No covariance specified");
+  }
+
 
   image_sub_ = it_.subscribeCamera("image", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
