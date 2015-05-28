@@ -41,7 +41,7 @@
     <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
     <include file="$(find motion_planning)/launch/motion_planning.launch"/>
     <include file="$(find samplereturn)/launch/imu.launch"/>
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
+    <include file="$(find beacon_finder)/launch/april_beacon_finder.launch"/>
 
     <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
 

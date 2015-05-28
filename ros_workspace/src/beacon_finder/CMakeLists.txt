@@ -4,7 +4,22 @@ project(beacon_finder)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS rospy std_msgs)
+find_package(catkin REQUIRED COMPONENTS
+     rospy
+     roscpp
+     tf
+     tf_conversions
+     
+     sensor_msgs
+     geometry_msgs
+     std_msgs
+     message_generation
+     
+     cv_bridge
+     image_transport
+     image_geometry
+     cmake_modules
+     )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -19,9 +34,11 @@ catkin_python_setup()
 #######################################
 
 ## Generate messages in the 'msg' folder
-#add_message_files(
-#  FILES
-#)
+add_message_files(
+  FILES
+    AprilTagDetection.msg
+    AprilTagDetectionArray.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -37,10 +54,11 @@ catkin_python_setup()
 #)
 
 ## Generate added messages and services with any dependencies listed here
-#generate_messages(
-#    DEPENDENCIES
-#        std_msgs
-#)
+generate_messages(
+    DEPENDENCIES
+        std_msgs
+        geometry_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -65,9 +83,11 @@ catkin_package(
 ## Build ##
 ###########
 
+add_subdirectory(src/apriltags)
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${apriltags_INCLUDE_DIRS})
 
 ## Declare a cpp library
 # add_library(sample_detection_filter
@@ -85,6 +105,16 @@ catkin_package(
 # target_link_libraries(sample_detection_filter_node
 #   ${catkin_LIBRARIES}
 # )
+
+add_executable(beacon_april_node src/beacon_april_node.cpp)
+
+add_dependencies(beacon_april_node beacon_finder_generate_messages_cpp)
+
+target_link_libraries(beacon_april_node
+      ${catkin_LIBRARIES}
+      apriltags
+)
+
 
 #############
 ## Install ##
@@ -107,18 +137,17 @@ install(DIRECTORY launch
 )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS sample_detection_filter sample_detection_filter_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+install(TARGETS beacon_april_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
