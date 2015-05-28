@@ -11,6 +11,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <tf/transform_listener.h>
 #include <XmlRpcException.h>
 
 #include "apriltag.h"
@@ -55,6 +56,7 @@ class BeaconAprilDetector{
   ros::Publisher detections_pub_;
   ros::Publisher pose_pub_;
   ros::Publisher beacon_pose_pub_;
+  tf::TransformListener    _tf;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -65,6 +67,7 @@ class BeaconAprilDetector{
 
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
     it_(nh),
+    _tf(ros::Duration(10.0)),
     tag_det_(NULL),
     covariance_(36,0.0)
 {
@@ -190,7 +193,12 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       }
       AprilTagDescription description = description_itr->second;
       double tag_size = description.size();
-
+      
+    std::string frame_id = description.frame_name();
+    tf::StampedTransform T_tag_to_beacon;
+    _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_tag_to_beacon);
+    ROS_INFO("Xform");
+        
     cv::Mat imgPts(4, 2, CV_64F, det->p);
     cv::Vec3d rvec;
     cv::Vec3d tvec;
@@ -200,7 +208,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
         continue;
     }
-
 
     geometry_msgs::PoseStamped tag_pose;
     double th = cv::norm(rvec);
