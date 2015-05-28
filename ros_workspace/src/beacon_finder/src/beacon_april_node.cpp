@@ -79,7 +79,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
 
 
   //get tag family parametre
-  nh.param("tag_family", famname_, std::string("tag36h11"));
+  pnh.param("tag_family", famname_, std::string("tag36h11"));
   if (!famname_.compare("tag36h11"))
     this->tag_fam_ = tag36h11_create();
   else if (!famname_.compare("tag36h10"))
@@ -96,7 +96,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   }
 
   int border;
-  nh.param("border", border, 1);
+  pnh.param("border", border, 1);
   this->tag_fam_->black_border = border;
 
   //setup tag detector
@@ -104,19 +104,19 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   apriltag_detector_add_family(this->tag_det_, this->tag_fam_);
   //these defaults taken from apriltag_demo.c
   double decim, blur;
-  nh.param("decimate", decim, 1.0);
+  pnh.param("decimate", decim, 1.0);
   this->tag_det_->quad_decimate = decim;
-  nh.param("blur", blur, 0.0);
+  pnh.param("blur", blur, 0.0);
   this->tag_det_->quad_sigma = blur;
-  nh.param("threads", this->tag_det_->nthreads, 4);
-  nh.param("debug", this->tag_det_->debug, 0);
-  nh.param("refine_edges", this->tag_det_->refine_edges, 1);
-  nh.param("refine_decode", this->tag_det_->refine_decode, 0);
-  nh.param("refine_pose", this->tag_det_->refine_pose, 0);
+  pnh.param("threads", this->tag_det_->nthreads, 4);
+  pnh.param("debug", this->tag_det_->debug, 0);
+  pnh.param("refine_edges", this->tag_det_->refine_edges, 1);
+  pnh.param("refine_decode", this->tag_det_->refine_decode, 0);
+  pnh.param("refine_pose", this->tag_det_->refine_pose, 0);
 
   image_sub_ = it_.subscribeCamera("image_rect", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
-  detections_pub_ = nh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
+  detections_pub_ = pnh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
   pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tag_detections_pose", 1);
 }
 
