@@ -39,7 +39,7 @@ set(APRILTAGS_C_SOURCES
     ${SRC_DIR}/common/getopt.c
 )
 
-add_library(apriltags
+add_library(apriltags STATIC
   ${APRILTAGS_C_SOURCES}
 )
 target_link_libraries(apriltags ${CMAKE_THREAD_LIBS_INIT} m)
