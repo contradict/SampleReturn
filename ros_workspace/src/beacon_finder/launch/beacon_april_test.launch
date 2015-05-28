@@ -7,4 +7,18 @@
              address="localhost"
              />
     <include file="$(find beacon_finder)/launch/april_beacon_finder.launch"/>
+<!--james' terrible test fixture
+    <node name="search"
+            pkg="usb_cam"
+            type="usb_cam_node"
+            ns="/cameras"
+            machine="search"
+            respawn="true"
+            output="screen">
+        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/ffmv-port-left-640.yaml"/>
+        <param name="video_device" type="string" value="/dev/video1"/>
+        <remap from="/cameras/search/image_raw" to="/cameras/search/image"/>
+        <remap from="/cameras/search/camera_info" to="/cameras/search/info"/>
+    </node>
+-->
 </launch>
