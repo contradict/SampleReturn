@@ -43,7 +43,7 @@
             id: 411,
             size: 0.2032,
             corners: [],
-            frame_id: beacon_front_right),
+            frame_id: beacon_front_right},
           {
             id: 412,
             size: 0.2032,
