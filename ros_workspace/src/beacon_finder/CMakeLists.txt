@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
      rospy
      roscpp
      tf
+     tf_conversions
      
      sensor_msgs
      geometry_msgs

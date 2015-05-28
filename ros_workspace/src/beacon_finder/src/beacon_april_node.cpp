@@ -12,6 +12,7 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include <XmlRpcException.h>
 
 #include "apriltag.h"
@@ -131,11 +132,6 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tag_detections_pose", 1);
   beacon_pose_pub_ = pnh.advertise<geometry_msgs::PoseWithCovarianceStamped>("beacon_pose", 10);
 
-  //wait for the beacon_publisher to start up  
-  _tf.waitForTransform("map", "beacon",
-                        ros::Time(0),
-                        ros::Duration(30.0));
-
 }
 
 BeaconAprilDetector::~BeaconAprilDetector(){
@@ -200,9 +196,15 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       double tag_size = description.size();
       
     std::string frame_id = description.frame_name();
-    tf::StampedTransform T_tag_to_beacon;
-    _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_tag_to_beacon);
-    ROS_INFO("Xform");
+    std::string tf_err;
+    if(!_tf.canTransform("beacon", frame_id, ros::Time(0), &tf_err))
+    {
+        ROS_ERROR_STREAM("Unable to transform to frame " << frame_id << ": " << tf_err);
+        continue;
+    }
+
+    tf::StampedTransform T_beacon_to_tag;
+    _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
         
     cv::Mat imgPts(4, 2, CV_64F, det->p);
     cv::Vec3d rvec;
@@ -214,17 +216,19 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         continue;
     }
 
-    geometry_msgs::PoseStamped tag_pose;
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
-    tag_pose.pose.position.x = tvec[0];
-    tag_pose.pose.position.y = tvec[1];
-    tag_pose.pose.position.z = tvec[2];
-    tag_pose.pose.orientation.x = axis[0]*sin(th/2);
-    tag_pose.pose.orientation.y = axis[1]*sin(th/2);
-    tag_pose.pose.orientation.z = axis[2]*sin(th/2);
-    tag_pose.pose.orientation.w = cos(th/2);
+    tf::Transform tag_to_camera(tf::Quaternion(tf::Vector3(axis[0], axis[1], axis[2]), th),
+            tf::Vector3(tvec[0], tvec[1], tvec[2]));
+    tf::StampedTransform tag_to_camera_s(tag_to_camera,
+            msg->header.stamp, frame_id, msg->header.frame_id);
+    tf::StampedTransform beacon_to_camera( T_beacon_to_tag * tag_to_camera_s,
+            msg->header.stamp, "beacon", msg->header.frame_id);
+
+    geometry_msgs::PoseStamped tag_pose;
+    tf::pointTFToMsg( beacon_to_camera.getOrigin(), tag_pose.pose.position);
+    tf::quaternionTFToMsg( beacon_to_camera.getRotation(), tag_pose.pose.orientation);
     tag_pose.header = cv_ptr->header;
 
     geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
