@@ -9,6 +9,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <boost/foreach.hpp>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <XmlRpcException.h>
 
@@ -53,6 +54,7 @@ class BeaconAprilDetector{
   image_transport::Publisher image_pub_;
   ros::Publisher detections_pub_;
   ros::Publisher pose_pub_;
+  ros::Publisher beacon_pose_pub_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -125,6 +127,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   image_pub_ = it_.advertise("tag_detections_image", 1);
   detections_pub_ = pnh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
   pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tag_detections_pose", 1);
+  beacon_pose_pub_ = pnh.advertise<geometry_msgs::PoseWithCovarianceStamped>("beacon_pose", 10);
 }
 
 BeaconAprilDetector::~BeaconAprilDetector(){
@@ -212,6 +215,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_pose.pose.orientation.w = cos(th/2);
     tag_pose.header = cv_ptr->header;
 
+    geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
+    beacon_pose_msg.header = cv_ptr->header;
+    std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
+    beacon_pose_msg.pose.pose = tag_pose.pose;
+
     beacon_finder::AprilTagDetection tag_detection;
     tag_detection.header = cv_ptr->header;
     tag_detection.pose = tag_pose.pose;
@@ -220,6 +228,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_detection_array.detections.push_back(tag_detection);
     tag_pose_array.poses.push_back(tag_pose.pose);
 
+    beacon_pose_pub_.publish(beacon_pose_msg);
   }
   //free up detections memory
   apriltag_detections_destroy(detections);
