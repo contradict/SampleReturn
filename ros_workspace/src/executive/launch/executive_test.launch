@@ -73,7 +73,18 @@
         <remap from="joint_states" to="platform_joint_state"/>
         <param name="publish_frequency" type="double" value="10"/>
     </node>
-    
+
+    <node name="beacon_publisher"
+          machine="search" 
+          pkg="robot_state_publisher" 
+          type="robot_state_publisher"
+          output="log"
+          ns="/processes/beacon/">
+        <remap from="joint_states" to="platform_joint_state"/>
+        <param name="robot_description" value="$(find samplereturn)/urdf/beacon.urdf"/>
+        <param name="publish_frequency" type="double" value="1"/>
+    </node>
+
     <include file="$(find beacon_finder)/launch/beacon_finder.launch">
         <!--for sim, beacon finder should publish the beacon visualization xform in map-->
         <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>

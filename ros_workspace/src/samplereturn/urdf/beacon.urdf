@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!--home beacon transforms-->
+<robot name="home_beacon">   
+    <link name="beacon"/>
+    
+    <link name="beacon_front"/>
+    <joint name="beacon_front_x" type="fixed">
+        <parent link="beacon"/>
+        <child link="beacon_front"/>
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    </joint>
+    
+    <link name="beacon_front_right"/>
+    <joint name="beacon_front_right_x" type="fixed">
+        <parent link="beacon"/>
+        <child link="beacon_front_right"/>
+        <origin xyz="0.6096 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    </joint>
+</robot>
+
