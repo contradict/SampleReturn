@@ -105,7 +105,7 @@ void OdometrySensorHandler<MEASUREMENT_TYPE, MANAGER_TYPE>::ProcessOdometryMeasu
       fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::p_d;
     }
     if (mngr->Getcfg().odometry_fixed_yaw_d) {
-      fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::yaw_d;
+      fixedstates |= 1 << msf_updates::EKFState::StateDefinition_T::q_d;
     }
   }
 

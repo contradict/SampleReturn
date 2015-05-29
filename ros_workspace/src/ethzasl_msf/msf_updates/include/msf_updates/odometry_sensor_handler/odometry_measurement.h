@@ -141,8 +141,7 @@ namespace msf_updates {
                     Eigen::Matrix<double, 3, 3> C_ib = q_ib.toRotationMatrix();
                     Eigen::Matrix<double, 3, 3> C_bi = C_ib.transpose();
 
-                    double yaw_d = state.Get<StateDefinition_T::yaw_d>()(0);
-                    Eigen::Quaterniond q_d = Eigen::Quaterniond(sqrt(1.0-yaw_d*yaw_d/4.0), 0, 0, yaw_d/2.0);
+                    Eigen::Quaterniond q_d =  state.Get<StateDefinition_T::q_d>();
                     Eigen::Matrix<double, 3, 3> C_d = q_d.toRotationMatrix();
 
                     Eigen::Matrix<double, 2, 1> p_d = state.Get<StateDefinition_T::p_d>();
@@ -171,8 +170,8 @@ namespace msf_updates {
                         kIdxstartcorr_q = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
                         StateDefinition_T::q>::value,
 
-                        kIdxstartcorr_yawd = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
-                        StateDefinition_T::yaw_d>::value,
+                        kIdxstartcorr_qd = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
+                        StateDefinition_T::q_d>::value,
                         kIdxstartcorr_pd = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
                         StateDefinition_T::p_d>::value,
                         kIdxstartcorr_qib = msf_tmp::GetStartIndexInCorrection<StateSequence_T,
@@ -184,7 +183,7 @@ namespace msf_updates {
                     // Read the fixed states flags.
                     bool calibposfix = (fixedstates_ & 1 << StateDefinition_T::p_ib);
                     bool calibattfix = (fixedstates_ & 1 << StateDefinition_T::q_ib);
-                    bool driftdattfix = (fixedstates_ & 1 << StateDefinition_T::yaw_d);
+                    bool driftdattfix = (fixedstates_ & 1 << StateDefinition_T::q_d);
                     bool driftdposfix = (fixedstates_ & 1 << StateDefinition_T::p_d);
 
                     // Set crosscov to zero for fixed states.
@@ -193,7 +192,7 @@ namespace msf_updates {
                     if (calibattfix)
                         state_in->ClearCrossCov<StateDefinition_T::q_ib>();
                     if (driftdattfix)
-                        state_in->ClearCrossCov<StateDefinition_T::yaw_d>();
+                        state_in->ClearCrossCov<StateDefinition_T::q_d>();
                     if (driftdposfix)
                         state_in->ClearCrossCov<StateDefinition_T::p_d>();
 
@@ -255,7 +254,7 @@ namespace msf_updates {
                         (Eigen::Matrix<double, 2, 2>::Zero().eval()):
                         (Eigen::Matrix<double, 3, 3>::Identity().block<2, 2>(0,0).eval());  //p_d
 
-                    H.block<2, 1>(0, kIdxstartcorr_yawd) =
+                    H.block<2, 1>(0, kIdxstartcorr_qd+2) =
                         driftdattfix ?
                         Eigen::Matrix<double, 2, 1>::Zero() :
                         (-C_d.transpose()*Skew(C_bw_y*C_bi*(C_iw.transpose()*p_iw+p_ib))).block<2,1>(0,2).eval();  // yaw_d
@@ -286,10 +285,10 @@ namespace msf_updates {
                     dq_iw.z() = eps/2;
                     H(2, kIdxstartcorr_q+2) = (orientation(dq_iw).conjugate()*orientation()).z()/eps*2;
 
-                    H.block<1, 3>(2, kIdxstartcorr_yawd) =
+                    H.block<1, 3>(2, kIdxstartcorr_qd) =
                         driftdattfix ?
                         Eigen::Matrix<double, 1, 3>::Zero() :
-                        (-Eigen::Matrix<double, 3, 3>::Identity()).block<1,3>(2,0).eval();  // yaw_d
+                        (Eigen::Matrix<double, 3, 3>::Identity()).block<1,3>(2,0).eval();  // yaw_d
 
                     if(calibattfix)
                     {
@@ -374,8 +373,7 @@ namespace msf_updates {
 
                         Eigen::Matrix<double, 3, 1> p_ib = state.Get<StateDefinition_T::p_ib>();
 
-                        double yaw_d = state.Get<StateDefinition_T::yaw_d>()(0);
-                        Eigen::Quaterniond q_d = Eigen::Quaterniond(sqrt(1.0-yaw_d*yaw_d/4.0), 0, 0, yaw_d/2.0);
+                        Eigen::Quaterniond q_d = state.Get<StateDefinition_T::q_d>();
                         // construct odometry->world rotation
                         Eigen::Quaterniond q_wo = (q_bw_pr*q_d).conjugate();
 
@@ -499,8 +497,7 @@ namespace msf_updates {
 
                         Eigen::Quaterniond q_ib_old = state_old.Get<StateDefinition_T::q_ib>();
 
-                        double yaw_d_old = state_old.Get<StateDefinition_T::yaw_d>()(0);
-                        Eigen::Quaterniond q_d_old = Eigen::Quaterniond(sqrt(1.0-yaw_d_old*yaw_d_old/4.0), 0, 0, yaw_d_old/2.0);
+                        Eigen::Quaterniond q_d_old = state_old.Get<StateDefinition_T::q_d>();
 
                         Eigen::Matrix<double, 2, 1> p_d_old = state_old.Get<StateDefinition_T::p_d>();
 
@@ -523,8 +520,7 @@ namespace msf_updates {
 
                         Eigen::Quaterniond q_ib_new = state_new.Get<StateDefinition_T::q_ib>();
 
-                        double yaw_d_new = state_new.Get<StateDefinition_T::yaw_d>()(0);
-                        Eigen::Quaterniond q_d_new = Eigen::Quaterniond(sqrt(1.0-yaw_d_new*yaw_d_new/4.0), 0, 0, yaw_d_new/2.0);
+                        Eigen::Quaterniond q_d_new = state_new.Get<StateDefinition_T::q_d>();
 
                         Eigen::Matrix<double, 2, 1> p_d_new = state_new.Get<StateDefinition_T::p_d>();
 

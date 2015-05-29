@@ -129,7 +129,6 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
     Eigen::Matrix<double, 2, 1> p_d, p_ob;
     Eigen::Matrix<double, 6, 1> z_o;
     Eigen::Quaternion<double> q_iw, q_wv, q_ic, q_vc, q_ib, q_d, q_ob;
-    double yaw_d;
     msf_core::MSF_Core<EKFState_T>::ErrorStateCov P;
 
     // init values
@@ -143,7 +142,6 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
     q_iw.setIdentity();  // initial conditions
     p_iw.setZero();
 
-    yaw_d = 0;
     q_d.setIdentity();
     p_d.setZero();      // World-odometry position drift.
 
@@ -237,7 +235,6 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
 
     //q_ob = q_d.conjugate() * q_bw_pr.conjugate() * q_iw * q_ib;
     q_d = q_bw_pr.conjugate() * q_iw * q_ib * q_ob.conjugate();
-    yaw_d = q_d.z();
     Eigen::Quaterniond q_wo = (q_bw_pr*q_d).conjugate();
     p_d = p_ob - (q_wo*(p_iw + q_iw*p_ib)).block<2,1>(0,0);
     //z_p = ((q_wo*(p_iw + q_iw*p_ib)).block<2,1>(0,0) + p_d);
@@ -270,7 +267,7 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
     meas->SetStateInitValue < StateDefinition_T::p_wv > (p_wv);
     meas->SetStateInitValue < StateDefinition_T::q_ic > (q_ic);
     meas->SetStateInitValue < StateDefinition_T::p_ic > (p_ic);
-    meas->SetStateInitValue < StateDefinition_T::yaw_d> (msf_core::Vector1::Constant(yaw_d));
+    meas->SetStateInitValue < StateDefinition_T::q_d> (q_d);
     meas->SetStateInitValue < StateDefinition_T::p_d > (p_d);
     meas->SetStateInitValue < StateDefinition_T::q_ib > (q_ib);
     meas->SetStateInitValue < StateDefinition_T::p_ib > (p_ib);
@@ -306,7 +303,7 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
         config_.pose_noise_p_ic);
     const msf_core::Vector1 n_L = msf_core::Vector1::Constant(
         config_.pose_noise_scale);
-    const msf_core::Vector1 nyawdv = msf_core::Vector1::Constant(
+    const msf_core::Vector3 nyawdv = msf_core::Vector3::Constant(
         config_.odometry_noise_yaw_d);
     const msf_core::Vector2 npdv = msf_core::Vector2::Constant(
         config_.odometry_noise_p_d);
@@ -327,7 +324,7 @@ class WheelVisualSensorManager : public msf_core::MSF_SensorManagerROS<
         (dt * nqicv.cwiseProduct(nqicv)).asDiagonal();
     state.GetQBlock<StateDefinition_T::p_ic>() =
         (dt * npicv.cwiseProduct(npicv)).asDiagonal();
-    state.GetQBlock<StateDefinition_T::yaw_d>() =
+    state.GetQBlock<StateDefinition_T::q_d>() =
         (dt * nyawdv.cwiseProduct(nyawdv)).asDiagonal();
     state.GetQBlock<StateDefinition_T::p_d>() =
         (dt * npdv.cwiseProduct(npdv)).asDiagonal();
