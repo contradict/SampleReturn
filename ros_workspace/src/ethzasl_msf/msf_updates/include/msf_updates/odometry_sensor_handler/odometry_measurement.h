@@ -330,12 +330,41 @@ namespace msf_updates {
                         Eigen::Matrix<double, 1, 3>::Zero() : 
                         (-C_bi*Skew(state.w_m)).block<1,3>(2,0).eval(); // q_ib
 
-                    //MSF_INFO_STREAM("p_iw:" << p_iw.transpose() << " v_iw:" << v_iw.transpose() << " q_iw:" << STREAMQUAT(q_iw));
-                    //MSF_INFO_STREAM("p_ib:" << p_ib.transpose() << " q_ib:" << STREAMQUAT(q_ib));
-                    //MSF_INFO_STREAM("p_d:" << p_d.transpose() << " yaw_d:" << yaw_d);
-                    //MSF_INFO_STREAM("H[:,0:9]:\n" << H.leftCols(9));
-                    //MSF_INFO_STREAM("H[:,9:28]:\n" << H.middleCols<19>(9));
-                    //MSF_INFO_STREAM("H[:,28:37]:\n" << H.middleCols<9>(28));
+                    MSF_INFO_STREAM("p_iw:" << p_iw.transpose() << " v_iw:" << v_iw.transpose() << " q_iw:" << STREAMQUAT(q_iw));
+                    MSF_INFO_STREAM("p_d:" << p_d.transpose() << " q_d:" << STREAMQUAT(q_d));
+                    MSF_INFO_STREAM("p_ib:" << p_ib.transpose() << " q_ib:" << STREAMQUAT(q_ib));
+                    MSF_INFO_STREAM("q_bw: " << STREAMQUAT(q_bw));
+                    MSF_INFO_STREAM("q_bw_y: " << STREAMQUAT(q_bw_y));
+                    MSF_INFO_STREAM("q_bw_pr: " << STREAMQUAT(q_bw_pr));
+                    MSF_INFO_STREAM("q_wo: " << STREAMQUAT(q_wo));
+                    //  p,      0:3
+                    //  v,      3:6
+                    //  q,      6:9
+                    //  b_w,    9:12
+                    //  b_a,    12:15
+                    //  L,      15:16
+                    //  q_wv,   16:19
+                    //  p_wv,   19:22
+                    //  q_ic,   22:25
+                    //  p_ic,   25:28
+                    //  q_d,    28:31
+                    //  p_d,    31:34
+                    //  q_ib,   34:37
+                    //  p_ib,   37:40
+                    MSF_INFO_STREAM("p_d:" << p_d.transpose() << " q_d:" << STREAMQUAT(q_d));
+                    MSF_INFO_STREAM("p,v,q");
+                    MSF_INFO_STREAM("H[:,0:9]:\n" << H.leftCols(9));
+                    MSF_INFO_STREAM("H[:,9:28]: (omitted)");
+                    MSF_INFO_STREAM("q_d, p_d, q_ib, p_ib");
+                    MSF_INFO_STREAM("H[:,28:40]:\n" << H.middleCols<9>(28));
+                    if (!CheckForNumeric(H, "H_odometry")) {
+                        MSF_WARN_STREAM("Odometry H has nan:");
+                        MSF_WARN_STREAM("H[:,0:9]:\n" << H.leftCols(9));
+                        MSF_WARN_STREAM("H[:,9:28]:\n" << H.middleCols<19>(9));
+                        MSF_WARN_STREAM("H[:,28:37]:\n" << H.middleCols<9>(28));
+                        MSF_WARN_STREAM(
+                                    "state: "<<const_cast<EKFState_T&>(state).ToEigenVector().transpose());
+                    }
                 }
 
                 /**
@@ -418,13 +447,14 @@ namespace msf_updates {
 
                         //MSF_INFO_STREAM("r_old: " << r_old.transpose());
 
+                        MSF_INFO_STREAM("odometry residual: " << r_old.transpose());
                         if (!CheckForNumeric(r_old, "r_old")) {
                             MSF_ERROR_STREAM("r_old: "<<r_old);
                             MSF_WARN_STREAM(
                                     "state: "<<const_cast<EKFState_T&>(state). ToEigenVector().transpose());
                         }
-                        if (!CheckForNumeric(H_new, "H_old")) {
-                            MSF_ERROR_STREAM("H_old: "<<H_new);
+                        if (!CheckForNumeric(H_new, "H_new")) {
+                            MSF_ERROR_STREAM("H_new: "<<H_new);
                             MSF_WARN_STREAM(
                                     "state: "<<const_cast<EKFState_T&>(state). ToEigenVector().transpose());
                         }
@@ -568,8 +598,9 @@ namespace msf_updates {
                         Eigen::Matrix<double, 1, 1> diffmeasomega = z_p_.block<1,1>(5,0) - prevmeas->z_p_.block<1,1>(5,0);
                         r_old.block<1,1>(5,0) = diffmeasomega - diffprobomega;
 
-                        if (!CheckForNumeric(r_old, "r_old")) {
-                            MSF_ERROR_STREAM("r_old: "<<r_old);
+                        MSF_INFO_STREAM("odometry residual: " << r_new.transpose());
+                        if (!CheckForNumeric(r_new, "r_new")) {
+                            MSF_ERROR_STREAM("r_new: "<<r_new);
                             MSF_WARN_STREAM(
                                     "state: "<<const_cast<EKFState_T&>(state_new). ToEigenVector().transpose());
                         }
