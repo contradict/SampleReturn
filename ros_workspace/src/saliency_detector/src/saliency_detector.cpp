@@ -18,6 +18,19 @@
 #include <Eigen/Dense>
 #include "color_naming.h"
 
+struct index_score {
+  float count;
+  uchar R;
+  uchar G;
+  uchar B;
+  uchar L;
+  uchar a;
+  uchar b;
+  uchar H;
+  uchar S;
+  uchar V;
+} __attribute__((packed));
+
 class SaliencyDetectorNode
 {
   ros::NodeHandle nh;
@@ -120,6 +133,69 @@ class SaliencyDetectorNode
     cam_model_.fromCameraInfo(msg);
     cv::Mat K = cv::Mat(cam_model_.intrinsicMatrix());
     inv_K_ = K.inv();
+  }
+
+  // There may be a bug in this, it produces slightly different maps than
+  // the python script example. Qualitatively very similar, but with slightly
+  // different range. I will hopefully get back to finding and fixing this.
+  cv::Mat computeGlobalSaliency(cv::Mat image) {
+    cv::Mat lab_image, hsv_image;
+    cv::cvtColor(image,lab_image,cv::COLOR_RGB2Lab);
+    cv::cvtColor(image,hsv_image,cv::COLOR_RGB2HSV);
+
+    int channels[] = {0,1,2};
+    int hist_size[] = {12,12,12};
+    float r_range[] = {0,256};
+    float g_range[] = {0,256};
+    float b_range[] = {0,256};
+    const float* ranges[] = {r_range,g_range,b_range};
+
+    cv::Mat hist;
+    cv::calcHist(&image, 1, channels, cv::Mat(), hist, 3, hist_size, ranges);
+
+    float sum = 0;
+    std::vector<index_score> top_indices;
+    // Normalize hist
+    for (int i=0; i<hist_size[0]; i++) {
+      for (int j=0; j<hist_size[1]; j++) {
+        for (int k=0; k<hist_size[2]; k++) {
+          sum += hist.at<float>(i,j,k);
+          float bin_width = r_range[1]/float(hist_size[0]);
+          struct index_score i_s;
+          i_s.count = hist.at<float>(i,j,k);
+          i_s.R = (i+0.5)*bin_width;
+          i_s.G = (j+0.5)*bin_width;
+          i_s.B = (k*0.5)*bin_width;
+          // Add Lab space for distance metric
+          cv::Mat rgb(1,1,CV_8UC3,&i_s.R);
+          cv::Mat Lab(1,1,CV_8UC3,&i_s.L);
+          cv::Mat HSV(1,1,CV_8UC3,&i_s.H);
+          cv::cvtColor(rgb,Lab,CV_RGB2Lab);
+          cv::cvtColor(rgb,HSV,CV_RGB2HSV);
+          top_indices.push_back(i_s);
+        }
+      }
+    }
+    // Reduce hist to n ~= 100 bins (try to cover some fraction of pixels. e.g.95%)
+    std::sort(top_indices.begin(), top_indices.end(), [](struct index_score a, struct index_score b) {
+        return b.count < a.count;
+        });
+
+    // For query image, iterate over hist bins to compute per-pixel score,
+    // which is distance between query pixel and hist bin color * hist bin count
+    cv::Mat out = cv::Mat::zeros(image.rows,image.cols,CV_32FC1);
+    for (int n=0; n<40; n++) {
+      for (int i=0; i<image.rows;i++) {
+        for (int j=0; j<image.cols;j++) {
+          cv::Vec3b lab_px = lab_image.at<cv::Vec3b>(i,j);
+          cv::Vec3b hsv_px = hsv_image.at<cv::Vec3b>(i,j);
+          float diff = abs(int(hsv_px[0]) - int(top_indices[n].H))
+            + abs(int(lab_px[1]) - int(top_indices[n].a)) + abs(int(lab_px[2]) - int(top_indices[n].b));
+          out.at<float>(i,j) += top_indices[n].count*diff/sum;
+        }
+      }
+    }
+    return out;
   }
 
   void messageCallback(const sensor_msgs::ImageConstPtr& msg)
