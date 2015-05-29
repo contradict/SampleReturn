@@ -107,7 +107,7 @@ class PursueSample(object):
         #sample_lost search pattern
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
         self.state_machine.userdata.square_search_size = self.node_params.square_search_size
-        self.state_machine.userdata.settle_time = 5
+        self.state_machine.userdata.settle_time = rospy.Duration(self.node_params.settle_time)
         self.state_machine.userdata.manipulator_search_angle = math.pi/4
         self.state_machine.userdata.search_count = 0
         self.state_machine.userdata.search_try_limit = 2
