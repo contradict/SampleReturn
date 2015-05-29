@@ -596,7 +596,7 @@ namespace msf_updates {
                         // angular rate
                         Eigen::Matrix<double, 1, 1> diffprobomega = (q_ib_new.conjugate()*state_new.w_m - q_ib_old.conjugate()*state_old.w_m).block<1,1>(2,0);
                         Eigen::Matrix<double, 1, 1> diffmeasomega = z_p_.block<1,1>(5,0) - prevmeas->z_p_.block<1,1>(5,0);
-                        r_old.block<1,1>(5,0) = diffmeasomega - diffprobomega;
+                        r_new.block<1,1>(5,0) = diffmeasomega - diffprobomega;
 
                         MSF_INFO_STREAM("odometry residual: " << r_new.transpose());
                         if (!CheckForNumeric(r_new, "r_new")) {
