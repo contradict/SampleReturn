@@ -611,7 +611,7 @@ class KalmanDetectionFilter
   void clearMarker(std::shared_ptr<ColoredKF> ckf) {
     visualization_msgs::MarkerArray marker_array;
     visualization_msgs::Marker marker;
-    marker.header.frame_id = "map";
+    marker.header.frame_id = _filter_frame_id;
     marker.header.stamp = ros::Time::now();
     marker.id = ckf->filter_id;
     marker.action = visualization_msgs::Marker::DELETE;
@@ -676,7 +676,7 @@ class KalmanDetectionFilter
       cov.type = visualization_msgs::Marker::CYLINDER;
       cov.id = std::get<3>(exclusion_list_[i]);
       cov.ns = "exclusion";
-      cov.header.frame_id = "map";
+      cov.header.frame_id = _filter_frame_id;
       cov.header.stamp = ros::Time::now();
       cov.color.r = 1.0;
       cov.color.g = 0.0;
@@ -689,8 +689,8 @@ class KalmanDetectionFilter
       cov.pose.orientation.y = 0;
       cov.pose.orientation.z = 0;
       cov.pose.orientation.w = 1;
-      cov.scale.x = std::get<2>(exclusion_list_[i]);
-      cov.scale.y = std::get<2>(exclusion_list_[i]);
+      cov.scale.x = std::get<2>(exclusion_list_[i])*2;
+      cov.scale.y = std::get<2>(exclusion_list_[i])*2;
       cov.scale.z = 0.0;
       cov.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
