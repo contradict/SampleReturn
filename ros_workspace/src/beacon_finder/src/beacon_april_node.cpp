@@ -125,10 +125,6 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pnh.param("refine_edges", this->tag_det_->refine_edges, 1);
   pnh.param("refine_decode", this->tag_det_->refine_decode, 0);
   pnh.param("refine_pose", this->tag_det_->refine_pose, 0);
-  if (!pnh.getParam("covariance", this->covariance_))
-  {
-    ROS_ERROR("No covariance specified");
-  }
   pnh.param("position_sigma", this->position_sigma_, 0.01);
   pnh.param("position_sigma_scale", this->position_sigma_scale_, 0.05);
   pnh.param("rotation_sigma", this->rotation_sigma_, 0.15);

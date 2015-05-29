@@ -46,17 +46,7 @@
         <param name="position_sigma_scale" value="0.05"/>
         <!-- old beacon finder variance: 0.02 -->
         <param name="rotation_sigma" value="0.15"/>
-
-        <rosparam param="covariance"> [
-            0.50,  0,    0,    0,    0,    0,
-            0,     0.50, 0,    0,    0,    0,
-            0,     0,    0.50, 0,    0,    0,
-            0,     0,    0,    0.02, 0,    0,
-            0,     0,    0,    0,    0.02, 0,
-            0,     0,    0,    0,    0,    0.02
-            ]
-        </rosparam>
-    </node>
+   </node>
 
     <param name="/processes/beacon/robot_description" textfile="$(find samplereturn)/urdf/beacon.urdf"/>
 
