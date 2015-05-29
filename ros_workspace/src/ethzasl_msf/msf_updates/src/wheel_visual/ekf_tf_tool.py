@@ -158,10 +158,10 @@ def TfromSt(h, chld, st):
 #  p_wv,   21:24
 #  q_ic,   24:28
 #  p_ic,   28:31
-#  yaw_d, 31:32
-#  p_d,   32:34
-#  q_ib,   34:38
-#  p_ib,   38:41
+#  q_d,    31:35
+#  p_d,    35:37
+#  q_ib,   37:41
+#  p_ib,   41:44
 class StateToTF(object):
     def __init__(self):
         self.b_ = tf2_ros.TransformBroadcaster()
@@ -204,18 +204,17 @@ class StateToTF(object):
         # odometry yaw drift
         # same as vision frame drift (quaternion conjugation necessary)
         h = Header(msg.header.seq, msg.header.stamp, 'map')
-        y_wo = msg.data[31]
         t_wo = FancyTransform(h, 'odometry', Transform(
-                Vector3(msg.data[32], msg.data[33], 0),
-                Quaternion(0.0, 0.0, -sin(y_wo/2.0), cos(y_wo/2.0))))
+                Vector3(msg.data[35], msg.data[36], 0),
+                Quaternion(msg.data[32], msg.data[33], msg.data[34], msg.data[31])))
         rospy.loginfo("t_wo:\n%s", t_wo)
 
         # odometry sensor position
         # same as camera position
         h = Header(msg.header.seq, msg.header.stamp, 'imu')
         t_ib = FancyTransform(h, 'base', Transform(
-                Vector3(*msg.data[38:41]),
-                Quaternion(msg.data[35], msg.data[36], msg.data[37], msg.data[34])))
+                Vector3(*msg.data[41:44]),
+                Quaternion(msg.data[38], msg.data[39], msg.data[40], msg.data[37])))
         rospy.loginfo("t_ib:\n%s", t_ib)
 
         self.b_.sendTransform([t_iw, t_wv, t_ic, t_wo, t_ib])
