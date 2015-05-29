@@ -143,16 +143,17 @@ class PursueSample(object):
  
             smach.StateMachine.add('APPROACH_SAMPLE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'SAMPLE_VERIFY',
+                                   transitions = {'complete':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'blocked':'PUBLISH_FAILURE',
                                                   'started_blocked':'PUBLISH_FAILURE',
-                                                  'missed_target':'SAMPLE_VERIFY',
+                                                  'missed_target':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'off_course':'PUBLISH_FAILURE',
                                                   'object_detected':'PUBLISH_FAILURE',
                                                   'preempted':'PUBLISH_FAILURE',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'move_goal':'pursuit_goal'})
 
+            '''
             @smach.cb_interface(outcomes=['verified','not_verified'])
             def sample_verify_resp(userdata, response):
                 if response.verified:
@@ -182,6 +183,12 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  'Sample not verified.'),
                                    transitions = {'next':'PUBLISH_FAILURE'})    
+            '''
+
+            smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
+                                           AnnounceState(self.announcer,
+                                                         'Prepare ing final approach.'),
+                                           transitions = {'next':'CALCULATE_MANIPULATOR_APPROACH'})    
 
              #calculate the final strafe move to the sample, this gets us the yaw for the obstacle check
             smach.StateMachine.add('CALCULATE_MANIPULATOR_APPROACH',
