@@ -50,7 +50,7 @@
     <remap from="camera_info" to="/cameras/search/info"/>
     <remap from="ack" to="/processes/executive/pursuit_result"/>
     <remap from="odometry" to="/motion/odometry"/>
-    <param name="max_dist" type="double" value="0.5"/>
+    <param name="max_dist" type="double" value="1.5"/>
     <param name="max_cov" type="double" value="1.5"/>
     <param name="max_pub_cov" type="double" value="0.3"/>
     <param name="max_pub_vel" type="double" value="0.1"/>
