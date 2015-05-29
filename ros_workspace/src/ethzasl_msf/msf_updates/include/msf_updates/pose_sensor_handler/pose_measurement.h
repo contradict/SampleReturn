@@ -267,6 +267,12 @@ struct PoseMeasurement : public PoseMeasurementBase {
             Eigen::Matrix<double, 3, 3>::Zero() :
             Eigen::Matrix<double, 3, 3>::Identity().eval();  //q_ic
 
+    MSF_INFO_STREAM("p,v,q");
+    MSF_INFO_STREAM("H[:,0:9]:\n" << H.leftCols(9));
+    MSF_INFO_STREAM("H[:,9:15]: (omitted)");
+    MSF_INFO_STREAM("L, q_wv, p_wv, q_ic, p_ic");
+    MSF_INFO_STREAM("H[:,15:28]:\n" << H.middleCols<13>(15));
+    MSF_INFO_STREAM("H[:,28:40]: (omitted)");
     // This line breaks the filter if a position sensor in the global frame is
     // available or if we want to set a global yaw rotation.
     //H.block<1, 1>(6, kIdxstartcorr_qwv + 2) = Eigen::Matrix<double, 1, 1>::
@@ -315,6 +321,7 @@ struct PoseMeasurement : public PoseMeasurementBase {
       r_old(6, 0) = -2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y())
           / (1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z()));
 
+      MSF_INFO_STREAM("pose residual: " << r_old.transpose());
       if (!CheckForNumeric(r_old, "r_old")) {
         MSF_ERROR_STREAM("r_old: "<<r_old);
         MSF_WARN_STREAM(
@@ -428,6 +435,7 @@ struct PoseMeasurement : public PoseMeasurementBase {
       r_new(6, 0) = -2 * (q_err.w() * q_err.z() + q_err.x() * q_err.y())
           / (1 - 2 * (q_err.y() * q_err.y() + q_err.z() * q_err.z()));
 
+      MSF_INFO_STREAM("pose residual: " << r_new.transpose());
       if (!CheckForNumeric(r_old, "r_old")) {
         MSF_ERROR_STREAM("r_old: "<<r_old);
         MSF_WARN_STREAM(
