@@ -3,6 +3,7 @@ import cv2
 import sys
 from matplotlib.pyplot import imshow,draw
 import scipy.linalg
+import time
 
 #img = cv2.imread(sys.argv[1])
 #img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
@@ -37,7 +38,7 @@ if (len(sys.argv)==3):
 elif (len(sys.argv)==2):
     train_img = cv2.cvtColor(cv2.imread(sys.argv[1]),cv2.COLOR_BGR2RGB)
     trim_train_img = train_img[600:,...].copy()
-    trim_train_img = cv2.resize(trim_train_img,(1000,540))
+    trim_train_img = cv2.resize(trim_train_img,(1000,540),interpolation=cv2.INTER_AREA)
     print "Calc Hist Start: ",time.clock()
     hist = cv2.calcHist([trim_train_img],[0,1,2],None,[12,12,12],[0,256,0,256,0,256])
     # Normalize hist
@@ -65,6 +66,7 @@ for i in range(40):
 for i in range(top_bins.shape[0]):
     lab_bin = cv2.cvtColor(top_bins[i,:3].reshape((1,1,3)).astype(np.uint8),cv2.COLOR_RGB2LAB)
     hsv_bin = cv2.cvtColor(top_bins[i,:3].reshape((1,1,3)).astype(np.uint8),cv2.COLOR_RGB2HSV)
+    #top_bins[i,:3] = lab_bin.reshape((3))
     top_bins[i,1:3] = lab_bin.reshape((3))[1:3]
     top_bins[i,0] = hsv_bin.reshape((3))[0]
 print "Calc Hist End: ",time.clock()
@@ -73,12 +75,15 @@ print "Calc Hist End: ",time.clock()
 if (len(sys.argv)==3):
     query_img = cv2.cvtColor(cv2.imread(sys.argv[2]),cv2.COLOR_BGR2LAB)
 elif (len(sys.argv)==2):
-    query_img_lab = cv2.cvtColor(cv2.imread(sys.argv[1]),cv2.COLOR_BGR2LAB)
-    query_img_hsv = cv2.cvtColor(cv2.imread(sys.argv[1]),cv2.COLOR_BGR2HSV)
+    #query_img_lab = cv2.cvtColor(cv2.imread(sys.argv[1]),cv2.COLOR_BGR2LAB)
+    #query_img_hsv = cv2.cvtColor(cv2.imread(sys.argv[1]),cv2.COLOR_BGR2HSV)
+    query_img_lab = cv2.cvtColor(trim_train_img,cv2.COLOR_RGB2LAB)
+    query_img_hsv = cv2.cvtColor(trim_train_img,cv2.COLOR_RGB2HSV)
     query_img_lab[...,0] = query_img_hsv[...,0]
 print "Img Comp Start: ",time.clock()
-trim_query_img = query_img_lab[600:,...].copy()
-trim_query_img = cv2.resize(trim_query_img,(1000,540))
+#trim_query_img = query_img_lab[600:,...].copy()
+#trim_query_img = cv2.resize(trim_query_img,(1000,540))
+trim_query_img = query_img_lab.copy()
 score_img = np.zeros((trim_query_img.shape[0],trim_query_img.shape[1]),np.float32)
 for n in range(top_bins.shape[0]):
     dist = np.abs(trim_query_img - top_bins[n,:3])
