@@ -46,6 +46,8 @@ class CloseRangeDetector(object):
         self.classifier.load(rospack.get_path('saliency_detector')+'/config/trained_svm')
 
     def verify_callback(self, req):
+        resp = VerifyResponse(True)
+        return resp
         # When a point request is received, take the last image, transform the point
         # from odom to search_camera, project into pixel space, compute shape metrics
         if self.cam_model is None or self.last_img is None:

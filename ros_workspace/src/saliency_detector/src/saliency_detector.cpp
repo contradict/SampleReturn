@@ -100,7 +100,7 @@ class SaliencyDetectorNode
       nh.advertise<sensor_msgs::Image>(sub_mask_debug_topic.c_str(), 3);
 
     pub_named_point =
-      nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 3);
+      nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 12);
 
     blob_params_.blobColor = 255;
     blob_params_.minArea = 15;
@@ -268,6 +268,21 @@ class SaliencyDetectorNode
     bms_img_width_ = config.bms_img_width;
 
     blobDetect_on_ = config.blobDetect_on;
+
+    blob_params_.filterByArea = config.filterByArea;
+    blob_params_.minArea = config.minArea;
+    blob_params_.maxArea = config.maxArea;
+
+    blob_params_.filterByConvexity = config.filterByConvexity;
+    blob_params_.minConvexity = config.minConvexity;
+    blob_params_.maxConvexity = config.maxConvexity;
+
+    blob_params_.minThreshold = config.minThreshold;
+    blob_params_.maxThreshold = config.maxThreshold;
+    blob_params_.thresholdStep = config.thresholdStep;
+    blob_params_.minRepeatability = config.minRepeatability;
+
+    blob_ = cv::SimpleBlobDetector(blob_params_);
 
     saliency_mutex_.unlock();
   }

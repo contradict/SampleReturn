@@ -12,14 +12,14 @@ simple_moves: [
 #and distance all specified relative to base_link.
 #example: - { rotate: -45, distance: 10 }
 moves: [
-    { rotate: -10, distance: 55 },
-    { rotate: -90, distance: 5 },
+    { rotate: -170, distance: 2 },
+    { rotate: -90, distance: 2 },
 ]
 
 #Pursue samples during the recovery moves?
 #Finding a sample will trigger pursuit, and 
 #cancel the remaining recovery moves.
-pursue_samples: true
+pursue_samples: false
 
 #A value of 1 gets rid of the rest of the raster on the
 #current spoke.  Only useful if exiting to web_manager.

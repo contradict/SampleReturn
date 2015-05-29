@@ -457,6 +457,9 @@ class LevelTwoWeb(object):
             
     def beacon_update(self, beacon_pose):
         #update the detection_message with the beacon if we want to stop when we see it
+        rospy.logdebug("LEVEL_TWO report_beacon: {!s}, \
+                       received beacon pose: {!s}".format(self.state_machine.userdata.report_beacon,
+                                                          beacon_pose))
         if self.state_machine.userdata.report_beacon:
             beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                      beacon_pose.pose.pose.position)
