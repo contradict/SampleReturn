@@ -186,7 +186,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
 
-  ROS_INFO("Found %d tags.", zarray_size(detections));
+  ROS_DEBUG("BEACON FINDER found %d tags.", zarray_size(detections));
 
   for (int i = 0; i < zarray_size(detections); i++) {
       apriltag_detection_t *det;
