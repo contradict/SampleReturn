@@ -65,6 +65,9 @@ class BeaconAprilDetector{
   apriltag_detector_t *tag_det_;
   image_geometry::PinholeCameraModel model_;
   std::vector<double> covariance_;
+  double position_sigma_;
+  double position_sigma_scale_;
+  double rotation_sigma_;
 };
 
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
@@ -126,6 +129,9 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   {
     ROS_ERROR("No covariance specified");
   }
+  pnh.param("position_sigma", this->position_sigma_, 0.01);
+  pnh.param("position_sigma_scale", this->position_sigma_scale_, 0.05);
+  pnh.param("rotation_sigma", this->rotation_sigma_, 0.15);
 
   image_sub_ = it_.subscribeCamera("image", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
@@ -238,6 +244,18 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
     beacon_pose.header = cv_ptr->header;
 
+    //calculate covariance based on range
+    double range = cv::norm(tvec);
+    double pos_sigma = position_sigma_scale_ * range * position_sigma_;
+    double pos_covariance = pos_sigma * pos_sigma;
+    double rot_covariance = rotation_sigma_ * rotation_sigma_;
+    covariance_[0] = pos_covariance;
+    covariance_[7] = pos_covariance;
+    covariance_[14] = pos_covariance;
+    covariance_[21] = rot_covariance;
+    covariance_[28] = rot_covariance;
+    covariance_[35] = rot_covariance;
+    
     geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
     beacon_pose_msg.header = cv_ptr->header;
     std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());

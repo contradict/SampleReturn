@@ -39,6 +39,14 @@
             frame_id: beacon_front_left}
         ]
         </rosparam>
+        <!--position sigma specified at 0m-->
+        <!--scale in sigma/meter. With .05, sigma should be about 5m at 100m range-->
+        <!--1 radians per second with 50ms timing inaccuracy????-->
+        <param name="position_sigma" value="0.01"/>
+        <param name="position_sigma_scale" value="0.05"/>
+        <!-- old beacon finder variance: 0.02 -->
+        <param name="rotation_sigma" value="0.15"/>
+
         <rosparam param="covariance"> [
             0.50,  0,    0,    0,    0,    0,
             0,     0.50, 0,    0,    0,    0,
