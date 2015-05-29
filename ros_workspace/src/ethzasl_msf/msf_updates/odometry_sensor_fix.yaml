@@ -64,7 +64,7 @@ odometry_sensor/odometry_measurement_world_sensor: true
 # For the pose sensor noise levels use the std deviation the units are
 #  position: [m]
 #  orientation: [rad]
-wheel_visual_sensor/pose_use_fixed_covariance: false
+wheel_visual_sensor/pose_use_fixed_covariance: true
 wheel_visual_sensor/pose_noise_meas_p: 0.01              # [m]
 wheel_visual_sensor/pose_noise_meas_q: 0.02              # [rad]
 
@@ -79,14 +79,14 @@ wheel_visual_sensor/pose_noise_scale: 0.0
 # Transformation that expresses the position and orientation of the gravity aligned world frame 
 # w.r.t the vision/camera frame
 wheel_visual_sensor/pose_fixed_p_wv: true              
-wheel_visual_sensor/pose_noise_p_wv: 0.0                  
-wheel_visual_sensor/pose_fixed_q_wv: true
-wheel_visual_sensor/pose_noise_q_wv: 0.0                  
+wheel_visual_sensor/pose_noise_p_wv: 0.001
+wheel_visual_sensor/pose_fixed_q_wv: false
+wheel_visual_sensor/pose_noise_q_wv: 0.0001
 
 wheel_visual_sensor/odometry_fixed_p_d: false
-wheel_visual_sensor/odometry_noise_p_d: 0.0
-wheel_visual_sensor/odometry_fixed_yaw_d: false
-wheel_visual_sensor/odometry_noise_yaw_d: 0.0
+wheel_visual_sensor/odometry_noise_p_d: 0.001
+wheel_visual_sensor/odometry_fixed_yaw_d: true
+wheel_visual_sensor/odometry_noise_yaw_d: 0.0001
 
 
 # Transformation that expresses the position and orientation of the pose-sensor w.r.t. the IMU 
