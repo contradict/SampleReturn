@@ -85,9 +85,9 @@ int main(int argc, char **argv)
       for (int j=0; j<small.cols;j++) {
         cv::Vec3b lab_px = lab_small.at<cv::Vec3b>(i,j);
         cv::Vec3b hsv_px = hsv_small.at<cv::Vec3b>(i,j);
-        float diff = abs(hsv_px[0] - top_indices[n].H)
-          + abs(lab_px[1] - top_indices[n].a) + abs(lab_px[2] - top_indices[n].b);
-        out.at<double>(i,j) += top_indices[n].count*diff/sum;
+        float diff = abs(int(hsv_px[0]) - int(top_indices[n].H))
+          + abs(int(lab_px[1]) - int(top_indices[n].a)) + abs(int(lab_px[2]) - int(top_indices[n].b));
+        out.at<float>(i,j) += top_indices[n].count*diff/sum;
       }
     }
   }
