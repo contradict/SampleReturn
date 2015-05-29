@@ -263,7 +263,8 @@ class KalmanDetectionFilter
 
     filter_id_count_ = 1;
     current_published_id_ = 0;
-    exclusion_count_ = 0;
+    exclusion_count_ = 1;
+    exclusion_list_.push_back(std::make_tuple(0,0,10.0,0));
 
     odometry_received_ = false;
     last_x_ = 0.0;
