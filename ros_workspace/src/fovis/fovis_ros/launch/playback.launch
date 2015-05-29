@@ -51,6 +51,8 @@
         >
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
         <remap from="odometry" to="lls_odometry"/>
+
+        <param name="publish_tf" type="bool" value="false"/>
     </node>
 
 </launch>
