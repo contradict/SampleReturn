@@ -1,2 +1,2 @@
-int id
+uint16 id
 bool success
