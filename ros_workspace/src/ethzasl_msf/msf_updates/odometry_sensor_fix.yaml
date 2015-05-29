@@ -23,12 +23,19 @@ data_playback: true             # Set to true for playback, set to false on the 
 #  gyro: [rad/s^2/sqrt(Hz)]
  
 ####### ADIS 16448
-core/core_noise_acc: 0.0022563    # [m/s^2/sqrt(Hz)] 
-core/core_noise_gyr: 0.0004       # [rad/s/sqrt(Hz)] 
+#core/core_noise_acc: 0.0022563    # [m/s^2/sqrt(Hz)]
+#core/core_noise_gyr: 0.0004       # [rad/s/sqrt(Hz)]
 
-core/core_fixed_bias: false
-core/core_noise_accbias: 8e-5     # [m/s^3/sqrt(Hz)]
-core/core_noise_gyrbias: 3e-6     # [rad/s^2/sqrt(Hz)]
+#core/core_fixed_bias: false
+#core/core_noise_accbias: 8e-5     # [m/s^3/sqrt(Hz)]
+#core/core_noise_gyrbias: 3e-6     # [rad/s^2/sqrt(Hz)]
+
+####### 3DM-GX3-45
+core/core_noise_acc: 800.0e-6 # data sheed 80ug/sqrt(Hz)
+core/core_noise_gyr: 5.0e-4   # 0.03 degrees/sec/sqrt(Hz)
+
+core/core_noise_accbias: 8.0e-5
+core/core_noise_gyrbias: 1.5e-6
 
 ####### mpu6000
 #core/core_noise_acc: 0.003924    # [m/s^2/sqrt(Hz)] mpu6000 datasheet
