@@ -651,6 +651,7 @@ class ConfirmSampleAcquired(smach.State):
                                        'sample_present',
                                        'aborted'],
                              input_keys=['latched_sample',
+                                         'latched_filter_id',
                                         'detected_sample',
                                         'action_result',
                                         'grab_count',
@@ -674,7 +675,8 @@ class ConfirmSampleAcquired(smach.State):
             #this is the path of great success, notify filter nodes about success
             #and return the acquired sample ID in case the calling executive needs it
             self.announcer.say("Sample acquired")
-            self.result_pub.publish(samplereturn_msg.PursuitResult(True))
+            self.result_pub.publish(samplereturn_msg.PursuitResult(id = userdata.latched_filter_id,
+                                                                   success = True))
             userdata.action_result.result_string = ('sample acquired')
             userdata.action_result.result_int = userdata.latched_sample.sample_id
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
@@ -704,21 +706,26 @@ class PublishFailure(smach.State):
     def __init__(self, result_pub):
         smach.State.__init__(self,
                              outcomes=['next'],
+                             input_keys = ['latched_filter_id'],
                              output_keys=['detected_sample',
                                           'pursuit_goal'])
         self.result_pub = result_pub
     def execute(self, userdata):
         userdata.detected_sample = None
         userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
-        self.result_pub.publish(samplereturn_msg.PursuitResult(False))
+        self.result_pub.publish(samplereturn_msg.PursuitResult(id = userdata.latched_filter_id,
+                                                               success = False))
         return 'next'
 
 class PursueSampleAborted(smach.State):
     def __init__(self, result_pub):
-        smach.State.__init__(self, outcomes=['next'])
+        smach.State.__init__(self,
+                             input_keys = ['latched_filter_id'],
+                             outcomes=['next'])
         self.result_pub = result_pub
     def execute(self, userdata):
-        self.result_pub.publish(samplereturn_msg.PursuitResult(False))
+        self.result_pub.publish(samplereturn_msg.PursuitResult(id = userdata.latched_filter_id,
+                                                               success = False))
         return 'next'
     
 #transforms a detected point, and also calculates a position min_pursuit_distance from the point
