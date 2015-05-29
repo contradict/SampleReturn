@@ -219,7 +219,13 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
         continue;
     }
-
+    
+    ROS_INFO_STREAM("Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
+    ROS_INFO_STREAM("imgPts:\n" <<
+        "[[" << imgPts.at<double>(0,0) << ", " << imgPts.at<double>(0,1) << "],\n" <<
+        " [" << imgPts.at<double>(1,0) << ", " << imgPts.at<double>(1,1) << "],\n" <<
+        " [" << imgPts.at<double>(2,0) << ", " << imgPts.at<double>(2,1) << "],\n" <<
+        " [" << imgPts.at<double>(3,0) << ", " << imgPts.at<double>(3,1) << "]]");   
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
