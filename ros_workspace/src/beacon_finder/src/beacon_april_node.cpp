@@ -29,11 +29,11 @@ namespace beacon_april_node{
  
 class AprilTagDescription{
  public:
-  AprilTagDescription(int id, double size, std::string &frame_name, cv::Mat &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
+  AprilTagDescription(int id, double size, std::string &frame_name, std::vector<cv::Point3d> &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
   double size(){return size_;}
   int id(){return id_;} 
   std::string& frame_name(){return frame_name_;}
-  cv::Mat corners;
+  std::vector<cv::Point3d> corners;
  private:
   int id_;
   double size_;
@@ -59,6 +59,10 @@ class BeaconAprilDetector{
   ros::Publisher beacon_pose_pub_;
   ros::Publisher beacon_debug_pose_pub_;
   tf::TransformListener    _tf;
+  cv::RNG rng_;
+  int solve_tries_;
+  double solve_noise_;
+  double rvec_tolerance_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -74,7 +78,8 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     it_(nh),
     _tf(ros::Duration(10.0)),
     tag_det_(NULL),
-    covariance_(36,0.0)
+    covariance_(36,0.0),
+    rng_(0)
 {
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
@@ -89,6 +94,9 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     }
   }
 
+  pnh.param("solve_tries", solve_tries_, 3);
+  pnh.param("solve_noise", solve_noise_, 1e-3);
+  pnh.param("rvec_tolerance", rvec_tolerance_, 1e-2);
 
   //get tag family parametre
   pnh.param("tag_family", famname_, std::string("tag36h11"));
@@ -210,22 +218,53 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tf::StampedTransform T_beacon_to_tag;
     _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
         
-    cv::Mat imgPts(4, 2, CV_64F, det->p);
-    cv::Vec3d rvec;
-    cv::Vec3d tvec;
-    if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
+    std::vector<cv::Point2d> imgPts;
+    for(int i=0;i<4;i++)
     {
-        ROS_ERROR("Unable to solve for tag pose.");
-        ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
-        continue;
+        imgPts.push_back(cv::Point2d(det->p[i][0], det->p[i][1]));
     }
+    std::vector<cv::Vec3d> rvecs;
+    std::vector<cv::Vec3d> tvecs;
+    for(int i=0;i<solve_tries_;i++)
+    {
+        cv::Vec3d rvec, tvec;
+        std::vector<cv::Point2d> disturbed_imgPts;
+        for(const auto &pt : imgPts)
+        {
+            disturbed_imgPts.push_back(pt + cv::Point2d(solve_noise_*(double)rng_, solve_noise_*(double)rng_));
+        }
+        if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
+        {
+            ROS_ERROR("Unable to solve for tag pose.");
+            ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+            continue;
+        }
+        rvecs.push_back(rvec);
+        tvecs.push_back(tvec);
+    }
+    double distance=0;
+    cv::Vec3d rvec=rvecs[0], tvec=tvecs[0];
+    for(int i=1; i<solve_tries_; i++)
+    {
+        distance=std::max(distance, cv::norm(rvecs[0] - rvecs[i]));
+        rvec += rvecs[i];
+        tvec += tvecs[i];
+    }
+    tvec /= solve_tries_;
+    rvec /= solve_tries_;
     
     ROS_INFO_STREAM("Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
+    ROS_INFO_STREAM("    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
     ROS_INFO_STREAM("imgPts:\n" <<
-        "[[" << imgPts.at<double>(0,0) << ", " << imgPts.at<double>(0,1) << "],\n" <<
-        " [" << imgPts.at<double>(1,0) << ", " << imgPts.at<double>(1,1) << "],\n" <<
-        " [" << imgPts.at<double>(2,0) << ", " << imgPts.at<double>(2,1) << "],\n" <<
-        " [" << imgPts.at<double>(3,0) << ", " << imgPts.at<double>(3,1) << "]]");   
+        "[" << imgPts[0] << ",\n" <<
+        " " << imgPts[0] << ",\n" <<
+        " " << imgPts[0] << ",\n" <<
+        " " << imgPts[0] << "]");
+    if(distance>rvec_tolerance_)
+    {
+        ROS_ERROR_STREAM("large rvec distance, skipping: " << distance);
+        continue;
+    }
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
@@ -305,32 +344,39 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
       frame_name_stream << "tag_" << id;
       frame_name = frame_name_stream.str();
     }
-    cv::Mat corners(4,3, CV_64F);
+    std::vector<cv::Point3d> corners;
     if(tag_description.hasMember("corners")) {
         ROS_ASSERT(tag_description["corners"].getType() == XmlRpc::XmlRpcValue::TypeArray);
         XmlRpc::XmlRpcValue v = tag_description["corners"];
-        for(int i =0; i < v.size(); i++)
+        for(int i =0; i < v.size(); i+=3)
         {
-            if(v[i].getType() == XmlRpc::XmlRpcValue::TypeDouble)
-            {
-                corners.at<double>(i) = (double)v[i];
-            }
-            else if(v[i].getType() == XmlRpc::XmlRpcValue::TypeInt)
-            {
-                corners.at<double>(i) = (int)v[i];
-            }
-            else
-            {
-                ROS_ERROR_STREAM("Non-numeric type in corners at index " << i << ": " << v[i].getType());
-            }
-        }
+            auto parsenum = [&i](XmlRpc::XmlRpcValue v) -> double {
+                if(v.getType() == XmlRpc::XmlRpcValue::TypeDouble)
+                {
+                    return (double)v;
+                }
+                else if(v.getType() == XmlRpc::XmlRpcValue::TypeInt)
+                {
+                    return (int)v;
+                }
+                else
+                {
+                    ROS_ERROR_STREAM("Non-numeric type in corners at index " << i << ": " << v.getType());
+                }
+                return 0;
+            };
+            double x=0,y=0,z=0;
+            x = parsenum(v[i]);
+            y = parsenum(v[i+1]);
+            z = parsenum(v[i+2]);
+            corners.push_back(cv::Point3d(x, y, z));
+         }
     }
     else {
-        double c[4][3] = {{-size/2, -size/2, 0},
-                          {size/2, -size/2, 0},
-                          {size/2, size/2, 0},
-                          {-size/2, size/2, 0}};
-        corners = cv::Mat(4,3, CV_64F, c).clone();
+        corners = {cv::Point3d(-size/2, -size/2, 0),
+                          cv::Point3d(size/2, -size/2, 0),
+                          cv::Point3d(size/2, size/2, 0),
+                          cv::Point3d(-size/2, size/2, 0)};
     }
     AprilTagDescription description(id, size, frame_name, corners);
     ROS_INFO_STREAM("Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);
