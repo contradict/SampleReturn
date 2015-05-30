@@ -67,6 +67,9 @@ class KalmanDetectionFilter
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
   // Exclusion sites are center,radius,id (x,y,r,id)
   std::vector<std::tuple<float,float,float,int16_t> > exclusion_list_;
+  // Filters that have ever been published, in case we need their position
+  // to create an exclusion zone
+  std::map<int16_t, std::shared_ptr<ColoredKF> > published_filters_;
 
   ros::Time last_time_;
   double max_dist_;
@@ -326,22 +329,31 @@ class KalmanDetectionFilter
    */
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
   {
-    if (current_published_id_ == 0) {
-      return;
-    }
-    auto ackedFilter = std::find_if(filter_list_.begin(), filter_list_.end(),
-            [&msg](const std::shared_ptr<ColoredKF> &filter) -> bool
-            {
-                return msg.id == filter->filter_id;
-            });
-    if(ackedFilter == filter_list_.end())
+    auto ackedFilter = published_filters_.find(msg.id);
+    if(ackedFilter == published_filters_.end())
     {
         ROS_ERROR_STREAM("Ack for unknown filter id: " << msg.id);
         return;
     }
+    published_filters_.erase(msg.id);
+
+    ROS_DEBUG_STREAM("Procesing ack for filter id " << msg.id << ".");
+    auto activeAckedFilter = std::find_if(filter_list_.begin(), filter_list_.end(),
+            [&msg](const std::shared_ptr<ColoredKF> &filter) -> bool
+            {
+                return msg.id == filter->filter_id;
+            });
+
+    if(activeAckedFilter != filter_list_.end())
+    {
+        ROS_DEBUG_STREAM("Removing filter id " << msg.id << " from active list.");
+        auto new_end = std::remove_if(filter_list_.begin(), filter_list_.end(),
+                [&](std::shared_ptr<ColoredKF> ckf) {return ckf->filter_id == current_published_id_;});
+        filter_list_.erase(new_end, filter_list_.end());
+    }
     double x, y, r;
-    x = (*ackedFilter)->filter.statePost.at<float>(0);
-    y = (*ackedFilter)->filter.statePost.at<float>(1);
+    x = ackedFilter->second->filter.statePost.at<float>(0);
+    y = ackedFilter->second->filter.statePost.at<float>(1);
     if (msg.success) {
       r = pos_exclusion_radius_;
     }
@@ -352,11 +364,8 @@ class KalmanDetectionFilter
     exclusion_count_ += 1;
 
     // Clear this Marker from Rviz
-    clearMarker(*ackedFilter);
+    clearMarker(ackedFilter->second);
 
-    auto new_end = std::remove_if(filter_list_.begin(), filter_list_.end(),
-        [&](std::shared_ptr<ColoredKF> ckf) {return ckf->filter_id == current_published_id_;});
-    filter_list_.erase(new_end, filter_list_.end());
     current_published_id_ = 0;
     drawFilterStates();
   }
@@ -417,6 +426,7 @@ class KalmanDetectionFilter
         if (filter_ptr->filter_id == current_published_id_) {
           if (filter_ptr->certainty > certainty_thresh_ &&
               filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_) {
+            published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
             point_msg.header.frame_id = _filter_frame_id;
             point_msg.header.stamp = ros::Time::now();
@@ -462,6 +472,7 @@ class KalmanDetectionFilter
     }
 
     if (nearest_id != 0) {
+      published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(nearest_filter->filter_id, nearest_filter));
       current_published_id_ = nearest_id;
       samplereturn_msgs::NamedPoint point_msg;
       point_msg.header.frame_id = _filter_frame_id;
