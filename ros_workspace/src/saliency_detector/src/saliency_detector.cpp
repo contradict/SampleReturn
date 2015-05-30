@@ -5,7 +5,9 @@
 #include <ros/console.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <geometry_msgs/PointStamped.h>
 #include <samplereturn_msgs/NamedPoint.h>
+#include <tf/transform_listener.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/saliency_detector_paramsConfig.h>
@@ -48,6 +50,10 @@ class SaliencyDetectorNode
   double bms_top_trim_;
   double bms_img_width_;
 
+  bool filter_by_real_area_;
+  double min_real_area_;
+  double max_real_area_;
+
   XmlRpc::XmlRpcValue interior_colors_, exterior_colors_;
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
 
@@ -57,6 +63,8 @@ class SaliencyDetectorNode
   ColorNaming cn_;
 
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
+
+  tf::TransformListener listener_;
 
   public:
   SaliencyDetectorNode() {
@@ -194,16 +202,14 @@ class SaliencyDetectorNode
       if (cam_model_.initialized()
           && in_it != interior_colors_vec_.end()
           && ex_it != exterior_colors_vec_.end()){
+        float scale = cv_ptr->image.cols/bms_img_width_;
+        cv::Point3d ray =
+          cam_model_.projectPixelTo3dRay(cv::Point2d(kp[i].pt.x*scale,(kp[i].pt.y*scale+bms_top_trim_)));
+        if(!checkContourSize(sub_mask,ray,scale,msg->header))
+            continue;
         cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
         cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
             CV_RGB(0,255,0));
-        if(!checkContourSize(sub_img))
-            continue;
-        //float scale = cv_ptr->image.rows/600.;
-        float scale = cv_ptr->image.cols/bms_img_width_;
-        cv::Point3d ray =
-          //cam_model_.projectPixelTo3dRay(cv::Point2d((kp[i].pt.x*scale+bms_top_trim_),kp[i].pt.y*scale));
-          cam_model_.projectPixelTo3dRay(cv::Point2d(kp[i].pt.x*scale,(kp[i].pt.y*scale+bms_top_trim_)));
         std::cout << "BMS Coords: x: "<<kp[i].pt.x<<" y: "<<kp[i].pt.y<<std::endl;
         std::cout << "Pixel coords: x:" << kp[i].pt.x*scale <<"y: " << kp[i].pt.y*scale+bms_top_trim_ << std::endl;
         //std_msgs::Header header;
@@ -226,18 +232,61 @@ class SaliencyDetectorNode
     saliency_mutex_.unlock();
   }
 
-  bool checkContourSize(const cv::Mat region)
+  bool checkContourSize(const cv::Mat region, const cv::Point3d ray, float scale, const std_msgs::Header header)
   {
       std::vector<std::vector<cv::Point> > contours;
       std::vector<cv::Vec4i> hierarchy;
-      cv::findContours( region, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
-      cv::Mat contourImage;
-      cv::cvtColor( region, contourImage, CV_GRAY2RGB);
-      cv::drawContours( contourImage, contours, -1, cv::Scalar(0, 255, 0));
-      imshow("contours", contourImage);
-      cv::waitKey(1);
+      cv::findContours( region, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      // find largest contour
+      double maxArea = 0;
+      int max_idx = 0;
+      for (int i=0; i<contours.size(); i++) {
+        double area = cv::contourArea(cv::Mat(contours[i]));
+        if (area > maxArea) {
+          maxArea = area;
+          max_idx = i;
+        }
+      }
+      // project ray into ground, assuming flat ground
+      tf::StampedTransform camera_transform;
+      geometry_msgs::PointStamped camera_point, base_link_point;
+      tf::Vector3 pos;
+      camera_point.header = header;
+      camera_point.point.x = ray.x;
+      camera_point.point.y = ray.y;
+      camera_point.point.z = ray.z;
+      listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
+      pos = camera_transform.getOrigin();
+      camera_point.header.stamp = ros::Time(0);
+      listener_.transformPoint("base_link",camera_point,base_link_point);
 
-      return true;
+      float x_slope = (base_link_point.point.x - pos.getX())/(pos.getZ()-base_link_point.point.z);
+      float y_slope = (base_link_point.point.y - pos.getY())/(pos.getZ()-base_link_point.point.z);
+
+      float x = x_slope*pos.getZ();
+      float y = y_slope*pos.getZ();
+      float z = pos.getZ();
+      float range = sqrt(x*x + y*y + z*z);
+
+      float ang_per_px =
+        scale*atan(cam_model_.fullResolution().width/cam_model_.fx())/cam_model_.fullResolution().width;
+      float realArea = ang_per_px*ang_per_px*range*range*maxArea;
+      // Convert from square meters to square cm for more human-readable numbers
+      realArea *= 10000;
+
+      ROS_ERROR("Real Area: %f", realArea);
+      if ((realArea < max_real_area_) && (realArea > min_real_area_)) {
+        return true;
+      }
+      else {
+        return false;
+      }
+
+      //cv::Mat contourImage;
+      //cv::cvtColor( region, contourImage, CV_GRAY2RGB);
+      //cv::drawContours( contourImage, contours, -1, cv::Scalar(0, 255, 0));
+      //imshow("contours", contourImage);
+      //cv::waitKey(1);
   }
 
   /* Dynamic reconfigure callback */
@@ -258,6 +307,8 @@ class SaliencyDetectorNode
 
     blobDetect_on_ = config.blobDetect_on;
 
+    blob_params_.minDistBetweenBlobs = config.minDistBetweenBlobs;
+
     blob_params_.filterByArea = config.filterByArea;
     blob_params_.minArea = config.minArea;
     blob_params_.maxArea = config.maxArea;
@@ -272,6 +323,10 @@ class SaliencyDetectorNode
     blob_params_.minRepeatability = config.minRepeatability;
 
     blob_ = cv::SimpleBlobDetector(blob_params_);
+
+    filter_by_real_area_ = config.filterbyRealArea;
+    min_real_area_ = config.minRealArea;
+    max_real_area_ = config.maxRealArea;
 
     saliency_mutex_.unlock();
   }
