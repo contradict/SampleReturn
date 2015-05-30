@@ -216,33 +216,6 @@ class SaliencyDetectorNode
       }
     }
 
-    //if (kp.size() != 0) {
-    //if (kp[1].pt.x > 30 && kp[1].pt.y > 30 && kp[1].pt.x < 500 && kp[1].pt.y < 350) {
-    //  sub_img = small(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-    //  sub_mask = debug_bms_img_(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-    //  cv::threshold(sub_mask, sub_mask, 30, 255, cv::THRESH_BINARY);
-    //  Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-    //  Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
-    //  exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
-    //  interiorColor = cn_.computeInteriorColor(sub_img,sub_mask,exteriorColor);
-
-    //  std::cout << "Exterior Color" << std::endl;
-    //  std::cout << exteriorColor << std::endl;
-    //  std::cout << "Interior Color" << std::endl;
-    //  std::cout << interiorColor << std::endl;
-
-    //  string dominant_color = cn_.getDominantColor(interiorColor);
-    //  std::cout << "Dominant color " << dominant_color << std::endl;
-
-    //  std_msgs::Header sub_header;
-    //  sensor_msgs::ImagePtr sub_img_msg = cv_bridge::CvImage(sub_header,"rgb8",sub_img).toImageMsg();
-    //  pub_sub_img.publish(sub_img_msg);
-
-    //  sensor_msgs::ImagePtr sub_mask_msg = cv_bridge::CvImage(sub_header,"mono8",sub_mask).toImageMsg();
-    //  pub_sub_mask.publish(sub_mask_msg);
-    //}
-    //}
-
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
     pub_bms_img.publish(debug_img_msg);
