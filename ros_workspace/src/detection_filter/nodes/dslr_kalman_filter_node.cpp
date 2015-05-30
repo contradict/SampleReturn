@@ -335,7 +335,6 @@ class KalmanDetectionFilter
         ROS_ERROR_STREAM("Ack for unknown filter id: " << msg.id);
         return;
     }
-    published_filters_.erase(msg.id);
 
     ROS_DEBUG_STREAM("Procesing ack for filter id " << msg.id << ".");
     auto activeAckedFilter = std::find_if(filter_list_.begin(), filter_list_.end(),
@@ -365,6 +364,7 @@ class KalmanDetectionFilter
 
     // Clear this Marker from Rviz
     clearMarker(ackedFilter->second);
+    published_filters_.erase(msg.id);
 
     current_published_id_ = 0;
     drawFilterStates();
