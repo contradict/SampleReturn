@@ -205,14 +205,14 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   std::vector<cv::Vec3d>beacon_rots;
   std::vector<geometry_msgs::Pose>beacon_poses;
 
-  ROS_DEBUG_NAMED("apriltags", "BEACON FINDER found %d tags.", zarray_size(detections));
+  ROS_DEBUG_NAMED("apriltags", "APRIL BEACON FINDER found %d tags.", zarray_size(detections));
 
   for (int i = 0; i < zarray_size(detections); i++) {
       apriltag_detection_t *det;
       zarray_get(detections, i, &det);
       std::map<int, AprilTagDescription>::const_iterator description_itr = descriptions_.find(det->id);
       if(description_itr == descriptions_.end()){
-          ROS_WARN_THROTTLE(10.0, "Found tag: %d, but no description was found for it", det->id);
+          ROS_WARN_THROTTLE(10.0, "APRIL BEACON FINDER Found tag: %d, but no description was found for it", det->id);
           continue;
       }
       AprilTagDescription description = description_itr->second;
@@ -222,7 +222,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     std::string tf_err;
     if(!_tf.canTransform(frame_id, "beacon", ros::Time(0), &tf_err))
     {
-        ROS_ERROR_STREAM("Unable to transform to frame " << frame_id << ": " << tf_err);
+        ROS_ERROR_STREAM("APRIL BEACON FINDER Unable to transform to frame " << frame_id << ": " << tf_err);
         continue;
     }
 
@@ -250,11 +250,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         }
         if (cv::solvePnP(description.corners, disturbed_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
         {
-            ROS_ERROR_NAMED("solver", "Unable to solve for tag pose.");
-            ROS_ERROR_STREAM_NAMED("solver", "corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+            ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for tag pose.");
+            ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
             continue;
         }
-        ROS_DEBUG_STREAM_NAMED("solver", "noisy rvec(" << i << "): " << rvec);
+        ROS_DEBUG_STREAM_NAMED("solver", "APRIL BEACON FINDER noisy rvec(" << i << "): " << rvec);
         rvecs.push_back(rvec);
         tvecs.push_back(tvec);
     }
@@ -269,16 +269,16 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tvec /= solve_tries_;
     rvec /= solve_tries_;
     
-    ROS_DEBUG_STREAM_NAMED("solver", "Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "APRIL BEACON FINDER Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
     ROS_DEBUG_STREAM_NAMED("solver", "    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
-    ROS_DEBUG_STREAM_NAMED("solver", "imgPts:\n" <<
+    ROS_DEBUG_STREAM_NAMED("solver", "    imgPts:\n" <<
         "[" << imgPts[0] << ",\n" <<
         " " << imgPts[1] << ",\n" <<
         " " << imgPts[2] << ",\n" <<
         " " << imgPts[3] << "]");
     if(distance>rvec_tolerance_)
     {
-        ROS_ERROR_STREAM_NAMED("solver", "large rvec distance, skipping: " << distance);
+        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER large rvec distance, skipping: " << distance);
         continue;
     }
     double th = cv::norm(rvec);
@@ -329,11 +329,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::Vec3d pos_mean, pos_dev_v;
     cv::meanStdDev(beacon_tvecs, pos_mean, pos_dev_v);
     double pos_dev = norm(pos_dev_v);
-    ROS_DEBUG_STREAM_NAMED("consensus", "position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
+    ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
     cv::Vec3d rot_mean, rot_dev_v;
     cv::meanStdDev(beacon_rots, rot_mean, rot_dev_v);
     double rot_dev = norm(rot_dev_v);
-    ROS_DEBUG_STREAM_NAMED("consensus", "rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
+    ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
     if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
         for (auto &pose : beacon_poses) {
             geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
@@ -358,7 +358,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         }
     }
     else {
-        ROS_DEBUG_STREAM_NAMED("consensus", "not reporting pose!");
+        ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER not reporting pose!");
     }
 
   detections_pub_.publish(tag_detection_array);
@@ -417,7 +417,7 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
                 }
                 else
                 {
-                    ROS_ERROR_STREAM("Non-numeric type in corners at index " << i << ": " << v.getType());
+                    ROS_ERROR_STREAM("APRIL BEACON FINDER Non-numeric type in corners at index " << i << ": " << v.getType());
                 }
                 return 0;
             };
@@ -435,7 +435,7 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
                           cv::Point3d(-size/2, size/2, 0)};
     }
     AprilTagDescription description(id, size, frame_name, corners);
-    ROS_INFO_STREAM("Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);
+    ROS_INFO_STREAM("APRIL BEACON FINDER Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);
     descriptions.insert(std::make_pair(id, description));
   }
   return descriptions;
