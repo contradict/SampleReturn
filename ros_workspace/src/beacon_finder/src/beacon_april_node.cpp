@@ -48,6 +48,7 @@ class BeaconAprilDetector{
  private:
   void imageCb(const sensor_msgs::ImageConstPtr& msg,const sensor_msgs::CameraInfoConstPtr& cam_info);
   std::map<int, AprilTagDescription> parse_tag_descriptions(XmlRpc::XmlRpcValue& april_tag_descriptions);
+  void drawPoint(cv::Mat &img, const cv::Point2d pt);
 
  private:
   std::map<int, AprilTagDescription> descriptions_;
@@ -63,6 +64,7 @@ class BeaconAprilDetector{
   int solve_tries_;
   double solve_noise_;
   double rvec_tolerance_;
+  int point_size_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -79,7 +81,8 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     _tf(ros::Duration(10.0)),
     tag_det_(NULL),
     covariance_(36,0.0),
-    rng_(0)
+    rng_(0),
+    point_size_(10)
 {
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
@@ -221,7 +224,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     std::vector<cv::Point2d> imgPts;
     for(int i=0;i<4;i++)
     {
-        imgPts.push_back(cv::Point2d(det->p[i][0], det->p[i][1]));
+        cv::Point2d pt(det->p[i][0], det->p[i][1]);
+        drawPoint(cv_ptr->image, pt);
+        imgPts.push_back(pt);
     }
     std::vector<cv::Vec3d> rvecs;
     std::vector<cv::Vec3d> tvecs;
@@ -319,6 +324,17 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   detections_pub_.publish(tag_detection_array);
   tag_pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
+}
+
+void BeaconAprilDetector::drawPoint(cv::Mat &img, const cv::Point2d pt)
+{
+    cv::Point2d xhat(point_size_, 0);
+    cv::Point2d yhat(0, point_size_);
+
+    cv::line(img, pt, pt+xhat, cv::Scalar(255, 0, 0));
+    cv::line(img, pt, pt-xhat, cv::Scalar(255, 0, 0));
+    cv::line(img, pt, pt+yhat, cv::Scalar(255, 0, 0));
+    cv::line(img, pt, pt-yhat, cv::Scalar(255, 0, 0));
 }
 
 
