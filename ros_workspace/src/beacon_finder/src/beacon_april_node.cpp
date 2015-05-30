@@ -334,7 +334,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::meanStdDev(beacon_rots, rot_mean, rot_dev_v);
     double rot_dev = norm(rot_dev_v);
     ROS_DEBUG_STREAM_NAMED("consensus", "rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
-    if ((zarray_size(detections) > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
+    if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
         for (auto &pose : beacon_poses) {
             geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
             beacon_pose_msg.header = cv_ptr->header;
