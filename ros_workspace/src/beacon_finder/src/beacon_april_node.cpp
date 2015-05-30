@@ -253,6 +253,16 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         drawPoint(cv_ptr->image, pt);
         imgPts.push_back(pt);
     }
+    
+    cv::Vec3d rvec, tvec;
+    if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
+    {
+        ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for tag pose.");
+        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+        continue;
+    }
+
+/*   
     std::vector<cv::Vec3d> rvecs;
     std::vector<cv::Vec3d> tvecs;
     for(int i=0;i<solve_tries_;i++)
@@ -298,6 +308,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER large rvec distance, skipping: " << distance);
         continue;
     }
+*/  
+      
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
