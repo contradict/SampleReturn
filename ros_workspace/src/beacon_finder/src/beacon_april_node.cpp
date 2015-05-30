@@ -240,11 +240,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     if( (width<min_tag_size_) || (height<min_tag_size_))
     {
-        ROS_DEBUG_STREAM("Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
+        ROS_DEBUG_STREAM("APRIL BEACON FINDER Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
         continue;
     }
 
-    ROS_DEBUG_STREAM("Solving tag " << frame_id << ", (" << width << ", " << height << ")");
+    ROS_DEBUG_STREAM("APRIL BEACON FINDER Solving tag " << frame_id << ", (" << width << ", " << height << ")");
 
     std::vector<cv::Point2d> imgPts;
     for(int i=0;i<4;i++)
