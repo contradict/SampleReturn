@@ -357,6 +357,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             beacon_pose_pub_.publish(beacon_pose_msg);
         }
     }
+    else {
+        ROS_DEBUG_STREAM_NAMED("consensus", "not reporting pose!");
+    }
 
   detections_pub_.publish(tag_detection_array);
   tag_pose_pub_.publish(tag_pose_array);
