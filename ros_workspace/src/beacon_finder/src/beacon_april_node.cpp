@@ -240,7 +240,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             double dy=solve_noise_*((double)rng_-0.5)*2.0;
             disturbed_imgPts.push_back(pt + cv::Point2d(dx, dy));
         }
-        if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
+        if (cv::solvePnP(description.corners, disturbed_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
         {
             ROS_ERROR_NAMED("solver", "Unable to solve for tag pose.");
             ROS_ERROR_STREAM_NAMED("solver", "corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
