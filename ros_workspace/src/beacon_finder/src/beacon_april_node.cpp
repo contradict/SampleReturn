@@ -74,6 +74,8 @@ class BeaconAprilDetector{
   double position_sigma_;
   double position_sigma_scale_;
   double rotation_sigma_;
+  double rot_thresh_;
+  double pos_thresh_;
 };
 
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
@@ -140,6 +142,9 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pnh.param("position_sigma_scale", this->position_sigma_scale_, 0.05);
   pnh.param("rotation_sigma", this->rotation_sigma_, 0.15);
 
+  pnh.param("consensus_rot_threshold", this->rot_thresh_, 0.1);
+  pnh.param("consensus_trans_threshold", this->pos_thresh_, 1.0);
+
   image_sub_ = it_.subscribeCamera("image", 1, &BeaconAprilDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
   detections_pub_ = pnh.advertise<beacon_finder::AprilTagDetectionArray>("tag_detections", 1);
@@ -196,6 +201,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   beacon_finder::AprilTagDetectionArray tag_detection_array;
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
+  std::vector<cv::Vec3d>beacon_tvecs;
+  std::vector<cv::Vec3d>beacon_rots;
+  std::vector<geometry_msgs::Pose>beacon_poses;
 
   ROS_DEBUG_NAMED("apriltags", "BEACON FINDER found %d tags.", zarray_size(detections));
 
@@ -293,23 +301,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
     beacon_pose.header = cv_ptr->header;
 
-    //calculate covariance based on range
-    double range = cv::norm(tvec);
-    double pos_sigma = position_sigma_scale_ * range + position_sigma_;
-    double pos_covariance = pos_sigma * pos_sigma;
-    double rot_covariance = rotation_sigma_ * rotation_sigma_;
-    covariance_[0] = pos_covariance;
-    covariance_[7] = pos_covariance;
-    covariance_[14] = pos_covariance;
-    covariance_[21] = rot_covariance;
-    covariance_[28] = rot_covariance;
-    covariance_[35] = rot_covariance;
-
-    geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
-    beacon_pose_msg.header = cv_ptr->header;
-    std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
-    beacon_pose_msg.pose.pose = beacon_pose.pose;
-
     beacon_finder::AprilTagDetection tag_detection;
     tag_detection.header = cv_ptr->header;
     tag_detection.pose = tag_pose.pose;
@@ -318,11 +309,54 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tag_detection_array.detections.push_back(tag_detection);
     tag_pose_array.poses.push_back(tag_pose.pose);
 
-    beacon_pose_pub_.publish(beacon_pose_msg);
+    // accumulate all seen pose estimates for consensus checking
+    beacon_poses.push_back(beacon_pose.pose);
+    cv::Vec3d pos(beacon_pose.pose.position.x,
+            beacon_pose.pose.position.y,
+            beacon_pose.pose.position.z);
+    beacon_tvecs.push_back(pos);
+    cv::Vec3d rot(beacon_pose.pose.orientation.x/beacon_pose.pose.orientation.w,
+            beacon_pose.pose.orientation.y/beacon_pose.pose.orientation.w,
+            beacon_pose.pose.orientation.z/beacon_pose.pose.orientation.w);
+    beacon_rots.push_back(rot);
+
     beacon_debug_pose_pub_.publish(beacon_pose);
   }
   //free up detections memory
   apriltag_detections_destroy(detections);
+
+    //compute std_dev of poses
+    cv::Vec3d pos_mean, pos_dev_v;
+    cv::meanStdDev(beacon_tvecs, pos_mean, pos_dev_v);
+    double pos_dev = norm(pos_dev_v);
+    ROS_DEBUG_STREAM_NAMED("consensus", "position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
+    cv::Vec3d rot_mean, rot_dev_v;
+    cv::meanStdDev(beacon_rots, rot_mean, rot_dev_v);
+    double rot_dev = norm(rot_dev_v);
+    ROS_DEBUG_STREAM_NAMED("consensus", "rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
+    if ((pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
+        for (auto &pose : beacon_poses) {
+            geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
+            beacon_pose_msg.header = cv_ptr->header;
+
+            //calculate covariance based on range
+            cv::Vec3d pos(pose.position.x, pose.position.y, pose.position.z);
+            double range = cv::norm(pos);
+            double pos_sigma = position_sigma_scale_ * range + position_sigma_;
+            double pos_covariance = pos_sigma * pos_sigma;
+            double rot_covariance = rotation_sigma_ * rotation_sigma_;
+            covariance_[0] = pos_covariance;
+            covariance_[7] = pos_covariance;
+            covariance_[14] = pos_covariance;
+            covariance_[21] = rot_covariance;
+            covariance_[28] = rot_covariance;
+            covariance_[35] = rot_covariance;
+            std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
+            beacon_pose_msg.pose.pose = pose;
+
+            beacon_pose_pub_.publish(beacon_pose_msg);
+        }
+    }
 
   detections_pub_.publish(tag_detection_array);
   tag_pose_pub_.publish(tag_pose_array);
