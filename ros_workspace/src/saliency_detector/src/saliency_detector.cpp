@@ -274,19 +274,12 @@ class SaliencyDetectorNode
       // Convert from square meters to square cm for more human-readable numbers
       realArea *= 10000;
 
-      ROS_ERROR("Real Area: %f", realArea);
       if ((realArea < max_real_area_) && (realArea > min_real_area_)) {
         return true;
       }
       else {
         return false;
       }
-
-      //cv::Mat contourImage;
-      //cv::cvtColor( region, contourImage, CV_GRAY2RGB);
-      //cv::drawContours( contourImage, contours, -1, cv::Scalar(0, 255, 0));
-      //imshow("contours", contourImage);
-      //cv::waitKey(1);
   }
 
   /* Dynamic reconfigure callback */
