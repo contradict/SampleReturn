@@ -203,19 +203,19 @@ class ExecuteVFHMove(ExecuteMoveState):
                                                       'started_blocked',
                                                       'off_course',
                                                       'missed_target',
-                                                      'sample_detected',
+                                                      'object_detected',
                                                       'preempted','aborted'],
                                             input_keys=['move_goal',
-                                                        'stop_on_sample',
-                                                        'detected_sample',
+                                                        'stop_on_detection',
+                                                        'detection_message',
                                                         'paused',
                                                         'odometry_frame'],
-                                            output_keys=['detected_sample',
+                                            output_keys=['detection_message',
                                                          'vfh_result'])
       
     def execute(self, userdata):
-        #on entry clear old sample_detections!
-        userdata.detected_sample = None
+        #on entry clear old detections!
+        userdata.detection_message = None
         userdata.vfh_result = None
         goal = deepcopy(userdata.move_goal)
         rospy.loginfo("ExecuteVFHMove initial goal: %s" % (goal))
@@ -230,11 +230,11 @@ class ExecuteVFHMove(ExecuteMoveState):
             move_state = self._move_client.get_state()
             if move_state not in util.actionlib_working_states:
                 break
-            #Handle sample detection
-            if (userdata.detected_sample is not None) and userdata.stop_on_sample:
-                rospy.loginfo("ExecuteVFHMove detected sample: " + str(userdata.detected_sample))
+            #Handle object detection
+            if (userdata.detection_message is not None) and userdata.stop_on_detection:
+                rospy.loginfo("ExecuteVFHMove received detection: " + str(userdata.detection_message))
                 self.cancel_move()
-                return 'sample_detected'
+                return 'object_detected'
             #handle goal changes
             if not (goal.target_pose == userdata.move_goal.target_pose):
                 rospy.loginfo("ExecuteVFHMove goal changed: {!s} to {!s}".format(goal, userdata.move_goal))
@@ -273,18 +273,18 @@ class ExecuteSimpleMove(ExecuteMoveState):
         
         super(ExecuteSimpleMove, self).__init__(move_client,
                                                 outcomes=['complete',
-                                                          'sample_detected',
+                                                          'object_detected',
                                                           'preempted',
                                                           'aborted'],
                                                 input_keys=['simple_move',
-                                                            'stop_on_sample',
-                                                            'detected_sample',
+                                                            'stop_on_detection',
+                                                            'detection_message',
                                                             'paused'],
-                                                output_keys=['detected_sample'])
+                                                output_keys=['detection_message'])
         
     def execute(self, userdata):
 
-        userdata.detected_sample = None
+        userdata.detection_message = None
         goal = userdata.simple_move
         self._move_client.send_goal(goal)
 
@@ -296,11 +296,11 @@ class ExecuteSimpleMove(ExecuteMoveState):
                 break            
             if self.preempt_requested():
                 return self.handle_preempt()
-            #Handle sample detection
-            if userdata.stop_on_sample and (userdata.detected_sample is not None):
-                rospy.loginfo("ExecuteSimpleMove detected sample: " + str(userdata.detected_sample))
+            #Handle object detection
+            if userdata.stop_on_detection and (userdata.detection_message is not None):
+                rospy.loginfo("ExecuteSimpleMove detected object: " + str(userdata.detection_message))
                 self.cancel_move()
-                return 'sample_detected'
+                return 'object_detected'
             #if we are paused, cancel goal and wait, then resend
             #last goal and reset timeout timer
             self.check_pause(userdata, goal)
@@ -441,9 +441,9 @@ class MoveToPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
                              input_keys=['point_list',
-                                         'detected_sample',
+                                         'detection_message',
                                          'odometry_frame',
-                                         'stop_on_sample',
+                                         'stop_on_detection',
                                          'velocity'],
                              output_keys=['simple_move',
                                           'point_list'],

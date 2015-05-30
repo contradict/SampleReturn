@@ -622,19 +622,15 @@ bool Motion::selectMotionModeCallback(platform_motion_msgs::SelectMotionMode::Re
             }
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_ENABLE:
-            // can only ENABLE from DISABLE or PAUSE
-            if( motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE ||
-                motion_mode == platform_motion_msgs::SelectMotionMode::Request::MODE_PAUSE)
+            // can ENABLE from anywhere
+            if( !handleEnablePods(true, &podsResult) )
             {
-                if( !handleEnablePods(true, &podsResult) )
-                    return false;
-                if( podsResult )
-                    motion_mode = req.mode;
-            }
-            else
-            {
-                ROS_ERROR( "Attempted ENABLE from state other than DISABLE or PAUSE: %s", motion_mode_string( motion_mode ).c_str() );
+                //if the servos do not enter ENABLE, bad news...
                 return false;
+            }
+            if( podsResult )
+            {
+                motion_mode = req.mode;
             }
             break;
         case platform_motion_msgs::SelectMotionMode::Request::MODE_DISABLE:

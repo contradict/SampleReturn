@@ -212,7 +212,19 @@ class SimpleMover(object):
       v = np.max((v - (self.deceleration/self.loop_rate), 0))
       publisher(v)
       rate.sleep()
-
+      
+    #make sure the servos have received the last zero v twist
+    start_time = rospy.Time.now()
+    while not rospy.is_shutdown():
+      rospy.sleep(0.1)
+      if (self.current_omega < self.velocity_epsilon) \
+      and (self.current_speed < self.velocity_epsilon):
+        break
+      if (rospy.Time.now() - start_time) > rospy.Duration(2.0):
+        rospy.logwarn("SIMPLE_MOTION {} waited 2 seconds for \
+                       odometry to report v < epsilon.  Exiting anyway. \
+                       Robot is probably out of control.".format(self.param_ns))
+      
     self.running = False
     self.stop_requested = False
 

@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<!-- -*- mode: XML -*- -->
+<launch>
+
+    <node name="april_beacon_finder"
+        type="beacon_april_node"
+        pkg="beacon_finder"
+        ns="/processes/beacon"
+        machine="search"
+        >
+        <remap from="image" to="/cameras/search/image"/>
+        <remap from="/cameras/search/camera_info" to="/cameras/search/info"/>
+
+        <rosparam param="tag_descriptions">
+         [{
+            id: 407,
+            size: 0.8128,
+            frame_id: beacon_front},
+          {
+            id: 408,
+            size: 0.3048,
+            frame_id: beacon_right},
+          {
+            id: 409,
+            size: 0.8128,
+            frame_id: beacon_back},
+          {
+            id: 410,
+            size: 0.3048,
+            frame_id: beacon_left},
+          {
+            id: 411,
+            size: 0.2032,
+            frame_id: beacon_front_right},
+          {
+            id: 412,
+            size: 0.2032,
+            frame_id: beacon_front_left}
+        ]
+        </rosparam>
+        <!--position sigma specified at 0m-->
+        <!--scale in sigma/meter. With .05, sigma should be about 5m at 100m range-->
+        <!--1 radians per second with 50ms timing inaccuracy????-->
+        <param name="position_sigma" value="0.01"/>
+        <param name="position_sigma_scale" value="0.05"/>
+        <!-- old beacon finder variance: 0.02 -->
+        <param name="rotation_sigma" value="0.15"/>
+
+        <!--params for saving us from horrible solvePnP solutions-->
+        <param name="solve_tries" value="3"/>
+        <param name="solve_noise" value="0.5"/><!-- pixels -->
+        <param name="rvec_tolerance" value="0.05"/><!--radians-->
+        <param name="min_tag_size" type="int" value="60"/><!--pixels-->
+</node>
+
+    <param name="/processes/beacon/robot_description" textfile="$(find samplereturn)/urdf/beacon.urdf"/>
+
+    <node name="beacon_publisher"
+          machine="search" 
+          pkg="robot_state_publisher" 
+          type="robot_state_publisher"
+          output="log"
+          ns="/processes/beacon/">
+        <param name="publish_frequency" type="double" value="1"/>
+    </node>
+
+</launch>

@@ -2,6 +2,7 @@
 import math
 import threading
 import random
+import yaml
 from copy import deepcopy
 from collections import deque
 import numpy as np
@@ -56,6 +57,7 @@ class LevelTwoWeb(object):
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
+        self.local_frame = 'base_link'
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
@@ -103,6 +105,7 @@ class LevelTwoWeb(object):
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
+        self.state_machine.userdata.local_frame = self.local_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time = rospy.Time.now() + \
                                                   rospy.Duration(node_params.return_time_minutes*60)
@@ -114,16 +117,19 @@ class LevelTwoWeb(object):
         #beacon approach
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
+        self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
         
         #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
         self.state_machine.userdata.course_tolerance = None
+        self.state_machine.userdata.chord_course_tolerance = node_params.chord_course_tolerance
         self.state_machine.userdata.spoke_hub_radius = node_params.spoke_hub_radius
         self.state_machine.userdata.next_spoke_sign = node_params.next_spoke_sign
         self.state_machine.userdata.raster_step = node_params.raster_step
         self.state_machine.userdata.raster_offset = node_params.raster_offset
+        self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
         self.state_machine.userdata.blocked_retried = False
         self.state_machine.userdata.blocked_limit = 2
@@ -133,8 +139,9 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.raster_active = False
         
         #stop function flags
-        self.state_machine.userdata.stop_on_sample = False
-        self.state_machine.userdata.stop_on_beacon = False
+        self.state_machine.userdata.report_sample = False
+        self.state_machine.userdata.report_beacon = False
+        self.state_machine.userdata.stop_on_detection = True
 
         #subscriber controlled userdata
         self.state_machine.userdata.paused = False        
@@ -149,6 +156,7 @@ class LevelTwoWeb(object):
         #move management
         self.state_machine.userdata.vfh_result = None
         self.state_machine.userdata.active_manager = None
+        self.state_machine.userdata.retry_active = False
         #list of manager outcomes, and their corresponding labels
         manager_dict = {'WEB_MANAGER':'web_manager',
                         'RETURN_MANAGER':'return_manager',
@@ -166,11 +174,11 @@ class LevelTwoWeb(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(input_keys=['dismount_move'],
+                                   StartLeveLTwo(input_keys=['dismount_move',
+                                                             'spin_velocity'],
                                                  output_keys=['action_result',
-                                                              'stop_on_sample',
-                                                              'pursue_samples',
-                                                              'simple_move'],
+                                                              'simple_move',
+                                                              'half_turn'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -205,11 +213,20 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('DISMOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'WEB_MANAGER',
-                                                  'sample_detected':'WEB_MANAGER',
+                                   transitions = {'complete':'LOOK_AT_BEACON',
+                                                  'object_detected':'LOOK_AT_BEACON',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'false'})
+                                   remapping = {'stop_on_detection':'false'})
+
+            smach.StateMachine.add('LOOK_AT_BEACON',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'WEB_MANAGER',
+                                                  'object_detected':'WEB_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'simple_move':'half_turn',
+                                                'stop_on_detection':'false'})
             
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
@@ -217,6 +234,7 @@ class LevelTwoWeb(object):
                                               self.announcer),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
+                                                  'sample_detected':'PURSUE_SAMPLE',
                                                   'return_home':'ANNOUNCE_RETURN_HOME',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
@@ -237,7 +255,7 @@ class LevelTwoWeb(object):
                                                   'blocked':'RETRY_CHECK',
                                                   'started_blocked':'RETRY_CHECK',
                                                   'off_course':'ANNOUNCE_OFF_COURSE',
-                                                  'sample_detected':'PURSUE_SAMPLE',
+                                                  'object_detected':'MOVE_MUX',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
@@ -268,21 +286,19 @@ class LevelTwoWeb(object):
                                    MoveMUX(manager_transitions.keys()),
                                    transitions = manager_transitions)
             
-            @smach.cb_interface(input_keys=['detected_sample'],
-                                output_keys=['move_point_map'])
+            @smach.cb_interface(input_keys=['detection_message'])
             def pursuit_goal_cb(userdata, request):
                 goal = samplereturn_msg.GeneralExecutiveGoal()
-                goal.input_point = userdata.detected_sample
+                goal.input_point = userdata.detection_message
                 goal.input_string = "level_two_pursuit_request"
                 #disable localization checks while in pursuit
-                userdata.move_point_map = None
                 return goal
             
-            @smach.cb_interface(output_keys=['detected_sample'])
+            @smach.cb_interface(output_keys=['detection_message'])
             def pursuit_result_cb(userdata, status, result):
                 #clear samples after a pursue action
                 rospy.sleep(2.0) #wait 2 seconds for detector/filter to clear for sure
-                userdata.detected_sample = None
+                userdata.detection_message = None
                                             
             smach.StateMachine.add('PURSUE_SAMPLE',
                                   smach_ros.SimpleActionState('pursue_sample',
@@ -308,16 +324,16 @@ class LevelTwoWeb(object):
                                    transitions = {'mount':'CALCULATE_MOUNT_MOVE',
                                                   'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'beacon_point':'detection_message'})
  
             smach.StateMachine.add('BEACON_SEARCH_SPIN',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'RETURN_MANAGER',
-                                                  'sample_detected':'RETURN_MANAGER',
+                                                  'object_detected':'RETURN_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_sample':'stop_on_beacon',
-                                                'detected_sample':'beacon_point'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('CALCULATE_MOUNT_MOVE',
                                    CalculateMountMove(self.tf_listener, self.announcer),
@@ -326,26 +342,41 @@ class LevelTwoWeb(object):
  
             smach.StateMachine.add('MOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'DESELECT_PLANNER',
-                                                  'sample_detected':'RETURN_MANAGER',
+                                   transitions = {'complete':'WAIT_FOR_PREEMPT',
+                                                  'object_detected':'RETURN_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'})
-
-            smach.StateMachine.add('DESELECT_PLANNER',
-                                    SelectMotionMode(self.CAN_interface,
-                                                     MODE_ENABLE),
-                                    transitions = {'next':'complete',
-                                                   'paused':'LEVEL_TWO_ABORTED',
-                                                   'failed':'LEVEL_TWO_ABORTED'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'stop_on_detection':'false'})
+            
+            smach.StateMachine.add('WAIT_FOR_PREEMPT',
+                                   WaitForFlagState('false',
+                                                    flag_trigger_value = 'manual',
+                                                    timeout = 20,
+                                                    announcer = self.announcer,
+                                                    start_message ='Level two complete.'),
+                                   transitions = {'next':'WAIT_FOR_PREEMPT',
+                                                  'timeout':'WAIT_FOR_PREEMPT',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})            
             
             smach.StateMachine.add('RECOVERY_MANAGER',
                                    RecoveryManager('RECOVERY_MANAGER',
                                                    self.announcer,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
+                                                  'simple_move':'RECOVERY_SIMPLE_MOVE',
+                                                  'sample_detected':'PURSUE_SAMPLE',
                                                   'return_manager':'RETURN_MANAGER',
-                                                  'web_manager':'WEB_MANAGER'})
+                                                  'web_manager':'CREATE_MOVE_GOAL',
+                                                  'wait_for_preempt':'WAIT_FOR_PREEMPT'})
     
+            smach.StateMachine.add('RECOVERY_SIMPLE_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'RECOVERY_MANAGER',
+                                                  'object_detected':'RECOVERY_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'stop_on_detection':'false'})
+            
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
                                    transitions = {'recovery':'RECOVERY_MANAGER',
@@ -393,10 +424,10 @@ class LevelTwoWeb(object):
     
     def start_recovery(self, req):
         try:
-            params = rosparam.load_file(req.file)
-            rospy.loginfo("START_RECOVERY received params: {!s}".format(params))
+            params = yaml.load(req.yaml)
+            rospy.loginfo("START_RECOVERY received yaml params: {!s}".format(params))
             #get first namespace, and the first tuple entry (the param dict)
-            params = params[0][0]
+            #params = params[0][0]
         except Exception, exc:
             rospy.loginfo("START_RECOVERY failed to parse params: {!s}".format(exc))
             return False
@@ -410,30 +441,36 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.paused = msg.data
         
     def sample_update(self, sample):
-        try:
-            self.tf_listener.waitForTransform(self.odometry_frame,
-                                              sample.header.frame_id,
-                                              sample.header.stamp,
-                                              rospy.Duration(1.0))
-            point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
-            sample.point = point_in_frame.point
-            self.state_machine.userdata.detected_sample = sample
-        except tf.Exception:
-            rospy.logwarn("LEVEL_TWO failed to transform search detection point %s->%s",
-                          sample.header.frame_id, self.odometry_frame)
+        #only update the detection message with samples if stop_on_sample is true
+        if self.state_machine.userdata.report_sample:
+            try:
+                self.tf_listener.waitForTransform(self.odometry_frame,
+                                                  sample.header.frame_id,
+                                                  sample.header.stamp,
+                                                  rospy.Duration(1.0))
+                point_in_frame = self.tf_listener.transformPoint(self.odometry_frame, sample)
+                sample.point = point_in_frame.point
+                self.state_machine.userdata.detection_message = sample
+            except tf.Exception:
+                rospy.logwarn("LEVEL_TWO failed to transform search detection point %s->%s",
+                              sample.header.frame_id, self.odometry_frame)
             
     def beacon_update(self, beacon_pose):
-        #first, update the beacon point
-        beacon_point = geometry_msg.PointStamped(beacon_pose.header,
-                                                 beacon_pose.pose.pose.position)
-        self.state_machine.userdata.beacon_point = beacon_point
+        #update the detection_message with the beacon if we want to stop when we see it
+        rospy.logdebug("LEVEL_TWO report_beacon: {!s}, \
+                       received beacon pose: {!s}".format(self.state_machine.userdata.report_beacon,
+                                                          beacon_pose))
+        if self.state_machine.userdata.report_beacon:
+            beacon_point = geometry_msg.PointStamped(beacon_pose.header,
+                                                     beacon_pose.pose.pose.position)
+            self.state_machine.userdata.detection_message = beacon_point
     
     def localization_check(self, event):        
         
         saved_point_map = self.state_machine.userdata.move_point_map
         
         #if the VFH server is active, and the beacon correction is large enough, change the goal
-        if saved_point_map is not None:
+        if (saved_point_map is not None):
 
             goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
 
@@ -449,13 +486,15 @@ class LevelTwoWeb(object):
                 saved_point_odom = self.tf_listener.transformPoint(self.odometry_frame, saved_point_map)
             except tf.Exception:
                 rospy.logwarn("LEVEL_TWO beacon_update failed to transform target point")
+                return
             
             correction_error = util.point_distance_2d(goal_point_odom,
                                                       saved_point_odom.point)
             
             rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
             
-            if (correction_error > self.replan_threshold):
+            if (correction_error > self.replan_threshold) \
+            and self.vfh_mover.get_state() in util.actionlib_working_states:
                 self.announcer.say("Beacon correction.")
                 #update the VFH move goal
                 goal = deepcopy(self.state_machine.userdata.move_goal)
@@ -507,13 +546,12 @@ class StartLeveLTwo(smach.State):
         userdata.action_result = result
         
         #create the dismount_move
-        move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                              **userdata.dismount_move)
-
-        userdata.simple_move = move
+        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                              **userdata.dismount_move)
         
-        userdata.pursue_samples = True
-        userdata.stop_on_sample = True
+        userdata.half_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                             angle = np.pi,
+                                             velocity = userdata.spin_velocity)
 
         return 'next'
 
@@ -526,8 +564,11 @@ class WebManager(smach.State):
                                            'raster_active',
                                            'raster_points',
                                            'raster_step',
+                                           'raster_tolerance',
+                                           'chord_course_tolerance',
                                            'vfh_result',
                                            'manager_dict',
+                                           'detection_message',
                                            'return_time',
                                            'world_fixed_frame'],
                              output_keys = ['spoke_yaw',
@@ -535,15 +576,15 @@ class WebManager(smach.State):
                                             'spokes',
                                             'raster_active',
                                             'raster_points',
-                                            'retry_active',
                                             'move_target',
                                             'course_tolerance',
                                             'allow_rotate_to_clear',
-                                            'stop_on_sample',
-                                            'pursue_samples',
+                                            'report_sample',
+                                            'stop_on_detection',
                                             'active_manager'],
                              outcomes=['move',
                                        'get_raster',
+                                       'sample_detected',
                                        'return_home',
                                        'preempted', 'aborted'])
         
@@ -555,13 +596,18 @@ class WebManager(smach.State):
 
     def execute(self, userdata):
         #set the move manager key for the move mux
-        userdata.active_manager = userdata.manager_dict[self.label]        
-        
+        userdata.active_manager = userdata.manager_dict[self.label]
+        userdata.report_sample = True #always act on samples if this manager is working
+        userdata.stop_on_detection = True
+      
         if rospy.Time.now() > userdata.return_time:
-            userdata.stop_on_sample = False
-            userdata.pursue_samples = False
+            userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
+            userdata.stop_on_detection = False
             return 'return_home'
+        
+        if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
+            return 'sample_detected'
 
         if userdata.outbound:
             #this flag indicates it's time to make an outbound move
@@ -598,12 +644,20 @@ class WebManager(smach.State):
                     #replace the next inward point with this
                     next_move['point'] = geometry_msg.PointStamped(header, pos)
                     self.announcer.say("Head ing to next radius.")
-                                
+
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
                     self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
                     userdata.raster_active = False
                     userdata.outbound = True #request the next spoke move
+                else:
+                #if not, do we happen to aleady be close enough to the next point
+                #that planning to it is just a waste of time?
+                    yaw, distance = util.get_robot_strafe(self.tf_listener,
+                                                          next_move['point'])
+                    if distance < userdata.raster_tolerance:
+                        self.announcer.say("Already with in raster tolerance")
+                        next_move = userdata.raster_points.popleft()
                 
                 return self.load_move(next_move, userdata)
             else:
@@ -619,7 +673,7 @@ class WebManager(smach.State):
         if next_move['radial']:
             userdata.allow_rotate_to_clear = True
         else:
-            userdata.course_tolerance = 3.0
+            userdata.course_tolerance = userdata.chord_course_tolerance
             userdata.allow_rotate_to_clear = False
         #load the target into move_point, and save the move
         #move_point is consumed by the general move_goal transformer,
@@ -729,7 +783,8 @@ class CreateMoveGoal(smach.State):
                                            'course_tolerance',
                                            'vfh_result',
                                            'odometry_frame',
-                                           'world_fixed_frame'],
+                                           'world_fixed_frame',
+                                           'local_frame'],
                              output_keys = ['move_goal',
                                             'move_point_map',
                                             'course_tolerance'],
@@ -790,8 +845,10 @@ class CreateMoveGoal(smach.State):
         userdata.course_tolerance = None
 
         #store the point in map, to compare in the beacon update callback
-        userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
-                                                            map_pose.pose.position)
+        #unless the requested move was in local_frame
+        if target.header.frame_id != userdata.local_frame:
+            userdata.move_point_map = geometry_msg.PointStamped(map_pose.header,
+                                                                map_pose.pose.position)
         
         return 'next'
 
@@ -843,40 +900,84 @@ class RecoveryManager(smach.State):
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
                                            'manager_dict',
-                                           'raster_points'],
+                                           'move_target',
+                                           'raster_points',
+                                           'spokes',
+                                           'detection_message',
+                                           'local_frame'],
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
                                             'raster_points',
+                                            'spokes',
                                             'move_target',
-                                            'pursue_samples'],
+                                            'simple_move',
+                                            'report_sample',
+                                            'report_beacon',
+                                            'detection_message',
+                                            'stop_on_detection'],
                              outcomes=['move',
+                                       'sample_detected',
+                                       'simple_move',
                                        'return_manager',
                                        'web_manager',
+                                       'wait_for_preempt',
                                        'aborted'])
         
         self.label = label       
         self.announcer = announcer
         self.tf_listener = tf_listener
+        self.exit_move = None
         
     def execute(self, userdata):
-        #set the move manager key for the move mux
-        userdata.active_manager = userdata.manager_dict[self.label]
-        
-        rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
         
         if userdata.recovery_requested == True:
             #first time through
+            rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
             self.announcer.say("Enter ing recovery state")
+            #save these in case we are returning to the web manager
+            self.exit_move = userdata.move_target
+            userdata.detection_message = False
             userdata.recovery_requested = False
-            userdata.pursue_samples = userdata.recovery_parameters['pursue_samples']
-            if userdata.recovery_parameters['spokes_to_remove'] > 0:
-                if len(userdata.raster_points) > 0:
-                    userdata.raster_points = [userdata.raster_points[-1]]
+            userdata.report_beacon = False
+            userdata.stop_on_detection = True
+            userdata.report_sample = userdata.recovery_parameters['pursue_samples']
+            
+            #prune requested spokes
+            spokes_to_remove = userdata.recovery_parameters['spokes_to_remove']
+            while spokes_to_remove > 0:
+                #current spoke is already popped, so load the start of the next one first
+                self.exit_move = userdata.spokes[0]['start_point']
+                spokes_to_remove -=1
+                #if there are more spokes to remove, pop 1
+                if (spokes_to_remove > 0):
+                    if (len(userdata.spokes) > 1):
+                        userdata.spokes.popleft()    
+                    else:
+                        #unless there aren't enough spokes left
+                        rospy.loginfo("RECOVERY_MANAGER requested to prune too many spokes")
+                        break
+        
+        #set the move manager key for the move mux
+        userdata.active_manager = userdata.manager_dict[self.label]
+        
+        #if a sample is detected, cancel recovery and exit to pursuit
+        if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
+            userdata.active_manager = userdata.recovery_parameters['terminal_outcome'] 
+            userdata.move_target = self.exit_move
+            return 'sample_detected'
+        
+        if len(userdata.recovery_parameters['simple_moves']) > 0:
+            simple_move = userdata.recovery_parameters['simple_moves'].pop(0)
+            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                  angle = simple_move['angle'],
+                                                  distance = simple_move['distance'],
+                                                  velocity = simple_move['velocity'])
+            return 'simple_move'
         
         if len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
-            base_header = std_msg.Header(0, rospy.Time(0), 'base_link')            
+            base_header = std_msg.Header(0, rospy.Time(0), userdata.local_frame)            
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
             target_pose = util.pose_translate_by_yaw(base_pose_stamped,
                                                      move['distance'],
@@ -885,29 +986,39 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)            
             return 'move'
         else:
-            return userdata.recovery_parameters['terminal_outcome']
-        
+            userdata.stop_on_detection = False
+            #setting the active manager is for the return to web_manager
+            #it's the only way I could think of to return to the previous goal
+            #exiting to the return_manager will overwrite this stuff
+            userdata.active_manager = userdata.recovery_parameters['terminal_outcome'] 
+            userdata.move_target = self.exit_move
+            return userdata.recovery_parameters['terminal_outcome'] 
 
 class MoveMUX(smach.State):
     def __init__(self, manager_list):
         smach.State.__init__(self,
                              input_keys = ['active_manager'],
-                             output_keys = ['retry_active'],
+                             output_keys = ['retry_active',
+                                            'move_point_map'],
                              outcomes = manager_list)
         
     def execute(self, userdata):
+        #clear and reset flags after all moves!
         userdata.retry_active = False
+        userdata.move_point_map = None
         return userdata.active_manager
     
 class LevelTwoPreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested'],
+                             output_keys = ['move_point_map'],
                              outcomes=['recovery','exit'])
         
     def execute(self, userdata):
         
         if userdata.recovery_requested:
+            userdata.move_point_map = None
             return 'recovery'
         
         return 'exit'
@@ -919,8 +1030,4 @@ class LevelTwoAborted(smach.State):
     def execute(self, userdata):
         
         return 'next'
-    
-
-    
-    
     

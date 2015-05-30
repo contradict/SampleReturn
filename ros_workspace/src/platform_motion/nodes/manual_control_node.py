@@ -177,9 +177,9 @@ class ManualController(object):
             smach.StateMachine.add('SERVO_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'VISUAL_SERVO',
-                                                  'sample_detected':'VISUAL_SERVO',
+                                                  'object_detected':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED'},
-                                   remapping = {'stop_on_sample':'false'})
+                                   remapping = {'stop_on_detection':'false'})
    
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,

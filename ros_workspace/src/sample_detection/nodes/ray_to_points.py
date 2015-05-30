@@ -5,12 +5,14 @@ import numpy as np
 import cv2
 import copy
 
-from geometry_msgs.msg import Vector3Stamped,Point,PointStamped
+from geometry_msgs.msg import Vector3Stamped,Point,PointStamped,PolygonStamped
 from sensor_msgs.msg import PointCloud2
 from samplereturn_msgs.msg import NamedPoint
 from visualization_msgs.msg import Marker
 from cv_bridge import CvBridge
 from tf import TransformListener
+
+import message_filters
 
 class ray_to_points(object):
   # Alright, this thing is going to take in a ray (in the camera frame) from
@@ -27,6 +29,9 @@ class ray_to_points(object):
     self.points_pub = rospy.Publisher('points', PointCloud2)
     self.named_point_pub = rospy.Publisher('point', NamedPoint)
     self.marker_pub = rospy.Publisher('marker', Marker)
+
+    self.fence_line_sub = message_filters.Subscriber('fence_line',PolygonStamped)
+    self.cache = message_filters.Cache(self.fence_line_sub,120)
 
     self.tf = TransformListener()
     rospy.sleep(2.0)
@@ -46,12 +51,36 @@ class ray_to_points(object):
     point_stamped.point = point_in.point
 
     ground_named_point, odom_named_point = self.cast_ray(point_stamped,self.tf,point_in.name)
+    intersection = self.check_fence_intersection(ground_named_point)
     rospy.logdebug("ground_named_point %s",ground_named_point)
     rospy.logdebug("odom_named_point %s",odom_named_point)
     if ground_named_point.point.x > 25.0 or np.abs(ground_named_point.point.y) > 15.0:
       return
+    elif intersection:
+      rospy.logdebug("Detection intersects fence")
+      return
     self.named_point_pub.publish(odom_named_point)
     self.send_marker(odom_named_point)
+
+  def check_fence_intersection(self, ground_named_point):
+      # Line-line intersection of the fence line and the line between base_link
+      # and the cast DSLR detection. If there is an intersection, and it lies
+      # between base_link and the detection, reject the detection
+      fence_line_msg = self.cache.getElemAfterTime(ground_named_point.header.stamp)
+      if fence_line_msg is None:
+          return False
+      x1,y1 = 0.0,0.0
+      x2,y2 = ground_named_point.point.x,ground_named_point.point.y
+      x3,y3 = fence_line_msg.polygon.points[0].x,fence_line_msg.polygon.points[0].y
+      x4,y4 = fence_line_msg.polygon.points[1].x,fence_line_msg.polygon.points[1].y
+
+      px = ((x1*y2-y1*x2)*(x3-x4) - (x1-x2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4) - (y1-y2)*(x3-x4))
+      py = ((x1*y2-y1*x2)*(y3-y4) - (y1-y2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4) - (y1-y2)*(x3-x4))
+
+      if (np.abs(px) < np.abs(x2)) and ((y2<py<0) or (0<py<y2)):
+          return True
+      else:
+          return False
 
   def send_marker(self, named_pt):
     m=Marker()

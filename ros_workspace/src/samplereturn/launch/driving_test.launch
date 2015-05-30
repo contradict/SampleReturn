@@ -11,7 +11,7 @@
     <arg name="kind" default="install"/>
 
     <param name="use_sim_time" value="False" type="bool"/>
-    
+
     <!-- Launch Files -->
     <include file="$(find samplereturn)/launch/machine_definitions.launch">
         <arg name="user" value="$(arg user)"/>
@@ -41,14 +41,12 @@
     <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
     <include file="$(find motion_planning)/launch/motion_planning.launch"/>
     <include file="$(find samplereturn)/launch/imu.launch"/>
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
+    <include file="$(find beacon_finder)/launch/april_beacon_finder.launch"/>
 
     <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
-    
+
     <include file="$(find beacon_localizer)/launch/beacon_localizer.launch"/>
-    <!--
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
-    -->
 
     <include file="$(find solar_fisheye)/launch/molamola.launch"/>
 

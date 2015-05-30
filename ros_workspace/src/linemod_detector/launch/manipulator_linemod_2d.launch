@@ -22,7 +22,7 @@
   <node
     machine="search"
     pkg="detection_filter"
-    type="kalman_filter_node"
+    type="manipulator_kalman_filter_node"
     name="linemod_kalman_filter_node"
     ns="/processes/sample_detection/manipulator">
     <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
@@ -35,5 +35,18 @@
     <param name="process_noise_cov" type="double" value="0.001"/>
     <param name="measurement_noise_cov" type="double" value="0.02"/>
     <param name="period" type="double" value="0.03"/>
+    <rosparam param="color_transitions">
+        white: [gray, blue, green, white, pink]
+        black: []
+        gray: [gray, white, blue]
+        brown: [brown, orange, red]
+        pink: [pink, red, purple, white]
+        red: [red, pink, purple, orange, brown]
+        orange: [orange, yellow, red, brown]
+        yellow: [yellow, orange]
+        green: [green, white]
+        blue: [blue, gray, white]
+        purple: [purple, red,pink]
+    </rosparam>
   </node>
 </launch>

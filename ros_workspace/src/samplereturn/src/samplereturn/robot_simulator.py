@@ -15,6 +15,7 @@ import actionlib
 import tf
 import tf2_ros
 import tf_conversions
+from cv_bridge import CvBridge, CvBridgeError
 
 import samplereturn.util as util
 
@@ -22,6 +23,7 @@ import actionlib_msgs.msg as action_msg
 import std_msgs.msg as std_msg
 import sensor_msgs.msg as sensor_msg
 import nav_msgs.msg as nav_msg
+import sensor_msgs.msg as sensor_msg
 import nav_msgs.srv as nav_srv
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
@@ -48,6 +50,7 @@ class RobotSimulator(object):
 
         #IMPORTANT SWITCHES!        
         self.publish_samples = publish_samples
+        self.random_sample_verify = False
         self.publish_beacon = publish_beacon
         self.odometry_is_noisy = True
         self.broadcast_localization = False #fake localization handled by beacon_localizer!
@@ -128,9 +131,12 @@ class RobotSimulator(object):
         pursuit_result_name = "/processes/executive/pursuit_result"
         detected_sample_search_name = "/processes/sample_detection/search/filtered_point"
         detected_sample_manipulator_name = "/processes/sample_detection/manipulator/filtered_point"
+        search_verify_name = "/processes/sample_detection/search/close_range_verify"
         beacon_pose_name = "/processes/beacon/beacon_pose"
         beacon_debug_pose_name = "/processes/beacon/beacon_pose_debug"
 
+        manipulator_image_name = "/cameras/manipulator/left/rect_color"
+       
         point_cloud_center_name = "/cameras/navigation/center/points2"
         point_cloud_port_name = "/cameras/navigation/port/points2"
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
@@ -194,14 +200,26 @@ class RobotSimulator(object):
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
         
-        self.search_enable = rospy.Service(enable_search_name,
-                                           platform_srv.Enable,
-                                           self.service_enable_search_request)
-        self.manipulator_detector_enable = rospy.Service(enable_manipulator_detector_name,
-                                                         samplereturn_srv.Enable,
-                                                         self.enable_manipulator_detector)
-        self.manipulator_detector_enabled = False                                           
-                
+        rospy.Service(enable_search_name,
+                      platform_srv.Enable,
+                      self.service_enable_search_request)
+        rospy.Service(search_verify_name,
+                      samplereturn_srv.Verify,
+                      self.service_search_verify_request)
+        rospy.Service(enable_manipulator_detector_name,
+                      samplereturn_srv.Enable,
+                      self.enable_manipulator_detector)
+        self.manipulator_detector_enabled = False
+        
+        #publisher for blank images to sun_pointing
+        self.cv_bridge = CvBridge()
+        self.manipulator_image_publisher = rospy.Publisher(manipulator_image_name,
+                                                           sensor_msg.Image,
+                                                           queue_size = 1)
+        self.empty_image_data = np.zeros((480,640,3), dtype='uint8')
+        
+        rospy.Timer(rospy.Duration(1.0/30.0), self.publish_manipulator_image)
+                                            
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
@@ -210,15 +228,15 @@ class RobotSimulator(object):
 
 
         #platform motion publishers, services, and action servers
-        self.select_motion_mode = rospy.Service(select_motion_name,
-                                                platform_srv.SelectMotionMode,
-                                                self.service_motion_mode_request)
-        self.enable_wheelpods = rospy.Service(enable_wheelpods_name,
-                                              platform_srv.Enable,
-                                              self.service_enable_wheelpods)
-        self.enable_carousel = rospy.Service(enable_carousel_name,
-                                             platform_srv.Enable,
-                                             self.service_enable_wheelpods)
+        rospy.Service(select_motion_name,
+                      platform_srv.SelectMotionMode,
+                      self.service_motion_mode_request)
+        rospy.Service(enable_wheelpods_name,
+                      platform_srv.Enable,
+                      self.service_enable_wheelpods)
+        rospy.Service(enable_carousel_name,
+                      platform_srv.Enable,
+                      self.service_enable_wheelpods)
         
         self.home_wheelpods_server = actionlib.SimpleActionServer(home_wheelpods_name,
                                                                   platform_msg.HomeAction,
@@ -533,7 +551,13 @@ class RobotSimulator(object):
             if ((now - self.beacon_pose_queue[0].header.stamp) > self.beacon_pose_delay):
                 #rospy.loginfo("Publishing Beacon: {!s} with delay {!s}".format(self.beacon_pose_queue[0].header, delay.to_sec()))
                 self.beacon_pose_pub.publish(self.beacon_pose_queue.popleft())
-            
+    
+    def publish_manipulator_image(self, event):
+        now = event.current_real
+        header = std_msg.Header(0, now, 'manipulator_left_camera')
+        msg = self.cv_bridge.cv2_to_imgmsg(self.empty_image_data, "bgr8")
+        msg.header = header
+        self.manipulator_image_publisher.publish(msg)
 
     def check_sample_detection_search(self, event):
         if self.publish_samples:
@@ -710,6 +734,14 @@ class RobotSimulator(object):
     def service_enable_search_request(self, req):
         rospy.sleep(0.5)
         return req.state
+    
+    #fail 1 out of 3 times to verify a sample
+    def service_search_verify_request(self, req):
+        rospy.sleep(0.5)
+        if self.random_sample_verify:
+            return random.choice([True, True, False])
+        else:
+            return True
         
     def service_motion_mode_request(self, req):
         rospy.sleep(0.2)
@@ -809,7 +841,7 @@ class RobotSimulator(object):
     def zero_robot(self):
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
-        self.comman_twist = geometry_msg.Twist()
+        self.command_twist = geometry_msg.Twist()
         self.noisy_robot_pose = self.initial_pose()
         self.noisy_robot_odometry = self.initial_odometry()
         

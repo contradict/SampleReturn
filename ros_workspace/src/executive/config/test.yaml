@@ -9,19 +9,22 @@ level_two:
     spin_velocity: 0.2
     spoke_count: 20 
     max_spoke_length: 200 
-    first_spoke_offset: 0 
+    first_spoke_offset: 163 
     next_spoke_sign: 1 # 1 for ccw, -1 for cw
-    spoke_hub_radius: 10
+    spoke_hub_radius: 15
     #raster step is distance between raster lines
     #raster offset is how close to the spoke we get
     #before we go to the next raster step
     raster_step: 6
     raster_offset: 6
-    return_time_minutes: 60 
+    raster_tolerance: 1.5 #close enough to next point?
+    chord_course_tolerance: 3.0 #what is off course on a chord move
+    return_time_minutes: 110 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 2.0, velocity: 0.5}
     beacon_approach_point: {x: 10.0, y: 0}
     beacon_observation_delay: 10 
+    beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan
     replan_threshold: 2.0
     #for costmap issues, set to zero to disable this
