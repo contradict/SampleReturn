@@ -54,6 +54,8 @@ class BeaconAprilDetector{
   void imageCb(const sensor_msgs::ImageConstPtr& msg,const sensor_msgs::CameraInfoConstPtr& cam_info);
   std::map<int, AprilTagDescription> parse_tag_descriptions(XmlRpc::XmlRpcValue& april_tag_descriptions);
   void drawPoint(cv::Mat &img, const cv::Point2d pt);
+  bool solveWithNoise(const apriltag_detection_t *det, AprilTagDescription &description, cv_bridge::CvImagePtr cv_ptr, cv::Vec3d *rvec, cv::Vec3d *tvec, bool initial_guess);
+  geometry_msgs::PoseStamped sendTransform(cv::Vec3d& rvec, cv::Vec3d& tvec, std::string frame_id, const std_msgs::Header& hdr);
 
  private:
   std::map<int, AprilTagDescription> descriptions_;
@@ -71,6 +73,7 @@ class BeaconAprilDetector{
   double rvec_tolerance_;
   int point_size_;
   int min_tag_size_;
+  double rvec_reflection_tolerance_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -108,6 +111,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pnh.param("rvec_tolerance", rvec_tolerance_, 1e-2);
 
   pnh.param("min_tag_size", min_tag_size_, 100);
+  pnh.param("rvec_reflection_tolerance", rvec_reflection_tolerance_, 0.1);
 
   //get tag family parametre
   pnh.param("tag_family", famname_, std::string("tag36h11"));
@@ -175,6 +179,73 @@ BeaconAprilDetector::~BeaconAprilDetector(){
   }
 }
 
+bool BeaconAprilDetector::solveWithNoise(const apriltag_detection_t *det, AprilTagDescription &description, cv_bridge::CvImagePtr cv_ptr, cv::Vec3d *rvec, cv::Vec3d *tvec, bool initial_guess)
+{
+    std::vector<cv::Point2d> imgPts;
+    for(int i=0;i<4;i++)
+    {
+        cv::Point2d pt(det->p[i][0], det->p[i][1]);
+        drawPoint(cv_ptr->image, pt);
+        imgPts.push_back(pt);
+    }
+    std::vector<cv::Vec3d> rvecs;
+    std::vector<cv::Vec3d> tvecs;
+    for(int i=0;i<solve_tries_;i++)
+    {
+        cv::Vec3d rvec, tvec;
+        std::vector<cv::Point2d> disturbed_imgPts;
+        for(const auto &pt : imgPts)
+        {
+            double dx=solve_noise_*((double)rng_-0.5)*2.0;
+            double dy=solve_noise_*((double)rng_-0.5)*2.0;
+            disturbed_imgPts.push_back(pt + cv::Point2d(dx, dy));
+        }
+        if (cv::solvePnP(description.corners, disturbed_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, initial_guess, CV_ITERATIVE) == false)
+        {
+            ROS_ERROR_NAMED("solver", "Unable to solve for tag pose.");
+            ROS_ERROR_STREAM_NAMED("solver", "corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+            return false;
+        }
+        ROS_DEBUG_STREAM_NAMED("solver", "noisy rvec(" << i << "): " << rvec);
+        rvecs.push_back(rvec);
+        tvecs.push_back(tvec);
+    }
+    double distance=0;
+    *rvec=rvecs[0]; *tvec=tvecs[0];
+    for(int i=1; i<solve_tries_; i++)
+    {
+        distance=std::max(distance, cv::norm(rvecs[0] - rvecs[i]));
+        *rvec += rvecs[i];
+        *tvec += tvecs[i];
+    }
+    *tvec /= solve_tries_;
+    *rvec /= solve_tries_;
+
+    ROS_DEBUG_STREAM_NAMED("solver", "Tag: " << description.frame_name() << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "imgPts:\n" <<
+        "[" << imgPts[0] << ",\n" <<
+        " " << imgPts[1] << ",\n" <<
+        " " << imgPts[2] << ",\n" <<
+        " " << imgPts[3] << "]");
+    if(distance>rvec_tolerance_)
+    {
+        ROS_ERROR_STREAM_NAMED("solver", "large rvec distance, skipping: " << distance);
+        return false;
+    }
+    return true;
+}
+
+
+double unwrap(double angle)
+{
+    while(angle>M_PI)
+        angle -= 2*M_PI;
+    while(angle<-M_PI)
+        angle += 2*M_PI;
+    return angle;
+}
+
 void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const sensor_msgs::CameraInfoConstPtr& cam_info){
   if(tag_det_ == NULL)
     return;
@@ -216,18 +287,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
           continue;
       }
       AprilTagDescription description = description_itr->second;
-      double tag_size = description.size();
       
-    std::string frame_id = description.frame_name();
-    std::string tf_err;
-    if(!_tf.canTransform(frame_id, "beacon", ros::Time(0), &tf_err))
-    {
-        ROS_ERROR_STREAM("Unable to transform to frame " << frame_id << ": " << tf_err);
-        continue;
-    }
-
-    tf::StampedTransform T_beacon_to_tag;
-    _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
 
     double width, height;
     width = std::min(abs(det->p[1][0] - det->p[0][0]),
@@ -237,64 +297,85 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     if( (width<min_tag_size_) || (height<min_tag_size_))
     {
-        ROS_DEBUG_STREAM("Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
+        ROS_DEBUG_STREAM("Skipping small tag " << description.frame_name() << ", (" << width << ", " << height << ")");
         continue;
     }
 
-    ROS_DEBUG_STREAM("Solving tag " << frame_id << ", (" << width << ", " << height << ")");
+    ROS_DEBUG_STREAM("Solving tag " << description.frame_name() << ", (" << width << ", " << height << ")");
+    cv::Vec3d rvec, tvec;
+    if(!solveWithNoise(det, description, cv_ptr, &rvec, &tvec, false))
+        continue;
 
-    std::vector<cv::Point2d> imgPts;
-    for(int i=0;i<4;i++)
+    double th = cv::norm(rvec);
+    cv::Vec3d axis;
+    cv::normalize(rvec, axis);
+    Eigen::Quaterniond q_rvec(Eigen::AngleAxisd(th, Eigen::Vector3d(axis(0), axis(1), axis(2))));
+    Eigen::Quaterniond q_y=Eigen::Quaterniond(q_rvec.conjugate().w(), 0, 0, q_rvec.conjugate().z()).normalized().conjugate();
+    Eigen::Quaterniond q_pr = q_y.conjugate()*q_rvec;
+    ROS_DEBUG_STREAM_NAMED("reflect", "q_y: ("
+            << q_y.w() << ", " << q_y.x() << ", " << q_y.y() << ", " << q_y.z() << ")");
+    double theta_rvec = 2*atan2(q_y.z(), q_y.w());
+    double theta_tvec = atan2(tvec[0], tvec(2));
+
+    ROS_DEBUG_STREAM_NAMED("reflect", "theta_rvec: " << theta_rvec << " theta_tvec: " << theta_tvec);
+
+    double theta_diff = unwrap(theta_rvec - theta_tvec);
+    double theta_reflected;
+    if(theta_diff<0)
+        theta_reflected = -M_PI-theta_diff+theta_tvec;
+    else
+        theta_reflected = M_PI-theta_diff+theta_tvec;
+    Eigen::Quaterniond q_y_reflected(Eigen::AngleAxisd(theta_reflected, Eigen::Vector3d(0,0,1)));
+    Eigen::Quaterniond q_rvec_reflected = q_y_reflected*q_pr;
+    th = acos(q_rvec_reflected.w())*2;
+    cv::Vec3d vec_reflected(q_rvec_reflected.x(),q_rvec_reflected.y(),q_rvec_reflected.z());
+    cv::Vec3d rvec_reflected;
+    cv::normalize(vec_reflected, rvec_reflected);
+    rvec_reflected *= th;
+
+    std::string frame_id = description.frame_name();
+    /*
+     * Disable filtering for now, still playing with the axis of reflection
+    if(!solveWithNoise(det, description, cv_ptr, &rvec_reflected, &tvec, true))
+        continue;
+
+    if(cv::norm(rvec-rvec_reflected)>rvec_reflection_tolerance_)
     {
-        cv::Point2d pt(det->p[i][0], det->p[i][1]);
-        drawPoint(cv_ptr->image, pt);
-        imgPts.push_back(pt);
-    }
-    std::vector<cv::Vec3d> rvecs;
-    std::vector<cv::Vec3d> tvecs;
-    for(int i=0;i<solve_tries_;i++)
-    {
-        cv::Vec3d rvec, tvec;
-        std::vector<cv::Point2d> disturbed_imgPts;
-        for(const auto &pt : imgPts)
-        {
-            double dx=solve_noise_*((double)rng_-0.5)*2.0;
-            double dy=solve_noise_*((double)rng_-0.5)*2.0;
-            disturbed_imgPts.push_back(pt + cv::Point2d(dx, dy));
-        }
-        if (cv::solvePnP(description.corners, disturbed_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
-        {
-            ROS_ERROR_NAMED("solver", "Unable to solve for tag pose.");
-            ROS_ERROR_STREAM_NAMED("solver", "corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
-            continue;
-        }
-        ROS_DEBUG_STREAM_NAMED("solver", "noisy rvec(" << i << "): " << rvec);
-        rvecs.push_back(rvec);
-        tvecs.push_back(tvec);
-    }
-    double distance=0;
-    cv::Vec3d rvec=rvecs[0], tvec=tvecs[0];
-    for(int i=1; i<solve_tries_; i++)
-    {
-        distance=std::max(distance, cv::norm(rvecs[0] - rvecs[i]));
-        rvec += rvecs[i];
-        tvec += tvecs[i];
-    }
-    tvec /= solve_tries_;
-    rvec /= solve_tries_;
-    
-    ROS_DEBUG_STREAM_NAMED("solver", "Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
-    ROS_DEBUG_STREAM_NAMED("solver", "    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
-    ROS_DEBUG_STREAM_NAMED("solver", "imgPts:\n" <<
-        "[" << imgPts[0] << ",\n" <<
-        " " << imgPts[1] << ",\n" <<
-        " " << imgPts[2] << ",\n" <<
-        " " << imgPts[3] << "]");
-    if(distance>rvec_tolerance_)
-    {
-        ROS_ERROR_STREAM_NAMED("solver", "large rvec distance, skipping: " << distance);
+        ROS_WARN_STREAM("Skipping tag " << frame_id << " with incosistent reflection solution");
         continue;
     }
+    */
+
+    geometry_msgs::PoseStamped tag_pose;
+    beacon_finder::AprilTagDetection tag_detection;
+
+    tag_pose = sendTransform(rvec, tvec, frame_id, msg->header);
+    tag_pose_array.poses.push_back(tag_pose.pose);
+    tag_detection.header = msg->header;
+    tag_detection.pose = tag_pose.pose;
+    tag_detection.id = det->id;
+    tag_detection.size = description.size();
+    tag_detection_array.detections.push_back(tag_detection);
+
+    tag_pose = sendTransform(rvec_reflected, tvec, frame_id+"_reflected", msg->header);
+    tag_pose_array.poses.push_back(tag_pose.pose);
+    tag_detection.header = msg->header;
+    tag_detection.pose = tag_pose.pose;
+    tag_detection.id = det->id;
+    tag_detection.size = description.size();
+    tag_detection_array.detections.push_back(tag_detection);
+
+  }
+  //free up detections memory
+  apriltag_detections_destroy(detections);
+
+  detections_pub_.publish(tag_detection_array);
+  tag_pose_pub_.publish(tag_pose_array);
+  image_pub_.publish(cv_ptr->toImageMsg());
+}
+
+geometry_msgs::PoseStamped BeaconAprilDetector::sendTransform(cv::Vec3d& rvec, cv::Vec3d& tvec, std::string frame_id, const std_msgs::Header& hdr)
+{
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
@@ -302,18 +383,28 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             tf::Vector3(tvec[0], tvec[1], tvec[2]));
 
     tf::StampedTransform tag_to_camera_s(tag_to_camera,
-            msg->header.stamp, frame_id, msg->header.frame_id);
+            hdr.stamp, frame_id, hdr.frame_id);
     geometry_msgs::PoseStamped tag_pose;
     tf::pointTFToMsg( tag_to_camera.getOrigin(), tag_pose.pose.position);
     tf::quaternionTFToMsg( tag_to_camera.getRotation(), tag_pose.pose.orientation);
-    tag_pose.header = cv_ptr->header;
+    tag_pose.header = hdr;
 
+    std::string tf_err;
+    if(!_tf.canTransform(frame_id, "beacon", ros::Time(0), &tf_err))
+    {
+        ROS_ERROR_STREAM("Unable to transform to frame " << frame_id << ": " << tf_err);
+        return tag_pose;
+    }
+
+    tf::StampedTransform T_beacon_to_tag;
+    _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
     tf::StampedTransform beacon_to_camera(  tag_to_camera_s* T_beacon_to_tag,
-            msg->header.stamp, "beacon", msg->header.frame_id);
+            hdr.stamp, "beacon", hdr.frame_id);
     geometry_msgs::PoseStamped beacon_pose;
     tf::pointTFToMsg( beacon_to_camera.getOrigin(), beacon_pose.pose.position);
     tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
-    beacon_pose.header = cv_ptr->header;
+    beacon_pose.header = hdr;
+    beacon_debug_pose_pub_.publish(beacon_pose);
 
     //calculate covariance based on range
     double range = cv::norm(tvec);
@@ -328,27 +419,13 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     covariance_[35] = rot_covariance;
 
     geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
-    beacon_pose_msg.header = cv_ptr->header;
+    beacon_pose_msg.header = hdr;
     std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
     beacon_pose_msg.pose.pose = beacon_pose.pose;
 
-    beacon_finder::AprilTagDetection tag_detection;
-    tag_detection.header = cv_ptr->header;
-    tag_detection.pose = tag_pose.pose;
-    tag_detection.id = det->id;
-    tag_detection.size = tag_size;
-    tag_detection_array.detections.push_back(tag_detection);
-    tag_pose_array.poses.push_back(tag_pose.pose);
-
     beacon_pose_pub_.publish(beacon_pose_msg);
-    beacon_debug_pose_pub_.publish(beacon_pose);
-  }
-  //free up detections memory
-  apriltag_detections_destroy(detections);
 
-  detections_pub_.publish(tag_detection_array);
-  tag_pose_pub_.publish(tag_pose_array);
-  image_pub_.publish(cv_ptr->toImageMsg());
+    return tag_pose;
 }
 
 void BeaconAprilDetector::drawPoint(cv::Mat &img, const cv::Point2d pt)
