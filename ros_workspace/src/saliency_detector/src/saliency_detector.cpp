@@ -197,6 +197,8 @@ class SaliencyDetectorNode
         cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
         cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
             CV_RGB(0,255,0));
+        if(!checkContourSize(sub_img))
+            continue;
         //float scale = cv_ptr->image.rows/600.;
         float scale = cv_ptr->image.cols/bms_img_width_;
         cv::Point3d ray =
@@ -222,6 +224,20 @@ class SaliencyDetectorNode
 
     ROS_DEBUG("messageCallback ended");
     saliency_mutex_.unlock();
+  }
+
+  bool checkContourSize(const cv::Mat region)
+  {
+      std::vector<std::vector<cv::Point> > contours;
+      std::vector<cv::Vec4i> hierarchy;
+      cv::findContours( region, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+      cv::Mat contourImage;
+      cv::cvtColor( region, contourImage, CV_GRAY2RGB);
+      cv::drawContours( contourImage, contours, -1, cv::Scalar(0, 255, 0));
+      imshow("contours", contourImage);
+      cv::waitKey(1);
+
+      return true;
   }
 
   /* Dynamic reconfigure callback */
