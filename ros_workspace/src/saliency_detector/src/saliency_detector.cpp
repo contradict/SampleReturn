@@ -17,6 +17,7 @@
 
 #include <Eigen/Dense>
 #include "color_naming.h"
+#include <thread>
 
 struct index_score {
   float count;
@@ -37,11 +38,13 @@ class SaliencyDetectorNode
   ros::Subscriber sub_img;
   ros::Subscriber sub_camera_info;
   ros::Publisher pub_bms_img;
+  ros::Publisher pub_gcs_img;
   ros::Publisher pub_sub_img;
   ros::Publisher pub_sub_mask;
   ros::Publisher pub_named_point;
   string img_topic;
   string bms_debug_topic;
+  string gcs_debug_topic;
   string sub_debug_topic;
   string sub_mask_debug_topic;
   string named_point_topic;
@@ -82,6 +85,7 @@ class SaliencyDetectorNode
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("img_topic", img_topic, string("/cameras/search/image"));
     private_node_handle_.param("bms_debug_topic", bms_debug_topic, string("bms_img"));
+    private_node_handle_.param("gcs_debug_topic", gcs_debug_topic, string("gcs_img"));
     private_node_handle_.param("sub_debug_topic", sub_debug_topic, string("sub_img"));
     private_node_handle_.param("sub_mask_debug_topic", sub_mask_debug_topic, string("sub_mask"));
     private_node_handle_.param("named_point_topic", named_point_topic, string("named_point"));
@@ -105,6 +109,9 @@ class SaliencyDetectorNode
 
     pub_bms_img =
       nh.advertise<sensor_msgs::Image>(bms_debug_topic.c_str(), 3);
+
+    pub_gcs_img =
+      nh.advertise<sensor_msgs::Image>(gcs_debug_topic.c_str(), 3);
 
     pub_sub_img =
       nh.advertise<sensor_msgs::Image>(sub_debug_topic.c_str(), 3);
@@ -138,7 +145,7 @@ class SaliencyDetectorNode
   // There may be a bug in this, it produces slightly different maps than
   // the python script example. Qualitatively very similar, but with slightly
   // different range. I will hopefully get back to finding and fixing this.
-  cv::Mat computeGlobalSaliency(cv::Mat image) {
+  void computeGlobalSaliency(cv::Mat image, cv::Mat& out) {
     cv::Mat lab_image, hsv_image;
     cv::cvtColor(image,lab_image,cv::COLOR_RGB2Lab);
     cv::cvtColor(image,hsv_image,cv::COLOR_RGB2HSV);
@@ -183,7 +190,7 @@ class SaliencyDetectorNode
 
     // For query image, iterate over hist bins to compute per-pixel score,
     // which is distance between query pixel and hist bin color * hist bin count
-    cv::Mat out = cv::Mat::zeros(image.rows,image.cols,CV_32FC1);
+    //cv::Mat out = cv::Mat::zeros(image.rows,image.cols,CV_32FC1);
     for (int n=0; n<40; n++) {
       for (int i=0; i<image.rows;i++) {
         for (int j=0; j<image.cols;j++) {
@@ -195,7 +202,10 @@ class SaliencyDetectorNode
         }
       }
     }
-    return out;
+    cv::Mat thresh, dst;
+    cv::threshold(out,out,110,255,cv::THRESH_BINARY);
+    out.convertTo(out, CV_8U);
+    //return dst;
   }
 
   void messageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -214,6 +224,22 @@ class SaliencyDetectorNode
     cv::resize(cv_ptr->image.rowRange(bms_top_trim_,cv_ptr->image.rows),
         small,cv::Size(bms_img_width_,(cv_ptr->image.rows-bms_top_trim_)*(bms_img_width_/cv_ptr->image.cols)),
         0.0,0.0,cv::INTER_AREA);
+
+    cv::Mat out = cv::Mat::zeros(small.rows,small.cols,CV_32FC1);
+    //std::thread first(&SaliencyDetectorNode::computeGlobalSaliency,this,small,out);
+    //std::thread second(&bms_.computeSaliency,this,small,bms_sample_step_);
+
+    //first.join();
+    //second.join();
+
+    //cv::Mat out = cv::Mat::zeros(small.rows,small.cols,CV_32FC1);
+    //cv::Mat global_saliency = computeGlobalSaliency(small, out);
+    computeGlobalSaliency(small, out);
+    std_msgs::Header header;
+    //sensor_msgs::ImagePtr debug_img_msg;
+    sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"mono8",out).toImageMsg();
+    //sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"mono8",global_saliency).toImageMsg();
+    pub_gcs_img.publish(debug_img_msg);
 
     bms_.computeSaliency(small, bms_sample_step_);
     debug_bms_img_ = bms_.getSaliencyMap().clone();
@@ -292,8 +318,9 @@ class SaliencyDetectorNode
       }
     }
 
-    std_msgs::Header header;
-    sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
+    //std_msgs::Header header;
+    //sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
+    debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
     pub_bms_img.publish(debug_img_msg);
 
     ROS_DEBUG("messageCallback ended");
