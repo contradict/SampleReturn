@@ -29,7 +29,12 @@ namespace beacon_april_node{
  
 class AprilTagDescription{
  public:
-  AprilTagDescription(int id, double size, std::string &frame_name, std::vector<cv::Point3d> &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
+  AprilTagDescription(int id, double size, std::string &frame_name, std::vector<cv::Point3d> &corner_pos):
+      corners(corner_pos),
+      id_(id),
+      size_(size),
+      frame_name_(frame_name)
+    {}
   double size(){return size_;}
   int id(){return id_;} 
   std::string& frame_name(){return frame_name_;}
@@ -80,10 +85,10 @@ class BeaconAprilDetector{
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
     it_(nh),
     _tf(ros::Duration(10.0)),
-    tag_det_(NULL),
-    covariance_(36,0.0),
     rng_(0),
-    point_size_(10)
+    point_size_(10),
+    tag_det_(NULL),
+    covariance_(36,0.0)
 {
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
