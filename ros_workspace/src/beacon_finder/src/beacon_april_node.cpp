@@ -21,11 +21,68 @@
 #include "tag36artoolkit.h"
 #include "tag25h9.h"
 #include "tag25h7.h"
+extern "C" {
+#include "homography.h"
+}
 
 #include <beacon_finder/AprilTagDetection.h>
 #include <beacon_finder/AprilTagDetectionArray.h>
 
 namespace beacon_april_node{
+//taken from commented out code in apriltags
+static void matrix_to_quat(const matd_t *R, double q[4])
+{
+    // see: "from quaternion to matrix and back"
+
+    // trace: get the same result if R is 4x4 or 3x3:
+    double T = MATD_EL(R, 0, 0) + MATD_EL(R, 1, 1) + MATD_EL(R, 2, 2) + 1;
+    double S = 0;
+
+    double m0  = MATD_EL(R, 0, 0);
+    double m1  = MATD_EL(R, 1, 0);
+    double m2  = MATD_EL(R, 2, 0);
+    double m4  = MATD_EL(R, 0, 1);
+    double m5  = MATD_EL(R, 1, 1);
+    double m6  = MATD_EL(R, 2, 1);
+    double m8  = MATD_EL(R, 0, 2);
+    double m9  = MATD_EL(R, 1, 2);
+    double m10 = MATD_EL(R, 2, 2);
+
+    if (T > 0.0000001) {
+        S = sqrtf(T) * 2;
+        q[1] = -( m9 - m6 ) / S;
+        q[2] = -( m2 - m8 ) / S;
+        q[3] = -( m4 - m1 ) / S;
+        q[0] = 0.25 * S;
+    } else if ( m0 > m5 && m0 > m10 )  {    // Column 0:
+        S  = sqrtf( 1.0 + m0 - m5 - m10 ) * 2;
+        q[1] = -0.25 * S;
+        q[2] = -(m4 + m1 ) / S;
+        q[3] = -(m2 + m8 ) / S;
+        q[0] = (m9 - m6 ) / S;
+    } else if ( m5 > m10 ) {            // Column 1:
+        S  = sqrtf( 1.0 + m5 - m0 - m10 ) * 2;
+        q[1] = -(m4 + m1 ) / S;
+        q[2] = -0.25 * S;
+        q[3] = -(m9 + m6 ) / S;
+        q[0] = (m2 - m8 ) / S;
+    } else {
+        // Column 2:
+        S  = sqrtf( 1.0 + m10 - m0 - m5 ) * 2;
+        q[1] = -(m2 + m8 ) / S;
+        q[2] = -(m9 + m6 ) / S;
+        q[3] = -0.25 * S;
+        q[0] = (m4 - m1 ) / S;
+    }
+
+    double mag2 = 0;
+    for (int i = 0; i < 4; i++)
+        mag2 += q[i]*q[i];
+    double norm = 1.0 / sqrtf(mag2);
+    for (int i = 0; i < 4; i++)
+        q[i] *= norm;
+}
+
  
 class AprilTagDescription{
  public:
@@ -185,12 +242,10 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
   zarray_t *detections;
   detections = apriltag_detector_detect(tag_det_, apr_image);
-  /*
   double fx = cam_info->K[0];
   double fy = cam_info->K[4];
-  double px = cam_info->K[2];
-  double py = cam_info->K[5];
-  */
+  double cx = cam_info->K[2];
+  double cy = cam_info->K[5];
   model_.fromCameraInfo(cam_info);
 
   beacon_finder::AprilTagDetectionArray tag_detection_array;
@@ -221,6 +276,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tf::StampedTransform T_beacon_to_tag;
     _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
         
+    /*
     std::vector<cv::Point2d> imgPts;
     for(int i=0;i<4;i++)
     {
@@ -250,8 +306,18 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         rvecs.push_back(rvec);
         tvecs.push_back(tvec);
     }
+    */
     double distance=0;
-    cv::Vec3d rvec=rvecs[0], tvec=tvecs[0];
+    //cv::Vec3d rvec=rvecs[0], tvec=tvecs[0];
+    matd_t * m = homography_to_pose(det->H, fx, fy, cx, cy);
+    double q[4];
+    matrix_to_quat(m, q);
+    cv::Vec3d tvec;
+    tvec[0] = MATD_EL(m, 0, 3);
+    tvec[1] = MATD_EL(m, 1, 3);
+    tvec[2] = MATD_EL(m, 2, 3);
+
+    /*
     for(int i=1; i<solve_tries_; i++)
     {
         distance=std::max(distance, cv::norm(rvecs[0] - rvecs[i]));
@@ -277,6 +343,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
     tf::Transform tag_to_camera(tf::Quaternion(tf::Vector3(axis[0], axis[1], axis[2]), th),
+    */
+    tf::Transform tag_to_camera(tf::Quaternion(tf::Vector3(q[0], q[1], q[2]), q[3]),
             tf::Vector3(tvec[0], tvec[1], tvec[2]));
 
     tf::StampedTransform tag_to_camera_s(tag_to_camera,
