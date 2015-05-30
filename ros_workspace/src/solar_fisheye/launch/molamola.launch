@@ -36,8 +36,13 @@
 
         <!--Institude park in Worcester, MA, USA-->
         <!--"Lattitude of the origin of the tangent space on the earth (degrees)"-->
-        <param name="lat" type="double" value="42.2750873" />
         <!--"Longitude of the origin of the tangent space on the earth (degrees)"-->
+        <!--
+        <param name="lat" type="double" value="42.2750873" />
         <param name="lon" type="double" value="-71.8036266" />
+        -->
+        <!-- Bette Davis Picnic Area, LA, USA-->
+        <param name="lat" type="double" value="34.157229"/>
+        <param name="lon" type="double" value="-118.294347"/>
     </node>
 </launch>
