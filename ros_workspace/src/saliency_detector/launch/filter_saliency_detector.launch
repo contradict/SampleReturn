@@ -19,7 +19,7 @@
     <param name="filterByConvexity" type="bool" value="False"/>
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="20.0"/>
-    <param name="maxArea" type="double" value="5000.0"/>
+    <param name="maxArea" type="double" value="6000.0"/>
   </node>
 
   <node
