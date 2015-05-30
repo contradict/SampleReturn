@@ -65,6 +65,7 @@ class BeaconAprilDetector{
   double solve_noise_;
   double rvec_tolerance_;
   int point_size_;
+  int min_tag_size_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -100,6 +101,8 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pnh.param("solve_tries", solve_tries_, 3);
   pnh.param("solve_noise", solve_noise_, 1e-3);
   pnh.param("rvec_tolerance", rvec_tolerance_, 1e-2);
+
+  pnh.param("min_tag_size", min_tag_size_, 100);
 
   //get tag family parametre
   pnh.param("tag_family", famname_, std::string("tag36h11"));
@@ -220,7 +223,21 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     tf::StampedTransform T_beacon_to_tag;
     _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
-        
+
+    double width, height;
+    width = std::min(abs(det->p[1][0] - det->p[0][0]),
+                     abs(det->p[2][0] - det->p[3][0]));
+    height = std::min(abs(det->p[3][1] - det->p[0][1]),
+                      abs(det->p[2][1] - det->p[1][1]));
+
+    if( (width<min_tag_size_) || (height<min_tag_size_))
+    {
+        ROS_DEBUG_STREAM("Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
+        continue;
+    }
+
+    ROS_DEBUG_STREAM("Solving tag " << frame_id << ", (" << width << ", " << height << ")");
+
     std::vector<cv::Point2d> imgPts;
     for(int i=0;i<4;i++)
     {
