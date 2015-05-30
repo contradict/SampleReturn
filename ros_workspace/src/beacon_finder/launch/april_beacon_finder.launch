@@ -46,7 +46,13 @@
         <param name="position_sigma_scale" value="0.05"/>
         <!-- old beacon finder variance: 0.02 -->
         <param name="rotation_sigma" value="0.15"/>
-   </node>
+
+        <!--params for saving us from horrible solvePnP solutions-->
+        <param name="solve_tries" value="3"/>
+        <param name="solve_noise" value="0.5"/><!-- pixels -->
+        <param name="rvec_tolerance" value="0.05"/><!--radians-->
+        <param name="min_tag_size" type="int" value="60"/><!--pixels-->
+</node>
 
     <param name="/processes/beacon/robot_description" textfile="$(find samplereturn)/urdf/beacon.urdf"/>
 

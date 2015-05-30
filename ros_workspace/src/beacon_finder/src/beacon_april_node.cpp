@@ -29,11 +29,11 @@ namespace beacon_april_node{
  
 class AprilTagDescription{
  public:
-  AprilTagDescription(int id, double size, std::string &frame_name, cv::Mat &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
+  AprilTagDescription(int id, double size, std::string &frame_name, std::vector<cv::Point3d> &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
   double size(){return size_;}
   int id(){return id_;} 
   std::string& frame_name(){return frame_name_;}
-  cv::Mat corners;
+  std::vector<cv::Point3d> corners;
  private:
   int id_;
   double size_;
@@ -48,6 +48,7 @@ class BeaconAprilDetector{
  private:
   void imageCb(const sensor_msgs::ImageConstPtr& msg,const sensor_msgs::CameraInfoConstPtr& cam_info);
   std::map<int, AprilTagDescription> parse_tag_descriptions(XmlRpc::XmlRpcValue& april_tag_descriptions);
+  void drawPoint(cv::Mat &img, const cv::Point2d pt);
 
  private:
   std::map<int, AprilTagDescription> descriptions_;
@@ -59,6 +60,12 @@ class BeaconAprilDetector{
   ros::Publisher beacon_pose_pub_;
   ros::Publisher beacon_debug_pose_pub_;
   tf::TransformListener    _tf;
+  cv::RNG rng_;
+  int solve_tries_;
+  double solve_noise_;
+  double rvec_tolerance_;
+  int point_size_;
+  int min_tag_size_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -74,7 +81,9 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     it_(nh),
     _tf(ros::Duration(10.0)),
     tag_det_(NULL),
-    covariance_(36,0.0)
+    covariance_(36,0.0),
+    rng_(0),
+    point_size_(10)
 {
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
@@ -89,6 +98,11 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     }
   }
 
+  pnh.param("solve_tries", solve_tries_, 3);
+  pnh.param("solve_noise", solve_noise_, 1e-3);
+  pnh.param("rvec_tolerance", rvec_tolerance_, 1e-2);
+
+  pnh.param("min_tag_size", min_tag_size_, 100);
 
   //get tag family parametre
   pnh.param("tag_family", famname_, std::string("tag36h11"));
@@ -186,7 +200,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
 
-  ROS_INFO("Found %d tags.", zarray_size(detections));
+  ROS_DEBUG_NAMED("apriltags", "BEACON FINDER found %d tags.", zarray_size(detections));
 
   for (int i = 0; i < zarray_size(detections); i++) {
       apriltag_detection_t *det;
@@ -209,17 +223,73 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     tf::StampedTransform T_beacon_to_tag;
     _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
-        
-    cv::Mat imgPts(4, 2, CV_64F, det->p);
-    cv::Vec3d rvec;
-    cv::Vec3d tvec;
-    if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec) == false)
+
+    double width, height;
+    width = std::min(abs(det->p[1][0] - det->p[0][0]),
+                     abs(det->p[2][0] - det->p[3][0]));
+    height = std::min(abs(det->p[3][1] - det->p[0][1]),
+                      abs(det->p[2][1] - det->p[1][1]));
+
+    if( (width<min_tag_size_) || (height<min_tag_size_))
     {
-        ROS_ERROR("Unable to solve for tag pose.");
-        ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+        ROS_DEBUG_STREAM("Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
         continue;
     }
 
+    ROS_DEBUG_STREAM("Solving tag " << frame_id << ", (" << width << ", " << height << ")");
+
+    std::vector<cv::Point2d> imgPts;
+    for(int i=0;i<4;i++)
+    {
+        cv::Point2d pt(det->p[i][0], det->p[i][1]);
+        drawPoint(cv_ptr->image, pt);
+        imgPts.push_back(pt);
+    }
+    std::vector<cv::Vec3d> rvecs;
+    std::vector<cv::Vec3d> tvecs;
+    for(int i=0;i<solve_tries_;i++)
+    {
+        cv::Vec3d rvec, tvec;
+        std::vector<cv::Point2d> disturbed_imgPts;
+        for(const auto &pt : imgPts)
+        {
+            double dx=solve_noise_*((double)rng_-0.5)*2.0;
+            double dy=solve_noise_*((double)rng_-0.5)*2.0;
+            disturbed_imgPts.push_back(pt + cv::Point2d(dx, dy));
+        }
+        if (cv::solvePnP(description.corners, disturbed_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
+        {
+            ROS_ERROR_NAMED("solver", "Unable to solve for tag pose.");
+            ROS_ERROR_STREAM_NAMED("solver", "corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+            continue;
+        }
+        ROS_DEBUG_STREAM_NAMED("solver", "noisy rvec(" << i << "): " << rvec);
+        rvecs.push_back(rvec);
+        tvecs.push_back(tvec);
+    }
+    double distance=0;
+    cv::Vec3d rvec=rvecs[0], tvec=tvecs[0];
+    for(int i=1; i<solve_tries_; i++)
+    {
+        distance=std::max(distance, cv::norm(rvecs[0] - rvecs[i]));
+        rvec += rvecs[i];
+        tvec += tvecs[i];
+    }
+    tvec /= solve_tries_;
+    rvec /= solve_tries_;
+    
+    ROS_DEBUG_STREAM_NAMED("solver", "Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "imgPts:\n" <<
+        "[" << imgPts[0] << ",\n" <<
+        " " << imgPts[1] << ",\n" <<
+        " " << imgPts[2] << ",\n" <<
+        " " << imgPts[3] << "]");
+    if(distance>rvec_tolerance_)
+    {
+        ROS_ERROR_STREAM_NAMED("solver", "large rvec distance, skipping: " << distance);
+        continue;
+    }
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
@@ -276,6 +346,17 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   image_pub_.publish(cv_ptr->toImageMsg());
 }
 
+void BeaconAprilDetector::drawPoint(cv::Mat &img, const cv::Point2d pt)
+{
+    cv::Point2d xhat(point_size_, 0);
+    cv::Point2d yhat(0, point_size_);
+
+    cv::line(img, pt, pt+xhat, cv::Scalar(255, 0, 0));
+    cv::line(img, pt, pt-xhat, cv::Scalar(255, 0, 0));
+    cv::line(img, pt, pt+yhat, cv::Scalar(255, 0, 0));
+    cv::line(img, pt, pt-yhat, cv::Scalar(255, 0, 0));
+}
+
 
 std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(XmlRpc::XmlRpcValue& tag_descriptions){
   std::map<int, AprilTagDescription> descriptions;
@@ -299,32 +380,39 @@ std::map<int, AprilTagDescription> BeaconAprilDetector::parse_tag_descriptions(X
       frame_name_stream << "tag_" << id;
       frame_name = frame_name_stream.str();
     }
-    cv::Mat corners(4,3, CV_64F);
+    std::vector<cv::Point3d> corners;
     if(tag_description.hasMember("corners")) {
         ROS_ASSERT(tag_description["corners"].getType() == XmlRpc::XmlRpcValue::TypeArray);
         XmlRpc::XmlRpcValue v = tag_description["corners"];
-        for(int i =0; i < v.size(); i++)
+        for(int i =0; i < v.size(); i+=3)
         {
-            if(v[i].getType() == XmlRpc::XmlRpcValue::TypeDouble)
-            {
-                corners.at<double>(i) = (double)v[i];
-            }
-            else if(v[i].getType() == XmlRpc::XmlRpcValue::TypeInt)
-            {
-                corners.at<double>(i) = (int)v[i];
-            }
-            else
-            {
-                ROS_ERROR_STREAM("Non-numeric type in corners at index " << i << ": " << v[i].getType());
-            }
-        }
+            auto parsenum = [&i](XmlRpc::XmlRpcValue v) -> double {
+                if(v.getType() == XmlRpc::XmlRpcValue::TypeDouble)
+                {
+                    return (double)v;
+                }
+                else if(v.getType() == XmlRpc::XmlRpcValue::TypeInt)
+                {
+                    return (int)v;
+                }
+                else
+                {
+                    ROS_ERROR_STREAM("Non-numeric type in corners at index " << i << ": " << v.getType());
+                }
+                return 0;
+            };
+            double x=0,y=0,z=0;
+            x = parsenum(v[i]);
+            y = parsenum(v[i+1]);
+            z = parsenum(v[i+2]);
+            corners.push_back(cv::Point3d(x, y, z));
+         }
     }
     else {
-        double c[4][3] = {{-size/2, -size/2, 0},
-                          {size/2, -size/2, 0},
-                          {size/2, size/2, 0},
-                          {-size/2, size/2, 0}};
-        corners = cv::Mat(4,3, CV_64F, c).clone();
+        corners = {cv::Point3d(-size/2, -size/2, 0),
+                          cv::Point3d(size/2, -size/2, 0),
+                          cv::Point3d(size/2, size/2, 0),
+                          cv::Point3d(-size/2, size/2, 0)};
     }
     AprilTagDescription description(id, size, frame_name, corners);
     ROS_INFO_STREAM("Loaded tag config: "<<id<<", size: "<<size<<", frame_name: "<<frame_name);

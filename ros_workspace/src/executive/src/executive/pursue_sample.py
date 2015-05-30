@@ -143,16 +143,17 @@ class PursueSample(object):
  
             smach.StateMachine.add('APPROACH_SAMPLE',
                                    ExecuteVFHMove(self.vfh_mover),
-                                   transitions = {'complete':'SAMPLE_VERIFY',
+                                   transitions = {'complete':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'blocked':'PUBLISH_FAILURE',
                                                   'started_blocked':'PUBLISH_FAILURE',
-                                                  'missed_target':'SAMPLE_VERIFY',
+                                                  'missed_target':'ANNOUNCE_MANIPULATOR_APPROACH',
                                                   'off_course':'PUBLISH_FAILURE',
                                                   'object_detected':'PUBLISH_FAILURE',
                                                   'preempted':'PUBLISH_FAILURE',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'move_goal':'pursuit_goal'})
 
+            '''
             @smach.cb_interface(outcomes=['verified','not_verified'])
             def sample_verify_resp(userdata, response):
                 if response.verified:
@@ -182,6 +183,12 @@ class PursueSample(object):
                                    AnnounceState(self.announcer,
                                                  'Sample not verified.'),
                                    transitions = {'next':'PUBLISH_FAILURE'})    
+            '''
+
+            smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
+                                           AnnounceState(self.announcer,
+                                                         'Prepare ing final approach.'),
+                                           transitions = {'next':'CALCULATE_MANIPULATOR_APPROACH'})    
 
              #calculate the final strafe move to the sample, this gets us the yaw for the obstacle check
             smach.StateMachine.add('CALCULATE_MANIPULATOR_APPROACH',
@@ -558,39 +565,45 @@ class CalculateManipulatorApproach(smach.State):
         self.tf_listener = tf_listener
         
     def execute(self, userdata):
-        
+
+        #wait the settle time, then see if the sample is still there
+        #timeout for this is also settle time
         userdata.target_sample = None
         rospy.sleep(userdata.settle_time)
-        if userdata.target_sample is None:
-            return 'point_lost'
-        else:
-            try:
-                yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
-                robot_yaw = util.get_current_robot_yaw(self.tf_listener, userdata.odometry_frame)
-            except tf.Exception:
-                rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
-                return 'aborted'
-            rospy.loginfo("MANIPULATOR_APPROACH calculated with distance: {:f}, yaw: {:f} ".format(distance, yaw))
-            #if, for some bizarre reason, the sample is now in a way different spot, re-approach
-            if np.abs(yaw) > userdata.sample_yaw_tolerance:
-                return 'retry_approach'
-            #load sample distance and yaw for obstacle check      
-            userdata.target_yaw = robot_yaw + yaw
-            userdata.target_distance = distance
-            #clear detected_sample prior to manipulator approach
-            userdata.detected_sample = None
-            distance -= userdata.final_pursuit_step
-            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                                  angle = yaw,
-                                                  distance = distance,
-                                                  velocity = userdata.pursuit_velocity)
-            userdata.final_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                                 angle = yaw,
-                                                 distance = userdata.final_pursuit_step,
-                                                 velocity = userdata.search_velocity)
-            return 'move'
+        userdata.target_sample = None
+        start_time = rospy.Time.now()
+        while not rospy.core.is_shutdown_requested():
+            rospy.sleep(0.1)
+            if userdata.target_sample is not None:
+                break #sample is still there, approach
+            if (rospy.Time.now() - start_time) > userdata.settle_time:
+                return 'point_lost' #sample disappeared, give up
         
-        return 'aborted'
+        try:
+            yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
+            robot_yaw = util.get_current_robot_yaw(self.tf_listener, userdata.odometry_frame)
+        except tf.Exception:
+            rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
+            return 'aborted'
+        rospy.loginfo("MANIPULATOR_APPROACH calculated with distance: {:f}, yaw: {:f} ".format(distance, yaw))
+        #if, for some bizarre reason, the sample is now in a way different spot, re-approach
+        if np.abs(yaw) > userdata.sample_yaw_tolerance:
+            return 'retry_approach'
+        #load sample distance and yaw for obstacle check      
+        userdata.target_yaw = robot_yaw + yaw
+        userdata.target_distance = distance
+        #clear detected_sample prior to manipulator approach
+        userdata.detected_sample = None
+        distance -= userdata.final_pursuit_step
+        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                              angle = yaw,
+                                              distance = distance,
+                                              velocity = userdata.pursuit_velocity)
+        userdata.final_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                             angle = yaw,
+                                             distance = userdata.final_pursuit_step,
+                                             velocity = userdata.search_velocity)
+        return 'move'
 
 class HandleSearch(smach.State):
     def __init__(self, tf_listener, announcer):
