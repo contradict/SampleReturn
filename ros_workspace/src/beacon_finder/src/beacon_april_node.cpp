@@ -197,7 +197,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
 
-  ROS_DEBUG("BEACON FINDER found %d tags.", zarray_size(detections));
+  ROS_DEBUG_NAMED("apriltags", "BEACON FINDER found %d tags.", zarray_size(detections));
 
   for (int i = 0; i < zarray_size(detections); i++) {
       apriltag_detection_t *det;
@@ -240,10 +240,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         }
         if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
         {
-            ROS_ERROR("Unable to solve for tag pose.");
-            ROS_ERROR_STREAM("corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+            ROS_ERROR_NAMED("solver", "Unable to solve for tag pose.");
+            ROS_ERROR_STREAM_NAMED("solver", "corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
             continue;
         }
+        ROS_DEBUG_STREAM_NAMED("solver", "noisy rvec(" << i << "): " << rvec);
         rvecs.push_back(rvec);
         tvecs.push_back(tvec);
     }
@@ -258,16 +259,16 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tvec /= solve_tries_;
     rvec /= solve_tries_;
     
-    ROS_INFO_STREAM("Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
-    ROS_INFO_STREAM("    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
-    ROS_INFO_STREAM("imgPts:\n" <<
+    ROS_DEBUG_STREAM_NAMED("solver", "Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
+    ROS_DEBUG_STREAM_NAMED("solver", "imgPts:\n" <<
         "[" << imgPts[0] << ",\n" <<
-        " " << imgPts[0] << ",\n" <<
-        " " << imgPts[0] << ",\n" <<
-        " " << imgPts[0] << "]");
+        " " << imgPts[1] << ",\n" <<
+        " " << imgPts[2] << ",\n" <<
+        " " << imgPts[3] << "]");
     if(distance>rvec_tolerance_)
     {
-        ROS_ERROR_STREAM("large rvec distance, skipping: " << distance);
+        ROS_ERROR_STREAM_NAMED("solver", "large rvec distance, skipping: " << distance);
         continue;
     }
     double th = cv::norm(rvec);
