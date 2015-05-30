@@ -236,7 +236,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         std::vector<cv::Point2d> disturbed_imgPts;
         for(const auto &pt : imgPts)
         {
-            disturbed_imgPts.push_back(pt + cv::Point2d(solve_noise_*(double)rng_, solve_noise_*(double)rng_));
+            double dx=solve_noise_*((double)rng_-0.5)*2.0;
+            double dy=solve_noise_*((double)rng_-0.5)*2.0;
+            disturbed_imgPts.push_back(pt + cv::Point2d(dx, dy));
         }
         if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
         {
