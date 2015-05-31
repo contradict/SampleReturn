@@ -297,6 +297,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::Vec3d rot(beacon_pose.pose.orientation.x/beacon_pose.pose.orientation.w,
             beacon_pose.pose.orientation.y/beacon_pose.pose.orientation.w,
             beacon_pose.pose.orientation.z/beacon_pose.pose.orientation.w);
+    ROS_DEBUG_STREAM("APRIL BEACON FINDER axis: " << axis[0] << ", " << axis[1] << ", " << axis[2]);
+    ROS_DEBUG_STREAM("APRIL BEACON FINDER rot: " << rot[0] << ", " << rot[1] << ", " << rot[2]);
+    
     beacon_orientations.push_back(rot);
 
     beacon_debug_pose_pub_.publish(beacon_pose);
@@ -314,6 +317,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     double rot_dev = norm(rot_dev_v);
     ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
     if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
+        //publish the average of the poses
+        geometry_msgs::PoseStamped mean_pose;
         
         
         /*
