@@ -266,7 +266,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         transformed_corners.push_back(pt3d);
     }
 
-    //if the tag is too small, don't try single pnp
+    //if the tag is too small, don't try solvepnp
     if( (width<min_tag_size_) || (height<min_tag_size_)) {
         ROS_DEBUG_STREAM("APRIL BEACON FINDER Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
         continue;
@@ -323,10 +323,10 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             beacon_pose.pose.orientation.z/beacon_pose.pose.orientation.w);
     beacon_rotations.push_back(rot);
 
-    beacon_debug_pose_pub_.publish(beacon_pose);
+    //publishing multiple poses on this pose msg is pointless, you only see the last
+    //beacon_debug_pose_pub_.publish(beacon_pose);
   
   } //end of detection iteration
-    
 
   //compute std_dev of poses
   cv::Vec3d pos_mean, pos_dev_v;
@@ -365,7 +365,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   }
   
   //if we see a corner, try to do a fit on all the points we see
-  if (zarray_size(detections) >= 2) {
+  if (zarray_size(detections) >= 3) {
     
     cv::Vec3d rvec, tvec;
     if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
@@ -375,7 +375,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         
     } else {
       
-        ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 2+ tags.");        
+        ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 3+ tags.");        
       
         //this solution is for points xformed into beacon frame
         double th = cv::norm(rvec);
