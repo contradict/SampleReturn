@@ -312,5 +312,12 @@
         <parent link="body_triangle"/>
         <child link="microstrain"/>
         <origin xyz="-0.455 0 0.155" rpy="0 3.1416 0"/>
-    </joint>
+     </joint>
+     <link name="sun_camera"/>
+     <joint name="sun_camera_bracket" type="fixed">
+         <parent link="body_triangle"/>
+         <child link="sun_camera"/>
+         <origin xyz="-0.727 0 0.311" rpy="0 0 1.57"/>
+     </joint>
+
 </robot>
