@@ -100,10 +100,6 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
     }
   }
 
-  pnh.param("solve_tries", solve_tries_, 3);
-  pnh.param("solve_noise", solve_noise_, 1e-3);
-  pnh.param("rvec_tolerance", rvec_tolerance_, 1e-2);
-
   pnh.param("min_tag_size", min_tag_size_, 100);
 
   //get tag family parametre
@@ -204,8 +200,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   beacon_finder::AprilTagDetectionArray tag_detection_array;
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
-  std::vector<cv::Vec3d>beacon_tvecs;
-  std::vector<cv::Vec3d>beacon_rots;
+  std::vector<cv::Vec3d>beacon_positions;
+  std::vector<cv::Vec3d>beacon_orientations;
   std::vector<geometry_msgs::Pose>beacon_poses;
 
   ROS_DEBUG_NAMED("apriltags", "APRIL BEACON FINDER found %d tags.", zarray_size(detections));
@@ -246,6 +242,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     ROS_DEBUG_STREAM("APRIL BEACON FINDER Solving tag " << frame_id << ", (" << width << ", " << height << ")");
 
+    //stuff points from detections into an array for opencv
     std::vector<cv::Point2d> imgPts;
     for(int i=0;i<4;i++)
     {
@@ -254,6 +251,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         imgPts.push_back(pt);
     }
     
+    //use solvePnP to get the rotation and translation between camera and tag
     cv::Vec3d rvec, tvec;
     if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
     {
@@ -261,54 +259,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
         continue;
     }
-
-/*   
-    std::vector<cv::Vec3d> rvecs;
-    std::vector<cv::Vec3d> tvecs;
-    for(int i=0;i<solve_tries_;i++)
-    {
-        cv::Vec3d rvec, tvec;
-        std::vector<cv::Point2d> disturbed_imgPts;
-        for(const auto &pt : imgPts)
-        {
-            double dx=solve_noise_*((double)rng_-0.5)*2.0;
-            double dy=solve_noise_*((double)rng_-0.5)*2.0;
-            disturbed_imgPts.push_back(pt + cv::Point2d(dx, dy));
-        }
-        if (cv::solvePnP(description.corners, disturbed_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
-        {
-            ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for tag pose.");
-            ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
-            continue;
-        }
-        ROS_DEBUG_STREAM_NAMED("solver", "APRIL BEACON FINDER noisy rvec(" << i << "): " << rvec);
-        rvecs.push_back(rvec);
-        tvecs.push_back(tvec);
-    }
-    double distance=0;
-    cv::Vec3d rvec=rvecs[0], tvec=tvecs[0];
-    for(int i=1; i<solve_tries_; i++)
-    {
-        distance=std::max(distance, cv::norm(rvecs[0] - rvecs[i]));
-        rvec += rvecs[i];
-        tvec += tvecs[i];
-    }
-    tvec /= solve_tries_;
-    rvec /= solve_tries_;
-    
-    ROS_DEBUG_STREAM_NAMED("solver", "APRIL BEACON FINDER Tag: " << frame_id << " rvec:(" << rvec[0] << ", " << rvec[1] << ", " << rvec[2] << ")");
-    ROS_DEBUG_STREAM_NAMED("solver", "    tvec:(" << tvec[0] << ", " << tvec[1] << ", " << tvec[2] << ")");
-    ROS_DEBUG_STREAM_NAMED("solver", "    imgPts:\n" <<
-        "[" << imgPts[0] << ",\n" <<
-        " " << imgPts[1] << ",\n" <<
-        " " << imgPts[2] << ",\n" <<
-        " " << imgPts[3] << "]");
-    if(distance>rvec_tolerance_)
-    {
-        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER large rvec distance, skipping: " << distance);
-        continue;
-    }
-*/  
       
     double th = cv::norm(rvec);
     cv::Vec3d axis;
@@ -343,11 +293,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::Vec3d pos(beacon_pose.pose.position.x,
             beacon_pose.pose.position.y,
             beacon_pose.pose.position.z);
-    beacon_tvecs.push_back(pos);
+    beacon_positions.push_back(pos);
     cv::Vec3d rot(beacon_pose.pose.orientation.x/beacon_pose.pose.orientation.w,
             beacon_pose.pose.orientation.y/beacon_pose.pose.orientation.w,
             beacon_pose.pose.orientation.z/beacon_pose.pose.orientation.w);
-    beacon_rots.push_back(rot);
+    beacon_orientations.push_back(rot);
 
     beacon_debug_pose_pub_.publish(beacon_pose);
   }
@@ -356,14 +306,17 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     //compute std_dev of poses
     cv::Vec3d pos_mean, pos_dev_v;
-    cv::meanStdDev(beacon_tvecs, pos_mean, pos_dev_v);
+    cv::meanStdDev(beacon_positions, pos_mean, pos_dev_v);
     double pos_dev = norm(pos_dev_v);
     ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
     cv::Vec3d rot_mean, rot_dev_v;
-    cv::meanStdDev(beacon_rots, rot_mean, rot_dev_v);
+    cv::meanStdDev(beacon_orientations, rot_mean, rot_dev_v);
     double rot_dev = norm(rot_dev_v);
     ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
     if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
+        
+        
+        /*
         for (auto &pose : beacon_poses) {
             geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
             beacon_pose_msg.header = cv_ptr->header;
@@ -384,7 +337,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             beacon_pose_msg.pose.pose = pose;
 
             beacon_pose_pub_.publish(beacon_pose_msg);
-        }
+        }*/
     }
     else {
         ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER not reporting pose!");
