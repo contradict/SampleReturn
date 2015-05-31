@@ -327,7 +327,77 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     //beacon_debug_pose_pub_.publish(beacon_pose);
   
   } //end of detection iteration
+  
+  //try the multi_tag solution
+  if (zarray_size(detections) > 1) {
+    
+    cv::Vec3d rvec, tvec;
+    if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
+        
+        ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
+        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
+        
+    } else {
+      
+        ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for: "<< zarray_size(detections) << " tags.");        
+      
+        //this solution is for points xformed into beacon frame
+        double th = cv::norm(rvec);
+        cv::Vec3d axis;
+        cv::normalize(rvec, axis);
+        tf::Transform beacon_to_camera(tf::Quaternion(tf::Vector3(axis[0], axis[1], axis[2]), th),
+                tf::Vector3(tvec[0], tvec[1], tvec[2]));
 
+        geometry_msgs::PoseStamped beacon_pose;
+        tf::pointTFToMsg( beacon_to_camera.getOrigin(), beacon_pose.pose.position);
+        tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
+        beacon_pose.header = cv_ptr->header;
+        
+        //put this pose in the array, and the debug msg    
+        tag_pose_array.poses.push_back(beacon_pose.pose);
+        beacon_debug_pose_pub_.publish(beacon_pose);           
+
+        //add this to pose estimates for consensus checking
+        beacon_poses.push_back(beacon_pose.pose);
+        cv::Vec3d pos(beacon_pose.pose.position.x,
+                beacon_pose.pose.position.y,
+                beacon_pose.pose.position.z);
+        beacon_positions.push_back(pos);
+        cv::Vec3d rot(beacon_pose.pose.orientation.x/beacon_pose.pose.orientation.w,
+                beacon_pose.pose.orientation.y/beacon_pose.pose.orientation.w,
+                beacon_pose.pose.orientation.z/beacon_pose.pose.orientation.w);
+        beacon_rotations.push_back(rot);
+        
+        if (zarray_size(detections) >= 3){
+        
+          geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
+          beacon_pose_msg.header = cv_ptr->header;
+    
+          //calculate covariance based on range
+          cv::Vec3d pos(beacon_pose.pose.position.x,
+                        beacon_pose.pose.position.y,
+                        beacon_pose.pose.position.z);
+          double range = cv::norm(pos);
+          double pos_sigma = position_sigma_scale_ * range + position_sigma_;
+          double pos_covariance = pos_sigma * pos_sigma;
+          double rot_covariance = rotation_sigma_ * rotation_sigma_;
+          covariance_[0] = pos_covariance;
+          covariance_[7] = pos_covariance;
+          covariance_[14] = pos_covariance;
+          covariance_[21] = rot_covariance;
+          covariance_[28] = rot_covariance;
+          covariance_[35] = rot_covariance;
+          std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
+          beacon_pose_msg.pose.pose = beacon_pose.pose;
+    
+          ROS_DEBUG_STREAM("APRIL BEACON FINDER publishing 3+ tag solution, we believe the hell out of this.");        
+          
+          beacon_pose_pub_.publish(beacon_pose_msg);
+        }
+    }
+  }
+   
+  
   //compute std_dev of poses
   cv::Vec3d pos_mean, pos_dev_v;
   cv::meanStdDev(beacon_positions, pos_mean, pos_dev_v);
@@ -360,64 +430,12 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
           beacon_pose_pub_.publish(beacon_pose_msg);
       }
+      
   } else {
         ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER not reporting single tag poses!");
   }
   
-  //if we see a corner, try to do a fit on all the points we see
-  if (zarray_size(detections) >= 3) {
-    
-    cv::Vec3d rvec, tvec;
-    if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
-        
-        ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
-        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
-        
-    } else {
-      
-        ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 3+ tags.");        
-      
-        //this solution is for points xformed into beacon frame
-        double th = cv::norm(rvec);
-        cv::Vec3d axis;
-        cv::normalize(rvec, axis);
-        tf::Transform beacon_to_camera(tf::Quaternion(tf::Vector3(axis[0], axis[1], axis[2]), th),
-                tf::Vector3(tvec[0], tvec[1], tvec[2]));
 
-        geometry_msgs::PoseStamped beacon_pose;
-        tf::pointTFToMsg( beacon_to_camera.getOrigin(), beacon_pose.pose.position);
-        tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
-        beacon_pose.header = cv_ptr->header;
-        
-        //put this pose in the array, and the debug msg    
-        tag_pose_array.poses.push_back(beacon_pose.pose);
-        beacon_debug_pose_pub_.publish(beacon_pose);           
-
-        geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
-        beacon_pose_msg.header = cv_ptr->header;
-
-        //calculate covariance based on range
-        cv::Vec3d pos(beacon_pose.pose.position.x,
-                      beacon_pose.pose.position.y,
-                      beacon_pose.pose.position.z);
-        double range = cv::norm(pos);
-        double pos_sigma = position_sigma_scale_ * range + position_sigma_;
-        double pos_covariance = pos_sigma * pos_sigma;
-        double rot_covariance = rotation_sigma_ * rotation_sigma_;
-        covariance_[0] = pos_covariance;
-        covariance_[7] = pos_covariance;
-        covariance_[14] = pos_covariance;
-        covariance_[21] = rot_covariance;
-        covariance_[28] = rot_covariance;
-        covariance_[35] = rot_covariance;
-        std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
-        beacon_pose_msg.pose.pose = beacon_pose.pose;
-
-        beacon_pose_pub_.publish(beacon_pose_msg);
-      
-    }
-      
-  }
 
   //free up detections memory
   apriltag_detections_destroy(detections);
