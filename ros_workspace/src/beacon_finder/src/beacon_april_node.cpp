@@ -75,6 +75,7 @@ class BeaconAprilDetector{
   double position_sigma_;
   double position_sigma_scale_;
   double rotation_sigma_;
+  double rotation_sigma_3tag_;
   double rot_thresh_;
   double pos_thresh_;
 };
@@ -140,6 +141,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   pnh.param("position_sigma", this->position_sigma_, 0.01);
   pnh.param("position_sigma_scale", this->position_sigma_scale_, 0.05);
   pnh.param("rotation_sigma", this->rotation_sigma_, 0.15);
+  pnh.param("rotation_sigma_3tag", this->rotation_sigma_3tag_, 0.15);
 
   pnh.param("consensus_rot_threshold", this->rot_thresh_, 0.1);
   pnh.param("consensus_trans_threshold", this->pos_thresh_, 1.0);
@@ -380,7 +382,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
           double range = cv::norm(pos);
           double pos_sigma = position_sigma_scale_ * range + position_sigma_;
           double pos_covariance = pos_sigma * pos_sigma;
-          double rot_covariance = rotation_sigma_ * rotation_sigma_;
+          double rot_covariance = rotation_sigma_3tag_ * rotation_sigma_3tag_;
           covariance_[0] = pos_covariance;
           covariance_[7] = pos_covariance;
           covariance_[14] = pos_covariance;
