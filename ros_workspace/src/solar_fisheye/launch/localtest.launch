@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <machine name="search"
+             address="localhost"
+    />
+    <include file="$(find solar_fisheye)/launch/molamola.launch" />
+</launch>

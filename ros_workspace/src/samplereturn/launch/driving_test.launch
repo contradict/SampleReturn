@@ -48,6 +48,8 @@
     <include file="$(find beacon_localizer)/launch/beacon_localizer.launch"/>
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
 
+    <include file="$(find solar_fisheye)/launch/molamola.launch"/>
+
     <!-- Launch executive last -->
     <include file="$(find executive)/launch/executive.launch">
         <arg name="executive_config" value="$(arg executive_config)"/>
