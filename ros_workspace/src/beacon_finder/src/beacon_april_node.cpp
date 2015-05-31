@@ -201,7 +201,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
   std::vector<cv::Vec3d>beacon_positions;
-  std::vector<cv::Vec3d>beacon_orientations;
+  std::vector<cv::Vec3d>beacon_rotations;
   std::vector<geometry_msgs::Pose>beacon_poses;
 
   ROS_DEBUG_NAMED("apriltags", "APRIL BEACON FINDER found %d tags.", zarray_size(detections));
@@ -300,7 +300,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     ROS_DEBUG_STREAM("APRIL BEACON FINDER axis: " << axis[0] << ", " << axis[1] << ", " << axis[2]);
     ROS_DEBUG_STREAM("APRIL BEACON FINDER rot: " << rot[0] << ", " << rot[1] << ", " << rot[2]);
     
-    beacon_orientations.push_back(rot);
+    beacon_rotations.push_back(rot);
 
     beacon_debug_pose_pub_.publish(beacon_pose);
   }
@@ -313,15 +313,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     double pos_dev = norm(pos_dev_v);
     ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
     cv::Vec3d rot_mean, rot_dev_v;
-    cv::meanStdDev(beacon_orientations, rot_mean, rot_dev_v);
+    cv::meanStdDev(beacon_rotations, rot_mean, rot_dev_v);
     double rot_dev = norm(rot_dev_v);
     ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
     if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
-        //publish the average of the poses
-        geometry_msgs::PoseStamped mean_pose;
-        
-        
-        /*
+ 
         for (auto &pose : beacon_poses) {
             geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
             beacon_pose_msg.header = cv_ptr->header;
@@ -342,7 +338,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             beacon_pose_msg.pose.pose = pose;
 
             beacon_pose_pub_.publish(beacon_pose_msg);
-        }*/
+        }
     }
     else {
         ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER not reporting pose!");
