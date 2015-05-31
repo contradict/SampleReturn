@@ -392,7 +392,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
           std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
           beacon_pose_msg.pose.pose = beacon_pose.pose;
     
-          ROS_DEBUG_STREAM("APRIL BEACON FINDER publishing 3+ tag solution, we believe the hell out of this.");        
+          ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER publishing 3+ tag solution, we believe the hell out of this.");        
           
           beacon_pose_pub_.publish(beacon_pose_msg);
         }
@@ -434,7 +434,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       }
       
   } else {
-        ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER not reporting single tag poses!");
+        ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER deviation too large, not reporting poses from individual tags.");
   }
   
 
