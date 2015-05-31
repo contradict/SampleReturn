@@ -14,29 +14,37 @@
 
         <rosparam param="tag_descriptions">
          [{
-            id: 407,
-            size: 0.8128,
-            frame_id: beacon_front},
-          {
-            id: 408,
-            size: 0.3048,
-            frame_id: beacon_right},
-          {
-            id: 409,
-            size: 0.8128,
-            frame_id: beacon_back},
-          {
-            id: 410,
-            size: 0.3048,
-            frame_id: beacon_left},
-          {
-            id: 411,
-            size: 0.2032,
+            id: 400,
+            size: 0.6299,
             frame_id: beacon_front_right},
           {
-            id: 412,
-            size: 0.2032,
-            frame_id: beacon_front_left}
+            id: 401,
+            size: 0.6299,
+            frame_id: beacon_front_left},
+          {
+            id: 402,
+            size: 0.3048,
+            frame_id: beacon_right_top},
+          {
+            id: 403,
+            size: 0.3048,
+            frame_id: beacon_right_bottom},
+          {
+            id: 404,
+            size: 0.6299,
+            frame_id: beacon_back_right},
+          {
+            id: 405,
+            size: 0.6299,
+            frame_id: beacon_back_left},
+          {
+            id: 406,
+            size: 0.3048,
+            frame_id: beacon_left_top},
+          {
+            id: 407,
+            size: 0.3048,
+            frame_id: beacon_left_bottom},
         ]
         </rosparam>
         <!--position sigma specified at 0m-->
