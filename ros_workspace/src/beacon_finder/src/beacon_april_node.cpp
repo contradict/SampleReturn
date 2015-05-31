@@ -327,8 +327,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   
   } //end of detection iteration
     
-  //free up detections memory
-  apriltag_detections_destroy(detections);
 
   //compute std_dev of poses
   cv::Vec3d pos_mean, pos_dev_v;
@@ -367,7 +365,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   }
   
   //if we see a corner, try to do a fit on all the points we see
-  if (beacon_poses.size() >= 3) {
+  if (zarray_size(detections) >= 3) {
     
     cv::Vec3d rvec, tvec;
     if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
@@ -421,6 +419,10 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       
   }
 
+  //free up detections memory
+  apriltag_detections_destroy(detections);
+  
+  //publish debug image and arrays  
   detections_pub_.publish(tag_detection_array);
   tag_pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
