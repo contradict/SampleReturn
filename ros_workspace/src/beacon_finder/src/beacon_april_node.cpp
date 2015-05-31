@@ -230,7 +230,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
     tf::StampedTransform T_beacon_to_tag;
     _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
-
     
     double width, height;
     width = std::min(abs(det->p[1][0] - det->p[0][0]),
@@ -238,15 +237,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     height = std::min(abs(det->p[3][1] - det->p[0][1]),
                       abs(det->p[2][1] - det->p[1][1]));
 
-    if( (width<min_tag_size_) || (height<min_tag_size_))
-    {
-        ROS_DEBUG_STREAM("APRIL BEACON FINDER Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
-        continue;
-    }
-
-    ROS_DEBUG_STREAM("APRIL BEACON FINDER Solving tag " << frame_id << ", (" << width << ", " << height << ")");
-
-    //stuff points from detections into an array for opencv
+    //stuff points from detections into an array for opencv, even if the tag is small,
+    //these may be useful to the multi tag solver
     std::vector<cv::Point2d> imgPts;
     for(int i=0;i<4;i++)
     {
@@ -273,6 +265,14 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
                          transformed_point.point.z);
         transformed_corners.push_back(pt3d);
     }
+
+    //if the tag is too small, don't try single pnp
+    if( (width<min_tag_size_) || (height<min_tag_size_)) {
+        ROS_DEBUG_STREAM("APRIL BEACON FINDER Skipping small tag " << frame_id << ", (" << width << ", " << height << ")");
+        continue;
+    } else {
+        ROS_DEBUG_STREAM("APRIL BEACON FINDER Solving tag " << frame_id << ", (" << width << ", " << height << ")");  
+    }
     
     //use solvePnP to get the rotation and translation between camera and tag
     cv::Vec3d rvec, tvec;
@@ -282,7 +282,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imgPts:\n" << imgPts);
         continue;
     }
-      
+    
+    //calculate the tag pose in camera frame  
     double th = cv::norm(rvec);
     cv::Vec3d axis;
     cv::normalize(rvec, axis);
@@ -389,7 +390,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         tf::pointTFToMsg( beacon_to_camera.getOrigin(), beacon_pose.pose.position);
         tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
         beacon_pose.header = cv_ptr->header;
-            
+        
+        //put this pose in the array, and the debug msg    
+        tag_pose_array.poses.push_back(beacon_pose.pose);
         beacon_debug_pose_pub_.publish(beacon_pose);           
 
         geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
