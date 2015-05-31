@@ -203,6 +203,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   std::vector<cv::Vec3d>beacon_positions;
   std::vector<cv::Vec3d>beacon_rotations;
   std::vector<geometry_msgs::Pose>beacon_poses;
+  std::vector<cv::Point2d> all_imgPts;
+  std::vector<cv::Point3d> transformed_corners;
+  
 
   ROS_DEBUG_NAMED("apriltags", "APRIL BEACON FINDER found %d tags.", zarray_size(detections));
 
@@ -228,6 +231,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     tf::StampedTransform T_beacon_to_tag;
     _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
 
+    
     double width, height;
     width = std::min(abs(det->p[1][0] - det->p[0][0]),
                      abs(det->p[2][0] - det->p[3][0]));
@@ -249,6 +253,25 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         cv::Point2d pt(det->p[i][0], det->p[i][1]);
         drawPoint(cv_ptr->image, pt);
         imgPts.push_back(pt);
+        
+        //also create full list, and transformed points for full check
+        all_imgPts.push_back(pt);
+        std_msgs::Header header;
+        header.frame_id = frame_id;
+        header.stamp = ros::Time(0);
+        geometry_msgs::Point point;
+        point.x = description.corners[i].x;
+        point.y = description.corners[i].y;
+        point.z = description.corners[i].z;
+        geometry_msgs::PointStamped point_stamped;
+        point_stamped.header = header;
+        point_stamped.point = point;
+        geometry_msgs::PointStamped transformed_point;
+        _tf.transformPoint("beacon", point_stamped, transformed_point);
+        cv::Point3d pt3d(transformed_point.point.x,
+                         transformed_point.point.y,
+                         transformed_point.point.z);
+        transformed_corners.push_back(pt3d);
     }
     
     //use solvePnP to get the rotation and translation between camera and tag
@@ -256,7 +279,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     if (cv::solvePnP(description.corners, imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false)
     {
         ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for tag pose.");
-        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imagPts:\n" << imgPts);
+        ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << description.corners << std::endl << "imgPts:\n" << imgPts);
         continue;
     }
       
@@ -297,9 +320,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     cv::Vec3d rot(beacon_pose.pose.orientation.x/beacon_pose.pose.orientation.w,
             beacon_pose.pose.orientation.y/beacon_pose.pose.orientation.w,
             beacon_pose.pose.orientation.z/beacon_pose.pose.orientation.w);
-    ROS_DEBUG_STREAM("APRIL BEACON FINDER axis: " << axis[0] << ", " << axis[1] << ", " << axis[2]);
-    ROS_DEBUG_STREAM("APRIL BEACON FINDER rot: " << rot[0] << ", " << rot[1] << ", " << rot[2]);
-    
     beacon_rotations.push_back(rot);
 
     beacon_debug_pose_pub_.publish(beacon_pose);
@@ -339,9 +359,25 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
             beacon_pose_pub_.publish(beacon_pose_msg);
         }
-    }
-    else {
+    } else {
         ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER not reporting pose!");
+    }
+    
+    //if we see a corner, try to do a fit on all the points we see
+    if (beacon_poses.size() >= 3) {
+      
+      cv::Vec3d rvec, tvec;
+      if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
+          
+          ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
+          ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
+          
+      } else {
+        
+          ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 3+ tags.");        
+        
+      }
+      
     }
 
   detections_pub_.publish(tag_detection_array);
