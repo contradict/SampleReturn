@@ -295,24 +295,13 @@
         <origin xyz="-0.239 0.0 -0.121"/>
     </joint>
 
-    <link name="imu_0"/>
-    <joint name="imu_0_mount" type="fixed">
-        <parent link="body_triangle"/>
-        <child link="imu_0"/>
-        <origin xyz="-0.445 0 0.0113" rpy="0 3.1416 -1.5708"/>
-    </joint>
-    <link name="imu_1"/>
-    <joint name="imu_1_mount" type="fixed">
-        <parent link="body_triangle"/>
-        <child link="imu_1"/>
-        <origin xyz="-0.445 0 0.0175" rpy="0 3.1416 -1.5708"/>
-    </joint>
     <link name="microstrain"/>
     <joint name="microstrain_mount" type="fixed">
         <parent link="body_triangle"/>
         <child link="microstrain"/>
         <origin xyz="-0.455 0 0.155" rpy="0 3.1416 0"/>
      </joint>
+    
      <link name="sun_camera"/>
      <joint name="sun_camera_bracket" type="fixed">
          <parent link="body_triangle"/>
