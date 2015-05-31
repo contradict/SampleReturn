@@ -376,6 +376,20 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         
           ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 3+ tags.");        
         
+          //this solution is for points xformed into beacon frame
+          double th = cv::norm(rvec);
+          cv::Vec3d axis;
+          cv::normalize(rvec, axis);
+          tf::Transform beacon_to_camera(tf::Quaternion(tf::Vector3(axis[0], axis[1], axis[2]), th),
+                  tf::Vector3(tvec[0], tvec[1], tvec[2]));
+
+          geometry_msgs::PoseStamped beacon_pose;
+          tf::pointTFToMsg( beacon_to_camera.getOrigin(), beacon_pose.pose.position);
+          tf::quaternionTFToMsg( beacon_to_camera.getRotation(), beacon_pose.pose.orientation);
+          beacon_pose.header = cv_ptr->header;
+              
+          beacon_debug_pose_pub_.publish(beacon_pose);           
+        
       }
       
     }
