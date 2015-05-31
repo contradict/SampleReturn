@@ -65,8 +65,8 @@ class KalmanDetectionFilter
   std::string frustum_poly_topic;
 
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
-  // Exclusion sites are center,radius,id (x,y,r,id)
-  std::vector<std::tuple<float,float,float,int16_t> > exclusion_list_;
+  // Exclusion sites are center,radius,id (x,y,r,id,odometer reading)
+  std::vector<std::tuple<float,float,float,int16_t,float> > exclusion_list_;
   // Filters that have ever been published, in case we need their position
   // to create an exclusion zone
   std::map<int16_t, std::shared_ptr<ColoredKF> > published_filters_;
@@ -100,6 +100,8 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
   double odometry_tick_dist_;
+
+  double exclusion_zone_range_;
 
   tf::TransformListener listener_;
 
@@ -293,6 +295,8 @@ class KalmanDetectionFilter
 
     odometry_tick_dist_ = config.odometry_tick_dist;
 
+    exclusion_zone_range_ = config.exclusion_zone_range;
+
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
@@ -359,7 +363,7 @@ class KalmanDetectionFilter
     else {
       r = neg_exclusion_radius_;
     }
-    exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_));
+    exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_,odometer_));
     exclusion_count_ += 1;
 
     // Clear this Marker from Rviz
@@ -402,9 +406,15 @@ class KalmanDetectionFilter
       for (int i=0; i<filter_list_.size(); i++) {
         if (isInView(filter_list_[i]->filter) or
             ((odometer_-last_odometry_tick_)>odometry_tick_dist_)) {
+          // Manage filters
           filter_list_[i]->filter.predict();
           filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
           filter_list_[i]->certainty -= certainty_dec_;
+          // Manage exclusion zones
+          auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
+              [this](std::tuple<float,float,float,int16_t,float> zone)
+              {return (odometer_ - std::get<4>(zone)) > exclusion_zone_range_;});
+          exclusion_list_.erase(new_end, exclusion_list_.end());
         }
       }
     }
