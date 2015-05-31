@@ -146,13 +146,14 @@
 
     <!-- define suspension properties -->
     <xacro:property name="wheel_diameter" value="0.3239"/>
+    <!-- this is not the wheel diameter for odometry!-->
     <xacro:property name="wheel_width" value="0.12"/>
     <xacro:property name="yoke_height" value="0.281"/>
     <xacro:property name="axle_offset" value="0.254"/>
     <xacro:property name="suspension_length" value="0.318"/>
     <xacro:property name="suspension_mounting_height" value="0.256"/>
     <!-- instantiate 3 modules -->
-    <xacro:wheel_module name="stern" position="-1.126 0 ${suspension_mounting_height}"/>
+    <xacro:wheel_module name="stern" position="-1.1256 0 ${suspension_mounting_height}"/>
     <xacro:wheel_module name="port" position="0.0 0.650 ${suspension_mounting_height}"/>
     <xacro:wheel_module name="starboard" position="0.0 -0.650 ${suspension_mounting_height}"/>
     <link name="base_link">
