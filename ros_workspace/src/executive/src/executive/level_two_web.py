@@ -60,11 +60,11 @@ class LevelTwoWeb(object):
         self.local_frame = 'base_link'
  
         #need platform point
+        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
         platform_point = geometry_msg.Point( 0, 0, 0)
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
-        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
         point = geometry_msg.Point(node_params.beacon_approach_point['x'],
                                    node_params.beacon_approach_point['y'], 0)
         beacon_facing_orientation = util.pointing_quaternion_2d(point, platform_point)
