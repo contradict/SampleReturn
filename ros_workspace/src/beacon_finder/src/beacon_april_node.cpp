@@ -365,7 +365,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   }
   
   //if we see a corner, try to do a fit on all the points we see
-  if (zarray_size(detections) >= 3) {
+  if (zarray_size(detections) >= 2) {
     
     cv::Vec3d rvec, tvec;
     if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
@@ -375,7 +375,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         
     } else {
       
-        ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 3+ tags.");        
+        ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for 2+ tags.");        
       
         //this solution is for points xformed into beacon frame
         double th = cv::norm(rvec);
