@@ -1,28 +1,24 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(saliency_detector)
-
-set(CMAKE_BUILD_TYPE Debug)
+project(solar_fisheye)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  roslib
+  eigen_conversions
+  geometry_msgs
+  image_transport
   sensor_msgs
-  samplereturn_msgs
   cv_bridge
-  dynamic_reconfigure
   image_geometry
-  tf
-  cmake_modules)
-
-find_package(Eigen REQUIRED)
+  dynamic_reconfigure
+  message_generation
+)
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(OpenCV)
 
+add_definitions(-std=c++11)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -54,11 +50,10 @@ find_package(Eigen REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+    FILES
+    SunSensor.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -75,12 +70,17 @@ find_package(Eigen REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+generate_messages(
+    DEPENDENCIES
+    geometry_msgs
+    std_msgs
+)
 
-generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
+# dynamic reconfigure
+generate_dynamic_reconfigure_options(
+    cfg/SolarFisheye.cfg
+)
+
 
 ###################################
 ## catkin specific configuration ##
@@ -92,12 +92,10 @@ generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS
-    include
-    ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS color_naming saliency_detector_core
-  CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
-  DEPENDS opencv2 Eigen
+#  INCLUDE_DIRS include
+#  LIBRARIES solar_fisheye
+#  CATKIN_DEPENDS eigen_conversions geometry_msgs image_transport std_msgs vision_opencv
+#  DEPENDS system_lib
 )
 
 ###########
@@ -106,46 +104,34 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
- include_directories(include
-   ${Eigen_INCLUDE_DIRS}
-   ${catkin_INCLUDE_DIRS}
+# include_directories(include)
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
-add_definitions(${Eigen_DEFINITIONS})
-
 ## Declare a cpp library
-add_library(BMS
-  src/BMS.cpp
- )
-
-add_library(saliency_detector_core
-  src/saliency_detector_core.cpp
- )
-
-add_library(color_naming
-  src/color_naming.cpp
+add_library( ${PROJECT_NAME}
+   src/sun_finder.cpp
+   src/solpos.c
 )
 
 ## Declare a cpp executable
- add_executable(saliency_detector_node src/saliency_detector.cpp)
- # add_executable(BMS_standalone src/BMS.cpp)
+add_executable(solar_fisheye_node src/solar_fisheye_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
- add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
- add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
+# add_dependencies(solar_fisheye_node solar_fisheye_generate_messages_cpp)
+# Generate dynamic reconfigure first
+add_dependencies(solar_fisheye solar_fisheye_gencfg)
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(saliency_detector_core
+target_link_libraries(solar_fisheye_node
+   ${PROJECT_NAME}
    ${catkin_LIBRARIES}
-   )
-
- target_link_libraries(saliency_detector_node
-   saliency_detector_core
-   color_naming
-   ${catkin_LIBRARIES}
-   BMS
- )
+   ${OpenCV_LIBRARIES}
+)
 
 #############
 ## Install ##
@@ -156,47 +142,37 @@ add_library(color_naming
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
- install(PROGRAMS
-   nodes/close_range_detector.py
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
+# install(PROGRAMS
+#   scripts/my_python_script
+#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
+install(TARGETS solar_fisheye solar_fisheye_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
-
-install(DIRECTORY launch
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-    USE_SOURCE_PERMISSIONS
 )
-install(FILES config/w2c.txt
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
-)
-
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+   FILES_MATCHING PATTERN "*.h"
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
+install(DIRECTORY
+    launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  USE_SOURCE_PERMISSIONS
+)
 
 #############
 ## Testing ##
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_saliency_detector.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_solar_fisheye.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

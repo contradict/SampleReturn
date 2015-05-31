@@ -134,8 +134,8 @@ class ray_to_points(object):
     y_slope = (base_link_point.point.y - pos[1])/(pos[2]-base_link_point.point.z)
 
     ground_point = np.array([0.,0.,0.])
-    ground_point[0] = x_slope*height
-    ground_point[1] = y_slope*height
+    ground_point[0] = x_slope*height + pos[0]
+    ground_point[1] = y_slope*height + pos[1]
 
     ground_named_point = NamedPoint()
     ground_named_point.point.x = ground_point[0]

@@ -73,6 +73,8 @@
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
              /cameras/manipulator/right/camera_info
+             /cameras/sun_cam/image_raw
+             /cameras/sun_cam/camera_info
              /process/beacon_finder/beacon_pose
              /process/sample_detection/named_point
              /process/sample_detection/manipulator/named_point
