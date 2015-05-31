@@ -721,7 +721,7 @@ class KalmanDetectionFilter
       cov.scale.x = std::get<2>(exclusion_list_[i])*2;
       cov.scale.y = std::get<2>(exclusion_list_[i])*2;
       cov.scale.z = 0.0;
-      cov.lifetime = ros::Duration();
+      cov.lifetime = ros::Duration(2.0);
       marker_array.markers.push_back(cov);
     }
 
