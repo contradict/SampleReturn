@@ -61,7 +61,9 @@ class LevelTwoWeb(object):
  
         #need platform point
         header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
-        platform_point = geometry_msg.Point( -0.9, 0, 0)
+        platform_point = geometry_msg.Point(node_params.platform_point['x'],
+                                            node_params.platform_point['y'], 0)
+                                            
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
