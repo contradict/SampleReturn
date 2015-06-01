@@ -2,8 +2,12 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
-    <arg name="start_paused"/>
+    <arg name="start_paused" default="True"/>
 
+    <arg name="port_wheel_diameter" value="0.3106"/>
+    <arg name="starboard_wheel_diameter" value="0.3106"/>
+    <arg name="stern_wheel_diameter" value="0.3106"/>
+    
     <!-- Remaps - apply to all nodes in this launch file -->
     <remap from="platform_joint_state" to="/motion/platform_joint_state"/>`
     <remap from="enable_wheel_pods" to="/motion/wheel_pods/enable"/>
@@ -31,9 +35,9 @@
           output="log"
           ns="/motion">
         <!--launch-prefix="xterm -e gdb -ex run - -args"-->
-        <param name="port_steering_offset" type="double" value="0.1175"/>
-        <param name="starboard_steering_offset" type="double" value="0.037"/>
-        <param name="stern_steering_offset" type="double" value="0.0655"/>
+        <param name="port_steering_offset" type="double" value="0.104"/>
+        <param name="starboard_steering_offset" type="double" value="0.025"/>
+        <param name="stern_steering_offset" type="double" value="0.072"/>
 
         <param name="carousel_id" type="int" value="1"/>
         <param name="starboard_steering_id" type="int" value="2"/>
@@ -43,7 +47,7 @@
         <param name="port_steering_id" type="int" value="6"/>
         <param name="port_wheel_id" type="int" value="7"/>
 
-        <param name="wheel_diameter" type="double" value="0.314"/>
+        <param name="wheel_diameter" type="double" value="0.3110"/>
 
         <param name="status_publish_interval" type="double" value="1.0"/>
     </node>
@@ -54,7 +58,7 @@
           type="EKF_odometry"
           output="log"
           ns="/motion">
-        <param name="wheel_diameter" type="double" value="0.314"/>
+        <param name="wheel_diameter" type="double" value="0.3110"/>
         <param name="odom_frame_id" type="string" value="/odom"/>
     </node>
 

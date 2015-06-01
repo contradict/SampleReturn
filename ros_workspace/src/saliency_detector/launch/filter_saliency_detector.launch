@@ -8,7 +8,7 @@
     machine="search"
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/image"/>
-    <rosparam param="interior_colors">[red, pink, white]
+    <rosparam param="interior_colors">[red, pink, purple, white, blue]
     </rosparam>
     <rosparam param="exterior_colors">[green]
     </rosparam>
@@ -19,7 +19,7 @@
     <param name="filterByConvexity" type="bool" value="False"/>
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="20.0"/>
-    <param name="maxArea" type="double" value="5000.0"/>
+    <param name="maxArea" type="double" value="6000.0"/>
   </node>
 
   <node

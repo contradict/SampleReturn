@@ -4,13 +4,12 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /TF1/Frames1
         - /TF1/Tree1
         - /Polygon1/Status1
         - /Costmap1/Status1
-        - /Filter Markers1
-      Splitter Ratio: 0.408367
-    Tree Height: 515
+        - /Tag Detection Array1
+      Splitter Ratio: 0.850534
+    Tree Height: 549
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -29,7 +28,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: BMS Image
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -60,17 +59,29 @@ Visualization Manager:
           Value: true
         beacon:
           Value: true
+        beacon_back_left:
+          Value: false
+        beacon_back_right:
+          Value: false
+        beacon_front_left:
+          Value: false
+        beacon_front_right:
+          Value: false
+        beacon_left_bottom:
+          Value: false
+        beacon_left_top:
+          Value: false
         beacon_localizer_T:
           Value: true
+        beacon_right_bottom:
+          Value: false
+        beacon_right_top:
+          Value: false
         body_triangle:
           Value: false
         carousel:
           Value: false
         fake_laser:
-          Value: false
-        imu_0:
-          Value: false
-        imu_1:
           Value: false
         manipulator_arm:
           Value: false
@@ -86,6 +97,8 @@ Visualization Manager:
           Value: false
         map:
           Value: true
+        microstrain:
+          Value: false
         navigation_center_baseline_bar:
           Value: false
         navigation_center_left_camera:
@@ -140,6 +153,8 @@ Visualization Manager:
           Value: false
         stern_yoke:
           Value: false
+        sun_camera:
+          Value: false
         top_triangle:
           Value: false
       Marker Scale: 5
@@ -150,7 +165,22 @@ Visualization Manager:
       Tree:
         map:
           beacon:
-            {}
+            beacon_back_left:
+              {}
+            beacon_back_right:
+              {}
+            beacon_front_left:
+              {}
+            beacon_front_right:
+              {}
+            beacon_left_bottom:
+              {}
+            beacon_left_top:
+              {}
+            beacon_right_bottom:
+              {}
+            beacon_right_top:
+              {}
           beacon_localizer_T:
             {}
           odom:
@@ -159,10 +189,6 @@ Visualization Manager:
                 carousel:
                   {}
                 fake_laser:
-                  {}
-                imu_0:
-                  {}
-                imu_1:
                   {}
                 manipulator_arm:
                   {}
@@ -173,6 +199,8 @@ Visualization Manager:
                   manipulator_right_camera:
                     manipulator_right_camera_lens:
                       {}
+                microstrain:
+                  {}
                 navigation_center_baseline_bar:
                   navigation_center_left_camera:
                     navigation_center_left_camera_lens:
@@ -209,6 +237,8 @@ Visualization Manager:
                   stern_yoke:
                     stern_wheel:
                       {}
+                sun_camera:
+                  {}
                 top_triangle:
                   {}
       Update Interval: 0
@@ -433,14 +463,6 @@ Visualization Manager:
       Marker Topic: /processes/executive/web_markers
       Name: Executive Debug
       Namespaces:
-        {}
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /processes/beacon/beacon_pose_debug
-      Name: Beacon Debug Marker
-      Namespaces:
         "": true
       Queue Size: 100
       Value: true
@@ -450,6 +472,7 @@ Visualization Manager:
       Name: Filter Markers
       Namespaces:
         "": true
+        exclusion: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -489,8 +512,29 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
-    - Class: rviz/Image
+    - Alpha: 1
+      Axes Length: 5
+      Axes Radius: 0.1
+      Class: rviz/Pose
+      Color: 255; 25; 0
       Enabled: true
+      Head Length: 0.3
+      Head Radius: 0.1
+      Name: Beacon Debug Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05
+      Shape: Axes
+      Topic: /processes/beacon/april_beacon_finder/beacon_pose_debug
+      Value: true
+    - Arrow Length: 2
+      Class: rviz/PoseArray
+      Color: 255; 25; 0
+      Enabled: true
+      Name: Tag Detection Array
+      Topic: /processes/beacon/april_beacon_finder/tag_detections_pose
+      Value: true
+    - Class: rviz/Image
+      Enabled: false
       Image Topic: /processes/sample_detection/search/bms_img
       Max Value: 1
       Median window: 5
@@ -499,7 +543,7 @@ Visualization Manager:
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -523,7 +567,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0
+      Angle: 0.02
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
@@ -532,21 +576,21 @@ Visualization Manager:
         Value: false
       Name: Current View
       Near Clip Distance: 0.01
-      Scale: 15.2491
+      Scale: 14.7629
       Target Frame: base_link
       Value: TopDownOrtho (rviz)
-      X: 3.17402
-      Y: -1.06999
+      X: -28.9323
+      Y: -0.0472785
     Saved: ~
 Window Geometry:
   BMS Image:
     collapsed: false
   Displays:
     collapsed: false
-  Height: 796
+  Height: 830
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001f800000292fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000292000000dd00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb00000016004c006500660074002000430061006d0065007200610000000000ffffffff0000000000000000fb000000120042004d005300200049006d00610067006502000003a1000001af000003d50000027f000000010000010f00000292fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000002800000292000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000069b0000003efc0100000002fb0000000800540069006d006501000000000000069b000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000003880000029200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000129000002b4fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000002b4000000dd00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb00000016004c006500660074002000430061006d0065007200610000000000ffffffff0000000000000000fb000000120042004d005300200049006d00610067006502000003a1000001af000003d50000027f000000010000010f000002b4fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000028000002b4000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000006320000003efc0100000002fb0000000800540069006d0065010000000000000632000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000003ee000002b400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -555,6 +599,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1691
-  X: 185
-  Y: 83
+  Width: 1586
+  X: 292
+  Y: 192

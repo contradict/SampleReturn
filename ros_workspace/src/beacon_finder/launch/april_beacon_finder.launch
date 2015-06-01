@@ -14,29 +14,45 @@
 
         <rosparam param="tag_descriptions">
          [{
-            id: 407,
-            size: 0.8128,
-            frame_id: beacon_front},
-          {
-            id: 408,
-            size: 0.3048,
-            frame_id: beacon_right},
-          {
-            id: 409,
-            size: 0.8128,
-            frame_id: beacon_back},
-          {
-            id: 410,
-            size: 0.3048,
-            frame_id: beacon_left},
-          {
-            id: 411,
-            size: 0.2032,
+            id: 400,
+            size: 0.6299,
             frame_id: beacon_front_right},
           {
-            id: 412,
-            size: 0.2032,
-            frame_id: beacon_front_left}
+            id: 401,
+            size: 0.6299,
+            frame_id: beacon_front_left},
+          {
+            id: 402,
+            size: 0.3048,
+            frame_id: beacon_right_top},
+          {
+            id: 403,
+            size: 0.3048,
+            frame_id: beacon_right_bottom},
+          {
+            id: 404,
+            size: 0.6299,
+            frame_id: beacon_back_right},
+          {
+            id: 405,
+            size: 0.6299,
+            frame_id: beacon_back_left},
+          {
+            id: 406,
+            size: 0.3048,
+            frame_id: beacon_left_top},
+          {
+            id: 407,
+            size: 0.3048,
+            frame_id: beacon_left_bottom},
+          {
+            id: 408,
+            size: 0.4064,
+            frame_id: beacon_front_lower},
+          {
+            id: 409,
+            size: 0.4064,
+            frame_id: beacon_back_lower}
         ]
         </rosparam>
         <!--position sigma specified at 0m-->
@@ -45,14 +61,16 @@
         <param name="position_sigma" value="0.01"/>
         <param name="position_sigma_scale" value="0.05"/>
         <!-- old beacon finder variance: 0.02 -->
-        <param name="rotation_sigma" value="0.15"/>
+        <param name="rotation_sigma" value="0.25"/>
+
+        <param name="rotation_sigma_3tag" value="0.05"/>
 
         <!--params for saving us from horrible solvePnP solutions-->
-        <param name="solve_tries" value="3"/>
-        <param name="solve_noise" value="0.5"/><!-- pixels -->
-        <param name="rvec_tolerance" value="0.05"/><!--radians-->
         <param name="min_tag_size" type="int" value="60"/><!--pixels-->
-</node>
+        <param name="consensus_rot_threshold" type="double" value="0.1"/><!--radians-->
+        <param name="consensus_trans_threshold" type="double" value="0.5"/><!--meters-->
+
+    </node>
 
     <param name="/processes/beacon/robot_description" textfile="$(find samplereturn)/urdf/beacon.urdf"/>
 

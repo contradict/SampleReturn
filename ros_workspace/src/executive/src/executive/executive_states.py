@@ -443,7 +443,6 @@ class MoveToPoints(smach.State):
                              input_keys=['point_list',
                                          'detection_message',
                                          'odometry_frame',
-                                         'stop_on_detection',
                                          'velocity'],
                              output_keys=['simple_move',
                                           'point_list'],

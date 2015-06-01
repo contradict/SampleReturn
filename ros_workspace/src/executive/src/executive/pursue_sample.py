@@ -107,7 +107,7 @@ class PursueSample(object):
         #sample_lost search pattern
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
         self.state_machine.userdata.square_search_size = self.node_params.square_search_size
-        self.state_machine.userdata.settle_time = 5
+        self.state_machine.userdata.settle_time = rospy.Duration(self.node_params.settle_time)
         self.state_machine.userdata.manipulator_search_angle = math.pi/4
         self.state_machine.userdata.search_count = 0
         self.state_machine.userdata.search_try_limit = 2
@@ -278,7 +278,7 @@ class PursueSample(object):
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
                                    transitions = {'sample_search':'HANDLE_SEARCH_MOVES',
-                                                  'aborted':'PUBLISH_FAILURE'})
+                                                  'no_sample':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('HANDLE_SEARCH_MOVES',
                                    MoveToPoints(self.tf_listener),
@@ -608,7 +608,7 @@ class CalculateManipulatorApproach(smach.State):
 class HandleSearch(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
-                             outcomes=['sample_search', 'aborted'],
+                             outcomes=['sample_search', 'no_sample'],
                              input_keys=['square_search_size',
                                          'search_count',
                                          'search_try_limit',
@@ -624,6 +624,7 @@ class HandleSearch(smach.State):
 
         if userdata.search_count >= userdata.search_try_limit:
             self.announcer.say("Search limit reached")
+            return 'no_sample'
 
         point_list = collections.deque([])
         square_step = userdata.square_search_size

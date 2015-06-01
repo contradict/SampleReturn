@@ -58,18 +58,19 @@ class LevelTwoWeb(object):
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
         self.local_frame = 'base_link'
-        
-        #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
+ 
+        #need platform point
         header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
-        point = geometry_msg.Point(node_params.beacon_approach_point['x'],
-                                   node_params.beacon_approach_point['y'], 0)
-        beacon_facing_orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
-        pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
-        self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
-        
-        #also need platform point
         platform_point = geometry_msg.Point( 0, 0, 0)
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
+        
+        #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
+        point = geometry_msg.Point(node_params.beacon_approach_point['x'],
+                                   node_params.beacon_approach_point['y'], 0)
+        beacon_facing_orientation = util.pointing_quaternion_2d(point, platform_point)
+        geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
+        pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
+        self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")

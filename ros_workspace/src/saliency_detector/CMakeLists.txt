@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   dynamic_reconfigure
   image_geometry
+  tf
   cmake_modules)
 
 find_package(Eigen REQUIRED)
