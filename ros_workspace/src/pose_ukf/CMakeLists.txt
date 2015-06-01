@@ -119,6 +119,7 @@ include_directories(
 add_library(pose_ukf
    src/pose_ukf_impl.cpp
    src/pitchroll_ukf_impl.cpp
+   src/sunyaw_ukf_impl.cpp
    src/rotation_average.cpp
 )
 
@@ -140,6 +141,13 @@ target_link_libraries(pitchroll_ukf_node
    ${eigen_LIBRARIES}
 )
 
+add_executable(sunyaw_ukf_node src/sunyaw_node.cpp)
+target_link_libraries(sunyaw_ukf_node
+    pose_ukf
+   ${catkin_LIBRARIES}
+   ${Boost_LIBRARIES}
+   ${eigen_LIBRARIES}
+)
 
 add_executable(test_ukf
     src/test/ukf_test.cpp)
