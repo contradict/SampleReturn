@@ -191,12 +191,12 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
   zarray_t *detections;
   detections = apriltag_detector_detect(tag_det_, apr_image);
-  /*
-  double fx = cam_info->K[0];
-  double fy = cam_info->K[4];
-  double px = cam_info->K[2];
-  double py = cam_info->K[5];
-  */
+  
+  //if no detections, exit this callback
+  if (zarray_size(detections) == 0) {
+    return;
+  }
+
   model_.fromCameraInfo(cam_info);
 
   beacon_finder::AprilTagDetectionArray tag_detection_array;
@@ -208,7 +208,6 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   std::vector<cv::Point2d> all_imgPts;
   std::vector<cv::Point3d> transformed_corners;
   
-
   ROS_DEBUG_NAMED("apriltags", "APRIL BEACON FINDER found %d tags.", zarray_size(detections));
 
   for (int i = 0; i < zarray_size(detections); i++) {
