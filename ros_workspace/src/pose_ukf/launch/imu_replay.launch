@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="bagfile"/>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+
+    <param name="use_sim_time" value="true" type="bool"/>
+
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="replay" value="true"/>
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+
+    <node
+        name="replay"
+        pkg="rosbag"
+        type="play"
+        output="screen"
+        args="--pause --clock
+            --bags $(arg bagfile)
+            --topics
+            tf
+            /io/imu_0/data_raw
+            /io/imu_1/data_raw
+            /io/microstrain_3dm_gx3_35/imu
+            /motion/platform_joint_state
+            /motion/odometry
+            "
+            >
+    </node>
+
+    <node
+        name="microstrain_imu_transform"
+        pkg="tf"
+        type="static_transform_publisher"
+        output="screen"
+        args="0.455 0 0.155 0 3.1416 0 base_link imu 10"/>
+
+    <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
+</launch>

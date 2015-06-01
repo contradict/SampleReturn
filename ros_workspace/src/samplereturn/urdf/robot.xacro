@@ -319,5 +319,4 @@
          <child link="sun_camera"/>
          <origin xyz="-0.727 0 0.311" rpy="0 0 1.57"/>
      </joint>
-
 </robot>
