@@ -222,12 +222,22 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('LOOK_AT_BEACON',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'WEB_MANAGER',
-                                                  'object_detected':'WEB_MANAGER',
+                                   transitions = {'complete':'CALIBRATE_TO_BEACON',
+                                                  'object_detected':'CALIBRATE_TO_BEACON',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'simple_move':'half_turn',
                                                 'stop_on_detection':'false'})
+            
+            smach.StateMachine.add('CALIBRATE_TO_BEACON',
+                                   WaitForFlagState('false',
+                                                    flag_trigger_value = 'true',
+                                                    timeout = 10,
+                                                    announcer = self.announcer,
+                                                    start_message ='Calibrate ing to beacon.'),
+                                   transitions = {'next':'WEB_MANAGER',
+                                                  'timeout':'WEB_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})  
             
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
@@ -351,7 +361,7 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('WAIT_FOR_PREEMPT',
                                    WaitForFlagState('false',
-                                                    flag_trigger_value = 'manual',
+                                                    flag_trigger_value = 'true',
                                                     timeout = 20,
                                                     announcer = self.announcer,
                                                     start_message ='Level two complete.'),
