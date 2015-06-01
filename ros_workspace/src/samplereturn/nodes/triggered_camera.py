@@ -22,6 +22,7 @@ import rospy
 import yaml
 import Queue
 import threading
+import rosnode
 
 import std_msgs.msg as std_msg
 from sensor_msgs.msg import Image, CameraInfo
@@ -35,6 +36,7 @@ class TriggeredCamera(object):
     def __init__(self):
         self.trigger_count = 0
         self.image_count = 0
+        self.missing_image_count = 0
         self.enabled = True
         self.paused = False
         self.trigger_rate = rospy.get_param('~rate', 1.0)
@@ -46,6 +48,8 @@ class TriggeredCamera(object):
         self.queue_size_warning = rospy.get_param('~queue_size_warning', 3)
         self.restart_delay = rospy.get_param('~restart_delay', 5.0)
         self.frame_id = rospy.get_param('~frame_id', 'search_camera')
+        self.camera_node_name = rospy.get_param('~camera_node_name', 'camera')
+        self.restart_camera_threshold = rospy.get_param('~restart_camera_threshold', 5)
         calibration_name = rospy.get_param('~calib_file', None)
         if calibration_name is not None:
             rospy.logdebug("calibration_name: %s", calibration_name)
@@ -152,6 +156,7 @@ class TriggeredCamera(object):
         if self.pause_for_restart_timer is not None:
             self.start_restart_timer()
 
+        self.missing_image_count = 0
         self.image_count += 1
         rospy.logdebug("image seq: %d queue: %d", self.image_count,
                 self.timestamp_queue.qsize())
@@ -262,6 +267,16 @@ class TriggeredCamera(object):
         self.missing_image_timer.shutdown()
         self.missing_image_timer = None
         self.clear_queue("Image receipt timeout")
+        self.missing_image_count += 1
+        if self.missing_image_count > self.restart_camera_threshold:
+            self.restart_camera()
+        else:
+            self.start_restart_timer()
+
+    def restart_camera(self):
+        # Just kill it here, will be restarted by
+        # roslaunch respawn
+        rosnode.kill_nodes(self.camera_node_name)
         self.start_restart_timer()
 
     def clear_queue(self, reason):
