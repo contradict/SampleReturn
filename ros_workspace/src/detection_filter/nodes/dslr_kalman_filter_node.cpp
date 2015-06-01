@@ -556,6 +556,9 @@ class KalmanDetectionFilter
 
   bool checkColor(std::string filter_color, std::string obs_color)
   {
+    if (is_manipulator_) {
+      return true;
+    }
     std::vector<std::string>::iterator color_it;
     color_it = std::find(color_transitions_map_[filter_color].begin(),
                           color_transitions_map_[filter_color].end(),
