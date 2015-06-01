@@ -330,9 +330,10 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   
   } //end of detection iteration
   
-  //try the multi_tag solution
+  //if only one tag, do nothing
   if (zarray_size(detections) > 1) {
     
+    //try the multi_tag solution
     cv::Vec3d rvec, tvec;
     if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
         
@@ -397,47 +398,47 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
           beacon_pose_pub_.publish(beacon_pose_msg);
         }
     }
-  }
-   
+
+    //compute std_dev of poses
+    cv::Vec3d pos_mean, pos_dev_v;
+    cv::meanStdDev(beacon_positions, pos_mean, pos_dev_v);
+    double pos_dev = norm(pos_dev_v);
+    ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
+    cv::Vec3d rot_mean, rot_dev_v;
+    cv::meanStdDev(beacon_rotations, rot_mean, rot_dev_v);
+    double rot_dev = norm(rot_dev_v);
+    ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
+    if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
   
-  //compute std_dev of poses
-  cv::Vec3d pos_mean, pos_dev_v;
-  cv::meanStdDev(beacon_positions, pos_mean, pos_dev_v);
-  double pos_dev = norm(pos_dev_v);
-  ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose position mean: " << pos_mean << " |" << cv::norm(pos_mean) << "| std_dev:" << pos_dev << " |" << pos_dev << "|");
-  cv::Vec3d rot_mean, rot_dev_v;
-  cv::meanStdDev(beacon_rotations, rot_mean, rot_dev_v);
-  double rot_dev = norm(rot_dev_v);
-  ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER pose rotation mean: " << rot_mean << " |" << cv::norm(rot_mean) << "| std_dev:" << rot_dev << " |" << rot_dev << "|");
-  if ((beacon_poses.size() > 1) && (pos_dev < pos_thresh_) && (rot_dev < rot_thresh_)) {
-
-      for (auto &pose : beacon_poses) {
-          geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
-          beacon_pose_msg.header = cv_ptr->header;
-
-          //calculate covariance based on range
-          cv::Vec3d pos(pose.position.x, pose.position.y, pose.position.z);
-          double range = cv::norm(pos);
-          double pos_sigma = position_sigma_scale_ * range + position_sigma_;
-          double pos_covariance = pos_sigma * pos_sigma;
-          double rot_covariance = rotation_sigma_ * rotation_sigma_;
-          covariance_[0] = pos_covariance;
-          covariance_[7] = pos_covariance;
-          covariance_[14] = pos_covariance;
-          covariance_[21] = rot_covariance;
-          covariance_[28] = rot_covariance;
-          covariance_[35] = rot_covariance;
-          std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
-          beacon_pose_msg.pose.pose = pose;
-
-          beacon_pose_pub_.publish(beacon_pose_msg);
-      }
-      
+        for (auto &pose : beacon_poses) {
+            geometry_msgs::PoseWithCovarianceStamped beacon_pose_msg;
+            beacon_pose_msg.header = cv_ptr->header;
+  
+            //calculate covariance based on range
+            cv::Vec3d pos(pose.position.x, pose.position.y, pose.position.z);
+            double range = cv::norm(pos);
+            double pos_sigma = position_sigma_scale_ * range + position_sigma_;
+            double pos_covariance = pos_sigma * pos_sigma;
+            double rot_covariance = rotation_sigma_ * rotation_sigma_;
+            covariance_[0] = pos_covariance;
+            covariance_[7] = pos_covariance;
+            covariance_[14] = pos_covariance;
+            covariance_[21] = rot_covariance;
+            covariance_[28] = rot_covariance;
+            covariance_[35] = rot_covariance;
+            std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
+            beacon_pose_msg.pose.pose = pose;
+  
+            beacon_pose_pub_.publish(beacon_pose_msg);
+        }
+        
+    } else {
+          ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER deviation too large, not reporting poses from individual tags.");
+    }
+  
   } else {
-        ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER deviation too large, not reporting poses from individual tags.");
-  }
-  
-
+    ROS_DEBUG_STREAM_NAMED("consensus", "APRIL BEACON FINDER only found 1 tag, publishing nothing.");        
+  } //end if detections >1
 
   //free up detections memory
   apriltag_detections_destroy(detections);
