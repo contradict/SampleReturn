@@ -21,12 +21,12 @@ level_two:
     chord_course_tolerance: 3.0 #what is off course on a chord move
     return_time_minutes: 100 
     #dismount and beacon approach
-    dismount_move: {angle: 35, distance: 6.0, velocity: 0.5}
-    beacon_approach_point: {x: 6.0, y: 4.0}
+    dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
+    beacon_approach_point: {x: 5.0, y: 0.0}
     beacon_observation_delay: 10 
     beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan
-    replan_threshold: 2.0
+    replan_threshold: 5.0
     #for costmap issues, set to zero to disable this
     blocked_retry_delay: 3.0
 
