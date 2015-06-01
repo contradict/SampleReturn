@@ -1,0 +1,20 @@
+#this is the yaml config for the diagnostic aggregator
+pub_rate: 1.0 # Optional
+base_path: '' # Optional, prepended to all diagnostic output
+analyzers:
+    cpu:
+        type: diagnostic_aggregator/GenericAnalyzer
+        path: CPU
+        contains: 'CPU'
+    hd:
+        type: diagnostic_aggregator/GenericAnalyzer
+        path: HD
+        contains: 'HD'
+    tf:
+        type: diagnostic_aggregator/GenericAnalyzer
+        path: TF
+        startswith: tf_monitor
+    sensors:
+        type: diagnostic_aggregator/GenericAnalyzer
+        path: sensors
+        startswith: sensors_monitor
