@@ -29,6 +29,8 @@
             /io/microstrain_3dm_gx3_35/imu
             /motion/platform_joint_state
             /motion/odometry
+            /cameras/sun_cam/image_raw
+            /cameras/sun_cam/camera_info
             "
             >
     </node>
@@ -40,5 +42,11 @@
         output="screen"
         args="0.455 0 0.155 0 3.1416 0 base_link imu 10"/>
 
-    <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
+    <include file="$(find solar_fisheye)/launch/molamola.launch">
+        <arg name="replay" value="true"/>
+    </include>
+    <!--
+    <include file="$(find pose_ukf)/launch/sunyaw_ukf.launch"/>
+    -->
+
 </launch>
