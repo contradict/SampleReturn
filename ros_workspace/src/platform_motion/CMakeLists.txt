@@ -103,6 +103,7 @@ add_executable(EKF_odometry
     src/EKF_odometry.cpp
     src/EKF_odometry_node.cpp
     src/wheelpodmeasurementpdf.cpp
+    src/odometrywithcurvature.cpp
     )
 target_link_libraries(EKF_odometry
     ${Boost_LIBRARIES}
