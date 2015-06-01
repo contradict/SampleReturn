@@ -25,6 +25,13 @@
         <origin xyz="0.366 0.0 0.0" rpy="0.0 0.0 0.0"/>
     </joint>
 
+    <link name="beacon_front_lower"/>
+    <joint name="beacon_front_lower_x" type="fixed">
+        <parent link="beacon"/>
+        <child link="beacon_front_lower"/>
+        <origin xyz="0.0 0.803 0.197" rpy="0.0 -0.2632 0.0"/>
+    </joint>
+
     <link name="beacon_right_top"/>
     <joint name="beacon_right_top_x" type="fixed">
         <parent link="beacon"/>
@@ -65,6 +72,13 @@
         <parent link="beacon"/>
         <child link="beacon_back_right"/>
         <origin xyz="-0.366 0.0 0.394" rpy="0.0 3.1416 0.0"/>
+    </joint>
+
+    <link name="beacon_back_lower"/>
+    <joint name="beacon_back_lower_x" type="fixed">
+        <parent link="beacon"/>
+        <child link="beacon_back_lower"/>
+        <origin xyz="0.0 0.803 0.197" rpy="0.0 2.8784 0.0"/>
     </joint>
 
 </robot>

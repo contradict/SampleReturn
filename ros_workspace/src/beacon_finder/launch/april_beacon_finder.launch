@@ -45,6 +45,14 @@
             id: 407,
             size: 0.3048,
             frame_id: beacon_left_bottom},
+          {
+            id: 408,
+            size: 0.4064,
+            frame_id: beacon_front_lower},
+          {
+            id: 409,
+            size: 0.4064,
+            frame_id: beacon_back_lower}
         ]
         </rosparam>
         <!--position sigma specified at 0m-->
