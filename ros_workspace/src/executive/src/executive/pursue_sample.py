@@ -382,7 +382,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_POINT_LOST',
                                    AnnounceState(self.announcer,
-                                                 "Sample lost. abort ing"),
+                                                 "Sample lost."),
                                    transitions = {'next':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('PUBLISH_FAILURE',
