@@ -196,7 +196,12 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   
   //report number of tags if any found
   if (zarray_size(detections) > 1) {
-    ROS_DEBUG("APRIL BEACON FINDER found %d tags.", zarray_size(detections));
+    ROS_DEBUG_NAMED("tag_detection", "APRIL BEACON FINDER found %d tags.", zarray_size(detections));
+
+    double detection_time = (ros::Time::now() - start_time).toSec();
+  
+    ROS_DEBUG("APRIL BEACON FINDER tag detection executed in: %lf", detection_time);
+
   }
   
   //if less than 3, just exit the callback
@@ -344,12 +349,12 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   cv::Vec3d rvec, tvec;
   if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
       
-      ROS_ERROR_NAMED("solver", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
-      ROS_ERROR_STREAM_NAMED("solver", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
+      ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
+      ROS_ERROR_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
           
   } else {
     
-      ROS_DEBUG_STREAM("APRIL BEACON FINDER found solution for: "<< zarray_size(detections) << " tags.");        
+      ROS_DEBUG_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER found solution for: "<< zarray_size(detections) << " tags.");        
     
       //this solution is for points xformed into beacon frame
       double th = cv::norm(rvec);
@@ -387,7 +392,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         std::copy(covariance_.begin(), covariance_.end(), beacon_pose_msg.pose.covariance.begin());
         beacon_pose_msg.pose.pose = beacon_pose.pose;
   
-        ROS_DEBUG_STREAM("APRIL BEACON FINDER publishing " << zarray_size(detections) << " tag solution.");        
+        ROS_DEBUG_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER publishing " << zarray_size(detections) << " tag solution.");        
         
         beacon_pose_pub_.publish(beacon_pose_msg);
   }
@@ -440,7 +445,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
   double execution_time = (ros::Time::now() - start_time).toSec();
   
-  ROS_DEBUG("APRIL BEACON FINDER detection callback executed in: %lf", execution_time);
+  ROS_DEBUG("APRIL BEACON FINDER full image callback executed in: %lf", execution_time);
   
 }
 
