@@ -440,7 +440,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
 
   double execution_time = (ros::Time::now() - start_time).toSec();
   
-  ROS_DEBUG("APRIL BEACON FINDER detection callback executed in: ", execution_time);
+  ROS_DEBUG("APRIL BEACON FINDER detection callback executed in: %lf", execution_time);
   
 }
 
