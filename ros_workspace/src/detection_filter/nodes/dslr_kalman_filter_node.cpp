@@ -8,6 +8,7 @@
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <ros/console.h>
+#include <std_msgs/Float32.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
@@ -48,6 +49,7 @@ class KalmanDetectionFilter
   ros::Subscriber sub_cam_info;
   ros::Subscriber sub_ack;
   ros::Subscriber sub_odometry;
+  ros::Subscriber sub_exclusion_zone;
 
   ros::Publisher pub_detection;
   ros::Publisher pub_debug_img;
@@ -58,6 +60,7 @@ class KalmanDetectionFilter
   std::string cam_info_topic;
   std::string ack_topic;
   std::string odometry_topic;
+  std::string exclusion_zone_topic;
 
   std::string filtered_detection_topic;
   std::string debug_img_topic;
@@ -124,6 +127,7 @@ class KalmanDetectionFilter
     detection_topic = "point";
     ack_topic = "ack";
     odometry_topic = "odometry";
+    exclusion_zone_topic = "exclusion_zone";
 
     filtered_detection_topic = "filtered_point";
     debug_img_topic = "debug_img";
@@ -250,6 +254,9 @@ class KalmanDetectionFilter
     sub_odometry =
       nh.subscribe(odometry_topic.c_str(), 3, &KalmanDetectionFilter::odometryCallback, this);
 
+    sub_exclusion_zone =
+      nh.subscribe(exclusion_zone_topic.c_str(), 3, &KalmanDetectionFilter::exclusionZoneCallback, this);
+
     pub_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_detection_topic.c_str(), 3);
 
@@ -274,6 +281,17 @@ class KalmanDetectionFilter
     last_y_ = 0.0;
     odometer_ = 0.0;
     last_odometry_tick_ = 0.0;
+  }
+
+  void exclusionZoneCallback(const std_msgs::Float32 radius)
+  {
+    // This is for recovery mode. When a message is published to this topic,
+    // drop an exclusion zone at current base_link of radius.
+    tf::StampedTransform transform;
+    listener_.lookupTransform(_filter_frame_id, "base_link", ros::Time(0), transform);
+    exclusion_list_.push_back(std::make_tuple(transform.getOrigin().x(),
+                                              transform.getOrigin().y(),
+                                              radius.data,exclusion_count_,odometer_));
   }
 
   /* Dynamic reconfigure callback */
