@@ -350,8 +350,9 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     
   } //end if > 1
   
-  //free up detections memory
+  //free up memory
   apriltag_detections_destroy(detections);
+  image_u8_destroy(apr_image);
   
   //publish debug image
   image_pub_.publish(cv_ptr->toImageMsg());
