@@ -347,13 +347,31 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
   
   //try the multi_tag (3+) solution
   cv::Vec3d rvec, tvec;
-  if (cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE) == false) {
-      
+  bool solved = false;
+  solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE);
+  if ( !solved) {
       ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
       ROS_ERROR_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
-          
+  } else if (tvec[2] < 0) {
+      ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER solved for crazy pose! retrying");
+      //sometimes we end up on the back side of the lens, so flip to the front and re-slolve
+      tvec[0] *= -1;
+      tvec[1] *= -1;
+      tvec[2] *= -1;
+      rvec[0] = 0;
+      rvec[1] = 0;
+      rvec[2] = 0;
+      solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, true, CV_ITERATIVE);
+      if (tvec[2] < 0) {
+          ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER solved for crazy pose a second time! giving up");
+          solved = false;
+      }
+  }
+
+  if ( !solved) {//still not solved
+      ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
+      ROS_ERROR_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
   } else {
-    
       ROS_DEBUG_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER found solution for: "<< zarray_size(detections) << " tags.");        
     
       //this solution is for points xformed into beacon frame
