@@ -48,5 +48,8 @@
         blue: [blue, gray, white]
         purple: [purple, red, pink]
     </rosparam>
+    <param name="certainty_inc" type="double" value="1.0"/>
+    <param name="certainty_dec" type="double" value="0.0"/>
+    <param name="certainty_thresh" type="double" value="3.0"/>
   </node>
 </launch>
