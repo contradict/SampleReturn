@@ -24,8 +24,8 @@
         pkg="linemod_detector"
         type="linemod_detector_2d"
         name="hard_manipulator_linemod_detector_2d"
-        ns="/processes/sample_detection/manipulator">
-      <remap from="color" to="/cameras/manipulator/left/image_rect_color"/>
+        ns="/processes/sample_detection/manipulator/hard">
+      <remap from="color" to="/cameras/manipulator/left/rect_color"/>
       <remap from="disparity" to="/cameras/manipulator/disparity"/>
       <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
       <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
