@@ -8,19 +8,20 @@
         output="screen"
         >
         <!--
+        launch-prefix="tmux_new_window gdb -ex run -\-args "
         launch-prefix="tmux_new_window gdb - -args "
-        launch-prefix="tmux_new_window gdb -ex run - -args "
         launch-prefix="tmux_new_window valgrind "
         -->
         <remap from="imu" to="/io/microstrain_3dm_gx3_35/imu"/>
+        <remap from="sun" to="/processes/sun_finder/measurement"/>
         <rosparam param="process_sigma">
-            orientation: [ 0.01, 0.01, 1e-8 ]
-            omega: [ 0.5, 0.5, 0.5 ]
+            orientation: [ 0.001, 0.001, 1e-4 ]
+            omega: [ 0.1, 0.1, 0.1 ]
             gyro_bias: [ 1e-8, 1e-8, 1e-8 ]
             accel_bias: [ 1e-8, 1e-8, 1e-8 ]
         </rosparam>
-        <param name="sun_sigma" type="double" value="1e-2"/>
-        <!-- orientation(r,p), omega(x,y), gyro bias(x,y), accel bias(x,y,z) -->
+        <param name="sun_sigma" type="double" value="5e-2"/>
+        <!-- orientation(r,p,y), omega(x,y,z), gyro bias(x,y,z) -->
         <rosparam param="initial_covariance">
             [
               0.010, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
