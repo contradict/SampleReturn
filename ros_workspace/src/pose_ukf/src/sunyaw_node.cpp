@@ -10,7 +10,10 @@
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <functional>
+#include <visualization_msgs/Marker.h>
+
 #include "solar_fisheye/SunSensor.h"
+
 
 
 namespace SunYawUKF {
@@ -34,6 +37,7 @@ class SunYawUKFNode
     ros::Timer publish_timer_;
     ros::Publisher pose_pub_;
     ros::Publisher state_pub_;
+    ros::Publisher vis_pub_;
 
     SunYawUKF *ukf_;
     ros::Time last_update_;
@@ -56,7 +60,7 @@ class SunYawUKFNode
         SunYawUKFNode();
         ~SunYawUKFNode();
         void connect(void);
-        void printState(void);
+        void printState(std::string name="stateprint");
 };
 
 SunYawUKFNode::SunYawUKFNode() :
@@ -92,6 +96,7 @@ SunYawUKFNode::SunYawUKFNode() :
 
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
     state_pub_ = nh.advertise<pose_ukf::PitchRoll>("state", 1);
+    vis_pub_ = nh.advertise<visualization_msgs::Marker>("sun_vis", 1);
     seq_ = 0;
     publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &SunYawUKFNode::sendPose, this);
 }
@@ -116,12 +121,22 @@ SunYawUKFNode::sendPose(const ros::TimerEvent& e)
     (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
-    msg->header.frame_id = imu_frame_;
-    msg->header.stamp = ros::Time::now();
-    msg->header.seq = seq_++;
-    tf::pointEigenToMsg( Eigen::Vector3d::Zero(), msg->pose.position);
-    tf::quaternionEigenToMsg( ukf_->state().Orientation, msg->pose.orientation);
-    pose_pub_.publish(msg);
+    ros::Time now = ros::Time::now();
+    if(listener_.canTransform("map", imu_frame_, ros::Time(0)))
+    {
+        msg->header.frame_id = "map";
+        msg->header.stamp = ros::Time::now();
+        msg->header.seq = seq_++;
+        tf::StampedTransform imuInMap;
+        listener_.lookupTransform("map", imu_frame_, ros::Time(0), imuInMap);
+        tf::StampedTransform baseInImu;
+        listener_.lookupTransform(imu_frame_, base_name_, ros::Time(0), baseInImu);
+        Eigen::Quaterniond brot;
+        tf::quaternionTFToEigen(baseInImu.getRotation(), brot);
+        tf::pointTFToMsg( imuInMap.getOrigin(), msg->pose.position);
+        tf::quaternionEigenToMsg( brot*ukf_->state().Orientation.inverse(), msg->pose.orientation);
+        pose_pub_.publish(msg);
+    }
 }
 
 void
@@ -163,24 +178,24 @@ SunYawUKFNode::imuCallback(const sensor_msgs::ImuConstPtr& msg)
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > accel_cov(msg->linear_acceleration_covariance.data());
     meas_cov.block<3, 3>(0, 0) = accel_cov;
-    ROS_INFO_STREAM("imu accel cov:\n" << accel_cov);
+    ROS_DEBUG_STREAM_NAMED("imucallback", "imu accel cov:\n" << accel_cov);
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > omega_cov(msg->angular_velocity_covariance.data());
     meas_cov.block<3, 3>(3, 3) = omega_cov;
-    ROS_INFO_STREAM("imu omega cov:\n" << omega_cov);
+    ROS_DEBUG_STREAM_NAMED("imucallback", "imu omega cov:\n" << omega_cov);
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
 
     double dt = (msg->header.stamp - last_update_).toSec();
     if(dt<0)
         return;
-    ROS_INFO_STREAM("Performing IMU predict with dt=" << dt << ", delta_t=" << m.delta_t);
-    ROS_INFO_STREAM("process noise:\n" << process_noise(dt));
+    ROS_DEBUG_STREAM_NAMED("imucallback", "Performing IMU predict with dt=" << dt << ", delta_t=" << m.delta_t);
+    ROS_DEBUG_STREAM_NAMED("imucallback", "process noise:\n" << process_noise(dt));
     ukf_->predict(dt, process_noise(dt));
     last_update_ = msg->header.stamp;
-    ROS_INFO_STREAM("Performing IMU correct with measurement:\n" << m);
-    ROS_INFO_STREAM("Measurement covariance :\n" << meas_cov);
+    ROS_DEBUG_STREAM_NAMED("imucallback", "Performing IMU correct with measurement:\n" << m);
+    ROS_DEBUG_STREAM_NAMED("imucallback", "Measurement covariance :\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    printState();
+    printState("imucallback");
     sendState();
 }
 
@@ -190,8 +205,30 @@ SunYawUKFNode::sunCallback(const solar_fisheye::SunSensorConstPtr& msg)
     SunSensorMeasurement m;
     tf::vectorMsgToEigen(msg->reference,
                          m.reference);
-    tf::vectorMsgToEigen(msg->measurement,
+    geometry_msgs::Vector3Stamped vcamera, vimu;
+    vcamera.header = msg->header;
+    vcamera.vector = msg->measurement;
+    std::string errmsg;
+    if(!listener_.canTransform(imu_frame_, msg->header.frame_id, msg->header.stamp, &errmsg))
+    {
+        ROS_ERROR_STREAM_NAMED("suncallback", "Cannot transform " << msg->header.frame_id << " to " << imu_frame_ << ": " << errmsg);
+        return;
+    }
+    tf::StampedTransform baseInImu;
+    if(!listener_.canTransform(imu_frame_, base_name_, ros::Time(0), &errmsg))
+    {
+        ROS_ERROR_STREAM_NAMED("suncallback", "Cannot transform " << base_name_ << " to " << imu_frame_ << ": " << errmsg);
+        return;
+    }
+
+    listener_.lookupTransform(imu_frame_, base_name_, ros::Time(0), baseInImu);
+    Eigen::Quaterniond brot;
+    tf::quaternionTFToEigen(baseInImu.getRotation(), brot);
+
+    listener_.transformVector(imu_frame_, vcamera, vimu);
+    tf::vectorMsgToEigen(vimu.vector,
                          m.measurement);
+    m.measurement = brot*ukf_->state().Orientation.inverse()*m.reference;
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
     meas_cov(0,0) = sigma_sun_;
