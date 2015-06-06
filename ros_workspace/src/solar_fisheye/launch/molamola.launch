@@ -27,16 +27,18 @@
         type="solar_fisheye_node"
         ns="/processes"
         machine="search"
-        output="log">
+        output="log"
+        launch-prefix="tmux_new_window gdb -ex run -\-args "
+        >
         <remap from="camera" to="/cameras/sun_cam" />
 
         <!--"Centroid minimum intensity to report a measurement"-->
         <param name="min_centroid" type="double" value="128" />
 
         <!--"Maximum std. dev. (2nd moment) to report a measurement"-->
-        <param name="max_dev" type="double" value="300" />
+        <param name="max_dev" type="double" value="400" />
 
-        <param name="noise_threshold" type="int" value="25" />
+        <param name="noise_threshold" type="int" value="64" />
 
         <!--Institude park in Worcester, MA, USA-->
         <!--"Lattitude of the origin of the tangent space on the earth (degrees)"-->
