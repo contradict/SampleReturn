@@ -134,9 +134,9 @@ SunYawUKFNode::sendState(void)
     state->omega.x = ukf_->state().Omega(0);
     state->omega.y = ukf_->state().Omega(1);
     state->omega.z = ukf_->state().Omega(2);
-    //tf::vectorEigenToMsg(ukf_->state().AccelBias, state->accel_bias);
     state->gyro_bias.x = ukf_->state().GyroBias(0);
     state->gyro_bias.y = ukf_->state().GyroBias(1);
+    state->gyro_bias.z = ukf_->state().GyroBias(2);
     state_pub_.publish(state);
 }
 
@@ -200,20 +200,51 @@ SunYawUKFNode::sunCallback(const solar_fisheye::SunSensorConstPtr& msg)
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
 
-    ROS_INFO_STREAM("Performing SUN correct with measurement:\n" << m);
-    ROS_INFO_STREAM("Measurement covariance :\n" << meas_cov);
+    if(listener_.canTransform("map", imu_frame_, ros::Time(0), &errmsg))
+    {
+        tf::StampedTransform imuInMap;
+        listener_.lookupTransform("map", imu_frame_, ros::Time(0), imuInMap);
+        visualization_msgs::Marker meas_mkr;
+        meas_mkr.header.stamp = msg->header.stamp;
+        meas_mkr.header.frame_id = "map";
+        meas_mkr.id = 0;
+        meas_mkr.type = visualization_msgs::Marker::ARROW;
+        meas_mkr.action = visualization_msgs::Marker::MODIFY;
+        tf::pointTFToMsg(imuInMap.getOrigin(), meas_mkr.pose.position);
+        Eigen::Quaterniond qor = Eigen::Quaterniond::FromTwoVectors(
+                Eigen::Vector3d(1,0,0),
+                ukf_->state().Orientation*m.measurement);
+        tf::quaternionEigenToMsg(qor, meas_mkr.pose.orientation);
+        meas_mkr.scale.x=3.0;
+        meas_mkr.scale.y=0.1;
+        meas_mkr.scale.z=0.1;
+        meas_mkr.color.r=1.0;
+        meas_mkr.color.g=1.0;
+        meas_mkr.color.b=0.0;
+        meas_mkr.color.a=1.0;
+        meas_mkr.text="measurement";
+        vis_pub_.publish(meas_mkr);
+    }
+    else
+    {
+        ROS_ERROR_STREAM_NAMED("suncallback", "Cannot transform " << imu_frame_ << " to " << "map" << ": " << errmsg);
+    }
+
+    ROS_DEBUG_STREAM_NAMED("suncallback", "Performing SUN correct with measurement:\n" << m);
+    ROS_DEBUG_STREAM_NAMED("suncallback", "Measurement covariance :\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    printState();
+    printState("suncallback");
     sendState();
 }
+
 void
-SunYawUKFNode::printState(void)
+SunYawUKFNode::printState(std::string name)
 {
-    ROS_INFO_STREAM("State:\n" << ukf_->state());
-    ROS_INFO_STREAM("Covariance:\n" << ukf_->covariance());
-    ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<3,3>(0,0)));
-    ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<3,3>(3,3)));
-    ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<2,2>(6,6)));
+    ROS_DEBUG_STREAM_NAMED(name, "State:\n" << ukf_->state());
+    ROS_DEBUG_STREAM_NAMED(name, "Covariance:\n" << ukf_->covariance());
+    ROS_DEBUG_STREAM_NAMED(name, "orientation cov:\n" << (ukf_->covariance().block<3,3>(0,0)));
+    ROS_DEBUG_STREAM_NAMED(name, "omega cov:\n" << (ukf_->covariance().block<3,3>(3,3)));
+    ROS_DEBUG_STREAM_NAMED(name, "gyro bias cov:\n" << (ukf_->covariance().block<3,3>(6,6)));
 }
 
 template <typename V>

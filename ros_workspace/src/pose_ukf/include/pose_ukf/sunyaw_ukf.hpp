@@ -84,12 +84,11 @@ struct SunYawState
     {
         struct SunYawState out;
         Eigen::Vector3d omega;
-        omega.setZero();
         omega = offset.segment<3>(0);
-        out.Omega = Omega + offset.segment<3>(3);
-        out.GyroBias = GyroBias + offset.segment<3>(4);
         Eigen::Quaterniond rot=exp(omega);
         out.Orientation = rot*Orientation;
+        out.Omega = Omega + offset.segment<3>(3);
+        out.GyroBias = GyroBias + offset.segment<3>(6);
         return out;
     };
     Eigen::VectorXd
@@ -109,14 +108,10 @@ struct SunYawState
             const Eigen::VectorXd &Chinu) const
     {
         struct SunYawState out;
-        Eigen::Vector3d o;
-        o.setZero();
-        o.segment<3>(0) = Omega*dt + Chinu.segment<3>(0);
+        Eigen::Quaterniond rot=exp(Omega*dt + Chinu.segment<3>(0));
+        out.Orientation = Orientation*rot;
         out.Omega = Omega + Chinu.segment<3>(3);
         out.GyroBias = GyroBias + Chinu.segment<3>(6);
-        Eigen::Quaterniond rot=exp(o);
-        out.Orientation = Orientation*rot;
-        //out.AccelBias = AccelBias + Chinu.segment<3>(6);
         return out;
     };
     void mean(const std::vector<double> &weights,
