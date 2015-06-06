@@ -411,13 +411,6 @@ class LineMOD_Detector
     LineMOD_Detector::sources.clear();
   }
 
-//  void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
-//      std_msgs::Header header)
-//  {
-//    ROS_DEBUG("Publishing Point");
-//    samplereturn_msgs::NamedPoint point_msg;
-//
-
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
       std_msgs::Header header, float grip_angle, int sample_id)
   {
