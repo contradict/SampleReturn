@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+
+    <node
+        name="sun_record"
+        pkg="rosbag"
+        type="record"
+        output="screen"
+        machine="search"
+        args="
+            tf
+            /io/microstrain_3dm_gx3_35/imu
+            /motion/platform_joint_state
+            /motion/odometry
+            /processes/beacon/beacon_pose
+            /cameras/sun_cam/image_raw
+            /cameras/sun_cam/camera_info
+            "
+            >
+    </node>
+
+</launch>
