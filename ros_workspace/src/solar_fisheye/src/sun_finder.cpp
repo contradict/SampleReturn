@@ -3,6 +3,9 @@
 #include <math.h>
 #include <time.h>
 #include <opencv2/opencv.hpp>
+#include <visualization_msgs/MarkerArray.h>
+#include <tf_conversions/tf_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 #include "solpos00.h"
 
@@ -148,9 +151,11 @@ SunFinder::SunFinder()
     std::string camera_ns = nh.resolveName("camera");
     //ROS_INFO_STREAM("camera_ns: " << camera_ns);
 
+    ros::NodeHandle pnh("~");
     it_ = new image_transport::ImageTransport(nh);
     sub_ = it_->subscribeCamera(camera_ns + "/image_raw", 0, &SunFinder::imageCallback, this);
-    meas_pub_ = nh.advertise<solar_fisheye::SunSensor>("measurement", 3);
+    meas_pub_ = pnh.advertise<solar_fisheye::SunSensor>("measurement", 3);
+    vis_pub_ = pnh.advertise<visualization_msgs::MarkerArray>("visualization", 3);
 
     reconfigure_server_.setCallback(boost::bind(&SunFinder::configure, this, _1, _2));
 }
@@ -189,6 +194,11 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
     mc.x = std::min(float(imageMat.size().width), std::max(mc.x, 0.0f));
     mc.y = std::min(float(imageMat.size().height), std::max(mc.y, 0.0f));
 
+    ROS_DEBUG_STREAM("sun centriod value: " << (int)img_thr.at<uint8_t>(mc));
+    ROS_DEBUG_STREAM("sun sqrt(mu02): " << sqrt(mu.mu02));
+    ROS_DEBUG_STREAM("sun sqrt(mu20): " << sqrt(mu.mu20));
+    ROS_DEBUG_STREAM("sun sqrt(abs(mu11)): " << sqrt(fabs(mu.mu11)));
+
     if ( (img_thr.at<uint8_t>(mc) >= config_.min_centroid)
             && (sqrt(mu.mu20) <= config_.max_dev)
             //&& (sqrt(mu.mu11) <= config_.max_dev)
@@ -211,6 +221,55 @@ SunFinder::imageCallback(const sensor_msgs::ImageConstPtr &image_msg,
         meas.reference.y = sun.y;
         meas.reference.z = sun.z;
         meas_pub_.publish(meas);
+
+        tf::StampedTransform cameraInMap;
+        if(listener_.canTransform("map", image_msg->header.frame_id, image_msg->header.stamp))
+        {
+            listener_.lookupTransform("map", image_msg->header.frame_id, image_msg->header.stamp, cameraInMap);
+            visualization_msgs::MarkerArray vis;
+            visualization_msgs::Marker ref_mkr;
+            ref_mkr.header.stamp = image_msg->header.stamp;
+            ref_mkr.header.frame_id = "map";
+            ref_mkr.id = 0;
+            ref_mkr.type = visualization_msgs::Marker::ARROW;
+            ref_mkr.action = visualization_msgs::Marker::MODIFY;
+            tf::pointTFToMsg(cameraInMap.getOrigin(), ref_mkr.pose.position);
+            Eigen::Quaterniond qor = Eigen::Quaterniond::FromTwoVectors(
+                    Eigen::Vector3d(1,0,0),
+                    Eigen::Vector3d(meas.reference.x, -meas.reference.y, -meas.reference.z));
+            tf::quaternionEigenToMsg(qor, ref_mkr.pose.orientation);
+            ref_mkr.scale.x=3.0;
+            ref_mkr.scale.y=0.1;
+            ref_mkr.scale.z=0.1;
+            ref_mkr.color.r=1.0;
+            ref_mkr.color.g=1.0;
+            ref_mkr.color.b=0.0;
+            ref_mkr.color.a=1.0;
+            ref_mkr.text="reference";
+            vis.markers.push_back(ref_mkr);
+
+            visualization_msgs::Marker meas_mkr;
+            meas_mkr.header = image_msg->header;
+            meas_mkr.id = 1;
+            meas_mkr.type = visualization_msgs::Marker::ARROW;
+            meas_mkr.action = visualization_msgs::Marker::MODIFY;
+            tf::pointEigenToMsg(Eigen::Vector3d::Zero(), meas_mkr.pose.position);
+            Eigen::Quaterniond qom = Eigen::Quaterniond::FromTwoVectors(
+                    Eigen::Vector3d(1,0,0),
+                    Eigen::Vector3d(meas.measurement.x, meas.measurement.y, meas.measurement.z));
+            tf::quaternionEigenToMsg(qom, meas_mkr.pose.orientation);
+            meas_mkr.scale.x=3.0;
+            meas_mkr.scale.y=0.1;
+            meas_mkr.scale.z=0.1;
+            meas_mkr.color.r=0.6;
+            meas_mkr.color.g=0.6;
+            meas_mkr.color.b=0.2;
+            meas_mkr.color.a=1.0;
+            meas_mkr.text="measurement";
+            vis.markers.push_back(meas_mkr);
+            vis_pub_.publish(vis);
+        }
+
     }
 }
 

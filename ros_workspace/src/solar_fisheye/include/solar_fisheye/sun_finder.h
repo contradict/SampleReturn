@@ -6,6 +6,7 @@
 #include <image_geometry/pinhole_camera_model.h>
 #include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
+#include <tf/transform_listener.h>
 
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/affine.hpp>
@@ -24,9 +25,12 @@ class SunFinder
     image_transport::CameraSubscriber sub_;
     image_geometry::PinholeCameraModel model_;
     ros::Publisher meas_pub_;
+    ros::Publisher vis_pub_;
 
     SolarFisheyeConfig config_;
     dynamic_reconfigure::Server<solar_fisheye::SolarFisheyeConfig> reconfigure_server_;
+
+    tf::TransformListener listener_;
 
     void configure(SolarFisheyeConfig &config, uint32_t level);
 
