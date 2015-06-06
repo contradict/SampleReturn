@@ -239,7 +239,7 @@ struct SunSensorMeasurement
     {
         struct SunSensorMeasurement m;
         m.reference = reference;
-        m.measurement = st.Orientation * reference + noise;
+        m.measurement = st.Orientation.inverse() * reference + noise;
         return m;
     }
 
