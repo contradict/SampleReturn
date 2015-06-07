@@ -29,7 +29,9 @@ level_two:
     gyro_calibration_delay: 10
     beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan
+    #if greater than recalibrate, wait and observe beacon, and set gyro bias
     replan_threshold: 2.0
+    recalibrate_threshold: 5.0    
     #for costmap issues, set to zero to disable this
     blocked_retry_delay: 3.0
 
