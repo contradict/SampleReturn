@@ -309,6 +309,11 @@ class LineMOD_Detector
         std::string dominant_color = cn.getDominantColor(interiorColor);
         std::cout << "Dominant color " << dominant_color << std::endl;
 
+        if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
+            m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
+            m.class_id == "metal_box") {
+          hull = floodFillHull(hull, display);
+        }
         cv::RotatedRect rect = cv::minAreaRect(hull);
         ROS_INFO("Meausred angle: %f width: %f height: %f",
                 rect.angle, rect.size.width, rect.size.height);
@@ -488,6 +493,49 @@ class LineMOD_Detector
     }
 
     LineMOD_Detector::img_point_pub.publish(img_point_msg);
+  }
+
+  std::vector<cv::Point> floodFillHull(const std::vector<cv::Point>& hull,
+      const cv::Mat color_image)
+  {
+    cv::Moments M = cv::moments(hull);
+    float cx = M.m10/M.m00;
+    float cy = M.m01/M.m00;
+    std::vector<cv::Point> grip_hull;
+    // Take the convex hull of a metal sample symbol, floodFill from some
+    // points on it to get a mask for grip computation.
+    for (int i = 0; i < 1; i++)
+    {
+      float offset_x = hull[i].x-cx;
+      float offset_y = hull[i].y-cy;
+      float length = std::sqrt(pow(offset_x,2)+pow(offset_y,2));
+      cv::Point offset_pt((hull[i].x+4*(offset_x/length)),
+                          (hull[i].y+4*(offset_y/length)));
+      cv::Point trunc_offset_pt((offset_pt.x>=color_image.cols)?color_image.cols:offset_pt.x,
+                                (offset_pt.y>=color_image.rows)?color_image.rows:offset_pt.y);
+      cv::Mat mask;
+      mask = cv::Mat::zeros(color_image.rows+2, color_image.cols+2, CV_8UC1);
+      cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
+          0, cv::Scalar(10,10,10), cv::Scalar(10,10,10),
+          (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
+      std::vector<std::vector<cv::Point> > contours;
+      cv::findContours(mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      double maxArea = 0;
+      int max_idx = 0;
+      for (int i=0; i<contours.size(); i++) {
+        double area = cv::contourArea(cv::Mat(contours[i]));
+        if (area > maxArea) {
+          maxArea = area;
+          max_idx = i;
+        }
+      }
+      cv::convexHull(contours[max_idx], grip_hull);
+      // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
+
+      cv::imshow("mask",mask);
+      cv::waitKey(10);
+    }
+    return grip_hull;
   }
 
   cv::Mat trimDisparity(cv::Mat flat_disparity, float min_disparity) {
