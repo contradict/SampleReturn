@@ -518,6 +518,8 @@ class LineMOD_Detector
       cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
           0, cv::Scalar(10,10,10), cv::Scalar(10,10,10),
           (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
+      cv::imshow("mask",mask);
+      cv::waitKey(10);
       std::vector<std::vector<cv::Point> > contours;
       cv::findContours(mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       double maxArea = 0;
@@ -532,8 +534,6 @@ class LineMOD_Detector
       cv::convexHull(contours[max_idx], grip_hull);
       // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
 
-      cv::imshow("mask",mask);
-      cv::waitKey(10);
     }
     return grip_hull;
   }
