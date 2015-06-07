@@ -273,17 +273,43 @@ class LineMOD_Detector
     std::set<std::string> visited;
 
     ROS_DEBUG("Matches size: %u", (int)matches.size());
+    float best_match_similarity = 0;
+    int best_match_idx = -1;
+    std::cout << "Matches size: " << (int)matches.size() << std::endl;
     for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
     {
+      std::cout << "Matches size: " << (int)matches.size() << std::endl;
+      std::cout << i << std::endl;
       cv::linemod::Match m = matches[i];
       ROS_DEBUG("Matching count: %u", i);
 
       std::cout << "I: " << i << "classes visited: " << classes_visited << std::endl;
       std::cout << "matches.size: " << (int)matches.size() << "num classes: " <<
         LineMOD_Detector::num_classes << std::endl;
+      if (m.similarity > best_match_similarity) {
+        best_match_similarity = m.similarity;
+        best_match_idx = i;
+      }
       if (visited.insert(m.class_id).second)
       {
         ++classes_visited;
+      }
+    }
+    std::cout << "Best match similarity: " << best_match_similarity << std::endl;
+    std::cout << "Best match idx: " << best_match_idx << std::endl;
+    if (best_match_idx == -1) {
+      LineMOD_Detector::sources.clear();
+      return;
+    }
+    //for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
+    //{
+    //  cv::linemod::Match m = matches[i];
+    //  ROS_DEBUG("Matching count: %u", i);
+
+    //  if (visited.insert(m.class_id).second)
+    //  {
+    //    ++classes_visited;
+    cv::linemod::Match m = matches[best_match_idx];
 
         if (show_match_result)
         {
@@ -407,8 +433,8 @@ class LineMOD_Detector
           }
         }
 
-      }
-    }
+    //  }
+    //}
 
    if(_publish_debug_img)
    {
@@ -512,14 +538,14 @@ class LineMOD_Detector
       float offset_x = hull[i].x-cx;
       float offset_y = hull[i].y-cy;
       float length = std::sqrt(pow(offset_x,2)+pow(offset_y,2));
-      cv::Point offset_pt((hull[i].x+4*(offset_x/length)),
-                          (hull[i].y+4*(offset_y/length)));
+      cv::Point offset_pt((hull[i].x+10*(offset_x/length)),
+                          (hull[i].y+10*(offset_y/length)));
       cv::Point trunc_offset_pt((offset_pt.x>=color_image.cols)?color_image.cols:offset_pt.x,
                                 (offset_pt.y>=color_image.rows)?color_image.rows:offset_pt.y);
       cv::Mat mask;
       mask = cv::Mat::zeros(color_image.rows+2, color_image.cols+2, CV_8UC1);
       cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
-          0, cv::Scalar(10,10,10), cv::Scalar(10,10,10),
+          0, cv::Scalar(8,8,8), cv::Scalar(8,8,8),
           (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
       cv::imshow("mask",mask);
       cv::waitKey(10);
