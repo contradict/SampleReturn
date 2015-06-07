@@ -25,6 +25,7 @@ import geometry_msgs.msg as geometry_msg
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import visualization_msgs.msg as vis_msg
+import kvh_fog.srv as kvh_fog_srv
 
 import motion_planning.simple_motion as simple_motion
 
@@ -35,6 +36,9 @@ from executive.executive_states import ExecuteVFHMove
 from executive.executive_states import WaitForFlagState
 from executive.beacon_return_states import BeaconReturn
 from executive.beacon_return_states import CalculateMountMove
+
+from kvh_fog.srv import MeasureBias, MeasureBiasRequest, MeasureBiasResponse
+
 
 import samplereturn.util as util
 
@@ -117,11 +121,13 @@ class LevelTwoWeb(object):
         #dismount move
         self.state_machine.userdata.dismount_move = node_params.dismount_move
 
-        #beacon approach
+        #beacon and localization
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
         self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
+        self.beacon_calibration_delay = node_params.beacon_calibration_delay
+        self.gyro_calibration_delay = node_params.gyro_calibration_delay
         
         #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
@@ -234,12 +240,22 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('CALIBRATE_TO_BEACON',
                                    WaitForFlagState('false',
                                                     flag_trigger_value = 'true',
-                                                    timeout = 10,
+                                                    timeout = self.beacon_calibration_delay,
                                                     announcer = self.announcer,
                                                     start_message ='Calibrate ing to beacon.'),
                                    transitions = {'next':'WEB_MANAGER',
                                                   'timeout':'WEB_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED'})  
+            
+            #request kvh_fog node to measure and set the current bias.
+            #only do this while stopped!
+            kvh_request = kvh_fog_srv.MeasureBiasRequest(self.gyro_calibration_delay)
+            smach.StateMachine.add('CALIBRATE_GYRO',
+                                    smach_ros.ServiceState('measure_bias',
+                                                            kvh_fog_srv.MeasureBias,
+                                                            request = kvh_request),
+                                    transitions = {'succeeded':'WEB_MANAGER', 
+                                                    'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
