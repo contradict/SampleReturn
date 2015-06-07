@@ -34,7 +34,8 @@ EKFOdometryNode::EKFOdometryNode(void):OdometryNode()
 
     param_nh.param("max_yaw_correction_rate", max_yaw_correction_rate, 0.05);
 
-    yaw_sub = param_nh.subscribe("sun_yaw", 2, &EKFOdometryNode::updateYaw, this);
+    yaw_pose_sub = param_nh.subscribe("pose_yaw", 2, &EKFOdometryNode::updateYawPose, this);
+    yaw_imu_sub = param_nh.subscribe("imu_yaw", 2, &EKFOdometryNode::updateYawImu, this);
 }
 
 void EKFOdometryNode::init(void)
@@ -94,22 +95,22 @@ void EKFOdometryNode::initializeModels(void)
     wheel_meas_model = new BFL::AnalyticMeasurementModelGaussianUncertainty(wheel_meas_pdf);
 
     /***********************************
-    * Initialize sun measurement model 
+    * Initialize yaw measurement model
     *  set uncertianty to N(0,1) for now, This will be updated by the
     *  covariance data from the message
     ***********************************/
-    MatrixWrapper::ColumnVector sunNoiseMu(1);
-    sunNoiseMu = 0.0;
-    MatrixWrapper::SymmetricMatrix sunNoiseCov(1);
-    sunNoiseCov = 1.0;
-    BFL::Gaussian sunUncertainty(sunNoiseMu, sunNoiseCov);
-    MatrixWrapper::Matrix Hsun(1,5);
-    Hsun = 0.0;
-    Hsun(1,4) = 1.0;
+    MatrixWrapper::ColumnVector yawNoiseMu(1);
+    yawNoiseMu = 0.0;
+    MatrixWrapper::SymmetricMatrix yawNoiseCov(1);
+    yawNoiseCov = 1.0;
+    BFL::Gaussian yawUncertainty(yawNoiseMu, yawNoiseCov);
+    MatrixWrapper::Matrix Hyaw(1,5);
+    Hyaw = 0.0;
+    Hyaw(1,4) = 1.0;
     std::vector<MatrixWrapper::Matrix> Hmats;
-    Hmats.push_back(Hsun);
-    sun_meas_pdf = new BFL::LinearAnalyticConditionalGaussian(Hmats, sunUncertainty);
-    sun_meas_model = new BFL::LinearAnalyticMeasurementModelGaussianUncertainty(sun_meas_pdf);
+    Hmats.push_back(Hyaw);
+    yaw_meas_pdf = new BFL::LinearAnalyticConditionalGaussian(Hmats, yawUncertainty);
+    yaw_meas_model = new BFL::LinearAnalyticMeasurementModelGaussianUncertainty(yaw_meas_pdf);
 
     /****************************
      * Linear prior DENSITY     *
@@ -185,18 +186,29 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
 
 }
 
-void EKFOdometryNode::updateYaw(const geometry_msgs::PoseWithCovarianceStampedConstPtr& yawmsg)
+void EKFOdometryNode::updateYawPose(geometry_msgs::PoseWithCovarianceStampedConstPtr yawmsg)
 {
     MatrixWrapper::ColumnVector x=filter->PostGet()->ExpectedValueGet();
     if(fabs(x(3))>max_yaw_correction_rate)
         return;
-    MatrixWrapper::ColumnVector measurement(1);
-    measurement(1) = tf::getYaw(yawmsg->pose.pose.orientation);
+    updateYaw(tf::getYaw(yawmsg->pose.pose.orientation), yawmsg->pose.covariance[3*6+3]);
+}
 
-    MatrixWrapper::SymmetricMatrix sunCov(1);
-    sunCov(1,1) = yawmsg->pose.covariance[3*6+3];
-    sun_meas_pdf->AdditiveNoiseSigmaSet(sunCov);
-    filter->Update(sys_model,sun_meas_model,measurement);
+void EKFOdometryNode::updateYawImu(sensor_msgs::ImuConstPtr imumsg)
+{
+    updateYaw(tf::getYaw(imumsg->orientation), imumsg->orientation_covariance[8]);
+}
+
+void EKFOdometryNode::updateYaw(double yaw, double cov)
+{
+    MatrixWrapper::ColumnVector x=filter->PostGet()->ExpectedValueGet();
+    MatrixWrapper::ColumnVector measurement(1);
+    measurement(1) = yaw;
+
+    MatrixWrapper::SymmetricMatrix yawCov(1);
+    yawCov(1,1) = cov;
+    yaw_meas_pdf->AdditiveNoiseSigmaSet(yawCov);
+    filter->Update(sys_model,yaw_meas_model,measurement);
 }
 
 }
