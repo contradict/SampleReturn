@@ -278,6 +278,9 @@ class LineMOD_Detector
       cv::linemod::Match m = matches[i];
       ROS_DEBUG("Matching count: %u", i);
 
+      std::cout << "I: " << i << "classes visited: " << classes_visited << std::endl;
+      std::cout << "matches.size: " << (int)matches.size() << "num classes: " <<
+        LineMOD_Detector::num_classes << std::endl;
       if (visited.insert(m.class_id).second)
       {
         ++classes_visited;
