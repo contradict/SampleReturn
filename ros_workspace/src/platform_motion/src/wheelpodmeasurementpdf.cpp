@@ -36,16 +36,17 @@ MatrixWrapper::Matrix
 WheelPodMeasurementPdf::dfGet(unsigned int i) const
 {
     MatrixWrapper::Matrix pod_direction = computePodDirections();
-    MatrixWrapper::Matrix df(6,3);
+    MatrixWrapper::Matrix df(6,5);
 
     if(i==0)
     {
-        //[[ dv0/dvx         dv0/dvy         dv0/domega]
-        // [ dv0_perp/dvx    dv0_perp/dvy    dv0_perp/domega]
-        // [ dv1/dvx         dv1/dvy         dv1/domega]
-        // [ dv1_perp/dvx    dv1_perp/dvy    dv1_perp/domega]
-        // [ dv2/dvx         dv2/dvy         dv2/domega]]
-        // [ dv2_perp/dvx    dv2_perp/dvy    dv2_perp/domega]]
+        df = 0.0;
+        //[[ dv0/dvx         dv0/dvy         dv0/domega       dyaw dk]
+        // [ dv0_perp/dvx    dv0_perp/dvy    dv0_perp/domega  dyaw dk]
+        // [ dv1/dvx         dv1/dvy         dv1/domega       dyaw dk]
+        // [ dv1_perp/dvx    dv1_perp/dvy    dv1_perp/domega  dyaw dk]
+        // [ dv2/dvx         dv2/dvy         dv2/domega       dyaw dk]
+        // [ dv2_perp/dvx    dv2_perp/dvy    dv2_perp/domega  dyaw dk]]
 
         df(1,1) =      pod_direction(1,1);
         df(1,2) =      pod_direction(2,1);
