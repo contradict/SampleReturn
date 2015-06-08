@@ -105,8 +105,6 @@ class KVHFOGNode(object):
                 self._averaging_start_time = None
 
     def _send_one(self, now, angle):
-        if self._invert_rotation:
-            angle *= -1
         msg = Imu()
         msg.header.stamp = now
         msg.header.seq = self._seq
@@ -117,14 +115,20 @@ class KVHFOGNode(object):
         if self._gyro.current_mode == self._gyro.MODE_RATE:
             msg.angular_velocity.z = angle - self._rate_bias
             msg.angular_velocity_covariance[8] = (self._sigma_omega*self._sample_period)**2
+            if self._invert_rotation:
+                msg.angular_velocity.z *= -1
         if self._gyro.current_mode == self._gyro.MODE_DTHETA:
             msg.angular_velocity = angle/self._sample_period - self._rate_bias
             msg.angular_velocity_covariance[8] = (self._sigma_omega*self._sample_period)**2
+            if self._invert_rotation:
+                msg.angular_velocity.z *= -1
         if self._gyro.current_mode == self._gyro.MODE_INTEGRATED:
             dt = (now - self._bias_measurement_time).to_sec()
             corrected_angle = angle - self._rate_bias*dt
             msg.orientation.w = cos(corrected_angle/2.0)
             msg.orientation.z = sin(corrected_angle/2.0)
+            if self._invert_rotation:
+                msg.orientation.z *= -1
             msg.orientation_covariance[8] = self._sigma_theta*self._sigma_theta
 
         self._pub.publish(msg)
