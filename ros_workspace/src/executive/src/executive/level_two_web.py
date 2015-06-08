@@ -104,10 +104,6 @@ class LevelTwoWeb(object):
         #lists
         self.state_machine.userdata.spokes = self.spokes
         self.state_machine.userdata.raster_points = deque()
-        
-        #store the intial planned goal in map, check for the need to replan
-        self.state_machine.userdata.move_point_map = None
-        self.replan_threshold = node_params.replan_threshold
 
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
@@ -128,6 +124,10 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.platform_point = self.platform_point
         self.beacon_calibration_delay = node_params.beacon_calibration_delay
         self.gyro_calibration_delay = node_params.gyro_calibration_delay
+        #store the intial planned goal in map, check for the need to replan
+        self.state_machine.userdata.move_point_map = None
+        self.replan_threshold = node_params.replan_threshold
+        self.recalibrate_threshold = node_params.recalibrate_threshold
         
         #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
@@ -247,6 +247,7 @@ class LevelTwoWeb(object):
                                                   'timeout':'WEB_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED'})  
             
+            '''
             #request kvh_fog node to measure and set the current bias.
             #only do this while stopped!
             kvh_request = kvh_fog_srv.MeasureBiasRequest(self.gyro_calibration_delay)
@@ -255,7 +256,8 @@ class LevelTwoWeb(object):
                                                             kvh_fog_srv.MeasureBias,
                                                             request = kvh_request),
                                     transitions = {'succeeded':'WEB_MANAGER', 
-                                                    'aborted':'LEVEL_TWO_ABORTED'})
+                                                   'aborted':'LEVEL_TWO_ABORTED'})
+            '''
             
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
