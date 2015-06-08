@@ -50,6 +50,8 @@
         <param name="wheel_diameter" type="double" value="0.3112"/>
 
         <param name="status_publish_interval" type="double" value="1.0"/>
+
+        <remap from="/motion/odometry/imu_yaw" to="/io/kvh/imu"/>
     </node>
 
     <node name="odometry"
