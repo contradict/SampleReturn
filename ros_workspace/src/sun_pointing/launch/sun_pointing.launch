@@ -9,7 +9,7 @@
     type="compute_angle_server.py"
     ns="/processes/compute_sun_angle">
 
-    <param name="spin_velocity" value="0.2"/>
+    <param name="spin_velocity" value="0.3"/>
     <param name="odometry_frame" value="odom"/>
     <param name="yaw_update_period" value="0.05"/>
 
