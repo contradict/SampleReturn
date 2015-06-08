@@ -159,6 +159,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.beacon_point = None
         self.state_machine.userdata.recovery_requested = False
+        self.state_machine.userdata.map_calibration_requested = False
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
@@ -413,6 +414,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
                                    transitions = {'recovery':'RECOVERY_MANAGER',
+                                                  'calibrate':'RECOVERY_MANAGER',
                                                   'exit':'preempted'})
             
             smach.StateMachine.add('LEVEL_TWO_ABORTED',
@@ -531,10 +533,15 @@ class LevelTwoWeb(object):
             
             if self.vfh_mover.get_state() in util.actionlib_working_states:
                 
+                '''
                 if (correction_error > self.recalibrate_threshold):
-                    self.announcer.say("Large beacon correction, recalibrate ing.")
+                    self.announcer.say("Large beacon correction. Calibrate ing.")
+                    self.state_machine.userdata.map_calibration_requested = True
+                    self.state_machine.userdata.beacon_point = self.last_beacon_point
+                    self.state_machine.request_preempt()
+                '''
                 
-                elif (correction_error > self.replan_threshold):
+                if (correction_error > self.replan_threshold):
                     self.announcer.say("Beacon correction.")
                     #update the VFH move goal
                     goal = deepcopy(self.state_machine.userdata.move_goal)
@@ -1052,15 +1059,19 @@ class MoveMUX(smach.State):
 class LevelTwoPreempted(smach.State):
     def __init__(self):
         smach.State.__init__(self,
-                             input_keys = ['recovery_requested'],
+                             input_keys = ['recovery_requested',
+                                           'map_calibration_requested'],
                              output_keys = ['move_point_map'],
-                             outcomes=['recovery','exit'])
+                             outcomes=['recovery', 'calibrate', 'exit'])
         
     def execute(self, userdata):
         
+        userdata.move_point_map = None
+        
         if userdata.recovery_requested:
-            userdata.move_point_map = None
             return 'recovery'
+        elif userdata.map_calibration_requested:
+            return 'calibrate'
         
         return 'exit'
 
