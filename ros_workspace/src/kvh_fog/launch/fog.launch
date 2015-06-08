@@ -19,7 +19,7 @@
         <param name="lattitude" type="double" value="42.2750873" />
         <!-- if not specified, default to local earth rate-->
         <!--
-        <param name="bias" type="double" value="0.000106659"/>
         -->
+        <param name="bias" type="double" value="-5.12e-5"/>
      </node>
 </launch>
