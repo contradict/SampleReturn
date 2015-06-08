@@ -10,7 +10,7 @@ from sensor_msgs.msg import Imu
 class KVHFOGNode(object):
     def __init__(self):
         self._port = rospy.get_param("port", "/dev/ttyUSB0")
-        self._discard_count = rospy.get_param("discard_cout", 10)
+        self._discard_count = rospy.get_param("discard_count", 10)
         self._reopen_delay = rospy.get_param("reopen_delay", 30)
         self._frame_id = rospy.get_param("frame_id", "gyro")
         # DSP3000 async has 100Hz update rate
