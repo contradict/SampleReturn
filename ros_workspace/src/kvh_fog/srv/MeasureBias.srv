@@ -1,0 +1,6 @@
+# seconds
+float64 averaging_time
+---
+bool success
+# radians/second
+float64 measured_bias
