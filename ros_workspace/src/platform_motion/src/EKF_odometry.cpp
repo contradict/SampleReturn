@@ -162,6 +162,7 @@ void EKFOdometryNode::computeOdometry(struct odometry_measurements &data, const 
     MatrixWrapper::ColumnVector OdometryFrameVelocity = R*posterior.sub(1,2);
     odom_position[0] += OdometryFrameVelocity(1);
     odom_position[1] += OdometryFrameVelocity(2);
+    odom_orientation = posterior(4);
     odom_velocity[0] = posterior(1)/data.interval;
     odom_velocity[1] = posterior(2)/data.interval;
     odom_omega = posterior(3)/data.interval;
