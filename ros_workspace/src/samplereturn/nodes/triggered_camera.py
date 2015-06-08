@@ -37,7 +37,7 @@ class TriggeredCamera(object):
         self.trigger_count = 0
         self.image_count = 0
         self.missing_image_count = 0
-        self.enabled = True
+        self.enabled = False
         self.paused = False
         self.trigger_rate = rospy.get_param('~rate', 1.0)
         self.time_offset = rospy.get_param('~capture_delay', 0.0)
