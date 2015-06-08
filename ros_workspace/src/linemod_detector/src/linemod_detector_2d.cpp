@@ -407,26 +407,27 @@ class LineMOD_Detector
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::COLORED_BALL);
           }
-          if (m.class_id == "metal_star" &&
-              dominant_color!="brown")
+          if (m.class_id == "metal_star")
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::METAL_1);
           }
-          if (m.class_id == "metal_pi" &&
-              dominant_color!="brown")
+          if (m.class_id == "metal_pi" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::METAL_1);
           }
-          if (m.class_id == "metal_tree" &&
-              dominant_color!="brown")
+          if (m.class_id == "metal_tree" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::METAL_1);
           }
-          if (m.class_id == "metal_lines" &&
-              dominant_color!="brown")
+          if (m.class_id == "metal_lines" )
+          {
+            LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
+                angle, samplereturn_msgs::NamedPoint::METAL_1);
+          }
+          if (m.class_id == "metal_square" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::METAL_1);
