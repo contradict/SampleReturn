@@ -8,9 +8,9 @@
     machine="search"
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/image"/>
-    <rosparam param="interior_colors">[red, pink, purple, white, blue]
+    <rosparam param="interior_colors">[red, pink, purple, white, blue, yellow, gray, orange]
     </rosparam>
-    <rosparam param="exterior_colors">[green]
+    <rosparam param="exterior_colors">[green, brown]
     </rosparam>
     <param name="bms_opening_width" type="int" value="7"/>
     <param name="bms_thresh" type="double" value="20"/>
