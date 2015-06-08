@@ -41,6 +41,7 @@
             /io/microstrain_3dm_gx3_35/imu
             /io/microstrain_3dm_gx3_35/gps
             /io/microstrain_3dm_gx3_35/magnetometer
+            /io/kvh/imu
             /motion/odometry
             /motion/platform_joint_state
             /motion/carousel/angle
