@@ -686,7 +686,7 @@ class RobotSimulator(object):
             #then load the beacon pose (in true map), and transform to search_camera_lens
             try:
                 beacon_trans, beacon_quat = \
-                            self.tf_listener.lookupTransform(self.reality_frame,
+                            self.tf_listener.lookupTransform(self.sim_map,
                                                              'beacon',
                                                              rospy.Time(0))
                 now = self.tf_listener.getLatestCommonTime('search_camera_lens',
