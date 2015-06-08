@@ -3,6 +3,8 @@
 <!-- -*- mode: XML -*- -->
 <launch>
 
+    <arg name="beacon_description" default="$(find samplereturn)/urdf/beacon.urdf"/>
+
     <node name="april_beacon_finder"
         type="beacon_april_node"
         pkg="beacon_finder"
@@ -72,7 +74,7 @@
 
     </node>
 
-    <param name="/processes/beacon/robot_description" textfile="$(find samplereturn)/urdf/beacon.urdf"/>
+    <param name="/processes/beacon/robot_description" textfile="$(arg beacon_description)"/>
 
     <node name="beacon_publisher"
           machine="search" 

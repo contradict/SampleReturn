@@ -4,6 +4,7 @@
 
     <arg name="odometry_frame" value="odom"/>
     <arg name="world_fixed_frame" value="sim_map"/>
+    <arg name="beacon_description" value="$(find samplereturn)/urdf/sim_beacon.urdf"/> 
     <arg name="beacon_localization" value="true"/>
     <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
     
@@ -74,7 +75,9 @@
         <param name="publish_frequency" type="double" value="10"/>
     </node>
 
-    <include file="$(find beacon_finder)/launch/april_beacon_finder.launch"/>
+    <include file="$(find beacon_finder)/launch/april_beacon_finder.launch">
+        <arg name="beacon_description" value="$(arg beacon_description)"/>
+    </include>
 
     <group if="$(arg beacon_localization)">
         <include file="$(find beacon_localizer)/launch/beacon_localizer.launch">
