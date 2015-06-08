@@ -1,7 +1,7 @@
 #camera ignore params, to allow testing without certain cameras
 executive_master:
     ignore_search_camera: True
-    ignore_manipulator_camera: False
+    ignore_manipulator_camera: True
         
 level_two:
     #for search  behaviour, degrees and meters
