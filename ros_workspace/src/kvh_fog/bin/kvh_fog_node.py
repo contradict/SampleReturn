@@ -21,7 +21,10 @@ class KVHFOGNode(object):
         self._sigma_theta = rospy.get_param("sigma_theta",
                 radians(1.0)/3600.)
         lat = rospy.get_param("lattitude", 34.156406)
-        self._rate_bias = driver.EARTH_RATE*sin(radians(lat))
+        if rospy.has_param("bias"):
+            self._rate_bias = rospy.get_param("bias")
+        else:
+            self._rate_bias = driver.EARTH_RATE*sin(radians(lat))
         self._gyro = None
         self._seq = 0
 
