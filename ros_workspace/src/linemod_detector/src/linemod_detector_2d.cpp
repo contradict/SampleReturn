@@ -295,8 +295,8 @@ class LineMOD_Detector
         ++classes_visited;
       }
     }
-    std::cout << "Best match similarity: " << best_match_similarity << std::endl;
-    std::cout << "Best match idx: " << best_match_idx << std::endl;
+    //std::cout << "Best match similarity: " << best_match_similarity << std::endl;
+    //std::cout << "Best match idx: " << best_match_idx << std::endl;
     if (best_match_idx == -1) {
       if(_publish_debug_img)
       {
@@ -346,7 +346,7 @@ class LineMOD_Detector
 
         if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
             m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
-            m.class_id == "metal_box") {
+            m.class_id == "metal_square") {
           hull = floodFillHull(hull, display);
         }
         cv::RotatedRect rect = cv::minAreaRect(hull);
