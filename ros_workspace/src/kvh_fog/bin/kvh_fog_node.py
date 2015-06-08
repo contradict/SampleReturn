@@ -25,6 +25,7 @@ class KVHFOGNode(object):
             self._rate_bias = rospy.get_param("bias")
         else:
             self._rate_bias = driver.EARTH_RATE*sin(radians(lat))
+        self._invert_rotation = rospy.get_param("invert_rotation", False)
         self._gyro = None
         self._seq = 0
 
@@ -104,6 +105,8 @@ class KVHFOGNode(object):
                 self._averaging_start_time = None
 
     def _send_one(self, now, angle):
+        if self._invert_rotation:
+            angle *= -1
         msg = Imu()
         msg.header.stamp = now
         msg.header.seq = self._seq

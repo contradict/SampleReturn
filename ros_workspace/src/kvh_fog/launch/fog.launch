@@ -21,5 +21,6 @@
         <!--
         -->
         <param name="bias" type="double" value="-5.12e-5"/>
+        <param name="invert_rotation" type="bool" value="true"/>
      </node>
 </launch>
