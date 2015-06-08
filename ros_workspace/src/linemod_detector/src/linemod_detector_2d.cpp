@@ -298,6 +298,12 @@ class LineMOD_Detector
     std::cout << "Best match similarity: " << best_match_similarity << std::endl;
     std::cout << "Best match idx: " << best_match_idx << std::endl;
     if (best_match_idx == -1) {
+      if(_publish_debug_img)
+      {
+          sensor_msgs::ImagePtr debugmsg = cv_bridge::CvImage(color_ptr->header, color_ptr->encoding, display).toImageMsg();
+          debug_img_pub.publish(debugmsg);
+      }
+
       LineMOD_Detector::sources.clear();
       return;
     }
@@ -541,8 +547,8 @@ class LineMOD_Detector
       float length = std::sqrt(pow(offset_x,2)+pow(offset_y,2));
       cv::Point offset_pt((hull[i].x+10*(offset_x/length)),
                           (hull[i].y+10*(offset_y/length)));
-      cv::Point trunc_offset_pt((offset_pt.x>=color_image.cols)?color_image.cols:offset_pt.x,
-                                (offset_pt.y>=color_image.rows)?color_image.rows:offset_pt.y);
+      cv::Point trunc_offset_pt((offset_pt.x>=color_image.cols)?(color_image.cols-1):offset_pt.x,
+                                (offset_pt.y>=color_image.rows)?(color_image.rows-1):offset_pt.y);
       cv::Mat mask;
       mask = cv::Mat::zeros(color_image.rows+2, color_image.cols+2, CV_8UC1);
       cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
