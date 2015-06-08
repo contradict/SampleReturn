@@ -53,6 +53,12 @@ class SaliencyDetectorNode
   bool filter_by_real_area_;
   double min_real_area_;
   double max_real_area_;
+  double min_real_area_redpinkpurple_;
+  double max_real_area_redpinkpurple_;
+  double min_real_area_bluewhitegray_;
+  double max_real_area_bluewhitegray_;
+  double min_real_area_yellow_;
+  double max_real_area_yellow_;
 
   XmlRpc::XmlRpcValue interior_colors_, exterior_colors_;
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
@@ -205,7 +211,7 @@ class SaliencyDetectorNode
         float scale = cv_ptr->image.cols/bms_img_width_;
         cv::Point3d ray =
           cam_model_.projectPixelTo3dRay(cv::Point2d(kp[i].pt.x*scale,(kp[i].pt.y*scale+bms_top_trim_)));
-        if(!checkContourSize(sub_mask,ray,scale,msg->header))
+        if(!checkContourSize(sub_mask,ray,scale,msg->header,dominant_color))
             continue;
         cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
         cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
@@ -232,7 +238,8 @@ class SaliencyDetectorNode
     saliency_mutex_.unlock();
   }
 
-  bool checkContourSize(const cv::Mat region, const cv::Point3d ray, float scale, const std_msgs::Header header)
+  bool checkContourSize(const cv::Mat region, const cv::Point3d ray, float scale,
+      const std_msgs::Header header, string color)
   {
       std::vector<std::vector<cv::Point> > contours;
       std::vector<cv::Vec4i> hierarchy;
@@ -274,6 +281,30 @@ class SaliencyDetectorNode
       // Convert from square meters to square cm for more human-readable numbers
       realArea *= 10000;
 
+      if ((color == "red") || (color == "pink") || (color == "purple")) {
+        if ((realArea < max_real_area_redpinkpurple_) && (realArea > min_real_area_redpinkpurple_)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
+      if ((color == "blue") || (color == "white") || (color == "gray")) {
+        if ((realArea < max_real_area_bluewhitegray_) && (realArea > min_real_area_bluewhitegray_)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
+      if (color == "yellow") {
+        if ((realArea < max_real_area_yellow_) && (realArea > min_real_area_yellow_)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
       if ((realArea < max_real_area_) && (realArea > min_real_area_)) {
         return true;
       }
@@ -320,6 +351,13 @@ class SaliencyDetectorNode
     filter_by_real_area_ = config.filterbyRealArea;
     min_real_area_ = config.minRealArea;
     max_real_area_ = config.maxRealArea;
+
+    min_real_area_redpinkpurple_ = config.minRealArea_redpinkpurple;
+    max_real_area_redpinkpurple_ = config.maxRealArea_redpinkpurple;
+    min_real_area_bluewhitegray_ = config.minRealArea_bluewhitegray;
+    max_real_area_bluewhitegray_ = config.maxRealArea_bluewhitegray;
+    min_real_area_yellow_ = config.minRealArea_yellow;
+    max_real_area_yellow_ = config.maxRealArea_yellow;
 
     saliency_mutex_.unlock();
   }

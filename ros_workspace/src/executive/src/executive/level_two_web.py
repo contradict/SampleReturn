@@ -25,6 +25,7 @@ import geometry_msgs.msg as geometry_msg
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import visualization_msgs.msg as vis_msg
+import kvh_fog.srv as kvh_fog_srv
 
 import motion_planning.simple_motion as simple_motion
 
@@ -35,6 +36,9 @@ from executive.executive_states import ExecuteVFHMove
 from executive.executive_states import WaitForFlagState
 from executive.beacon_return_states import BeaconReturn
 from executive.beacon_return_states import CalculateMountMove
+
+from kvh_fog.srv import MeasureBias, MeasureBiasRequest, MeasureBiasResponse
+
 
 import samplereturn.util as util
 
@@ -61,7 +65,9 @@ class LevelTwoWeb(object):
  
         #need platform point
         header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
-        platform_point = geometry_msg.Point( 0, 0, 0)
+        platform_point = geometry_msg.Point(node_params.platform_point['x'],
+                                            node_params.platform_point['y'], 0)
+                                            
         self.platform_point = geometry_msg.PointStamped(header, platform_point)
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
@@ -71,6 +77,8 @@ class LevelTwoWeb(object):
         geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
         pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
         self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
+        self.last_beacon_point = None
+        self.last_correction_error = 0
         
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")
@@ -98,10 +106,6 @@ class LevelTwoWeb(object):
         #lists
         self.state_machine.userdata.spokes = self.spokes
         self.state_machine.userdata.raster_points = deque()
-        
-        #store the intial planned goal in map, check for the need to replan
-        self.state_machine.userdata.move_point_map = None
-        self.replan_threshold = node_params.replan_threshold
 
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
@@ -115,11 +119,17 @@ class LevelTwoWeb(object):
         #dismount move
         self.state_machine.userdata.dismount_move = node_params.dismount_move
 
-        #beacon approach
+        #beacon and localization
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
         self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
+        self.beacon_calibration_delay = node_params.beacon_calibration_delay
+        self.gyro_calibration_delay = node_params.gyro_calibration_delay
+        #store the intial planned goal in map, check for the need to replan
+        self.state_machine.userdata.move_point_map = None
+        self.replan_threshold = node_params.replan_threshold
+        self.recalibrate_threshold = node_params.recalibrate_threshold
         
         #search parameters
         self.state_machine.userdata.move_velocity = node_params.move_velocity
@@ -222,12 +232,34 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('LOOK_AT_BEACON',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'WEB_MANAGER',
-                                                  'object_detected':'WEB_MANAGER',
+                                   transitions = {'complete':'CALIBRATE_TO_BEACON',
+                                                  'object_detected':'CALIBRATE_TO_BEACON',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'simple_move':'half_turn',
                                                 'stop_on_detection':'false'})
+            
+            smach.StateMachine.add('CALIBRATE_TO_BEACON',
+                                   WaitForFlagState('false',
+                                                    flag_trigger_value = 'true',
+                                                    timeout = self.beacon_calibration_delay,
+                                                    announcer = self.announcer,
+                                                    start_message ='Calibrate ing to beacon.'),
+                                   transitions = {'next':'WEB_MANAGER',
+                                                  'timeout':'WEB_MANAGER',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})  
+            
+            '''
+            #request kvh_fog node to measure and set the current bias.
+            #only do this while stopped!
+            kvh_request = kvh_fog_srv.MeasureBiasRequest(self.gyro_calibration_delay)
+            smach.StateMachine.add('CALIBRATE_GYRO',
+                                    smach_ros.ServiceState('measure_bias',
+                                                            kvh_fog_srv.MeasureBias,
+                                                            request = kvh_request),
+                                    transitions = {'succeeded':'WEB_MANAGER', 
+                                                   'aborted':'LEVEL_TWO_ABORTED'})
+            '''
             
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
@@ -351,7 +383,7 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('WAIT_FOR_PREEMPT',
                                    WaitForFlagState('false',
-                                                    flag_trigger_value = 'manual',
+                                                    flag_trigger_value = 'true',
                                                     timeout = 20,
                                                     announcer = self.announcer,
                                                     start_message ='Level two complete.'),
@@ -415,7 +447,7 @@ class LevelTwoWeb(object):
         rospy.Service("start_recovery", samplereturn_srv.RecoveryParameters, self.start_recovery)
         
         #start a timer loop to check for localization updates
-        rospy.Timer(rospy.Duration(5.0), self.localization_check)
+        rospy.Timer(rospy.Duration(2.0), self.localization_check)
         
         #start action servers and services
         sls.start()
@@ -461,10 +493,10 @@ class LevelTwoWeb(object):
         rospy.logdebug("LEVEL_TWO report_beacon: {!s}, \
                        received beacon pose: {!s}".format(self.state_machine.userdata.report_beacon,
                                                           beacon_pose))
-        if self.state_machine.userdata.report_beacon:
-            beacon_point = geometry_msg.PointStamped(beacon_pose.header,
+        self.last_beacon_point = geometry_msg.PointStamped(beacon_pose.header,
                                                      beacon_pose.pose.pose.position)
-            self.state_machine.userdata.detection_message = beacon_point
+        if self.state_machine.userdata.report_beacon:
+            self.state_machine.userdata.detection_message = self.last_beacon_point
     
     def localization_check(self, event):        
         
@@ -492,15 +524,23 @@ class LevelTwoWeb(object):
             correction_error = util.point_distance_2d(goal_point_odom,
                                                       saved_point_odom.point)
             
-            rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+            if (np.abs(correction_error-self.last_correction_error) > 0.1):
+                rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+
+            self.last_correction_error = correction_error
             
-            if (correction_error > self.replan_threshold) \
-            and self.vfh_mover.get_state() in util.actionlib_working_states:
-                self.announcer.say("Beacon correction.")
-                #update the VFH move goal
-                goal = deepcopy(self.state_machine.userdata.move_goal)
-                goal.target_pose.pose.position = saved_point_odom.point
-                self.state_machine.userdata.move_goal = goal                
+            if self.vfh_mover.get_state() in util.actionlib_working_states:
+                
+                if (correction_error > self.recalibrate_threshold):
+                    self.announcer.say("Large beacon correction, recalibrate ing.")
+                
+                elif (correction_error > self.replan_threshold):
+                    self.announcer.say("Beacon correction.")
+                    #update the VFH move goal
+                    goal = deepcopy(self.state_machine.userdata.move_goal)
+                    goal.target_pose.pose.position = saved_point_odom.point
+                    self.state_machine.userdata.move_goal = goal                
+                    
 
     def get_spokes(self, spoke_count, spoke_length, offset, hub_radius, direction):
         #This creates a list of dictionaries.  The yaw entry is a useful piece of information
