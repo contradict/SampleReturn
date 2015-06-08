@@ -120,6 +120,7 @@ install(PROGRAMS
 
 ## Mark executables and/or libraries for installation
 install(TARGETS kalman_filter_node dslr_kalman_filter_node
+    manipulator_kalman_filter_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
