@@ -9,23 +9,24 @@ from sensor_msgs.msg import Imu
 
 class KVHFOGNode(object):
     def __init__(self):
-        self._port = rospy.get_param("port", "/dev/ttyUSB0")
-        self._discard_count = rospy.get_param("discard_count", 10)
-        self._reopen_delay = rospy.get_param("reopen_delay", 30)
-        self._frame_id = rospy.get_param("frame_id", "gyro")
+        self._port = rospy.get_param("~port", "/dev/ttyUSB0")
+        self._discard_count = rospy.get_param("~discard_count", 10)
+        self._reopen_delay = rospy.get_param("~reopen_delay", 30)
+        self._frame_id = rospy.get_param("~frame_id", "gyro")
         # DSP3000 async has 100Hz update rate
-        self._sample_period = rospy.get_param("sample_period", 0.010)
-        self._sigma_omega = rospy.get_param("sigma_omega",
+        self._sample_period = rospy.get_param("~sample_period", 0.010)
+        self._sigma_omega = rospy.get_param("~sigma_omega",
                 radians(0.0667)/3600.)
         # based on bias stability of 1 degree/hour
-        self._sigma_theta = rospy.get_param("sigma_theta",
+        self._sigma_theta = rospy.get_param("~sigma_theta",
                 radians(1.0)/3600.)
-        lat = rospy.get_param("lattitude", 34.156406)
-        if rospy.has_param("bias"):
-            self._rate_bias = rospy.get_param("bias")
+        lat = rospy.get_param("~lattitude", 34.156406)
+        if rospy.has_param("~bias"):
+            self._rate_bias = rospy.get_param("~bias")
         else:
             self._rate_bias = driver.EARTH_RATE*sin(radians(lat))
-        self._invert_rotation = rospy.get_param("invert_rotation", False)
+        self._invert_rotation = rospy.get_param("~invert_rotation", False)
+        rospy.loginfo("Invert: %s", self._invert_rotation)
         self._gyro = None
         self._seq = 0
 
