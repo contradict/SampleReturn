@@ -67,13 +67,13 @@ catkin_python_setup()
 #)
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-   DEPENDENCIES
-   geometry_msgs
-   actionlib_msgs
-   std_msgs
-   std_msgs  # Or other packages containing msgs
-)
+# generate_messages(
+#    DEPENDENCIES
+#    geometry_msgs
+#    actionlib_msgs
+#    std_msgs
+#    std_msgs  # Or other packages containing msgs
+# )
 
 ###################################
 ## catkin specific configuration ##
