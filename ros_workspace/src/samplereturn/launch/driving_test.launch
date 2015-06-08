@@ -40,7 +40,9 @@
     <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
     <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
     <include file="$(find motion_planning)/launch/motion_planning.launch"/>
+    <!--
     <include file="$(find samplereturn)/launch/imu.launch"/>
+    -->
     <include file="$(find kvh_fog)/launch/fog.launch"/>
     <include file="$(find beacon_finder)/launch/april_beacon_finder.launch"/>
 
