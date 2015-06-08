@@ -124,7 +124,8 @@ add_executable(solar_fisheye_node src/solar_fisheye_node.cpp)
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(solar_fisheye_node solar_fisheye_generate_messages_cpp)
 # Generate dynamic reconfigure first
-add_dependencies(solar_fisheye solar_fisheye_gencfg)
+add_dependencies(${PROJECT_NAME} solar_fisheye_gencfg)
+add_dependencies(solar_fisheye_node solar_fisheye_gencfg)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(solar_fisheye_node
