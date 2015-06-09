@@ -3,7 +3,7 @@
 <launch>
 
     <!--Important arg, start the system paused? -->
-    <arg name="start_paused" default="False"/>
+    <arg name="start_paused" default="True"/>
     <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
 
     <arg name="user" default="robot"/>
