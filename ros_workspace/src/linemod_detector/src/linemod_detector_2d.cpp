@@ -415,13 +415,14 @@ class LineMOD_Detector
           }
           if (m.class_id == "pink_tennis_ball" &&
               (dominant_color=="pink" || dominant_color=="white" || dominant_color=="red" ||
-               dominant_color=="orange" || dominant_color=="purple"))
+               dominant_color=="orange" || dominant_color=="purple" ||
+               dominant_color=="brown"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, rect.center, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
           }
           if (m.class_id == "colored_ball" &&
-              dominant_color!="brown" && dominant_color!="white" && dominant_color!="gray")
+              dominant_color!="brown" && dominant_color!="gray")
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, rect.center, samplereturn_msgs::NamedPoint::COLORED_BALL);
