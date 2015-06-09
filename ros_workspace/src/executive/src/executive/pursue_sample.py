@@ -242,6 +242,13 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'ENABLE_HARD_MANIPULATOR_DETECTOR',
+                                                    'aborted':'PUBLISH_FAILURE'})
+            
+            smach.StateMachine.add('ENABLE_HARD_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
                                      transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
                                                     'aborted':'PUBLISH_FAILURE'})
             
@@ -393,6 +400,13 @@ class PursueSample(object):
             #beginning of clean exit path
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'DISABLE_HARD_MANIPULATOR_DETECTOR',
+                                                    'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'})
+            
+            smach.StateMachine.add('DISABLE_HARD_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'ANNOUNCE_CONTINUE',
