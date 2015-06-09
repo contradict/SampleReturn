@@ -100,6 +100,8 @@ class LineMOD_Detector
   float min_count;
   bool hard_samples;
   bool _publish_debug_img;
+  double max_hull_area_;
+  double min_hull_area_;
 
   ColorNaming cn;
   //image_geometry::PinholeCameraModel cam_model_;
@@ -137,6 +139,8 @@ class LineMOD_Detector
     ros::param::get("~hard_samples", LineMOD_Detector::hard_samples);
     ros::param::param<bool>("~publish_debug_img", _publish_debug_img, true);
     ros::param::param<std::string>("~detection_frame_id", _detection_frame_id, "odom");
+    ros::param::param<double>("~max_hull_area", max_hull_area_, 18000);
+    ros::param::param<double>("~min_hull_area", min_hull_area_, 2500);
 
     ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
@@ -352,8 +356,6 @@ class LineMOD_Detector
           // Do some area checks to make sure nothing crazy was fit
           double hull_area = cv::contourArea(hull);
           double max_hull_area_, min_hull_area_;
-          max_hull_area_ = 18000;
-          min_hull_area_ = 2500;
           if ((hull_area > max_hull_area_) || (hull_area < min_hull_area_)) {
             return;
           }
