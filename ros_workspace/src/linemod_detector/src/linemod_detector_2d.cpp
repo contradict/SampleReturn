@@ -150,7 +150,7 @@ class LineMOD_Detector
     }
     std::cout << num_modalities << std::endl;
 
-    enabled_ = true;
+    enabled_ = false;
     got_right_camera_info_ = false;
     got_disp_ = false;
   }
