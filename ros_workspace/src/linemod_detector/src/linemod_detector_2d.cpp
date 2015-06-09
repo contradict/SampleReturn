@@ -493,12 +493,13 @@ class LineMOD_Detector
           ROS_ERROR("No disparities present, cannot emit point.");
           return;
       }
-      std::cout << "Median Disp: " << median_disp << std::endl;
+      ROS_DEBUG("Median Disp: %f", median_disp);
 
       cam_model_.projectDisparityTo3d(cv::Point2d(m.x+templates[1].width/2,m.y+templates[1].height/2),
           median_disp, xyz);
       temp_point.point.x = xyz.x;
       temp_point.point.y = xyz.y;
+      ROS_DEBUG("Projected z: %f", xyz.z);
       if (xyz.z > max_depth) {
         temp_point.point.z = max_depth;
         temp_point.point.x /= (xyz.z/max_depth);
