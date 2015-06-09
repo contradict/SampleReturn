@@ -142,8 +142,6 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.raster_offset = node_params.raster_offset
         self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
-        self.state_machine.userdata.blocked_retried = False
-        self.state_machine.userdata.blocked_limit = 2
 
         #web management flags
         self.state_machine.userdata.outbound = True
@@ -190,7 +188,7 @@ class LevelTwoWeb(object):
                                                              'spin_velocity'],
                                                  output_keys=['action_result',
                                                               'simple_move',
-                                                              'half_turn'],
+                                                              'beacon_turn'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -237,7 +235,7 @@ class LevelTwoWeb(object):
                                                   'object_detected':'CALIBRATE_TO_BEACON',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'half_turn',
+                                   remapping = {'simple_move':'beacon_turn',
                                                 'stop_on_detection':'false'})
             
             smach.StateMachine.add('CALIBRATE_TO_BEACON',
@@ -246,9 +244,16 @@ class LevelTwoWeb(object):
                                                     timeout = self.beacon_calibration_delay,
                                                     announcer = self.announcer,
                                                     start_message ='Calibrate ing to beacon.'),
-                                   transitions = {'next':'WEB_MANAGER',
-                                                  'timeout':'WEB_MANAGER',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED'})  
+                                   transitions = {'next':'FINISH_CALIBRATION',
+                                                  'timeout':'FINISH_CALIBRATION',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})
+            
+            smach.StateMachine.add('FINISH_CALIBRATION',
+                                   FinishCalibration(input_keys = ['map_calibration_requested'],
+                                                     output_keys = ['map_calibration_requested'],
+                                                     outcomes = ['first', 'recalibration']),
+                                   transitions = {'first':'WEB_MANAGER',
+                                                  'recalibration':'CREATE_MOVE_GOAL',})
             
             '''
             #request kvh_fog node to measure and set the current bias.
@@ -302,7 +307,7 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('ANNOUNCE_BLOCKED',
                                    AnnounceState(self.announcer, 'Path Blocked.'),
-                                   transitions = {'next':'MOVE_MUX'})
+                                                 transitions = {'next':'MOVE_MUX'})
             
             smach.StateMachine.add('ANNOUNCE_ROTATE_TO_CLEAR',
                                    AnnounceState(self.announcer, 'Started Blocked.'),
@@ -411,10 +416,15 @@ class LevelTwoWeb(object):
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_detection':'false'})
             
+            smach.StateMachine.add('CALCULATE_BEACON_ROTATION',
+                                   CalculateBeaconRotation(self.tf_listener),
+                                   transitions = {'next':'LOOK_AT_BEACON',
+                                                  'aborted':'CREATE_MOVE_GOAL'})
+            
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(),
                                    transitions = {'recovery':'RECOVERY_MANAGER',
-                                                  'calibrate':'RECOVERY_MANAGER',
+                                                  'calibrate':'CALCULATE_BEACON_ROTATION',
                                                   'exit':'preempted'})
             
             smach.StateMachine.add('LEVEL_TWO_ABORTED',
@@ -505,7 +515,7 @@ class LevelTwoWeb(object):
         saved_point_map = self.state_machine.userdata.move_point_map
         
         #if the VFH server is active, and the beacon correction is large enough, change the goal
-        if (saved_point_map is not None):
+        if saved_point_map is not None:
 
             goal_point_odom = self.state_machine.userdata.move_goal.target_pose.pose.position
 
@@ -527,21 +537,22 @@ class LevelTwoWeb(object):
                                                       saved_point_odom.point)
             
             if (np.abs(correction_error-self.last_correction_error) > 0.1):
-                rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+                rospy.loginfo("LEVEL_TWO localization correction error: {:f}".format(correction_error))
 
             self.last_correction_error = correction_error
             
             if self.vfh_mover.get_state() in util.actionlib_working_states:
                 
-                '''
                 if (correction_error > self.recalibrate_threshold):
-                    self.announcer.say("Large beacon correction. Calibrate ing.")
-                    self.state_machine.userdata.map_calibration_requested = True
+                    rospy.loginfo("LEVEL_TWO handling large beacon correction.")
+                    self.announcer.say("Large beacon correction.")
                     self.state_machine.userdata.beacon_point = self.last_beacon_point
+                    self.state_machine.userdata.map_calibration_requested = True
+                    self.state_machine.userdata.move_point_map = None
                     self.state_machine.request_preempt()
-                '''
                 
-                if (correction_error > self.replan_threshold):
+                elif (correction_error > self.replan_threshold):
+                    rospy.loginfo("LEVEL_TWO replan for small beacon correction.")
                     self.announcer.say("Beacon correction.")
                     #update the VFH move goal
                     goal = deepcopy(self.state_machine.userdata.move_goal)
@@ -597,7 +608,7 @@ class StartLeveLTwo(smach.State):
         userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                               **userdata.dismount_move)
         
-        userdata.half_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+        userdata.beacon_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
                                              angle = np.pi,
                                              velocity = userdata.spin_velocity)
 
@@ -649,6 +660,7 @@ class WebManager(smach.State):
         userdata.stop_on_detection = True
       
         if rospy.Time.now() > userdata.return_time:
+            rospy.loginfo("WEB_MANAGER exceeded return_time")
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
             userdata.stop_on_detection = False
@@ -662,7 +674,7 @@ class WebManager(smach.State):
             spoke = userdata.spokes.popleft()
             #there is an extra spoke at the end
             if len(userdata.spokes) == 0:
-                rospy.loginfo("SPOKE MANAGER finished last spoke")
+                rospy.loginfo("WEB_MANAGER finished last spoke")
                 return 'return_home'
             userdata.spoke_yaw = spoke['yaw']
             next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
@@ -1042,6 +1054,48 @@ class RecoveryManager(smach.State):
             userdata.move_target = self.exit_move
             return userdata.recovery_parameters['terminal_outcome'] 
 
+class CalculateBeaconRotation(smach.State):
+    
+    def __init__(self, tf_listener):
+        smach.State.__init__(self,
+                             input_keys = ['beacon_point',
+                                           'spin_velocity',
+                                           'odometry_frame',
+                                           'world_fixed_frame'],
+                             output_keys = ['beacon_turn'],
+                             outcomes = ['next',
+                                         'aborted'])
+        
+        self.tf_listener = tf_listener
+    
+    def execute(self, userdata):
+        point = userdata.beacon_point
+        move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                              angle = 0.0,
+                              velocity = userdata.spin_velocity)
+        
+        try:
+            point_in_odom = self.tf_listener.transformPoint(userdata.odometry_frame,
+                                                            point)
+            point_in_odom.header.stamp = rospy.Time(0)
+            yaw, dist = util.get_robot_strafe(self.tf_listener, point_in_odom)
+            move.angle = yaw
+        except tf.Exception, e:
+            rospy.loginfo("LEVEL_TWO calibration rotation not calculated: {!s}".format(e))
+            return 'aborted'
+                    
+        userdata.beacon_turn = move
+        return 'next'
+
+class FinishCalibration(smach.State):
+    
+    def execute(self, userdata):
+        if userdata.map_calibration_requested:
+            userdata.map_calibration_requested = False
+            return 'recalibration'
+        else:
+            return 'first'
+    
 class MoveMUX(smach.State):
     def __init__(self, manager_list):
         smach.State.__init__(self,

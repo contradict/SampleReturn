@@ -90,7 +90,6 @@ class PursueSample(object):
         self.state_machine.userdata.final_pursuit_step = self.node_params.final_pursuit_step
         self.state_machine.userdata.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.max_pursuit_error = self.node_params.max_pursuit_error        
-        self.state_machine.userdata.max_sample_lost_time = self.node_params.max_sample_lost_time        
         self.state_machine.userdata.sample_yaw_tolerance = np.pi/4
         self.sample_obstacle_check_width = self.node_params.sample_obstacle_check_width
             #latched filter id is the id of the hypothesis that triggered this pursuit

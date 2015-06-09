@@ -155,7 +155,7 @@ class RobotSimulator(object):
         #odometry
         self.odometry_dt = 0.05
         odometry_noise_sigma = np.diag([0.1, 0.1, 0.01, 0.01])
-        self.odometry_noise_mean = [0.0, 0.0, 0.001, 0.0]
+        self.odometry_noise_mean = [0.0, 0.0, 0.0005, 0.0]
         self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
@@ -643,7 +643,6 @@ class RobotSimulator(object):
     def check_beacon_pose(self, event):
         if not self.publish_beacon:
             return
-
                 
         try:
             #get distances and yaws from reality frame origin
