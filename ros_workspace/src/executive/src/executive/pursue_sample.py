@@ -339,8 +339,10 @@ class PursueSample(object):
                     goal.target_bin = userdata.available_small_bins[0]
                     userdata.active_bin_id = goal.target_bin
                 goal.grip_torque = 0.7
-                rospy.loginfo("PURSUE_SAMPLE grab_goal: {!s}, sample_id: {!s}".format(goal,
-                                                                                      userdata.latched_sample.sample_id))
+                rospy.loginfo("PURSUE_SAMPLE target_bin: {!s}, sample_id: {!s},\
+                              goal: {!s}".format(userdata.active_bin_id,
+                                          userdata.latched_sample.sample_id,
+                                          goal))
                 rospy.loginfo("PURSUE_SAMPLE available_small_bins: {!s}".format(userdata.available_small_bins))
                 rospy.loginfo("PURSUE_SAMPLE available_big_bins: {!s}".format(userdata.available_big_bins))
                 return goal
@@ -703,11 +705,11 @@ class ConfirmSampleAcquired(smach.State):
             if (userdata.active_bin_id in userdata.available_small_bins) \
             and (len(userdata.available_small_bins) > 1):
                 used_bin = userdata.available_small_bins.pop(0)
-                rospy.loginfo("PURSUE_SAMPLE marking small bin {!s} as occupied".format(used_bin))
+                rospy.loginfo("PURSUE_SAMPLE removing small_bin: {!s}".format(used_bin))
             if (userdata.active_bin_id in userdata.available_big_bins) \
             and (len(userdata.available_big_bins) > 1):
                 used_bin = userdata.available_big_bins.pop(0)
-                rospy.loginfo("PURSUE_SAMPLE placed sample in bin: {!s}".format(used_bin))
+                rospy.loginfo("PURSUE_SAMPLE removing big_bin: {!s}".format(used_bin))
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
             return 'sample_gone'
         else:

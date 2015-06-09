@@ -214,9 +214,9 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = False,
-                                                    timeout = 15,
+                                                    timeout = 20,
                                                     announcer = self.announcer,
-                                                    start_message ='System is paused. Un pause to continue level two'),
+                                                    start_message ='System is paused. Un pause to begin level two'),
                                    transitions = {'next':'SELECT_PLANNER',
                                                   'timeout':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED'})
