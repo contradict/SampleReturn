@@ -125,7 +125,8 @@ class LineMOD_Detector
     got_color = false;
     K = cv::Mat(3,3,CV_64FC1);
 
-    service_ = nh.advertiseService("enable",&LineMOD_Detector::enable,this);
+    ros::NodeHandle pnh("~");
+    service_ = pnh.advertiseService("enable",&LineMOD_Detector::enable,this);
 
     std::string filename;
     ros::param::get("~template_file", filename);

@@ -19,13 +19,12 @@
       <param name="min_count" type="double" value="100.0"/>
     </node>
 
-    <!--
       <node
         machine="search"
         pkg="linemod_detector"
         type="linemod_detector_2d"
         name="hard_manipulator_linemod_detector_2d"
-        ns="/processes/sample_detection/manipulator/hard">
+        ns="/processes/sample_detection/manipulator">
       <remap from="color" to="/cameras/manipulator/left/rect_color"/>
       <remap from="disparity" to="/cameras/manipulator/disparity"/>
       <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
@@ -37,7 +36,6 @@
       <param name="min_count" type="double" value="100.0"/>
       <param name="hard_samples" type="bool" value="True"/>
     </node>
-    -->
 
   <node
     machine="search"
