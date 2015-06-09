@@ -537,14 +537,14 @@ class LevelTwoWeb(object):
                                                       saved_point_odom.point)
             
             if (np.abs(correction_error-self.last_correction_error) > 0.1):
-                rospy.loginfo("CORRECTION ERROR: {:f}".format(correction_error))
+                rospy.loginfo("LEVEL_TWO localization correction error: {:f}".format(correction_error))
 
             self.last_correction_error = correction_error
             
             if self.vfh_mover.get_state() in util.actionlib_working_states:
                 
                 if (correction_error > self.recalibrate_threshold):
-                    rospy.loginfo("LEVEL_TWO large beacon correction.")
+                    rospy.loginfo("LEVEL_TWO handling large beacon correction.")
                     self.announcer.say("Large beacon correction.")
                     self.state_machine.userdata.beacon_point = self.last_beacon_point
                     self.state_machine.userdata.map_calibration_requested = True
@@ -552,6 +552,7 @@ class LevelTwoWeb(object):
                     self.state_machine.request_preempt()
                 
                 elif (correction_error > self.replan_threshold):
+                    rospy.loginfo("LEVEL_TWO replan for small beacon correction.")
                     self.announcer.say("Beacon correction.")
                     #update the VFH move goal
                     goal = deepcopy(self.state_machine.userdata.move_goal)
@@ -659,6 +660,7 @@ class WebManager(smach.State):
         userdata.stop_on_detection = True
       
         if rospy.Time.now() > userdata.return_time:
+            rospy.loginfo("WEB_MANAGER exceeded return_time")
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
             userdata.stop_on_detection = False
@@ -672,7 +674,7 @@ class WebManager(smach.State):
             spoke = userdata.spokes.popleft()
             #there is an extra spoke at the end
             if len(userdata.spokes) == 0:
-                rospy.loginfo("SPOKE MANAGER finished last spoke")
+                rospy.loginfo("WEB_MANAGER finished last spoke")
                 return 'return_home'
             userdata.spoke_yaw = spoke['yaw']
             next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
