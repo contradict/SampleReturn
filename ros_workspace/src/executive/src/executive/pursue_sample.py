@@ -698,14 +698,14 @@ class ConfirmSampleAcquired(smach.State):
                                                                    success = True))
             userdata.action_result.result_string = ('sample acquired')
             userdata.action_result.result_int = userdata.latched_sample.sample_id
-            #de-allocate the bin
+            #de-allocate the bin if it isn't the last one in the list
             rospy.loginfo("PURSUE_SAMPLE placed sample in bin: {!s}".format(userdata.active_bin_id))
-            if userdata.active_bin_id in userdata.available_small_bins \
-            and len(userdata.available_small_bins > 1):
+            if (userdata.active_bin_id in userdata.available_small_bins) \
+            and (len(userdata.available_small_bins) > 1):
                 used_bin = userdata.available_small_bins.pop(0)
                 rospy.loginfo("PURSUE_SAMPLE marking small bin {!s} as occupied".format(used_bin))
-            if userdata.active_bin_id in userdata.available_big_bins \
-            and len(userdata.available_big_bins > 1):
+            if (userdata.active_bin_id in userdata.available_big_bins) \
+            and (len(userdata.available_big_bins) > 1):
                 used_bin = userdata.available_big_bins.pop(0)
                 rospy.loginfo("PURSUE_SAMPLE placed sample in bin: {!s}".format(used_bin))
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
