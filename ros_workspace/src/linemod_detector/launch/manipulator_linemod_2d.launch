@@ -19,6 +19,7 @@
       <param name="min_count" type="double" value="100.0"/>
     </node>
 
+    <!--
       <node
         machine="search"
         pkg="linemod_detector"
@@ -36,6 +37,7 @@
       <param name="min_count" type="double" value="100.0"/>
       <param name="hard_samples" type="bool" value="True"/>
     </node>
+    -->
 
   <node
     machine="search"
