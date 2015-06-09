@@ -10,5 +10,5 @@ servo_params:
     try_limit: 3
 
 manipulator_correction:
-    x: -0.010
+    x: -0.040
     y: -0.025
