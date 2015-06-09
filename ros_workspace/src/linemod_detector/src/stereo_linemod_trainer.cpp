@@ -298,9 +298,16 @@ void computeColorMask(const cv::Mat& color, cv::Mat& mask, int r_size, int g_siz
   buffer[0] = r_size;
   buffer[1] = g_size;
   buffer[2] = b_size;
-  cv::Vec3b lower = color_pt - buffer;
-  cv::Vec3b upper = color_pt + buffer;
+  cv::Vec3b bg_color;
+  bg_color[0] = 68;
+  bg_color[1] = 130;
+  bg_color[2] = 28;
+  //cv::Vec3b lower = color_pt - buffer;
+  //cv::Vec3b upper = color_pt + buffer;
+  cv::Vec3b lower = bg_color - buffer;
+  cv::Vec3b upper = bg_color + buffer;
   cv::inRange(hsv_img, lower, upper, mask);
+  mask = 255-mask;
   mask.setTo(0,win_mask);
   //cv::imshow("win_mask", win_mask);
   cv::imshow("exp_color_mask", mask);
@@ -504,7 +511,7 @@ class Image_test
     depth_img.convertTo(depth_img, CV_16U);
 
     Image_test::sources.push_back(Image_test::color_img);
-    Image_test::sources.push_back(depth_img);
+    //Image_test::sources.push_back(depth_img);
 
       cv::Point pt1((depth_img.cols/2)-Image_test::win_size,(depth_img.rows/2)-Image_test::win_size);
       cv::Point pt2((depth_img.cols/2)+Image_test::win_size,(depth_img.rows/2)+Image_test::win_size);
@@ -572,35 +579,35 @@ class Image_test
         Image_test::win_size -= 5;
         std::cout << "Win size: " << win_size << std::endl;
       }
-      else if (key == 'g')
+      else if (key == 'f')
       {
         Image_test::g_size -= 2;
         std::cout << "g size: " << g_size << std::endl;
       }
-      else if (key == 'G')
+      else if (key == 'g')
       {
         Image_test::g_size += 5;
-        std::cout << "g size: " << g_size << std::endl;
+        std::cout << "G size: " << g_size << std::endl;
       }
-      else if (key == 'r')
+      else if (key == 'e')
       {
         Image_test::r_size -= 5;
         std::cout << "r size: " << r_size << std::endl;
       }
-      else if (key == 'R')
+      else if (key == 'r')
       {
         Image_test::r_size += 5;
-        std::cout << "r size: " << r_size << std::endl;
+        std::cout << "R size: " << r_size << std::endl;
       }
-      else if (key == 'b')
+      else if (key == 'v')
       {
         Image_test::b_size -= 5;
         std::cout << "b size: " << b_size << std::endl;
       }
-      else if (key == 'B')
+      else if (key == 'b')
       {
         Image_test::b_size += 5;
-        std::cout << "b size: " << b_size << std::endl;
+        std::cout << "B size: " << b_size << std::endl;
       }
       else if (key == 'i')
       {
@@ -698,7 +705,7 @@ class Image_test
       Image_test::sources.clear();
       cv::imshow("display",display);
       cv::imshow("color_gradient",displayQuantized(quantized_images[0]));
-      cv::imshow("depth_normals",displayQuantized(quantized_images[1]));
+      //cv::imshow("depth_normals",displayQuantized(quantized_images[1]));
   }
 
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
