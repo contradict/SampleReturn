@@ -512,7 +512,7 @@ class LineMOD_Detector
       }
       ROS_DEBUG("Median Disp: %f", median_disp);
 
-      cam_model_.projectDisparityTo3d(cv::Point2d(m.x+templates[1].width/2,m.y+templates[1].height/2),
+      cam_model_.projectDisparityTo3d(cv::Point2d(grip_center.x,grip_center.y),
           median_disp, xyz);
       temp_point.point.x = xyz.x;
       temp_point.point.y = xyz.y;
