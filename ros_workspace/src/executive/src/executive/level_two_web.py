@@ -112,8 +112,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.local_frame = self.local_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
-        self.state_machine.userdata.return_time = rospy.Time.now() + \
-                                                  rospy.Duration(node_params.return_time_minutes*60)
+        self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #dismount move
@@ -185,10 +184,12 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(input_keys=['dismount_move',
-                                                             'spin_velocity'],
+                                                             'spin_velocity',
+                                                             'return_time_offset'],
                                                  output_keys=['action_result',
                                                               'simple_move',
-                                                              'beacon_turn'],
+                                                              'beacon_turn',
+                                                              'return_time'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -611,6 +612,8 @@ class StartLeveLTwo(smach.State):
         userdata.beacon_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
                                              angle = np.pi,
                                              velocity = userdata.spin_velocity)
+        
+        userdata.return_time = rospy.Time.now() + userdata.return_time_offset
 
         return 'next'
 
