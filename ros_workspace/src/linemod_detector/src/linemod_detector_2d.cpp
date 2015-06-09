@@ -376,69 +376,69 @@ class LineMOD_Detector
               (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple" || dominant_color=="orange"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::RED_PUCK);
+                angle, rect.center, samplereturn_msgs::NamedPoint::RED_PUCK);
           }
           if (m.class_id == "orange_pipe" &&
               (dominant_color=="orange" || dominant_color=="white" || dominant_color=="yellow"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
+                angle, rect.center, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
           }
           if (m.class_id == "pre_cached" &&
               (dominant_color=="white" || dominant_color=="gray"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
+                angle, rect.center, samplereturn_msgs::NamedPoint::PRE_CACHED);
           }
           if (m.class_id == "pre_cached_side" &&
               (dominant_color=="white" || dominant_color=="gray"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
+                angle, rect.center, samplereturn_msgs::NamedPoint::PRE_CACHED);
           }
           if (m.class_id == "wood_cube" &&
               (dominant_color=="yellow" || dominant_color=="brown" || dominant_color=="white"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
+                angle, rect.center, samplereturn_msgs::NamedPoint::WOODEN_CUBE);
           }
           if (m.class_id == "pink_tennis_ball" &&
               (dominant_color=="pink" || dominant_color=="white" || dominant_color=="red" ||
                dominant_color=="orange" || dominant_color=="purple"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
+                angle, rect.center, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
           }
           if (m.class_id == "colored_ball" &&
               dominant_color!="brown" && dominant_color!="white" && dominant_color!="gray")
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::COLORED_BALL);
+                angle, rect.center, samplereturn_msgs::NamedPoint::COLORED_BALL);
           }
           if (m.class_id == "metal_star")
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::METAL_1);
+                angle, rect.center, samplereturn_msgs::NamedPoint::METAL_1);
           }
           if (m.class_id == "metal_pi" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::METAL_1);
+                angle, rect.center, samplereturn_msgs::NamedPoint::METAL_1);
           }
           if (m.class_id == "metal_tree" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::METAL_1);
+                angle, rect.center, samplereturn_msgs::NamedPoint::METAL_1);
           }
           if (m.class_id == "metal_lines" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::METAL_1);
+                angle, rect.center, samplereturn_msgs::NamedPoint::METAL_1);
           }
           if (m.class_id == "metal_square" )
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
-                angle, samplereturn_msgs::NamedPoint::METAL_1);
+                angle, rect.center, samplereturn_msgs::NamedPoint::METAL_1);
           }
         }
 
@@ -455,7 +455,7 @@ class LineMOD_Detector
   }
 
   void publishPoint(const std::vector<cv::linemod::Template>& templates, cv::linemod::Match m,
-      std_msgs::Header header, float grip_angle, int sample_id)
+      std_msgs::Header header, float grip_angle, cv::Point2f grip_center, int sample_id)
   {
     ROS_DEBUG("Publishing Img Point");
     samplereturn_msgs::NamedPoint img_point_msg;
@@ -463,8 +463,10 @@ class LineMOD_Detector
     img_point_msg.sample_id = sample_id;
     img_point_msg.header = header;
     // We only care about the base pyramid level gradient modality
-    img_point_msg.point.x = m.x + templates[1].width/2;
-    img_point_msg.point.y = m.y + templates[1].height/2;
+    //img_point_msg.point.x = m.x + templates[1].width/2;
+    //img_point_msg.point.y = m.y + templates[1].height/2;
+    img_point_msg.point.x = grip_center.x;
+    img_point_msg.point.y = grip_center.y;
     img_point_msg.grip_angle = grip_angle;
     ROS_DEBUG("Point x and y: %f, %f", img_point_msg.point.x, img_point_msg.point.y);
 
