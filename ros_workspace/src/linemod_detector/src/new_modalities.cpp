@@ -283,8 +283,11 @@ bool InnerColorGradientPyramid::extractTemplate(Template& templ) const
   Mat local_mask;
   if (!mask.empty())
   {
-    Mat element = getStructuringElement(MORPH_RECT, Size(31,31));
-    erode(mask, local_mask, element, Point(-1,-1), 1, BORDER_REPLICATE);
+    //Mat element = getStructuringElement(MORPH_RECT, Size(31,31));
+    Mat element = getStructuringElement(MORPH_RECT, Size(11,11));
+    dilate(mask, local_mask, element, Point(-1,-1), 1, BORDER_REPLICATE);
+    erode(local_mask, local_mask, element, Point(-1,-1), 1, BORDER_REPLICATE);
+    erode(local_mask, local_mask, element, Point(-1,-1), 1, BORDER_REPLICATE);
   }
 
   // Create sorted list of all pixels with magnitude greater than a threshold
@@ -314,8 +317,10 @@ bool InnerColorGradientPyramid::extractTemplate(Template& templ) const
     }
   }
   // We require a certain number of features
-  if (candidates.size() < num_features)
+  std::cout << "Candidates Size: " << candidates.size() << std::endl;
+  if (candidates.size() < num_features) {
     return false;
+  }
   // NOTE: Stable sort to agree with old code, which used std::list::sort()
   std::stable_sort(candidates.begin(), candidates.end());
 
