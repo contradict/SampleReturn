@@ -403,7 +403,7 @@ class LineMOD_Detector
           }
           if (m.class_id == "pink_tennis_ball" &&
               (dominant_color=="pink" || dominant_color=="white" || dominant_color=="red" ||
-               dominant_color="orange" || dominant_color=="purple"))
+               dominant_color=="orange" || dominant_color=="purple"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
