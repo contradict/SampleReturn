@@ -24,7 +24,6 @@
         pkg="linemod_detector"
         type="linemod_detector_2d"
         name="hard_manipulator_linemod_detector_2d"
-        output="screen"
         ns="/processes/sample_detection/manipulator/hard">
       <remap from="color" to="/cameras/manipulator/left/rect_color"/>
       <remap from="disparity" to="/cameras/manipulator/disparity"/>
@@ -41,7 +40,7 @@
   <node
     machine="search"
     pkg="detection_filter"
-    type="dslr_kalman_filter_node"
+    type="manipulator_kalman_filter_node"
     name="linemod_kalman_filter_node"
     ns="/processes/sample_detection/manipulator">
     <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
