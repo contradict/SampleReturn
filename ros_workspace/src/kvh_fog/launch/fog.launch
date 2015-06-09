@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node name="gyro"
+        pkg="kvh_fog"
+        type="kvh_fog_node.py"
+        ns="/io/kvh"
+        machine="navigate"
+        output="screen">
+        <param name="frame_id" type="string" value="gyro"/>
+        <param name="port" type="string" value="/dev/ttyUSB0"/>
+        <!-- discard measurements after re-open -->
+        <param name="discard_count" type="int" value="10"/>
+        <!-- seconds to wait before re-open -->
+        <param name="reopen_delay" type="int" value="30"/>
+        <!-- Bette Davis Picnic Area, LA, USA-->
+        <!--<param name="lat" type="double" value="34.157229"/>-->
+        <!--Institude park in Worcester, MA, USA-->
+        <param name="lattitude" type="double" value="42.2750873" />
+        <!-- if not specified, default to local earth rate-->
+        <!--
+        -->
+        <param name="bias" type="double" value="-5.12e-5"/>
+        <param name="invert_rotation" type="bool" value="true"/>
+     </node>
+</launch>

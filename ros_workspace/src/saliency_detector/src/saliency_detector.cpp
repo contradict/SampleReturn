@@ -5,7 +5,9 @@
 #include <ros/console.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <geometry_msgs/PointStamped.h>
 #include <samplereturn_msgs/NamedPoint.h>
+#include <tf/transform_listener.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/saliency_detector_paramsConfig.h>
@@ -48,12 +50,27 @@ class SaliencyDetectorNode
   double bms_top_trim_;
   double bms_img_width_;
 
+  bool filter_by_real_area_;
+  double min_real_area_;
+  double max_real_area_;
+  double min_real_area_redpinkpurple_;
+  double max_real_area_redpinkpurple_;
+  double min_real_area_bluewhitegray_;
+  double max_real_area_bluewhitegray_;
+  double min_real_area_yellow_;
+  double max_real_area_yellow_;
+
+  XmlRpc::XmlRpcValue interior_colors_, exterior_colors_;
+  std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
+
   image_geometry::PinholeCameraModel cam_model_;
   cv::Mat inv_K_;
 
   ColorNaming cn_;
 
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
+
+  tf::TransformListener listener_;
 
   public:
   SaliencyDetectorNode() {
@@ -71,6 +88,16 @@ class SaliencyDetectorNode
     private_node_handle_.param("named_point_topic", named_point_topic, string("named_point"));
     private_node_handle_.param("camera_info_topic", sub_camera_info_topic, string("/cameras/search/info"));
 
+    private_node_handle_.getParam("interior_colors",interior_colors_);
+    private_node_handle_.getParam("exterior_colors",exterior_colors_);
+
+    for (int i=0; i<interior_colors_.size(); i++) {
+      interior_colors_vec_.push_back(static_cast<std::string>(interior_colors_[i]));
+    }
+    for (int i=0; i<exterior_colors_.size(); i++) {
+      exterior_colors_vec_.push_back(static_cast<std::string>(exterior_colors_[i]));
+    }
+
     sub_img =
       nh.subscribe(img_topic.c_str(), 3, &SaliencyDetectorNode::messageCallback, this);
 
@@ -87,7 +114,7 @@ class SaliencyDetectorNode
       nh.advertise<sensor_msgs::Image>(sub_mask_debug_topic.c_str(), 3);
 
     pub_named_point =
-      nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 3);
+      nh.advertise<samplereturn_msgs::NamedPoint>(named_point_topic.c_str(), 12);
 
     blob_params_.blobColor = 255;
     blob_params_.minArea = 15;
@@ -103,7 +130,7 @@ class SaliencyDetectorNode
 
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& msg)
   {
-    ROS_INFO("Camera Info Callback");
+    ROS_DEBUG("Camera Info Callback");
     cam_model_.fromCameraInfo(msg);
     cv::Mat K = cv::Mat(cam_model_.intrinsicMatrix());
     inv_K_ = K.inv();
@@ -112,7 +139,7 @@ class SaliencyDetectorNode
   void messageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     saliency_mutex_.lock();
-    ROS_INFO("messageCallback");
+    ROS_DEBUG("messageCallback");
     cv_bridge::CvImagePtr cv_ptr;
     try {
       cv_ptr = cv_bridge::toCvCopy(msg, "");
@@ -130,7 +157,7 @@ class SaliencyDetectorNode
     debug_bms_img_ = bms_.getSaliencyMap().clone();
 
     if (bms_thresh_on_) {
-      ROS_INFO("Thresholding");
+      ROS_DEBUG("Thresholding");
       cv::threshold(debug_bms_img_, debug_bms_img_, bms_thresh_, 255, cv::THRESH_BINARY);
     }
 
@@ -141,7 +168,7 @@ class SaliencyDetectorNode
     if (blobDetect_on_) {
       cv::Mat blob_copy = debug_bms_img_.clone();
       blob_.detect(blob_copy, kp);
-      ROS_INFO("Keypoints Detected: %lu", kp.size());
+      ROS_DEBUG("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
       for (size_t i=0; i < kp.size(); i++)
       {
@@ -174,19 +201,21 @@ class SaliencyDetectorNode
       cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
           CV_RGB(100,100,100));
 
+      std::vector<std::string>::iterator in_it, ex_it;
+      in_it = std::find(interior_colors_vec_.begin(),interior_colors_vec_.end(),dominant_color);
+      ex_it = std::find(exterior_colors_vec_.begin(),exterior_colors_vec_.end(),dominant_exterior_color);
+
       if (cam_model_.initialized()
-          && dominant_color != "green" && dominant_color != "brown"
-          && dominant_exterior_color == "green"
-          && dominant_color != "gray" && dominant_color != "black"
-          && dominant_color != "blue" ) {
+          && in_it != interior_colors_vec_.end()
+          && ex_it != exterior_colors_vec_.end()){
+        float scale = cv_ptr->image.cols/bms_img_width_;
+        cv::Point3d ray =
+          cam_model_.projectPixelTo3dRay(cv::Point2d(kp[i].pt.x*scale,(kp[i].pt.y*scale+bms_top_trim_)));
+        if(!checkContourSize(sub_mask,ray,scale,msg->header,dominant_color))
+            continue;
         cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
         cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
             CV_RGB(0,255,0));
-        //float scale = cv_ptr->image.rows/600.;
-        float scale = cv_ptr->image.cols/bms_img_width_;
-        cv::Point3d ray =
-          //cam_model_.projectPixelTo3dRay(cv::Point2d((kp[i].pt.x*scale+bms_top_trim_),kp[i].pt.y*scale));
-          cam_model_.projectPixelTo3dRay(cv::Point2d(kp[i].pt.x*scale,(kp[i].pt.y*scale+bms_top_trim_)));
         std::cout << "BMS Coords: x: "<<kp[i].pt.x<<" y: "<<kp[i].pt.y<<std::endl;
         std::cout << "Pixel coords: x:" << kp[i].pt.x*scale <<"y: " << kp[i].pt.y*scale+bms_top_trim_ << std::endl;
         //std_msgs::Header header;
@@ -201,46 +230,94 @@ class SaliencyDetectorNode
       }
     }
 
-    //if (kp.size() != 0) {
-    //if (kp[1].pt.x > 30 && kp[1].pt.y > 30 && kp[1].pt.x < 500 && kp[1].pt.y < 350) {
-    //  sub_img = small(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-    //  sub_mask = debug_bms_img_(Range(kp[1].pt.y-2*kp[1].size,kp[1].pt.y+2*kp[1].size),Range(kp[1].pt.x-2*kp[1].size,kp[1].pt.x+2*kp[1].size));
-    //  cv::threshold(sub_mask, sub_mask, 30, 255, cv::THRESH_BINARY);
-    //  Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-    //  Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
-    //  exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
-    //  interiorColor = cn_.computeInteriorColor(sub_img,sub_mask,exteriorColor);
-
-    //  std::cout << "Exterior Color" << std::endl;
-    //  std::cout << exteriorColor << std::endl;
-    //  std::cout << "Interior Color" << std::endl;
-    //  std::cout << interiorColor << std::endl;
-
-    //  string dominant_color = cn_.getDominantColor(interiorColor);
-    //  std::cout << "Dominant color " << dominant_color << std::endl;
-
-    //  std_msgs::Header sub_header;
-    //  sensor_msgs::ImagePtr sub_img_msg = cv_bridge::CvImage(sub_header,"rgb8",sub_img).toImageMsg();
-    //  pub_sub_img.publish(sub_img_msg);
-
-    //  sensor_msgs::ImagePtr sub_mask_msg = cv_bridge::CvImage(sub_header,"mono8",sub_mask).toImageMsg();
-    //  pub_sub_mask.publish(sub_mask_msg);
-    //}
-    //}
-
     std_msgs::Header header;
     sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
     pub_bms_img.publish(debug_img_msg);
 
-    ROS_INFO("messageCallback ended");
+    ROS_DEBUG("messageCallback ended");
     saliency_mutex_.unlock();
+  }
+
+  bool checkContourSize(const cv::Mat region, const cv::Point3d ray, float scale,
+      const std_msgs::Header header, string color)
+  {
+      std::vector<std::vector<cv::Point> > contours;
+      std::vector<cv::Vec4i> hierarchy;
+      cv::findContours( region, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      // find largest contour
+      double maxArea = 0;
+      int max_idx = 0;
+      for (int i=0; i<contours.size(); i++) {
+        double area = cv::contourArea(cv::Mat(contours[i]));
+        if (area > maxArea) {
+          maxArea = area;
+          max_idx = i;
+        }
+      }
+      // project ray into ground, assuming flat ground
+      tf::StampedTransform camera_transform;
+      geometry_msgs::PointStamped camera_point, base_link_point;
+      tf::Vector3 pos;
+      camera_point.header = header;
+      camera_point.point.x = ray.x;
+      camera_point.point.y = ray.y;
+      camera_point.point.z = ray.z;
+      listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
+      pos = camera_transform.getOrigin();
+      camera_point.header.stamp = ros::Time(0);
+      listener_.transformPoint("base_link",camera_point,base_link_point);
+
+      float x_slope = (base_link_point.point.x - pos.getX())/(pos.getZ()-base_link_point.point.z);
+      float y_slope = (base_link_point.point.y - pos.getY())/(pos.getZ()-base_link_point.point.z);
+
+      float x = x_slope*pos.getZ();
+      float y = y_slope*pos.getZ();
+      float z = pos.getZ();
+      float range = sqrt(x*x + y*y + z*z);
+
+      float ang_per_px =
+        scale*atan(cam_model_.fullResolution().width/cam_model_.fx())/cam_model_.fullResolution().width;
+      float realArea = ang_per_px*ang_per_px*range*range*maxArea;
+      // Convert from square meters to square cm for more human-readable numbers
+      realArea *= 10000;
+
+      if ((color == "red") || (color == "pink") || (color == "purple")) {
+        if ((realArea < max_real_area_redpinkpurple_) && (realArea > min_real_area_redpinkpurple_)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
+      if ((color == "blue") || (color == "white") || (color == "gray")) {
+        if ((realArea < max_real_area_bluewhitegray_) && (realArea > min_real_area_bluewhitegray_)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
+      if (color == "yellow") {
+        if ((realArea < max_real_area_yellow_) && (realArea > min_real_area_yellow_)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
+      if ((realArea < max_real_area_) && (realArea > min_real_area_)) {
+        return true;
+      }
+      else {
+        return false;
+      }
   }
 
   /* Dynamic reconfigure callback */
   void configCallback(saliency_detector::saliency_detector_paramsConfig &config, uint32_t level)
   {
     saliency_mutex_.lock();
-    ROS_INFO("configCallback");
+    ROS_DEBUG("configCallback");
     // Construct BMS
     bms_ = BMS(config.bms_dilation_width_1, config.bms_opening_width,
         config.bms_normalize, config.bms_handle_border);
@@ -253,6 +330,34 @@ class SaliencyDetectorNode
     bms_img_width_ = config.bms_img_width;
 
     blobDetect_on_ = config.blobDetect_on;
+
+    blob_params_.minDistBetweenBlobs = config.minDistBetweenBlobs;
+
+    blob_params_.filterByArea = config.filterByArea;
+    blob_params_.minArea = config.minArea;
+    blob_params_.maxArea = config.maxArea;
+
+    blob_params_.filterByConvexity = config.filterByConvexity;
+    blob_params_.minConvexity = config.minConvexity;
+    blob_params_.maxConvexity = config.maxConvexity;
+
+    blob_params_.minThreshold = config.minThreshold;
+    blob_params_.maxThreshold = config.maxThreshold;
+    blob_params_.thresholdStep = config.thresholdStep;
+    blob_params_.minRepeatability = config.minRepeatability;
+
+    blob_ = cv::SimpleBlobDetector(blob_params_);
+
+    filter_by_real_area_ = config.filterbyRealArea;
+    min_real_area_ = config.minRealArea;
+    max_real_area_ = config.maxRealArea;
+
+    min_real_area_redpinkpurple_ = config.minRealArea_redpinkpurple;
+    max_real_area_redpinkpurple_ = config.maxRealArea_redpinkpurple;
+    min_real_area_bluewhitegray_ = config.minRealArea_bluewhitegray;
+    max_real_area_bluewhitegray_ = config.maxRealArea_bluewhitegray;
+    min_real_area_yellow_ = config.minRealArea_yellow;
+    max_real_area_yellow_ = config.maxRealArea_yellow;
 
     saliency_mutex_.unlock();
   }

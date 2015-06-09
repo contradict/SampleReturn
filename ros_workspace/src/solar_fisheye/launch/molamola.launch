@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node name="sun_cam"
+        pkg="usb_cam"
+        type="usb_cam_node"
+        ns="/cameras"
+        machine="search"
+        respawn="true"
+        output="screen">
+        <param name="camera_frame_id" type="string" value="sun_camera"/>
+        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/cheap-fisheye.yaml"/>
+        <param name="video_device" type="string" value="/dev/video0"/>
+        <param name="image_width" type="int" value="1920"/>
+        <param name="image_height" type="int" value="1080"/>
+        <param name="pixel_format" type="string" value="yuyv"/>
+        <param name="io_method" type="string" value="mmap"/>
+        <param name="gain" type="int" value="1"/>
+        <param name="autoexposure" type="bool" value="false"/>
+        <param name="exposure" type="int" value="1"/>
+    </node>
+    <node name="sun_finder"
+        pkg="solar_fisheye"
+        type="solar_fisheye_node"
+        ns="/processes"
+        machine="search"
+        output="log">
+        <remap from="camera" to="/cameras/sun_cam" />
+
+        <!--"Centroid minimum intensity to report a measurement"-->
+        <param name="min_centroid" type="double" value="128" />
+
+        <!--"Maximum std. dev. (2nd moment) to report a measurement"-->
+        <param name="max_dev" type="double" value="300" />
+
+        <param name="noise_threshold" type="int" value="25" />
+
+        <!--Institude park in Worcester, MA, USA-->
+        <!--"Lattitude of the origin of the tangent space on the earth (degrees)"-->
+        <!--"Longitude of the origin of the tangent space on the earth (degrees)"-->
+        <!--
+        <param name="lat" type="double" value="42.2750873" />
+        <param name="lon" type="double" value="-71.8036266" />
+        -->
+        <!-- Bette Davis Picnic Area, LA, USA-->
+        <param name="lat" type="double" value="34.157229"/>
+        <param name="lon" type="double" value="-118.294347"/>
+    </node>
+</launch>

@@ -48,7 +48,7 @@ class VFHMoveServer( object ):
         self.shutdown=False
         
         node_params = util.get_node_params()
-        self.publish_debug=True
+        self.publish_debug = node_params.publish_debug
 
         self.odometry_frame = node_params.odometry_frame
         self._mover = SimpleMover("~vfh_motion_params/")
@@ -66,11 +66,16 @@ class VFHMoveServer( object ):
         #goal flags and params
         self._goal_orientation_tolerance = np.radians(node_params.goal_orientation_tolerance)
         self._goal_obstacle_radius = node_params.goal_obstacle_radius
+        self._clear_distance = node_params.clear_distance
+        self._clear_first_angle = np.radians(node_params.clear_first_angle)
+        self._default_course_tolerance = node_params.course_tolerance
+        self._course_tolerance = node_params.course_tolerance
         self._goal_odom = None
         self._goal_local = None
         self._target_point_odom = None
         self._start_point = None
         self._orient_at_target = False
+        self._rotate_to_clear = False
  
         #costmap crap
         self.costmap = None
@@ -83,39 +88,38 @@ class VFHMoveServer( object ):
         #vfh flags
         self.vfh_running = False
         self.stop_requested = False
-        self.last_vfh_update = None
+        self.last_vfh_update = rospy.Time.now()
 
         #VFH algorithm params
         self._lethal_threshold = node_params.lethal_threshold
         self.sector_angle = np.radians(node_params.sector_angle)
         self.active_window = np.radians(node_params.active_window)
         #cost coefficients
-        self.u_goal = 5 #cost multiplier for angular difference to target_angle
-        self.u_current = 3 #cost multiplier for angular difference from current angle
+        self.u_goal = node_params.u_goal #cost multiplier for angular difference to target_angle
+        self.u_current = node_params.u_current #cost multiplier for angular difference from current angle
         #constants a and b:  vfh guy say they should be set such that a-b*dmax = 0
         #so that obstacles produce zero cost at a range of dmax.  Seems like b=1 is fine...
         #so I am replacing this with a=dmax
-        self.max_obstacle_distance = 6.0 #this is dmax
-        self.min_obstacle_distance = 0.5 #min. dist. to consider for obstacles                
+        self.max_obstacle_distance = node_params.max_obstacle_distance #this is dmax
+        self.min_obstacle_distance = node_params.min_obstacle_distance #min. dist. to consider for obstacles                
         
         #setup sectors
-        self.sector_count = int(self.active_window/self.sector_angle) + 1
+        sector_count = int(self.active_window/self.sector_angle) + 1
         #offset from first sector in array to the robot zero sector
         self.zero_offset = int(self.active_window/(self.sector_angle * 2))
         #sectors are free if 0, or blocked if 1, start with all free!
-        self.sectors = np.zeros(self.sector_count, dtype=np.bool)
+        self.vfh_sectors = np.zeros(sector_count, dtype=np.bool)
         self.current_sector_index = 0 #start moving straight along the robot's yaw
-        self.target_point = None
-
+        
         #thresholds at which to set clear, or blocked, a gap for hysteresis
         #I think lethal cells are set to 100 in costmap, so these thresholds will be kinda high
-        self.threshold_high = 2000
-        self.threshold_low = 1000        
+        self.threshold_high = node_params.threshold_high
+        self.threshold_low = node_params.threshold_high
         
         #debug marker stuff
         self.debug_marker_pub = rospy.Publisher('vfh_markers',
                                                 vis_msg.MarkerArray,
-                                                queue_size=2)
+                                                queue_size=3)
         self.marker_id = 0
 
         #this loop controls the strafe angle using vfh sauce
@@ -139,6 +143,9 @@ class VFHMoveServer( object ):
         goal = self._as.accept_new_goal()
         
         try:
+            self._tf.waitForTransform('base_link', goal.target_pose.header.frame_id,
+                                      goal.target_pose.header.stamp,
+                                      rospy.Duration(1.0))
             goal_local = self._tf.transformPose('base_link', goal.target_pose)
             goal_odom = self._tf.transformPose(self.odometry_frame, goal.target_pose)
         except tf.Exception, exc:
@@ -148,24 +155,32 @@ class VFHMoveServer( object ):
         self._goal_local = goal_local
         self._goal_odom = goal_odom
         self._orient_at_target = bool(goal.orient_at_target)
+        self._rotate_to_clear = bool(goal.rotate_to_clear)
         header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-        self._target_point_odom =  PointStamped(header, self._goal_odom.pose.position)
+        self.set_path_points_odom(PointStamped(header, self._goal_odom.pose.position))
+      
+        #publish the hopeful path (a straight line)
+        if self.publish_debug:
+            self.publish_debug_path()
         
-        #calculate the stop_distance for stopping once near target pose
+        #load goal parameters, or use defaults
         spin_velocity = goal.spin_velocity if (goal.spin_velocity != 0) else self._mover.max_velocity
         move_velocity = goal.move_velocity if (goal.move_velocity != 0) else self._mover.max_velocity
+        self._course_tolerance = goal.course_tolerance if (goal.course_tolerance != 0) \
+                                 else self._default_course_tolerance
+        #calculate the stop_distance for stopping once near target pose
         self.stop_distance = move_velocity**2/2./self._mover.acceleration
 
         #if the action server is inactive, fire up a movement thread
         if not active:
-            rospy.logdebug("VFH Server not active, goal received, starting.")
+            rospy.loginfo("VFH Server not active, goal received, starting.")
             self.stop_requested = False
             self.execute_thread = threading.Thread(target=self.execute_movement,
                                                    args=(move_velocity,
                                                          spin_velocity));
             self.execute_thread.start();
         else:
-            rospy.logdebug("VFH Server active, self._goal_odom updated.")
+            rospy.loginfo("VFH Server active, self._goal_odom updated.")
         
     #called by the AS when new goal received, and also when preempted
     def preempt_cb(self):
@@ -177,47 +192,105 @@ class VFHMoveServer( object ):
     def is_stop_requested(self):
         return self.stop_requested
 
-    def execute_movement(self, move_velocity, spin_velocity):
-        #store the starting point in odom
+    #sets the target point and the start point in odom frame
+    def set_path_points_odom(self, target_stamped):
+        target_point_odom = None
+        try:
+            target_point_odom = self._tf.transformPoint(self.odometry_frame,
+                                                        target_stamped)
+        except tf.Exception, exc:
+            rospy.logwarn("VFH MOVE SERVER:could not transform point: %s"%exc)
+            self._as.set_aborted(result = VFHMoveResult(outcome = VFHMoveResult.ERROR))
+            return False
+        self._target_point_odom = target_point_odom
         current_pose = util.get_current_robot_pose(self._tf, self.odometry_frame)
         self._start_point = current_pose.pose.position
-        #if nothing modifies this... that would be an error!
-        self._action_outcome = VFHMoveResult.ERROR
 
-        # turn to face goal
-        dyaw = np.arctan2( self._goal_local.pose.position.y,
-                           self._goal_local.pose.position.x)
+    def execute_movement(self, move_velocity, spin_velocity):
+
+        ##### Begin rotate to clear section
+        #if requested rotate until the forward sector is clear, then move
+        #clear_distance straight ahead, then try to move to the target pose
+        if self._rotate_to_clear:
+            start_dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
+            rot_sign = np.sign(start_dyaw)
+            #first try rotating toward the target 120 degrees or so
+            error = self._mover.execute_spin(rot_sign*self._clear_first_angle,
+                                             max_velocity = spin_velocity,
+                                             stop_function=self.clear_check)
+            if self.exit_check(): return
+            #if that doesn't work, spin all the way around
+            if np.abs(error) < self._goal_orientation_tolerance:
+                self._mover.execute_spin(-1*rot_sign*2*np.pi,
+                                        max_velocity = spin_velocity,
+                                        stop_function=self.clear_check)
+            if self.exit_check(): return
+            dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
+            rospy.loginfo("VFH finished rotate_to-clear, start dyaw: {:f}, finish dyaw: {:f}".format(start_dyaw, dyaw))
+            if np.abs(start_dyaw - dyaw) < self._goal_orientation_tolerance:
+                #we spun all the way around +/- a little, so we are trapped
+                self._action_outcome == VFHMoveResult.BLOCKED
+            else:
+                #we found a clear spot, drive clear_distance meters ahead
+                saved_odom_point = deepcopy(self._target_point_odom)
+                #save the final goal for later
+                header = std_msg.Header(0, rospy.Time(0), 'base_link')
+                point = geometry_msg.Point(self._clear_distance, 0, 0)
+                target_point_base = geometry_msg.PointStamped(header, point)
+                self.set_path_points_odom(target_point_base)
+                if self.publish_debug: self.publish_debug_path()
+                self.vfh_running = True
+                self._mover.execute_continuous_strafe(0.0,
+                                                      max_velocity = move_velocity,
+                                                      stop_function=self.is_stop_requested)
+                self.vfh_running = False
+                if self.exit_check(): return
+                #reload previous goal
+                self.set_path_points_odom(saved_odom_point)
+                if self.publish_debug: self.publish_debug_path()
+
+        ##### Begin normal movement section
+        self._action_outcome = VFHMoveResult.ERROR #initialize outcome to error
+
+        ##### Turn to face goal
+        dyaw, d = util.get_robot_strafe(self._tf, self._target_point_odom)
         if np.abs(dyaw) > self._goal_orientation_tolerance:
-            rospy.logdebug("VFH Rotating to heading by %f.", dyaw)
+            rospy.loginfo("VFH Rotating to point at goal by: %f.", dyaw)
             self._mover.execute_spin(dyaw,
                                      max_velocity = spin_velocity,
                                      stop_function=self.is_stop_requested)
             if self.exit_check(): return
 
-        # drive to goal using vfh
-        distance = np.hypot(self._goal_local.pose.position.x,
-                            self._goal_local.pose.position.y)
-        #use param velocity unless a move_velocity was included in goal
-        rospy.loginfo("VFH Moving %f meters ahead.", distance)
+        ##### Strafe to goal pose using VFH
+        yaw, distance = util.get_robot_strafe(self._tf, self._target_point_odom)
         #start vfh and wait for one update
         self.vfh_running = True
         start_time =  rospy.Time.now()
         while not self._as.is_preempt_requested():
-            rospy.sleep(0.5)
+            rospy.sleep(0.1)
             if self.last_vfh_update > start_time: break
         #If we received a valid goal (not too short, or out of target window), then
-        #the outcome should still be un-set (still ERROR).  Make the move
+        #the outcome should still be un-set (still ERROR).
         if self._action_outcome == VFHMoveResult.ERROR:
+            rospy.loginfo("VFH Moving %f meters ahead.", distance)
             self._mover.execute_continuous_strafe(0.0,
                                                   max_velocity = move_velocity,
                                                   stop_function=self.is_stop_requested)
             self.vfh_running = False
             if self.exit_check(): return
+            
+        elif self._action_outcome == VFHMoveResult.BLOCKED:
+            rospy.loginfo("VFH reporting STARTED_BLOCKED")
+            #we found all sectors blocked before we even tried to move
+            self._action_outcome = VFHMoveResult.STARTED_BLOCKED
 
+        #if we got to the goal(ish), turn and face in requested orientation
+        if self._action_outcome in [VFHMoveResult.COMPLETE,
+                                    VFHMoveResult.MISSED_TARGET]:
             # turn to requested orientation
             dyaw = self.yaw_error()
             if self._orient_at_target and (np.abs(dyaw) > self._goal_orientation_tolerance):
-                rospy.logdebug("VFH Rotating to goal yaw %f.", dyaw)
+                rospy.loginfo("VFH Rotating to goal yaw: %f.", dyaw)
                 self._mover.execute_spin(dyaw,
                                          spin_velocity,
                                          stop_function=self.is_stop_requested)
@@ -235,6 +308,17 @@ class VFHMoveServer( object ):
             #don't attempt to send preempt result if we are in shutdown
             if not self.shutdown:
                 self._as.set_preempted(result = VFHMoveResult(outcome = VFHMoveResult.EXTERNAL_STOP))
+            return True
+        else:
+            return False
+        
+    def clear_check(self):
+        #check for other stop requests
+        if self.stop_requested: return True
+        #sector True = blocked
+        #check the middle sector
+        sectors, state = self.update_sectors([True], self.sector_angle)
+        if not sectors[0]:
             return True
         else:
             return False
@@ -269,39 +353,68 @@ class VFHMoveServer( object ):
         
         start_time = rospy.get_time()
 
-        #get current position from mover object
-        robot_position = self._mover.current_position
-        robot_yaw = self._mover.current_yaw
-
-        valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
-
-        yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, self._target_point_odom)
-        target_index = int(round(yaw_to_target/self.sector_angle) + self.zero_offset)
-        
+        #Update the sector states, and return the inverse costs
+        self.vfh_sectors, vfh_state = self.update_sectors(self.vfh_sectors, self.sector_angle)
+ 
         #if we are within stop_distance initiate stop
-        if distance_to_target < self.stop_distance:
-            #rospy.loginfo("VFH distance_to_target < stop_distance (%f)" % self.stop_distance)
+        if vfh_state['distance_to_target'] < self.stop_distance:
             return self.stop_with_outcome(VFHMoveResult.COMPLETE)
-            
-        #if we are too far off the line between start point, and goal, initiate stop
-        dist_off_course = util.point_distance_to_line(geometry_msg.Point(*robot_position),
-                                                      self._start_point,
-                                                      self._target_point_odom.point)
-        if (dist_off_course > 5.0):
+
+        if (vfh_state['distance_off_course'] > self._course_tolerance):
             return self.stop_with_outcome(VFHMoveResult.OFF_COURSE)           
                     
         #if the target is not in the active window, we are probably close to it,
         #but locally blocked: stop!
-        if not 0 <= target_index < len(self.sectors):
+        if not 0 <= vfh_state['target_index'] < len(self.vfh_sectors):
             return self.stop_with_outcome(VFHMoveResult.MISSED_TARGET)
-            
-        obstacle_density = np.zeros(self.sector_count)
-        inverse_cost = np.zeros(self.sector_count)
+
+        #stop the mover if the path is totally blocked
+        if np.all(self.vfh_sectors):
+            rospy.logdebug("VFH all blocked, stop!")
+            return self.stop_with_outcome(VFHMoveResult.BLOCKED)
+
+        #If mover has started the wheels driving (initial steering alignment finished),
+        #find the sector index with the lowest cost index (inverse cost!).
+        if self._mover.is_running():
+            min_cost_index = vfh_state['minimum_cost_index']
+            if self.current_sector_index != min_cost_index:
+                self._mover.set_strafe_angle(vfh_state['minimum_cost_angle'])
+                self.current_sector_index = min_cost_index
+        
+        rospy.logdebug("SELECTED SECTOR index: %d" %(self.current_sector_index))
+
+        #record the time        
+        self.last_vfh_update = rospy.Time.now()
+        
+        #rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))        
+
+    def update_sectors(self, sectors, sector_angle):
+
+        #sector_count and zero offset
+        sector_count = len(sectors)
+        zero_offset = np.rint(sector_count/2.0)
+
+        #get current position from mover object
+        robot_position = self._mover.current_position
+        robot_yaw = self._mover.current_yaw
+
+        yaw_to_target, distance_to_target = util.get_robot_strafe(self._tf, self._target_point_odom)
+        target_index = int(round(yaw_to_target/sector_angle) + zero_offset)
+
+        #if we are too far off the line between start point, and goal, initiate stop
+        distance_off_course = util.point_distance_to_line(geometry_msg.Point(*robot_position),
+                                                         self._start_point,
+                                                         self._target_point_odom.point)
+
+        valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)
+        
+        obstacle_density = np.zeros(len(sectors))
+        inverse_costs = np.zeros(len(sectors))
         #nonzero_coords = np.transpose(np.nonzero(self.costmap))        
 
-        for index in range(len(self.sectors)):
+        for index in range(sector_count):
             #yaw in odom            
-            sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
+            sector_yaw = robot_yaw + (index - zero_offset) * sector_angle
             #get start and end points for the bresenham line
             start = self.bresenham_point(robot_cmap_coords,
                                         self.min_obstacle_distance,
@@ -329,39 +442,21 @@ class VFHMoveServer( object ):
             #set sectors above threshold density as blocked, those below as clear, and do
             #not change the ones in between
             if obstacle_density[index] >= self.threshold_high:
-                self.sectors[index] = True
-                inverse_cost[index] = 0 #inversely infinitely expensive
+                sectors[index] = True
+                inverse_costs[index] = 0 #inversely infinitely expensive
             if obstacle_density[index] <= self.threshold_low:
-                self.sectors[index] = False
+                sectors[index] = False
             #if sector is clear (it may not have been changed this time!) set its cost, making it a candidate sector
-            if not self.sectors[index]:
-                inverse_cost[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - self.zero_offset)*self.sector_angle)
-                                            + self.u_current*np.abs(self.current_sector_index - index)*self.sector_angle) 
-
-        #stop the mover if the path is totally blocked
-        if np.all(self.sectors):
-            rospy.logdebug("VFH all blocked, stop!")
-            return self.stop_with_outcome(VFHMoveResult.BLOCKED)
-
-        #If mover has started the wheels driving (initial steering alignment finished),
-        #find the sector index with the lowest cost index (inverse cost!).
-        if self._mover.is_running():
-            min_cost_index = np.argmax(inverse_cost)
-            if self.current_sector_index != min_cost_index:
-                self._mover.set_strafe_angle( (min_cost_index - self.zero_offset) * self.sector_angle)
-                self.current_sector_index = min_cost_index
-        
-        #record the time        
-        self.last_vfh_update = rospy.Time.now()
-
+            if not sectors[index]:
+                inverse_costs[index] = 1.0 / ( self.u_goal*np.abs(yaw_to_target - (index - zero_offset)*sector_angle)
+                                            + self.u_current*np.abs(self.current_sector_index - index)*sector_angle) 
+           
         #START DEBUG CRAP
         if self.publish_debug:
-    
+            
             rospy.logdebug("TARGET SECTOR index: %d" % (target_index))
-            rospy.logdebug("SELECTED SECTOR index: %d" %(self.current_sector_index))
-            rospy.logdebug("SECTORS: %s" % (self.sectors))
-            rospy.logdebug("OBSTACLES: %s" % (obstacle_density))
-            rospy.logdebug("INVERSE_COSTS: %s" % (inverse_cost))
+            rospy.logdebug("SECTORS: %s" % (sectors))
+            rospy.logdebug("INVERSE_COSTS: %s" % (inverse_costs))
             
             vfh_debug_array = []
             vfh_debug_marker = vis_msg.Marker()
@@ -369,53 +464,42 @@ class VFHMoveServer( object ):
             vfh_debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
             vfh_debug_marker.type = vis_msg.Marker.ARROW
             vfh_debug_marker.color = std_msg.ColorRGBA(0, 0, 0, 1)
-            vfh_debug_marker.scale = geometry_msg.Vector3(min(self.max_obstacle_distance, (distance_to_target + self._goal_obstacle_radius)), .02, .02)
+            arrow_len = min(self.max_obstacle_distance,
+                            (distance_to_target + self._goal_obstacle_radius))
+            vfh_debug_marker.scale = geometry_msg.Vector3(arrow_len, .02, .02)
             vfh_debug_marker.lifetime = rospy.Duration(0.2)
             
-            #rospy.loginfo("SECTORS: %s" % (self.sectors))
-            for index in range(len(self.sectors)):
+            for index in range(sector_count):
                 debug_marker = deepcopy(vfh_debug_marker)
-                sector_yaw = robot_yaw + (index - self.zero_offset) * self.sector_angle
-                debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, sector_yaw))
-                debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
+                sector_yaw = robot_yaw + (index - zero_offset) * sector_angle
+                quat_vals = tf.transformations.quaternion_from_euler(0, 0, sector_yaw)
+                debug_marker.pose.orientation = geometry_msg.Quaternion(*quat_vals)
+                debug_marker.pose.position = geometry_msg.Point(robot_position[0],
+                                                                robot_position[1], 0)
                 if self.current_sector_index == index:
                     debug_marker.color = std_msg.ColorRGBA(0.1, 1.0, 0.1, 1)                
-                elif not self.sectors[index]:
+                elif not sectors[index]:
                     debug_marker.color = std_msg.ColorRGBA(0.1, 0.1, 1.0, 1)                
                 else:
                     debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 0.1, 1)                
                 debug_marker.id = self.marker_id
                 self.marker_id += 1
                 vfh_debug_array.append(debug_marker)
-                
-            debug_marker = deepcopy(vfh_debug_marker)
-            target_yaw_odom = robot_yaw + yaw_to_target
-            debug_marker.pose.orientation = geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0, 0, target_yaw_odom))
-            debug_marker.pose.position = geometry_msg.Point(robot_position[0], robot_position[1], 0)
-            debug_marker.color = std_msg.ColorRGBA(1.0, 0.1, 1.0, 1)                
-            debug_marker.id = self.marker_id
-            self.marker_id += 1
-            vfh_debug_array.append(debug_marker)    
  
-            #target point marker
-            debug_marker = vis_msg.Marker()
-            debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
-            debug_marker.type = vis_msg.Marker.CYLINDER
-            debug_marker.color = std_msg.ColorRGBA(1, 0.25, 0, 0.5)
-            debug_marker.scale = geometry_msg.Vector3(.3, .3, .3)
-            debug_marker.pose = Pose()
-            debug_marker.pose.position = self._target_point_odom.point
-            debug_marker.pose.orientation = geometry_msg.Quaternion(0,0,0,1)
-            debug_marker.lifetime = rospy.Duration(0) #0 is forever
-            debug_marker.id = self.marker_id
-            self.marker_id += 1
-            vfh_debug_array.append(debug_marker) 
-            
             vfh_debug_msg = vis_msg.MarkerArray(vfh_debug_array)
             self.debug_marker_pub.publish(vfh_debug_msg)
-        
-            #rospy.loginfo("VFH LOOP took: %.4f seconds to complete" % (rospy.get_time() - start_time))        
 
+        #load the state dictionary
+        vfh_state = {}
+        min_cost_index = np.argmax(inverse_costs)
+        vfh_state['minimum_cost_index'] = min_cost_index
+        vfh_state['minimum_cost_angle'] = (min_cost_index - zero_offset) * sector_angle
+        vfh_state['target_index'] = target_index
+        vfh_state['distance_to_target'] = distance_to_target
+        vfh_state['distance_off_course'] = distance_off_course
+
+        return sectors, vfh_state
+        
     def stop_with_outcome(self, outcome):
         self._action_outcome =  outcome
         self._mover.stop()
@@ -501,8 +585,29 @@ class VFHMoveServer( object ):
         current_pose = util.get_current_robot_pose(self._tf,
                                                    self.odometry_frame)             
         
-        return (euler_from_orientation(self._goal_odom.pose.orientation)[-1] -
-            euler_from_orientation(current_pose.pose.orientation)[-1])
+        raw_error = euler_from_orientation(self._goal_odom.pose.orientation)[-1] - \
+                    euler_from_orientation(current_pose.pose.orientation)[-1]
+        
+        return util.unwind(raw_error)
+
+    def publish_debug_path(self):
+
+        robot_point = self._start_point
+        target_point = self._target_point_odom.point
+        
+        debug_marker = vis_msg.Marker()
+        debug_marker.header = std_msg.Header(0, rospy.Time(0), self.odometry_frame)
+        debug_marker.type = vis_msg.Marker.LINE_STRIP
+        debug_marker.color = std_msg.ColorRGBA(1, 0.25, 0, 0.5)
+        debug_marker.scale = geometry_msg.Vector3(.3, 0, 0)
+        line_points = [robot_point, target_point]
+        debug_marker.points = line_points
+        debug_marker.lifetime = rospy.Duration(0) #0 is forever
+        debug_marker.id = self.marker_id
+        self.marker_id += 1
+ 
+        vfh_debug_msg = vis_msg.MarkerArray([debug_marker])
+        self.debug_marker_pub.publish(vfh_debug_msg)
 
     def position_error(self):
         """

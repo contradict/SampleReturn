@@ -18,9 +18,13 @@
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
 
         <!-- general params-->
+        <param name="publish_debug" value="True"/><!-- this is a lot of stuff, turn it off when possible!-->
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
-        <param name="goal_orientation_tolerance" value="4"/><!--degrees!-->
+        <param name="goal_orientation_tolerance" value="2"/><!--degrees!-->
         <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
+        <param name="clear_distance" value="4.0"/><!-- dist to move after rotating to clear -->
+        <param name="clear_first_angle" value="120"/><!--rotate this angle first to check for clear, then rotate other way-->
+        <param name="course_tolerance" value="5.0"/>
 
         <!--VFH algorithm parameters, angles in degrees -->
         <param name="active_window" value="120"/>

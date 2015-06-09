@@ -8,6 +8,18 @@
     machine="search"
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/image"/>
+    <rosparam param="interior_colors">[red, pink, purple, white, blue]
+    </rosparam>
+    <rosparam param="exterior_colors">[green]
+    </rosparam>
+    <param name="bms_opening_width" type="int" value="7"/>
+    <param name="bms_thresh" type="double" value="20"/>
+    <param name="bms_thresh_on" type="bool" value="True"/>
+    <param name="bms_img_width" type="double" value="1000"/>
+    <param name="filterByConvexity" type="bool" value="False"/>
+    <param name="filterByArea" type="bool" value="True"/>
+    <param name="minArea" type="double" value="20.0"/>
+    <param name="maxArea" type="double" value="6000.0"/>
   </node>
 
   <node
@@ -16,17 +28,29 @@
     name="ray_to_points"
     machine="search"
     ns="/processes/sample_detection/search">
+    <remap from="fence_line" to="/processes/fence_detection/fence_line"/>
+  </node>
+
+  <node
+    pkg="saliency_detector"
+    type="close_range_detector.py"
+    name="close_range_detector"
+    machine="search"
+    ns="/processes/sample_detection/search">
+    <remap from="cam_info" to="/cameras/search/info"/>
+    <remap from="image" to="/cameras/search/image"/>
   </node>
 
   <node
     pkg="detection_filter"
-    type="kalman_filter_node"
+    type="dslr_kalman_filter_node"
     name="kalman_filter_node"
     machine="search"
     ns="/processes/sample_detection/search">
     <remap from="camera_info" to="/cameras/search/info"/>
     <remap from="ack" to="/processes/executive/pursuit_result"/>
-    <param name="max_dist" type="double" value="0.5"/>
+    <remap from="odometry" to="/motion/odometry"/>
+    <param name="max_dist" type="double" value="1.5"/>
     <param name="max_cov" type="double" value="1.5"/>
     <param name="max_pub_cov" type="double" value="0.3"/>
     <param name="max_pub_vel" type="double" value="0.1"/>
@@ -34,8 +58,24 @@
     <param name="positive_exclusion_radius" type="double" value="10.0"/>
     <param name="negative_exclusion_radius" type="double" value="1.5"/>
     <param name="error_cov_post" type="double" value="0.3"/>
-    <param name="process_noise_cov" type="double" value="0.05"/>
+    <param name="process_noise_cov" type="double" value="0.01"/>
     <param name="measurement_noise_cov" type="double" value="0.1"/>
-    <param name="period" type="double" value="2"/>
+    <param name="period" type="double" value="0.5"/>
+    <param name="certainty_inc" type="double" value="1.0"/>
+    <param name="certainty_dec" type="double" value="0.7"/>
+    <param name="certainty_thresh" type="double" value="3.0"/>
+    <rosparam param="color_transitions">
+        white: [gray, blue, green, white, pink]
+        black: []
+        gray: [gray, white, blue]
+        brown: [brown, orange, red]
+        pink: [pink, red, purple, white]
+        red: [red, pink, purple, orange, brown]
+        orange: [orange, yellow, red, brown]
+        yellow: [yellow, orange]
+        green: [green, white]
+        blue: [blue, gray, white]
+        purple: [purple, red,pink]
+    </rosparam>
   </node>
 </launch>

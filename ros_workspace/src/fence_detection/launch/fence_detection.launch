@@ -3,44 +3,18 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
 
-    <!-- Fence Nodelet Host process -->
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="manager"
-        args="manager"
-        ns="fence"
-        output="log"
-        />
-
-    <!-- Compute Stereo Point Cloud -->
-    <node
-        machine="navigate"
-        pkg="nodelet"
-        type="nodelet"
-        name="stereo_image_points"
-        args="load stereo_image_proc/point_cloud2 /fence/manager"
-        ns="fence"
-        output="log"
-        >
-        <param name="approximate_sync" type="bool" value="true"/>
-        <remap from="left/image_rect_color" to="fence_img"/>
-        <remap from="left/camera_info" to="/cameras/navigation/left/camera_info"/>
-        <remap from="right/camera_info" to="/cameras/navigation/right/camera_info"/>
-        <remap from="disparity" to="fence_disp"/>
-    </node>
-
     <!-- Fence Detector -->
     <node
         machine="navigate"
         pkg="fence_detection"
-        type="freq_fence_detection.py"
+        type="simple_fence_detection"
         name="fence_detection"
-        ns="fence"
-        output="log">
-        <remap from="input_image" to="/cameras/navigation/center/left/image_rect_color"/>
-        <remap from="input_disparity" to="/cameras/navigation/center/disparity"/>
+        ns="/processes/fence_detection">
+        <remap from="color_image" to="/cameras/navigation/center/left/rect_color"/>
+        <remap from="disparity_image" to="/cameras/navigation/center/disparity"/>
+        <remap from="left/camera_info" to="/cameras/navigation/center/left/camera_info"/>
+        <remap from="right/camera_info" to="/cameras/navigation/center/right/camera_info"/>
     </node>
+
 
 </launch>

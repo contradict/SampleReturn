@@ -8,18 +8,14 @@
     pkg="sun_pointing"
     type="compute_angle_server.py"
     ns="/processes/compute_sun_angle">
-    <rosparam>
-      compute_sun_angle_params:
-        max_velocity: 0.4
-        acceleration: 0.4
-        stop_deceleration: 1.5
-        timeout: 20
-        loop_rate: 10
-        steering_angle_epsilon: 0.01
-    </rosparam>
+
+    <param name="spin_velocity" value="0.3"/>
+    <param name="odometry_frame" value="odom"/>
+    <param name="yaw_update_period" value="0.05"/>
+
     <remap from="image" to="/cameras/manipulator/left/rect_color"/>
-    <remap from="odometry" to="/motion/odometry"/>
-    <remap from="twist" to="/motion/servo_command"/>
-    <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
-  </node>
+    <remap from="simple_move" to="/processes/simple_move"/>
+    <remap from="twist" to="/motion/planner_command"/>
+
+</node>
 </launch>

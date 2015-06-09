@@ -22,6 +22,7 @@ import rospy
 import yaml
 import Queue
 import threading
+import rosnode
 
 import std_msgs.msg as std_msg
 from sensor_msgs.msg import Image, CameraInfo
@@ -35,7 +36,8 @@ class TriggeredCamera(object):
     def __init__(self):
         self.trigger_count = 0
         self.image_count = 0
-        self.enabled = True
+        self.missing_image_count = 0
+        self.enabled = False
         self.paused = False
         self.trigger_rate = rospy.get_param('~rate', 1.0)
         self.time_offset = rospy.get_param('~capture_delay', 0.0)
@@ -46,6 +48,8 @@ class TriggeredCamera(object):
         self.queue_size_warning = rospy.get_param('~queue_size_warning', 3)
         self.restart_delay = rospy.get_param('~restart_delay', 5.0)
         self.frame_id = rospy.get_param('~frame_id', 'search_camera')
+        self.camera_node_name = rospy.get_param('~camera_node_name', 'camera')
+        self.restart_camera_threshold = rospy.get_param('~restart_camera_threshold', 5)
         calibration_name = rospy.get_param('~calib_file', None)
         if calibration_name is not None:
             rospy.logdebug("calibration_name: %s", calibration_name)
@@ -89,35 +93,35 @@ class TriggeredCamera(object):
                 persistent=True)
 
     def try_to_set_recordingmedia(self):
-        success = False
-        def doit(photo_config):
+        self.recording_media_success = False
+        def doit(self, photo_config):
             try:
                 rospy.logdebug("Setting recording media")
                 photo_config(SetConfigRequest(param="recordingmedia",
                     value="1 SDRAM"))
-                success = True
+                self.recording_media_success = True
                 rospy.loginfo("Set recording media to SDRAM")
             except rospy.ServiceException:
                 rospy.logerr("config service failed")
-        def worker():
-            while not rospy.is_shutdown() and not success:
+        def worker(self):
+            while not rospy.is_shutdown() and not self.recording_media_success:
                 try:
                     rospy.logdebug("Connecting to service set_config")
                     rospy.wait_for_service("set_config", 20.0)
+                except rospy.ROSInterruptException:
+                    rospy.logerr("Never found set_config, exiting for shutdown.")
+                    break
                 except rospy.ROSException:
                     rospy.logerr("Cannot contact set_config, retrying.")
                     continue
-                except rospy.ROSInterrupException:
-                    rospy.logerr("Never found set_config, exiting for shutdown.")
-                    break
                 photo_config = rospy.ServiceProxy('set_config', SetConfig)
-                threading.Thread(target=lambda:doit(photo_config)).start()
+                threading.Thread(target=lambda: doit(self, photo_config)).start()
                 rospy.sleep(10.0)
                 try:
                     photo_config.close()
                 except:
                     pass
-        threading.Thread(target=worker).start()
+        threading.Thread(target=lambda: worker(self)).start()
 
     def wait_for_service(self, name):
         while not rospy.is_shutdown():
@@ -152,6 +156,7 @@ class TriggeredCamera(object):
         if self.pause_for_restart_timer is not None:
             self.start_restart_timer()
 
+        self.missing_image_count = 0
         self.image_count += 1
         rospy.logdebug("image seq: %d queue: %d", self.image_count,
                 self.timestamp_queue.qsize())
@@ -262,6 +267,16 @@ class TriggeredCamera(object):
         self.missing_image_timer.shutdown()
         self.missing_image_timer = None
         self.clear_queue("Image receipt timeout")
+        self.missing_image_count += 1
+        if self.missing_image_count > self.restart_camera_threshold:
+            self.restart_camera()
+        else:
+            self.start_restart_timer()
+
+    def restart_camera(self):
+        # Just kill it here, will be restarted by
+        # roslaunch respawn
+        rosnode.kill_nodes(self.camera_node_name)
         self.start_restart_timer()
 
     def clear_queue(self, reason):

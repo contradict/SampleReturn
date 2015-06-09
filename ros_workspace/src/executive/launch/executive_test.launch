@@ -4,6 +4,7 @@
 
     <arg name="odometry_frame" value="odom"/>
     <arg name="world_fixed_frame" value="sim_map"/>
+    <arg name="beacon_description" value="$(find samplereturn)/urdf/sim_beacon.urdf"/> 
     <arg name="beacon_localization" value="true"/>
     <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
     
@@ -35,7 +36,8 @@
     </node>
     
     <include file="$(find samplereturn)/launch/joystick.launch"/>
-
+    <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
+    
     <include file="$(find samplereturn)/launch/planner_dumb.launch">
         <arg name="odometry_frame" value="$(arg odometry_frame)"/>
     </include>
@@ -72,10 +74,9 @@
         <remap from="joint_states" to="platform_joint_state"/>
         <param name="publish_frequency" type="double" value="10"/>
     </node>
-    
-    <include file="$(find beacon_finder)/launch/beacon_finder.launch">
-        <!--for sim, beacon finder should publish the beacon visualization xform in map-->
-        <arg name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
+
+    <include file="$(find beacon_finder)/launch/april_beacon_finder.launch">
+        <arg name="beacon_description" value="$(arg beacon_description)"/>
     </include>
 
     <group if="$(arg beacon_localization)">
@@ -84,5 +85,6 @@
             <arg name="odometry_frame" value="$(arg odometry_frame)"/>
         </include>
     </group>
+
 
 </launch>

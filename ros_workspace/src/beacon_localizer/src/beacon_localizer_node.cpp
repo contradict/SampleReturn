@@ -59,6 +59,7 @@ BeaconKFNode::BeaconKFNode( void ):
     _system_model(NULL),
     _prior(NULL),
     _filter(NULL),
+    _tf(ros::Duration(30.0)),
     _camera_frame_id(""),
     _last_beacon_time(ros::Time(0))
 {
@@ -220,7 +221,6 @@ void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConst
     }
     catch (tf::TransformException &ex) {
          ROS_ERROR("BEACON_LOCALIZER transform lookup failure: %s", ex.what());
-         ros::Duration(1.0).sleep();
          return;
     }
 

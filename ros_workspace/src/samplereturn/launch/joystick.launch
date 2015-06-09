@@ -29,14 +29,15 @@
     <param name="BUTTON_GRAB" value="3"/>
     <param name="BUTTON_SERVO" value="1"/>
     <param name="BUTTON_CANCEL" value="2"/>
+    <param name="BUTTON_PURSUE" value="5"/>
     <param name="BUTTON_LOCK" value="0"/>
     <param name="BUTTON_LIGHTS" value="6"/>
     <param name="BUTTON_SEARCH_CAMERA" value="4"/>
     <!-- Scaling -->
     <param name="LINEAR_SCALE" value="2.0" type="double"/>
-    <param name="LINEAR_EXP" value="2.5" type="double"/>
+    <param name="LINEAR_EXP" value="2.0" type="double"/>
     <param name="ANGULAR_SCALE" value="3.14" type="double"/>
-    <param name="ANGULAR_EXP" value="2" type="double"/>
+    <param name="ANGULAR_EXP" value="1.5" type="double"/>
 
     <!-- this file loads the velocities and such for servoing onto sample,
          the node must already have a simple_mover up and running -->
@@ -45,7 +46,9 @@
     <!-- Remaps -->
     <remap from="joystick_command" to="/motion/joystick_command"/>
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
+    <remap from="detected_sample_search" to="/processes/sample_detection/search/filtered_point"/>
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>
+    <remap from="home_wheel_pods" to="/motion/wheel_pods/home"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
     <remap from="manipulator_action" to="/motion/manipulator/grab_action"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
@@ -53,6 +56,7 @@
     <remap from="joy" to="/io/joy"/>
     <remap from="search_lights" to="/io/search_lights"/>
     <remap from="enable_search" to="/cameras/search/enable"/>
+    <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/enable"/>
 
 </node>
 
