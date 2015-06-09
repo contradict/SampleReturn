@@ -142,8 +142,6 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.raster_offset = node_params.raster_offset
         self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
-        self.state_machine.userdata.blocked_retried = False
-        self.state_machine.userdata.blocked_limit = 2
 
         #web management flags
         self.state_machine.userdata.outbound = True
@@ -190,7 +188,7 @@ class LevelTwoWeb(object):
                                                              'spin_velocity'],
                                                  output_keys=['action_result',
                                                               'simple_move',
-                                                              'half_turn'],
+                                                              'beacon_turn'],
                                                  outcomes=['next']),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
@@ -237,7 +235,7 @@ class LevelTwoWeb(object):
                                                   'object_detected':'CALIBRATE_TO_BEACON',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'half_turn',
+                                   remapping = {'simple_move':'beacon_turn',
                                                 'stop_on_detection':'false'})
             
             smach.StateMachine.add('CALIBRATE_TO_BEACON',
