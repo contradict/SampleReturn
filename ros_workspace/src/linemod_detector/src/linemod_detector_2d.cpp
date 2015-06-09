@@ -343,7 +343,7 @@ class LineMOD_Detector
         interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
         //std::cout << "Interior color: " << interiorColor << std::endl;
         std::string dominant_color = cn.getDominantColor(interiorColor);
-        std::cout << "Dominant color " << dominant_color << std::endl;
+        ROS_DEBUG("Dominant color: %s", dominant_color.c_str());
 
         if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
             m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
@@ -385,13 +385,13 @@ class LineMOD_Detector
                 angle, samplereturn_msgs::NamedPoint::ORANGE_PIPE);
           }
           if (m.class_id == "pre_cached" &&
-              (dominant_color=="white"))
+              (dominant_color=="white" || dominant_color=="gray"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
           }
           if (m.class_id == "pre_cached_side" &&
-              (dominant_color=="white"))
+              (dominant_color=="white" || dominant_color=="gray"))
           {
             LineMOD_Detector::publishPoint(templates, m, color_ptr->header,
                 angle, samplereturn_msgs::NamedPoint::PRE_CACHED);
