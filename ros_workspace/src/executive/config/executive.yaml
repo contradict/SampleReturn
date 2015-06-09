@@ -6,7 +6,7 @@ executive_master:
 level_two:
     #for search  behaviour, degrees and meters
     move_velocity: 0.8
-    spin_velocity: 0.2
+    spin_velocity: 0.3
     spoke_count: 20 
     max_spoke_length: 200 
     first_spoke_offset: 0 
