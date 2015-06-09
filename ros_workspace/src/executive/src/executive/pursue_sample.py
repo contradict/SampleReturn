@@ -249,8 +249,15 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
+                                     transitions = {'succeeded':'DISABLE_SEARCH_CAMERA',
                                                     'aborted':'PUBLISH_FAILURE'})
+            
+            smach.StateMachine.add('DISABLE_SEARCH_CAMERA',
+                                    smach_ros.ServiceState('enable_search',
+                                                            platform_srv.Enable,
+                                                            request = platform_srv.EnableRequest(False)),
+                                    transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
+                                                   'aborted':'MANIPULATOR_APPROACH_MOVE'})
             
             smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -409,8 +416,15 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
-                                     transitions = {'succeeded':'ANNOUNCE_CONTINUE',
-                                                    'aborted':'ANNOUNCE_CONTINUE'})
+                                     transitions = {'succeeded':'ENABLE_SEARCH_CAMERA',
+                                                    'aborted':'ENABLE_SEARCH_CAMERA'})
+            
+            smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
+                                    smach_ros.ServiceState('enable_search',
+                                                            platform_srv.Enable,
+                                                            request = platform_srv.EnableRequest(True)),
+                                    transitions = {'succeeded':'ANNOUNCE_CONTINUE',
+                                                   'aborted':'ANNOUNCE_CONTINUE'})
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
