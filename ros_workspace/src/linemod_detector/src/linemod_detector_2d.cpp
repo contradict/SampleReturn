@@ -275,17 +275,17 @@ class LineMOD_Detector
     ROS_DEBUG("Matches size: %u", (int)matches.size());
     float best_match_similarity = 0;
     int best_match_idx = -1;
-    std::cout << "Matches size: " << (int)matches.size() << std::endl;
+    //std::cout << "Matches size: " << (int)matches.size() << std::endl;
     for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
     {
-      std::cout << "Matches size: " << (int)matches.size() << std::endl;
-      std::cout << i << std::endl;
+      //std::cout << "Matches size: " << (int)matches.size() << std::endl;
+      //std::cout << i << std::endl;
       cv::linemod::Match m = matches[i];
       ROS_DEBUG("Matching count: %u", i);
 
-      std::cout << "I: " << i << "classes visited: " << classes_visited << std::endl;
-      std::cout << "matches.size: " << (int)matches.size() << "num classes: " <<
-        LineMOD_Detector::num_classes << std::endl;
+      //std::cout << "I: " << i << "classes visited: " << classes_visited << std::endl;
+      //std::cout << "matches.size: " << (int)matches.size() << "num classes: " <<
+      //  LineMOD_Detector::num_classes << std::endl;
       if (m.similarity > best_match_similarity) {
         best_match_similarity = m.similarity;
         best_match_idx = i;
@@ -554,8 +554,8 @@ class LineMOD_Detector
       cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
           0, cv::Scalar(8,8,8), cv::Scalar(8,8,8),
           (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
-      cv::imshow("mask",mask);
-      cv::waitKey(10);
+      //cv::imshow("mask",mask);
+      //cv::waitKey(10);
       std::vector<std::vector<cv::Point> > contours;
       cv::findContours(mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       double maxArea = 0;
