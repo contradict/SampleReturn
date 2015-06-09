@@ -155,8 +155,15 @@ class ManualController(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'ENABLE_HARD_MANIPULATOR_DETECTOR',
+                                                    'aborted':'SELECT_JOYSTICK'})
+            
+            smach.StateMachine.add('ENABLE_HARD_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
                                      transitions = {'succeeded':'SELECT_SERVO_MODE',
-                                                    'aborted':'SELECT_JOYSTICK'})            
+                                                    'aborted':'SELECT_JOYSTICK'})
             
             smach.StateMachine.add('SELECT_SERVO_MODE',
                                    SelectMotionMode(self.CAN_interface,
@@ -196,9 +203,16 @@ class ManualController(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'DISABLE_HARD_MANIPULATOR_DETECTOR',
+                                                    'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'})           
+ 
+            smach.StateMachine.add('DISABLE_HARD_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'SELECT_JOYSTICK',
-                                                    'aborted':'SELECT_JOYSTICK'})           
-            
+                                                    'aborted':'SELECT_JOYSTICK'})
+                        
             smach.StateMachine.add('ANNOUNCE_GRAB',
                                    AnnounceState(self.announcer,
                                                  'Start ing, grab.'),
