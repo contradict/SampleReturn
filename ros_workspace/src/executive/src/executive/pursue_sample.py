@@ -340,7 +340,7 @@ class PursueSample(object):
                     userdata.active_bin_id = goal.target_bin
                 goal.grip_torque = 0.7
                 rospy.loginfo("PURSUE_SAMPLE target_bin: {!s}, sample_id: {!s},\
-                              goal: {!s}".format(userdata.active_bin_id,
+                              goal: {!s}".format(goal.target_bin,
                                           userdata.latched_sample.sample_id,
                                           goal))
                 rospy.loginfo("PURSUE_SAMPLE available_small_bins: {!s}".format(userdata.available_small_bins))
