@@ -342,7 +342,7 @@ void Stereoproc::imageCb(
         disp_msg_->valid_window.y_offset = top;
         disp_msg_->valid_window.width    = right - left;
         disp_msg_->valid_window.height   = bottom - top;
-        disp_msg_->min_disparity = block_matcher_min_disparity_;
+        disp_msg_->min_disparity = block_matcher_min_disparity_ + 1;
         disp_msg_->max_disparity = block_matcher_min_disparity_ + block_matcher_.ndisp - 1;
 
         disp_msg_->image.height = l_rect_mono.rows;
