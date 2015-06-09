@@ -377,6 +377,8 @@ class LineMOD_Detector
 
         ROS_INFO("Angle: %f", angle);
 
+        cv::circle(display,rect.center,5,cv::Scalar(255,0,255));
+
         if (dominant_color != "green") {
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
         }
