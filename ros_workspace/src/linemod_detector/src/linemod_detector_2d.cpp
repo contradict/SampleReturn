@@ -349,6 +349,14 @@ class LineMOD_Detector
             m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
             m.class_id == "metal_square") {
           hull = floodFillHull(hull, display);
+          // Do some area checks to make sure nothing crazy was fit
+          double hull_area = cv::contourArea(hull);
+          double max_hull_area_, min_hull_area_;
+          max_hull_area_ = 18000;
+          min_hull_area_ = 2500;
+          if ((hull_area > max_hull_area_) || (hull_area < min_hull_area_)) {
+            return;
+          }
         }
         cv::RotatedRect rect = cv::minAreaRect(hull);
         ROS_INFO("Meausred angle: %f width: %f height: %f",
@@ -573,8 +581,6 @@ class LineMOD_Detector
         }
       }
       cv::convexHull(contours[max_idx], grip_hull);
-      // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
-
     }
     return grip_hull;
   }
