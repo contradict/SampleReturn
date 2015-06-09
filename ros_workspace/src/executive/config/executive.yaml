@@ -25,7 +25,7 @@ level_two:
     beacon_approach_point: {x: 6.0, y: 0}
     platform_point: {x: -0.9, y: 0.0}
     beacon_observation_delay: 10 
-    beacon_calibration_delay: 10
+    beacon_calibration_delay: 20
     gyro_calibration_delay: 10
     beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan.
