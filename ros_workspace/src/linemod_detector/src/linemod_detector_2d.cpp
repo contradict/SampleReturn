@@ -355,7 +355,7 @@ class LineMOD_Detector
           hull = floodFillHull(hull, display);
           // Do some area checks to make sure nothing crazy was fit
           double hull_area = cv::contourArea(hull);
-          ROS_DEBUG("Metal Sample Hull Area: %d", hull_area);
+          ROS_DEBUG("Metal Sample Hull Area: %f", hull_area);
           double max_hull_area_, min_hull_area_;
           if ((hull_area > max_hull_area_) || (hull_area < min_hull_area_)) {
             return;
