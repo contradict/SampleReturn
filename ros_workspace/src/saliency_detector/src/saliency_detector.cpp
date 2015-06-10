@@ -281,7 +281,7 @@ class SaliencyDetectorNode
       // Convert from square meters to square cm for more human-readable numbers
       realArea *= 10000;
 
-      if ((color == "red") || (color == "pink") || (color == "purple")) {
+      if ((color == "red") || (color == "pink") || (color == "purple") || (color == "orange")) {
         if ((realArea < max_real_area_redpinkpurple_) && (realArea > min_real_area_redpinkpurple_)) {
           return true;
         }
