@@ -116,11 +116,11 @@ class ManipulatorStateMachine(object):
                          'aborted':'ERROR'}
       )
 
-      @smach.cb_interface()
-      def arm_down_response_cb(input_keys = ['arm_down_maximum',
+      @smach.cb_interface(input_keys = ['arm_down_maximum',
                                              'arm_joint_position'],
-                               output_keys = ['target_bin'],
-                               outcomes = ['too_high']):
+                          output_keys = ['target_bin'],
+                          outcomes = ['too_high'])
+      def arm_down_response_cb(userdata, response):
         
         rospy.loginfo("MANIPULATOR ARM DOWN position: {!s}, limit: {!s}".format(userdata.arm_joint_position,
                                                                                 userdata.arm_down_maximum))
