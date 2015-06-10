@@ -17,6 +17,34 @@
       <param name="min_depth" type="double" value="0.4"/>
       <param name="max_depth" type="double" value="0.58"/>
       <param name="min_count" type="double" value="100.0"/>
+      <rosparam>
+          bms_dilation_width_1: 1
+          bms_dilation_width_2: 1
+          bms_handle_border: false
+          bms_img_width: 200.0
+          bms_normalize: true
+          bms_opening_width: 3
+          bms_sample_step: 8
+          bms_thresh: 50
+          bms_thresh_on: true
+
+          exterior_colors: [green, brown]
+          interior_colors: [red, orange, pink]
+
+          filterByArea: true
+          filterByColor: true
+          filterByConvexity: false
+          blobColor: 255
+          maxArea: 10000.0
+          maxConvexity: 1.0
+          maxThreshold: 50.0
+          minArea: 1000.0
+          minConvexity: 0.7
+          minDistBetweenBlobs: 15.0
+          minRepeatability: 2.0
+          minThreshold: 10.0
+          thresholdStep: 10.0
+      </rosparam>
     </node>
 
       <node
