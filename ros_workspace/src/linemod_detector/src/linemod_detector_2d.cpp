@@ -13,6 +13,8 @@
 #include <image_geometry/stereo_camera_model.h>
 #include <tf/transform_listener.h>
 #include <samplereturn_msgs/Enable.h>
+#include <linemod_detector/LinemodConfig.h>
+#include <dynamic_reconfigure/server.h>
 #include "new_modalities.hpp"
 
 // Function prototypes
@@ -80,6 +82,7 @@ class LineMOD_Detector
   ros::Publisher img_point_pub;
   ros::Publisher point_pub;
   ros::Publisher debug_img_pub;
+  dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
   std::vector<cv::Mat> sources;
   cv::Mat color_img;
   cv::Mat disparity_img;
@@ -100,6 +103,8 @@ class LineMOD_Detector
   float min_count;
   bool hard_samples;
   bool _publish_debug_img;
+
+  linemod_detector::LinemodConfig _config;
 
   ColorNaming cn;
   //image_geometry::PinholeCameraModel cam_model_;
@@ -138,6 +143,8 @@ class LineMOD_Detector
     ros::param::param<bool>("~publish_debug_img", _publish_debug_img, true);
     ros::param::param<std::string>("~detection_frame_id", _detection_frame_id, "odom");
 
+    reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
+
     ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
     // Initialize LINEMOD data structures
@@ -154,6 +161,11 @@ class LineMOD_Detector
     enabled_ = false;
     got_right_camera_info_ = false;
     got_disp_ = false;
+  }
+
+  void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
+  {
+      _config = config;
   }
 
   bool enable(samplereturn_msgs::Enable::Request &req,
