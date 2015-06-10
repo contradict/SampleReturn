@@ -9,7 +9,7 @@ modalities:
       strong_threshold: 55.
 classes:
    -
-      class_id: class0
+      class_id: pre_cached
       modalities: [ ColorGradient ]
       pyramid_levels: 2
       template_pyramids:
