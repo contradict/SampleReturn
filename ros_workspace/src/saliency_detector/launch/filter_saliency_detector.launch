@@ -20,7 +20,7 @@
     <param name="filterByConvexity" type="bool" value="False"/>
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="20.0"/>
-    <param name="maxArea" type="double" value="6000.0"/>
+    <param name="maxArea" type="double" value="10000.0"/>
     <param name="minRealArea_bluewhitegray" type="double" value="15"/>
     <param name="maxRealArea_bluewhitegray" type="double" value="200"/>
   </node>
