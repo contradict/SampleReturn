@@ -25,7 +25,7 @@
           bms_normalize: true
           bms_opening_width: 3
           bms_sample_step: 8
-          bms_thresh: 50
+          bms_thresh: 40
           bms_thresh_on: true
 
           exterior_colors: [green, brown]
