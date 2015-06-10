@@ -60,7 +60,8 @@ class DSP3000(object):
 
         Potentially invalid or None if an error occurs
         """
-        line = self.port.readline().split()
+        rawline = self.port.readline()
+        line = rawline.split()
         now = rospy.Time.now()
         angle, valid = None, False
         if len(line) == 2:
@@ -70,6 +71,8 @@ class DSP3000(object):
                 valid = rawvalid == "1"
             except ValueError:
                 rospy.logerr("Invalid angle value: %s", rawangle)
+        elif len(rawline) == 0:
+            rospy.logerr("zero length response")
         return now, valid, angle
 
     def close(self):
