@@ -38,7 +38,7 @@
           maxArea: 10000.0
           maxConvexity: 1.0
           maxThreshold: 50.0
-          minArea: 1000.0
+          minArea: 400.0
           minConvexity: 0.7
           minDistBetweenBlobs: 15.0
           minRepeatability: 2.0
