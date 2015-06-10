@@ -84,6 +84,7 @@ class LineMOD_Detector
   ros::Publisher img_point_pub;
   ros::Publisher point_pub;
   ros::Publisher debug_img_pub;
+  ros::Publisher debug_mask_pub;
   ros::Publisher pub_bms_img;
   dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
   std::vector<cv::Mat> sources;
@@ -138,6 +139,7 @@ class LineMOD_Detector
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
+    debug_mask_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_mask", 1);
     pub_bms_img = pnh.advertise<sensor_msgs::Image>("bms_debug", 1);
     service_ = pnh.advertiseService("enable",&LineMOD_Detector::enable,this);
 
@@ -386,7 +388,7 @@ class LineMOD_Detector
           if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
                   m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
                   m.class_id == "metal_square") {
-              hull = floodFillHull(hull, display);
+              hull = floodFillHull(hull, display, color_ptr->header);
               double hull_area = cv::contourArea(hull);
               ROS_DEBUG_STREAM("Metal sample hull area: " << hull_area);
               if(hull_area>max_hull_area_ || hull_area<min_hull_area_)
@@ -612,7 +614,7 @@ class LineMOD_Detector
   }
 
   std::vector<cv::Point> floodFillHull(const std::vector<cv::Point>& hull,
-      const cv::Mat color_image)
+      const cv::Mat color_image, std_msgs::Header header)
   {
     cv::Moments M = cv::moments(hull);
     float cx = M.m10/M.m00;
@@ -634,6 +636,12 @@ class LineMOD_Detector
       cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
           0, cv::Scalar(8,8,8), cv::Scalar(8,8,8),
           (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
+      if (_publish_debug_img)
+      {
+        sensor_msgs::ImagePtr debugmsg = cv_bridge::CvImage(header,
+            "mono8",mask).toImageMsg();
+        debug_mask_pub.publish(debugmsg);
+      }
       //cv::imshow("mask",mask);
       //cv::waitKey(10);
       // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
