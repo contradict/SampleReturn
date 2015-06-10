@@ -117,8 +117,7 @@ class ManipulatorStateMachine(object):
       )
 
       @smach.cb_interface()
-      def arm_down_response_cb(userdata,
-                               input_keys = ['arm_down_maximum',
+      def arm_down_response_cb(input_keys = ['arm_down_maximum',
                                              'arm_joint_position'],
                                output_keys = ['target_bin'],
                                outcomes = ['too_high']):
