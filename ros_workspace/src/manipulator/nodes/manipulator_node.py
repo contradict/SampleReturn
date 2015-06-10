@@ -169,7 +169,7 @@ class ManipulatorStateMachine(object):
           smach_ros.ServiceState('wrist_joint/go_to_position', GoToPosition,
           request = GoToPositionRequest(self.wrist_zero_position),
           response_cb = manipulator_response_cb),
-          transitions = {'succeeded':'GET_BIN',
+          transitions = {'succeeded':'success',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       ) 
@@ -209,7 +209,7 @@ class ManipulatorStateMachine(object):
           SelectCarouselBinAction,
           goal=carousel_clear_bin,
           output_keys=['action_result']),
-          transitions = {'succeeded':'success',
+          transitions = {'succeeded':'ZERO_WRIST',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       )
