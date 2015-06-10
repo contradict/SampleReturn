@@ -6,7 +6,7 @@
           pkg="photo"
           type="photo_node"
           name="photo_node"
-          respawn_delay="10.0"
+          respawn_delay="5.0"
           respawn="true"
           ns="/cameras/search">
         <remap from="cam_img" to="image"/>
@@ -23,7 +23,7 @@
         <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
         <param name="frame_id" value="search_camera"/>
         <param name="capture_delay" type="double" value="0.15"/>
-        <param name="restart_delay" type="double" value="1.0"/>
+        <param name="restart_delay" type="double" value="7.0"/>
         <param name="error_timeout" type="double" value="5.0"/>
         <param name="gpio_servo_id" type="int" value="1"/>
         <param name="gpio_pin" type="int" value="2"/>
