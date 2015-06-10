@@ -29,7 +29,7 @@
         <param name="gpio_pin" type="int" value="2"/>
         <param name="pulse_width" type="double" value="0.1"/>
         <param name="camera_node_name" type="string" value="/cameras/search/photo_node"/>
-        <param name="restart_camera_threshold" type="int" value="5"/>
+        <param name="restart_camera_threshold" type="int" value="3"/>
         <remap from="pause_state" to="/io/pause_state"/>
         <remap from="cam_img" to="image"/>
         <remap from="cam_info" to="info"/>
