@@ -224,11 +224,17 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('DISMOUNT_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'LOOK_AT_BEACON',
-                                                  'object_detected':'LOOK_AT_BEACON',
+                                   transitions = {'complete':'ANNOUNCE_DISMOUNT',
+                                                  'object_detected':'ANNOUNCE_DISMOUNT',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'},
                                    remapping = {'stop_on_detection':'false'})
+            
+            smach.StateMachine.add('ANNOUNCE_DISMOUNT',
+                                   AnnounceState(self.announcer,
+                                                 'Hey Steve!  I made it off the platform this time.'),
+                                   transitions = {'next':'LOOK_AT_BEACON'})
+            
 
             smach.StateMachine.add('LOOK_AT_BEACON',
                                    ExecuteSimpleMove(self.simple_mover),
