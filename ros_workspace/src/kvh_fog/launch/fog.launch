@@ -20,7 +20,7 @@
         <!-- if not specified, default to local earth rate-->
         <!--
         -->
-        <param name="bias" type="double" value="-5.12e-5"/>
+        <param name="bias" type="double" value="-6.7e-5"/>
         <param name="invert_rotation" type="bool" value="true"/>
      </node>
 </launch>

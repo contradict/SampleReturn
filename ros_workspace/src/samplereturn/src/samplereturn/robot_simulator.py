@@ -75,10 +75,10 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-47, 10, 0), 'id':3},
                              {'point':geometry_msg.Point(-70, 62, 0), 'id':7},
                              {'point':geometry_msg.Point(-104, 45, 0), 'id':9},
-                             {'point':geometry_msg.Point(70, -52, 0), 'id':10},
+                             {'point':geometry_msg.Point(70, -49, 0), 'id':10},
                              {'point':geometry_msg.Point(120, 28, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
-                             {'point':geometry_msg.Point(10.8, 30.6, 0), 'id':4},
+                             {'point':geometry_msg.Point(-10.8, 30.6, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
@@ -157,7 +157,7 @@ class RobotSimulator(object):
         #odometry
         self.odometry_dt = 0.05
         odometry_noise_sigma = np.diag([0.1, 0.1, 0.01, 0.01])
-        self.odometry_noise_mean = [0.0, 0.0, 0.0005, 0.0]
+        self.odometry_noise_mean = [0.0, 0.0, 0.0002, 0.0]
         self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
