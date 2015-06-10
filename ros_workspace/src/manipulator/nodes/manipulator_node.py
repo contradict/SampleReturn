@@ -160,7 +160,7 @@ class ManipulatorStateMachine(object):
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
           response_cb = manipulator_response_cb),          
-          transitions = {'succeeded':'ZERO_WRIST',
+          transitions = {'succeeded':'GET_BIN',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       ) 
