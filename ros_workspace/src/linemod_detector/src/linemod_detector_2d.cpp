@@ -476,7 +476,7 @@ class LineMOD_Detector
       }
 
       // If no template, try BMS
-      if(!sent_something)
+      if(!sent_something && !hard_samples)
       {
           cv::Point bms_centriod;
           std::string bms_color;
