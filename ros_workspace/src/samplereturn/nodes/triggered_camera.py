@@ -281,6 +281,7 @@ class TriggeredCamera(object):
         # Just kill it here, will be restarted by
         # roslaunch respawn
         rosnode.kill_nodes([self.camera_node_name])
+        self.try_to_set_recordingmedia()
         self.start_restart_timer()
 
     def clear_queue(self, reason):
