@@ -500,6 +500,7 @@ class LineMOD_Detector
           {
               cv::RotatedRect rect = computeGripAngle(hull);
               ROS_DEBUG_STREAM("BMS success centroid: " << bms_centriod << " color: " << bms_color << " angle: " << rect.angle);
+              publishPoint(rect, "bms_blob", color_ptr->header, samplereturn_msgs::NamedPoint::BLUE_ROCK);
           }
           else
           {
