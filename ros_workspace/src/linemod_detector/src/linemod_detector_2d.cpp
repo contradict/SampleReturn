@@ -552,8 +552,8 @@ class LineMOD_Detector
       {
           for(int col=0;col<disparity_img.cols;col++)
           {
-              if(cv::pointPolygonTest(rect_points, cv::Point(col, row), false) &&
-                 disparity_img.at<float>(row, col)>min_disp)
+              if((cv::pointPolygonTest(rect_points, cv::Point(col, row), false)>0) &&
+                 (disparity_img.at<float>(row, col)>min_disp))
               {
                   interesting_disparities.push_back(disparity_img.at<float>(row, col));
               }
