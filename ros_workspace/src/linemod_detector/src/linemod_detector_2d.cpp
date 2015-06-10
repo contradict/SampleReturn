@@ -495,13 +495,13 @@ class LineMOD_Detector
       // If no template, try BMS
       if(!sent_something && !hard_samples)
       {
-          cv::Point bms_centriod;
+          cv::Point bms_centroid;
           std::string bms_color;
           std::vector<cv::Point> hull;
-          if(performBMSCheck(color_ptr->image, &bms_centriod, &bms_color, &hull))
+          if(performBMSCheck(color_ptr->image, &bms_centroid, &bms_color, &hull))
           {
               cv::RotatedRect rect = computeGripAngle(hull);
-              ROS_DEBUG_STREAM("BMS success centroid: " << bms_centriod << " color: " << bms_color << " angle: " << rect.angle);
+              ROS_DEBUG_STREAM("BMS success centroid: " << bms_centroid << " color: " << bms_color << " angle: " << rect.angle);
               publishPoint(rect, "bms_blob", color_ptr->header, samplereturn_msgs::NamedPoint::BLUE_ROCK);
           }
           else
