@@ -805,7 +805,9 @@ class LineMOD_Detector
                   for(auto &pt : *hull)
                   {
                       pt.x += mincol;
+                      pt.x *= scale;
                       pt.y += minrow;
+                      pt.y *= scale;
                   }
                   std::vector<std::vector<cv::Point> > contours;
                   contours.push_back(*hull);
