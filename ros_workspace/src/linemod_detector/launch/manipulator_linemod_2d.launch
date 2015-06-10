@@ -13,7 +13,7 @@
       <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
       <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
       <param name="template_file" type="string" value="$(find linemod_detector)/config/easy_intermediate_test.yaml"/>
-      <param name="pub_threshold" type="double" value="83.0"/>
+      <param name="pub_threshold" type="double" value="80.0"/>
       <param name="min_depth" type="double" value="0.4"/>
       <param name="max_depth" type="double" value="0.58"/>
       <param name="min_count" type="double" value="100.0"/>
