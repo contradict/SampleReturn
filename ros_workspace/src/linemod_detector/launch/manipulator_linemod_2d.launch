@@ -13,10 +13,56 @@
       <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
       <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
       <param name="template_file" type="string" value="$(find linemod_detector)/config/easy_intermediate_test.yaml"/>
-      <param name="pub_threshold" type="double" value="86.0"/>
+      <param name="pub_threshold" type="double" value="80.0"/>
+      <param name="min_depth" type="double" value="0.4"/>
+      <param name="max_depth" type="double" value="0.58"/>
+      <param name="min_count" type="double" value="100.0"/>
+      <rosparam>
+          bms_dilation_width_1: 1
+          bms_dilation_width_2: 1
+          bms_handle_border: false
+          bms_img_width: 200.0
+          bms_normalize: true
+          bms_opening_width: 3
+          bms_sample_step: 8
+          bms_thresh: 50
+          bms_thresh_on: true
+
+          exterior_colors: [green, brown]
+          interior_colors: [red, orange, pink]
+
+          filterByArea: true
+          filterByColor: true
+          filterByConvexity: false
+          blobColor: 255
+          maxArea: 10000.0
+          maxConvexity: 1.0
+          maxThreshold: 50.0
+          minArea: 400.0
+          minConvexity: 0.7
+          minDistBetweenBlobs: 15.0
+          minRepeatability: 2.0
+          minThreshold: 10.0
+          thresholdStep: 10.0
+      </rosparam>
+    </node>
+
+      <node
+        machine="search"
+        pkg="linemod_detector"
+        type="linemod_detector_2d"
+        name="hard_manipulator_linemod_detector_2d"
+        ns="/processes/sample_detection/manipulator">
+      <remap from="color" to="/cameras/manipulator/left/rect_color"/>
+      <remap from="disparity" to="/cameras/manipulator/disparity"/>
+      <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
+      <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
+      <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
+      <param name="pub_threshold" type="double" value="90.0"/>
       <param name="min_depth" type="double" value="0.4"/>
       <param name="max_depth" type="double" value="0.65"/>
       <param name="min_count" type="double" value="100.0"/>
+      <param name="hard_samples" type="bool" value="True"/>
     </node>
 
   <node
@@ -30,9 +76,9 @@
     <param name="max_cov" type="double" value="0.4"/>
     <param name="max_pub_cov" type="double" value="0.05"/>
     <param name="max_pub_vel" type="double" value="0.02"/>
-    <param name="accumulate" type="bool" value="false"/>
+    <param name="is_manipulator" type="bool" value="true"/>
     <param name="error_cov_post" type="double" value="0.1"/>
-    <param name="process_noise_cov" type="double" value="0.001"/>
+    <param name="process_noise_cov" type="double" value="0.00003"/>
     <param name="measurement_noise_cov" type="double" value="0.02"/>
     <param name="period" type="double" value="0.03"/>
     <rosparam param="color_transitions">
@@ -46,7 +92,10 @@
         yellow: [yellow, orange]
         green: [green, white]
         blue: [blue, gray, white]
-        purple: [purple, red,pink]
+        purple: [purple, red, pink]
     </rosparam>
+    <param name="certainty_inc" type="double" value="1.0"/>
+    <param name="certainty_dec" type="double" value="0.0"/>
+    <param name="certainty_thresh" type="double" value="3.0"/>
   </node>
 </launch>

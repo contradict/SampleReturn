@@ -40,6 +40,30 @@ static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
   return detector;
 }
 
+static cv::Ptr<cv::linemod::Detector> readExpandedLinemod(const std::string& filename)
+{
+  cv::Ptr<cv::linemod::Detector> detector = cv::linemod::getExpandedLINEMOD();
+
+  cv::FileStorage fs(filename, cv::FileStorage::READ);
+  cv::FileNode fn = fs["classes"];
+  for (cv::FileNodeIterator i = fn.begin(), iend = fn.end(); i != iend; ++i)
+    detector->readClass(*i);
+
+  return detector;
+}
+
+static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filename)
+{
+  cv::Ptr<cv::linemod::Detector> detector = cv::linemod::getInnerLINE();
+
+  cv::FileStorage fs(filename, cv::FileStorage::READ);
+  cv::FileNode fn = fs["classes"];
+  for (cv::FileNodeIterator i = fn.begin(), iend = fn.end(); i != iend; ++i)
+    detector->readClass(*i);
+
+  return detector;
+}
+
 static void writeLinemod(const cv::Ptr<cv::linemod::Detector>& detector, const std::string& filename)
 {
   cv::FileStorage fs(filename, cv::FileStorage::WRITE);
@@ -269,17 +293,24 @@ void computeColorMask(const cv::Mat& color, cv::Mat& mask, int r_size, int g_siz
   cv::Mat hsv_img;
   cv::cvtColor(color,hsv_img,CV_RGB2HSV_FULL);
   cv::Vec3b color_pt = hsv_img.at<cv::Vec3b>(color.size().height/2, color.size().width/2);
-  std::cout << "Target Color: " << color_pt << std::endl;
+  //std::cout << "Target Color: " << color_pt << std::endl;
   cv::Vec3b buffer;
   buffer[0] = r_size;
   buffer[1] = g_size;
   buffer[2] = b_size;
-  cv::Vec3b lower = color_pt - buffer;
-  cv::Vec3b upper = color_pt + buffer;
+  cv::Vec3b bg_color;
+  bg_color[0] = 68;
+  bg_color[1] = 130;
+  bg_color[2] = 28;
+  //cv::Vec3b lower = color_pt - buffer;
+  //cv::Vec3b upper = color_pt + buffer;
+  cv::Vec3b lower = bg_color - buffer;
+  cv::Vec3b upper = bg_color + buffer;
   cv::inRange(hsv_img, lower, upper, mask);
+  mask = 255-mask;
   mask.setTo(0,win_mask);
   //cv::imshow("win_mask", win_mask);
-  cv::imshow("exp_color_mask", mask);
+  //cv::imshow("exp_color_mask", mask);
 }
 
 
@@ -447,7 +478,7 @@ class Image_test
     b_size = 10;
 
     // Initialize LINEMOD data structures
-    Image_test::filename = "pre_cached.yaml";
+    Image_test::filename = "pre_cached_4.yaml";
     //detector = cv::linemod::getExpandedLINEMOD();
     //detector = cv::linemod::getDefaultLINEMOD();
     //detector = cv::linemod::getDefaultLINE();
@@ -480,7 +511,7 @@ class Image_test
     depth_img.convertTo(depth_img, CV_16U);
 
     Image_test::sources.push_back(Image_test::color_img);
-    Image_test::sources.push_back(depth_img);
+    //Image_test::sources.push_back(depth_img);
 
       cv::Point pt1((depth_img.cols/2)-Image_test::win_size,(depth_img.rows/2)-Image_test::win_size);
       cv::Point pt2((depth_img.cols/2)+Image_test::win_size,(depth_img.rows/2)+Image_test::win_size);
@@ -495,8 +526,13 @@ class Image_test
       subtractPlane(depth_img, mask, chain, focal_length);
       computeColorMask(Image_test::color_img, color_mask, Image_test::r_size, Image_test::g_size, Image_test::b_size, Image_test::win_size);
 
-      cv::imshow("mask", mask);
+      cv::Mat extractor_mask;
+      cv::erode(color_mask, extractor_mask, cv::Mat(), cv::Point(-1,-1), 1, cv::BORDER_REPLICATE);
+      cv::subtract(color_mask, extractor_mask, extractor_mask);
+
+      //cv::imshow("mask", mask);
       cv::imshow("test_color_mask", color_mask);
+      cv::imshow("extractor_mask", extractor_mask);
 
       char key = (char)cv::waitKey(10);
       if (key == 'q')
@@ -548,55 +584,55 @@ class Image_test
         Image_test::win_size -= 5;
         std::cout << "Win size: " << win_size << std::endl;
       }
-      else if (key == 'g')
+      else if (key == 'f')
       {
         Image_test::g_size -= 2;
         std::cout << "g size: " << g_size << std::endl;
       }
-      else if (key == 'G')
+      else if (key == 'g')
       {
         Image_test::g_size += 5;
-        std::cout << "g size: " << g_size << std::endl;
+        std::cout << "G size: " << g_size << std::endl;
       }
-      else if (key == 'r')
+      else if (key == 'e')
       {
         Image_test::r_size -= 5;
         std::cout << "r size: " << r_size << std::endl;
       }
-      else if (key == 'R')
+      else if (key == 'r')
       {
         Image_test::r_size += 5;
-        std::cout << "r size: " << r_size << std::endl;
+        std::cout << "R size: " << r_size << std::endl;
       }
-      else if (key == 'b')
+      else if (key == 'v')
       {
         Image_test::b_size -= 5;
         std::cout << "b size: " << b_size << std::endl;
       }
-      else if (key == 'B')
+      else if (key == 'b')
       {
         Image_test::b_size += 5;
-        std::cout << "b size: " << b_size << std::endl;
+        std::cout << "B size: " << b_size << std::endl;
       }
-      else if (key == 'i')
+      else if (key == 'u')
       {
         cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
         mod->weak_threshold -= float(10.0);
         std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
       }
-      else if (key == 'I')
+      else if (key == 'i')
       {
         cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
         mod->weak_threshold += float(10.0);
         std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
       }
-      else if (key == 'u')
+      else if (key == 'j')
       {
         cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
         mod->weak_threshold -= float(1.0);
         std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
       }
-      else if (key == 'U')
+      else if (key == 'k')
       {
         cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
         mod->weak_threshold += float(1.0);
@@ -674,7 +710,7 @@ class Image_test
       Image_test::sources.clear();
       cv::imshow("display",display);
       cv::imshow("color_gradient",displayQuantized(quantized_images[0]));
-      cv::imshow("depth_normals",displayQuantized(quantized_images[1]));
+      //cv::imshow("depth_normals",displayQuantized(quantized_images[1]));
   }
 
   void colorCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -710,7 +746,7 @@ class Image_test
       cv::rectangle(Image_test::display, pt1, pt2, CV_RGB(0,0,0), 3);
       cv::rectangle(Image_test::display, pt1, pt2, CV_RGB(255,255,0), 1);
       cv::circle(Image_test::display, cv::Point(lab_img.size().width/2,lab_img.size().height/2),5,CV_RGB(0,255,255),2);
-      cv::imshow("color", color_ptr->image);
+      //cv::imshow("color", color_ptr->image);
   }
 };
 

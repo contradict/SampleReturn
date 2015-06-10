@@ -3,7 +3,7 @@
 <launch>
 
     <!--Important arg, start the system paused? -->
-    <arg name="start_paused" default="False"/>
+    <arg name="start_paused" default="True"/>
     <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
 
     <arg name="user" default="robot"/>
@@ -51,7 +51,9 @@
     <include file="$(find beacon_localizer)/launch/beacon_localizer.launch"/>
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
 
+    <!--
     <include file="$(find solar_fisheye)/launch/molamola.launch"/>
+    -->
 
     <!-- Launch executive last -->
     <include file="$(find executive)/launch/executive.launch">

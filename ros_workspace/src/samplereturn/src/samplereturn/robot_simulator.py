@@ -75,10 +75,10 @@ class RobotSimulator(object):
                              {'point':geometry_msg.Point(-47, 10, 0), 'id':3},
                              {'point':geometry_msg.Point(-70, 62, 0), 'id':7},
                              {'point':geometry_msg.Point(-104, 45, 0), 'id':9},
-                             {'point':geometry_msg.Point(70, -52, 0), 'id':10},
+                             {'point':geometry_msg.Point(70, -49, 0), 'id':10},
                              {'point':geometry_msg.Point(120, 28, 0), 'id':2},
                              {'point':geometry_msg.Point(93, -72, 0), 'id':6},
-                             {'point':geometry_msg.Point(10.8, 30.6, 0), 'id':4},
+                             {'point':geometry_msg.Point(-10.8, 30.6, 0), 'id':4},
                              {'point':geometry_msg.Point(-42, 52, 0), 'id':8}]
 
         self.sample_marker = vis_msg.Marker()
@@ -106,7 +106,9 @@ class RobotSimulator(object):
         enable_wheelpods_name = "/motion/wheel_pods/enable"
         enable_carousel_name = "/motion/carousel/enable"
 
-        enable_manipulator_detector_name = "/processes/sample_detection/manipulator/enable"
+        enable_manipulator_detector_name = "/processes/sample_detection/manipulator/manipulator_linemod_detector_2d/enable"
+        enable_hard_manipulator_detector_name = "/processes/sample_detection/manipulator/hard_manipulator_linemod_detector_2d/enable"
+        
         enable_search_name = "/cameras/search/enable"
         
         select_motion_name = "/motion/CAN/select_motion_mode"
@@ -155,7 +157,7 @@ class RobotSimulator(object):
         #odometry
         self.odometry_dt = 0.05
         odometry_noise_sigma = np.diag([0.1, 0.1, 0.01, 0.01])
-        self.odometry_noise_mean = [0.0, 0.0, 0.0005, 0.0]
+        self.odometry_noise_mean = [0.0, 0.0, 0.0002, 0.0]
         self.odometry_noise_covariance = np.square(odometry_noise_sigma*self.odometry_dt)
         self.robot_pose = self.initial_pose()
         self.robot_odometry = self.initial_odometry()
@@ -209,6 +211,9 @@ class RobotSimulator(object):
         rospy.Service(enable_manipulator_detector_name,
                       samplereturn_srv.Enable,
                       self.enable_manipulator_detector)
+        rospy.Service(enable_hard_manipulator_detector_name,
+                      samplereturn_srv.Enable,
+                      self.enable_hard_manipulator_detector)
         self.manipulator_detector_enabled = False
         
         #publisher for blank images to sun_pointing
@@ -723,7 +728,11 @@ class RobotSimulator(object):
  
     def enable_manipulator_detector(self, req):
         self.manipulator_detector_enabled = req.state
-        rospy.sleep(0.5)
+        rospy.sleep(0.25)
+        return req.state
+
+    def enable_hard_manipulator_detector(self, req):
+        rospy.sleep(0.25)
         return req.state
     
     def service_enable_search_request(self, req):

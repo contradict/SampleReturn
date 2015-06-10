@@ -11,11 +11,11 @@ from samplereturn.util import wait_for_rosout
 
 class PauseSwitch(object):
     def __init__(self):
-        self.start_paused = rospy.get_param("start_paused", False)
-        self.gpio_servo_id = rospy.get_param("gpio_servo_id", 1)
-        self.button_mask = rospy.get_param("button_mask", 2)
-        self.carousel_servo_id = rospy.get_param("carousel_servo_id", 1)
-        wheelpod_servo_ids_string = rospy.get_param("wheelpod_servo_ids",
+        self.start_paused = rospy.get_param("~start_paused", False)
+        self.gpio_servo_id = rospy.get_param("~gpio_servo_id", 1)
+        self.button_mask = rospy.get_param("~button_mask", 2)
+        self.carousel_servo_id = rospy.get_param("~carousel_servo_id", 1)
+        wheelpod_servo_ids_string = rospy.get_param("~wheelpod_servo_ids",
                                                     "[2,3,4,5,6,7]")
         self.wheelpod_servo_ids =\
             [int(filter(lambda x: x.isdigit(), s)) for s in

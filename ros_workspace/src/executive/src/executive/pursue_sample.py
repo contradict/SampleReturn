@@ -118,7 +118,8 @@ class PursueSample(object):
         #total bullshit for bins
         self.state_machine.userdata.available_small_bins = [1,2,3,8,9,10]
         self.state_machine.userdata.available_big_bins = [4,5,6,7]
-        self.state_machine.userdata.big_sample_ids = [4]
+        self.state_machine.userdata.big_sample_ids = [4,6,7,10]
+        self.state_machine.userdata.active_bin_id = 0
         
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
@@ -241,8 +242,22 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
+                                     transitions = {'succeeded':'ENABLE_HARD_MANIPULATOR_DETECTOR',
                                                     'aborted':'PUBLISH_FAILURE'})
+            
+            smach.StateMachine.add('ENABLE_HARD_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'DISABLE_SEARCH_CAMERA',
+                                                    'aborted':'PUBLISH_FAILURE'})
+            
+            smach.StateMachine.add('DISABLE_SEARCH_CAMERA',
+                                    smach_ros.ServiceState('enable_search',
+                                                            platform_srv.Enable,
+                                                            request = platform_srv.EnableRequest(False)),
+                                    transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
+                                                   'aborted':'MANIPULATOR_APPROACH_MOVE'})
             
             smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
@@ -324,24 +339,25 @@ class PursueSample(object):
                                             'available_big_bins',
                                             'big_sample_ids'],
                                 output_keys=['available_small_bins',
-                                             'available_big_bins'])
+                                             'available_big_bins',
+                                             'active_bin_id'])
             def grab_goal_cb(userdata, request):
                 goal = manipulator_msg.ManipulatorGoal()
                 goal.type = goal.GRAB
                 goal.wrist_angle = userdata.latched_sample.grip_angle                    
+                #decide to put in next small or big bin
                 if (userdata.latched_sample.sample_id in userdata.big_sample_ids):
-                    if len(userdata.available_big_bins) > 0:
-                        goal.target_bin = userdata.available_big_bins.pop(0)
-                    else:
-                        goal.target_bin = 0
+                    goal.target_bin = userdata.available_big_bins[0]
+                    userdata.active_bin_id = goal.target_bin
                 else:
-                    if len(userdata.available_small_bins) > 0:
-                        goal.target_bin = userdata.available_small_bins.pop(0)
-                    else:
-                        goal.target_bin = 0                    
+                    goal.target_bin = userdata.available_small_bins[0]
+                    userdata.active_bin_id = goal.target_bin
                 goal.grip_torque = 0.7
-                rospy.loginfo("PURSUE_SAMPLE grab_goal_cb, goal: %s, sample_id: %s" % (
-                              goal, userdata.latched_sample.sample_id))
+                rospy.loginfo("PURSUE_SAMPLE target_bin: {!s}, sample_id: {!s}, goal: {!s}".format(goal.target_bin,
+                                                                                                   userdata.latched_sample.sample_id,
+                                                                                                   goal))
+                rospy.loginfo("PURSUE_SAMPLE available_small_bins: {!s}".format(userdata.available_small_bins))
+                rospy.loginfo("PURSUE_SAMPLE available_big_bins: {!s}".format(userdata.available_big_bins))
                 return goal
     
             #if Steve pauses the robot during this action, it returns preempted,
@@ -393,8 +409,22 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
-                                     transitions = {'succeeded':'ANNOUNCE_CONTINUE',
-                                                    'aborted':'ANNOUNCE_CONTINUE'})
+                                     transitions = {'succeeded':'DISABLE_HARD_MANIPULATOR_DETECTOR',
+                                                    'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'})
+            
+            smach.StateMachine.add('DISABLE_HARD_MANIPULATOR_DETECTOR',
+                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'ENABLE_SEARCH_CAMERA',
+                                                    'aborted':'ENABLE_SEARCH_CAMERA'})
+            
+            smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
+                                    smach_ros.ServiceState('enable_search',
+                                                            platform_srv.Enable,
+                                                            request = platform_srv.EnableRequest(True)),
+                                    transitions = {'succeeded':'ANNOUNCE_CONTINUE',
+                                                   'aborted':'ANNOUNCE_CONTINUE'})
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
@@ -665,14 +695,19 @@ class ConfirmSampleAcquired(smach.State):
                                        'aborted'],
                              input_keys=['latched_sample',
                                          'latched_filter_id',
-                                        'detected_sample',
-                                        'action_result',
-                                        'grab_count',
-                                        'grab_count_limit'],
+                                         'detected_sample',
+                                         'action_result',
+                                         'grab_count',
+                                         'grab_count_limit',
+                                         'active_bin_id',
+                                         'available_small_bins',
+                                         'available_big_bins'],
                              output_keys=['detected_sample',
                                           'grab_count',
                                           'action_result',
-                                          'pursuit_goal'])
+                                          'pursuit_goal',
+                                          'available_small_bins',
+                                          'available_big_bins'])
 
         self.announcer = announcer
         self.result_pub = result_pub
@@ -692,6 +727,16 @@ class ConfirmSampleAcquired(smach.State):
                                                                    success = True))
             userdata.action_result.result_string = ('sample acquired')
             userdata.action_result.result_int = userdata.latched_sample.sample_id
+            #de-allocate the bin if it isn't the last one in the list
+            rospy.loginfo("PURSUE_SAMPLE placed sample in bin: {!s}".format(userdata.active_bin_id))
+            if (userdata.active_bin_id in userdata.available_small_bins) \
+            and (len(userdata.available_small_bins) > 1):
+                used_bin = userdata.available_small_bins.pop(0)
+                rospy.loginfo("PURSUE_SAMPLE removing small_bin: {!s}".format(used_bin))
+            if (userdata.active_bin_id in userdata.available_big_bins) \
+            and (len(userdata.available_big_bins) > 1):
+                used_bin = userdata.available_big_bins.pop(0)
+                rospy.loginfo("PURSUE_SAMPLE removing big_bin: {!s}".format(used_bin))
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
             return 'sample_gone'
         else:

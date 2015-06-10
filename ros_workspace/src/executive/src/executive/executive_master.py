@@ -152,7 +152,7 @@ class ExecutiveMaster(object):
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = False,
-                                                    timeout = 10,
+                                                    timeout = 20,
                                                     announcer = self.announcer,
                                                     start_message ='Waiting for system enable'),
                                    transitions = {'next':'HOME_PLATFORM',

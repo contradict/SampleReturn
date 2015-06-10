@@ -11,4 +11,4 @@ servo_params:
 
 manipulator_correction:
     x: -0.010
-    y: -0.025
+    y:  0.000

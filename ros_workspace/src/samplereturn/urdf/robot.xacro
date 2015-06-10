@@ -267,8 +267,8 @@
     <joint name="search_camera_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="search_camera"/>
-        <!-- still considering 3 search camera angles: 20, 25, 40 degrees -->
-        <origin xyz="0.124 0.0 0.963" rpy="-1.9185 0 -1.634"/>
+        <!--  search camera angles:  20 degrees -->
+        <origin xyz="0.124 0.0 0.963" rpy="-1.920 0 -1.5708"/>
     </joint>
 
     <!--fake laser scanner-->
