@@ -214,8 +214,12 @@ class TriggeredCamera(object):
 
     def no_first_image(self, evt):
         self.clear_queue("First trigger sent, no image received, retrying.")
+        self.missing_image_count += 1
         self.wait_for_first_image_timer = None
-        self.start_trigger_timer(None)
+        if self.missing_image_count > self.restart_camera_threshold:
+            self.restart_camera()
+        else:
+            self.start_trigger_timer(None)
 
     def send_one_trigger(self):
         rospy.logdebug("Send one trigger")

@@ -25,11 +25,11 @@
           bms_normalize: true
           bms_opening_width: 3
           bms_sample_step: 8
-          bms_thresh: 50
+          bms_thresh: 40
           bms_thresh_on: true
 
           exterior_colors: [green, brown]
-          interior_colors: [red, orange, pink]
+          interior_colors: [red, orange, pink, white]
 
           filterByArea: true
           filterByColor: true
