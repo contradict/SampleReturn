@@ -410,7 +410,8 @@ class LineMOD_Detector
               cv::circle(display, rect.center, 5, cv::Scalar(255,0,255));
               if (m.class_id == "red_puck" &&
                       (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple"
-                       || dominant_color=="orange" || dominant_color=="white"))
+                       || dominant_color=="orange" || dominant_color=="white" ||
+                       dominant_color=="yellow"))
               {
                   sent_something = true;
                   LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
