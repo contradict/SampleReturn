@@ -42,6 +42,9 @@ class ManipulatorStateMachine(object):
     self.arm_up_torque = rospy.get_param('~arm_up_torque', 0.6)
     self.arm_up_standoff = rospy.get_param('~arm_up_standoff', 0.1)
     
+    #if arm position greater than this after heading down, we are too high for grabbing
+    self.arm_down_maximum = rospy.get_param('~arm_down_maximum', 3.0)
+    
     self.hand_open_position = rospy.get_param('~hand_open_position', 0.0)
     self.grip_torque = 0.5
     
@@ -67,6 +70,11 @@ class ManipulatorStateMachine(object):
     self.arm_pause = rospy.ServiceProxy('arm_joint/pause', Enable)
     self.wrist_pause = rospy.ServiceProxy('wrist_joint/pause', Enable)
     self.hand_pause = rospy.ServiceProxy('hand_joint/pause', Enable)
+    
+    rospy.Subscriber('arm_joint/state',
+                     JointState,
+                     self.arm_joint_cb,
+                     queue_size = 1 )
             
     #IMPORTANT - actions and services (including pause) will be
     #started after state machine declaration
@@ -77,6 +85,8 @@ class ManipulatorStateMachine(object):
         input_keys = ['action_goal'],
         output_keys = ['action_result']
     )
+    
+    self.sm.userdata.arm_down_maximum = self.arm_down_maximum
   
     with self.sm:
            
@@ -106,11 +116,28 @@ class ManipulatorStateMachine(object):
                          'aborted':'ERROR'}
       )
 
+      @smach.cb_interface(input_keys = ['arm_down_maximum',
+                                             'arm_joint_position'],
+                          output_keys = ['target_bin'],
+                          outcomes = ['too_high'])
+      def arm_down_response_cb(userdata, response):
+        
+        rospy.loginfo("MANIPULATOR ARM DOWN position: {!s}, limit: {!s}".format(userdata.arm_joint_position,
+                                                                                userdata.arm_down_maximum))
+        
+        if userdata.arm_joint_position > userdata.arm_down_maximum:
+          #give up and don't try to grab
+          userdata.target_bin = 0
+          return 'too_high'
+        else:
+          return 'succeeded'
+
       smach.StateMachine.add('ARM_DOWN',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(self.arm_down_velocity, self.arm_down_torque, self.arm_down_standoff),
-          response_cb = manipulator_response_cb),
+          response_cb = arm_down_response_cb),
           transitions = {'succeeded':'GRIP_SAMPLE',
+                         'too_high':'ARM_UP',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       )
@@ -133,7 +160,7 @@ class ManipulatorStateMachine(object):
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
           response_cb = manipulator_response_cb),          
-          transitions = {'succeeded':'ZERO_WRIST',
+          transitions = {'succeeded':'GET_BIN',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       ) 
@@ -142,7 +169,7 @@ class ManipulatorStateMachine(object):
           smach_ros.ServiceState('wrist_joint/go_to_position', GoToPosition,
           request = GoToPositionRequest(self.wrist_zero_position),
           response_cb = manipulator_response_cb),
-          transitions = {'succeeded':'GET_BIN',
+          transitions = {'succeeded':'success',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       ) 
@@ -182,7 +209,7 @@ class ManipulatorStateMachine(object):
           SelectCarouselBinAction,
           goal=carousel_clear_bin,
           output_keys=['action_result']),
-          transitions = {'succeeded':'success',
+          transitions = {'succeeded':'ZERO_WRIST',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       )
@@ -242,10 +269,19 @@ class ManipulatorStateMachine(object):
                                         self.sm,
                                         '/START_MANIPULATOR')
     sls.start()
+
+    #subscribe to arm_joint state
+    rospy.Subscriber('arm_joint/state',
+                     JointState,
+                     self.arm_joint_cb,
+                     queue_size = 1 )
   
     #start action servers and services
     manipulator_action_server.run_server()
     self.pause_service = rospy.Service('pause', Enable, self.service_pause)
+  
+  def arm_joint_cb(self, msg):
+    self.sm.userdata.arm_joint_position = msg.current_pos
     
   def service_pause(self, req):
     self.paused = req.state

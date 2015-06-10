@@ -214,8 +214,12 @@ class TriggeredCamera(object):
 
     def no_first_image(self, evt):
         self.clear_queue("First trigger sent, no image received, retrying.")
+        self.missing_image_count += 1
         self.wait_for_first_image_timer = None
-        self.start_trigger_timer(None)
+        if self.missing_image_count > self.restart_camera_threshold:
+            self.restart_camera()
+        else:
+            self.start_trigger_timer(None)
 
     def send_one_trigger(self):
         rospy.logdebug("Send one trigger")
@@ -276,7 +280,8 @@ class TriggeredCamera(object):
     def restart_camera(self):
         # Just kill it here, will be restarted by
         # roslaunch respawn
-        rosnode.kill_nodes(self.camera_node_name)
+        rosnode.kill_nodes([self.camera_node_name])
+        self.try_to_set_recordingmedia()
         self.start_restart_timer()
 
     def clear_queue(self, reason):
