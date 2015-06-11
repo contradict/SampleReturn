@@ -23,6 +23,8 @@
     <param name="maxArea" type="double" value="10000.0"/>
     <param name="minRealArea_bluewhitegray" type="double" value="15"/>
     <param name="maxRealArea_bluewhitegray" type="double" value="200"/>
+    <param name="minRealArea_yellow" type="double" value="10"/>
+    <param name="maxRealArea_yellow" type="double" value="200"/>
   </node>
 
   <node
