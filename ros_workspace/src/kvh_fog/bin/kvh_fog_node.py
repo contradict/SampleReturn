@@ -41,10 +41,6 @@ class KVHFOGNode(object):
         self._pub = rospy.Publisher("imu", Imu, queue_size=10)
         self._avg_srv = rospy.Service("measure_bias", MeasureBias,
                 self.handle_averaging)
-        self._runthread = threading.Thread(target=self.run)
-
-    def start(self):
-        self._runthread.start()
 
     def open(self):
         self._gyro = driver.DSP3000(self._port)
@@ -152,5 +148,4 @@ class KVHFOGNode(object):
 if __name__ == "__main__":
     rospy.init_node("kvh_fog")
     node = KVHFOGNode()
-    node.start()
-    rospy.spin()
+    node.run()
