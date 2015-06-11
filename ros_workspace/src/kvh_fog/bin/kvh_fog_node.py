@@ -62,7 +62,7 @@ class KVHFOGNode(object):
         while not rospy.is_shutdown():
             try:
                 now, valid, angle = self._gyro.read()
-            except driver.SerialException, e:
+            except (driver.SerialException, OSError), e:
                 rospy.logerr("Error reading from device: %s", e)
                 rospy.logerr("Retry in %f.", self._reopen_delay)
                 self._gyro.close()
