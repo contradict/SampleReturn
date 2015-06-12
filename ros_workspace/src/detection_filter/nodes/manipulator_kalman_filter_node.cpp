@@ -408,7 +408,7 @@ class KalmanDetectionFilter
     ROS_DEBUG("Number of Filters: %lu", filter_list_.size());
     geometry_msgs::PointStamped temp_msg, temp_msg_base_link;
     temp_msg.header.frame_id = "odom";
-    temp_msg.header.stamp = ros::Time::now();
+    temp_msg.header.stamp = ros::Time(0);
 
     cv::Mat img = cv::Mat::zeros(500, 500, CV_8UC3);
     float px_per_meter = 50.0;
@@ -418,13 +418,15 @@ class KalmanDetectionFilter
       temp_msg.point.y = filter_ptr.filter->statePost.at<float>(1);
       temp_msg.point.z = 0.0;
 
-      try {
-        listener_.waitForTransform("base_link", "odom", temp_msg.header.stamp, ros::Duration(0.2));
+      if( listener_.canTransform( "base_link", temp_msg.header.frame_id, temp_msg.header.stamp))
+      {
+        listener_.transformPoint("base_link",temp_msg,temp_msg_base_link);
       }
-      catch (tf::TransformException e) {
-        ROS_ERROR_STREAM("Aww shit " << e.what());
+      else
+      {
+        ROS_ERROR_STREAM("cannot transform filter from odom to base_link");
+        continue;
       }
-      listener_.transformPoint("base_link",temp_msg,temp_msg_base_link);
 
       cv::Point mean(temp_msg_base_link.point.x * px_per_meter,
           temp_msg_base_link.point.y * px_per_meter);
