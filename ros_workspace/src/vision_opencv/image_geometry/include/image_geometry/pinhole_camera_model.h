@@ -5,7 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/gpu/gpu.hpp>
+#include <opencv2/core/cuda.hpp>
 #include <stdexcept>
 
 namespace image_geometry {
@@ -114,9 +114,9 @@ public:
   void rectifyImage(const cv::Mat& raw, cv::Mat& rectified,
                     int interpolation = cv::INTER_LINEAR) const;
 
-  void rectifyImageGPU(const cv::gpu::GpuMat& raw, cv::gpu::GpuMat& rectified,
+  void rectifyImageGPU(const cv::cuda::GpuMat& raw, cv::cuda::GpuMat& rectified,
                     int interpolation = cv::INTER_LINEAR,
-                    cv::gpu::Stream& strm=cv::gpu::Stream::Null()) const;
+                    cv::cuda::Stream& strm=cv::cuda::Stream::Null()) const;
 
   /**
    * \brief Apply camera distortion to a rectified image.
