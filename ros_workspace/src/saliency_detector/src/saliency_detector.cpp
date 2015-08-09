@@ -29,12 +29,12 @@ class SaliencyDetectorNode
   ros::Publisher pub_sub_img;
   ros::Publisher pub_sub_mask;
   ros::Publisher pub_named_point;
-  string img_topic;
-  string bms_debug_topic;
-  string sub_debug_topic;
-  string sub_mask_debug_topic;
-  string named_point_topic;
-  string sub_camera_info_topic;
+  std::string img_topic;
+  std::string bms_debug_topic;
+  std::string sub_debug_topic;
+  std::string sub_mask_debug_topic;
+  std::string named_point_topic;
+  std::string sub_camera_info_topic;
 
   boost::mutex saliency_mutex_;
 
@@ -81,12 +81,12 @@ class SaliencyDetectorNode
     dr_srv.setCallback(cb);
 
     ros::NodeHandle private_node_handle_("~");
-    private_node_handle_.param("img_topic", img_topic, string("/cameras/search/image"));
-    private_node_handle_.param("bms_debug_topic", bms_debug_topic, string("bms_img"));
-    private_node_handle_.param("sub_debug_topic", sub_debug_topic, string("sub_img"));
-    private_node_handle_.param("sub_mask_debug_topic", sub_mask_debug_topic, string("sub_mask"));
-    private_node_handle_.param("named_point_topic", named_point_topic, string("named_point"));
-    private_node_handle_.param("camera_info_topic", sub_camera_info_topic, string("/cameras/search/info"));
+    private_node_handle_.param("img_topic", img_topic, std::string("/cameras/search/image"));
+    private_node_handle_.param("bms_debug_topic", bms_debug_topic, std::string("bms_img"));
+    private_node_handle_.param("sub_debug_topic", sub_debug_topic, std::string("sub_img"));
+    private_node_handle_.param("sub_mask_debug_topic", sub_mask_debug_topic, std::string("sub_mask"));
+    private_node_handle_.param("named_point_topic", named_point_topic, std::string("named_point"));
+    private_node_handle_.param("camera_info_topic", sub_camera_info_topic, std::string("/cameras/search/info"));
 
     private_node_handle_.getParam("interior_colors",interior_colors_);
     private_node_handle_.getParam("exterior_colors",exterior_colors_);
@@ -125,7 +125,8 @@ class SaliencyDetectorNode
     blob_params_.filterByConvexity = false;
     blob_params_.filterByInertia = false;
     blob_params_.minDistBetweenBlobs = 50.;
-    blob_ = cv::SimpleBlobDetector(blob_params_);
+    blob_ = cv::SimpleBlobDetector();
+    blob_.create(blob_params_);
   }
 
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& msg)
@@ -163,7 +164,7 @@ class SaliencyDetectorNode
 
     cv::Mat debug_bms_img_color;
 
-    vector<cv::KeyPoint> kp;
+    std::vector<cv::KeyPoint> kp;
 
     if (blobDetect_on_) {
       cv::Mat blob_copy = debug_bms_img_.clone();
@@ -193,9 +194,9 @@ class SaliencyDetectorNode
       exteriorColor = cn_.computeExteriorColor(sub_img,sub_mask);
       interiorColor = cn_.computeInteriorColor(sub_img,sub_mask,exteriorColor);
 
-      string dominant_color = cn_.getDominantColor(interiorColor);
+      std::string dominant_color = cn_.getDominantColor(interiorColor);
       std::cout << "Dominant color " << dominant_color << std::endl;
-      string dominant_exterior_color = cn_.getDominantColor(exteriorColor);
+      std::string dominant_exterior_color = cn_.getDominantColor(exteriorColor);
       std::cout << "Dominant exterior color " << dominant_exterior_color << std::endl;
 
       cv::putText(debug_bms_img_color, dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
@@ -239,7 +240,7 @@ class SaliencyDetectorNode
   }
 
   bool checkContourSize(const cv::Mat region, const cv::Point3d ray, float scale,
-      const std_msgs::Header header, string color)
+      const std_msgs::Header header, std::string color)
   {
       std::vector<std::vector<cv::Point> > contours;
       std::vector<cv::Vec4i> hierarchy;
@@ -346,7 +347,8 @@ class SaliencyDetectorNode
     blob_params_.thresholdStep = config.thresholdStep;
     blob_params_.minRepeatability = config.minRepeatability;
 
-    blob_ = cv::SimpleBlobDetector(blob_params_);
+    blob_ = cv::SimpleBlobDetector();
+    blob_.create(blob_params_);
 
     filter_by_real_area_ = config.filterbyRealArea;
     min_real_area_ = config.minRealArea;
