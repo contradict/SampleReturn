@@ -69,7 +69,7 @@ static void writeLinemod(const cv::Ptr<cv::linemod::Detector>& detector, const s
   cv::FileStorage fs(filename, cv::FileStorage::WRITE);
   detector->write(fs);
 
-  std::vector<std::string> ids = detector->classIds();
+  std::vector<cv::String> ids = detector->classIds();
   fs << "classes" << "[";
   for (int i = 0; i < (int)ids.size(); ++i)
   {
@@ -616,32 +616,32 @@ class Image_test
       }
       else if (key == 'u')
       {
-        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
-        mod->weak_threshold -= float(10.0);
-        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+        cv::Ptr<cv::linemod::Modality> mod = detector->getModalities()[0];
+        mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold -= float(10.0);
+        std::cout << "Weak Threshold: " << mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold << std::endl;
       }
       else if (key == 'i')
       {
-        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
-        mod->weak_threshold += float(10.0);
-        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+        cv::Ptr<cv::linemod::Modality> mod = detector->getModalities()[0];
+        mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold += float(10.0);
+        std::cout << "Weak Threshold: " << mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold << std::endl;
       }
       else if (key == 'j')
       {
-        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
-        mod->weak_threshold -= float(1.0);
-        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+        cv::Ptr<cv::linemod::Modality> mod = detector->getModalities()[0];
+        mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold -= float(1.0);
+        std::cout << "Weak Threshold: " << mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold << std::endl;
       }
       else if (key == 'k')
       {
-        cv::Ptr<cv::linemod::ColorGradient> mod = detector->getModalities()[0];
-        mod->weak_threshold += float(1.0);
-        std::cout << "Weak Threshold: " << mod->weak_threshold << std::endl;
+        cv::Ptr<cv::linemod::Modality> mod = detector->getModalities()[0];
+        mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold += float(1.0);
+        std::cout << "Weak Threshold: " << mod.dynamicCast<cv::linemod::ColorGradient>()->weak_threshold << std::endl;
       }
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
-      std::vector<std::string> class_ids;
+      std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
       Image_test::detector->match(sources, (float)Image_test::matching_threshold, matches, class_ids, quantized_images);
 

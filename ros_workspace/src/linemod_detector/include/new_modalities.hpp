@@ -1,9 +1,10 @@
-#include <opencv2/objdetect/objdetect.hpp>
-#include "opencv2/imgproc/imgproc.hpp"
-#include "opencv2/imgproc/imgproc_c.h"
-#include "opencv2/core/core_c.h"
-#include "opencv2/core/internal.hpp"
-#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/rgbd/linemod.hpp>
+#include <opencv2/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/imgproc/imgproc_c.h>
+#include <opencv2/core/core_c.h>
+#include <opencv2/core/internal.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 #include <iostream>
 
@@ -35,7 +36,7 @@ public:
    */
   InnerColorGradient(float weak_threshold, size_t num_features, float strong_threshold);
 
-  virtual std::string name() const;
+  cv::String name() const;
 
   virtual void read(const FileNode& fn);
   virtual void write(FileStorage& fs) const;

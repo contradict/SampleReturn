@@ -10,6 +10,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/rgbd/linemod.hpp>
 
 // Function prototypes
 void drawResponse(const std::vector<cv::linemod::Template>& templates,
@@ -176,7 +177,7 @@ class LineMOD_Detector
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
-      std::vector<std::string> class_ids;
+      std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
       LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
@@ -242,7 +243,7 @@ class LineMOD_Detector
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
-      std::vector<std::string> class_ids;
+      std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
       LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
