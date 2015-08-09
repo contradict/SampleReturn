@@ -112,30 +112,17 @@ public:
    * \brief Rectify a raw camera image.
    */
   void rectifyImage(const cv::Mat& raw, cv::Mat& rectified,
-#if OPENCV3
                     int interpolation = cv::INTER_LINEAR) const;
-#else
-                    int interpolation = CV_INTER_LINEAR) const;
-#endif
+
   void rectifyImageGPU(const cv::gpu::GpuMat& raw, cv::gpu::GpuMat& rectified,
-#if OPENCV3
                     int interpolation = cv::INTER_LINEAR,
-#else
-                    int interpolation = CV_INTER_LINEAR,
-#endif
                     cv::gpu::Stream& strm=cv::gpu::Stream::Null()) const;
-
-
 
   /**
    * \brief Apply camera distortion to a rectified image.
    */
   void unrectifyImage(const cv::Mat& rectified, cv::Mat& raw,
-#if OPENCV3
                       int interpolation = cv::INTER_LINEAR) const;
-#else
-                      int interpolation = CV_INTER_LINEAR) const;
-#endif
 
   /**
    * \brief Compute the rectified image coordinates of a pixel in the raw image.
