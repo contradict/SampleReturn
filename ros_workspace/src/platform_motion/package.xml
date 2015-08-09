@@ -51,7 +51,7 @@
     <run_depend>rviz</run_depend>
 
     <export>
-        <rviz plugin="${prefix}/plugin_description.xml"/>
+        <!-- <rviz plugin="${prefix}/plugin_description.xml"/> -->
     </export>
 
 </package>
