@@ -3,11 +3,11 @@
 *
 *  Copyright (c) 2014, Kei Okada.
 *  All rights reserved.
-* 
+*
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions
 *  are met:
-* 
+*
 *   * Redistributions of source code must retain the above copyright
 *     notice, this list of conditions and the following disclaimer.
 *   * Redistributions in binary form must reproduce the above
@@ -17,7 +17,7 @@
 *   * Neither the name of the Kei Okada nor the names of its
 *     contributors may be used to endorse or promote products derived
 *     from this software without specific prior written permission.
-* 
+*
 *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -104,7 +104,7 @@ class LKFlowNodelet : public nodelet::Nodelet
   {
     do_work(msg, cam_info->header.frame_id);
   }
-  
+
   void imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     do_work(msg, msg->header.frame_id);
@@ -131,6 +131,10 @@ class LKFlowNodelet : public nodelet::Nodelet
     {
       // Convert the image into something opencv can handle.
       cv::Mat image = cv_bridge::toCvShare(msg, msg->encoding)->image;
+      if (msg->encoding == sensor_msgs::image_encodings::RGB8 ||
+          msg->encoding == sensor_msgs::image_encodings::RGB16) {
+        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+      }
 
       // Messages
       opencv_apps::FlowArrayStamped flows_msg;
@@ -150,7 +154,11 @@ class LKFlowNodelet : public nodelet::Nodelet
       cv::TermCriteria termcrit(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS, 20, 0.03);
       cv::Size subPixWinSize(10,10), winSize(31,31);
 
-      cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+      if ( image.channels() > 1 ) {
+        cv::cvtColor( image, gray, cv::COLOR_BGR2GRAY );
+      } else {
+        image.copyTo(gray);
+      }
 
       if( nightMode )
         image = cv::Scalar::all(0);
@@ -338,7 +346,7 @@ public:
     initialize_points_service_ = local_nh_.advertiseService("initialize_points", &LKFlowNodelet::initialize_points_cb, this);
     delete_points_service_ = local_nh_.advertiseService("delete_points", &LKFlowNodelet::delete_points_cb, this);
     toggle_night_mode_service_ = local_nh_.advertiseService("toggle_night_mode", &LKFlowNodelet::toggle_night_mode_cb, this);
-        
+
     if( debug_view_ ) {
       subscriber_count_++;
     }
