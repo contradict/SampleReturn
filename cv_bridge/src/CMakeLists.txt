@@ -1,6 +1,7 @@
 # add library
-add_library(${PROJECT_NAME} cv_bridge.cpp)
-add_dependencies(${PROJECT_NAME} sensor_msgs_gencpp)
+include_directories(./)
+add_library(${PROJECT_NAME} cv_bridge.cpp rgb_colors.cpp)
+add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} ${catkin_LIBRARIES})
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
@@ -34,7 +35,7 @@ if (PYTHON_VERSION_MAJOR VERSION_EQUAL 3)
   add_definitions(-DPYTHON3)
 endif()
 
-if (OpenCV_VERSION VERSION_EQUAL "3")
+if (OpenCV_VERSION_MAJOR VERSION_EQUAL 3)
 add_library(${PROJECT_NAME}_boost module.cpp module_opencv3.cpp)
 else()
 add_library(${PROJECT_NAME}_boost module.cpp module_opencv2.cpp)

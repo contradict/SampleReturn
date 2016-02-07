@@ -1,6 +1,6 @@
 <package>
   <name>vision_opencv</name>
-  <version>1.11.8</version>
+  <version>1.11.11</version>
   <description>Packages for interfacing ROS with OpenCV, a library of programming functions for real time computer vision.</description>
   <author>Patrick Mihelich</author>
   <author>James Bowman</author>
@@ -16,7 +16,7 @@
   <!-- Old stack contents -->
   <run_depend>cv_bridge</run_depend>
   <run_depend>image_geometry</run_depend>
-
+  <run_depend>opencv_apps</run_depend>
   <export>
     <metapackage/>
   </export>
