@@ -1,5 +1,7 @@
 #include "image_geometry/stereo_camera_model.h"
 
+#include <opencv2/cudastereo.hpp>
+
 namespace image_geometry {
 
 StereoCameraModel::StereoCameraModel()
@@ -138,17 +140,18 @@ void StereoCameraModel::projectDisparityImageTo3d(const cv::Mat& disparity, cv::
 }
 
 void StereoCameraModel::projectDisparityImageTo3dGPU(
-        const cv::gpu::GpuMat& disparity,
-        cv::gpu::GpuMat& point_cloud,
+        const cv::cuda::GpuMat& disparity,
+        cv::cuda::GpuMat& point_cloud,
         bool handleMissingValues,
-        cv::gpu::Stream& strm) const
+        cv::cuda::Stream& strm) const
 {
   assert( initialized() );
 
   cv::Mat Qdouble(Q_);
   cv::Mat Qfloat(4, 4, CV_32F);
   Qdouble.convertTo( Qfloat, CV_32F);
-  cv::gpu::reprojectImageTo3D(disparity, point_cloud, Qfloat, 3, handleMissingValues, strm);
+  //cv::cuda::reprojectImageTo3D(disparity, point_cloud, Qfloat, 3, handleMissingValues, strm);
+  cv::cuda::reprojectImageTo3D(disparity, point_cloud, Qfloat, 3, strm);
 }
 
 } //namespace image_geometry

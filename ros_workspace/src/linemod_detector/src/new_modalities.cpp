@@ -352,7 +352,7 @@ InnerColorGradient::InnerColorGradient(float _weak_threshold, size_t _num_featur
 
 static const char ICG_NAME[] = "InnerColorGradient";
 
-std::string InnerColorGradient::name() const
+cv::String InnerColorGradient::name() const
 {
   return ICG_NAME;
 }

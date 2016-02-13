@@ -5,7 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/gpu/gpu.hpp>
+#include <opencv2/core/cuda.hpp>
 #include <stdexcept>
 
 namespace image_geometry {
@@ -112,30 +112,17 @@ public:
    * \brief Rectify a raw camera image.
    */
   void rectifyImage(const cv::Mat& raw, cv::Mat& rectified,
-#if OPENCV3
                     int interpolation = cv::INTER_LINEAR) const;
-#else
-                    int interpolation = CV_INTER_LINEAR) const;
-#endif
-  void rectifyImageGPU(const cv::gpu::GpuMat& raw, cv::gpu::GpuMat& rectified,
-#if OPENCV3
+
+  void rectifyImageGPU(const cv::cuda::GpuMat& raw, cv::cuda::GpuMat& rectified,
                     int interpolation = cv::INTER_LINEAR,
-#else
-                    int interpolation = CV_INTER_LINEAR,
-#endif
-                    cv::gpu::Stream& strm=cv::gpu::Stream::Null()) const;
-
-
+                    cv::cuda::Stream& strm=cv::cuda::Stream::Null()) const;
 
   /**
    * \brief Apply camera distortion to a rectified image.
    */
   void unrectifyImage(const cv::Mat& rectified, cv::Mat& raw,
-#if OPENCV3
                       int interpolation = cv::INTER_LINEAR) const;
-#else
-                      int interpolation = CV_INTER_LINEAR) const;
-#endif
 
   /**
    * \brief Compute the rectified image coordinates of a pixel in the raw image.

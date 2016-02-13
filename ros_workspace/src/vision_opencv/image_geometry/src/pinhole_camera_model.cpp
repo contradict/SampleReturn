@@ -1,7 +1,7 @@
 #include "image_geometry/pinhole_camera_model.h"
 #include <sensor_msgs/distortion_models.h>
 #include <boost/make_shared.hpp>
-#include <opencv2/gpu/gpu.hpp>
+#include <opencv2/cudawarping.hpp>
 
 namespace image_geometry {
 
@@ -20,7 +20,7 @@ struct PinholeCameraModel::Cache
   mutable bool reduced_maps_dirty;
   mutable cv::Mat reduced_map1, reduced_map2;
   mutable cv::Mat reduced_map1_float, reduced_map2_float;
-  mutable cv::gpu::GpuMat gpu_reduced_map1, gpu_reduced_map2;
+  mutable cv::cuda::GpuMat gpu_reduced_map1, gpu_reduced_map2;
   
   mutable bool rectified_roi_dirty;
   mutable cv::Rect rectified_roi;
@@ -131,7 +131,7 @@ bool PinholeCameraModel::fromCameraInfo(const sensor_msgs::CameraInfo& msg)
   // Figure out how to handle the distortion
   if (cam_info_.distortion_model == sensor_msgs::distortion_models::PLUMB_BOB ||
       cam_info_.distortion_model == sensor_msgs::distortion_models::RATIONAL_POLYNOMIAL) {
-    cache_->distortion_state = (cam_info_.D[0] == 0.0) ? NONE : CALIBRATED;
+    cache_->distortion_state = (cam_info_.D.size() == 0 || (cam_info_.D[0] == 0.0)) ? NONE : CALIBRATED;
   }
   else
     cache_->distortion_state = UNKNOWN;
@@ -297,9 +297,9 @@ void PinholeCameraModel::rectifyImage(const cv::Mat& raw, cv::Mat& rectified, in
   }
 }
 
-void PinholeCameraModel::rectifyImageGPU(const cv::gpu::GpuMat& raw,
-        cv::gpu::GpuMat& rectified, int interpolation,
-        cv::gpu::Stream& strm) const
+void PinholeCameraModel::rectifyImageGPU(const cv::cuda::GpuMat& raw,
+        cv::cuda::GpuMat& rectified, int interpolation,
+        cv::cuda::Stream& strm) const
 {
   assert( initialized() );
 
@@ -309,7 +309,7 @@ void PinholeCameraModel::rectifyImageGPU(const cv::gpu::GpuMat& raw,
       break;
     case CALIBRATED:
       initRectificationMaps(true);
-      cv::gpu::remap(raw, rectified, cache_->gpu_reduced_map1, cache_->gpu_reduced_map2, interpolation, strm);
+      cv::cuda::remap(raw, rectified, cache_->gpu_reduced_map1, cache_->gpu_reduced_map2, interpolation, cv::BORDER_CONSTANT, cv::Scalar(), strm);
       break;
     default:
       assert(cache_->distortion_state == UNKNOWN);

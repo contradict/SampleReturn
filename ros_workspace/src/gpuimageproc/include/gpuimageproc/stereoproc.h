@@ -1,7 +1,7 @@
 #include <boost/thread/lock_guard.hpp>
 
 #include <opencv2/opencv.hpp>
-#include <opencv2/gpu/gpu.hpp>
+#include <opencv2/core/cuda.hpp>
 
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
@@ -14,6 +14,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <sensor_msgs/Image.h>
 #include <stereo_msgs/DisparityImage.h>
+#include <opencv2/cudastereo.hpp>
 
 #include "gpuimageproc/GPUConfig.h"
 #include "gpuimageproc/connectedtopics.h"
@@ -53,7 +54,7 @@ class Stereoproc : public nodelet::Nodelet
 
   stereo_msgs::DisparityImagePtr disp_msg_;
   cv::Mat_<float> disp_msg_data_;
-  cv::gpu::CudaMem filter_buf_;
+  cv::cuda::HostMem filter_buf_;
 
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
@@ -64,10 +65,10 @@ class Stereoproc : public nodelet::Nodelet
   // Processing state (note: only safe because we're single-threaded!)
   image_geometry::StereoCameraModel model_;
 
-  cv::gpu::StereoBM_GPU block_matcher_;
+  cv::Ptr<cv::cuda::StereoBM> block_matcher_;
   const int block_matcher_min_disparity_ = 0;
 
-  cv::gpu::StereoConstantSpaceBP csbp_;
+  cv::Ptr<cv::cuda::StereoConstantSpaceBP> csbp_;
 
   void connectCb();
 

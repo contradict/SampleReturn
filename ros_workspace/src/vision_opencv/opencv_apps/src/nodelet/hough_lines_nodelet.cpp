@@ -3,11 +3,11 @@
 *
 *  Copyright (c) 2014, Kei Okada.
 *  All rights reserved.
-* 
+*
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions
 *  are met:
-* 
+*
 *   * Redistributions of source code must retain the above copyright
 *     notice, this list of conditions and the following disclaimer.
 *   * Redistributions in binary form must reproduce the above
@@ -17,7 +17,7 @@
 *   * Neither the name of the Kei Okada nor the names of its
 *     contributors may be used to endorse or promote products derived
 *     from this software without specific prior written permission.
-* 
+*
 *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -100,7 +100,7 @@ class HoughLinesNodelet : public nodelet::Nodelet
   {
     do_work(msg, cam_info->header.frame_id);
   }
-  
+
   void imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     do_work(msg, msg->header.frame_id);
@@ -127,7 +127,11 @@ class HoughLinesNodelet : public nodelet::Nodelet
       std::vector<cv::Rect> faces;
       cv::Mat src_gray, edges;
 
-      cv::cvtColor( frame, src_gray, cv::COLOR_BGR2GRAY );
+      if ( frame.channels() > 1 ) {
+        cv::cvtColor( frame, src_gray, cv::COLOR_BGR2GRAY );
+      } else {
+        src_gray = frame;
+      }
       /// Apply Canny edge detector
       Canny( src_gray, edges, 50, 200, 3 );
 
@@ -146,11 +150,7 @@ class HoughLinesNodelet : public nodelet::Nodelet
       }
 
       /// Initialize
-#if OPENCV3
       cv::cvtColor( edges, frame, cv::COLOR_GRAY2BGR );
-#else
-      cv::cvtColor( edges, frame, CV_GRAY2BGR );
-#endif
 
       switch (config_.hough_type) {
         case hough_lines::HoughLines_Standard_Hough_Transform:
@@ -167,10 +167,10 @@ class HoughLinesNodelet : public nodelet::Nodelet
               double cos_t = cos(t), sin_t = sin(t);
               double x0 = r*cos_t, y0 = r*sin_t;
               double alpha = 1000;
-              
+
               cv::Point pt1( cvRound(x0 + alpha*(-sin_t)), cvRound(y0 + alpha*cos_t) );
               cv::Point pt2( cvRound(x0 - alpha*(-sin_t)), cvRound(y0 - alpha*cos_t) );
-#if OPENCV3
+#ifndef CV_VERSION_EPOCH
               cv::line( frame, pt1, pt2, cv::Scalar(255,0,0), 3, cv::LINE_AA);
 #else
               cv::line( frame, pt1, pt2, cv::Scalar(255,0,0), 3, CV_AA);
@@ -197,7 +197,7 @@ class HoughLinesNodelet : public nodelet::Nodelet
             for( size_t i = 0; i < p_lines.size(); i++ )
             {
               cv::Vec4i l = p_lines[i];
-#if OPENCV3
+#ifndef CV_VERSION_EPOCH
               cv::line( frame, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255,0,0), 3, cv::LINE_AA);
 #else
               cv::line( frame, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255,0,0), 3, CV_AA);
@@ -221,7 +221,7 @@ class HoughLinesNodelet : public nodelet::Nodelet
       }
 
       // Publish the image.
-      sensor_msgs::Image::Ptr out_img = cv_bridge::CvImage(msg->header, msg->encoding,frame).toImageMsg();
+      sensor_msgs::Image::Ptr out_img = cv_bridge::CvImage(msg->header, "bgr8", frame).toImageMsg();
       img_pub_.publish(out_img);
       msg_pub_.publish(lines_msg);
     }
@@ -301,7 +301,7 @@ public:
     ros::SubscriberStatusCallback msg_disconnect_cb = boost::bind(&HoughLinesNodelet::msg_disconnectCb, this, _1);
     img_pub_ = image_transport::ImageTransport(local_nh_).advertise("image", 1, img_connect_cb, img_disconnect_cb);
     msg_pub_ = local_nh_.advertise<opencv_apps::LineArrayStamped>("lines", 1, msg_connect_cb, msg_disconnect_cb);
-        
+
     if( debug_view_ ) {
       subscriber_count_++;
     }

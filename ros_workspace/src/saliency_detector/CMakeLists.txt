@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules)
 
 find_package(Eigen REQUIRED)
+find_package(OpenCV)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -138,6 +139,7 @@ add_library(color_naming
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
    )
 
  target_link_libraries(saliency_detector_node

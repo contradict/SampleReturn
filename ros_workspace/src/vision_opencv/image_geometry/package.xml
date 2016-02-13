@@ -1,6 +1,6 @@
-<package>
+<package format="2">
   <name>image_geometry</name>
-  <version>1.11.7</version>
+  <version>1.11.11</version>
   <description>
     `image_geometry` contains C++ and Python libraries for interpreting images
     geometrically. It interfaces the calibration parameters in sensor_msgs/CameraInfo
@@ -22,7 +22,9 @@
   <build_depend>python-opencv</build_depend>
   <build_depend>sensor_msgs</build_depend>
 
-  <run_depend>libopencv-dev</run_depend>
-  <run_depend>python-opencv</run_depend>
-  <run_depend>sensor_msgs</run_depend>
+  <exec_depend>libopencv-dev</exec_depend>
+  <exec_depend>python-opencv</exec_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+
+  <doc_depend>dvipng</doc_depend>
 </package>

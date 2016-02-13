@@ -311,7 +311,7 @@ class LineMOD_Detector
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
-      std::vector<std::string> class_ids;
+      std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
       LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
@@ -744,9 +744,10 @@ class LineMOD_Detector
       blob_params.thresholdStep = _config.thresholdStep;
       blob_params.minRepeatability = _config.minRepeatability;
 
-      cv::SimpleBlobDetector blob(blob_params);
+      cv::SimpleBlobDetector blob;
+      blob.create(blob_params);
 
-      vector<cv::KeyPoint> kp;
+      std::vector<cv::KeyPoint> kp;
 
       cv::Mat debug_bms_img_color;
 
@@ -781,7 +782,7 @@ class LineMOD_Detector
 
           *dominant_color = cn.getDominantColor(interiorColor);
           ROS_DEBUG_STREAM("Dominant color " << *dominant_color);
-          string dominant_exterior_color = cn.getDominantColor(exteriorColor);
+          std::string dominant_exterior_color = cn.getDominantColor(exteriorColor);
           ROS_DEBUG_STREAM("Dominant exterior color " << dominant_exterior_color);
 
           cv::putText(debug_bms_img_color, *dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,

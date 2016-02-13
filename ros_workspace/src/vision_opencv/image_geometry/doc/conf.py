@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# cv_bridge documentation build configuration file, created by
+# image_geometry documentation build configuration file, created by
 # sphinx-quickstart on Mon Jun  1 14:21:53 2009.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -11,8 +11,6 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import roslib
-roslib.load_manifest('cv_bridge')
 import sys, os
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -39,7 +37,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'cv_bridge'
+project = u'image_geometry'
 copyright = u'2009, Willow Garage, Inc.'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -122,7 +120,7 @@ html_theme = 'default'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+#html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -160,7 +158,7 @@ html_static_path = ['_static']
 #html_file_suffix = ''
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'cv_bridgedoc'
+htmlhelp_basename = 'image_geometrydoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -174,7 +172,7 @@ htmlhelp_basename = 'cv_bridgedoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'cv_bridge.tex', u'stereo\\_utils Documentation',
+  ('index', 'image_geometry.tex', u'stereo\\_utils Documentation',
    u'James Bowman', 'manual'),
 ]
 
@@ -195,12 +193,9 @@ latex_documents = [
 # If false, no module index is generated.
 #latex_use_modindex = True
 
-
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'http://docs.python.org/': None,
-    'http://opencv.willowgarage.com/documentation/': None,
-    'http://opencv.willowgarage.com/documentation/python/': None,
     'http://docs.scipy.org/doc/numpy' : None,
-    'http://opencv.willowgarage.com/documentation/python' : None
+    'http://www.ros.org/doc/api/tf/html/python/' : None
     }

@@ -3,11 +3,11 @@
 *
 *  Copyright (c) 2014, Kei Okada.
 *  All rights reserved.
-* 
+*
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions
 *  are met:
-* 
+*
 *   * Redistributions of source code must retain the above copyright
 *     notice, this list of conditions and the following disclaimer.
 *   * Redistributions in binary form must reproduce the above
@@ -17,7 +17,7 @@
 *   * Neither the name of the Kei Okada nor the names of its
 *     contributors may be used to endorse or promote products derived
 *     from this software without specific prior written permission.
-* 
+*
 *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -53,10 +53,6 @@
 #include "opencv_apps/Contour.h"
 #include "opencv_apps/ContourArray.h"
 #include "opencv_apps/ContourArrayStamped.h"
-
-#if OPENCV3
-#include <opencv2/imgproc/types_c.h>
-#endif
 
 namespace convex_hull {
 class ConvexHullNodelet : public nodelet::Nodelet
@@ -103,7 +99,7 @@ class ConvexHullNodelet : public nodelet::Nodelet
   {
     do_work(msg, cam_info->header.frame_id);
   }
-  
+
   void imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     do_work(msg, msg->header.frame_id);
@@ -130,7 +126,11 @@ class ConvexHullNodelet : public nodelet::Nodelet
       cv::Mat src_gray;
 
       /// Convert image to gray and blur it
-      cv::cvtColor( frame, src_gray, cv::COLOR_RGB2GRAY );
+      if ( frame.channels() > 1 ) {
+        cv::cvtColor( frame, src_gray, cv::COLOR_RGB2GRAY );
+      } else {
+        src_gray = frame;
+      }
       cv::blur( src_gray, src_gray, cv::Size(3,3) );
 
       /// Create window
@@ -154,14 +154,14 @@ class ConvexHullNodelet : public nodelet::Nodelet
       std::vector<std::vector<cv::Point> >hull( contours.size() );
       for( size_t i = 0; i < contours.size(); i++ )
       {   cv::convexHull( cv::Mat(contours[i]), hull[i], false ); }
-      
+
       /// Draw contours + hull results
       cv::Mat drawing = cv::Mat::zeros( threshold_output.size(), CV_8UC3 );
       for( size_t i = 0; i< contours.size(); i++ )
       {
         cv::Scalar color = cv::Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
         cv::drawContours( drawing, contours, (int)i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point() );
-        cv::drawContours( drawing, hull, (int)i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point() );
+        cv::drawContours( drawing, hull, (int)i, color, 4, 8, std::vector<cv::Vec4i>(), 0, cv::Point() );
 
         opencv_apps::Contour contour_msg;
         for ( size_t j = 0; j < hull[i].size(); j++ ) {
@@ -265,7 +265,7 @@ public:
     ros::SubscriberStatusCallback msg_disconnect_cb = boost::bind(&ConvexHullNodelet::msg_disconnectCb, this, _1);
     img_pub_ = image_transport::ImageTransport(local_nh_).advertise("image", 1, img_connect_cb, img_disconnect_cb);
     msg_pub_ = local_nh_.advertise<opencv_apps::ContourArrayStamped>("hulls", 1, msg_connect_cb, msg_disconnect_cb);
-        
+
     if( debug_view_ ) {
       subscriber_count_++;
     }

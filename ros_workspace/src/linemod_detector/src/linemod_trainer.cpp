@@ -45,7 +45,7 @@ static void writeLinemod(const cv::Ptr<cv::linemod::Detector>& detector, const s
   cv::FileStorage fs(filename, cv::FileStorage::WRITE);
   detector->write(fs);
 
-  std::vector<std::string> ids = detector->classIds();
+  std::vector<cv::String> ids = detector->classIds();
   fs << "classes" << "[";
   for (int i = 0; i < (int)ids.size(); ++i)
   {
@@ -576,7 +576,7 @@ class Image_test
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
-      std::vector<std::string> class_ids;
+      std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
       Image_test::detector->match(sources, (float)Image_test::matching_threshold, matches, class_ids, quantized_images);
 

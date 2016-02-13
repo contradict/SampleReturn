@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS tf rospy
   image_geometry
   samplereturn_msgs)
 
+find_package(OpenCV)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -94,6 +95,7 @@ add_definitions( -std=gnu++0x )
 ## Specify libraries to link a library or executable target against
  target_link_libraries(kalman_filter_node
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
  )
  target_link_libraries(dslr_kalman_filter_node
    ${catkin_LIBRARIES}

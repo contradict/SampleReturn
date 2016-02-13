@@ -2,6 +2,42 @@
 Changelog for package cv_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.11.11 (2016-01-31)
+--------------------
+* clean up the doc files
+* fix a few warnings in doc jobs
+* Contributors: Vincent Rabaud
+
+1.11.10 (2016-01-16)
+--------------------
+* fix OpenCV3 build
+* Describe about converting label to bgr image in cvtColorForDisplay
+* Convert label to BGR image to display
+* Add test for rgb_colors.cpp
+* Add rgb_colors util
+* Update doc for converting to BGR in cvtColorForDisplay
+* Convert to BGR from any encoding
+* Refactor: sensor_msgs::image_encodings -> enc
+* Contributors: Kentaro Wada, Vincent Rabaud
+
+1.11.9 (2015-11-29)
+-------------------
+* deal with endianness
+* add cvtColorForDisplay
+* Improved efficiency by using toCvShare instead of toCvCopy.
+* Add format enum for easy use and choose format.
+* fix compilation warnings
+* start to extend the cv_bridge with cvCompressedImage class, that will convert from cv::Mat opencv images to CompressedImage ros messages and vice versa
+* Contributors: Carlos Costa, Vincent Rabaud, talregev
+
+1.11.8 (2015-07-15)
+-------------------
+* Simplify some OpenCV3 distinction
+* fix tests
+* fix test under OpenCV3
+* Remove Python for Android
+* Contributors: Gary Servin, Vincent Rabaud
+
 1.11.7 (2014-12-14)
 -------------------
 * check that the type is indeed a Numpy one

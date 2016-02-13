@@ -54,12 +54,6 @@
 #include "opencv_apps/ContourArray.h"
 #include "opencv_apps/ContourArrayStamped.h"
 
-#if OPENCV3
-#include <opencv2/imgproc/types_c.h>
-#include <opencv2/imgproc/imgproc_c.h>
-#include <opencv2/video.hpp>
-#endif
-
 namespace segment_objects {
 class SegmentObjectsNodelet : public nodelet::Nodelet
 {
@@ -82,10 +76,10 @@ class SegmentObjectsNodelet : public nodelet::Nodelet
   std::string window_name_;
   static bool need_config_update_;
 
-#if OPENCV3
+#ifndef CV_VERSION_EPOCH
   cv::Ptr<cv::BackgroundSubtractorMOG2> bgsubtractor;
 #else
-  cv::BackgroundSubtractorMOG2 bgsubtractor;
+  cv::BackgroundSubtractorMOG bgsubtractor;
 #endif
   bool update_bg_model;
 
@@ -145,7 +139,7 @@ class SegmentObjectsNodelet : public nodelet::Nodelet
         }
       }
 
-#if OPENCV3
+#ifndef CV_VERSION_EPOCH
       bgsubtractor->apply(frame, bgmask, update_bg_model ? -1 : 0);
 #else
       bgsubtractor(frame, bgmask, update_bg_model ? -1 : 0);
@@ -214,7 +208,7 @@ class SegmentObjectsNodelet : public nodelet::Nodelet
       }
 
       // Publish the image.
-      sensor_msgs::Image::Ptr out_img = cv_bridge::CvImage(msg->header, msg->encoding, out_frame).toImageMsg();
+      sensor_msgs::Image::Ptr out_img = cv_bridge::CvImage(msg->header, "bgr8", out_frame).toImageMsg();
       img_pub_.publish(out_img);
       msg_pub_.publish(contours_msg);
       area_pub_.publish(area_msg);
@@ -293,7 +287,7 @@ public:
     window_name_ = "segmented";
     update_bg_model = true;
 
-#if OPENCV3
+#ifndef CV_VERSION_EPOCH
     bgsubtractor = cv::createBackgroundSubtractorMOG2();
 #else
     bgsubtractor.set("noiseSigma", 10);
@@ -303,7 +297,7 @@ public:
     image_transport::SubscriberStatusCallback img_disconnect_cb = boost::bind(&SegmentObjectsNodelet::img_disconnectCb, this, _1);
     ros::SubscriberStatusCallback msg_connect_cb    = boost::bind(&SegmentObjectsNodelet::msg_connectCb, this, _1);
     ros::SubscriberStatusCallback msg_disconnect_cb = boost::bind(&SegmentObjectsNodelet::msg_disconnectCb, this, _1);
-    img_pub_ = image_transport::ImageTransport(local_nh_).advertise("segmented", 1, img_connect_cb, img_disconnect_cb);
+    img_pub_ = image_transport::ImageTransport(local_nh_).advertise("image", 1, img_connect_cb, img_disconnect_cb);
     msg_pub_ = local_nh_.advertise<opencv_apps::ContourArrayStamped>("contours", 1, msg_connect_cb, msg_disconnect_cb);
     area_pub_ = local_nh_.advertise<std_msgs::Float64>("area", 1, msg_connect_cb, msg_disconnect_cb);
     update_bg_model_service_ = local_nh_.advertiseService("update_bg_model", &SegmentObjectsNodelet::update_bg_model_cb, this);

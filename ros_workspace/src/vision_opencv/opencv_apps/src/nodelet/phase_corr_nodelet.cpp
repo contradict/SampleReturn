@@ -3,11 +3,11 @@
 *
 *  Copyright (c) 2014, Kei Okada.
 *  All rights reserved.
-* 
+*
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions
 *  are met:
-* 
+*
 *   * Redistributions of source code must retain the above copyright
 *     notice, this list of conditions and the following disclaimer.
 *   * Redistributions in binary form must reproduce the above
@@ -17,7 +17,7 @@
 *   * Neither the name of the Kei Okada nor the names of its
 *     contributors may be used to endorse or promote products derived
 *     from this software without specific prior written permission.
-* 
+*
 *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -32,12 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-// https://github.com/Itseez/opencv/blob/2.4/samples/cpp/tutorial_code/ImgTrans/HoughLines_Demo.cpp
-/**
- * @file HoughLines_Demo.cpp
- * @brief Demo code for Hough Transform
- * @author OpenCV team
- */
+// https://github.com/Itseez/opencv/blob/master/samples/cpp/phase_corr.cpp
 
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
@@ -95,7 +90,7 @@ class PhaseCorrNodelet : public nodelet::Nodelet
   {
     do_work(msg, cam_info->header.frame_id);
   }
-  
+
   void imageCallback(const sensor_msgs::ImageConstPtr& msg)
   {
     do_work(msg, msg->header.frame_id);
@@ -119,8 +114,12 @@ class PhaseCorrNodelet : public nodelet::Nodelet
       shift_msg.header = msg->header;
 
       // Do the work
-      cv::cvtColor(frame, curr, cv::COLOR_RGB2GRAY);
-        
+      if ( frame.channels() > 1 ) {
+        cv::cvtColor( frame, curr, cv::COLOR_BGR2GRAY );
+      } else {
+        curr = frame;
+      }
+
       if( debug_view_) {
         cv::namedWindow( window_name_, cv::WINDOW_AUTOSIZE );
         if (need_config_update_) {
@@ -141,16 +140,16 @@ class PhaseCorrNodelet : public nodelet::Nodelet
       cv::Point2d shift = cv::phaseCorrelate(prev64f, curr64f, hann);
       double radius = cv::sqrt(shift.x*shift.x + shift.y*shift.y);
 
-      if(radius > 5)
+      if(radius > 0)
       {
         // draw a circle and line indicating the shift direction...
         cv::Point center(curr.cols >> 1, curr.rows >> 1);
-#if OPENCV3
-        cv::circle(frame, center, (int)radius, cv::Scalar(0, 255, 0), 3, cv::LINE_AA);
-        cv::line(frame, center, cv::Point(center.x + (int)shift.x, center.y + (int)shift.y), cv::Scalar(0, 255, 0), 3, cv::LINE_AA);
+#ifndef CV_VERSION_EPOCH
+        cv::circle(frame, center, (int)(radius*5), cv::Scalar(0, 255, 0), 3, cv::LINE_AA);
+        cv::line(frame, center, cv::Point(center.x + (int)(shift.x*5), center.y + (int)(shift.y*5)), cv::Scalar(0, 255, 0), 3, cv::LINE_AA);
 #else
-        cv::circle(frame, center, (int)radius, cv::Scalar(0, 255, 0), 3, CV_AA);
-        cv::line(frame, center, cv::Point(center.x + (int)shift.x, center.y + (int)shift.y), cv::Scalar(0, 255, 0), 3, CV_AA);
+        cv::circle(frame, center, (int)(radius*5), cv::Scalar(0, 255, 0), 3, CV_AA);
+        cv::line(frame, center, cv::Point(center.x + (int)(shift.x*5), center.y + (int)(shift.y*5)), cv::Scalar(0, 255, 0), 3, CV_AA);
 #endif
 
         //
@@ -245,7 +244,7 @@ public:
     ros::SubscriberStatusCallback msg_disconnect_cb = boost::bind(&PhaseCorrNodelet::msg_disconnectCb, this, _1);
     img_pub_ = image_transport::ImageTransport(local_nh_).advertise("image", 1, img_connect_cb, img_disconnect_cb);
     msg_pub_ = local_nh_.advertise<opencv_apps::Point2DStamped>("shift", 1, msg_connect_cb, msg_disconnect_cb);
-        
+
     if( debug_view_ ) {
       subscriber_count_++;
     }

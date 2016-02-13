@@ -3,14 +3,10 @@ project(opencv_apps)
 
 find_package(catkin REQUIRED COMPONENTS cv_bridge dynamic_reconfigure message_generation image_transport nodelet roscpp)
 
-find_package(OpenCV 2.4.10 REQUIRED)
-if (OpenCV_VERSION VERSION_EQUAL "3")
-  add_definitions("-DOPENCV3=1")
-  set(${PROJECT_NAME}_EXTRA_CFG)
-  set(${PROJECT_NAME}_EXTRA_FILES)
-else()
-  set(${PROJECT_NAME}_EXTRA_CFG cfg/SimpleFlow.cfg)
-  set(${PROJECT_NAME}_EXTRA_FILES src/nodelet/simple_flow_nodelet.cpp)
+find_package(OpenCV REQUIRED)
+message(STATUS "OpenCV Components: ${OpenCV_LIB_COMPONENTS}")
+if(OpenCV_VERSION VERSION_LESS "3.0" OR TARGET opencv_optflow)
+  set(OPENCV_HAVE_OPTFLOW TRUE)
 endif()
 
 # generate the dynamic_reconfigure config file
@@ -26,8 +22,8 @@ generate_dynamic_reconfigure_options(
   cfg/PeopleDetect.cfg
   cfg/PhaseCorr.cfg
   cfg/SegmentObjects.cfg
+  cfg/SimpleFlow.cfg
   cfg/WatershedSegmentation.cfg
-  ${${PROJECT_NAME}_EXTRA_CFG}
   )
 
 ## Generate messages in the 'msg' folder
@@ -78,6 +74,10 @@ catkin_package()
 include_directories( ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 
 ## Declare a cpp library
+if(OPENCV_HAVE_OPTFLOW)
+  list(APPEND ${PROJECT_NAME}_EXTRA_FILES src/nodelet/simple_flow_nodelet.cpp)
+endif()
+
 add_library(${PROJECT_NAME} SHARED
   # https://github.com/Itseez/opencv/blob/2.4/samples/cpp/tutorial_code
   # ImgTrans
@@ -103,6 +103,8 @@ add_library(${PROJECT_NAME} SHARED
   # calibration_artificial.cpp
   # calibration.cpp
   src/nodelet/camshift_nodelet.cpp
+  src/nodelet/simple_example_nodelet.cpp
+  src/nodelet/simple_compressed_example_nodelet.cpp
   # chamfer.cpp
   # connected_components.cpp
   # contours2.cpp
@@ -163,7 +165,10 @@ add_library(${PROJECT_NAME} SHARED
   # rgbdodometry.cpp
   src/nodelet/segment_objects_nodelet.cpp
   ## select3dobj.cpp
-  # src/nodelet/simple_flow_nodelet.cpp
+###
+### simple flow requires opencv-contrib https://github.com/ros-perception/vision_opencv/issues/108
+###
+###  src/nodelet/simple_flow_nodelet.cpp
   # squares.cpp
   # starter_imagelist.cpp
   # starter_video.cpp
@@ -230,6 +235,14 @@ add_executable(camshift_exe src/node/camshift.cpp)
 SET_TARGET_PROPERTIES(camshift_exe PROPERTIES OUTPUT_NAME camshift)
 target_link_libraries(camshift_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
+add_executable(simple_example_exe src/node/simple_example.cpp)
+SET_TARGET_PROPERTIES(simple_example_exe PROPERTIES OUTPUT_NAME simple_example)
+target_link_libraries(simple_example_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(simple_compressed_example_exe src/node/simple_compressed_example.cpp)
+SET_TARGET_PROPERTIES(simple_compressed_example_exe PROPERTIES OUTPUT_NAME simple_compressed_example)
+target_link_libraries(simple_compressed_example_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
 add_executable(fback_flow_exe src/node/fback_flow.cpp)
 SET_TARGET_PROPERTIES(fback_flow_exe PROPERTIES OUTPUT_NAME fback_flow)
 target_link_libraries(fback_flow_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
@@ -264,9 +277,12 @@ target_link_libraries(segment_objects_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES
 
   # select3dobj.cpp
 
-add_executable(simple_flow_exe src/node/simple_flow.cpp)
-SET_TARGET_PROPERTIES(simple_flow_exe PROPERTIES OUTPUT_NAME simple_flow)
-target_link_libraries(simple_flow_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+# simple flow requires opencv-contrib https://github.com/ros-perception/vision_opencv/issues/108
+if(OPENCV_HAVE_OPTFLOW)
+  add_executable(simple_flow_exe src/node/simple_flow.cpp)
+  SET_TARGET_PROPERTIES(simple_flow_exe PROPERTIES OUTPUT_NAME simple_flow)
+  target_link_libraries(simple_flow_exe ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+endif()
 
   # starter_video.cpp
   # videocapture_pvapi.cpp
@@ -279,9 +295,15 @@ target_link_libraries(watershed_segmentation_exe ${catkin_LIBRARIES} ${OpenCV_LI
 
 
 install(TARGETS edge_detection_exe hough_lines_exe hough_circles_exe face_detection_exe goodfeature_track_exe
-  camshift_exe fback_flow_exe lk_flow_exe people_detect_exe phase_corr_exe segment_objects_exe watershed_segmentation_exe
+  camshift_exe simple_example_exe simple_compressed_example_exe fback_flow_exe lk_flow_exe people_detect_exe phase_corr_exe segment_objects_exe watershed_segmentation_exe
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 install(FILES nodelet_plugins.xml
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+
+## test
+if(CATKIN_ENABLE_TESTING)
+  find_package(catkin REQUIRED COMPONENTS rostest)
+  add_subdirectory(test)
+endif()
