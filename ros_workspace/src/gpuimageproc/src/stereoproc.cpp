@@ -503,6 +503,9 @@ void Stereoproc::configCb(Config &config, uint32_t level)
     config.correlation_window_size |= 0x1; // must be odd
     config.disparity_range = (config.disparity_range / 16) * 16; // must be multiple of 16
 
+    if(block_matcher_.empty())
+        block_matcher_ = cv::cuda::createStereoBM(config.disparity_range,
+                config.correlation_window_size);
     // Note: With single-threaded NodeHandle, configCb and imageCb can't be called
     // concurrently, so this is thread-safe.Q
     block_matcher_->setPreFilterType(config.xsobel?cv::cuda::StereoBM::PREFILTER_XSOBEL:cv::cuda::StereoBM::PREFILTER_NORMALIZED_RESPONSE);
@@ -517,8 +520,6 @@ void Stereoproc::configCb(Config &config, uint32_t level)
     maxDiff_= config.max_diff;
     maxSpeckleSize_ = config.max_speckle_size;
 
-    block_matcher_ = cv::cuda::createStereoBM(config.disparity_range,
-            config.correlation_window_size);
 }
 
 } // namespace stereo_image_proc
