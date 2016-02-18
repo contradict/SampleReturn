@@ -139,7 +139,7 @@ class GPUSender
         }
         void enqueueSend(cv::cuda::GpuMat& m, cv::cuda::Stream& strm)
         {
-            m.upload(image_data_, strm);
+            m.download(image_data_, strm);
             strm.enqueueHostCallback(
                 [](int status, void *userData)
                 {
