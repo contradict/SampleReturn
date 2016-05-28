@@ -243,33 +243,94 @@
         <origin xyz="-0.1147 0.0 0.064" rpy="-2.792 0 -1.571"/>
     </joint>
 
-    <link name="search_camera">
+    <!-- begin seach and beacon cameras -->
+    <!-- center camera -->
+    <link name="search_center_camera">
         <visual>
             <geometry>
-                <box size="0.10 0.08 0.05"/>
+                <box size="0.03 0.03 0.03"/>
             </geometry>
             <material name="sensor"/>
         </visual>
     </link>
-    <link name="search_camera_lens">
+    <link name="search_center_lens">
         <visual>
             <geometry>
-                <cylinder length="0.10" radius="0.035"/>
+                <cylinder length="0.04" radius="0.015"/>
             </geometry>
             <material name="lens"/>
         </visual>
     </link>
-    <joint name="search_lens_joint" type="fixed">
-        <parent link="search_camera"/>
-        <child link="search_camera_lens"/>
-        <origin xyz="0.0 0.0 0.025" rpy="0 0 0"/>
+    <joint name="search_center_lens_joint" type="fixed">
+        <parent link="search_center_camera"/>
+        <child link="search_center_lens"/>
+        <origin xyz="0.0 0.0 0.04" rpy="0 0 0"/>
     </joint>
-    <joint name="search_camera_joint" type="fixed">
+    <joint name="search_center_camera_joint" type="fixed">
         <parent link="body_triangle"/>
-        <child link="search_camera"/>
-        <!--  search camera angles:  20 degrees -->
-        <origin xyz="0.124 0.0 0.963" rpy="-1.920 0 -1.5708"/>
+        <child link="search_center_camera"/>
+        <!--  search camera center angle:  45 degrees -->
+        <origin xyz="0.207 0.0 0.970" rpy="-2.3562 0 -1.5708"/>
     </joint>
+
+    <!-- port camera -->
+    <link name="search_port_camera">
+        <visual>
+            <geometry>
+                <box size="0.03 0.03 0.03"/>
+            </geometry>
+            <material name="sensor"/>
+        </visual>
+    </link>
+    <link name="search_port_lens">
+        <visual>
+            <geometry>
+                <cylinder length="0.04" radius="0.015"/>
+            </geometry>
+            <material name="lens"/>
+        </visual>
+    </link>
+    <joint name="search_port_lens_joint" type="fixed">
+        <parent link="search_port_camera"/>
+        <child link="search_port_lens"/>
+        <origin xyz="0.0 0.0 0.04" rpy="0 0 0"/>
+    </joint>
+    <joint name="search_port_camera_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="search_port_camera"/>
+        <!--  search camera center angle:  45 degrees -->
+        <origin xyz="0.178 0.070 0.971" rpy="-2.2689 0 -0.5236"/>
+    </joint>
+
+    <!-- starboard camera -->
+    <link name="search_starboard_camera">
+        <visual>
+            <geometry>
+                <box size="0.03 0.03 0.03"/>
+            </geometry>
+            <material name="sensor"/>
+        </visual>
+    </link>
+    <link name="search_starboard_lens">
+        <visual>
+            <geometry>
+                <cylinder length="0.04" radius="0.015"/>
+            </geometry>
+            <material name="lens"/>
+        </visual>
+    </link>
+    <joint name="search_starboard_lens_joint" type="fixed">
+        <parent link="search_starboard_camera"/>
+        <child link="search_starboard_lens"/>
+        <origin xyz="0.0 0.0 0.04" rpy="0 0 0"/>
+    </joint>
+    <joint name="search_starboard_camera_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="search_starboard_camera"/>
+        <!--  search camera center angle:  45 degrees -->
+        <origin xyz="0.178 -0.070 0.971" rpy="-2.2689 0 -2.6180"/>
+    </joint>
+
 
     <!--fake laser scanner-->
     <link name="fake_laser">
