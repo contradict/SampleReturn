@@ -195,15 +195,15 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode.  Enable ing search camera.'),
-                                   transitions = {'next':'ENABLE_SEARCH_CAMERA'})
+                                                 'Enter ing level two mode.'), #  Enable ing search camera.'),
+                                   transitions = {'next':'SELECT_PLANNER'})
             
-            smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
-                                    smach_ros.ServiceState('enable_search',
-                                                            platform_srv.Enable,
-                                                            request = platform_srv.EnableRequest(True)),
-                                    transitions = {'succeeded':'SELECT_PLANNER',
-                                                   'aborted':'LEVEL_TWO_ABORTED'})
+            #smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
+            #                        smach_ros.ServiceState('enable_search',
+            #                                                platform_srv.Enable,
+            #                                                request = platform_srv.EnableRequest(True)),
+            #                        transitions = {'succeeded':'SELECT_PLANNER',
+            #                                       'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
