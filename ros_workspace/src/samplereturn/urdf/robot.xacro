@@ -298,7 +298,7 @@
     <joint name="search_port_camera_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="search_port_camera"/>
-        <!--  search camera center angle:  45 degrees -->
+        <!--  search camera side angles:  40 deg. down, 60 deg. out -->
         <origin xyz="0.178 0.070 0.971" rpy="-2.2689 0 -0.5236"/>
     </joint>
 
@@ -327,10 +327,38 @@
     <joint name="search_starboard_camera_joint" type="fixed">
         <parent link="body_triangle"/>
         <child link="search_starboard_camera"/>
-        <!--  search camera center angle:  45 degrees -->
+        <!--  search camera side angles:  40 deg. down, 60 deg. out -->
         <origin xyz="0.178 -0.070 0.971" rpy="-2.2689 0 -2.6180"/>
     </joint>
-
+    
+    <!-- beacon camera -->
+    <link name="navigation_beacon_camera">
+        <visual>
+            <geometry>
+                <box size="0.03 0.03 0.03"/>
+            </geometry>
+            <material name="sensor"/>
+        </visual>
+    </link>
+    <link name="navigation_beacon_lens">
+        <visual>
+            <geometry>
+                <cylinder length="0.04" radius="0.015"/>
+            </geometry>
+            <material name="lens"/>
+        </visual>
+    </link>
+    <joint name="navigation_beacon_lens_joint" type="fixed">
+        <parent link="navigation_beacon_camera"/>
+        <child link="navigation_beacon_lens"/>
+        <origin xyz="0.0 0.0 0.04" rpy="0 0 0"/>
+    </joint>
+    <joint name="navigation_beacon_camera_joint" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="navigation_beacon_camera"/>
+        <!--  navigation beacon angle:  0 degrees -->
+        <origin xyz="0.165 0 0.899" rpy="-1.5708 -0 -1.5708"/>
+    </joint>
 
     <!--fake laser scanner-->
     <link name="fake_laser">
