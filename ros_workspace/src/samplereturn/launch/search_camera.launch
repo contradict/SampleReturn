@@ -1,43 +1,30 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <!-- DSLR Camera Service Server -->
     <node machine="search"
-          pkg="photo"
-          type="photo_node"
-          name="photo_node"
+          pkg="basler_camera"
+          type="basler_camera_node"
+          name="basler_camera"
           respawn_delay="5.0"
           respawn="true"
-          ns="/cameras/search">
-        <remap from="cam_img" to="image"/>
-        <remap from="cam_info" to="info"/>
+          ns="/cameras/search/center">
+        <param name="frame_id" type="string" value="search_center_camera" />
+        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/search_basler_center.yaml" />
+        <param name="serial_number" type="string" value="21864021"/>
+        <param name="AcquisitionFrameRate" type="double" value="3"/>
+        <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
+        <remap from="basler_camera/image_raw" to="image_raw"/>
     </node>
 
-    <node
-        machine="search"
-        pkg="samplereturn"
-        type="triggered_camera.py"
-        name="triggered_camera"
-        ns="/cameras/search">
-        <param name="rate" value="1.0"/>
-        <param name="calib_file" value="$(find samplereturn)/calibration/D5100-search.yaml"/>
-        <param name="frame_id" value="search_camera"/>
-        <param name="capture_delay" type="double" value="0.15"/>
-        <param name="restart_delay" type="double" value="7.0"/>
-        <param name="error_timeout" type="double" value="5.0"/>
-        <param name="gpio_servo_id" type="int" value="1"/>
-        <param name="gpio_pin" type="int" value="2"/>
-        <param name="pulse_width" type="double" value="0.1"/>
-        <param name="camera_node_name" type="string" value="/cameras/search/photo_node"/>
-        <param name="restart_camera_threshold" type="int" value="3"/>
-        <remap from="pause_state" to="/io/pause_state"/>
-        <remap from="cam_img" to="image"/>
-        <remap from="cam_info" to="info"/>
-        <remap from="cam_status" to="status"/>
-        <remap from="gpio_service" to="/io/gpio_service"/>
-        <remap from="triggered_image" to="photo_node/triggered_capture"/>
-        <remap from="timestamped_image" to="image"/>
-        <remap from="timestamped_info" to="info"/>
-        <remap from="set_config" to="photo_node/set_config"/>
+    <node machine="search"
+        pkg="image_proc"
+        type="image_proc"
+        name="image_proc"
+        ns="/cameras/search/center"
+        >
+        <!-- this is a terrible hack so this node
+             does not see our custom opencv3 build.
+        -->
+        <env name="LD_LIBRARY_PATH" value="/opt/ros/indigo/lib"/>
     </node>
 </launch>

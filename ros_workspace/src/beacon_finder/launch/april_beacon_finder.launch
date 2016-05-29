@@ -11,8 +11,8 @@
         ns="/processes/beacon"
         machine="search"
         >
-        <remap from="image" to="/cameras/search/image"/>
-        <remap from="/cameras/search/camera_info" to="/cameras/search/info"/>
+        <remap from="image" to="/cameras/search/center/image_color"/>
+        <remap from="/cameras/search/camera_info" to="/cameras/search/center/camera_info"/>
 
         <rosparam param="tag_descriptions">
          [{
