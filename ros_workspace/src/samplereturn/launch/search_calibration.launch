@@ -3,8 +3,8 @@
 <launch>
     <!-- Calibration tool -->
 
-    <arg name="camera" default="/cameras/search"/>
-    <arg name="image" default="image"/>
+    <arg name="camera" default="/cameras/search/center/basler_camera"/>
+    <arg name="image" default="/cameras/search/center/image_mono"/>
     <node
         pkg="camera_calibration"
         type="cameracalibrator.py"
@@ -12,7 +12,8 @@
         args="--size 9x6 --square 0.1 -p chessboard --approximate=0.05"
         output="screen"
         >
-        <remap from="image" to="$(arg camera)/$(arg image)"/>
+        <remap from="image" to="$(arg image)"/>
+        <remap from="camera" to="$(arg camera)"/>
       </node>
 
 </launch>
