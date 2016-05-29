@@ -1,0 +1,61 @@
+basler_params:
+  -
+    name: AcquisitionFrameRate
+    type: float
+    value: 10.0
+  -
+    name: ExposureTime
+    type: float
+    value: 15000.0
+  -
+    name: AcquisitionMode
+    type: enum
+    value: Continuous
+  -
+    name: OverlapMode
+    type: enum
+    value: 'Off'
+  -
+    name: ExposureAuto
+    type: enum
+    value: 'Off'
+  -
+    name: GainAuto
+    type: enum
+    value: 'Off'
+  -
+    name: LightSourcePreset
+    type: enum
+    value: 'Off'
+  -
+    name: BalanceWhiteAuto
+    type: enum
+    value: 'Off'
+  -
+    name: BalanceRatioSelector
+    type: enum
+    value: 'Blue'
+  -
+    name: BalanceRatio
+    type: float
+    value: 2.56
+  -
+    name: Gain
+    type: float
+    value: 1.0
+  -
+    name: TriggerMode
+    type: enum
+    value: 'Off'
+  -
+    name: LineSelector
+    type: enum
+    value: Line1
+  -
+    name: LineSource
+    type: enum
+    value: ExposureActive
+  -
+    name: LineMode
+    type: enum
+    value: Output
