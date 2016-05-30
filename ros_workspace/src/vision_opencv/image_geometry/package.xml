@@ -1,6 +1,6 @@
 <package format="2">
   <name>image_geometry</name>
-  <version>1.11.11</version>
+  <version>1.11.12</version>
   <description>
     `image_geometry` contains C++ and Python libraries for interpreting images
     geometrically. It interfaces the calibration parameters in sensor_msgs/CameraInfo
@@ -27,4 +27,5 @@
   <build_export_depend>sensor_msgs</build_export_depend>
 
   <doc_depend>dvipng</doc_depend>
+  <doc_depend>texlive-latex-extra</doc_depend>
 </package>
