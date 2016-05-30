@@ -41,7 +41,7 @@ class SaliencyDetectorNode
   cv::Mat debug_bms_img_;
   BMS bms_;
   cv::SimpleBlobDetector::Params blob_params_;
-  cv::SimpleBlobDetector blob_;
+  cv::Ptr<cv::SimpleBlobDetector> blob_;
   bool blobDetect_on_;
   int bms_sample_step_;
   double bms_blur_std_;
@@ -125,8 +125,7 @@ class SaliencyDetectorNode
     blob_params_.filterByConvexity = false;
     blob_params_.filterByInertia = false;
     blob_params_.minDistBetweenBlobs = 50.;
-    blob_ = cv::SimpleBlobDetector();
-    blob_.create(blob_params_);
+    blob_ = cv::SimpleBlobDetector::create(blob_params_);
   }
 
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& msg)
@@ -168,7 +167,7 @@ class SaliencyDetectorNode
 
     if (blobDetect_on_) {
       cv::Mat blob_copy = debug_bms_img_.clone();
-      blob_.detect(blob_copy, kp);
+      blob_->detect(blob_copy, kp);
       ROS_DEBUG("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
       for (size_t i=0; i < kp.size(); i++)
@@ -347,8 +346,7 @@ class SaliencyDetectorNode
     blob_params_.thresholdStep = config.thresholdStep;
     blob_params_.minRepeatability = config.minRepeatability;
 
-    blob_ = cv::SimpleBlobDetector();
-    blob_.create(blob_params_);
+    blob_ = cv::SimpleBlobDetector::create(blob_params_);
 
     filter_by_real_area_ = config.filterbyRealArea;
     min_real_area_ = config.minRealArea;
