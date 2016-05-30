@@ -43,23 +43,22 @@ before_script:
   - cd ~/catkin_ws/src
   - wstool init
   - if [[ -f $ROSINSTALL_FILE ]] ; then wstool merge $ROSINSTALL_FILE ; fi
-  - if [ $OPENCV_VERSION == 3 ]; then wstool set -y image_pipeline --git https://github.com/ros-perception/image_pipeline; fi # need to recompile image_proc
   - wstool up
 
   # package depdencies: install using rosdep.
   - cd ~/catkin_ws
-  - rosdep install -y -r --from-paths src --ignore-src --rosdistro $ROS_DISTRO
+  - rosdep install -q -y -r --from-paths src --ignore-src --rosdistro $ROS_DISTRO
 
 # Compile and test.
 script:
   - source /opt/ros/$ROS_DISTRO/setup.bash
   - cd ~/catkin_ws
-  - catkin build -p1 -j1
-  - catkin run_tests -p1 -j1
+  - catkin build -p1 -j1 --no-status
+  - catkin run_tests -p1 -j1 --no-status
   - catkin_test_results --all build
-  - catkin clean -b
+  - catkin clean -b --yes
   - catkin config --install
-  - catkin build -p1 -j1
+  - catkin build -p1 -j1 --no-status
 after_failure:
   - find ${HOME}/.ros/test_results -type f -exec echo "== {} ==" \; -exec cat {} \;
   - for file in ${HOME}/.ros/log/rostest-*; do echo "=== $file ==="; cat $file; done
