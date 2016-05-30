@@ -163,8 +163,10 @@ class image_desync(object):
         elif not self.got_info['left']:
             self.pub.publish(Float64(-float('inf')))
             self.missing_count['left']  += 1
+            self.missing_count['right']  = 0
         elif not self.got_info['right']:
             self.pub.publish(Float64(float('inf')))
+            self.missing_count['left']   = 0
             self.missing_count['right'] += 1
         else:
             self.missing_count['left'] = 0
