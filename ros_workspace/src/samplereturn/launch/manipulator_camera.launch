@@ -86,8 +86,11 @@
               type="image_desync.py"
               ns="/cameras/manipulator">
             <param name="manager_node_name" type="string" value="/cameras/manipulator/manager"/>
-            <param name="max_desync" type="double" value="0.02"/>
-        </node>
+            <param name="check_interval" type="double" value="0.05"/>
+            <param name="max_desync" type="double" value="0.033"/>
+            <param name="max_missing_count" type="int" value="30"/>
+            <param name="startup_delay" type="int" value="15"/>
+         </node>
     </group>
 
     <!-- Compute Stereo -->
