@@ -1,1 +1,3 @@
 /CMakeLists.txt
+.rosinstall.bak
+image_transport_plugins
