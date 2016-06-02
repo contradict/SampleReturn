@@ -103,7 +103,6 @@
               output="log"
               respawn_delay="5.0"
               respawn="true">
-            <remap from="pointcloud" to="points2"/>
             <param name="approximate_sync" type="bool" value="true"/>
             <param name="publisher_queue_size" type="int" value="5"/>
             <param name="correlation_window_size" type="int" value="21"/>
@@ -114,7 +113,24 @@
             <param name="max_speckle_size" type="int" value="800"/>
             <param name="max_diff" type="double" value="5"/>
         </node>
-    </group>
+        <node name="voxelfilter"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/VoxelGrid $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input"  to="pointcloud" />
+              <remap from="~output" to="points2"/>
+              <param name="leaf_size" type="double" value="0.025"/>
+              <param name="filter_limit_min" type="double" value="-0.020"/>
+              <param name="filter_limit_max" type="double" value="1.5"/>
+              <param name="input_frame" type="string" value="base_link"/>
+              <param name="output_frame" type="string" value="base_link"/>
+          </node>
+     </group>
 
 
 </launch>
