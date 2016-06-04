@@ -736,6 +736,7 @@ class RobotSimulator(object):
         return req.state
     
     def service_enable_search_request(self, req):
+        rospy.logwarn("SEARCH_ENABLE requested, feature deprecated.")
         rospy.sleep(0.5)
         return req.state
     
