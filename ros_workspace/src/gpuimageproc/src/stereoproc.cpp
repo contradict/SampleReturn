@@ -296,6 +296,7 @@ void Stereoproc::imageCb(
 
     cv::cuda::GpuMat disparity;
     cv::cuda::GpuMat disparity_16s;
+    cv::cuda::GpuMat disparity_filtered;
     if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
         r_strm.waitForCompletion();
@@ -303,13 +304,19 @@ void Stereoproc::imageCb(
         //allocate cpu-side resource
         filter_buf_.create(l_rect_mono.size(), CV_16SC1);
         //enqueueDownload
-        disparity.convertTo(disparity_16s, CV_16SC1, 256, l_strm);
+        disparity.convertTo(disparity_16s, CV_16SC1, 16, l_strm);
         disparity_16s.download(filter_buf_, l_strm);
         l_strm.waitForCompletion();
         filterSpeckles();
         //enqueueUpload
         disparity_16s.upload(filter_buf_, l_strm);
-        disparity_16s.convertTo(disparity, CV_32FC1, 1/256.);
+        if(bilateral_filter_enabled_)
+        {
+            bilateral_filter_->apply(disparity_16s, l_rect_mono, disparity_filtered);
+            disparity_filtered.convertTo(disparity, CV_32FC1, 1/16.);
+        } else {
+            disparity_16s.convertTo(disparity, CV_32FC1, 1/16.);
+        }
     }
 
     if(connected_.Disparity)
@@ -517,6 +524,18 @@ void Stereoproc::configCb(Config &config, uint32_t level)
             config.correlation_window_size, config.disparity_range,
             config.texture_threshold);
 
+    if(bilateral_filter_.empty())
+    {
+        bilateral_filter_ = cv::cuda::createDisparityBilateralFilter(config.filter_ndisp, config.filter_radius, config.filter_iters);
+    } else {
+        bilateral_filter_->setNumDisparities(config.filter_ndisp);
+        bilateral_filter_->setRadius(config.filter_radius);
+        bilateral_filter_->setNumIters(config.filter_iters);
+    }
+    bilateral_filter_->setEdgeThreshold(config.filter_edge_threshold);
+    bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
+    bilateral_filter_->setSigmaRange(config.filter_sigma_range);
+    bilateral_filter_enabled_ = config.bilateral_filter;
     maxDiff_= config.max_diff;
     maxSpeckleSize_ = config.max_speckle_size;
 

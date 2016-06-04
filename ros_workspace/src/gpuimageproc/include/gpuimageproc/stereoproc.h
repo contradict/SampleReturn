@@ -66,6 +66,7 @@ class Stereoproc : public nodelet::Nodelet
   image_geometry::StereoCameraModel model_;
 
   cv::Ptr<cv::cuda::StereoBM> block_matcher_;
+  cv::Ptr<cv::cuda::DisparityBilateralFilter> bilateral_filter_;
   const int block_matcher_min_disparity_ = 0;
 
   cv::Ptr<cv::cuda::StereoConstantSpaceBP> csbp_;
@@ -80,6 +81,7 @@ class Stereoproc : public nodelet::Nodelet
   void sendDisparity(void);
 
   void filterSpeckles(void);
+  bool bilateral_filter_enabled_;
   int maxSpeckleSize_;
   double maxDiff_;
 
