@@ -48,6 +48,7 @@ class ManualController(object):
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
         self.odometry_frame = 'odom'
+        self.last_sample = rospy.Time.now()
  
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
@@ -398,6 +399,10 @@ class ManualController(object):
             point_in_frame = self.tf.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
+            if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
+                self.announcer.say("Sample published.")
+                self.last_sample = rospy.Time.now()
+            
         except tf.Exception:
             rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
                           sample.header.frame_id, self.odometry_frame)
