@@ -249,7 +249,7 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'DISABLE_SEARCH_CAMERA',
+                                     transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
                                                     'aborted':'PUBLISH_FAILURE'})
             
             smach.StateMachine.add('DISABLE_SEARCH_CAMERA',
@@ -416,8 +416,8 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
-                                     transitions = {'succeeded':'ENABLE_SEARCH_CAMERA',
-                                                    'aborted':'ENABLE_SEARCH_CAMERA'})
+                                     transitions = {'succeeded':'ANNOUNCE_CONTINUE',
+                                                    'aborted':'ANNOUNCE_CONTINUE'})
             
             smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
                                     smach_ros.ServiceState('enable_search',
