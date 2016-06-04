@@ -41,9 +41,10 @@ class ManualController(object):
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
-        self.search_camera_enable = rospy.ServiceProxy('enable_search',
-                platform_srv.Enable,
-                persistent=True)
+        self.search_camera_enable = None
+        #self.search_camera_enable = rospy.ServiceProxy('enable_search',
+        #        platform_srv.Enable,
+        #        persistent=True)
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
         self.odometry_frame = 'odom'
@@ -375,7 +376,7 @@ class ManualController(object):
         if self.joy_state.button('BUTTON_SEARCH_CAMERA'):
             newstate = self.state_machine.userdata.search_camera_state^True
             try:
-                self.search_camera_enable(newstate)
+                #self.search_camera_enable(newstate)
                 self.state_machine.userdata.search_camera_state = newstate
             except (rospy.ServiceException, rospy.ROSSerializationException,
                     TypeError), e:
@@ -450,7 +451,7 @@ class ProcessGoal(smach.State):
             return 'invalid_goal'
 
         try:
-            self.search_camera_enable(False)
+            #self.search_camera_enable(False)
             userdata.search_camera_state = False
         except (rospy.ServiceException,
                 rospy.ROSSerializationException, TypeError), e:
@@ -684,11 +685,11 @@ class ManualPreempted(smach.State):
         
     def execute(self, userdata):
 
-        try:
-            self.search_camera_enable(True)
-        except (rospy.ServiceException,
-                rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("Unable to re-enable search camera: %s", e)
+        #try:
+        #    self.search_camera_enable(True)
+        #except (rospy.ServiceException,
+        #        rospy.ROSSerializationException, TypeError), e:
+        #    rospy.logerr("Unable to re-enable search camera: %s", e)
 
         #we are preempted by the top state machine
         #set motion mode to None and exit
@@ -710,11 +711,11 @@ class ManualAborted(smach.State):
         self.search_camera_enable = search_camera_enable
         
     def execute(self, userdata):
-        try:
-            self.search_camera_enable(True)
-        except (rospy.ServiceException,
-                rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("Unable to re-enable search camera: %s", e)
+        #try:
+        #    self.search_camera_enable(True)
+        #except (rospy.ServiceException,
+        #        rospy.ROSSerializationException, TypeError), e:
+        #    rospy.logerr("Unable to re-enable search camera: %s", e)
 
         result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
