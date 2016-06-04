@@ -64,6 +64,7 @@ class ManualController(object):
         self.state_machine.userdata.paused = False
         self.state_machine.userdata.light_state = False
         self.state_machine.userdata.search_camera_state = True
+        self.state_machine.userdata.announce_sample = False
 
         #strafe search settings
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
@@ -399,9 +400,10 @@ class ManualController(object):
             point_in_frame = self.tf.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
-            if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
-                self.announcer.say("Sample published.")
-                self.last_sample = rospy.Time.now()
+            if self.state_machine.userdata.announce_sample:
+                if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
+                    self.announcer.say("Sample published.")
+                    self.last_sample = rospy.Time.now()
             
         except tf.Exception:
             rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
@@ -496,8 +498,11 @@ class JoystickListen(smach.State):
                                        'lock_wheelpods_requested',
                                        'preempted',
                                        'aborted'],
-                             input_keys=['action_goal', 'allow_driving', 'allow_manipulator'],
-                             output_keys=['action_feedback'])
+                             input_keys=['action_goal',
+                                         'allow_driving',
+                                         'allow_manipulator'],
+                             output_keys=['action_feedback',
+                                          'announce_sample'])
         
         self.CAN_interface = CAN_interface
         self.joy_state = joy_state
@@ -508,6 +513,7 @@ class JoystickListen(smach.State):
         self.allow_driving = userdata.allow_driving
         self.allow_manipulator = userdata.allow_manipulator
         self.button_outcome = None
+        userdata.announce_sample = True
  
         #publish the joystick defined twist every 50ms    
         driving_timer = rospy.Timer(rospy.Duration(.05), self.driving_callback)
@@ -518,6 +524,7 @@ class JoystickListen(smach.State):
         self.button_CV.release()
         
         driving_timer.shutdown()       
+        userdata.announce_sample = False       
                 
         return self.button_outcome
 
