@@ -41,12 +41,14 @@ class ManualController(object):
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
-        self.search_camera_enable = rospy.ServiceProxy('enable_search',
-                platform_srv.Enable,
-                persistent=True)
+        self.search_camera_enable = None
+        #self.search_camera_enable = rospy.ServiceProxy('enable_search',
+        #        platform_srv.Enable,
+        #        persistent=True)
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
         self.odometry_frame = 'odom'
+        self.last_sample = rospy.Time.now()
  
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
@@ -62,6 +64,7 @@ class ManualController(object):
         self.state_machine.userdata.paused = False
         self.state_machine.userdata.light_state = False
         self.state_machine.userdata.search_camera_state = True
+        self.state_machine.userdata.announce_sample = False
 
         #strafe search settings
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
@@ -375,7 +378,7 @@ class ManualController(object):
         if self.joy_state.button('BUTTON_SEARCH_CAMERA'):
             newstate = self.state_machine.userdata.search_camera_state^True
             try:
-                self.search_camera_enable(newstate)
+                #self.search_camera_enable(newstate)
                 self.state_machine.userdata.search_camera_state = newstate
             except (rospy.ServiceException, rospy.ROSSerializationException,
                     TypeError), e:
@@ -397,6 +400,11 @@ class ManualController(object):
             point_in_frame = self.tf.transformPoint(self.odometry_frame, sample)
             sample.point = point_in_frame.point
             self.state_machine.userdata.detected_sample = sample
+            if self.state_machine.userdata.announce_sample:
+                if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
+                    self.announcer.say("Sample published.")
+                    self.last_sample = rospy.Time.now()
+            
         except tf.Exception:
             rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
                           sample.header.frame_id, self.odometry_frame)
@@ -450,7 +458,7 @@ class ProcessGoal(smach.State):
             return 'invalid_goal'
 
         try:
-            self.search_camera_enable(False)
+            #self.search_camera_enable(False)
             userdata.search_camera_state = False
         except (rospy.ServiceException,
                 rospy.ROSSerializationException, TypeError), e:
@@ -490,8 +498,11 @@ class JoystickListen(smach.State):
                                        'lock_wheelpods_requested',
                                        'preempted',
                                        'aborted'],
-                             input_keys=['action_goal', 'allow_driving', 'allow_manipulator'],
-                             output_keys=['action_feedback'])
+                             input_keys=['action_goal',
+                                         'allow_driving',
+                                         'allow_manipulator'],
+                             output_keys=['action_feedback',
+                                          'announce_sample'])
         
         self.CAN_interface = CAN_interface
         self.joy_state = joy_state
@@ -502,6 +513,7 @@ class JoystickListen(smach.State):
         self.allow_driving = userdata.allow_driving
         self.allow_manipulator = userdata.allow_manipulator
         self.button_outcome = None
+        userdata.announce_sample = True
  
         #publish the joystick defined twist every 50ms    
         driving_timer = rospy.Timer(rospy.Duration(.05), self.driving_callback)
@@ -512,6 +524,7 @@ class JoystickListen(smach.State):
         self.button_CV.release()
         
         driving_timer.shutdown()       
+        userdata.announce_sample = False       
                 
         return self.button_outcome
 
@@ -684,11 +697,11 @@ class ManualPreempted(smach.State):
         
     def execute(self, userdata):
 
-        try:
-            self.search_camera_enable(True)
-        except (rospy.ServiceException,
-                rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("Unable to re-enable search camera: %s", e)
+        #try:
+        #    self.search_camera_enable(True)
+        #except (rospy.ServiceException,
+        #        rospy.ROSSerializationException, TypeError), e:
+        #    rospy.logerr("Unable to re-enable search camera: %s", e)
 
         #we are preempted by the top state machine
         #set motion mode to None and exit
@@ -710,11 +723,11 @@ class ManualAborted(smach.State):
         self.search_camera_enable = search_camera_enable
         
     def execute(self, userdata):
-        try:
-            self.search_camera_enable(True)
-        except (rospy.ServiceException,
-                rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("Unable to re-enable search camera: %s", e)
+        #try:
+        #    self.search_camera_enable(True)
+        #except (rospy.ServiceException,
+        #        rospy.ROSSerializationException, TypeError), e:
+        #    rospy.logerr("Unable to re-enable search camera: %s", e)
 
         result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
