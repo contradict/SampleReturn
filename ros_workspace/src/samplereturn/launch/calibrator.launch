@@ -8,7 +8,7 @@
         pkg="camera_calibration"
         type="cameracalibrator.py"
         name="calibrator"
-        args="-\-size 11x4 -\-square 0.0126 -p acircles -\-approximate=0.05 -\-fix-aspect-ratio"
+        args="-\-size 9x6 -\-square 0.10 -p chessboard -\-approximate=0.05 -\-fix-aspect-ratio"
         output="screen"
         >
         <!--
