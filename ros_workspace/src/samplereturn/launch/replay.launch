@@ -15,10 +15,7 @@
     </include>
 
 <!--
-            /cameras/navigation/starboard/left/camera_info
-            /cameras/navigation/starboard/left/image_raw
-            /cameras/navigation/starboard/right/camera_info
-            /cameras/navigation/starboard/right/image_raw
+            diagnostics
             /cameras/manipulator/left/camera_info
             /cameras/manipulator/left/image_raw
             /cameras/manipulator/right/camera_info
@@ -27,18 +24,16 @@
             /cameras/navigation/port/left/image_raw
             /cameras/navigation/port/right/camera_info
             /cameras/navigation/port/right/image_raw
--->
-    <node
-        name="replay"
-        pkg="rosbag"
-        type="play"
-        output="screen"
-        args="--clock --pause
-        --topics
+            /cameras/navigation/starboard/left/camera_info
+            /cameras/navigation/starboard/left/image_raw
+            /cameras/navigation/starboard/right/camera_info
+            /cameras/navigation/starboard/right/image_raw
             /cameras/navigation/center/left/camera_info
             /cameras/navigation/center/left/image_raw
             /cameras/navigation/center/right/camera_info
             /cameras/navigation/center/right/image_raw
+            /cameras/search/center/image_raw
+            /cameras/search/center/camera_info
             /io/battery_voltage
             /io/gpio_read
             /io/gpio_write
@@ -56,11 +51,15 @@
             /motion/odometry
             /motion/planner_command
             /motion/platform_joint_state
-            diagnostics
+-->
+    <node
+        name="replay"
+        pkg="rosbag"
+        type="play"
+        output="screen"
+        args="--clock --pause
+        --topics
             tf
-            /cameras/search/image
-            /cameras/search/info
-            /cameras/search/status
         --bags $(arg bags)
         "
         />
@@ -71,9 +70,16 @@
     <include file="$(find samplereturn)/launch/navigation_camera.launch">
         <arg name="run_cameras" default="false"/>
     </include>
+
+    <include file="$(find samplereturn)/launch/search_camera.launch">
+        <arg name="run_cameras" default="false"/>
+    </include>
+
     <include file="$(find samplereturn)/launch/manipulator_camera.launch">
         <arg name="run_cameras" default="false"/>
     </include>
+    <!--
+    -->
 
     <include file="$(find samplereturn)/launch/planner_dumb.launch"/>
 
@@ -81,9 +87,11 @@
     <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
 
     <include file="$(find beacon_finder)/launch/beacon_finder.launch"/>
-
     <!--
+    -->
+
     <include file="$(find fence_detection)/launch/fence_detection.launch"/>
+    <!--
     -->
 
 </launch>
