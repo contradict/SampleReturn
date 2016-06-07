@@ -18,25 +18,30 @@ robot_radius: 1.0
 
 plugins:
     -
-        name: obstacle_layer
+        name: port_obstacle_layer
+        type: "costmap_2d::VoxelLayer"
+    -
+        name: center_obstacle_layer
+        type: "costmap_2d::VoxelLayer"
+    -
+        name: starboard_obstacle_layer
         type: "costmap_2d::VoxelLayer"
     -
         name: inflation_layer
         type: "costmap_2d::InflationLayer"
 
-obstacle_layer:
-    origin_z: -0.5
-    z_resolution: 0.125
+port_obstacle_layer:
+    z_resolution: 0.0625
     z_voxels: 16
     unknown_threshold: 8
-    mark_threshold: 6
+    mark_threshold: 4
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
     obstacle_range: 10.5
     raytrace_range: 10.6
 
-    observation_sources: port_point_cloud center_point_cloud starboard_point_cloud
+    observation_sources: port_point_cloud
     port_point_cloud: {
         topic: /cameras/navigation/port/points2,
         data_type: PointCloud2,
@@ -49,6 +54,19 @@ obstacle_layer:
         obstacle_range: 10.5,
         raytrace_range: 10.6,
         }
+
+center_obstacle_layer:
+    z_resolution: 0.0625
+    z_voxels: 16
+    unknown_threshold: 8
+    mark_threshold: 4
+    #set if you want the voxel map published
+    publish_voxel_map: true
+    track_unknown_space: true
+    obstacle_range: 10.5
+    raytrace_range: 10.6
+
+    observation_sources: center_point_cloud
     center_point_cloud: {
         topic: /cameras/navigation/center/points2,
         data_type: PointCloud2,
@@ -61,6 +79,18 @@ obstacle_layer:
         obstacle_range: 10.5,
         raytrace_range: 10.6,
         }
+starboard_obstacle_layer:
+    z_resolution: 0.0625
+    z_voxels: 16
+    unknown_threshold: 8
+    mark_threshold: 4
+    #set if you want the voxel map published
+    publish_voxel_map: true
+    track_unknown_space: true
+    obstacle_range: 10.5
+    raytrace_range: 10.6
+
+    observation_sources: starboard_point_cloud
     starboard_point_cloud: {
         topic: /cameras/navigation/starboard/points2,
         data_type: PointCloud2,
