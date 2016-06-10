@@ -83,9 +83,9 @@ class PursueSample(object):
         self.state_machine.latched_sample = None
         
         #pursuit params
-        self.simple_pursuit_threshold = self.node_params.simple_pursuit_threshold
         self.max_pursuit_error = self.node_params.max_pursuit_error
         self.min_pursuit_distance = self.node_params.min_pursuit_distance
+        self.state_machine.userdata.simple_pursuit_threshold = self.node_params.simple_pursuit_threshold
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
         self.state_machine.userdata.spin_velocity = self.node_params.spin_velocity
         self.state_machine.userdata.final_pursuit_step = self.node_params.final_pursuit_step
@@ -133,13 +133,38 @@ class PursueSample(object):
             
             smach.StateMachine.add('START_SAMPLE_PURSUIT',
                                    StartSamplePursuit(self.tf_listener),
-                                   transitions = {'next':'ANNOUNCE_SAMPLE_PURSUIT'})
+                                   transitions = {'goal':'ANNOUNCE_SAMPLE_PURSUIT',
+                                                  'simple':'ANNOUNCE_SIMPLE_PURSUIT',
+                                                  'aborted':'PUBLISH_FAILURE'})
             
             smach.StateMachine.add('ANNOUNCE_SAMPLE_PURSUIT',
                                    AnnounceState(self.announcer,
                                                  'Sample detected.  Pursue ing'),
                                    transitions = {'next':'APPROACH_SAMPLE'})
- 
+            
+            smach.StateMachine.add('ANNOUNCE_SIMPLE_PURSUIT',
+                                   AnnounceState(self.announcer,
+                                                 'Sample detected.  Position ing'),
+                                   transitions = {'next':'APPROACH_STRAFE'})
+            
+            smach.StateMachine.add('APPROACH_STRAFE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'FACE_SAMPLE',
+                                                  'object_detected':'FACE_SAMPLE',
+                                                  'preempted':'PUBLISH_FAILURE',
+                                                  'aborted':'PUBLISH_FAILURE'},
+                                   remapping = {'simple_move':'approach_strafe',
+                                                'stop_on_detection':'false'})
+            
+            smach.StateMachine.add('FACE_SAMPLE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'ANNOUNCE_MANIPULATOR_APPROACH',
+                                                  'object_detected':'ANNOUNCE_MANIPULATOR_APPROACH',
+                                                  'preempted':'PUBLISH_FAILURE',
+                                                  'aborted':'PUBLISH_FAILURE'},
+                                   remapping = {'simple_move':'face_sample',
+                                                'stop_on_detection':'false'})        
+             
             smach.StateMachine.add('APPROACH_SAMPLE',
                                    ExecuteVFHMove(self.vfh_mover),
                                    transitions = {'complete':'ANNOUNCE_MANIPULATOR_APPROACH',
@@ -515,15 +540,18 @@ class PursueSample(object):
 class StartSamplePursuit(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             outcomes=['next'],
+                             outcomes=['goal','simple','aborted'],
                              input_keys=['action_goal',
                                          'pursuit_velocity',
                                          'spin_velocity',
                                          'min_pursuit_distance',
+                                         'simple_pursuit_threshold',
                                          'odometry_frame'],
                              output_keys=['latched_filter_id',
                                           'return_goal',
                                           'pursuit_goal',
+                                          'approach_strafe',
+                                          'face_sample',
                                           'action_result',
                                           'search_count',
                                           'grab_count'])
@@ -542,14 +570,24 @@ class StartSamplePursuit(smach.State):
         userdata.grab_count = 0
 
         rospy.loginfo("SAMPLE_PURSUIT input_point: %s" % (userdata.action_goal.input_point))        
-        
+  
         #store the filter_id on entry, this instance of pursuit will only try to pick up this hypothesis
         userdata.latched_filter_id = userdata.action_goal.input_point.filter_id
-        
+          
         point, pose = calculate_pursuit(self.tf_listener,
                                         userdata.action_goal.input_point,
                                         userdata.min_pursuit_distance,
-                                        userdata.odometry_frame)
+                                        userdata.odometry_frame)          
+          
+        try:
+            approach_point = geometry_msg.PointStamped(pose.header,
+                                                       pose.pose.position)
+            yaw, distance = util.get_robot_strafe(self.tf_listener, approach_point)
+            robot_yaw = util.get_current_robot_yaw(self.tf_listener, userdata.odometry_frame)
+        except tf.Exception:
+            rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
+            return 'aborted'
+        rospy.loginfo("INITIAL_PURSUIT calculated with distance: {:f}, yaw: {:f} ".format(distance, yaw))
 
         #this is the initial vfh goal pose
         goal = samplereturn_msg.VFHMoveGoal(target_pose = pose,
@@ -567,8 +605,27 @@ class StartSamplePursuit(smach.State):
                                             spin_velocity = userdata.spin_velocity,
                                             orient_at_target = False)
         userdata.return_goal = goal        
-                
-        return 'next'
+        
+        #if distance to sample approach point is small, use a simple move
+        if distance < userdata.simple_pursuit_threshold:
+                       
+            facing_yaw = euler_from_orientation(pose.pose.orientation)[-1]
+            dyaw = util.unwind(facing_yaw - robot_yaw)
+                        
+            userdata.approach_strafe = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                  angle = yaw,
+                                                  distance = distance,
+                                                  velocity = userdata.pursuit_velocity)
+            userdata.face_sample = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                 angle = dyaw,
+                                                 velocity = userdata.spin_velocity)       
+
+            return 'simple'
+        
+        #if further than threshold make a vfh move to approach point    
+        else:
+                  
+            return 'goal'
 
 #waits for the chassis to settle and then get a good image of the maybe-sample,  then load
 #a set of simple approach moves to get the manipulator cameras directly over the target
@@ -808,4 +865,15 @@ def calculate_pursuit(_tf, pursuit_point, min_pursuit_distance, odometry_frame):
         return point_in_frame, pursuit_pose
     except tf.Exception, e:
            rospy.logwarn("PURSUE_SAMPLE failed to transform pursuit point %s->%s: %s",
-           pursuit_point.header.frame_id, odometry_frame, e)        
+           pursuit_point.header.frame_id, odometry_frame, e)
+           
+def euler_from_orientation(orientation):
+    """
+    euler angles from geometry_msgs/Quaterion
+    """
+    return tf.transformations.euler_from_quaternion((
+        orientation.x,
+        orientation.y,
+        orientation.z,
+        orientation.w,
+        ))
