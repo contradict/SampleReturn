@@ -83,6 +83,7 @@ class PursueSample(object):
         self.state_machine.latched_sample = None
         
         #pursuit params
+        self.simple_pursuit_threshold = self.node_params.simple_pursuit_threshold
         self.max_pursuit_error = self.node_params.max_pursuit_error
         self.min_pursuit_distance = self.node_params.min_pursuit_distance
         self.state_machine.userdata.pursuit_velocity = self.node_params.pursuit_velocity
@@ -95,8 +96,6 @@ class PursueSample(object):
             #latched filter id is the id of the hypothesis that triggered this pursuit
             #if it ever disappears or becomes impossible to get to, etc, publish failure
         self.state_machine.userdata.latched_filter_id = None
-
-
         
         #stop function check flags        
         self.state_machine.userdata.check_pursuit_distance = False
