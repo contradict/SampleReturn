@@ -744,15 +744,15 @@ class LineMOD_Detector
       blob_params.thresholdStep = _config.thresholdStep;
       blob_params.minRepeatability = _config.minRepeatability;
 
-      cv::SimpleBlobDetector blob;
-      blob.create(blob_params);
+      cv::Ptr<cv::SimpleBlobDetector> blob;
+      blob = cv::SimpleBlobDetector::create(blob_params);
 
       std::vector<cv::KeyPoint> kp;
 
       cv::Mat debug_bms_img_color;
 
       cv::Mat blob_copy = debug_bms_img.clone();
-      blob.detect(blob_copy, kp);
+      blob->detect(blob_copy, kp);
       ROS_DEBUG("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img, debug_bms_img_color, CV_GRAY2RGB);
       cv::Mat sub_img, sub_mask;
