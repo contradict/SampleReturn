@@ -40,8 +40,8 @@ pursue_sample:
     pursuit_velocity: 0.5
     spin_velocity: 0.3
     max_pursuit_error: 0.5
-    min_pursuit_distance: 1.5
-    simple_pursuit_threshold: 1.0
+    min_pursuit_distance: 1.2
+    simple_pursuit_threshold: 1.5
     #after min_pursuit reached, we move to check_distance, wait settle_time
     #and check for obstacles.  Then we make the manipulator view approach.
     settle_time: 4.0
