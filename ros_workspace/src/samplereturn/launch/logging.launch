@@ -12,6 +12,9 @@
 
     <!-- rosbag record -->
     <!--
+            /io/microstrain_3dm_gx3_35/imu
+            /io/microstrain_3dm_gx3_35/gps
+            /io/microstrain_3dm_gx3_35/magnetometer
   -->
   <node machine="navigate"
       pkg="rosbag"
@@ -38,9 +41,6 @@
             /io/phidget_0/data_raw
             /io/phidget_0/is_calibrated
             /io/phidget_0/mag
-            /io/microstrain_3dm_gx3_35/imu
-            /io/microstrain_3dm_gx3_35/gps
-            /io/microstrain_3dm_gx3_35/magnetometer
             /io/kvh/imu
             /motion/odometry
             /motion/platform_joint_state
@@ -56,6 +56,10 @@
       >
   </node>
 
+    <!--
+             /cameras/sun_cam/image_raw
+             /cameras/sun_cam/camera_info
+    -->
    <node machine="search"
        pkg="rosbag"
        type="record"
@@ -73,8 +77,6 @@
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
              /cameras/manipulator/right/camera_info
-             /cameras/sun_cam/image_raw
-             /cameras/sun_cam/camera_info
              /process/beacon_finder/beacon_pose
              /process/sample_detection/named_point
              /process/sample_detection/manipulator/named_point
