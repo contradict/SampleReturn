@@ -28,6 +28,7 @@
         <!--<param name="linear_acceleration_stdev" value="300.0 * 1e-6 * 9.81"/>-->
     </node>
 
+    <!--
     <node name="microstrain_3dm_gx3_35"
         machine="navigate"
         respawn="true"
@@ -41,5 +42,6 @@
         <param name="imu_frame" value="microstrain"/>
 
     </node>
+    -->
 
 </launch>
