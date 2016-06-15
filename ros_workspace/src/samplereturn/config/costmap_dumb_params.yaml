@@ -2,7 +2,7 @@ robot_base_frame: base_link
 global_frame: odom
 transform_tolerance: 0.3
 
-update_frequency: 2.0
+update_frequency: 3.0
 publish_frequency: 1.0
 
 clear_every_send: true
@@ -38,21 +38,21 @@ port_obstacle_layer:
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 10.5
-    raytrace_range: 10.6
+    obstacle_range: 6.0
+    raytrace_range: 12
 
     observation_sources: port_point_cloud
     port_point_cloud: {
         topic: /cameras/navigation/port/points2,
         data_type: PointCloud2,
-        expected_update_rate: 0.2,
+        expected_update_rate: 0.3,
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
         min_obstacle_height: -0.5,
         max_obstacle_height: 1.5,
-        obstacle_range: 10.5,
-        raytrace_range: 10.6,
+        obstacle_range: 6.0,
+        raytrace_range: 12.0,
         }
 
 center_obstacle_layer:
@@ -63,21 +63,21 @@ center_obstacle_layer:
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 10.5
-    raytrace_range: 10.6
+    obstacle_range: 6.0
+    raytrace_range: 12.0
 
     observation_sources: center_point_cloud
     center_point_cloud: {
         topic: /cameras/navigation/center/points2,
         data_type: PointCloud2,
-        expected_update_rate: 0.2,
+        expected_update_rate: 0.3,
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
         min_obstacle_height: -0.5,
         max_obstacle_height: 1.5,
-        obstacle_range: 10.5,
-        raytrace_range: 10.6,
+        obstacle_range: 6.0,
+        raytrace_range: 12.0,
         }
 starboard_obstacle_layer:
     z_resolution: 0.0625
@@ -87,21 +87,21 @@ starboard_obstacle_layer:
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 10.5
-    raytrace_range: 10.6
+    obstacle_range: 6.0
+    raytrace_range: 12.0
 
     observation_sources: starboard_point_cloud
     starboard_point_cloud: {
         topic: /cameras/navigation/starboard/points2,
         data_type: PointCloud2,
-        expected_update_rate: 0.2,
+        expected_update_rate: 0.3,
         observation_persistence: 0.0,
         marking: true,
         clearing: true,
         min_obstacle_height: -0.5,
         max_obstacle_height: 1.5,
-        obstacle_range: 10.5,
-        raytrace_range: 10.6,
+        obstacle_range: 6.0,
+        raytrace_range: 12.0,
         }
 
 inflation_layer:
