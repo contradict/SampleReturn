@@ -79,9 +79,9 @@ PitchRollUKFNode::PitchRollUKFNode() :
     if(privatenh.getParam("initial_covariance", cov_vect))
     {
         int ndim = PitchRollState().ndim();
-        initial_covariance = Eigen::MatrixXd::Map(cov_vect.data(), ndim, ndim);
         PitchRollState st = ukf_->state();
-        ukf_->reset(st, initial_covariance);
+        st.Covariance = Eigen::MatrixXd::Map(cov_vect.data(), ndim, ndim);
+        ukf_->reset(st);
     }
 
     pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
@@ -187,19 +187,20 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 void
 PitchRollUKFNode::printState(void)
 {
-    ROS_INFO_STREAM("State:\n" << ukf_->state());
-    ROS_INFO_STREAM("Covariance:\n" << ukf_->covariance());
+    PitchRollState st = ukf_->state();
+    ROS_INFO_STREAM("State:\n" << st);
+    ROS_INFO_STREAM("Covariance:\n" << st.Covariance);
     if(ukf_->state().use_yaw_)
     {
-        ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<3,3>(0,0)));
-        ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<3,3>(3,3)));
-        ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<2,2>(6,6)));
+        ROS_INFO_STREAM("orientation cov:\n" << (st.Covariance.block<3,3>(0,0)));
+        ROS_INFO_STREAM("omega cov:\n" << (st.Covariance.block<3,3>(3,3)));
+        ROS_INFO_STREAM("gyro bias cov:\n" << (st.Covariance.block<2,2>(6,6)));
     }
     else
     {
-        ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<2,2>(0,0)));
-        ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<2,2>(2,2)));
-        ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<2,2>(4,4)));
+        ROS_INFO_STREAM("orientation cov:\n" << (st.Covariance.block<2,2>(0,0)));
+        ROS_INFO_STREAM("omega cov:\n" << (st.Covariance.block<2,2>(2,2)));
+        ROS_INFO_STREAM("gyro bias cov:\n" << (st.Covariance.block<2,2>(4,4)));
     }
     //ROS_INFO_STREAM("accel bias cov:\n" << (ukf_->covariance().block<3,3>(6,6)));
 }

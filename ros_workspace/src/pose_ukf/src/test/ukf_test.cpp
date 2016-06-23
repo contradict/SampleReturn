@@ -9,10 +9,15 @@ struct TestState
 {
     double x, v;
 
+    Eigen::MatrixXd Covariance;
+
     TestState() :
         x(0.0),
         v(0.0)
-    {};
+    {
+        Covariance.resize(ndim(), ndim());
+        Covariance.setIdentity();
+    };
 
     struct TestState
     boxplus(const Eigen::VectorXd& offset) const
@@ -172,9 +177,7 @@ runTest(void)
     double sigma = (2*M_PI)*(2*M_PI)*10;
     TestState st;
     st.v=0.0;
-    Eigen::MatrixXd cov(2,2);
-    cov.setIdentity();
-    ukf.reset(st, cov);
+    ukf.reset(st);
 
     Eigen::MatrixXd measurement_noise(1,1);
     measurement_noise(0,0) = 0.02;
@@ -186,9 +189,9 @@ runTest(void)
                  positions[0] << ", " <<
                  velocities[0] << ", " <<
                  ukf.state().x << ", " <<
-                 sqrt(ukf.covariance()(0,0)) << ", " <<
+                 sqrt(ukf.state().Covariance(0,0)) << ", " <<
                  ukf.state().v << ", " <<
-                 sqrt(ukf.covariance()(1,1)) << ", " <<
+                 sqrt(ukf.state().Covariance(1,1)) << ", " <<
                  0.0 << std::endl;
     int correct_every=1;
     for(int i=0;i<N;i++)
@@ -203,9 +206,9 @@ runTest(void)
                      positions[i] << ", " <<
                      velocities[i] << ", " <<
                      ukf.state().x << ", " <<
-                     sqrt(ukf.covariance()(0,0)) << ", " <<
+                     sqrt(ukf.state().Covariance(0,0)) << ", " <<
                      ukf.state().v << ", " <<
-                     sqrt(ukf.covariance()(1,1)) << ", " <<
+                     sqrt(ukf.state().Covariance(1,1)) << ", " <<
                      m.x << ", " <<
                      sqrt(measurement_noise(0,0)) <<
                      std::endl;

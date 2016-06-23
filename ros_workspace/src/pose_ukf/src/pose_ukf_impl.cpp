@@ -55,5 +55,10 @@ operator<<(std::ostream &out, const WheelOdometryMeasurement& m)
     return out;
 }
 
+std::ostream &
+operator<<(std::ostream &out, const YawMeasurement& m)
+{
+    out << "yaw: " << m.yaw << std::endl;
+}
 
 }

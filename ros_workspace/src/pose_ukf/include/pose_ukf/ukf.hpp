@@ -15,7 +15,6 @@ class ScaledUKF {
     double kappa_, alpha_, beta_;
 
     S state_;
-    Eigen::MatrixXd covariance_;
 
     void
     generateSigmaPoints(const S& mu,
@@ -87,15 +86,12 @@ class ScaledUKF {
             beta_(beta),
             kappa_(kappa)
         {
-            covariance_.resize(ndim(), ndim());
-            covariance_.setIdentity();
         };
 
         void
-        reset(const S& st, const Eigen::MatrixXd& cov)
+        reset(const S& st)
         {
             state_ = st;
-            covariance_ = cov;
         }
 
         void
@@ -106,7 +102,7 @@ class ScaledUKF {
             std::vector<S> Chi;
             std::vector<Eigen::VectorXd> nu;
             std::vector<double> weights, cweights;
-            generateSigmaPoints(state_, covariance_, covs,
+            generateSigmaPoints(state_, state_.Covariance, covs,
                     Chi, nu, weights, cweights);
 
             std::vector<S> Chiminus;
@@ -140,7 +136,7 @@ class ScaledUKF {
                 }
             }
             state_ = xhatminus;
-            covariance_ = Pminus;
+            state_.Covariance = Pminus;
         }
 
         template <typename M>
@@ -155,7 +151,7 @@ class ScaledUKF {
             std::vector<S> Chi;
             std::vector<Eigen::VectorXd> nu;
             std::vector<double> weights, cweights;
-            generateSigmaPoints(state_, covariance_, covs,
+            generateSigmaPoints(state_, state_.Covariance, covs,
                     Chi, nu, weights, cweights);
 
 
@@ -194,11 +190,11 @@ class ScaledUKF {
             Eigen::VectorXd update = K*innovation;
             //ROS_DEBUG_STREAM("Update: " << update.transpose());
             state_ = state_.boxplus(update);
-            covariance_ = covariance_ - K*Pyminus*K.transpose();
-            for(int i=0;i<covariance_.size();i++)
+            state_.Covariance -= K*Pyminus*K.transpose();
+            for(int i=0;i<state_.Covariance.size();i++)
             {
-                if(isnan(*(covariance_.data()+i)) ||
-                   fabs(*(covariance_.data()+i))>10.0f)
+                if(isnan(*(state_.Covariance.data()+i)) ||
+                   fabs(*(state_.Covariance.data()+i))>10.0f)
                 {
                     ROS_ERROR("Silly covariance");
                 }
@@ -206,7 +202,6 @@ class ScaledUKF {
         }
 
         const S& state(void) const {return state_;};
-        const Eigen::MatrixXd& covariance(void) const {return covariance_;};
 
         int ndim(void) const { return state_.ndim(); };
 

@@ -13,7 +13,8 @@
         launch-prefix="tmux_new_window gdb -ex run - -args "
         launch-prefix="tmux_new_window valgrind "
         -->
-        <remap from="imu" to="/io/microstrain_3dm_gx3_35/imu"/>
+        <remap from="imu" to="/io/phidget_0/data_raw"/>
+        <remap from="gyro" to="/io/kvh/imu"/>
         <remap from="joint_state" to="/motion/platform_joint_state"/>
         <param name="wheel_diameter" type="double" value="0.314"/>
         <param name="wheel_forward_noise" type="double" value="0.001"/>

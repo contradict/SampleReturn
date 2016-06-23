@@ -77,6 +77,7 @@ struct PitchRollState
     Eigen::Vector2d GyroBias;
     bool use_yaw_;
     //Eigen::Vector3d AccelBias;
+    Eigen::MatrixXd Covariance;
     PitchRollState()
     {
         use_yaw_ = USE_YAW;
@@ -84,6 +85,8 @@ struct PitchRollState
         Omega.setZero();
         GyroBias.setZero();
         //AccelBias.setZero();
+        Covariance.resize(ndim(), ndim());
+        Covariance.setIdentity();
     };
     struct PitchRollState
     boxplus(const Eigen::VectorXd& offset) const

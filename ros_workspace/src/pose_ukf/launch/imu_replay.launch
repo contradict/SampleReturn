@@ -23,10 +23,9 @@
         args="--pause --clock
             --bags $(arg bagfile)
             --topics
-            tf
-            /io/imu_0/data_raw
-            /io/imu_1/data_raw
-            /io/microstrain_3dm_gx3_35/imu
+            /tf
+            /io/phidget_0/data_raw
+            /io/kvh/imu
             /motion/platform_joint_state
             /motion/odometry
             "
@@ -34,11 +33,13 @@
     </node>
 
     <node
-        name="microstrain_imu_transform"
+        name="imu_0_gyro_transform"
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
-        args="0 0 0 0 0 0 microstrain imu 5"/>
+        args="-0.7 0.2 0 0 0 0 imu_0 gyro 5"/>
+    <!--
+        -->
 
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
 </launch>
