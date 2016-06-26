@@ -254,6 +254,7 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     tf::Pose imu_tf(q, v);
     tf::Pose odom_tf = transform_cache_[IMU_NAME].first * imu_tf * transform_cache_[IMU_NAME].first.inverse();
     tf::poseTFToMsg( odom_tf, msg->pose);
+    ROS_DEBUG_STREAM("pose q: " << q << " norm: " << q.length());
     pose_pub_.publish(msg);
 }
 
@@ -271,11 +272,14 @@ PoseUKFNode::sendState(void)
     msg->Velocity.y = ukf_->state().Velocity(1);
     msg->Acceleration.x = ukf_->state().Acceleration(0);
     msg->Acceleration.y = ukf_->state().Acceleration(1);
-    tf::quaternionEigenToMsg(ukf_->state().Orientation.unit_quaternion(), msg->Orientation);
+    Eigen::Quaterniond q=ukf_->state().Orientation.unit_quaternion();
+    tf::quaternionEigenToMsg(q, msg->Orientation);
     tf::vectorEigenToMsg(ukf_->state().Omega, msg->Omega);
     tf::vectorEigenToMsg(ukf_->state().AccelBias, msg->AccelBias);
     tf::vectorEigenToMsg(ukf_->state().GyroBias, msg->GyroBias);
 
+    double qn = q.norm();
+    ROS_DEBUG_STREAM("state q norm: " << qn);
     state_pub_.publish(msg);
 }
 
