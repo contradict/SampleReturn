@@ -138,7 +138,8 @@ class ScaledUKF {
                 if(isnan(*(Pminus.data()+i)) ||
                    fabs(*(Pminus.data()+i))>10.0f)
                 {
-                    ROS_ERROR("Silly covariance");
+                    ROS_ERROR_STREAM("Silly predict covariance\n" << Pminus);
+                    break;
                 }
             }
             state_ = xhatminus;
@@ -202,7 +203,8 @@ class ScaledUKF {
                 if(isnan(*(state_.Covariance.data()+i)) ||
                    fabs(*(state_.Covariance.data()+i))>10.0f)
                 {
-                    ROS_ERROR("Silly covariance");
+                    ROS_ERROR_STREAM("Silly correct covariance\n" << state_.Covariance);
+                    break;
                 }
             }
         }
