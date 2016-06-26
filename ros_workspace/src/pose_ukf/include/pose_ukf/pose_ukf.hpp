@@ -84,16 +84,17 @@ struct PoseState
     };
     struct PoseState
     advance(double dt,
+            Eigen::VectorXd control,
             const Eigen::VectorXd &Chinu) const
     {
         struct PoseState out;
         Eigen::Vector3d deltapos;
         deltapos.segment<2>(0) = (dt*Velocity + dt*dt*Acceleration/2.);
         deltapos(2) = 0;
-        out.Position = Position + (Orientation*deltapos).segment<2>(0) + Chinu.segment<2>(0);
         out.Velocity = Velocity + dt*Acceleration + Chinu.segment<2>(2);
         out.Acceleration = Acceleration + Chinu.segment<2>(4);
         Eigen::Vector3d delta_orientation = Omega*dt + Chinu.segment<3>(6);
+        out.Position = Position + (Orientation*deltapos).segment<2>(0) + Chinu.segment<2>(0);
         out.Orientation = Orientation*Sophus::SO3d::exp(delta_orientation);
         out.Omega = Omega + Chinu.segment<3>(9);
         out.GyroBias = GyroBias + Chinu.segment<3>(12);
@@ -213,6 +214,8 @@ struct PoseState
 
 
     ssize_t ndim(void) const {return 3*2 + 4*3 + 5*state_history_.size();};
+    static const double littleg;
+    static const Eigen::Vector3d gravity;
 
     friend std::ostream& operator<<(std::ostream &, const PoseState &);
 };
@@ -319,8 +322,7 @@ struct IMUOrientationMeasurement
     measure(const struct PoseState& st, const Eigen::VectorXd& noise) const
     {
         struct IMUOrientationMeasurement m;
-        Eigen::Vector3d gravity(0, 0, -littleg);
-        m.acceleration = st.Orientation.inverse() * gravity + st.AccelBias;
+        m.acceleration = st.Orientation.inverse() * st.gravity + st.AccelBias;
         m.acceleration.segment<2>(0) += st.Acceleration;
         m.acceleration += noise.segment<3>(0);
         m.omega = st.Omega + st.GyroBias + noise.segment<3>(3);
@@ -328,7 +330,6 @@ struct IMUOrientationMeasurement
     };
 
     ssize_t ndim(void) const { return 6; };
-    static const double littleg;
     friend std::ostream& operator<<(std::ostream &, const IMUOrientationMeasurement &);
 };
 

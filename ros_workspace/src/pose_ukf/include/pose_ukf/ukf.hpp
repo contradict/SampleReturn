@@ -97,6 +97,12 @@ class ScaledUKF {
         void
         predict(double dt, Eigen::MatrixXd process_noise)
         {
+            predict(dt, Eigen::VectorXd::Zero(process_noise.rows()), process_noise);
+        }
+
+        void
+        predict(double dt, Eigen::VectorXd control, Eigen::MatrixXd process_noise)
+        {
             std::vector<Eigen::MatrixXd> covs;
             covs.push_back(process_noise);
             std::vector<S> Chi;
@@ -111,7 +117,7 @@ class ScaledUKF {
             {
                 S chi = boost::get<0>(t);
                 Eigen::VectorXd nu = boost::get<1>(t);
-                S st = chi.advance(dt, nu.segment(0, Lx));
+                S st = chi.advance(dt, control, nu.segment(0, Lx));
                 Chiminus.push_back(st);
             }
             S xhatminus;

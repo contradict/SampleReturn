@@ -17,7 +17,8 @@ UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::WheelOdometryM
 
 namespace PoseUKF {
 
-const double IMUOrientationMeasurement::littleg=9.8066;
+const double PoseState::littleg=9.8066;
+const Eigen::Vector3d PoseState::gravity=Eigen::Vector3d(0, 0, -PoseState::littleg);
 
 std::ostream &
 operator<<(std::ostream &out, const PoseState& st)
