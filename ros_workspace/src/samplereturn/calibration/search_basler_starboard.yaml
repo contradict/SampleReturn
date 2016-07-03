@@ -1,0 +1,20 @@
+image_width: 3840
+image_height: 2748
+camera_name: /cameras/search/starboard/basler_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [4870.394373579737, 0, 1925.579599741067, 0, 4882.768133209302, 1488.451961267469, 0, 0, 1]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.1803138553271096, 0.2630810459944445, 0.005605124355205554, -0.001958339903482761, 0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [4761.849609375, 0, 1920.438418416947, 0, 0, 4812.5654296875, 1497.323524361331, 0, 0, 0, 1, 0]
