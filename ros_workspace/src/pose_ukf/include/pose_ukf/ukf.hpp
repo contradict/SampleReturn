@@ -147,6 +147,16 @@ class ScaledUKF {
 
         template <typename M>
         void
+        differentialcorrect(const M& measured,
+                const std::vector<Eigen::MatrixXd>& measurement_covs
+               )
+        {
+            correct(measured, measurement_covs);
+            state_.augment(measured.key_);
+        }
+
+        template <typename M>
+        void
         correct(const M& measured,
                 const std::vector<Eigen::MatrixXd>& measurement_covs
                )
