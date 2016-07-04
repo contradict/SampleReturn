@@ -252,7 +252,8 @@ void configure_callback(basler_camera::CameraConfig &config, uint32_t level)
 
 bool service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
 {
-  publish_enabled = req.state; 
+  publish_enabled = req.state;
+  resp.state = req.state;
   return true;  
 }
 
