@@ -19,13 +19,14 @@
              env-loader="/home/$(arg user)/$(arg path)/SampleReturn/ros_workspace/$(arg kind)/env.sh"
              user="$(arg user)"
              />
-
+         <!--
     <node
         name="microstrain_imu_transform"
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
         args="-0.455 0 0.155 0 3.1416 0 body_triangle imu 10"/>
+        -->
 
     <param name="robot_description"
            command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
@@ -53,6 +54,7 @@
            command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
     </node>
 
+    <!--
     <node name="microstrain_3dm_gx3_35"
         machine="navigate"
         respawn="true"
@@ -66,7 +68,9 @@
         <param name="ahrs_on" value="True"/>
 
     </node>
-
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
+    -->
+
+    <include file="$(find samplereturn)/launch/imu.launch"/>
 
 </launch>

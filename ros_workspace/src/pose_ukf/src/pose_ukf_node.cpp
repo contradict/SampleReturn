@@ -66,7 +66,7 @@ class PoseUKFNode
         bool initialize(void)
         {
             tf::StampedTransform wheel;
-            if(!lookupTransform(listener, base_name, wheel_link,
+            if(!::PoseUKF::lookupTransform(listener, base_name, wheel_link,
                         std::string("Unable to initialize wheel"),
                         &wheel))
                 return false;
@@ -100,6 +100,7 @@ class PoseUKFNode
     // index into wheels by rolling joint
     std::map<std::string, std::shared_ptr<struct Wheel> > rotation_values_;
 
+    std::string imu_frame_;
     std::string base_name_;
     std::string odom_frame_id_;
     double publish_period_;
@@ -110,6 +111,8 @@ class PoseUKFNode
     void gyroCallback(sensor_msgs::ImuConstPtr msg);
     void sendPose(const ros::TimerEvent& e);
     void sendState(void);
+    bool lookupTransform(std::string frame_id, std::string to_id, tf::StampedTransform& transform);
+    Sophus::SE3d tf2se3(const tf::StampedTransform& transform);
 
     tf::TransformBroadcaster broadcaster_;
     tf::TransformListener listener_;
@@ -122,10 +125,6 @@ class PoseUKFNode
     ros::Publisher pose_pub_;
     ros::Publisher state_pub_;
     bool send_on_timer_;
-
-    std::map<std::string, std::pair<tf::StampedTransform, Sophus::SE3d>> transform_cache_;
-    const std::string IMU_NAME="imu";
-    const std::string GYRO_NAME="gyro";
 
     PoseUKF *ukf_;
     ros::Time last_update_;
@@ -155,6 +154,7 @@ class PoseUKFNode
 };
 
 PoseUKFNode::PoseUKFNode() :
+    imu_frame_(""),
     ukf_(NULL)
 {
     ros::NodeHandle privatenh("~");
@@ -232,7 +232,8 @@ PoseUKFNode::initialize(void)
 void
 PoseUKFNode::sendPose(const ros::TimerEvent& e)
 {
-    if(transform_cache_.find(IMU_NAME) == transform_cache_.end())
+    tf::StampedTransform imu_transform;
+    if(!lookupTransform(imu_frame_, base_name_, imu_transform))
     {
         return;
     }
@@ -252,7 +253,7 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     pos3d(2) = 0;
     tf::vectorEigenToTF(pos3d, v);
     tf::Pose imu_tf(q, v);
-    tf::Pose odom_tf = transform_cache_[IMU_NAME].first * imu_tf * transform_cache_[IMU_NAME].first.inverse();
+    tf::Pose odom_tf = imu_transform * imu_tf * imu_transform.inverse();
     tf::poseTFToMsg( odom_tf, msg->pose);
     ROS_DEBUG_STREAM("pose q: " << q << " norm: " << q.length());
     pose_pub_.publish(msg);
@@ -264,7 +265,7 @@ PoseUKFNode::sendState(void)
     pose_ukf::PosePtr msg(new pose_ukf::Pose);
 
     msg->header.stamp = last_update_;
-    msg->header.frame_id = transform_cache_[IMU_NAME].first.frame_id_;
+    msg->header.frame_id = imu_frame_;
 
     msg->Position.x = ukf_->state().Position(0);
     msg->Position.y = ukf_->state().Position(1);
@@ -281,6 +282,7 @@ PoseUKFNode::sendState(void)
     double qn = q.norm();
     ROS_DEBUG_STREAM("state q norm: " << qn);
     state_pub_.publish(msg);
+    printState();
 }
 
 Eigen::MatrixXd
@@ -312,44 +314,18 @@ PoseUKFNode::process_noise(double dt) const
 void
 PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 {
-
-    if(transform_cache_.find(IMU_NAME) == transform_cache_.end())
-    {
-        try
-        {
-            tf::StampedTransform imu_transform;
-            listener_.lookupTransform(msg->header.frame_id,
-                    base_name_,
-                    ros::Time(0),
-                    imu_transform);
-            Eigen::Quaterniond imu_rotation;
-            Eigen::Vector3d imu_translation;
-            tf::quaternionTFToEigen(imu_transform.getRotation(), imu_rotation);
-            tf::vectorTFToEigen(imu_transform.getOrigin(), imu_translation);
-            Sophus::SE3d imu_se3(imu_rotation, imu_translation);
-            transform_cache_[IMU_NAME] = std::pair<tf::StampedTransform, Sophus::SE3d>(imu_transform, imu_se3);
-        }
-        catch(tf::TransformException ex)
-        {
-            ROS_ERROR_STREAM("Unable to look up imu frame: " << ex.what());
-            return;
-        }
-    }
-
+    imu_frame_ = msg->header.frame_id;
     IMUOrientationMeasurement m;
     tf::vectorMsgToEigen(msg->linear_acceleration,
             m.acceleration);
-    m.acceleration *= m.littleg;
     tf::vectorMsgToEigen(msg->angular_velocity,
             m.omega);
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > accel_cov(msg->linear_acceleration_covariance.data());
     meas_cov.block<3, 3>(0, 0) = accel_cov;
-    ROS_DEBUG_STREAM("imu accel cov:\n" << accel_cov);
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > omega_cov(msg->angular_velocity_covariance.data());
     meas_cov.block<3, 3>(3, 3) = omega_cov;
-    ROS_DEBUG_STREAM("imu omega cov:\n" << omega_cov);
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
 
@@ -357,7 +333,6 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     if(dt>0)
     {
         ROS_DEBUG_STREAM("Performing IMU predict with dt=" << dt );
-        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
     }
@@ -369,7 +344,6 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     ROS_DEBUG_STREAM("IMU correct:\n" << m);
     ROS_DEBUG_STREAM("IMU measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    //printState();
     sendState();
     if(!send_on_timer_)
     {
@@ -378,43 +352,59 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     }
 }
 
+
+bool PoseUKFNode::lookupTransform(std::string frame_id, std::string to_id, tf::StampedTransform& transform)
+{
+    if(frame_id=="" || to_id=="")
+    {
+        return false;
+    }
+    try
+    {
+        listener_.lookupTransform(frame_id,
+                to_id,
+                ros::Time(0),
+                transform);
+    }
+    catch(tf::TransformException ex)
+    {
+        ROS_ERROR_STREAM("Unable to look up " << frame_id << "->" << to_id << ": " << ex.what());
+        return false;
+    }
+    return true;
+}
+
+Sophus::SE3d PoseUKFNode::tf2se3(const tf::StampedTransform& transform)
+{
+    Sophus::SE3d se3;
+    Eigen::Quaterniond rotation;
+    Eigen::Vector3d translation;
+    tf::quaternionTFToEigen(transform.getRotation(), rotation);
+    tf::vectorTFToEigen(transform.getOrigin(), translation);
+    se3 = Sophus::SE3d(rotation, translation);
+    return se3;
+}
+
 void
 PoseUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
 {
-
-    if(transform_cache_.find(GYRO_NAME) == transform_cache_.end())
+    tf::StampedTransform gyro_transform;
+    if(!lookupTransform(msg->header.frame_id, imu_frame_, gyro_transform))
     {
-        try
-        {
-            tf::StampedTransform gyro_transform;
-            listener_.lookupTransform(msg->header.frame_id,
-                    base_name_,
-                    ros::Time(0),
-                    gyro_transform);
-            Eigen::Quaterniond gyro_rotation;
-            Eigen::Vector3d gyro_translation;
-            tf::quaternionTFToEigen(gyro_transform.getRotation(), gyro_rotation);
-            tf::vectorTFToEigen(gyro_transform.getOrigin(), gyro_translation);
-            Sophus::SE3d gyro_se3(gyro_rotation, gyro_translation);
-            transform_cache_[GYRO_NAME] = std::pair<tf::StampedTransform, Sophus::SE3d>(gyro_transform, gyro_se3);
-        }
-        catch(tf::TransformException ex)
-        {
-            ROS_ERROR_STREAM("Unable to look up gyro frame: " << ex.what());
-            return;
-        }
+       return;
     }
 
+    tf::Quaternion gq;
+    tf::quaternionMsgToTF(msg->orientation, gq);
+    tf::Transform gyro(gq);
+    tf::Transform gyro_imu = gyro_transform*gyro*gyro_transform.inverse();
     YawMeasurement m;
-    tf::quaternionMsgToEigen(msg->orientation, m.qyaw);
+    tf::quaternionTFToEigen(gyro_imu.getRotation(), m.qyaw);
     m.setyaw(m.qyaw);
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
-    ROS_DEBUG_STREAM("Raw cov: " << msg->orientation_covariance.data()[8]);
-    ROS_DEBUG("Raw cov: %e", msg->orientation_covariance.data()[8]);
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > cov(msg->orientation_covariance.data());
     meas_cov(0,0) = cov(2,2);
-    ROS_DEBUG_STREAM("gyro yaw cov:\n" << meas_cov(0,0));
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
 
@@ -422,7 +412,6 @@ PoseUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     if(dt>0)
     {
         ROS_DEBUG_STREAM("Performing gyro predict with dt=" << dt );
-        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
     }
@@ -434,7 +423,6 @@ PoseUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     ROS_DEBUG_STREAM("GYRO correct:\n" << m);
     ROS_DEBUG_STREAM("GYRO measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    //printState();
     sendState();
     if(!send_on_timer_)
     {
@@ -447,21 +435,26 @@ void
 PoseUKFNode::printState(void)
 {
     ROS_INFO_STREAM("State:\n" << ukf_->state());
-    ROS_INFO_STREAM("position cov:\n" << (ukf_->covariance().block<2,2>(0,0)));
-    ROS_INFO_STREAM("velocity cov:\n" << (ukf_->covariance().block<2,2>(2,2)));
-    ROS_INFO_STREAM("acceleration cov:\n" << (ukf_->covariance().block<2,2>(4,4)));
-    ROS_INFO_STREAM("orientation cov:\n" << (ukf_->covariance().block<3,3>(6,6)));
-    ROS_INFO_STREAM("omega cov:\n" << (ukf_->covariance().block<3,3>(9,9)));
-    ROS_INFO_STREAM("gyro bias cov:\n" << (ukf_->covariance().block<3,3>(12,12)));
-    ROS_INFO_STREAM("accel bias cov:\n" << (ukf_->covariance().block<3,3>(15,15)));
-    ROS_INFO_STREAM("covariance:\n" << ukf_->covariance());
+    Eigen::MatrixXd cov = ukf_->state().Covariance;
+    ROS_INFO_STREAM("position cov:\n" << (cov.block<2,2>(0,0)));
+    ROS_INFO_STREAM("velocity cov:\n" << (cov.block<2,2>(2,2)));
+    ROS_INFO_STREAM("orientation cov:\n" << (cov.block<3,3>(4,4)));
+    ROS_INFO_STREAM("omega cov:\n" << (cov.block<3,3>(7,7)));
+    ROS_INFO_STREAM("gyro bias cov:\n" << (cov.block<3,3>(10,10)));
+    ROS_INFO_STREAM("accel bias cov:\n" << (cov.block<3,3>(13,13)));
+    ROS_INFO_STREAM("covariance:\n" << cov);
 }
 
 void
 PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
 {
-    if(transform_cache_.find(IMU_NAME) == transform_cache_.end() || wheels_.size() == 0)
+    tf::StampedTransform imu_transform;
+    if(!lookupTransform(msg->header.frame_id, imu_frame_, imu_transform))
+    {
         return;
+    }
+
+    Sophus::SE3d imu_se3 = tf2se3(imu_transform);
 
     for( auto&& t: zip_range(msg->name, msg->position, msg->velocity) )
     {
@@ -470,13 +463,11 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         double velocity = boost::get<2>(t);
         if( steering_values_.find(name) != steering_values_.end() )
         {
-            ROS_DEBUG_STREAM("Set steering " << name << " p: " << position << " v: " << velocity);
             steering_values_[name]->steering_angle = position;
             steering_values_[name]->steering_velocity = velocity;
         }
         if( rotation_values_.find(name) != rotation_values_.end() )
         {
-            ROS_DEBUG_STREAM("Set rotation " << name << " p: " << position << " v: " << velocity);
             rotation_values_[name]->rotation_angle = position;
             rotation_values_[name]->rotation_velocity = velocity;
         }
@@ -497,7 +488,6 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     {
         double dphi, dtheta;
         good_delta &= wheels_[i]->delta(&dphi, &dtheta);
-        ROS_DEBUG_STREAM("Wheel[" << i << "] delta (" << dphi << ", " << dtheta << ")");
         direction << cos(wheels_[i]->steering_angle),
                      sin(wheels_[i]->steering_angle);
         wheel_deltas.segment<2>(2*i) = wheels_[i]->diameter*dtheta*direction/2.;
@@ -516,8 +506,6 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         ROS_ERROR("Large angle jump, skipping odometry update");
         return;
     }
-    ROS_DEBUG_STREAM("Joint state deltas: "<<wheel_deltas.transpose());
-    ROS_DEBUG_STREAM("Joint state velocities: "<<wheel_velocities.transpose());
 
     if(!(((measurement_cov-measurement_cov).array() == (measurement_cov-measurement_cov).array()).all()))
     {
@@ -535,25 +523,22 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
         ROS_ERROR_STREAM("Rotated covariance not finite\n" << covariance );
         return;
     }
-    ROS_DEBUG_STREAM("Joint state odometry motion: " << motion.transpose());
-    ROS_DEBUG_STREAM("Joint state odometry velocity: " << velocity.transpose());
-
 
     Sophus::SE3d odometry_delta_base_link;
     odometry_delta_base_link.translation() << motion(1), motion(2), 0;
     odometry_delta_base_link.so3() = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, motion(0)));
-    Sophus::SE3d odometry_delta_imu = transform_cache_[IMU_NAME].second*odometry_delta_base_link*transform_cache_[IMU_NAME].second.inverse();
+    Sophus::SE3d odometry_delta_imu = imu_se3*odometry_delta_base_link*imu_se3.inverse();
 
     Sophus::SE3d odometry_velocity_base_link;
     odometry_velocity_base_link.translation() << velocity(1), velocity(2), 0;
     odometry_velocity_base_link.so3() = Sophus::SO3d::exp(Eigen::Vector3d(0, 0, velocity(0)));
-    Sophus::SE3d odometry_velocity_imu = transform_cache_[IMU_NAME].second*odometry_velocity_base_link*transform_cache_[IMU_NAME].second.inverse();
+    Sophus::SE3d odometry_velocity_imu = imu_se3*odometry_velocity_base_link*imu_se3.inverse();
 
     Eigen::Matrix3d odometry_position_covariance_base_link;
     odometry_position_covariance_base_link.setIdentity();
     odometry_position_covariance_base_link.block<2,2>(0,0) = covariance.block<2,2>(1,1);
     Eigen::Matrix3d rot_base_to_imu;
-    tf::matrixTFToEigen(transform_cache_[IMU_NAME].first.getBasis(), rot_base_to_imu);
+    tf::matrixTFToEigen(imu_transform.getBasis(), rot_base_to_imu);
     Eigen::Matrix3d odometry_position_covariance_imu = rot_base_to_imu*odometry_position_covariance_base_link*rot_base_to_imu.transpose();
 
     double delta_t = (msg->header.stamp - last_joint_stamp_).toSec();
@@ -563,7 +548,6 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     if(dt>0)
     {
         ROS_DEBUG_STREAM("Performing odometry predict with dt=" << dt);
-        ROS_DEBUG_STREAM("Process noise:\n" << process_noise(dt));
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
     }
@@ -589,8 +573,7 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     ROS_DEBUG_STREAM("odometry correct:\n" << m);
     //ROS_DEBUG_STREAM("odometry prediction:\n" << m.measure(ukf_->state(), Eigen::VectorXd::Zero(m.ndim())));
     ROS_DEBUG_STREAM("odometry measurement covariance:\n" << meas_cov);
-    ukf_->correct(m, meas_covs);
-    //printState();
+    ukf_->differentialcorrect(m, meas_covs);
     sendState();
 }
 

@@ -37,7 +37,7 @@
         pkg="tf"
         type="static_transform_publisher"
         output="screen"
-        args="-0.7 0.2 0 0 0 0 imu_0 gyro 5"/>
+        args="-1.145 0.2 0 0 0 0 base_link gyro 5"/>
     <!--
         -->
 
