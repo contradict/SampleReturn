@@ -112,18 +112,17 @@ class ScaledUKF {
                     Chi, nu, weights, cweights);
 
             std::vector<S> Chiminus;
-            int Lx = state_.ndim();
             for(auto && t: zip_range(Chi, nu))
             {
                 S chi = boost::get<0>(t);
                 Eigen::VectorXd nu = boost::get<1>(t);
-                S st = chi.advance(dt, control, nu.segment(0, Lx));
+                S st = chi.advance(dt, control, nu);
                 Chiminus.push_back(st);
             }
             S xhatminus;
             xhatminus.mean(weights, Chiminus);
 
-            Eigen::MatrixXd Pminus(Lx, Lx);
+            Eigen::MatrixXd Pminus(state_.ndim(), state_.ndim());
             Pminus.setZero();
             for(auto && t: zip_range(cweights, Chiminus))
             {
@@ -167,8 +166,7 @@ class ScaledUKF {
             {
                 S st = boost::get<0>(t);
                 Eigen::VectorXd nu = boost::get<1>(t);
-                Yminus.push_back(measured.measure(st,
-                            nu.segment(0, measured.ndim())));
+                Yminus.push_back(measured.measure(st, nu));
             }
 
             M yhatminus;
