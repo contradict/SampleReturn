@@ -133,6 +133,7 @@ struct PitchRollState
     };
     struct PitchRollState
     advance(double dt,
+            const Eigen::VectorXd& control,
             const Eigen::VectorXd &Chinu) const
     {
         struct PitchRollState out;

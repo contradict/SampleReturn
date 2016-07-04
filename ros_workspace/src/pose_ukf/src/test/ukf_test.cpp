@@ -38,8 +38,9 @@ struct TestState
     }
 
     struct TestState
-    advance(double dt, const Eigen::VectorXd& nu) const
+    advance(double dt, const Eigen::VectorXd &control, const Eigen::VectorXd& nu) const
     {
+        (void)control;
         struct TestState st;
         st.x = x + v*dt + nu(0);
         st.v = v + nu(1);
