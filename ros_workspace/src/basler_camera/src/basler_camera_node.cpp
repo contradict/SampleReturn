@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
   ros::init(argc, argv, "basler_camera");
   ros::NodeHandle nh("~");
 
-  nh.advertiseService("enable_publish", service_enable);  
+  ros::ServiceServer enable_service = nh.advertiseService("enable_publish", service_enable);  
   
   if(!nh.hasParam("frame_rate"))
   {
