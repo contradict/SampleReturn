@@ -5,6 +5,7 @@
 #include "std_msgs/String.h"
 #include <basler_camera/CameraConfig.h>
 #include <dynamic_reconfigure/server.h>
+#include <platform_motion_msgs/Enable.h>
 
 // Include files to use the PYLON API.
 #include <pylon/PylonIncludes.h>
@@ -17,6 +18,7 @@ using namespace GenApi;
 using std::string;
 
 static CInstantCamera camera;
+static bool publish_enabled = false;
 
 void handle_basler_boolean_parameter(CInstantCamera& camera, string name, bool value)
 {
@@ -248,11 +250,19 @@ void configure_callback(basler_camera::CameraConfig &config, uint32_t level)
     }
 }
 
+bool service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
+{
+  publish_enabled = req.state; 
+  return true;  
+}
+
 int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "basler_camera");
   ros::NodeHandle nh("~");
 
+  nh.advertiseService("enable_publish", service_enable);  
+  
   if(!nh.hasParam("frame_rate"))
   {
       ROS_ERROR("frame_rate param has been removed. Please use AcquisitionFrameRate and remember to set AcquisitionFrameRateEnable=True");
@@ -360,14 +370,21 @@ int main(int argc, char* argv[])
     while (camera.IsGrabbing() && ros::ok())
     {
       ros::spinOnce();
-      try
+      if(publish_enabled) //if publishing not enabled, just wait
       {
-        camera.RetrieveResult(1, ptrGrabResult, TimeoutHandling_Return);
+        try
+        {
+          camera.RetrieveResult(1, ptrGrabResult, TimeoutHandling_Return);
+        }
+        catch (GenICam::GenericException &e)
+        {
+          ROS_ERROR_STREAM("An exception occurred during operation: " << e.GetDescription());
+          break;
+        }
       }
-      catch (GenICam::GenericException &e)
+      else
       {
-        ROS_ERROR_STREAM("An exception occurred during operation: " << e.GetDescription());
-        break;
+        ros::Duration(0.1).sleep();
       }
     }
   }
