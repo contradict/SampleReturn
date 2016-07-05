@@ -41,10 +41,20 @@ class ManualController(object):
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
         self.CAN_interface = util.CANInterface()
-        self.search_camera_enable = None
-        #self.search_camera_enable = rospy.ServiceProxy('enable_search',
-        #        platform_srv.Enable,
-        #        persistent=True)
+        #basler camera enable service proxies
+        self.search_camera_center_enable = rospy.ServiceProxy('enable_search_center',
+                                                              platform_srv.Enable,
+                                                              persistent=True)
+        self.search_camera_port_enable = rospy.ServiceProxy('enable_search_port',
+                                                            platform_srv.Enable,
+                                                            persistent=True)
+        self.search_camera_starboard_enable = rospy.ServiceProxy('enable_search_starboard',
+                                                                 platform_srv.Enable,
+                                                                 persistent=True)
+        self.navigation_camera_beacon_enable = rospy.ServiceProxy('enable_navigation_beacon',
+                                                                  platform_srv.Enable,
+                                                                  persistent=True)
+        
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
         self.odometry_frame = 'odom'
@@ -378,8 +388,15 @@ class ManualController(object):
         if self.joy_state.button('BUTTON_SEARCH_CAMERA'):
             newstate = self.state_machine.userdata.search_camera_state^True
             try:
-                #self.search_camera_enable(newstate)
+                self.search_camera_center_enable(newstate) 
+                self.search_camera_port_enable(newstate)
+                self.search_camera_starboard_enable(newstate)
+                self.navigation_camera_beacon_enable(newstate)
                 self.state_machine.userdata.search_camera_state = newstate
+                if newstate:
+                    self.announcer.say("Search cameras enabled")
+                else:
+                    self.announcer.say("Search cameras disabled")
             except (rospy.ServiceException, rospy.ROSSerializationException,
                     TypeError), e:
                 rospy.logerr("Unable to set search camera enable %s: %s",
