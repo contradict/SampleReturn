@@ -109,7 +109,10 @@ class RobotSimulator(object):
         enable_manipulator_detector_name = "/processes/sample_detection/manipulator/manipulator_linemod_detector_2d/enable"
         enable_hard_manipulator_detector_name = "/processes/sample_detection/manipulator/hard_manipulator_linemod_detector_2d/enable"
         
-        enable_search_name = "/cameras/search/enable"
+        enable_search_center_name = "/cameras/search/center/basler_camera/enable_publish"
+        enable_search_port_name = "/cameras/search/port/basler_camera/enable_publish"
+        enable_search_starboard_name = "/cameras/search/starboard/basler_camera/enable_publish"
+        enable_navigation_beacon_name =  "/cameras/navigation/beacon/basler_camera/enable_publish"
         
         select_motion_name = "/motion/CAN/select_motion_mode"
         
@@ -202,9 +205,19 @@ class RobotSimulator(object):
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
         
-        rospy.Service(enable_search_name,
+        rospy.Service(enable_search_center_name,
                       platform_srv.Enable,
-                      self.service_enable_search_request)
+                      self.service_enable_search_center_request)
+        rospy.Service(enable_search_port_name,
+                      platform_srv.Enable,
+                      self.service_enable_search_port_request)       
+        rospy.Service(enable_search_starboard_name,
+                      platform_srv.Enable,
+                      self.service_enable_search_starboard_request)        
+        rospy.Service(enable_navigation_beacon_name,
+                      platform_srv.Enable,
+                      self.service_enable_navigation_beacon_request)
+        
         rospy.Service(search_verify_name,
                       samplereturn_srv.Verify,
                       self.service_search_verify_request)
@@ -735,9 +748,21 @@ class RobotSimulator(object):
         rospy.sleep(0.25)
         return req.state
     
-    def service_enable_search_request(self, req):
-        rospy.logwarn("SEARCH_ENABLE requested, feature deprecated.")
-        rospy.sleep(0.5)
+    #camera enable handlers
+    def service_enable_search_center_request(self, req):
+        rospy.sleep(0.05)
+        return req.state
+
+    def service_enable_search_port_request(self, req):
+        rospy.sleep(0.05)
+        return req.state
+
+    def service_enable_search_starboard_request(self, req):
+        rospy.sleep(0.05)
+        return req.state
+
+    def service_enable_navigation_beacon_request(self, req):
+        rospy.sleep(0.05)
         return req.state
     
     #fail 1 out of 3 times to verify a sample
