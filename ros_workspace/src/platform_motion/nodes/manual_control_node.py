@@ -97,8 +97,7 @@ class ManualController(object):
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
            
             smach.StateMachine.add('START_MANUAL_CONTROL',
-                                   ProcessGoal(self.announcer,
-                                       self.search_camera_enable),
+                                   ProcessGoal(self.announcer),
                                    transitions = {'valid_goal':'SELECT_JOYSTICK',
                                                  'invalid_goal':'MANUAL_ABORTED'})
 
@@ -434,7 +433,7 @@ class ManualController(object):
         rospy.logwarn("MANUAL CONTROL STATE MACHINE EXIT")
    
 class ProcessGoal(smach.State):
-    def __init__(self, announcer, search_camera_enable):
+    def __init__(self, announcer):
         smach.State.__init__(self,
                              outcomes=['valid_goal',
                                        'invalid_goal'],
@@ -446,7 +445,6 @@ class ProcessGoal(smach.State):
                                           'search_camera_state'])
         
         self.announcer = announcer
-        self.search_camera_enable = search_camera_enable
             
     def execute(self, userdata):
         
@@ -473,13 +471,6 @@ class ProcessGoal(smach.State):
             self.announcer.say("Manipulator enabled.")
         else:
             return 'invalid_goal'
-
-        try:
-            #self.search_camera_enable(False)
-            userdata.search_camera_state = False
-        except (rospy.ServiceException,
-                rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("Unable to disable search camera: %s", e)
 
         return 'valid_goal'
 
