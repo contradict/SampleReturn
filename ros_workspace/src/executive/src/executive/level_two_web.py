@@ -201,7 +201,7 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode.'), #  Enable ing search camera.'),
+                                                 'Enter ing level two mode. Enable ing search cameras.'),
                                    transitions = {'next':'SELECT_PLANNER'})
             
             smach.StateMachine.add('SELECT_PLANNER',
@@ -231,7 +231,7 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('ANNOUNCE_DISMOUNT',
                                    AnnounceState(self.announcer,
-                                                 'Hey Steve!  I made it off the platform this time.'),
+                                                 'Platform dismounted.'),
                                    transitions = {'next':'LOOK_AT_BEACON'})
             
 
@@ -1161,7 +1161,7 @@ class LevelTwoPreempted(smach.State):
         #disable all search/beacon cameras
         try:
             for service_proxy in self.camera_services:
-                service_proxy(True)
+                service_proxy(False)
         except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
             rospy.logerr("LEVEL_TWO unable to disable cameras: %s:", e)    
         

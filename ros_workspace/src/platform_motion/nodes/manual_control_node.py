@@ -391,9 +391,9 @@ class ManualController(object):
                 self.navigation_camera_beacon_enable(newstate)
                 self.state_machine.userdata.search_camera_state = newstate
                 if newstate:
-                    self.announcer.say("Search cameras enabled")
+                    self.announcer.say("Search cameras enabled.")
                 else:
-                    self.announcer.say("Search cameras disabled")
+                    self.announcer.say("Search cameras disabled.")
             except (rospy.ServiceException, rospy.ROSSerializationException,
                     TypeError), e:
                 rospy.logerr("Unable to set search camera enable %s: %s",
