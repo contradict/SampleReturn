@@ -64,6 +64,7 @@ class ScaledUKF {
 
         Eigen::LLT<Eigen::MatrixXd> llt(((double)L+lambda)*P);
         Eigen::MatrixXd Psqrt = llt.matrixL();
+        ROS_DEBUG_STREAM("Lx:" << Lx << " Lnu:" << Lnu << " L:" << L << " Psqrt\n" << Psqrt);
         for(int i=0;i<L;i++)
         {
             Eigen::VectorXd p=Psqrt.col(i);
@@ -132,15 +133,6 @@ class ScaledUKF {
                 Pminus += w * diff * diff.transpose();
             }
 
-            for(int i=0;i<Pminus.size();i++)
-            {
-                if(isnan(*(Pminus.data()+i)) ||
-                   fabs(*(Pminus.data()+i))>10.0f)
-                {
-                    ROS_ERROR_STREAM("Silly predict covariance\n" << Pminus);
-                    break;
-                }
-            }
             state_ = xhatminus;
             state_.Covariance = Pminus;
         }
