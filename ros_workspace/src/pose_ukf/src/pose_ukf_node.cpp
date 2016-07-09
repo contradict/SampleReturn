@@ -255,7 +255,6 @@ PoseUKFNode::sendPose(const ros::TimerEvent& e)
     tf::Pose imu_tf(q, v);
     tf::Pose odom_tf = imu_transform * imu_tf * imu_transform.inverse();
     tf::poseTFToMsg( odom_tf, msg->pose);
-    ROS_DEBUG_STREAM("pose q: " << q << " norm: " << q.length());
     pose_pub_.publish(msg);
 }
 
@@ -280,9 +279,8 @@ PoseUKFNode::sendState(void)
     tf::vectorEigenToMsg(ukf_->state().GyroBias, msg->GyroBias);
 
     double qn = q.norm();
-    ROS_DEBUG_STREAM("state q norm: " << qn);
     state_pub_.publish(msg);
-    printState();
+    //printState();
 }
 
 Eigen::MatrixXd
@@ -333,7 +331,9 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     if(dt>0)
     {
         ROS_DEBUG_STREAM("Performing IMU predict with dt=" << dt );
+        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         ukf_->predict(dt, process_noise(dt));
+        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         last_update_ = msg->header.stamp;
     }
     else
@@ -343,7 +343,9 @@ PoseUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 
     ROS_DEBUG_STREAM("IMU correct:\n" << m);
     ROS_DEBUG_STREAM("IMU measurement covariance:\n" << meas_cov);
+    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
     ukf_->correct(m, meas_covs);
+    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
     sendState();
     if(!send_on_timer_)
     {
@@ -412,7 +414,9 @@ PoseUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     if(dt>0)
     {
         ROS_DEBUG_STREAM("Performing gyro predict with dt=" << dt );
+        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         ukf_->predict(dt, process_noise(dt));
+        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         last_update_ = msg->header.stamp;
     }
     else
@@ -422,7 +426,9 @@ PoseUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
 
     ROS_DEBUG_STREAM("GYRO correct:\n" << m);
     ROS_DEBUG_STREAM("GYRO measurement covariance:\n" << meas_cov);
+    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
     ukf_->correct(m, meas_covs);
+    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
     sendState();
     if(!send_on_timer_)
     {
@@ -548,7 +554,9 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     if(dt>0)
     {
         ROS_DEBUG_STREAM("Performing odometry predict with dt=" << dt);
+        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         ukf_->predict(dt, process_noise(dt));
+        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         last_update_ = msg->header.stamp;
     }
     else
@@ -574,6 +582,7 @@ PoseUKFNode::jointStateCallback(sensor_msgs::JointStateConstPtr msg)
     //ROS_DEBUG_STREAM("odometry prediction:\n" << m.measure(ukf_->state(), Eigen::VectorXd::Zero(m.ndim())));
     ROS_DEBUG_STREAM("odometry measurement covariance:\n" << meas_cov);
     ukf_->differentialcorrect(m, meas_covs);
+    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
     sendState();
 }
 
