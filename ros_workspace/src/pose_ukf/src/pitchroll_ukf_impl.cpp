@@ -8,7 +8,6 @@ UKF::ScaledUKF<PitchRollUKF::PitchRollState>::correct(const struct PitchRollUKF:
                                                       const std::vector<Eigen::MatrixXd>& measurement_covs
                                                      );
 
-const double PitchRollUKF::IMUOrientationMeasurement::littleg=9.8066;
 
 namespace PitchRollUKF {
 
@@ -17,14 +16,14 @@ operator<<(std::ostream &out, const PitchRollState& st)
 {
     double r, p, y;
     tf::Quaternion q;
-    tf::quaternionEigenToTF(st.Orientation, q);
+    tf::quaternionEigenToTF(st.Orientation.unit_quaternion(), q);
     tf::Matrix3x3 m(q);
     m.getRPY(r, p, y);
     out << "PitchRoll State:" << std::endl;
     out << "\tOrientation (" << r << ", " << p << ", " << y << ")\n";
     out << "\tOmega       (" << st.Omega.transpose() << ")\n";
     out << "\tGyroBias    (" << st.GyroBias.transpose() << ")\n";
-    //out << "\tAccelBias   (" << st.AccelBias.transpose() << ")\n";
+    out << "\tAccelBias   (" << st.AccelBias.transpose() << ")\n";
     return out;
 }
 
@@ -33,6 +32,13 @@ operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
 {
     out << "IMU measurement:\n\tacceleration: (" << m.acceleration.transpose() << ")" << std::endl;
     out << "\tomega: (" << m.omega.transpose() << ")" << std::endl;
+    return out;
+}
+
+std::ostream &
+operator<<(std::ostream &out, const YawMeasurement& m)
+{
+    out << "yaw: " << m.yaw << std::endl;
     return out;
 }
 
