@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+
+    <param name="use_sim_time" value="true" type="bool"/>
+
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="replay" value="true"/>
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+
+    <param name="robot_description"
+           command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+
+    <node name="state_publisher"
+          machine="navigate"
+          pkg="robot_state_publisher"
+          type="robot_state_publisher"
+          output="log"
+          ns="/motion">
+        <remap from="joint_states" to="platform_joint_state"/>
+        <param name="publish_frequency" type="double" value="10"/>
+    </node>
+
+    <node name="joint_gui"
+        machine="navigate"
+        pkg="joint_state_publisher"
+        type="joint_state_publisher"
+        output="log"
+        ns="/motion">
+        <remap from="joint_states" to="platform_joint_state"/>
+        <param name="use_gui" type="bool" value="true"/>
+        <param name="publish_default_velocities" type="bool" value="true"/>
+        <param name="robot_description"
+           command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
+    </node>
+
+
+    <node
+        name="synthetic"
+        pkg="pose_ukf"
+        type="syntheticinertial.py"
+        args="--pause"
+        output="screen">
+
+        <remap from="gyro" to="/io/kvh/imu"/>
+        <remap from="imu" to="/io/phidget_0/data_raw"/>
+    </node>
+
+    <node
+        name="imu_0_gyro_transform"
+        pkg="tf"
+        type="static_transform_publisher"
+        output="screen"
+        args="-1.145 0.2 0 0 0 0 base_link gyro 5"/>
+    <!--
+    <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
+        -->
+    <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
+
+</launch>
