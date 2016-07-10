@@ -51,13 +51,13 @@ class BeaconFinder:
         self._beacon_mounting_frame = rospy.get_param("~beacon_mounting_frame",
                 "platform")
         self._world_fixed_frame = rospy.get_param("~world_fixed_frame", "map")
-	self._odometry_frame = rospy.get_param("~odometry_frame", "odom")
-	self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
-	self._beacon_translation = rospy.get_param("~beacon_translation", [0,0,0])
-	self._beacon_rotation = rospy.get_param("~beacon_rotation", [0,0,0, 'rxyz'])
+        self._odometry_frame = rospy.get_param("~odometry_frame", "odom")
+        self._frontback_covariance = rospy.get_param("~frontback_covariance", [1.0, 1.0, 1.0, pi/16.0, pi/16.0, pi/16.0])
+        self._beacon_translation = rospy.get_param("~beacon_translation", [0,0,0])
+        self._beacon_rotation = rospy.get_param("~beacon_rotation", [0,0,0, 'rxyz'])
         #rospy.loginfo("BEACON ROTATION: {!s}".format(self._beacon_rotation))
-	
-	# beacon side params
+        
+        # beacon side params
         self.maxSizeError = rospy.get_param("~max_size_error", 0.1)
         self.maxDistanceError = rospy.get_param("~max_distance_error", 0.05)
         self.maxHorizontalRadians = rospy.get_param("~max_horizontal_radians", 0.1)
@@ -178,7 +178,7 @@ class BeaconFinder:
                 flags=cv2.CALIB_CB_ASYMMETRIC_GRID,
                 blobDetector=detector)
         if found:
-	    #rospy.loginfo("Found %s", name)
+        #rospy.loginfo("Found %s", name)
             self._found_queue.put((name, centers, found))
     
     def sideLook(self, name, image, detector):
@@ -475,12 +475,11 @@ class BeaconFinder:
     def broadcast_beacon_tf(self, evt):
         now = rospy.Time.now()
         rot = tf.transformations.quaternion_from_euler(*self._beacon_rotation)
-	self.tf_broadcaster.sendTransform(self._beacon_translation,
-					  rot,
-					  now,
-					  'beacon',
-					  self._world_fixed_frame,
-					  )
+    self.tf_broadcaster.sendTransform(self._beacon_translation,
+                                        rot,
+                                        now,
+                                        'beacon',
+                                        self._world_fixed_frame,)
 
 if __name__ == '__main__':
     rospy.init_node('beacon_finder')
