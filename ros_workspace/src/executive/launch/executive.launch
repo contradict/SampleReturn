@@ -33,8 +33,8 @@
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/manipulator_linemod_detector_2d/enable"/>
     <remap from="enable_hard_manipulator_detector" to="/processes/sample_detection/manipulator/hard_manipulator_linemod_detector_2d/enable"/>
     <remap from="enable_search_center" to="/cameras/search/center/basler_camera/enable_publish"/>
-    <remap from="enable_search_port" to="/cameras/search/center/basler_camera/enable_publish"/>
-    <remap from="enable_search_starboard" to="/cameras/search/center/basler_camera/enable_publish"/>
+    <remap from="enable_search_port" to="/cameras/search/port/basler_camera/enable_publish"/>
+    <remap from="enable_search_starboard" to="/cameras/search/starboard/basler_camera/enable_publish"/>
     <remap from="enable_navigation_beacon" to="/cameras/navigation/beacon/basler_camera/enable_publish"/>
     <remap from="beacon_pose" to="/processes/beacon/beacon_pose"/>
     <remap from="visual_servo_action" to="/processes/visual_servo/servo_action"/>
