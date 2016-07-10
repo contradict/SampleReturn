@@ -39,8 +39,8 @@ class PauseSwitch(object):
         rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
         rospy.Subscriber("current_motion_mode", SelectMotionModeResponse, self.motion_mode_update)
 
-        self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True)
-        self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement)
+        self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True, queue_size = 0)
+        self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement, queue_size = 1)
 
         # retrieve initial motion mode
         self.motion_mode = None
