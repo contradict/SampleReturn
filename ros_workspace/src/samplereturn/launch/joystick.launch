@@ -3,7 +3,7 @@
 <launch>
 
 <!-- joy node -->
-<node machine="navigate"
+<node machine="search"
       respawn="true" 
       pkg="joy"
       type="joy_node" 
