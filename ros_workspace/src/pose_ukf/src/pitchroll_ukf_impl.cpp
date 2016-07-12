@@ -14,16 +14,13 @@ namespace PitchRollUKF {
 std::ostream &
 operator<<(std::ostream &out, const PitchRollState& st)
 {
-    double r, p, y;
-    tf::Quaternion q;
-    tf::quaternionEigenToTF(st.Orientation.unit_quaternion(), q);
-    tf::Matrix3x3 m(q);
-    m.getRPY(r, p, y);
+    Eigen::Vector3d ypr = st.Orientation.unit_quaternion().toRotationMatrix().eulerAngles(2, 1, 0);
     out << "PitchRoll State:" << std::endl;
-    out << "\tOrientation (" << r << ", " << p << ", " << y << ")\n";
-    out << "\tOmega       (" << st.Omega.transpose() << ")\n";
-    out << "\tGyroBias    (" << st.GyroBias.transpose() << ")\n";
-    out << "\tAccelBias   (" << st.AccelBias.transpose() << ")\n";
+    out << "\tOrient ypr(" << ypr.transpose() << ")\n";
+    out << "\tOrient   q(" << st.Orientation.unit_quaternion().coeffs().transpose() << ")\n";
+    out << "\tOmega     (" << st.Omega.transpose() << ")\n";
+    out << "\tGyroBias  (" << st.GyroBias.transpose() << ")\n";
+    out << "\tAccelBias (" << st.AccelBias.transpose() << ")\n";
     return out;
 }
 
@@ -38,7 +35,7 @@ operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
 std::ostream &
 operator<<(std::ostream &out, const YawMeasurement& m)
 {
-    out << "yaw: " << m.yaw << std::endl;
+    out << "yaw: " << 2*acos(m.yaw.unit_quaternion().coeffs()[3]) << std::endl;
     return out;
 }
 
