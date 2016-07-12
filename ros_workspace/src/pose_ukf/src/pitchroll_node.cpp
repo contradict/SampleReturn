@@ -22,7 +22,7 @@ class PitchRollUKFNode
 
     void imuCallback(sensor_msgs::ImuConstPtr msg);
     void gyroCallback(sensor_msgs::ImuConstPtr msg);
-    void sendPose(const ros::TimerEvent& e);
+    void sendPose(void);
 
     tf::TransformBroadcaster broadcaster_;
     tf::TransformListener listener_;
@@ -92,7 +92,6 @@ PitchRollUKFNode::PitchRollUKFNode() :
     pose_pub_ =privatenh.advertise<geometry_msgs::PoseStamped>("estimated_pose", 1);
     state_pub_ = privatenh.advertise<pose_ukf::PitchRoll>("state", 1);
     seq_ = 0;
-    //publish_timer_ = privatenh.createTimer(ros::Duration(publish_period_), &PitchRollUKFNode::sendPose, this);
     ROS_INFO_STREAM("Initial state:\n" << ukf_->state());
     ROS_INFO_STREAM("Initial Cov:\n" << ukf_->state().Covariance);
 }
@@ -120,9 +119,8 @@ PitchRollUKFNode::~PitchRollUKFNode()
 }
 
 void
-PitchRollUKFNode::sendPose(const ros::TimerEvent& e)
+PitchRollUKFNode::sendPose(void)
 {
-    (void)e;
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
 
     msg->header.frame_id = imu_frame_;
