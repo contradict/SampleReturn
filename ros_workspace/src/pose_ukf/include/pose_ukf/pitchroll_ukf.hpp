@@ -129,7 +129,7 @@ struct IMUOrientationMeasurement
     measure(const struct PitchRollState& st, const Eigen::VectorXd& noise) const
     {
         struct IMUOrientationMeasurement m;
-        m.acceleration = -1.0*(st.Orientation.inverse() * Eigen::Vector3d::UnitZ()) + st.AccelBias + noise.segment<3>(0);
+        m.acceleration = (st.Orientation.inverse() * Eigen::Vector3d::UnitZ()) + st.AccelBias + noise.segment<3>(0);
         m.omega = st.Omega + st.GyroBias + noise.segment<3>(3);
         return m;
     };
