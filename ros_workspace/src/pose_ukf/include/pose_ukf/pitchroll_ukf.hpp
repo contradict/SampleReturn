@@ -34,6 +34,7 @@ struct PitchRollState
         Sophus::SO3d rot=Sophus::SO3d::exp(omega);
         out.Orientation = rot*Orientation;
         out.AccelBias = AccelBias + offset.segment<3>(9);
+        out.Covariance = Covariance;
         return out;
     };
     Eigen::VectorXd
@@ -60,6 +61,7 @@ struct PitchRollState
         out.Omega = Omega + Chinu.segment<3>(3);
         out.GyroBias = GyroBias + Chinu.segment<3>(6);
         out.AccelBias = AccelBias + Chinu.segment<3>(9);
+        out.Covariance = Covariance;
         return out;
     };
     void mean(const std::vector<double> &weights,
@@ -83,6 +85,7 @@ struct PitchRollState
         {
             Orientation = Chistate.front().Orientation;
         }
+        Covariance = Chistate[0].Covariance;
     };
     ssize_t ndim(void) const {return 4*3;};
 
