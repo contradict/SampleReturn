@@ -1,24 +1,16 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <arg name="user" default="robot"/>
-    <arg name="path" default="Desktop"/>
-    <arg name="kind" default="install"/>
+    <machine name="filtermachine"
+             address="localhost"
+    />
 
     <param name="use_sim_time" value="true" type="bool"/>
-
-    <include file="$(find samplereturn)/launch/machine_definitions.launch">
-        <arg name="replay" value="true"/>
-        <arg name="user" value="$(arg user)"/>
-        <arg name="path" value="$(arg path)"/>
-        <arg name="kind" value="$(arg kind)"/>
-    </include>
 
     <param name="robot_description"
            command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
 
     <node name="state_publisher"
-          machine="navigate"
           pkg="robot_state_publisher"
           type="robot_state_publisher"
           output="log"
@@ -28,7 +20,6 @@
     </node>
 
     <node name="joint_gui"
-        machine="navigate"
         pkg="joint_state_publisher"
         type="joint_state_publisher"
         output="log"
@@ -52,17 +43,13 @@
         <remap from="~imu" to="/io/phidget_0/data_raw"/>
     </node>
 
-    <node
-        name="imu_0_gyro_transform"
-        pkg="tf"
-        type="static_transform_publisher"
-        output="screen"
-        args="-1.145 0.2 0 0 0 0 base_link gyro 5"/>
     <!--
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
         -->
 
     <include file="$(find pose_ukf)/launch/vis_filter.launch"/>
-    <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
+    <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch">
+        <arg name="machine" value="filtermachine"/>
+    </include>
 
 </launch>
