@@ -29,7 +29,7 @@ Omegaf = np.r_[[0.25],
 
 Gravity = np.r_[[[ 0.0],
                  [ 0.0],
-                 [-9.8066]]]
+                 [ 9.8066]]]
 
 
 def integrate(dt, phase, orientation):
