@@ -114,6 +114,13 @@ public:
     {};
 };
 
+std::ostream &
+operator<<(std::ostream &out, const PositionMeasurement& m)
+{
+    out << "x: " << m.x;
+    return out;
+}
+
 }
 
 template
