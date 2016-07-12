@@ -24,7 +24,7 @@ class ScaledUKF {
                         std::vector<Eigen::VectorXd>& nu,
                         std::vector<double>& weights,
                         std::vector<double>& cweights
-                        )
+                        ) const
     {
         int L, Lx, Lnu;
         Lx = mu.ndim();
@@ -62,9 +62,17 @@ class ScaledUKF {
             d += m.rows();
         }
 
+        if((P-P.transpose()).cwiseAbs().maxCoeff()>1e-10)
+        {
+            ROS_ERROR_STREAM("Augmented covariance not symmetric:\n" << P);
+            ROS_ERROR_STREAM("P-P.T:\n" << (P-P.transpose()));
+        }
+        if(P.determinant() <= 0)
+        {
+            ROS_ERROR_STREAM("Augmented covariance not positive-definite: " << P.determinant() << "\n" << P);
+        }
         Eigen::LLT<Eigen::MatrixXd> llt(((double)L+lambda)*P);
         Eigen::MatrixXd Psqrt = llt.matrixL();
-        ROS_DEBUG_STREAM("Lx:" << Lx << " Lnu:" << Lnu << " L:" << L << " Psqrt\n" << Psqrt);
         for(int i=0;i<L;i++)
         {
             Eigen::VectorXd p=Psqrt.col(i);
@@ -73,7 +81,7 @@ class ScaledUKF {
             weights.push_back(wi);
             cweights.push_back(wi);
 
-            Chi.push_back(state_.boxplus(-1.0*p.segment(0, Lx)));
+            Chi.push_back(mu.boxplus(-1.0*p.segment(0, Lx)));
             nu.push_back(-1.0*p.segment(Lx, Lnu));
             weights.push_back(wi);
             cweights.push_back(wi);
@@ -192,11 +200,8 @@ class ScaledUKF {
 
             Eigen::MatrixXd K(yhatminus.ndim(), Lx);
             K = Pxy*Pyminus.inverse();
-            ROS_DEBUG_STREAM("K:\n" << K);
             Eigen::VectorXd innovation = (measured.boxminus(yhatminus));
-            ROS_DEBUG_STREAM("Innovation: " << innovation.transpose());
             Eigen::VectorXd update = K*innovation;
-            ROS_DEBUG_STREAM("Update: " << update.transpose());
             state_ = state_.boxplus(update);
             state_.Covariance -= K*Pyminus*K.transpose();
             for(int i=0;i<state_.Covariance.size();i++)
