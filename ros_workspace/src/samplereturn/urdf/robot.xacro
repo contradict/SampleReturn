@@ -396,7 +396,14 @@
     <joint name="imu_0_mount" type="fixed">
         <parent link="body_triangle"/>
         <child link="imu_0"/>
-        <origin xyz="-0.445 0 0.0113" rpy="3.1416 0 -1.5708"/>
+        <origin xyz="-0.445 0 0.0113" rpy="0 0 1.5708"/>
+    </joint>
+
+    <link name="gyro"/>
+    <joint name="gyro_mount" type="fixed">
+        <parent link="body_triangle"/>
+        <child link="gyro"/>
+        <origin xyz="-.635 0.127 0" rpy="3.1416 0 0"/>
     </joint>
     
      <link name="sun_camera"/>
