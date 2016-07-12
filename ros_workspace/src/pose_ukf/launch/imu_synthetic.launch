@@ -48,8 +48,8 @@
         args="--pause"
         output="screen">
 
-        <remap from="gyro" to="/io/kvh/imu"/>
-        <remap from="imu" to="/io/phidget_0/data_raw"/>
+        <remap from="~gyro" to="/io/kvh/imu"/>
+        <remap from="~imu" to="/io/phidget_0/data_raw"/>
     </node>
 
     <node
@@ -61,6 +61,8 @@
     <!--
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
         -->
+
+    <include file="$(find pose_ukf)/launch/vis_filter.launch"/>
     <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
 
 </launch>
