@@ -107,9 +107,6 @@ struct IMUOrientationMeasurement
     {
         Eigen::VectorXd diff(ndim());
         diff.segment<3>(0) = acceleration - other.acceleration;
-        ROS_DEBUG_STREAM("a " << acceleration.transpose());
-        ROS_DEBUG_STREAM("oa " << other.acceleration.transpose());
-        ROS_DEBUG_STREAM("da " << diff.segment<3>(0).transpose());
         diff.segment<3>(3) = omega - other.omega;
         return diff;
     };
@@ -125,7 +122,6 @@ struct IMUOrientationMeasurement
             struct IMUOrientationMeasurement m = t.get<1>();
             acceleration += w*m.acceleration;
             omega += w*m.omega;
-            ROS_DEBUG_STREAM("w " << w << " a " << m.acceleration.transpose() << " ma " << acceleration.transpose());
         }
     };
 
@@ -134,7 +130,6 @@ struct IMUOrientationMeasurement
     {
         struct IMUOrientationMeasurement m;
         m.acceleration = -1.0*(st.Orientation.inverse() * Eigen::Vector3d::UnitZ()) + st.AccelBias + noise.segment<3>(0);
-        ROS_DEBUG_STREAM("a " << m.acceleration.transpose());
         m.omega = st.Omega + st.GyroBias + noise.segment<3>(3);
         return m;
     };
