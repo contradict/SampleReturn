@@ -15,7 +15,7 @@ from numpy import cos, pi, sqrt, arctan2
 import rospy
 from geometry import rotations, SO3
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import Vector3, Quaternion
+from geometry_msgs.msg import Vector3, Quaternion, Pose, PoseStamped
 from std_msgs.msg import Header
 from rosgraph_msgs.msg import Clock
 
@@ -78,13 +78,18 @@ def step(dt, now, phase, orientation, seq):
     gyro = Imu(header,
                Quaternion(quat[1], quat[2], quat[3], quat[0]),
                np.diag([0, 0, 1e-10]).reshape((-1,)),
-               Vector3(*np.zeros((3,))),
+               Vector3(0,0,0),
                np.zeros((9,)),
-               Vector3(*np.zeros((3,))),
+               Vector3(0,0,0),
                np.zeros((9,)),
               )
+    header = Header(seq, rospy.Time(now), 'odom')
+    quat = rotations.quaternion_from_rotation(orientation)
+    pose = PoseStamped(header,
+            Pose(Vector3(0,0,0),
+                Quaternion(quat[1], quat[2], quat[3], quat[0])))
     seq += 1
-    return (imu, gyro), (now, phase, orientation, seq)
+    return (imu, gyro, pose), (now, phase, orientation, seq)
 
 def setiraw(fd):
     save = termios.tcgetattr(0)
@@ -99,8 +104,9 @@ def setiraw(fd):
 def run(pause=False):
     """ Run clock and integrator and emit values.
     """
-    imupub = rospy.Publisher('imu', Imu, queue_size=1)
-    gyropub = rospy.Publisher('gyro', Imu, queue_size=1)
+    imupub = rospy.Publisher('~imu', Imu, queue_size=1)
+    gyropub = rospy.Publisher('~gyro', Imu, queue_size=1)
+    truepose = rospy.Publisher('~pose', PoseStamped, queue_size=1)
     clockpub = rospy.Publisher('/clock', Clock, queue_size=1)
 
     loop_hz = 125.
@@ -120,9 +126,10 @@ def run(pause=False):
             if not singlestep:
                 time.sleep(dt/factor)
             if not pause:
-                (imu, gyro), (now, phase, orientation, seq) = step(dt, now, phase, orientation, seq)
+                (imu, gyro, pose), (now, phase, orientation, seq) = step(dt, now, phase, orientation, seq)
                 imupub.publish(imu)
                 gyropub.publish(gyro)
+                truepose.publish(pose)
                 clockpub.publish(Clock(rospy.Time(now)))
                 if singlestep:
                     pause = True
