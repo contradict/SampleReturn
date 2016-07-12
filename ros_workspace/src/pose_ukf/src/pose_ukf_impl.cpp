@@ -23,15 +23,11 @@ const Eigen::Vector3d PoseState::gravity=Eigen::Vector3d(0, 0, -PoseState::littl
 std::ostream &
 operator<<(std::ostream &out, const PoseState& st)
 {
-    double r, p, y;
-    tf::Quaternion q;
-    tf::quaternionEigenToTF(st.Orientation.unit_quaternion(), q);
-    tf::Matrix3x3 m(q);
-    m.getRPY(r, p, y);
+    Eigen::Vector3d rpy = st.Orientation.unit_quaternion().toRotationMatrix().eulerAngles(0, 1, 2);
     out << "Position      (" << st.Position.transpose() << ")\n";
     out << "Velocity      (" << st.Velocity.transpose() << ")\n";
     out << "Acceleration  (" << st.Acceleration.transpose() << ")\n";
-    out << "Orient(r,p,y) (" << r << ", " << p << ", " << y << ")\n";
+    out << "Orient(r,p,y) (" << rpy.transpose() << ")\n";
     out << "Omega         (" << st.Omega.transpose() << ")\n";
     out << "GyroBias      (" << st.GyroBias.transpose() << ")\n";
     out << "AccelBias     (" << st.AccelBias.transpose() << ")\n";
