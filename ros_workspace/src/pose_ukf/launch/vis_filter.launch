@@ -35,10 +35,4 @@
         type="rqt_plot"
         args="/io/phidget_0/data_raw/angular_velocity /io/phidget_0/data_raw/linear_acceleration"
         />
-     <node
-        name="vis_debug"
-        pkg="rqt_plot"
-        type="rqt_plot"
-        args="/filter/debug"
-        />
 </launch>
