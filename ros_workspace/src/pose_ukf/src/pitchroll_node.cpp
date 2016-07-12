@@ -138,14 +138,11 @@ PitchRollUKFNode::sendState(void)
     state->header.frame_id = imu_frame_;
     state->header.stamp = ros::Time::now();
     tf::quaternionEigenToMsg(ukf_->state().Orientation.unit_quaternion(), state->orientation);
-    state->omega.x = ukf_->state().Omega(0);
-    state->omega.y = ukf_->state().Omega(1);
-    state->omega.z = ukf_->state().Omega(2);
+    tf::vectorEigenToMsg(ukf_->state().Omega, state->omega);
     tf::vectorEigenToMsg(ukf_->state().AccelBias, state->accel_bias);
-    state->gyro_bias.x = ukf_->state().GyroBias(0);
-    state->gyro_bias.y = ukf_->state().GyroBias(1);
-    state->gyro_bias.x = ukf_->state().GyroBias(2);
+    tf::vectorEigenToMsg(ukf_->state().GyroBias, state->gyro_bias);
     state_pub_.publish(state);
+    //printState();
 }
 
 bool PitchRollUKFNode::lookupTransform(std::string frame_id, std::string to_id, tf::StampedTransform& transform)
@@ -193,35 +190,35 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > accel_cov(msg->linear_acceleration_covariance.data());
     meas_cov.block<3, 3>(0, 0) = accel_cov;
-    ROS_DEBUG_STREAM("imu accel cov:\n" << accel_cov);
+    //ROS_DEBUG_STREAM("imu accel cov:\n" << accel_cov);
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > omega_cov(msg->angular_velocity_covariance.data());
     meas_cov.block<3, 3>(3, 3) = omega_cov;
-    ROS_DEBUG_STREAM("imu omega cov:\n" << omega_cov);
+    //ROS_DEBUG_STREAM("imu omega cov:\n" << omega_cov);
     std::vector<Eigen::MatrixXd> meas_covs;
     meas_covs.push_back(meas_cov);
 
     double dt = (msg->header.stamp - last_update_).toSec();
     if(dt>0)
     {
-        ROS_DEBUG_STREAM("Performing imu predict with dt=" << dt );
-        ROS_DEBUG_STREAM("process noise:\n" << process_noise(dt));
+        //ROS_DEBUG_STREAM("Performing imu predict with dt=" << dt );
+        //ROS_DEBUG_STREAM("process noise:\n" << process_noise(dt));
         ukf_->predict(dt, process_noise(dt));
         last_update_ = msg->header.stamp;
     }
     else {
         ROS_DEBUG_STREAM("Skipping imu predict dt=" << dt);
     }
-    ROS_DEBUG_STREAM("Performing IMU correct with measurement:\n" << m);
-    ROS_DEBUG_STREAM("Measurement covariance :\n" << meas_cov);
+    //ROS_DEBUG_STREAM("Performing IMU correct with measurement:\n" << m);
+    //ROS_DEBUG_STREAM("Measurement covariance :\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    printState();
+    sendPose();
     sendState();
 }
 
 void
 PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
 {
-    ROS_DEBUG_STREAM("Got gyro msg " << msg->header.seq);
+    //ROS_DEBUG_STREAM("Got gyro msg " << msg->header.seq);
     tf::StampedTransform gyro_transform;
     if(!lookupTransform(msg->header.frame_id, imu_frame_, gyro_transform))
     {
@@ -246,10 +243,8 @@ PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     double dt = (msg->header.stamp - last_update_).toSec();
     if(dt>0)
     {
-        ROS_DEBUG_STREAM("Performing gyro predict with dt=" << dt );
-        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
+        //ROS_DEBUG_STREAM("Performing gyro predict with dt=" << dt );
         ukf_->predict(dt, process_noise(dt));
-        ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
         last_update_ = msg->header.stamp;
     }
     else
@@ -257,11 +252,9 @@ PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
         ROS_DEBUG_STREAM("Skipping gyro predict dt=" << dt);
     }
 
-    ROS_DEBUG_STREAM("GYRO correct:\n" << m);
-    ROS_DEBUG_STREAM("GYRO measurement covariance:\n" << meas_cov);
-    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
+    //ROS_DEBUG_STREAM("GYRO correct:\n" << m);
+    //ROS_DEBUG_STREAM("GYRO measurement covariance:\n" << meas_cov);
     ukf_->correct(m, meas_covs);
-    ROS_DEBUG_STREAM("AccelBias: " << ukf_->state().AccelBias.transpose());
     sendState();
 }
 
@@ -270,7 +263,7 @@ PitchRollUKFNode::printState(void)
 {
     PitchRollState st = ukf_->state();
     ROS_INFO_STREAM("State:\n" << st);
-    ROS_INFO_STREAM("Covariance:\n" << st.Covariance);
+    //ROS_INFO_STREAM("Covariance:\n" << st.Covariance);
     ROS_INFO_STREAM("orientation cov:\n" << (st.Covariance.block<3,3>(0,0)));
     ROS_INFO_STREAM("omega cov:\n" << (st.Covariance.block<3,3>(3,3)));
     ROS_INFO_STREAM("gyro bias cov:\n" << (st.Covariance.block<3,3>(6,6)));
