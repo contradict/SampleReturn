@@ -5,6 +5,7 @@
     <arg name="user" default="robot"/>
     <arg name="path" default="Desktop"/>
     <arg name="kind" default="install"/>
+    <arg name="rate" default="1.0"/>
 
     <param name="use_sim_time" value="true" type="bool"/>
 
@@ -21,6 +22,7 @@
         type="play"
         output="screen"
         args="--pause --clock
+            --rate $(arg rate)
             --bags $(arg bagfile)
             --topics
             /tf
@@ -42,5 +44,6 @@
     <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
         -->
     <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
+    <include file="$(find pose_ukf)/launch/vis_filter.launch"/>
 
 </launch>

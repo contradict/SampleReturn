@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node
+        name="rpy_gyro"
+        pkg="pose_ukf"
+        type="torpy.py"
+        output="screen">
+        <remap from="imu" to="/io/kvh/imu"/>
+    </node>
+
+    <node
+        name="rpy_filter"
+        pkg="pose_ukf"
+        type="torpy.py"
+        output="screen">
+        <remap from="pose" to="/filter/estimated_pose"/>
+    </node>
+
+    <node
+        name="vis_filter"
+        pkg="rqt_plot"
+        type="rqt_plot"
+        args="/rpy_filter/rpy"
+        />
+    <node
+        name="vis_gyro_z"
+        pkg="rqt_plot"
+        type="rqt_plot"
+        args="/rpy_gyro/rpy/z /io/phidget_0/data_raw/angular_velocity/z"
+        />
+    <node
+        name="vis_imu"
+        pkg="rqt_plot"
+        type="rqt_plot"
+        args="/io/phidget_0/data_raw/angular_velocity /io/phidget_0/data_raw/linear_acceleration"
+        />
+     <node
+        name="vis_debug"
+        pkg="rqt_plot"
+        type="rqt_plot"
+        args="/filter/debug"
+        />
+</launch>
