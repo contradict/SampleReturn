@@ -206,7 +206,7 @@ class PitchRollUKF : public UKF::ScaledUKF<struct PitchRollState>
 
     public:
 
-    PitchRollUKF(double alpha=0.1, double beta=2.0, double kappa=0.0) :
+    PitchRollUKF(double alpha=1.0, double beta=2.0, double kappa=0.0) :
         ::UKF::ScaledUKF<struct PitchRollState>(alpha, beta, kappa)
     {
     };
