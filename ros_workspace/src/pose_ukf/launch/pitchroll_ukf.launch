@@ -37,6 +37,11 @@
               0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000, 1.0e-9,  0.000,  0.000,
               0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000, 1.0e-9,  0.000,
               0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000, 1.0e-9]
-        </rosparam>
+          </rosparam>
+
+          <param name="publish_tf" type="bool" value="true"/>
+          <param name="odometry_frame" type="string" value="odom"/>
+          <param name="parent_frame" type="string" value="base_link_flat"/>
+          <param name="child_frame" type="string" value="base_link"/>
     </node>
 </launch>
