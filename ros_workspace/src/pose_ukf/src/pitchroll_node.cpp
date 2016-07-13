@@ -16,8 +16,10 @@ namespace PitchRollUKF {
 
 class PitchRollUKFNode
 {
-    std::string base_name_;
-    double publish_period_;
+    std::string odometry_frame_id_;
+    std::string parent_frame_id_;
+    std::string child_frame_id_;
+    bool publish_tf_;
     int seq_;
 
     void imuCallback(sensor_msgs::ImuConstPtr msg);
@@ -64,9 +66,10 @@ PitchRollUKFNode::PitchRollUKFNode() :
 {
     ros::NodeHandle privatenh("~");
 
-    privatenh.param("base_name", base_name_, std::string("base_link"));
-
-    privatenh.param("publish_period", publish_period_, 0.020);
+    privatenh.param("odometry_frame", odometry_frame_id_, std::string("odom"));
+    privatenh.param("parent_frame", parent_frame_id_, std::string("base_link_flat"));
+    privatenh.param("child_frame", child_frame_id_, std::string("base_link"));
+    privatenh.param("publish_tf", publish_tf_, true);
 
     double alpha, beta, kappa;
     privatenh.param("alpha", alpha, 1e-3);
@@ -129,6 +132,39 @@ PitchRollUKFNode::sendPose(void)
     tf::pointEigenToMsg( Eigen::Vector3d::Zero(), msg->pose.position);
     tf::quaternionEigenToMsg( ukf_->state().Orientation.unit_quaternion(), msg->pose.orientation);
     pose_pub_.publish(msg);
+
+    if(publish_tf_)
+    {
+        tf::StampedTransform odometry_in;
+        tf::StampedTransform imu_trans;
+        try
+        {
+            listener_.lookupTransform(parent_frame_id_, odometry_frame_id_, ros::Time(0), odometry_in);
+            listener_.lookupTransform(child_frame_id_, imu_frame_, ros::Time(0), imu_trans);
+        }
+        catch(tf::TransformException ex)
+        {
+            ROS_ERROR_STREAM("Unable to look up " << odometry_frame_id_ << "->" << parent_frame_id_ << ": " << ex.what());
+            return;
+        }
+        tf::Transform odometry_yaw;
+        odometry_yaw.setIdentity();
+        odometry_yaw.setRotation(odometry_in.getRotation());
+        tf::Transform pose;
+        tf::Quaternion pose_q;
+        tf::quaternionEigenToTF(ukf_->state().Orientation.unit_quaternion(), pose_q);
+        pose.setIdentity();
+        pose.setRotation(pose_q);
+
+        tf::Transform odometry_out = imu_trans*pose*imu_trans.inverse()*odometry_yaw.inverse();
+
+        geometry_msgs::TransformStamped odom_trans;
+        odom_trans.header = msg->header;
+        odom_trans.header.frame_id = parent_frame_id_;
+        odom_trans.child_frame_id = child_frame_id_;
+        tf::transformTFToMsg(odometry_out, odom_trans.transform);
+        broadcaster_.sendTransform(odom_trans);
+    }
 }
 
 void
