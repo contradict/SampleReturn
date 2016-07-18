@@ -164,7 +164,8 @@ PitchRollUKFNode::sendPose(void)
         pose.setIdentity();
         pose.setRotation(pose_q);
 
-        tf::Transform odometry_out = imu_trans*pose*imu_trans.inverse()*odometry_yaw.inverse();
+        imu_trans.setOrigin(tf::Vector3(0,0,0));
+        tf::Transform odometry_out = imu_trans.inverse()*pose.inverse()*imu_trans*odometry_yaw.inverse();
 
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header = msg->header;
