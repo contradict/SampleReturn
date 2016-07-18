@@ -155,6 +155,7 @@ install(
       motion_node
       least_squares_odometry
       EKF_odometry
+      lls_odometry
       test_path
       #path_viz
 
