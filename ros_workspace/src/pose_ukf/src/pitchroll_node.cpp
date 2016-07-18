@@ -130,7 +130,7 @@ PitchRollUKFNode::sendPose(void)
     msg->header.stamp = ros::Time::now();
     msg->header.seq = seq_++;
     tf::pointEigenToMsg( Eigen::Vector3d::Zero(), msg->pose.position);
-    tf::quaternionEigenToMsg( ukf_->state().Orientation.unit_quaternion(), msg->pose.orientation);
+    tf::quaternionEigenToMsg( ukf_->state().Orientation.unit_quaternion().inverse(), msg->pose.orientation);
     pose_pub_.publish(msg);
 
     if(publish_tf_)
