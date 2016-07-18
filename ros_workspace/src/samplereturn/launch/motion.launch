@@ -55,11 +55,11 @@
     <node name="odometry"
           machine="navigate"
           pkg="platform_motion"
-          type="LLS_odometry"
+          type="EKF_odometry"
           output="log"
           ns="/motion">
         <param name="wheel_diameter" type="double" value="0.3112"/>
-        <param name="odom_frame_id" type="string" value="/odom"/>
+        <param name="odom_frame_id" type="string" value="odom"/>
         <param name="child_frame_id" type="string" value="base_link_flat"/>
 
         <remap from="/motion/odometry/imu_yaw" to="/io/kvh/imu"/>
