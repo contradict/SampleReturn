@@ -145,6 +145,14 @@ PitchRollUKFNode::sendPose(void)
         catch(tf::TransformException ex)
         {
             ROS_ERROR_STREAM("Unable to look up " << odometry_frame_id_ << "->" << parent_frame_id_ << ": " << ex.what());
+            geometry_msgs::TransformStamped odom_trans;
+            odom_trans.header = msg->header;
+            odom_trans.header.frame_id = parent_frame_id_;
+            odom_trans.child_frame_id = child_frame_id_;
+            tf::Transform id;
+            id.setIdentity();
+            tf::transformTFToMsg(id, odom_trans.transform);
+            broadcaster_.sendTransform(odom_trans);
             return;
         }
         tf::Transform odometry_yaw;
