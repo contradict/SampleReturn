@@ -1,5 +1,6 @@
 #include <sophus/so3.hpp>
 #include <vector>
+#pragma once
 
 class RotationAverage
 {
