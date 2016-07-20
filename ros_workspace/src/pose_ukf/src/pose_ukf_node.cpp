@@ -4,6 +4,7 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <pose_ukf/pose_ukf.hpp>
 #include <pose_ukf/Pose.h>
+#include <pose_ukf/yaw_measurement.hpp>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
@@ -400,9 +401,10 @@ PoseUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     tf::quaternionMsgToTF(msg->orientation, gq);
     tf::Transform gyro(gq);
     tf::Transform gyro_imu = gyro_transform*gyro*gyro_transform.inverse();
-    YawMeasurement m;
-    tf::quaternionTFToEigen(gyro_imu.getRotation(), m.qyaw);
-    m.setyaw(m.qyaw);
+    Eigen::Quaterniond imu_gq;
+    tf::quaternionTFToEigen(gyro_imu.getRotation(), imu_gq);
+    YawMeasurement<PoseState> m;
+    m.yaw = Sophus::SO3d(imu_gq);
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > cov(msg->orientation_covariance.data());

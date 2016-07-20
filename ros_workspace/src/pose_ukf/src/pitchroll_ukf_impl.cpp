@@ -1,12 +1,17 @@
 #include <pose_ukf/pitchroll_ukf.hpp>
 #include <tf_conversions/tf_eigen.h>
 #include <tf/transform_datatypes.h>
+#include <pose_ukf/yaw_measurement.hpp>
 
 template
 void
 UKF::ScaledUKF<PitchRollUKF::PitchRollState>::correct(const struct PitchRollUKF::IMUOrientationMeasurement& measured,
                                                       const std::vector<Eigen::MatrixXd>& measurement_covs
                                                      );
+
+template
+std::ostream &
+PoseUKF::operator<<(std::ostream &out, const PoseUKF::YawMeasurement<PitchRollUKF::PitchRollState>& m);
 
 
 namespace PitchRollUKF {
@@ -29,13 +34,6 @@ operator<<(std::ostream &out, const IMUOrientationMeasurement& m)
 {
     out << "IMU measurement:\n\tacceleration: (" << m.acceleration.transpose() << ")" << std::endl;
     out << "\tomega: (" << m.omega.transpose() << ")" << std::endl;
-    return out;
-}
-
-std::ostream &
-operator<<(std::ostream &out, const YawMeasurement& m)
-{
-    out << "yaw: " << 2*acos(m.yaw.unit_quaternion().coeffs()[3]) << std::endl;
     return out;
 }
 

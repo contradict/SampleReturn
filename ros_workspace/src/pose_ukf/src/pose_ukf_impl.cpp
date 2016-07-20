@@ -1,6 +1,7 @@
 #include <pose_ukf/pose_ukf.hpp>
 #include <tf_conversions/tf_eigen.h>
 #include <tf/transform_datatypes.h>
+#include <pose_ukf/yaw_measurement.hpp>
 
 template
 void
@@ -13,7 +14,6 @@ void
 UKF::ScaledUKF<PoseUKF::PoseState>::correct(const struct PoseUKF::WheelOdometryMeasurement& measured,
                                             const std::vector<Eigen::MatrixXd>& measurement_covs
                                            );
-
 
 namespace PoseUKF {
 
@@ -52,11 +52,8 @@ operator<<(std::ostream &out, const WheelOdometryMeasurement& m)
     return out;
 }
 
+template
 std::ostream &
-operator<<(std::ostream &out, const YawMeasurement& m)
-{
-    out << "yaw: " << m.yaw << std::endl;
-    return out;
-}
+operator<<(std::ostream &out, const YawMeasurement<PoseState>& m);
 
 }

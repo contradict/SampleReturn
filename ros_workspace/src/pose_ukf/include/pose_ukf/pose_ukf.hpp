@@ -249,64 +249,6 @@ struct IMUOrientationMeasurement
     friend std::ostream& operator<<(std::ostream &, const IMUOrientationMeasurement &);
 };
 
-struct YawMeasurement
-{
-    double yaw;
-    Eigen::Quaterniond qyaw;
-
-    void setyaw(double y)
-    {
-        yaw = y;
-        qyaw = Eigen::AngleAxisd(y, Eigen::Vector3d::UnitZ());
-    }
-
-    void setyaw(const Eigen::Quaterniond& q)
-    {
-        Eigen::Matrix3d m;
-        m = Eigen::AngleAxisd(q);
-        yaw = m.eulerAngles(0, 1, 2)[2];
-    }
-
-    YawMeasurement()
-    {
-        setyaw(0);
-    }
-
-    Eigen::VectorXd
-    boxminus(const struct YawMeasurement other) const
-    {
-        Eigen::VectorXd dy;
-        dy.resize(1);
-        dy[0] = yaw - other.yaw;
-        return dy;
-    }
-
-    void mean(const std::vector<double>& weights,
-              const std::vector<struct YawMeasurement>& Chimeas)
-    {
-        double y=0;
-        for(const auto &&t: zip_range(weights, Chimeas))
-        {
-            double w = t.get<0>();
-            struct YawMeasurement m = t.get<1>();
-            y += w*m.yaw;
-        }
-        setyaw(y);
-    }
-
-    struct YawMeasurement
-    measure(const struct PoseState& st, const Eigen::VectorXd& noise) const
-    {
-        struct YawMeasurement m;
-        m.setyaw(st.Orientation.unit_quaternion());
-        m.setyaw(yaw+noise[0]);
-        return m;
-    }
-
-   ssize_t ndim() const { return 1; };
-   friend std::ostream& operator<<(std::ostream &, const YawMeasurement &);
-};
-
 class PoseUKF : public UKF::ScaledUKF<struct PoseState>
 {
     public:

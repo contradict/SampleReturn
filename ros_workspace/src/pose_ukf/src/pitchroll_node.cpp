@@ -4,6 +4,7 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <pose_ukf/PitchRoll.h>
 #include <pose_ukf/pitchroll_ukf.hpp>
+#include <pose_ukf/yaw_measurement.hpp>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
@@ -276,7 +277,7 @@ PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     tf::Transform gyro_imu = gyro_transform*gyro*gyro_transform.inverse();
     Eigen::Quaterniond imu_gq;
     tf::quaternionTFToEigen(gyro.getRotation(), imu_gq);
-    YawMeasurement m;
+    PoseUKF::YawMeasurement<PitchRollState> m;
     m.yaw = Sophus::SO3d(imu_gq);
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
