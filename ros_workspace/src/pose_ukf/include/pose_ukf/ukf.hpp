@@ -1,7 +1,5 @@
 #include <ros/ros.h>
 #include <vector>
-#include <tuple>
-#include <functional>
 #include <algorithm>
 #include <Eigen/Dense>
 #include <boost/math/special_functions/sinc.hpp>
