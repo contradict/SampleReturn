@@ -26,6 +26,7 @@ class PitchRollUKFNode
     void imuCallback(sensor_msgs::ImuConstPtr msg);
     void gyroCallback(sensor_msgs::ImuConstPtr msg);
     void sendPose(void);
+    void publishTFIdentity(void);
 
     tf::TransformBroadcaster broadcaster_;
     tf::TransformListener listener_;
@@ -123,6 +124,19 @@ PitchRollUKFNode::~PitchRollUKFNode()
 }
 
 void
+PitchRollUKFNode::publishTFIdentity(void)
+{
+    geometry_msgs::TransformStamped odom_trans;
+    odom_trans.header.stamp = ros::Time::now();
+    odom_trans.header.frame_id = parent_frame_id_;
+    odom_trans.child_frame_id = child_frame_id_;
+    tf::Transform id;
+    id.setIdentity();
+    tf::transformTFToMsg(id, odom_trans.transform);
+    broadcaster_.sendTransform(odom_trans);
+}
+
+void
 PitchRollUKFNode::sendPose(void)
 {
     geometry_msgs::PoseStampedPtr msg(new geometry_msgs::PoseStamped());
@@ -146,14 +160,7 @@ PitchRollUKFNode::sendPose(void)
         catch(tf::TransformException ex)
         {
             ROS_ERROR_STREAM("Unable to look up " << odometry_frame_id_ << "->" << parent_frame_id_ << ": " << ex.what());
-            geometry_msgs::TransformStamped odom_trans;
-            odom_trans.header = msg->header;
-            odom_trans.header.frame_id = parent_frame_id_;
-            odom_trans.child_frame_id = child_frame_id_;
-            tf::Transform id;
-            id.setIdentity();
-            tf::transformTFToMsg(id, odom_trans.transform);
-            broadcaster_.sendTransform(odom_trans);
+            publishTFIdentity();
             return;
         }
         tf::Transform odometry_yaw;
@@ -268,6 +275,7 @@ PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     tf::StampedTransform gyro_transform;
     if(!lookupTransform(msg->header.frame_id, imu_frame_, gyro_transform))
     {
+       if(!first_update_) publishTFIdentity();
        return;
     }
 
