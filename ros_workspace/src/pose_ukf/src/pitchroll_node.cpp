@@ -284,6 +284,10 @@ PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     tf::Transform gyro(gq);
     tf::Transform gyro_imu = gyro_transform*gyro*gyro_transform.inverse();
     Eigen::Quaterniond imu_gq;
+    // TODO: THIS IS SUSPICIOUS. I think it works, but it is wrong since
+    // the measurement is not rotated to imu frame
+    // there must be a geometry error somewhere else too.
+    // should be: tf::quaternionTFToEigen(gyro_imu.getRotation(), imu_gq);
     tf::quaternionTFToEigen(gyro.getRotation(), imu_gq);
     PoseUKF::YawMeasurement<PitchRollState> m;
     m.yaw = Sophus::SO3d(imu_gq);
