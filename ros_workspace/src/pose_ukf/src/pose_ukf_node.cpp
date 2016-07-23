@@ -167,7 +167,7 @@ PoseUKFNode::PoseUKFNode() :
     privatenh.param("publish_period", publish_period_, 0.020);
 
     double alpha, beta, kappa;
-    privatenh.param("alpha", alpha, 1e-3);
+    privatenh.param("alpha", alpha, 1.0);
     privatenh.param("beta", beta, 2.0);
     privatenh.param("kappa", kappa, 0.0);
 
