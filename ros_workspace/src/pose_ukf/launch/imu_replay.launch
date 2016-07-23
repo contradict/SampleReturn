@@ -41,9 +41,9 @@
         output="screen"
         args="-1.145 0.2 0 0 0 0 base_link gyro 5"/>
     <!--
-    <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
-        -->
     <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
+        -->
+    <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
     <include file="$(find pose_ukf)/launch/vis_filter.launch"/>
 
 </launch>
