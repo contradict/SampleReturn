@@ -10,7 +10,7 @@ struct PoseState
 {
     Eigen::Vector2d Position;
     Eigen::Vector2d Velocity;
-    Eigen::Vector2d Acceleration;
+    Eigen::Vector3d Acceleration;
     Sophus::SO3d Orientation;
     Eigen::Vector3d Omega;
     Eigen::Vector3d GyroBias;
@@ -35,12 +35,12 @@ struct PoseState
         struct PoseState out;
         out.Position = Position + offset.segment<2>(0);
         out.Velocity = Velocity + offset.segment<2>(2);
-        out.Acceleration = Acceleration + offset.segment<2>(4);
-        Sophus::SO3d rot = Sophus::SO3d::exp(offset.segment<3>(6));
+        out.Acceleration = Acceleration + offset.segment<3>(4);
+        Sophus::SO3d rot = Sophus::SO3d::exp(offset.segment<3>(7));
         out.Orientation = rot*Orientation;
-        out.Omega = Omega + offset.segment<3>(9);
-        out.GyroBias = GyroBias + offset.segment<3>(12);
-        out.AccelBias = AccelBias + offset.segment<3>(15);
+        out.Omega = Omega + offset.segment<3>(10);
+        out.GyroBias = GyroBias + offset.segment<3>(13);
+        out.AccelBias = AccelBias + offset.segment<3>(16);
         out.state_history_ = state_history_;
         out.Covariance = Covariance;
         return out;
@@ -52,11 +52,11 @@ struct PoseState
 
         out.segment<2>(0) = Position - other.Position;
         out.segment<2>(2) = Velocity - other.Velocity;
-        out.segment<2>(4) = Acceleration - other.Acceleration;
-        out.segment<3>(6) = Sophus::SO3d::log(Orientation*other.Orientation.inverse());
-        out.segment<3>(9) = Omega - other.Omega;
-        out.segment<3>(12) = GyroBias - other.GyroBias;
-        out.segment<3>(15) = AccelBias - other.AccelBias;
+        out.segment<3>(4) = Acceleration - other.Acceleration;
+        out.segment<3>(7) = Sophus::SO3d::log(Orientation*other.Orientation.inverse());
+        out.segment<3>(10) = Omega - other.Omega;
+        out.segment<3>(13) = GyroBias - other.GyroBias;
+        out.segment<3>(16) = AccelBias - other.AccelBias;
 
         return out;
     };
@@ -67,14 +67,14 @@ struct PoseState
     {
         (void)control;
         struct PoseState out;
-        out.Position = Position + dt*Velocity + dt*dt*Acceleration/2. + Chinu.segment<2>(0);
-        out.Velocity = Velocity + dt*Acceleration + Chinu.segment<2>(2);
-        out.Acceleration = Acceleration + Chinu.segment<2>(4);
-        Eigen::Vector3d delta_orientation = Omega*dt + Chinu.segment<3>(6);
+        out.Position = Position + dt*Velocity + dt*dt*Acceleration.segment<2>(0)/2. + Chinu.segment<2>(0);
+        out.Velocity = Velocity + dt*Acceleration.segment<2>(0) + Chinu.segment<2>(2);
+        out.Acceleration = Acceleration + Chinu.segment<3>(4);
+        Eigen::Vector3d delta_orientation = Omega*dt + Chinu.segment<3>(7);
         out.Orientation = Orientation*Sophus::SO3d::exp(delta_orientation);
-        out.Omega = Omega + Chinu.segment<3>(9);
-        out.GyroBias = GyroBias + Chinu.segment<3>(12);
-        out.AccelBias = AccelBias + Chinu.segment<3>(15);
+        out.Omega = Omega + Chinu.segment<3>(10);
+        out.GyroBias = GyroBias + Chinu.segment<3>(13);
+        out.AccelBias = AccelBias + Chinu.segment<3>(16);
         out.state_history_ = state_history_;
         out.Covariance = Covariance;
         return out;
@@ -237,9 +237,7 @@ struct IMUOrientationMeasurement
     measure(const struct PoseState& st, const Eigen::VectorXd& noise) const
     {
         struct IMUOrientationMeasurement m;
-        m.acceleration = st.Orientation.inverse() * st.gravity + st.AccelBias;
-        m.acceleration.segment<2>(0) += st.Acceleration;
-        m.acceleration += noise.segment<3>(0);
+        m.acceleration = st.Orientation.inverse() * st.gravity + st.Acceleration + st.AccelBias + noise.segment<3>(0);
         m.omega = st.Omega + st.GyroBias + noise.segment<3>(3);
         ROS_DEBUG_STREAM(m);
         return m;
