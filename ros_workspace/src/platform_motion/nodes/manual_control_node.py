@@ -406,22 +406,23 @@ class ManualController(object):
         self.state_machine.userdata.manipulator_sample = sample
 
     def sample_update(self, sample):
-        try:
-            self.tf.waitForTransform(self.odometry_frame,
-                                              sample.header.frame_id,
-                                              sample.header.stamp,
-                                              rospy.Duration(1.0))
-            point_in_frame = self.tf.transformPoint(self.odometry_frame, sample)
-            sample.point = point_in_frame.point
-            self.state_machine.userdata.detected_sample = sample
-            if self.state_machine.userdata.announce_sample:
-                if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
-                    self.announcer.say("Sample published.")
-                    self.last_sample = rospy.Time.now()
-            
-        except tf.Exception:
-            rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
-                          sample.header.frame_id, self.odometry_frame)
+        if self.state_machine.is_running():
+            try:
+                self.tf.waitForTransform(self.odometry_frame,
+                                                  sample.header.frame_id,
+                                                  sample.header.stamp,
+                                                  rospy.Duration(1.0))
+                point_in_frame = self.tf.transformPoint(self.odometry_frame, sample)
+                sample.point = point_in_frame.point
+                self.state_machine.userdata.detected_sample = sample
+                if self.state_machine.userdata.announce_sample:
+                    if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
+                        self.announcer.say("Sample published.")
+                        self.last_sample = rospy.Time.now()
+                
+            except tf.Exception:
+                rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
+                              sample.header.frame_id, self.odometry_frame)
 
     def shutdown_cb(self):
         self.state_machine.request_preempt()
