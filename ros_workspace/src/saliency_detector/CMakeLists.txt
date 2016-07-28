@@ -16,10 +16,15 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   image_geometry
   tf
+  image_transport
+  pcl_ros
+  pcl_conversions
+  eigen_conversions
   cmake_modules)
 
 find_package(Eigen REQUIRED)
 find_package(OpenCV)
+find_package(PCL REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -110,6 +115,7 @@ catkin_package(
  include_directories(include
    ${Eigen_INCLUDE_DIRS}
    ${catkin_INCLUDE_DIRS}
+   ${PCL_INCLUDE_DIRS}
 )
 
 add_definitions(${Eigen_DEFINITIONS})

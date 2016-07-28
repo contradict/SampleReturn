@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   geometry_msgs
   message_generation
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -81,6 +82,8 @@ add_message_files(
   NamedPoint.msg
   PursuitResult.msg
   CostmapCheck.msg
+  Patch.msg
+  PatchArray.msg
 )
 
 add_service_files(
@@ -112,6 +115,7 @@ add_action_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
     DEPENDENCIES
+        sensor_msgs
         geometry_msgs
         actionlib_msgs
         std_msgs
