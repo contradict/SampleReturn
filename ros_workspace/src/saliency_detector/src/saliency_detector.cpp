@@ -129,7 +129,8 @@ class SaliencyDetectorNode
     for (int i = 0; i < kp.size(); i++) {
       int x = kp[i].pt.x;
       int y = kp[i].pt.y;
-      int size = 2*kp[i].size;
+      // Pad a bit to avoid clipping
+      int size = 1.2*kp[i].size;
       int top_left_x = max(x-size,0);
       int top_left_y = max(y-size,0);
       int bot_right_x = min(x+size,cv_ptr->image.cols - 1);
