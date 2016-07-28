@@ -51,7 +51,6 @@ void BMS::computeSaliency(const Mat& src, float step)
 
 	for (int i=0;i<maps.size();i++)
 	{
-    cout << "I: " << i << endl;
 		vector<Mat> sp;
 		split(maps[i],sp);
     if (i==0) {
