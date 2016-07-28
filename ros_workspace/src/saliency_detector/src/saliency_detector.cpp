@@ -100,7 +100,8 @@ class SaliencyDetectorNode
     bms_.computeSaliency(small, bms_sample_step_);
     debug_bms_img_ = bms_.getSaliencyMap().clone();
     // Scale back up
-    cv::resize(debug_bms_img_, debug_bms_img_, cv::Size(), scale, scale, cv::INTER_AREA);
+    cv::resize(debug_bms_img_, debug_bms_img_, cv::Size(cv_ptr->image.cols,cv_ptr->image.rows),
+        0.0, 0.0, cv::INTER_AREA);
 
     // Threshold grayscale saliency into binary
     if (bms_thresh_on_) {
@@ -131,17 +132,18 @@ class SaliencyDetectorNode
       int size = 2*kp[i].size;
       int top_left_x = max(x-size,0);
       int top_left_y = max(y-size,0);
-      int bot_right_x = min(x+size,cv_ptr->image.cols);
-      int bot_right_y = min(y+size,cv_ptr->image.rows);
+      int bot_right_x = min(x+size,cv_ptr->image.cols - 1);
+      int bot_right_y = min(y+size,cv_ptr->image.rows - 1);
       int width = bot_right_x - top_left_x;
       int height = bot_right_y - top_left_y;
 
-      cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
-      //cv::rectangle(debug_bms_img_color, cv::Point2i(top_left_x,top_left_y),
-      //    cv::Point2i(bot_right_x,bot_right_y), CV_RGB(255,0,0), 4);
+      //cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
+      cv::rectangle(debug_bms_img_color, cv::Point2i(top_left_x,top_left_y),
+          cv::Point2i(bot_right_x,bot_right_y), CV_RGB(255,0,0), 4);
 
       sub_img = cv_ptr->image(Range(top_left_y, bot_right_y), Range(top_left_x, bot_right_x));
       sub_mask = debug_bms_img_(Range(top_left_y, bot_right_y), Range(top_left_x, bot_right_x));
+
       if (cv::countNonZero(sub_mask) == 0) {
         continue;
       }
