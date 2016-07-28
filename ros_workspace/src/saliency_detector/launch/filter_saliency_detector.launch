@@ -9,10 +9,6 @@
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/center/image_color"/>
     <remap from="/cameras/search/info" to="/cameras/search/center/camera_info"/>
-    <rosparam param="interior_colors">[red, pink, purple, white, blue, yellow, gray]
-    </rosparam>
-    <rosparam param="exterior_colors">[green, brown]
-    </rosparam>
     <param name="bms_opening_width" type="int" value="7"/>
     <param name="bms_thresh" type="double" value="20"/>
     <param name="bms_thresh_on" type="bool" value="True"/>
@@ -22,12 +18,9 @@
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="20.0"/>
     <param name="maxArea" type="double" value="10000.0"/>
-    <param name="minRealArea_bluewhitegray" type="double" value="15"/>
-    <param name="maxRealArea_bluewhitegray" type="double" value="200"/>
-    <param name="minRealArea_yellow" type="double" value="10"/>
-    <param name="maxRealArea_yellow" type="double" value="200"/>
   </node>
 
+  <!--
   <node
     pkg="sample_detection"
     type="ray_to_points.py"
@@ -84,4 +77,6 @@
         purple: [purple, red, pink]
     </rosparam>
   </node>
+  -->
+
 </launch>
