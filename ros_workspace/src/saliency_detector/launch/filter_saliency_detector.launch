@@ -22,7 +22,7 @@
 
   <node
     pkg="saliency_detector"
-    type="project"
+    type="ground_projector_node"
     name="ground_projector"
     machine="search"
     ns="/processes/sample_detection/search">
