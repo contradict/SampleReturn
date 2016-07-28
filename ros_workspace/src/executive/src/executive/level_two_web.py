@@ -126,6 +126,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.local_frame = self.local_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
+        self.state_machine.userdata.pause_time_offset = None
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #dismount move
@@ -608,12 +609,11 @@ class StartLeveLTwo(smach.State):
    
         smach.State.__init__(self,
                             input_keys=['dismount_move',
-                                        'spin_velocity',
-                                        'return_time_offset'],
+                                        'spin_velocity'],
                             output_keys=['action_result',
                                         'simple_move',
                                         'beacon_turn',
-                                        'return_time'],
+                                        'pause_time_offset'],
                             outcomes=['next']),
 
         self.camera_services = camera_services
@@ -638,8 +638,8 @@ class StartLeveLTwo(smach.State):
                 service_proxy(True)
         except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
             rospy.logerr("LEVEL_TWO unable to enable cameras: %s:", e)
-                
-        userdata.return_time = rospy.Time.now() + userdata.return_time_offset
+        
+        userdata.pause_time_offset = None        
 
         return 'next'
 
@@ -657,7 +657,9 @@ class WebManager(smach.State):
                                            'vfh_result',
                                            'manager_dict',
                                            'detection_message',
-                                           'return_time',
+                                           'start_time',
+                                           'return_time_offset',
+                                           'pause_time_offset',
                                            'world_fixed_frame'],
                              output_keys = ['spoke_yaw',
                                             'outbound',
@@ -687,8 +689,10 @@ class WebManager(smach.State):
         userdata.active_manager = userdata.manager_dict[self.label]
         userdata.report_sample = True #always act on samples if this manager is working
         userdata.stop_on_detection = True
+        
+        return_time = userdata.start_time + userdata.pause_time_offset + userdata.return_time_offset
       
-        if rospy.Time.now() > userdata.return_time:
+        if rospy.Time.now() > return_time:
             rospy.loginfo("WEB_MANAGER exceeded return_time")
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
@@ -709,7 +713,7 @@ class WebManager(smach.State):
             next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
             userdata.outbound = False
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
-            remaining_minutes = int((userdata.return_time - rospy.Time.now()).to_sec()/60)
+            remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
             self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(int(math.degrees(userdata.spoke_yaw)),
                                                                                          remaining_minutes))
             return self.load_move(next_move, userdata)
