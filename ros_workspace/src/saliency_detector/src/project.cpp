@@ -65,15 +65,15 @@ class GroundProjectorNode
 
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("sub_patch_array_topic", sub_patch_array_topic,
-        std::string("/detection/center/patch_array"));
+        std::string("/processes/sample_detection/search/patch_array"));
     private_node_handle_.param("pub_patch_array_topic", pub_patch_array_topic,
-        std::string("/detection/center/projected_patch_array"));
+        std::string("/processes/sample_detection/search/projected_patch_array"));
     private_node_handle_.param("sub_point_cloud_topic", sub_point_cloud_topic,
         std::string("/cameras/navigation/center/pointcloud"));
     private_node_handle_.param("pub_point_cloud_topic", pub_point_cloud_topic,
-        std::string("/process/ground_projector/center/pointcloud"));
+        std::string("/processes/ground_projector/search/pointcloud"));
     private_node_handle_.param("marker_topic", marker_topic,
-        std::string("/detection/center/ground_marker"));
+        std::string("/processes/ground_projector/search/ground_marker"));
 
     sub_patch_array =
       nh.subscribe(sub_patch_array_topic, 1, &GroundProjectorNode::patchArrayCallback, this);
