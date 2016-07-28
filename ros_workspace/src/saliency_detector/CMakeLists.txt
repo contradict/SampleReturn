@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   eigen_conversions
+  tf_conversions
   cmake_modules)
 
 find_package(Eigen REQUIRED)
@@ -86,7 +87,8 @@ find_package(PCL REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
-generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
+generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg
+  cfg/ground_projector_params.cfg)
 
 ###################################
 ## catkin specific configuration ##
@@ -135,17 +137,20 @@ add_library(color_naming
 
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
+ add_executable(ground_projector_node src/project.cpp)
  # add_executable(BMS_standalone src/BMS.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
  add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
+ add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
+   ${PCL_LIBRARIES}
    )
 
  target_link_libraries(saliency_detector_node
@@ -153,6 +158,10 @@ add_library(color_naming
    color_naming
    ${catkin_LIBRARIES}
    BMS
+ )
+
+ target_link_libraries(ground_projector_node
+   ${catkin_LIBRARIES}
  )
 
 #############
@@ -170,7 +179,7 @@ add_library(color_naming
  )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
+install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node ground_projector_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

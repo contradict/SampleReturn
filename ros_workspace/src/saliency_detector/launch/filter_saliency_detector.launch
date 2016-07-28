@@ -20,6 +20,14 @@
     <param name="maxArea" type="double" value="100000.0"/>
   </node>
 
+  <node
+    pkg="saliency_detector"
+    type="project"
+    name="ground_projector"
+    machine="search"
+    ns="/processes/sample_detection/search">
+  </node>
+
   <!--
   <node
     pkg="sample_detection"

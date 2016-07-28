@@ -2,5 +2,5 @@ Header header
 sensor_msgs/Image image
 sensor_msgs/Image mask
 sensor_msgs/RegionOfInterest image_roi
-geometry_msgs/Point world_point
+geometry_msgs/PointStamped world_point
 sensor_msgs/CameraInfo cam_info
