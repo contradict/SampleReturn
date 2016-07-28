@@ -7,7 +7,7 @@
     name="saliency_detector"
     machine="search"
     ns="/processes/sample_detection/search">
-    <param name="img_topic" type="string" value="/cameras/search/center/image_color"/>
+    <param name="img_topic" type="string" value="/cameras/search/center/image_color_rect"/>
     <remap from="/cameras/search/info" to="/cameras/search/center/camera_info"/>
     <param name="bms_opening_width" type="int" value="7"/>
     <param name="bms_thresh" type="double" value="20"/>
