@@ -149,8 +149,8 @@ class SaliencyDetectorNode
       p_msg.header = msg->header;
       p_msg.image = *(cv_bridge::CvImage(msg->header,"rgb8",sub_img).toImageMsg());
       p_msg.mask = *(cv_bridge::CvImage(msg->header,"mono8",sub_mask).toImageMsg());
-      p_msg.image_roi.x_offset = bot_right_x;
-      p_msg.image_roi.y_offset = bot_right_y;
+      p_msg.image_roi.x_offset = top_left_x;
+      p_msg.image_roi.y_offset = top_left_y;
       p_msg.image_roi.height = height;
       p_msg.image_roi.width = width;
       p_msg.cam_info = *cam_info;
