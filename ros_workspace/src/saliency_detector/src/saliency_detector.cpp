@@ -118,13 +118,6 @@ class SaliencyDetectorNode
       blob_->detect(blob_copy, kp);
       ROS_DEBUG("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
-      for (size_t i=0; i < kp.size(); i++)
-      {
-        //cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
-        cv::Point2f size_pt(kp[i].size, kp[i].size);
-        cv::rectangle(debug_bms_img_color, kp[i].pt - size_pt, kp[i].pt + size_pt,
-            CV_RGB(255,0,0), 1);
-      }
     }
 
     // Allocate images and mask for patch publishing
@@ -136,8 +129,17 @@ class SaliencyDetectorNode
       int x = kp[i].pt.x;
       int y = kp[i].pt.y;
       int size = 2*kp[i].size;
-      int height = min(y+size,cv_ptr->image.rows) - max(y-size,0);
-      int width = min(x+size,cv_ptr->image.cols) - max(x-size,0);
+      int top_left_x = max(x-size,0);
+      int top_left_y = max(y-size,0);
+      int bot_right_x = min(x+size,cv_ptr->image.cols);
+      int bot_right_y = min(y+size,cv_ptr->image.rows);
+      int width = bot_right_x - top_left_x;
+      int height = bot_right_y - top_left_y;
+
+      //cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
+      cv::rectangle(debug_bms_img_color, cv::Point2i(top_left_x,top_left_y),
+          cv::Point2i(bot_right_x,bot_right_y), CV_RGB(255,0,0), 1);
+
       sub_img = cv_ptr->image(Range(max(y-size,0), min(y+size,cv_ptr->image.rows)), Range(max(x-size,0), min(x+size,cv_ptr->image.cols)));
       sub_mask = debug_bms_img_(Range(max(y-size,0), min(y+size,cv_ptr->image.rows)), Range(max(x-size,0), min(x+size,cv_ptr->image.cols)));
       if (cv::countNonZero(sub_mask) == 0) {
@@ -147,8 +149,8 @@ class SaliencyDetectorNode
       p_msg.header = msg->header;
       p_msg.image = *(cv_bridge::CvImage(msg->header,"rgb8",sub_img).toImageMsg());
       p_msg.mask = *(cv_bridge::CvImage(msg->header,"mono8",sub_mask).toImageMsg());
-      p_msg.image_roi.x_offset = x;
-      p_msg.image_roi.y_offset = y;
+      p_msg.image_roi.x_offset = bot_right_x;
+      p_msg.image_roi.y_offset = bot_right_y;
       p_msg.image_roi.height = height;
       p_msg.image_roi.width = width;
       p_msg.cam_info = *cam_info;
