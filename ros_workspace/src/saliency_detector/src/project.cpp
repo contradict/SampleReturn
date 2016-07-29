@@ -129,6 +129,9 @@ class GroundProjectorNode
       std::vector<std::vector<cv::Point> > contours;
       std::vector<cv::Vec4i> hierarchy;
       cv::findContours(cv_ptr->image, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      if (contours.size() == 0) {
+        ROS_DEBUG("No contours found in patch %i", i);
+      }
       double maxArea = 0;
       int max_idx = 0;
       for (int j=0; j<contours.size(); j++) {
@@ -180,9 +183,14 @@ class GroundProjectorNode
     camera_point_b.point.y = ray_b.y;
     camera_point_b.point.z = ray_b.z;
     tf::StampedTransform camera_transform;
-    listener_.lookupTransform("base_link",header.frame_id,header.stamp,camera_transform);
+    // This is a static link, so Time(0) should be fine
+    listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
     tf::Vector3 pos;
     pos = camera_transform.getOrigin();
+    if (!listener_.canTransform("base_link",camera_point_a.header.frame_id,
+          camera_point_a.header.stamp)) {
+      return false;
+    }
     listener_.transformPoint("base_link",camera_point_a,base_link_point_a);
     listener_.transformPoint("base_link",camera_point_b,base_link_point_b);
     Eigen::Vector3d base_link_ray_a, base_link_ray_b, ray_origin;
@@ -223,7 +231,7 @@ class GroundProjectorNode
     // Ray: P = P0 + tV
     // Plane: P.N + d = 0, where P is intersection point
     // t = (P0.N + d)/(V.N) , P = P0 + tV
-    float t = (ray_origin.dot(plane.head(3)) + plane[4]) / (ray.dot(plane.head(3)));
+    float t = (ray_origin.dot(plane.head(3)) + plane[3]) / (ray.dot(plane.head(3)));
     Eigen::Vector3d P = ray_origin + t*ray;
     return P;
   }
