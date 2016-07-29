@@ -69,6 +69,10 @@
              /cameras/navigation/port/left/camera_info
              /cameras/search/center/image_raw
              /cameras/search/center/camera_info
+             /cameras/search/port/image_raw
+             /cameras/search/port/camera_info
+             /cameras/search/starboard/image_raw
+             /cameras/search/starboard/camera_info
              /cameras/manipulator/left/image_raw
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
