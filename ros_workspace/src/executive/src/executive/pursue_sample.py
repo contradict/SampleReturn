@@ -276,13 +276,6 @@ class PursueSample(object):
                                      transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
                                                     'aborted':'PUBLISH_FAILURE'})
             
-            smach.StateMachine.add('DISABLE_SEARCH_CAMERA',
-                                    smach_ros.ServiceState('enable_search',
-                                                            platform_srv.Enable,
-                                                            request = platform_srv.EnableRequest(False)),
-                                    transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
-                                                   'aborted':'MANIPULATOR_APPROACH_MOVE'})
-            
             smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
                                    transitions = {'complete':'MANIPULATOR_FINAL_MOVE',
@@ -442,14 +435,7 @@ class PursueSample(object):
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'ANNOUNCE_CONTINUE',
                                                     'aborted':'ANNOUNCE_CONTINUE'})
-            
-            smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
-                                    smach_ros.ServiceState('enable_search',
-                                                            platform_srv.Enable,
-                                                            request = platform_srv.EnableRequest(True)),
-                                    transitions = {'succeeded':'ANNOUNCE_CONTINUE',
-                                                   'aborted':'ANNOUNCE_CONTINUE'})
-
+ 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
                                                  "Exit ing pursuit."),

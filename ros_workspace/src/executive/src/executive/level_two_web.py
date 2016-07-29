@@ -83,6 +83,19 @@ class LevelTwoWeb(object):
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")
         self.CAN_interface = util.CANInterface()
+        self.camera_services = []
+        self.camera_services.append(rospy.ServiceProxy('enable_search_center',
+                                                        platform_srv.Enable,
+                                                        persistent=True))
+        self.camera_services.append(rospy.ServiceProxy('enable_search_port',
+                                                        platform_srv.Enable,
+                                                        persistent=True))
+        self.camera_services.append(rospy.ServiceProxy('enable_search_starboard',
+                                                        platform_srv.Enable,
+                                                        persistent=True))
+        self.camera_services.append(rospy.ServiceProxy('enable_navigation_beacon',
+                                                        platform_srv.Enable,
+                                                        persistent=True))
        
         #movement action servers        
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
@@ -183,27 +196,13 @@ class LevelTwoWeb(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(input_keys=['dismount_move',
-                                                             'spin_velocity',
-                                                             'return_time_offset'],
-                                                 output_keys=['action_result',
-                                                              'simple_move',
-                                                              'beacon_turn',
-                                                              'return_time'],
-                                                 outcomes=['next']),
+                                   StartLeveLTwo(self.camera_services),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode.'), #  Enable ing search camera.'),
+                                                 'Enter ing level two mode. Enable ing search cameras.'),
                                    transitions = {'next':'SELECT_PLANNER'})
-            
-            #smach.StateMachine.add('ENABLE_SEARCH_CAMERA',
-            #                        smach_ros.ServiceState('enable_search',
-            #                                                platform_srv.Enable,
-            #                                                request = platform_srv.EnableRequest(True)),
-            #                        transitions = {'succeeded':'SELECT_PLANNER',
-            #                                       'aborted':'LEVEL_TWO_ABORTED'})
             
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
@@ -232,7 +231,7 @@ class LevelTwoWeb(object):
             
             smach.StateMachine.add('ANNOUNCE_DISMOUNT',
                                    AnnounceState(self.announcer,
-                                                 'Hey Steve!  I made it off the platform this time.'),
+                                                 'Platform dismounted.'),
                                    transitions = {'next':'LOOK_AT_BEACON'})
             
 
@@ -429,7 +428,7 @@ class LevelTwoWeb(object):
                                                   'aborted':'CREATE_MOVE_GOAL'})
             
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
-                                  LevelTwoPreempted(),
+                                  LevelTwoPreempted(self.camera_services),
                                    transitions = {'recovery':'RECOVERY_MANAGER',
                                                   'calibrate':'CALCULATE_BEACON_ROTATION',
                                                   'exit':'preempted'})
@@ -605,6 +604,20 @@ class LevelTwoWeb(object):
 #searches the globe   
 class StartLeveLTwo(smach.State):
 
+    def __init__(self, camera_services): 
+   
+        smach.State.__init__(self,
+                            input_keys=['dismount_move',
+                                        'spin_velocity',
+                                        'return_time_offset'],
+                            output_keys=['action_result',
+                                        'simple_move',
+                                        'beacon_turn',
+                                        'return_time'],
+                            outcomes=['next']),
+
+        self.camera_services = camera_services
+
     def execute(self, userdata):
         
         result = samplereturn_msg.GeneralExecutiveResult()
@@ -619,6 +632,13 @@ class StartLeveLTwo(smach.State):
                                              angle = np.pi,
                                              velocity = userdata.spin_velocity)
         
+        #enable all search/beacon cameras
+        try:
+            for service_proxy in self.camera_services:
+                service_proxy(True)
+        except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("LEVEL_TWO unable to enable cameras: %s:", e)
+                
         userdata.return_time = rospy.Time.now() + userdata.return_time_offset
 
         return 'next'
@@ -1120,12 +1140,14 @@ class MoveMUX(smach.State):
         return userdata.active_manager
     
 class LevelTwoPreempted(smach.State):
-    def __init__(self):
+    def __init__(self, camera_services):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested',
                                            'map_calibration_requested'],
                              output_keys = ['move_point_map'],
                              outcomes=['recovery', 'calibrate', 'exit'])
+        
+        self.camera_services = camera_services
         
     def execute(self, userdata):
         
@@ -1135,6 +1157,13 @@ class LevelTwoPreempted(smach.State):
             return 'recovery'
         elif userdata.map_calibration_requested:
             return 'calibrate'
+    
+        #disable all search/beacon cameras
+        try:
+            for service_proxy in self.camera_services:
+                service_proxy(False)
+        except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
+            rospy.logerr("LEVEL_TWO unable to disable cameras: %s:", e)    
         
         return 'exit'
 

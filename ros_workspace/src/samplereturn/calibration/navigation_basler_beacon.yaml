@@ -1,0 +1,20 @@
+image_width: 3840
+image_height: 2748
+camera_name: /cameras/navigation/beacon/basler_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [4906.079538800276, 0, 1694.421453310726, 0, 4892.255356929256, 847.150278349782, 0, 0, 1]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.1612619759407453, 0.007244414053844808, 0.01522293834425071, -0.0001915671064270758, 0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [4779.1474609375, 0, 1681.189680418523, 0, 0, 4846.59619140625, 850.7556802495601, 0, 0, 0, 1, 0]

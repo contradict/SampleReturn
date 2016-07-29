@@ -3,7 +3,7 @@
 <launch>
 
 <!-- joy node -->
-<node machine="navigate"
+<node machine="search"
       respawn="true" 
       pkg="joy"
       type="joy_node" 
@@ -55,7 +55,10 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="joy" to="/io/joy"/>
     <remap from="search_lights" to="/io/search_lights"/>
-    <remap from="enable_search" to="/cameras/search/enable"/>
+    <remap from="enable_search_center" to="/cameras/search/center/basler_camera/enable_publish"/>
+    <remap from="enable_search_port" to="/cameras/search/port/basler_camera/enable_publish"/>
+    <remap from="enable_search_starboard" to="/cameras/search/starboard/basler_camera/enable_publish"/>
+    <remap from="enable_navigation_beacon" to="/cameras/navigation/beacon/basler_camera/enable_publish"/>
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/manipulator_linemod_detector_2d/enable"/>
     <remap from="enable_hard_manipulator_detector" to="/processes/sample_detection/manipulator/hard_manipulator_linemod_detector_2d/enable"/>
 

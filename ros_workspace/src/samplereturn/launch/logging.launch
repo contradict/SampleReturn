@@ -67,9 +67,8 @@
              /cameras/navigation/port/right/camera_info
              /cameras/navigation/port/left/image_raw
              /cameras/navigation/port/left/camera_info
-             /cameras/search/image
-             /cameras/search/info
-             /cameras/search/status
+             /cameras/search/center/image_raw
+             /cameras/search/center/camera_info
              /cameras/manipulator/left/image_raw
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
