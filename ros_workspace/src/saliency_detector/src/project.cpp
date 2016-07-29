@@ -179,12 +179,8 @@ class GroundProjectorNode
     camera_point_b.point.x = ray_b.x;
     camera_point_b.point.y = ray_b.y;
     camera_point_b.point.z = ray_b.z;
-    tf::StampedTransform camera_transform;
-    listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
     tf::Vector3 pos;
     pos = camera_transform.getOrigin();
-    camera_point_a.header.stamp = ros::Time(0);
-    camera_point_b.header.stamp = ros::Time(0);
     listener_.transformPoint("base_link",camera_point_a,base_link_point_a);
     listener_.transformPoint("base_link",camera_point_b,base_link_point_b);
     Eigen::Vector3d base_link_ray_a, base_link_ray_b, ray_origin;
