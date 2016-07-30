@@ -139,8 +139,8 @@ Mat BMS::getAttentionMap(const Mat& bm)
 		}
 	}
 
-	double max_, min_;
-	minMaxLoc(ret,&min_,&max_);
+	//double max_, min_;
+	//minMaxLoc(ret,&min_,&max_);
 	ret=ret != 1;
 
 	if(_dilation_width_1>0)
