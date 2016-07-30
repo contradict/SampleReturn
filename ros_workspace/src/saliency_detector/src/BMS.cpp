@@ -56,11 +56,11 @@ void BMS::computeSaliency(const Mat& src, float step)
     if (i==0) {
 		  //_feature_maps.push_back(sp[0]);
 	    _feature_maps.push_back(sp[1]);
-		  _feature_maps.push_back(sp[2]);
+		  //_feature_maps.push_back(sp[2]);
     }
     else {
 		  _feature_maps.push_back(sp[0]);
-	  //_feature_maps.push_back(sp[1]);
+	    _feature_maps.push_back(sp[1]);
 		//_feature_maps.push_back(sp[2]);
     }
 	}
