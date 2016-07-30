@@ -9,10 +9,11 @@
     ns="/processes/sample_detection/search">
     <param name="img_topic" type="string" value="/cameras/search/center/image_rect_color"/>
     <remap from="/cameras/search/info" to="/cameras/search/center/camera_info"/>
-    <param name="bms_opening_width" type="int" value="7"/>
+    <param name="bms_opening_width" type="int" value="3"/>
+    <param name="bms_dilation_width_1" type="int" value="0"/>
     <param name="bms_thresh" type="double" value="20"/>
     <param name="bms_thresh_on" type="bool" value="True"/>
-    <param name="bms_img_width" type="double" value="1000"/>
+    <param name="bms_img_width" type="double" value="400"/>
     <param name="bms_top_trim" type="double" value="0"/>
     <param name="filterByConvexity" type="bool" value="True"/>
     <param name="filterByArea" type="bool" value="True"/>
