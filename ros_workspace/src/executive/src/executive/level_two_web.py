@@ -3,6 +3,7 @@ import math
 import threading
 import random
 import yaml
+import time
 from copy import deepcopy
 from collections import deque
 import numpy as np
@@ -127,6 +128,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pause_time_offset = None
+        self.pause_start_time = None
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #dismount move
@@ -491,7 +493,28 @@ class LevelTwoWeb(object):
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
+              
+        if self.state_machine.is_running():
         
+            if (msg.data):  #if we were just paused
+                self.pause_start_time = rospy.Time.now()            
+            else:  #if we just received an unpause
+                if self.state_machine.userdata.pause_time_offset is None:
+                    #no pause time is recorded so, we have just unpaused for the first time
+                    self.state_machine.userdata.pause_time_offset = \
+                    rospy.Time.now() - self.state_machine.userdata.start_time
+                else:
+                    self.state_machine.userdata.pause_time_offset +=\
+                    rospy.Time.now() - self.pause_start_time
+
+            if (self.state_machine.userdata.pause_time_offset is not None):
+                
+                rospy.loginfo("LEVEL_TWO pause state change: start_time: {!s}, pause_time_offset: {:f}, return_offset_time: {:f}".format(
+                    time.strftime("%H:%M:%S", time.localtime(self.state_machine.userdata.start_time.to_sec())),
+                    self.state_machine.userdata.pause_time_offset.to_sec(),
+                    self.state_machine.userdata.return_time_offset.to_sec()
+                ))
+            
     def sample_update(self, sample):
         #only update the detection message with samples if stop_on_sample is true
         if self.state_machine.userdata.report_sample:
@@ -613,6 +636,7 @@ class StartLeveLTwo(smach.State):
                             output_keys=['action_result',
                                         'simple_move',
                                         'beacon_turn',
+                                        'start_time',
                                         'pause_time_offset'],
                             outcomes=['next']),
 
@@ -639,7 +663,8 @@ class StartLeveLTwo(smach.State):
         except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
             rospy.logerr("LEVEL_TWO unable to enable cameras: %s:", e)
         
-        userdata.pause_time_offset = None        
+        userdata.pause_time_offset = None
+        userdata.start_time = rospy.Time.now()
 
         return 'next'
 
