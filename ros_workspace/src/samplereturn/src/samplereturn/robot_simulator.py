@@ -673,10 +673,12 @@ class RobotSimulator(object):
                 print("Transforms not available in publish beacon: {!s}".format(exc))
                 return
 
-        #rospy.loginfo("BEACON CHECK, dist_to_origin, angle_to_robot, angle_to_origin:\
-        #              {!s}, {!s}, {!s}".format(dist_from_origin,
-        #                                np.degrees(angle_to_robot),
-        #                                np.degrees(angle_to_origin)))
+        '''
+        rospy.loginfo("BEACON CHECK, dist_to_origin, angle_to_robot, angle_to_origin:\
+                      {!s}, {!s}, {!s}".format(dist_from_origin,
+                                        np.degrees(angle_to_robot),
+                                        np.degrees(angle_to_origin)))
+        '''
 
         if dist_from_origin < 5.0 or dist_from_origin > 50.0:
             #print ("NO BEACON PUB: outside beacon view distance: %.2f" %(dist_from_origin))
@@ -705,15 +707,16 @@ class RobotSimulator(object):
                             self.tf_listener.lookupTransform(self.sim_map,
                                                              'beacon',
                                                              rospy.Time(0))
-                now = self.tf_listener.getLatestCommonTime('search_camera_lens',
+                now = self.tf_listener.getLatestCommonTime('navigation_beacon_lens',
                                                             self.reality_frame,)
                 msg = geometry_msg.PoseWithCovarianceStamped()
                 msg_pose = geometry_msg.PoseStamped()
                 msg_pose.header = std_msg.Header(0, now, self.reality_frame)
                 msg_pose.pose.orientation = geometry_msg.Quaternion(*beacon_quat)
                 msg_pose.pose.position = geometry_msg.Point(*beacon_trans)
-                msg_pose = self.tf_listener.transformPose('search_camera_lens', msg_pose)
-            except tf.Exception:
+                msg_pose = self.tf_listener.transformPose('navigation_beacon_lens', msg_pose)
+            except tf.Exception, exc:
+                print("Transforms not available in publish beacon: {!s}".format(exc))
                 return
             msg.pose.pose = msg_pose.pose
             msg.header = msg_pose.header
