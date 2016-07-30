@@ -242,9 +242,7 @@ class RobotSimulator(object):
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
         self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, queue_size=2)
-        rospy.Timer(rospy.Duration(0.2), self.publish_pause)
-
-
+        
         #platform motion publishers, services, and action servers
         rospy.Service(select_motion_name,
                       platform_srv.SelectMotionMode,
@@ -375,6 +373,7 @@ class RobotSimulator(object):
                                                      queue_size=2)
         rospy.Timer(rospy.Duration(2.0), self.check_beacon_pose)
 
+             
         #rospy.spin()
        
     def publish_path_markers(self, event):
@@ -736,8 +735,11 @@ class RobotSimulator(object):
             msg.new_pin_states = 0xFF
         self.GPIO_pub.publish(msg)
         
-    def publish_pause(self, event):
-        self.pause_pub.publish(std_msg.Bool(self.paused))
+    def pause(self):
+        self.pause_pub.publish(std_msg.Bool(True))
+        
+    def unpause(self):
+        self.pause_pub.publish(std_msg.Bool(False))
  
     def enable_manipulator_detector(self, req):
         self.manipulator_detector_enabled = req.state
