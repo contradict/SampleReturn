@@ -37,6 +37,8 @@ class SaliencyDetectorNode
   double bms_top_trim_;
   double bms_img_width_;
 
+  double scale_;
+
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
 
   public:
@@ -91,7 +93,7 @@ class SaliencyDetectorNode
 
     // Resize the image for BMS saliency computation
     cv::Mat small;
-    float scale = cv_ptr->image.cols/bms_img_width_;
+    scale_ = cv_ptr->image.cols/bms_img_width_;
     cv::resize(cv_ptr->image.rowRange(bms_top_trim_,cv_ptr->image.rows),
         small,cv::Size(bms_img_width_,(cv_ptr->image.rows-bms_top_trim_)*(bms_img_width_/cv_ptr->image.cols)),
         0.0,0.0,cv::INTER_AREA);
@@ -99,9 +101,6 @@ class SaliencyDetectorNode
     // Compute saliency map
     bms_.computeSaliency(small, bms_sample_step_);
     debug_bms_img_ = bms_.getSaliencyMap().clone();
-    // Scale back up
-    cv::resize(debug_bms_img_, debug_bms_img_, cv::Size(cv_ptr->image.cols,cv_ptr->image.rows),
-        0.0, 0.0, cv::INTER_AREA);
 
     // Threshold grayscale saliency into binary
     if (bms_thresh_on_) {
@@ -113,24 +112,29 @@ class SaliencyDetectorNode
     cv::Mat debug_bms_img_color;
     std::vector<cv::KeyPoint> kp;
 
-    // Detect blobs matching criteria, draw on output
+    // Detect blobs matching criteria
     if (blobDetect_on_) {
       cv::Mat blob_copy = debug_bms_img_.clone();
       blob_->detect(blob_copy, kp);
       ROS_DEBUG("Keypoints Detected: %lu", kp.size());
-      cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
     }
+
+    // Scale back up
+    cv::resize(debug_bms_img_, debug_bms_img_, cv::Size(cv_ptr->image.cols,cv_ptr->image.rows),
+        0.0, 0.0, cv::INTER_AREA);
+    cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
 
     // Allocate images and mask for patch publishing
     cv::Mat sub_img;
     cv::Mat sub_mask;
     samplereturn_msgs::PatchArray pa_msg;
 
+    // Scale keypoint params back up from smaller BMS image
     for (int i = 0; i < kp.size(); i++) {
-      int x = kp[i].pt.x;
-      int y = kp[i].pt.y;
+      int x = kp[i].pt.x * scale_;
+      int y = kp[i].pt.y * scale_;
       // Pad a bit to avoid clipping
-      int size = 1.2*kp[i].size;
+      int size = 1.2*kp[i].size * scale_;
       int top_left_x = max(x-size,0);
       int top_left_y = max(y-size,0);
       int bot_right_x = min(x+size,cv_ptr->image.cols - 1);
@@ -138,7 +142,6 @@ class SaliencyDetectorNode
       int width = bot_right_x - top_left_x;
       int height = bot_right_y - top_left_y;
 
-      //cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
       cv::rectangle(debug_bms_img_color, cv::Point2i(top_left_x,top_left_y),
           cv::Point2i(bot_right_x,bot_right_y), CV_RGB(255,0,0), 4);
 
@@ -164,7 +167,6 @@ class SaliencyDetectorNode
 
     sensor_msgs::ImagePtr debug_img_msg =
       cv_bridge::CvImage(msg->header,"rgb8",debug_bms_img_color).toImageMsg();
-    //debug_img_msg.header = msg->header;
     pub_bms_img.publish(debug_img_msg);
 
     ROS_DEBUG("messageCallback ended");
@@ -187,13 +189,15 @@ class SaliencyDetectorNode
     bms_img_width_ = config.bms_img_width;
 
     // Configure and construct blob detector
+    // Scale all spatialized params by bms image scale, since this operates on
+    // the small image.
     blobDetect_on_ = config.blobDetect_on;
 
-    blob_params_.minDistBetweenBlobs = config.minDistBetweenBlobs;
+    blob_params_.minDistBetweenBlobs = config.minDistBetweenBlobs / scale_;
 
     blob_params_.filterByArea = config.filterByArea;
-    blob_params_.minArea = config.minArea;
-    blob_params_.maxArea = config.maxArea;
+    blob_params_.minArea = config.minArea / pow(scale_,2);
+    blob_params_.maxArea = config.maxArea / pow(scale_,2);
 
     blob_params_.filterByConvexity = config.filterByConvexity;
     blob_params_.minConvexity = config.minConvexity;
