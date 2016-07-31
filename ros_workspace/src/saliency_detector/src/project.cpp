@@ -322,7 +322,10 @@ class GroundProjectorNode
     pub_marker.publish(mark);
     // Keep the plane around for patch projection, publish the clipped ground point cloud,
     // and a plane marker for Rviz
-    ground_plane_ = new_plane;
+    ground_plane_ << coefficients->values[0],
+                  coefficients->values[1],
+                  coefficients->values[2],
+                  coefficients->values[3];
     ground_plane_normal_ = plane_normal;
   }
 
