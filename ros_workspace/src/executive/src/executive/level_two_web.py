@@ -466,7 +466,7 @@ class LevelTwoWeb(object):
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
         self.time_remaining_pub = rospy.Publisher('time_remaining',
-                                                  std_msg.Time,
+                                                  std_msg.Int16,
                                                   queue_size=1)
         rospy.Timer(rospy.Duration(2.0), self.publish_time_remaining)        
         
@@ -502,7 +502,7 @@ class LevelTwoWeb(object):
                           self.state_machine.userdata.return_time_offset + \
                           self.state_machine.userdata.pause_time_offset
             time_remaining = return_time - rospy.Time.now()
-            self.time_remaining_pub.publish(time_remaining)    
+            self.time_remaining_pub.publish(int(time_remaining.to_sec()))    
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
