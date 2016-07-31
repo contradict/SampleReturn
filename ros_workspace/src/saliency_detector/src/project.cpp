@@ -230,8 +230,8 @@ class GroundProjectorNode
     // Plane defined as ax + by + cz + d = 0
     // Ray: P = P0 + tV
     // Plane: P.N + d = 0, where P is intersection point
-    // t = (P0.N + d)/(V.N) , P = P0 + tV
-    float t = (ray_origin.dot(plane.head(3)) + plane[3]) / (ray.dot(plane.head(3)));
+    // t = -(P0.N + d)/(V.N) , P = P0 + tV
+    float t = -(ray_origin.dot(plane.head(3)) + plane[3]) / (ray.dot(plane.head(3)));
     Eigen::Vector3d P = ray_origin + t*ray;
     return P;
   }
