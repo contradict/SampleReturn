@@ -128,7 +128,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pause_time_offset = rospy.Duration(0)
-        self.pause_start_time = None
+        self.state_machine.userdata.pause_start_time = None
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #dismount move
@@ -465,6 +465,11 @@ class LevelTwoWeb(object):
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
+        self.time_remaining_pub = rospy.Publisher('time_remaining',
+                                                  std_msg.Time,
+                                                  queue_size=1)
+        rospy.Timer(rospy.Duration(2.0), self.publish_time_remaining)        
+        
         rospy.Service("start_recovery", samplereturn_srv.RecoveryParameters, self.start_recovery)
         
         #start a timer loop to check for localization updates
@@ -491,22 +496,25 @@ class LevelTwoWeb(object):
         self.state_machine.request_preempt()
         return True
     
+    def publish_time_remaining(self, event):
+        if self.state_machine.is_running():
+            return_time = self.state_machine.userdata.start_time + \
+                          self.state_machine.userdata.return_time_offset + \
+                          self.state_machine.userdata.pause_time_offset
+            time_remaining = return_time - rospy.Time.now()
+            self.time_remaining_pub.publish(time_remaining)    
+    
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
               
         if self.state_machine.is_running():
         
             if (msg.data):  #if we were just paused
-                self.pause_start_time = rospy.Time.now()            
+                self.state_machine.userdata.pause_start_time = rospy.Time.now()            
             else:  #if we just received an unpause
-                if self.state_machine.userdata.pause_time_offset.to_sec != 0:
-                    #no pause time is recorded so, we have just unpaused for the first time
-                    self.state_machine.userdata.pause_time_offset = \
-                    rospy.Time.now() - self.state_machine.userdata.start_time
-                else:
-                    self.state_machine.userdata.pause_time_offset +=\
-                    rospy.Time.now() - self.pause_start_time
-
+                self.state_machine.userdata.pause_time_offset += \
+                    rospy.Time.now() - self.state_machine.userdata.pause_start_time 
+    
             if (self.state_machine.userdata.pause_time_offset.to_sec() != 0 ):
                 
                 rospy.loginfo("LEVEL_TWO pause state change: start_time: {!s}, pause_time_offset: {:f}, return_offset_time: {:f}".format(
@@ -631,12 +639,14 @@ class StartLeveLTwo(smach.State):
     def __init__(self, camera_services): 
    
         smach.State.__init__(self,
-                            input_keys=['dismount_move',
+                            input_keys=['paused',
+                                        'dismount_move',
                                         'spin_velocity'],
                             output_keys=['action_result',
                                         'simple_move',
                                         'beacon_turn',
                                         'start_time',
+                                        'pause_start_time',
                                         'pause_time_offset'],
                             outcomes=['next']),
 
@@ -662,9 +672,14 @@ class StartLeveLTwo(smach.State):
                 service_proxy(True)
         except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
             rospy.logerr("LEVEL_TWO unable to enable cameras: %s:", e)
+                
         
         userdata.pause_time_offset = rospy.Duration(0)
         userdata.start_time = rospy.Time.now()
+        if userdata.paused:
+            userdata.pause_start_time = rospy.Time.now()
+        
+
 
         return 'next'
 
