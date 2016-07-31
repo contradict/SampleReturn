@@ -36,11 +36,13 @@ class GroundProjectorNode
   ros::Publisher pub_point_cloud;
   ros::Publisher pub_patch_array;
   ros::Publisher pub_marker;
+  ros::Publisher pub_point;
   std::string sub_patch_array_topic;
   std::string pub_patch_array_topic;
   std::string sub_point_cloud_topic;
   std::string pub_point_cloud_topic;
   std::string marker_topic;
+  std::string point_topic;
 
   tf::TransformListener listener_;
 
@@ -74,6 +76,8 @@ class GroundProjectorNode
         std::string("/processes/ground_projector/search/pointcloud"));
     private_node_handle_.param("marker_topic", marker_topic,
         std::string("/processes/ground_projector/search/ground_marker"));
+    private_node_handle_.param("point_topic", point_topic,
+        std::string("/processes/ground_projector/search/ground_point"));
 
     sub_patch_array =
       nh.subscribe(sub_patch_array_topic, 1, &GroundProjectorNode::patchArrayCallback, this);
@@ -89,6 +93,9 @@ class GroundProjectorNode
 
     pub_marker =
       nh.advertise<visualization_msgs::Marker>(marker_topic.c_str(), 1);
+
+    pub_point =
+      nh.advertise<geometry_msgs::PointStamped>(point_topic.c_str(), 1);
 
     min_inliers_ = 30;
     ransac_distance_threshold_ = 1.0;
@@ -152,6 +159,7 @@ class GroundProjectorNode
       cv::Point3d ray_b = cam_model_.projectPixelTo3dRay(major_point_b);
       geometry_msgs::PointStamped world_point;
       if (checkContourSize(ray_a, ray_b, msg->patch_array[0].header, world_point)) {
+        pub_point.publish(world_point);
         samplereturn_msgs::Patch pa_msg;
         pa_msg.image = msg->patch_array[i].image;
         pa_msg.mask = msg->patch_array[i].mask;
