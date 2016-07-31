@@ -19,7 +19,7 @@ level_two:
     raster_offset: 6
     raster_tolerance: 1.5 #close enough to next point?
     chord_course_tolerance: 3.0 #what is off course on a chord move
-    return_time_minutes: 100
+    return_time_minutes: 5 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
     beacon_approach_point: {x: 6.0, y: 0}

@@ -3,6 +3,7 @@ import math
 import threading
 import random
 import yaml
+import time
 from copy import deepcopy
 from collections import deque
 import numpy as np
@@ -126,6 +127,8 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.local_frame = self.local_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
+        self.state_machine.userdata.pause_time_offset = rospy.Duration(0)
+        self.state_machine.userdata.pause_start_time = None
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
         
         #dismount move
@@ -462,6 +465,11 @@ class LevelTwoWeb(object):
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
+        self.time_remaining_pub = rospy.Publisher('minutes_remaining',
+                                                  std_msg.Int16,
+                                                  queue_size=1)
+        rospy.Timer(rospy.Duration(2.0), self.publish_time_remaining)        
+        
         rospy.Service("start_recovery", samplereturn_srv.RecoveryParameters, self.start_recovery)
         
         #start a timer loop to check for localization updates
@@ -488,9 +496,33 @@ class LevelTwoWeb(object):
         self.state_machine.request_preempt()
         return True
     
+    def publish_time_remaining(self, event):
+        if self.state_machine.is_running():
+            return_time = self.state_machine.userdata.start_time + \
+                          self.state_machine.userdata.return_time_offset + \
+                          self.state_machine.userdata.pause_time_offset
+            time_remaining = return_time - rospy.Time.now()
+            self.time_remaining_pub.publish(int(time_remaining.to_sec()/60))    
+    
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
+              
+        if self.state_machine.is_running():
         
+            if (msg.data):  #if we were just paused
+                self.state_machine.userdata.pause_start_time = rospy.Time.now()            
+            else:  #if we just received an unpause
+                self.state_machine.userdata.pause_time_offset += \
+                    rospy.Time.now() - self.state_machine.userdata.pause_start_time 
+    
+            if (self.state_machine.userdata.pause_time_offset.to_sec() != 0 ):
+                
+                rospy.loginfo("LEVEL_TWO pause state change: start_time: {!s}, pause_time_offset: {:f}, return_offset_time: {:f}".format(
+                    time.strftime("%H:%M:%S", time.localtime(self.state_machine.userdata.start_time.to_sec())),
+                    self.state_machine.userdata.pause_time_offset.to_sec(),
+                    self.state_machine.userdata.return_time_offset.to_sec()
+                ))
+            
     def sample_update(self, sample):
         #only update the detection message with samples if stop_on_sample is true
         if self.state_machine.userdata.report_sample:
@@ -607,13 +639,15 @@ class StartLeveLTwo(smach.State):
     def __init__(self, camera_services): 
    
         smach.State.__init__(self,
-                            input_keys=['dismount_move',
-                                        'spin_velocity',
-                                        'return_time_offset'],
+                            input_keys=['paused',
+                                        'dismount_move',
+                                        'spin_velocity'],
                             output_keys=['action_result',
                                         'simple_move',
                                         'beacon_turn',
-                                        'return_time'],
+                                        'start_time',
+                                        'pause_start_time',
+                                        'pause_time_offset'],
                             outcomes=['next']),
 
         self.camera_services = camera_services
@@ -639,7 +673,13 @@ class StartLeveLTwo(smach.State):
         except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
             rospy.logerr("LEVEL_TWO unable to enable cameras: %s:", e)
                 
-        userdata.return_time = rospy.Time.now() + userdata.return_time_offset
+        
+        userdata.pause_time_offset = rospy.Duration(0)
+        userdata.start_time = rospy.Time.now()
+        if userdata.paused:
+            userdata.pause_start_time = rospy.Time.now()
+        
+
 
         return 'next'
 
@@ -657,7 +697,9 @@ class WebManager(smach.State):
                                            'vfh_result',
                                            'manager_dict',
                                            'detection_message',
-                                           'return_time',
+                                           'start_time',
+                                           'return_time_offset',
+                                           'pause_time_offset',
                                            'world_fixed_frame'],
                              output_keys = ['spoke_yaw',
                                             'outbound',
@@ -687,8 +729,10 @@ class WebManager(smach.State):
         userdata.active_manager = userdata.manager_dict[self.label]
         userdata.report_sample = True #always act on samples if this manager is working
         userdata.stop_on_detection = True
+        
+        return_time = userdata.start_time + userdata.pause_time_offset + userdata.return_time_offset
       
-        if rospy.Time.now() > userdata.return_time:
+        if rospy.Time.now() > return_time:
             rospy.loginfo("WEB_MANAGER exceeded return_time")
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
@@ -709,7 +753,7 @@ class WebManager(smach.State):
             next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
             userdata.outbound = False
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
-            remaining_minutes = int((userdata.return_time - rospy.Time.now()).to_sec()/60)
+            remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
             self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(int(math.degrees(userdata.spoke_yaw)),
                                                                                          remaining_minutes))
             return self.load_move(next_move, userdata)
@@ -992,6 +1036,7 @@ class RecoveryManager(smach.State):
                                            'move_target',
                                            'raster_points',
                                            'spokes',
+                                           'return_time_offset',
                                            'detection_message',
                                            'local_frame'],
                              output_keys = ['recovery_parameters',
@@ -999,6 +1044,7 @@ class RecoveryManager(smach.State):
                                             'active_manager',
                                             'raster_points',
                                             'spokes',
+                                            'return_time_offset',
                                             'move_target',
                                             'simple_move',
                                             'report_sample',
@@ -1032,6 +1078,11 @@ class RecoveryManager(smach.State):
             userdata.stop_on_detection = True
             userdata.report_sample = userdata.recovery_parameters['pursue_samples']
             
+            #modify return time
+            if 'time_offset' in userdata.recovery_parameters:
+                time_offset = rospy.Duration(userdata.recovery_parameters['time_offset']*60)
+                userdata.return_time_offset += time_offset
+                
             #prune requested spokes
             spokes_to_remove = userdata.recovery_parameters['spokes_to_remove']
             while spokes_to_remove > 0:
