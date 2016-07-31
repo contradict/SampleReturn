@@ -54,7 +54,6 @@ class GroundProjectorNode
   double min_major_axis_, max_major_axis_;
 
   Eigen::Vector4d ground_plane_;
-  Eigen::Vector3d ground_plane_normal_;
   image_geometry::PinholeCameraModel cam_model_;
 
   public:
@@ -313,6 +312,8 @@ class GroundProjectorNode
           enough inliers");
       return;
     }
+    // Keep the plane around for patch projection, publish the clipped ground point cloud,
+    // and a plane marker for Rviz
     ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",coefficients->values[0],
                                                   coefficients->values[1],
                                                   coefficients->values[2],
@@ -325,11 +326,11 @@ class GroundProjectorNode
     Eigen::Vector3d xhat;
     xhat.setZero();
     xhat[0] = 1.0;
-    Eigen::Vector3d plane_normal;
-    plane_normal << coefficients->values[0],
-                 coefficients->values[1],
-                 coefficients->values[2];
-    orientation.setFromTwoVectors(xhat, plane_normal);
+    ground_plane_ << coefficients->values[0],
+                  coefficients->values[1],
+                  coefficients->values[2],
+                  coefficients->values[3];
+    orientation.setFromTwoVectors(xhat, ground_plane_.head(3));
     tf::quaternionEigenToMsg(orientation, mark.pose.orientation);
     mark.scale.x = 1.0;
     mark.scale.y = 0.1;
@@ -339,13 +340,6 @@ class GroundProjectorNode
     mark.color.g = 0.5;
     mark.color.b = 1.0;
     pub_marker.publish(mark);
-    // Keep the plane around for patch projection, publish the clipped ground point cloud,
-    // and a plane marker for Rviz
-    ground_plane_ << coefficients->values[0],
-                  coefficients->values[1],
-                  coefficients->values[2],
-                  coefficients->values[3];
-    ground_plane_normal_ = plane_normal;
   }
 
   void configCallback(saliency_detector::ground_projector_paramsConfig &config, uint32_t level)
