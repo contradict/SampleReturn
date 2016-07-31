@@ -146,8 +146,8 @@ class GroundProjectorNode
       // Project major axis end rays to plane, compute major axis in meters
       cv::Point2d roi_offset(msg->patch_array[i].image_roi.x_offset,
           msg->patch_array[i].image_roi.y_offset);
-      cv::Point2d major_point_a = (cv::Point2d(rect.center) + cv::Point2d(rect.size)) + roi_offset;
-      cv::Point2d major_point_b = (cv::Point2d(rect.center) - cv::Point2d(rect.size)) + roi_offset;
+      cv::Point2d major_point_a, major_point_b;
+      getMajorPointsFullImage(rect, roi_offset, major_point_a, major_point_b);
       cv::Point3d ray_a = cam_model_.projectPixelTo3dRay(major_point_a);
       cv::Point3d ray_b = cam_model_.projectPixelTo3dRay(major_point_b);
       geometry_msgs::PointStamped world_point;
@@ -166,6 +166,20 @@ class GroundProjectorNode
         continue;
       }
     }
+  }
+
+  void getMajorPointsFullImage(const cv::RotatedRect rect, cv::Point2d roi_offset,
+      cv::Point2d& major_point_a, cv::Point2d& major_point_b)
+  {
+    major_point_a.x = rect.center.x - (rect.size.width/2.)*cos(rect.angle*(M_PI/180.))
+                      + roi_offset.x;
+    major_point_a.y = rect.center.y - (rect.size.height/2.)*sin(rect.angle*(M_PI/180.))
+                      + roi_offset.y;
+    major_point_b.x = rect.center.x + (rect.size.width/2.)*cos(rect.angle*(M_PI/180.))
+                      + roi_offset.x;
+    major_point_b.y = rect.center.y + (rect.size.height/2.)*sin(rect.angle*(M_PI/180.))
+                      + roi_offset.y;
+    return;
   }
 
   bool checkContourSize(const cv::Point3d ray_a, const cv::Point3d ray_b,
