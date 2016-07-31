@@ -465,7 +465,7 @@ class LevelTwoWeb(object):
         
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
         
-        self.time_remaining_pub = rospy.Publisher('time_remaining',
+        self.time_remaining_pub = rospy.Publisher('minutes_remaining',
                                                   std_msg.Int16,
                                                   queue_size=1)
         rospy.Timer(rospy.Duration(2.0), self.publish_time_remaining)        
@@ -502,7 +502,7 @@ class LevelTwoWeb(object):
                           self.state_machine.userdata.return_time_offset + \
                           self.state_machine.userdata.pause_time_offset
             time_remaining = return_time - rospy.Time.now()
-            self.time_remaining_pub.publish(int(time_remaining.to_sec()))    
+            self.time_remaining_pub.publish(int(time_remaining.to_sec()/60))    
     
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
@@ -1036,6 +1036,7 @@ class RecoveryManager(smach.State):
                                            'move_target',
                                            'raster_points',
                                            'spokes',
+                                           'return_time_offset',
                                            'detection_message',
                                            'local_frame'],
                              output_keys = ['recovery_parameters',
@@ -1043,6 +1044,7 @@ class RecoveryManager(smach.State):
                                             'active_manager',
                                             'raster_points',
                                             'spokes',
+                                            'return_time_offset',
                                             'move_target',
                                             'simple_move',
                                             'report_sample',
@@ -1076,6 +1078,11 @@ class RecoveryManager(smach.State):
             userdata.stop_on_detection = True
             userdata.report_sample = userdata.recovery_parameters['pursue_samples']
             
+            #modify return time
+            if 'time_offset' in userdata.recovery_parameters:
+                time_offset = rospy.Duration(userdata.recovery_parameters['time_offset']*60)
+                userdata.return_time_offset += time_offset
+                
             #prune requested spokes
             spokes_to_remove = userdata.recovery_parameters['spokes_to_remove']
             while spokes_to_remove > 0:
