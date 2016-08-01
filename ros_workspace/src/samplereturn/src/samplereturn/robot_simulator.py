@@ -598,7 +598,7 @@ class RobotSimulator(object):
                 elif sample['id'] in self.excluded_ids:   
                     self.sample_marker.color = std_msg.ColorRGBA(254, 0, 0, 1)
                 else:
-                    if (self.sample_in_view(sample['point'], 1, 12, 7)) \
+                    if (self.sample_in_view(sample['point'], 1, 2.5, 3)) \
                     or (sample['id'] == self.active_sample_id):
                         #keep publishing the active detection id until it is cleared
                         #hopefully the sim won't have more than one active id...
