@@ -70,22 +70,22 @@ class RobotSimulator(object):
         self.active_sample_id = None
         self.collected_ids = []
         self.excluded_ids = []
-        self.fake_samples = [{'point':geometry_msg.Point(42, 49, 0),'id':16},
-                             {'point':geometry_msg.Point(-12, 121, 0),'id':1},
-                             {'point':geometry_msg.Point(12, 109, 0), 'id':2},
-                             {'point':geometry_msg.Point(-26, 104, 0), 'id':3},
-                             {'point':geometry_msg.Point(-37, 73, 0), 'id':4},
-                             {'point':geometry_msg.Point(-16, 39, 0), 'id':5},
-                             {'point':geometry_msg.Point(22, 22, 0), 'id':6},
-                             {'point':geometry_msg.Point(-39, 2, 0), 'id':7},
-                             {'point':geometry_msg.Point(-18, -34, 0), 'id':8},
-                             {'point':geometry_msg.Point(10, -36, 0), 'id':9},
-                             {'point':geometry_msg.Point(4, -73, 0), 'id':10},
-                             {'point':geometry_msg.Point(25, -92, 0), 'id':11},
-                             {'point':geometry_msg.Point(-20, -105, 0), 'id':12},
-                             {'point':geometry_msg.Point(-63, -118, 0), 'id':13},
-                             {'point':geometry_msg.Point(-85, -113, 0), 'id':14},
-                             {'point':geometry_msg.Point(-106, -132, 0), 'id':15}]
+        self.fake_samples = [{'point':geometry_msg.Point(-28, 58, 0),'id':16},
+                             {'point':geometry_msg.Point(-107, 59, 0),'id':1},
+                             {'point':geometry_msg.Point(-107, 32, 0), 'id':2},
+                             {'point':geometry_msg.Point(-87, 65, 0), 'id':3},
+                             {'point':geometry_msg.Point(-51, 64, 0), 'id':4},
+                             {'point':geometry_msg.Point(-31, 30, 0), 'id':5},
+                             {'point':geometry_msg.Point(-30, -13, 0), 'id':6},
+                             {'point':geometry_msg.Point(13, 38, 0), 'id':7},
+                             {'point':geometry_msg.Point(36, 3, 0), 'id':8},
+                             {'point':geometry_msg.Point(27, -24, 0), 'id':9},
+                             {'point':geometry_msg.Point(63, -32, 0), 'id':10},
+                             {'point':geometry_msg.Point(72, -62, 0), 'id':11},
+                             {'point':geometry_msg.Point(103, -25, 0), 'id':12},
+                             {'point':geometry_msg.Point(132, 11, 0), 'id':13},
+                             {'point':geometry_msg.Point(136, 32, 0), 'id':14},
+                             {'point':geometry_msg.Point(163, 43, 0), 'id':15}]
 
         self.sample_marker = vis_msg.Marker()
         self.sample_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
