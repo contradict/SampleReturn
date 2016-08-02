@@ -147,7 +147,9 @@ class GroundProjectorNode
       // Get largest contour
       std::vector<std::vector<cv::Point> > contours;
       std::vector<cv::Vec4i> hierarchy;
-      cv::findContours(cv_ptr->image, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      // findContours is destructive, hand in image copy
+      cv::Mat contour_copy = cv_ptr->image.clone();
+      cv::findContours(contour_copy, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       if (contours.size() == 0) {
         ROS_DEBUG("No contours found in patch %i", i);
       }
@@ -209,6 +211,13 @@ class GroundProjectorNode
                           msg->patch_array[i].image_roi.y_offset),
               cv::Point2f(msg->patch_array[i].image_roi.x_offset +
                           msg->patch_array[i].image_roi.width,
+                          msg->patch_array[i].image_roi.y_offset +
+                          msg->patch_array[i].image_roi.height), 255, 50);
+          cv::line(debug_image_,
+              cv::Point2f(msg->patch_array[i].image_roi.x_offset +
+                          msg->patch_array[i].image_roi.width,
+                          msg->patch_array[i].image_roi.y_offset),
+              cv::Point2f(msg->patch_array[i].image_roi.x_offset,
                           msg->patch_array[i].image_roi.y_offset +
                           msg->patch_array[i].image_roi.height), 255, 50);
         }
