@@ -153,11 +153,16 @@ class GroundProjectorNode
       cv::Point2d roi_offset(msg->patch_array[i].image_roi.x_offset,
           msg->patch_array[i].image_roi.y_offset);
       cv::Point2d major_point_a, major_point_b;
+      cv::Point2d rect_major_point_a, rect_major_point_b;
       getMajorPointsFullImage(rect, roi_offset, major_point_a, major_point_b);
       ROS_DEBUG("Major Point A: %f, %f",major_point_a.x,major_point_a.y);
       ROS_DEBUG("Major Point B: %f, %f",major_point_b.x,major_point_b.y);
-      cv::Point3d ray_a = cam_model_.projectPixelTo3dRay(major_point_a);
-      cv::Point3d ray_b = cam_model_.projectPixelTo3dRay(major_point_b);
+      rect_major_point_a = cam_model_.rectifyPoint(major_point_a);
+      rect_major_point_b = cam_model_.rectifyPoint(major_point_b);
+      ROS_DEBUG("Rect Major Point A: %f, %f",rect_major_point_a.x,rect_major_point_a.y);
+      ROS_DEBUG("Rect Major Point B: %f, %f",rect_major_point_b.x,rect_major_point_b.y);
+      cv::Point3d ray_a = cam_model_.projectPixelTo3dRay(rect_major_point_a);
+      cv::Point3d ray_b = cam_model_.projectPixelTo3dRay(rect_major_point_b);
       ROS_DEBUG("Ray A: %f, %f, %f",ray_a.x,ray_a.y,ray_a.z);
       ROS_DEBUG("Ray B: %f, %f, %f",ray_b.x,ray_b.y,ray_b.z);
       geometry_msgs::PointStamped world_point;
