@@ -143,7 +143,7 @@ class SaliencyDetectorNode
       int height = bot_right_y - top_left_y;
 
       cv::rectangle(debug_bms_img_color, cv::Point2i(top_left_x,top_left_y),
-          cv::Point2i(bot_right_x,bot_right_y), CV_RGB(255,0,0), 4);
+          cv::Point2i(bot_right_x,bot_right_y), CV_RGB(255,0,0), 10);
 
       sub_img = cv_ptr->image(Range(top_left_y, bot_right_y), Range(top_left_x, bot_right_x));
       sub_mask = debug_bms_img_(Range(top_left_y, bot_right_y), Range(top_left_x, bot_right_x));
