@@ -209,7 +209,7 @@ class GroundProjectorNode
     camera_point_b.point.z = ray_b.z;
     tf::StampedTransform camera_transform;
     // This is a static link, so Time(0) should be fine
-    //listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
+    listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
     if (!listener_.canTransform("odom",camera_point_a.header.frame_id,
           camera_point_a.header.stamp)) {
       ROS_INFO("Couldn't transform odom to %s\n",camera_point_a.header.frame_id.c_str());
