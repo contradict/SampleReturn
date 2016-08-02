@@ -73,7 +73,7 @@ class RobotSimulator(object):
         self.fake_samples = [{'point':geometry_msg.Point(-28, 58, 0),'id':16},
                              {'point':geometry_msg.Point(-107, 59, 0),'id':1},
                              {'point':geometry_msg.Point(-107, 32, 0), 'id':2},
-                             {'point':geometry_msg.Point(-87, 65, 0), 'id':3},
+                             {'point':geometry_msg.Point(-87, 68, 0), 'id':3},
                              {'point':geometry_msg.Point(-51, 64, 0), 'id':4},
                              {'point':geometry_msg.Point(-31, 30, 0), 'id':5},
                              {'point':geometry_msg.Point(-30, -13, 0), 'id':6},
