@@ -197,8 +197,8 @@ class GroundProjectorNode
       const std_msgs::Header header, geometry_msgs::PointStamped & ground_point)
   {
     // Take each ray in their origin frame, intersect with estimated ground plane
-    geometry_msgs::PointStamped camera_point_a, odom_point_a;
-    geometry_msgs::PointStamped camera_point_b, odom_point_b;
+    geometry_msgs::PointStamped camera_point_a, base_link_point_a;
+    geometry_msgs::PointStamped camera_point_b, base_link_point_b;
     camera_point_a.header = header;
     camera_point_a.point.x = ray_a.x;
     camera_point_a.point.y = ray_a.y;
@@ -210,28 +210,28 @@ class GroundProjectorNode
     tf::StampedTransform camera_transform;
     // This is a static link, so Time(0) should be fine
     listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
-    if (!listener_.canTransform("odom",camera_point_a.header.frame_id,
+    if (!listener_.canTransform("base_link",camera_point_a.header.frame_id,
           camera_point_a.header.stamp)) {
-      ROS_INFO("Couldn't transform odom to %s\n",camera_point_a.header.frame_id.c_str());
+      ROS_INFO("Couldn't transform base_link to %s\n",camera_point_a.header.frame_id.c_str());
       return false;
     }
-    listener_.transformPoint("odom",camera_point_a,odom_point_a);
-    listener_.transformPoint("odom",camera_point_b,odom_point_b);
-    Eigen::Vector3d odom_ray_a, odom_ray_b, ray_origin;
+    listener_.transformPoint("base_link",camera_point_a,base_link_point_a);
+    listener_.transformPoint("base_link",camera_point_b,base_link_point_b);
+    Eigen::Vector3d base_link_ray_a, base_link_ray_b, ray_origin;
     tf::Vector3 pos;
     pos = camera_transform.getOrigin();
-    ROS_DEBUG("Camera Pos in Odom: %f, %f, %f",pos.x(),pos.y(),pos.z());
+    ROS_DEBUG("Camera Pos in Base Link: %f, %f, %f",pos.x(),pos.y(),pos.z());
     ray_origin[0] = pos.x();
     ray_origin[1] = pos.y();
     ray_origin[2] = pos.z();
-    odom_ray_a[0] = odom_point_a.point.x - pos.x();
-    odom_ray_a[1] = odom_point_a.point.y - pos.y();
-    odom_ray_a[2] = odom_point_a.point.z - pos.z();
-    odom_ray_b[0] = odom_point_b.point.x - pos.x();
-    odom_ray_b[1] = odom_point_b.point.y - pos.y();
-    odom_ray_b[2] = odom_point_b.point.z - pos.z();
-    Eigen::Vector3d ground_point_a = intersectRayPlane(odom_ray_a, ray_origin, ground_plane_);
-    Eigen::Vector3d ground_point_b = intersectRayPlane(odom_ray_b, ray_origin, ground_plane_);
+    base_link_ray_a[0] = base_link_point_a.point.x - pos.x();
+    base_link_ray_a[1] = base_link_point_a.point.y - pos.y();
+    base_link_ray_a[2] = base_link_point_a.point.z - pos.z();
+    base_link_ray_b[0] = base_link_point_b.point.x - pos.x();
+    base_link_ray_b[1] = base_link_point_b.point.y - pos.y();
+    base_link_ray_b[2] = base_link_point_b.point.z - pos.z();
+    Eigen::Vector3d ground_point_a = intersectRayPlane(base_link_ray_a, ray_origin, ground_plane_);
+    Eigen::Vector3d ground_point_b = intersectRayPlane(base_link_ray_b, ray_origin, ground_plane_);
     ROS_DEBUG("Ground Point A: %f, %f, %f",ground_point_a.x(),ground_point_a.y(),ground_point_a.z());
     ROS_DEBUG("Ground Point B: %f, %f, %f",ground_point_b.x(),ground_point_b.y(),ground_point_b.z());
     Eigen::Vector3d mid_ground_point = (ground_point_a + ground_point_b)/2;
@@ -239,10 +239,11 @@ class GroundProjectorNode
     if (((ground_point_b - ground_point_a).norm() < max_major_axis_) &&
         ((ground_point_b - ground_point_a).norm() > min_major_axis_)) {
       ground_point.header.stamp = header.stamp;
-      ground_point.header.frame_id = "odom";
+      ground_point.header.frame_id = "base_link";
       ground_point.point.x = mid_ground_point[0];
       ground_point.point.y = mid_ground_point[1];
       ground_point.point.z = mid_ground_point[2];
+      listener_.transformPoint("odom",ground_point,ground_point);
       return true;
     }
     else {
