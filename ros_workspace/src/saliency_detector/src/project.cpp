@@ -154,8 +154,12 @@ class GroundProjectorNode
           msg->patch_array[i].image_roi.y_offset);
       cv::Point2d major_point_a, major_point_b;
       getMajorPointsFullImage(rect, roi_offset, major_point_a, major_point_b);
+      ROS_DEBUG("Major Point A: %f, %f",major_point_a.x,major_point_a.y);
+      ROS_DEBUG("Major Point B: %f, %f",major_point_b.x,major_point_b.y);
       cv::Point3d ray_a = cam_model_.projectPixelTo3dRay(major_point_a);
       cv::Point3d ray_b = cam_model_.projectPixelTo3dRay(major_point_b);
+      ROS_DEBUG("Ray A: %f, %f",ray_a.x,ray_a.y,ray_a.z);
+      ROS_DEBUG("Ray B: %f, %f",ray_b.x,ray_b.y,ray_b.z);
       geometry_msgs::PointStamped world_point;
       if (checkContourSize(ray_a, ray_b, msg->patch_array[0].header, world_point)) {
         pub_point.publish(world_point);
@@ -216,6 +220,7 @@ class GroundProjectorNode
     Eigen::Vector3d odom_ray_a, odom_ray_b, ray_origin;
     tf::Vector3 pos;
     pos = camera_transform.getOrigin();
+    ROS_DEBUG("Camera Pos in Odom: %f, %f, %f",pos.x,pos.y,pos.z);
     ray_origin[0] = pos.x();
     ray_origin[1] = pos.y();
     ray_origin[2] = pos.z();
@@ -227,7 +232,10 @@ class GroundProjectorNode
     odom_ray_b[2] = odom_point_b.point.z - pos.z();
     Eigen::Vector3d ground_point_a = intersectRayPlane(odom_ray_a, ray_origin, ground_plane_);
     Eigen::Vector3d ground_point_b = intersectRayPlane(odom_ray_b, ray_origin, ground_plane_);
+    ROS_DEBUG("Ground Point A: %f, %f, %f",ground_point_a.x,ground_point_a.y,ground_point_a.z);
+    ROS_DEBUG("Ground Point B: %f, %f, %f",ground_point_b.x,ground_point_b.y,ground_point_b.z);
     Eigen::Vector3d mid_ground_point = (ground_point_a + ground_point_b)/2;
+    ROS_DEBUG("Ground Point Mid: %f, %f, %f",mid_ground_point.x,mid_ground_point.y,mid_ground_point.z);
     if (((ground_point_b - ground_point_a).norm() < max_major_axis_) &&
         ((ground_point_b - ground_point_a).norm() > min_major_axis_)) {
       ground_point.header.stamp = header.stamp;
