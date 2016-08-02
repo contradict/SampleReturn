@@ -37,10 +37,12 @@ class GroundProjectorNode
   ros::Publisher pub_patch_array;
   ros::Publisher pub_marker;
   ros::Publisher pub_point;
+  ros::Publisher pub_debug_image;
   std::string sub_patch_array_topic;
   std::string pub_patch_array_topic;
   std::string sub_point_cloud_topic;
   std::string pub_point_cloud_topic;
+  std::string pub_debug_image_topic;
   std::string marker_topic;
   std::string point_topic;
 
@@ -52,9 +54,12 @@ class GroundProjectorNode
   int min_inliers_;
   double max_height_;
   double min_major_axis_, max_major_axis_;
+  bool enable_debug_;
 
   Eigen::Vector4d ground_plane_;
   image_geometry::PinholeCameraModel cam_model_;
+
+  cv::Mat debug_image_;
 
   public:
   GroundProjectorNode() {
@@ -77,6 +82,8 @@ class GroundProjectorNode
         std::string("/processes/ground_projector/search/ground_marker"));
     private_node_handle_.param("point_topic", point_topic,
         std::string("/processes/ground_projector/search/ground_point"));
+    private_node_handle_.param("pub_debug_image_topic", pub_debug_image_topic,
+        std::string("/processes/ground_projector/search/debug_image"));
 
     sub_patch_array =
       nh.subscribe(sub_patch_array_topic, 1, &GroundProjectorNode::patchArrayCallback, this);
@@ -96,11 +103,15 @@ class GroundProjectorNode
     pub_point =
       nh.advertise<geometry_msgs::PointStamped>(point_topic.c_str(), 1);
 
+    pub_debug_image =
+      nh.advertise<sensor_msgs::Image>(pub_debug_image_topic.c_str(), 1);
+
     min_inliers_ = 30;
     ransac_distance_threshold_ = 1.0;
     max_height_ = 1.0;
     min_major_axis_ = 0.04;
     max_major_axis_ = 0.12;
+    enable_debug_ = false;
   }
 
   // For a set of candidate sample patches, project them onto the ground to get
@@ -112,6 +123,10 @@ class GroundProjectorNode
       return;
     }
     samplereturn_msgs::PatchArray out_pa_msg;
+    if (enable_debug_) {
+      debug_image_ = cv::Mat::ones(msg->patch_array[0].cam_info.height,
+          msg->patch_array[0].cam_info.width, CV_8U)*255;
+    }
     if (!cam_model_.initialized())
     {
       cam_model_.fromCameraInfo(msg->patch_array[0].cam_info);
@@ -122,8 +137,6 @@ class GroundProjectorNode
     // Take the saliency contour, find the major axis, cast rays to
     // the ground plane
     cv_bridge::CvImagePtr cv_ptr;
-    //std::vector<samplereturn_msgs::Patch>::iterator it;
-    //for (it = msg->patch_array.begin(); it != msg->patch_array.end(); it++) {
     for (int i = 0; i < msg->patch_array.size(); i++) {
       try {
         cv_ptr = cv_bridge::toCvCopy(msg->patch_array[i].mask, "");
@@ -149,6 +162,17 @@ class GroundProjectorNode
       }
       // Find min enclosing rectangle, major axis
       cv::RotatedRect rect = cv::minAreaRect(contours[max_idx]);
+      if (enable_debug_) {
+        cv::Point2f vertices[4];
+        rect.points(vertices);
+        for (int k = 0; k < 4; k++) {
+          cv::line(cv_ptr->image, vertices[k], vertices[(k+1)%4], 255, 10);
+        }
+        cv_ptr->image.copyTo(debug_image_(cv::Rect(msg->patch_array[i].image_roi.x_offset,
+                msg->patch_array[i].image_roi.y_offset,
+                msg->patch_array[i].image_roi.width,
+                msg->patch_array[i].image_roi.height)));
+      }
       // Project major axis end rays to plane, compute major axis in meters
       cv::Point2d roi_offset(msg->patch_array[i].image_roi.x_offset,
           msg->patch_array[i].image_roi.y_offset);
@@ -179,8 +203,22 @@ class GroundProjectorNode
         pub_patch_array.publish(out_pa_msg);
       }
       else {
+        if (enable_debug_) {
+          cv::line(debug_image_,
+              cv::Point2f(msg->patch_array[i].image_roi.x_offset,
+                          msg->patch_array[i].image_roi.y_offset),
+              cv::Point2f(msg->patch_array[i].image_roi.x_offset +
+                          msg->patch_array[i].image_roi.width,
+                          msg->patch_array[i].image_roi.y_offset +
+                          msg->patch_array[i].image_roi.height), 255, 50);
+        }
         continue;
       }
+    }
+    if (enable_debug_) {
+      sensor_msgs::ImagePtr debug_image_msg =
+        cv_bridge::CvImage(msg->patch_array[0].header,"mono8",debug_image_).toImageMsg();
+      pub_debug_image.publish(debug_image_msg);
     }
   }
 
@@ -363,6 +401,7 @@ class GroundProjectorNode
     max_height_ = config.max_height;
     min_major_axis_ = config.min_major_axis;
     max_major_axis_ = config.max_major_axis;
+    enable_debug_ = config.enable_debug;
   }
 
 };
