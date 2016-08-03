@@ -1,33 +1,16 @@
 <?xml version="1.0"?>
 <launch>
+  <include file="$(find saliency_detector)/launch/saliency_detector.launch">
+    <arg name="namespace" value="port"/>
+  </include>
 
-  <node
-    pkg="saliency_detector"
-    type="saliency_detector_node"
-    name="saliency_detector"
-    machine="search"
-    ns="/processes/sample_detection/search">
-    <param name="img_topic" type="string" value="/cameras/search/center/image_color"/>
-    <remap from="/cameras/search/info" to="/cameras/search/center/camera_info"/>
-    <param name="bms_opening_width" type="int" value="3"/>
-    <param name="bms_dilation_width_1" type="int" value="0"/>
-    <param name="bms_thresh" type="double" value="20"/>
-    <param name="bms_thresh_on" type="bool" value="True"/>
-    <param name="bms_img_width" type="double" value="400"/>
-    <param name="bms_top_trim" type="double" value="0"/>
-    <param name="filterByConvexity" type="bool" value="True"/>
-    <param name="filterByArea" type="bool" value="True"/>
-    <param name="minArea" type="double" value="2500.0"/>
-    <param name="maxArea" type="double" value="100000.0"/>
-  </node>
+  <include file="$(find saliency_detector)/launch/saliency_detector.launch">
+    <arg name="namespace" value="center"/>
+  </include>
 
-  <node
-    pkg="saliency_detector"
-    type="ground_projector_node"
-    name="ground_projector"
-    machine="search"
-    ns="/processes/sample_detection/search">
-  </node>
+  <include file="$(find saliency_detector)/launch/saliency_detector.launch">
+    <arg name="namespace" value="starboard"/>
+  </include>
 
   <!--
   <node
