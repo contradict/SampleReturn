@@ -4,21 +4,9 @@ executive_master:
     ignore_manipulator_camera: True
         
 level_two:
-    #for search  behaviour, degrees and meters
-    move_velocity: 1.0
+    #all values in degrees and meters
+    move_velocity: 0.8 
     spin_velocity: 0.5
-    spoke_count: 24 
-    max_spoke_length: 130 
-    first_spoke_offset: 75
-    next_spoke_sign: 1 # 1 for ccw, -1 for cw
-    spoke_hub_radius: 20
-    #raster step is distance between raster lines
-    #raster offset is how close to the spoke we get
-    #before we go to the next raster step
-    raster_step: 6
-    raster_offset: 4
-    raster_tolerance: 1.5 #close enough to next point?
-    chord_course_tolerance: 3.0 #what is off course on a chord move
     return_time_minutes: 110 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
@@ -34,6 +22,30 @@ level_two:
     recalibrate_threshold: 5.0    
     #for costmap issues, set to zero to disable this
     blocked_retry_delay: 3.0
+  
+    #search shape parameters
+    starting_orientation: -21
+    spoke_hub_radius: 10
+    raster_step: 5
+    raster_tolerance: 1.5 #close enough to next point?
+    chord_course_tolerance: 4.0 #what is off course on a chord move
+  
+    #Slices are the angular extent between a start spoke and end spoke.
+    #Angles are specified in degrees from initial facing.  0 degrees is
+    #specified as the robot facing the Reference Point in the WPI
+    #localization map.  Slices also specify a maximum and minimum radius
+
+    web_slices: [
+        { start_angle: 14, end_angle: 34, inner_radius: 34, outer_radius: 44 },
+        { start_angle: 100, end_angle: 80, inner_radius: 36, outer_radius: 45 },
+        { start_angle: 154, end_angle: 130, inner_radius: 58, outer_radius: 88 },
+        { start_angle: 143, end_angle: 163, inner_radius: 37, outer_radius: 48 },
+        { start_angle: 160, end_angle: 185, inner_radius: 110, outer_radius: 135 },
+        { start_angle: 210, end_angle: 230, inner_radius: 26, outer_radius: 36 },
+        { start_angle: 330, end_angle: 350, inner_radius: 32, outer_radius: 42 },
+        { start_angle: 10, end_angle: 337, inner_radius: 66, outer_radius: 110 },
+        { start_angle: 20, end_angle: 38, inner_radius: 130, outer_radius: 175 }
+    ]
 
 pursue_sample:
     #sample approach (pursuit) parameters
