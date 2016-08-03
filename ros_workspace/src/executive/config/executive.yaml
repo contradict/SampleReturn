@@ -36,15 +36,15 @@ level_two:
     #localization map.  Slices also specify a maximum and minimum radius
 
     web_slices: [
-        { start_angle: 14, end_angle: 34, inner_radius: 34, outer_radius: 44 },
-        { start_angle: 100, end_angle: 80, inner_radius: 36, outer_radius: 45 },
-        { start_angle: 154, end_angle: 130, inner_radius: 58, outer_radius: 88 },
-        { start_angle: 143, end_angle: 163, inner_radius: 37, outer_radius: 48 },
-        { start_angle: 160, end_angle: 185, inner_radius: 110, outer_radius: 135 },
-        { start_angle: 210, end_angle: 230, inner_radius: 26, outer_radius: 36 },
-        { start_angle: 330, end_angle: 350, inner_radius: 32, outer_radius: 42 },
-        { start_angle: 10, end_angle: 337, inner_radius: 66, outer_radius: 110 },
-        { start_angle: 20, end_angle: 38, inner_radius: 130, outer_radius: 175 }
+        { start_angle: 14, end_angle: 34, min_radius: 34, max_radius: 44, return_on_end: True },
+        { start_angle: 100, end_angle: 80, min_radius: 36, max_radius: 45, return_on_end: True },
+        { start_angle: 154, end_angle: 130, min_radius: 58, max_radius: 88, return_on_end: True },
+        { start_angle: 143, end_angle: 163, min_radius: 37, max_radius: 48, return_on_end: True },
+        { start_angle: 160, end_angle: 185, min_radius: 110, max_radius: 135, return_on_end: False },
+        { start_angle: 210, end_angle: 230, min_radius: 26, max_radius: 36, return_on_end: True },
+        { start_angle: 10, end_angle: 337, min_radius: 66, max_radius: 110, return_on_end: True },
+        { start_angle: 330, end_angle: 350, min_radius: 32, max_radius: 42, return_on_end: True },
+        { start_angle: 20, end_angle: 38, min_radius: 130, max_radius: 175, return_on_end: False }
     ]
 
 pursue_sample:

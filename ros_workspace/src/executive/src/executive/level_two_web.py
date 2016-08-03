@@ -613,7 +613,7 @@ class LevelTwoWeb(object):
             for angle in [web_slice['start_angle'], web_slice['end_angle']]:
 
                 spokes.append({'yaw':yaw,
-                               'inner_radius':web_slice['inner_radius'],
+                               'min_radius':web_slice['min_radius'],
                                'start_point':start_point,
                                'end_point':end_point})
 
@@ -743,7 +743,7 @@ class WebManager(smach.State):
             #more slices left!
             userdata.active_slice = userdata.web_slices.popleft()
             end_point = get_polar_point(userdata.active_slice['start_angle'],
-                                    userdata.active_slice['outer_radius'],
+                                    userdata.active_slice['max_radius'],
                                     userdata.world_fixed_frame)
             next_move = {'point':end_point, 'radius':0, 'radial':True}
             userdata.outbound = False
@@ -856,8 +856,8 @@ class CreateRasterPoints(smach.State):
                 point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
                 raster_points.append({'point':point,'radius':radius,'radial':False})
                 radius -= userdata.raster_step
-                #return from next_spoke to ensure better facing of beacon
-                if radius <=userdata.active_slice['inner_radius']:
+                #return from end angle if flag is True
+                if radius <=userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
                     break
                 #inward move on next yaw
                 point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
@@ -866,9 +866,13 @@ class CreateRasterPoints(smach.State):
                 point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
                 raster_points.append({'point':point,'radius':radius,'radial':False})
                 radius -= userdata.raster_step
+                #return from starting angle if specified
+                if radius <=userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
+                    break
                 #inward move on current yaw
                 point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
                 raster_points.append({'point':point,'radius':radius,'radial':True})
+                
                 
             point = get_polar_point(next_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
             raster_points.append({'point':point,'radius':userdata.spoke_hub_radius,'radial':True})
