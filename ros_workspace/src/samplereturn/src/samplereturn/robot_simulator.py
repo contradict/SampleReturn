@@ -691,7 +691,7 @@ class RobotSimulator(object):
             return
         
         # within +/- pi/4 of forward, camera FOV
-        if angle_to_origin > -pi/4 and angle_to_origin < pi/4:
+        if angle_to_origin > np.radians(-22.0) and angle_to_origin < np.radians(22.0):
 
             #get beacon covar and pose from beacon_finder launch
             #then create the message covariance
