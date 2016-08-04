@@ -26,7 +26,7 @@
     type="ground_projector_node"
     name="ground_projector"
     machine="search"
-    ns="/processes/sample_detection/search/$(arg_namespace)">
+    ns="/processes/sample_detection/search/$(arg namespace)">
     <param name="sub_point_cloud_topic" type="string"
       value="/cameras/navigation/$(arg namespace)/pointcloud"/>
   </node>
@@ -36,7 +36,7 @@
     type="color_histogram_descriptor_node"
     name="color_histogram_descriptor"
     machine="search"
-    ns="/processes/sample_detection/search/$(arg_namespace)">
+    ns="/processes/sample_detection/search/$(arg namespace)">
   </node>
 
 </launch>
