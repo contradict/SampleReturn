@@ -75,7 +75,7 @@ class GroundProjectorNode
     private_node_handle_.param("pub_patch_array_topic", pub_patch_array_topic,
         std::string("projected_patch_array"));
     private_node_handle_.param("sub_point_cloud_topic", sub_point_cloud_topic,
-        std::string("pointcloud"));
+        std::string("points2"));
     private_node_handle_.param("pub_point_cloud_topic", pub_point_cloud_topic,
         std::string("ground_pointcloud"));
     private_node_handle_.param("marker_topic", marker_topic,
@@ -356,7 +356,7 @@ class GroundProjectorNode
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
     pcl::SACSegmentation<pcl::PointXYZ> seg;
-    seg.setOptimizeCoefficients (true);
+    seg.setOptimizeCoefficients (false);
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setDistanceThreshold (ransac_distance_threshold_);
 
