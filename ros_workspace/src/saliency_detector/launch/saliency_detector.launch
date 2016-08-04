@@ -6,7 +6,7 @@
     type="saliency_detector_node"
     name="saliency_detector"
     machine="search"
-    ns="/processes/sample_detection/search/$(arg_namespace)">
+    ns="/processes/sample_detection/search/$(arg namespace)">
     <param name="img_topic" type="string" value="/cameras/search/$(arg namespace)/image_color"/>
     <remap from="/cameras/search/info" to="/cameras/search/$(arg namespace)/camera_info"/>
     <param name="bms_opening_width" type="int" value="3"/>
