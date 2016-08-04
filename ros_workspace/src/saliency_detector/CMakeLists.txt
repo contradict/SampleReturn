@@ -88,7 +88,8 @@ find_package(PCL REQUIRED)
 # )
 
 generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg
-  cfg/ground_projector_params.cfg)
+  cfg/ground_projector_params.cfg
+  cfg/color_histogram_descriptor_params.cfg)
 
 ###################################
 ## catkin specific configuration ##
@@ -138,6 +139,7 @@ add_library(color_naming
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
  add_executable(ground_projector_node src/project.cpp)
+ add_executable(color_histogram_descriptor_node src/color_histogram_descriptor.cpp)
  # add_executable(BMS_standalone src/BMS.cpp)
 
 ## Add cmake target dependencies of the executable/library
@@ -145,6 +147,7 @@ add_library(color_naming
  add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
  add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
+ add_dependencies(color_histogram_descriptor_node ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
@@ -162,6 +165,12 @@ add_library(color_naming
 
  target_link_libraries(ground_projector_node
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+ )
+
+ target_link_libraries(color_histogram_descriptor_node
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
  )
 
 #############
@@ -179,7 +188,8 @@ add_library(color_naming
  )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node ground_projector_node
+install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
+   ground_projector_node color_histogram_descriptor_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
