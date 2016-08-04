@@ -16,9 +16,9 @@ Header header
 geometry_msgs/Point point
 # Replace color name with dominant hue (0-180)
 float32 hue
-#string name
+string name
 
 int16 filter_id
 float32 grip_angle
 
-#int8 sample_id
+int8 sample_id
