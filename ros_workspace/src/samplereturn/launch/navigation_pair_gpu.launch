@@ -152,6 +152,8 @@
                   filter_field_name: x
                   filter_limit_min: 0.0
                   filter_limit_max: 3.0
+                  input_frame="base_link"
+                  output_frame="base_link"
               </rosparam>
         </node>
         <node name="ylimit"
@@ -169,6 +171,8 @@
                   filter_field_name: y
                   filter_limit_min: -3.0
                   filter_limit_max:  3.0
+                  input_frame="base_link"
+                  output_frame="base_link"
               </rosparam>
         </node>
         <node name="planefit"
