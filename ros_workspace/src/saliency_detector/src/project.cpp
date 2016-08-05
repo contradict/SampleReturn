@@ -3,8 +3,7 @@
 #include <ros/console.h>
 #include <samplereturn_msgs/PatchArray.h>
 #include <samplereturn_msgs/Patch.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <geometry_msgs/PointStamped.h>
+#include <pcl_msgs/ModelCoefficients.h>
 #include <visualization_msgs/Marker.h>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
@@ -16,32 +15,19 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_geometry/pinhole_camera_model.h>
 
-#include <pcl/point_types.h>
-#include <pcl/conversions.h>
-#include <pcl/filters/impl/plane_clipper3D.hpp>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/PCLPointCloud2.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl_ros/transforms.h>
-
 #include <eigen_conversions/eigen_msg.h>
 
 class GroundProjectorNode
 {
   ros::Subscriber sub_patch_array;
-  ros::Subscriber sub_point_cloud;
-  ros::Publisher pub_point_cloud;
+  ros::Subscriber sub_plane_model;
   ros::Publisher pub_patch_array;
   ros::Publisher pub_marker;
   ros::Publisher pub_point;
   ros::Publisher pub_debug_image;
   std::string sub_patch_array_topic;
   std::string pub_patch_array_topic;
-  std::string sub_point_cloud_topic;
-  std::string pub_point_cloud_topic;
+  std::string sub_plane_model_topic;
   std::string pub_debug_image_topic;
   std::string marker_topic;
   std::string point_topic;
@@ -50,9 +36,6 @@ class GroundProjectorNode
 
   dynamic_reconfigure::Server<saliency_detector::ground_projector_paramsConfig> dr_srv;
 
-  double ransac_distance_threshold_;
-  int min_inliers_;
-  double max_height_;
   double min_major_axis_, max_major_axis_;
   bool enable_debug_;
 
@@ -74,10 +57,8 @@ class GroundProjectorNode
         std::string("patch_array"));
     private_node_handle_.param("pub_patch_array_topic", pub_patch_array_topic,
         std::string("projected_patch_array"));
-    private_node_handle_.param("sub_point_cloud_topic", sub_point_cloud_topic,
-        std::string("points2"));
-    private_node_handle_.param("pub_point_cloud_topic", pub_point_cloud_topic,
-        std::string("ground_pointcloud"));
+    private_node_handle_.param("sub_plane_model_topic", sub_plane_model_topic,
+        std::string("model"));
     private_node_handle_.param("marker_topic", marker_topic,
         std::string("ground_marker"));
     private_node_handle_.param("point_topic", point_topic,
@@ -88,11 +69,8 @@ class GroundProjectorNode
     sub_patch_array =
       nh.subscribe(sub_patch_array_topic, 1, &GroundProjectorNode::patchArrayCallback, this);
 
-    sub_point_cloud =
-      nh.subscribe(sub_point_cloud_topic, 1, &GroundProjectorNode::pointCloudCallback, this);
-
-    pub_point_cloud =
-      nh.advertise<sensor_msgs::PointCloud2>(pub_point_cloud_topic.c_str(), 1);
+    sub_plane_model =
+      nh.subscribe(sub_plane_model_topic, 1, &GroundProjectorNode::planeModelCallback, this);
 
     pub_patch_array =
       nh.advertise<samplereturn_msgs::PatchArray>(pub_patch_array_topic.c_str(), 1);
@@ -106,9 +84,6 @@ class GroundProjectorNode
     pub_debug_image =
       nh.advertise<sensor_msgs::Image>(pub_debug_image_topic.c_str(), 1);
 
-    min_inliers_ = 30;
-    ransac_distance_threshold_ = 1.0;
-    max_height_ = 1.0;
     min_major_axis_ = 0.04;
     max_major_axis_ = 0.12;
     enable_debug_ = false;
@@ -315,70 +290,15 @@ class GroundProjectorNode
     return P;
   }
 
-  // Take the associated stereo point cloud, trim and extract a ground plane
-  // for projecting candidate patches onto.
-  void pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr& msg)
+  // Take the plane model fit by the pcl_ros nodelets
+  void planeModelCallback(const pcl_msgs::ModelCoefficientsPtr& msg)
   {
-    // Transform points to base_link frame
-    sensor_msgs::PointCloud2 base_link_points_msg;
-    pcl_ros::transformPointCloud("/base_link",*msg,base_link_points_msg,listener_);
-
-    pcl::PCLPointCloud2 pcl_pc;
-    pcl_conversions::toPCL(base_link_points_msg, pcl_pc);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr ptr_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr clipped_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromPCLPointCloud2(pcl_pc,*ptr_cloud);
-
-    // Clip points to below some height above base_link z=0
-    Eigen::Vector4d new_plane;
-    new_plane.setZero();
-    new_plane[2] = -1.0;
-    new_plane[3] = max_height_;
-    pcl::PlaneClipper3D<pcl::PointXYZ> ground_clipper(new_plane.cast<float>());
-    pcl::PointIndices::Ptr clipped (new pcl::PointIndices);
-    std::vector<int> indices;
-    ground_clipper.clipPointCloud3D(*ptr_cloud,clipped->indices,indices);
-    pcl::ExtractIndices<pcl::PointXYZ> extract;
-    extract.setInputCloud (ptr_cloud);
-    extract.setIndices (clipped);
-    extract.setNegative (false);
-    extract.filter (*clipped_cloud);
-
-    pcl::toPCLPointCloud2(*clipped_cloud,pcl_pc);
-    pcl_conversions::fromPCL(pcl_pc,base_link_points_msg);
-
-    base_link_points_msg.header.stamp = msg->header.stamp;
-    base_link_points_msg.header.frame_id = "/base_link";
-    pub_point_cloud.publish(base_link_points_msg);
-
-    // Fit ground plane. This doesn't allow for arbitrarily complex ground geometry,
-    // but will handle local deviations in robot attitude and hillside approaches
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-    pcl::SACSegmentation<pcl::PointXYZ> seg;
-    seg.setOptimizeCoefficients (false);
-    seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setDistanceThreshold (ransac_distance_threshold_);
-
-    // Check if cloud is empty //
-    if (clipped_cloud->points.size() <= min_inliers_) {
-      ROS_DEBUG("Could not estimate a planar model for given dataset, not\
-          enough points at input.");
-      return;
-    }
-    seg.setInputCloud(clipped_cloud);
-    seg.segment (*inliers, *coefficients);
-    if (inliers->indices.size() <= min_inliers_) {
-      ROS_DEBUG("Could not estimate a planar model for given dataset, not\
-          enough inliers");
-      return;
-    }
-    // Keep the plane around for patch projection, publish the clipped ground point cloud,
-    // and a plane marker for Rviz
-    ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",coefficients->values[0],
-                                                  coefficients->values[1],
-                                                  coefficients->values[2],
-                                                  coefficients->values[3]);
+    // Keep the plane around for patch projection, publish a plane normal
+    // marker for Rviz
+    ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",msg->values[0],
+                                                  msg->values[1],
+                                                  msg->values[2],
+                                                  msg->values[3]);
 
     visualization_msgs::Marker mark;
     mark.header = msg->header;
@@ -387,10 +307,10 @@ class GroundProjectorNode
     Eigen::Vector3d xhat;
     xhat.setZero();
     xhat[0] = 1.0;
-    ground_plane_ << coefficients->values[0],
-                  coefficients->values[1],
-                  coefficients->values[2],
-                  coefficients->values[3];
+    ground_plane_ << msg->values[0],
+                  msg->values[1],
+                  msg->values[2],
+                  msg->values[3];
     orientation.setFromTwoVectors(xhat, ground_plane_.head(3));
     tf::quaternionEigenToMsg(orientation, mark.pose.orientation);
     mark.scale.x = 1.0;
@@ -405,9 +325,6 @@ class GroundProjectorNode
 
   void configCallback(saliency_detector::ground_projector_paramsConfig &config, uint32_t level)
   {
-    ransac_distance_threshold_ = config.ransac_distance_threshold;
-    min_inliers_ = config.min_inliers;
-    max_height_ = config.max_height;
     min_major_axis_ = config.min_major_axis;
     max_major_axis_ = config.max_major_axis;
     enable_debug_ = config.enable_debug;
