@@ -27,8 +27,8 @@
     name="ground_projector"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
-    <param name="sub_point_cloud_topic" type="string"
-      value="/cameras/navigation/$(arg namespace)/pointcloud"/>
+    <param name="sub_plane_model_topic" type="string"
+      value="/cameras/navigation/$(arg namespace)/planefit/model"/>
   </node>
 
   <node
