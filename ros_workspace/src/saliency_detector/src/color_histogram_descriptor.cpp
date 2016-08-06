@@ -153,7 +153,7 @@ class ColorHistogramDescriptorNode
       int min_hue_loc, max_hue_loc;
       cv::minMaxIdx(inner_hist, &min_hue, &max_hue, &min_hue_loc, &max_hue_loc);
       double dominant_hue = max_hue_loc * (180/hbins);
-      if ((dominant_hue < max_target_hue_) && (dominant_hue > min_target_hue_)) {
+      if (!((dominant_hue > max_target_hue_) && (dominant_hue < min_target_hue_))) {
         samplereturn_msgs::NamedPoint np_msg;
         np_msg.header.stamp = msg->patch_array[i].header.stamp;
         //np_msg.header.frame_id = "odom";
