@@ -850,14 +850,14 @@ class CreateRasterPoints(smach.State):
                                                                                     current_yaw,
                                                                                     next_yaw))
             
-            #generate one ccw-inward-cw-inward set of points per loop
-            while radius > 0:  #radius should never go less than zero
+            #generate one end_angle-inward-start_angle-inward set of points per loop
+            while radius >= userdata.active_slice['min_radius']: 
                 #chord move to next yaw
                 point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
                 raster_points.append({'point':point,'radius':radius,'radial':False})
                 radius -= userdata.raster_step
                 #return from end angle if flag is True
-                if radius <=userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
+                if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
                     break
                 #inward move on next yaw
                 point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
@@ -867,14 +867,14 @@ class CreateRasterPoints(smach.State):
                 raster_points.append({'point':point,'radius':radius,'radial':False})
                 radius -= userdata.raster_step
                 #return from starting angle if specified
-                if radius <=userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
+                if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
                     break
                 #inward move on current yaw
                 point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
                 raster_points.append({'point':point,'radius':radius,'radial':True})
                 
-                
-            point = get_polar_point(next_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
+            final_yaw = next_yaw if userdata.active_slice['return_on_end'] else current_yaw    
+            point = get_polar_point(final_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
             raster_points.append({'point':point,'radius':userdata.spoke_hub_radius,'radial':True})
                  
             #debug points
