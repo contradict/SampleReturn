@@ -44,6 +44,7 @@ class PitchRollUKFNode
     ros::Time last_imu_;
     std::string imu_frame_;
     bool first_update_;
+    double min_dt_;
 
     Eigen::Vector3d sigma_orientation_;
     Eigen::Vector3d sigma_omega_;
@@ -77,6 +78,7 @@ PitchRollUKFNode::PitchRollUKFNode() :
     privatenh.param("alpha", alpha, 1e-3);
     privatenh.param("beta", beta, 2.0);
     privatenh.param("kappa", kappa, 0.0);
+    privatenh.param("min_dt", min_dt_, 0.001);
 
     ukf_ = new PitchRollUKF(alpha, beta, kappa);
     parseProcessSigma(privatenh);
@@ -251,7 +253,7 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
     meas_covs.push_back(meas_cov);
 
     double dt = (msg->header.stamp - last_update_).toSec();
-    if(dt>0)
+    if(dt>min_dt_)
     {
         //ROS_DEBUG_STREAM("Performing imu predict with dt=" << dt );
         //ROS_DEBUG_STREAM("process noise:\n" << process_noise(dt));
@@ -309,7 +311,7 @@ PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
     meas_covs.push_back(meas_cov);
 
     double dt = (msg->header.stamp - last_update_).toSec();
-    if(dt>0)
+    if(dt>min_dt_)
     {
         //ROS_DEBUG_STREAM("Performing gyro predict with dt=" << dt );
         ukf_->predict(dt, process_noise(dt));
