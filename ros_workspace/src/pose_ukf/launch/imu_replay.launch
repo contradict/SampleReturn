@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="bagfile"/>
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+    <arg name="rate" default="1.0"/>
+
+    <param name="use_sim_time" value="true" type="bool"/>
+
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="replay" value="true"/>
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+    </include>
+
+    <node
+        name="replay"
+        pkg="rosbag"
+        type="play"
+        output="screen"
+        args="--pause --clock
+            --rate $(arg rate)
+            --bags $(arg bagfile)
+            --topics
+            /tf
+            /io/phidget_0/data_raw
+            /io/kvh/imu
+            /motion/platform_joint_state
+            /motion/odometry
+            "
+            >
+    </node>
+
+    <node
+        name="imu_0_gyro_transform"
+        pkg="tf"
+        type="static_transform_publisher"
+        output="screen"
+        args="-1.145 0.2 0 0 0 0 base_link gyro 5"/>
+    <!--
+    <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
+        -->
+    <include file="$(find pose_ukf)/launch/pose_ukf.launch"/>
+    <include file="$(find pose_ukf)/launch/vis_filter.launch"/>
+
+</launch>

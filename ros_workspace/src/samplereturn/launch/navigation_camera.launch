@@ -47,6 +47,7 @@
         <arg name="machine" value="navigate"/>
     </include>
 
+    <group if="$(arg run_cameras)">
     <node machine="search"
           pkg="basler_camera"
           type="basler_camera_node"
@@ -61,6 +62,7 @@
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
         <remap from="basler_camera/image_raw" to="image_raw"/>
     </node>
+    </group>
 
     <node machine="search"
         pkg="image_proc"

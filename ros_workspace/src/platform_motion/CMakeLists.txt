@@ -87,6 +87,15 @@ target_link_libraries(motion_node
 )
 add_dependencies(motion_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
+add_executable(lls_odometry
+    src/odometry_node.cpp
+    src/LLS_odometry.cpp
+    )
+target_link_libraries(lls_odometry
+    ${Boost_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
+
 add_executable(least_squares_odometry
     src/odometry_node.cpp
     src/least_squares_odometry_node.cpp
@@ -146,6 +155,7 @@ install(
       motion_node
       least_squares_odometry
       EKF_odometry
+      lls_odometry
       test_path
       #path_viz
 
