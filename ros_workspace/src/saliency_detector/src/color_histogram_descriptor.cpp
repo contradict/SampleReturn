@@ -27,6 +27,7 @@ class ColorHistogramDescriptorNode
   // OpenCV HSV represents H between 0-180, remember that
   int min_target_hue_;
   int max_target_hue_;
+  int min_color_saturation_;
   // Acknowledge that measurements are noisy, put some slop into stated ranges
   int hue_slop_;
   // Maximum correlation allowed between inner and outer regions of patches
@@ -94,10 +95,14 @@ class ColorHistogramDescriptorNode
                 msg->patch_array[i].image_roi.height)));
       }
       // Use mask to get background color and foreground color
-      cv::Mat hsv, inner_mask, outer_mask;
+      cv::Mat hsv, inner_mask, outer_mask, saturation_mask, saturation;
       cv::cvtColor(cv_ptr_img->image, hsv, cv::COLOR_RGB2HSV);
       cv::erode(cv_ptr_mask->image, inner_mask, cv::Mat());
       cv::erode(255 - (cv_ptr_mask->image), outer_mask, cv::Mat());
+      cv::extractChannel(hsv, saturation, 1);
+      cv::threshold(saturation, saturation_mask, min_color_saturation_, 255, cv::THRESH_BINARY);
+      cv::bitwise_or(inner_mask, saturation_mask, inner_mask);
+      cv::bitwise_or(outer_mask, saturation_mask, outer_mask);
 
       int hbins = 60;
       int histSize[] = { hbins };
