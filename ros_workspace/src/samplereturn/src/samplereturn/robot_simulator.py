@@ -70,22 +70,22 @@ class RobotSimulator(object):
         self.active_sample_id = None
         self.collected_ids = []
         self.excluded_ids = []
-        self.fake_samples = [{'point':geometry_msg.Point(-28, 58, 0),'id':16},
-                             {'point':geometry_msg.Point(-106, 61, 0),'id':1},
+        self.fake_samples = [{'point':geometry_msg.Point(-27, 58, 0),'id':16},
+                             {'point':geometry_msg.Point(-105, 62, 0),'id':1},
                              {'point':geometry_msg.Point(-105, 34, 0), 'id':2},
-                             {'point':geometry_msg.Point(-84, 66, 0), 'id':3},
+                             {'point':geometry_msg.Point(-84, 67, 0), 'id':3},
                              {'point':geometry_msg.Point(-51, 64, 0), 'id':4},
-                             {'point':geometry_msg.Point(-30, 31, 0), 'id':5},
+                             {'point':geometry_msg.Point(-29, 31, 0), 'id':5},
                              {'point':geometry_msg.Point(-29, -11, 0), 'id':6},
                              {'point':geometry_msg.Point(14, 37, 0), 'id':7},
                              {'point':geometry_msg.Point(39, 3, 0), 'id':8},
-                             {'point':geometry_msg.Point(29, -23, 0), 'id':9},
-                             {'point':geometry_msg.Point(66, -33, 0), 'id':10},
-                             {'point':geometry_msg.Point(74, -60, 0), 'id':11},
-                             {'point':geometry_msg.Point(104, -24, 0), 'id':12},
-                             {'point':geometry_msg.Point(133, 10, 0), 'id':13},
-                             {'point':geometry_msg.Point(138, 32, 0), 'id':14},
-                             {'point':geometry_msg.Point(164, 43, 0), 'id':15}]
+                             {'point':geometry_msg.Point(29, -24, 0), 'id':9},
+                             {'point':geometry_msg.Point(65, -34, 0), 'id':10},
+                             {'point':geometry_msg.Point(73, -60, 0), 'id':11},
+                             {'point':geometry_msg.Point(104, -25, 0), 'id':12},
+                             {'point':geometry_msg.Point(133, 9, 0), 'id':13},
+                             {'point':geometry_msg.Point(138, 31, 0), 'id':14},
+                             {'point':geometry_msg.Point(164, 42, 0), 'id':15}]
 
         self.sample_marker = vis_msg.Marker()
         self.sample_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
@@ -151,6 +151,9 @@ class RobotSimulator(object):
         point_cloud_center_name = "/cameras/navigation/center/points2"
         point_cloud_port_name = "/cameras/navigation/port/points2"
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
+        
+        time_remaining_name = '/processes/executive/minutes_remaining'
+        self.time_remaining = 0
 
         #tf stuff
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -314,6 +317,12 @@ class RobotSimulator(object):
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    PursuitResult,
                                                    self.handle_pursuit_result)
+        
+        self.time_remaining_sub = rospy.Subscriber(time_remaining_name,
+                                                   std_msg.Int16,
+                                                   self.handle_time_remaining)
+        
+        
         
 
         #visual servo stuff
@@ -662,6 +671,10 @@ class RobotSimulator(object):
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
         self.active_sample_id = None
+        print ("Time remaining: {!s} minutes".format(self.time_remaining))
+        
+    def handle_time_remaining(self, msg):
+        self.time_remaining = msg.data
         
     def check_beacon_pose(self, event):
         if not self.publish_beacon:
