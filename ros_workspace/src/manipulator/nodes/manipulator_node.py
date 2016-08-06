@@ -126,8 +126,8 @@ class ManipulatorStateMachine(object):
                                                                                 userdata.arm_down_maximum))
         
         if userdata.arm_joint_position > userdata.arm_down_maximum:
-          #give up and don't try to grab
-          userdata.target_bin = 0
+          #don't give up and try to grab anyway, just report the info
+          rospy.loginfo('MANIPULATOR did not get below arm_down_maximum, grabbing sample anyway')
           return 'too_high'
         else:
           return 'succeeded'
@@ -137,7 +137,7 @@ class ManipulatorStateMachine(object):
           request = VelocityStandoffRequest(self.arm_down_velocity, self.arm_down_torque, self.arm_down_standoff),
           response_cb = arm_down_response_cb),
           transitions = {'succeeded':'GRIP_SAMPLE',
-                         'too_high':'ARM_UP',
+                         'too_high':'GRIP_SAMPLE',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       )
