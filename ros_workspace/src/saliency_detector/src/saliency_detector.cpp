@@ -92,15 +92,19 @@ class SaliencyDetectorNode
     }
 
     // Resize the image for BMS saliency computation
+    ROS_INFO("Begin resize");
     cv::Mat small;
     scale_ = cv_ptr->image.cols/bms_img_width_;
     cv::resize(cv_ptr->image.rowRange(bms_top_trim_,cv_ptr->image.rows),
         small,cv::Size(bms_img_width_,(cv_ptr->image.rows-bms_top_trim_)*(bms_img_width_/cv_ptr->image.cols)),
-        0.0,0.0,cv::INTER_AREA);
+        0.0,0.0,cv::INTER_NEAREST);
+    ROS_INFO("End resize");
 
     // Compute saliency map
+    ROS_INFO("Begin BMS Comp");
     bms_.computeSaliency(small, bms_sample_step_);
     debug_bms_img_ = bms_.getSaliencyMap().clone();
+    ROS_INFO("End BMS Comp");
 
     // Threshold grayscale saliency into binary
     if (bms_thresh_on_) {
@@ -113,16 +117,20 @@ class SaliencyDetectorNode
     std::vector<cv::KeyPoint> kp;
 
     // Detect blobs matching criteria
+    ROS_INFO("Begin Blob Comp");
     if (blobDetect_on_) {
       cv::Mat blob_copy = debug_bms_img_.clone();
       blob_->detect(blob_copy, kp);
       ROS_DEBUG("Keypoints Detected: %lu", kp.size());
     }
+    ROS_INFO("End Blob Comp");
 
     // Scale back up
+    ROS_INFO("Begin resize");
     cv::resize(debug_bms_img_, debug_bms_img_, cv::Size(cv_ptr->image.cols,cv_ptr->image.rows),
-        0.0, 0.0, cv::INTER_AREA);
+        0.0, 0.0, cv::INTER_NEAREST);
     cv::cvtColor(debug_bms_img_, debug_bms_img_color, CV_GRAY2RGB);
+    ROS_INFO("End resize");
 
     // Allocate images and mask for patch publishing
     cv::Mat sub_img;
@@ -130,6 +138,7 @@ class SaliencyDetectorNode
     samplereturn_msgs::PatchArray pa_msg;
 
     // Scale keypoint params back up from smaller BMS image
+    ROS_INFO("Begin publish loop");
     for (int i = 0; i < kp.size(); i++) {
       int x = kp[i].pt.x * scale_;
       int y = kp[i].pt.y * scale_;
@@ -163,6 +172,7 @@ class SaliencyDetectorNode
       pa_msg.patch_array.push_back(p_msg);
 
     }
+    ROS_INFO("End publish loop");
     pub_patch_array.publish(pa_msg);
 
     sensor_msgs::ImagePtr debug_img_msg =
