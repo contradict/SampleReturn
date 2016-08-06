@@ -45,9 +45,7 @@ class ComputeAngle(object):
     self.current_yaw = None
 
     rospy.Timer(rospy.Duration(node_params.yaw_update_period),
-                self.update_yaw)                
-
-    rospy.Subscriber('image', Image, self.image_callback, None, 1)
+                self.update_yaw)
 
     self.action_server.start()
 
@@ -64,6 +62,7 @@ class ComputeAngle(object):
       self.img_angles.append(self.current_yaw)
 
   def run_compute_angle_action(self, goal):
+    image_sub = rospy.Subscriber('image', Image, self.image_callback, None, 1)
     self.starting_yaw = util.get_current_robot_yaw(self.tf_listener, self.odom_frame)
     #spin all the way around
     self.turning = True
@@ -80,6 +79,7 @@ class ComputeAngle(object):
       return
     self.min_lightness = []
     self.img_angles = []
+    image_sub.unregister()
     #return the value of best angle in odometry_frame
     self.action_server.set_succeeded(ComputeAngleResult(best_angle))
 
