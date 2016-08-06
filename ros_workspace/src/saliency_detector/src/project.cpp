@@ -127,6 +127,7 @@ class GroundProjectorNode
       cv::findContours(contour_copy, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       if (contours.size() == 0) {
         ROS_DEBUG("No contours found in patch %i", i);
+        continue;
       }
       double maxArea = 0;
       int max_idx = 0;
