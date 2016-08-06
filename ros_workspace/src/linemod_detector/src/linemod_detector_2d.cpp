@@ -127,10 +127,6 @@ class LineMOD_Detector
   public:
   LineMOD_Detector(): it(nh)
   {
-    color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
-    left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
-    right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
-    disparity_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
     img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
     point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
     matching_threshold = 80;
@@ -186,6 +182,18 @@ class LineMOD_Detector
   bool enable(samplereturn_msgs::Enable::Request &req,
               samplereturn_msgs::Enable::Response &res) {
     enabled_ = req.state;
+    if (req.state) {
+      color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
+      disparity_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
+      left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
+      right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
+    }
+    else {
+      color_sub.shutdown();
+      disparity_sub.shutdown();
+      left_cam_info_sub.shutdown();
+      right_cam_info_sub.shutdown();
+    }
     res.state = enabled_;
     return true;
   }
