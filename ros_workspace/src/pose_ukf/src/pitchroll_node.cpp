@@ -271,26 +271,36 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 void
 PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
 {
-    //ROS_DEBUG_STREAM("Got gyro msg " << msg->header.seq);
-    tf::StampedTransform gyro_transform;
-    if(!lookupTransform(msg->header.frame_id, imu_frame_, gyro_transform))
+    if(!listener_.canTransform(imu_frame_, msg->header.frame_id, msg->header.stamp))
     {
        if(!first_update_) publishTFIdentity();
        return;
     }
 
-    tf::Quaternion gq;
-    tf::quaternionMsgToTF(msg->orientation, gq);
-    tf::Transform gyro(gq);
-    tf::Transform gyro_imu = gyro_transform*gyro*gyro_transform.inverse();
-    Eigen::Quaterniond imu_gq;
-    // TODO: THIS IS SUSPICIOUS. I think it works, but it is wrong since
-    // the measurement is not rotated to imu frame
-    // there must be a geometry error somewhere else too.
-    // should be: tf::quaternionTFToEigen(gyro_imu.getRotation(), imu_gq);
-    tf::quaternionTFToEigen(gyro.getRotation(), imu_gq);
+    tf::Quaternion gyro_q;
+    tf::quaternionMsgToTF(msg->orientation, gyro_q);
+    //ROS_INFO_STREAM("gyro_q: " <<
+    //        gyro_q.x() << ", " <<
+    //        gyro_q.y() << ", " <<
+    //        gyro_q.z() << ", " <<
+    //        gyro_q.w() << ", ");
+    tf::StampedTransform gyro_imu;
+    listener_.lookupTransform(imu_frame_, msg->header.frame_id, msg->header.stamp, gyro_imu);
+    //ROS_INFO_STREAM("gyro_imu: " <<
+    //        gyro_imu.getRotation().x() << ", " <<
+    //        gyro_imu.getRotation().y() << ", " <<
+    //        gyro_imu.getRotation().z() << ", " <<
+    //        gyro_imu.getRotation().w() << ", ");
+    tf::Quaternion gyro_imu_tf = gyro_imu.getRotation() * gyro_q * gyro_imu.getRotation().inverse();
+    Eigen::Quaterniond imu_q;
+    tf::quaternionTFToEigen(gyro_imu_tf, imu_q);
+    //ROS_INFO_STREAM("imu_q: " <<
+    //        imu_q.x() << ", " <<
+    //        imu_q.y() << ", " <<
+    //        imu_q.z() << ", " <<
+    //        imu_q.w() << ", ");
     PoseUKF::YawMeasurement<PitchRollState> m;
-    m.yaw = Sophus::SO3d(imu_gq);
+    m.yaw = Sophus::SO3d(imu_q);
     Eigen::MatrixXd meas_cov(m.ndim(), m.ndim());
     meas_cov.setZero();
     Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > cov(msg->orientation_covariance.data());
