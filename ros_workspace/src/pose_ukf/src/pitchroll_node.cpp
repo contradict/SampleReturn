@@ -159,7 +159,7 @@ PitchRollUKFNode::sendPose(void)
         }
         catch(tf::TransformException ex)
         {
-            ROS_ERROR_STREAM("Unable to look up " << odometry_frame_id_ << "->" << parent_frame_id_ << ": " << ex.what());
+            //ROS_ERROR_STREAM("Unable to look up " << odometry_frame_id_ << "->" << parent_frame_id_ << ": " << ex.what());
             publishTFIdentity();
             return;
         }
