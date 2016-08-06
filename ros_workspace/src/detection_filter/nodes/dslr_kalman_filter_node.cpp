@@ -29,15 +29,15 @@ class ColoredKF
 {
   public:
     cv::KalmanFilter filter;
-    std::string color;
+    double hue;
     int16_t filter_id;
     float certainty;
-    ColoredKF(cv::KalmanFilter, std::string, int16_t, float);
+    ColoredKF(cv::KalmanFilter, double, int16_t, float);
 };
 
-ColoredKF::ColoredKF (cv::KalmanFilter kf, std::string c, int16_t id, float cert) {
+ColoredKF::ColoredKF (cv::KalmanFilter kf, double h, int16_t id, float cert) {
   filter = kf;
-  color = c;
+  hue = h;
   filter_id = id;
   certainty = cert;
 }
@@ -107,14 +107,13 @@ class KalmanDetectionFilter
   double exclusion_zone_range_;
   bool is_manipulator_;
 
+  double hue_tolerance_;
+
   tf::TransformListener listener_;
 
   std::string _filter_frame_id;
 
   dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig> dr_srv;
-
-  XmlRpc::XmlRpcValue color_transitions_;
-  std::map<std::string,std::vector<std::string> > color_transitions_map_;
 
   public:
   KalmanDetectionFilter()
@@ -125,7 +124,7 @@ class KalmanDetectionFilter
     dr_srv.setCallback(cb);
 
     cam_info_topic = "camera_info";
-    detection_topic = "point";
+    detection_topic = "named_point";
     ack_topic = "ack";
     odometry_topic = "odometry";
     exclusion_zone_topic = "exclusion_zone";
@@ -155,96 +154,6 @@ class KalmanDetectionFilter
     private_node_handle_.param("certainty_thresh", certainty_thresh_, double(0.9));
 
     private_node_handle_.param("is_manipulator", is_manipulator_, false);
-
-    private_node_handle_.getParam("color_transitions",color_transitions_);
-    if (color_transitions_.hasMember(std::string("red"))){
-      std::vector<std::string> red_vec;
-      for (int i=0; i<color_transitions_[std::string("red")].size(); i++) {
-        red_vec.push_back(static_cast<std::string>(color_transitions_[std::string("red")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("red",red_vec));
-    }
-    if (color_transitions_.hasMember(std::string("orange"))){
-      std::vector<std::string> orange_vec;
-      for (int i=0; i<color_transitions_[std::string("orange")].size(); i++) {
-        orange_vec.push_back(static_cast<std::string>(color_transitions_[std::string("orange")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("orange",orange_vec));
-    }
-    if (color_transitions_.hasMember(std::string("yellow"))){
-      std::vector<std::string> yellow_vec;
-      for (int i=0; i<color_transitions_[std::string("yellow")].size(); i++) {
-        yellow_vec.push_back(static_cast<std::string>(color_transitions_[std::string("yellow")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("yellow",yellow_vec));
-    }
-    if (color_transitions_.hasMember(std::string("green"))){
-      std::vector<std::string> green_vec;
-      for (int i=0; i<color_transitions_[std::string("green")].size(); i++) {
-        green_vec.push_back(static_cast<std::string>(color_transitions_[std::string("green")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("green",green_vec));
-    }
-    if (color_transitions_.hasMember(std::string("blue"))){
-      std::vector<std::string> blue_vec;
-      for (int i=0; i<color_transitions_[std::string("blue")].size(); i++) {
-        blue_vec.push_back(static_cast<std::string>(color_transitions_[std::string("blue")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("blue",blue_vec));
-    }
-    if (color_transitions_.hasMember(std::string("purple"))){
-      std::vector<std::string> purple_vec;
-      for (int i=0; i<color_transitions_[std::string("purple")].size(); i++) {
-        purple_vec.push_back(static_cast<std::string>(color_transitions_[std::string("purple")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("purple",purple_vec));
-    }
-    if (color_transitions_.hasMember(std::string("pink"))){
-      std::vector<std::string> pink_vec;
-      for (int i=0; i<color_transitions_[std::string("pink")].size(); i++) {
-        pink_vec.push_back(static_cast<std::string>(color_transitions_[std::string("pink")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("pink",pink_vec));
-    }
-    if (color_transitions_.hasMember(std::string("brown"))){
-      std::vector<std::string> brown_vec;
-      for (int i=0; i<color_transitions_[std::string("brown")].size(); i++) {
-        brown_vec.push_back(static_cast<std::string>(color_transitions_[std::string("brown")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("brown",brown_vec));
-    }
-    if (color_transitions_.hasMember(std::string("white"))){
-      std::vector<std::string> white_vec;
-      for (int i=0; i<color_transitions_[std::string("white")].size(); i++) {
-        white_vec.push_back(static_cast<std::string>(color_transitions_[std::string("white")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("white",white_vec));
-    }
-    if (color_transitions_.hasMember(std::string("gray"))){
-      std::vector<std::string> gray_vec;
-      for (int i=0; i<color_transitions_[std::string("gray")].size(); i++) {
-        gray_vec.push_back(static_cast<std::string>(color_transitions_[std::string("gray")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("gray",gray_vec));
-    }
-    if (color_transitions_.hasMember(std::string("black"))){
-      std::vector<std::string> black_vec;
-      for (int i=0; i<color_transitions_[std::string("black")].size(); i++) {
-        black_vec.push_back(static_cast<std::string>(color_transitions_[std::string("black")][i]));
-      }
-      color_transitions_map_.insert(std::pair<std::string,std::vector<std::string> >
-          ("black",black_vec));
-    }
 
     sub_cam_info =
       nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
@@ -317,6 +226,8 @@ class KalmanDetectionFilter
     odometry_tick_dist_ = config.odometry_tick_dist;
 
     exclusion_zone_range_ = config.exclusion_zone_range;
+
+    hue_tolerance_ = config.hue_tolerance;
 
     if(config.clear_filters) {
       //clear all filters
@@ -543,7 +454,7 @@ class KalmanDetectionFilter
     KF.statePost.at<float>(5) = 0;
 
     KF.predict();
-    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.name,filter_id_count_,PO_init_));
+    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.hue,filter_id_count_,PO_init_));
     filter_list_.push_back(CKF);
     filter_id_count_++;
     checkObservation(msg);
@@ -557,19 +468,25 @@ class KalmanDetectionFilter
     filter_list_[filter_index]->certainty = updateProb(current_PO, true, PDgO_, PDgo_);
   }
 
-  bool checkColor(std::string filter_color, std::string obs_color)
+  bool checkColor(double filter_hue, double obs_hue)
   {
     if (is_manipulator_) {
       return true;
     }
-    std::vector<std::string>::iterator color_it;
-    color_it = std::find(color_transitions_map_[filter_color].begin(),
-                          color_transitions_map_[filter_color].end(),
-                          obs_color);
-    ROS_DEBUG("Color Check: Filter Color:%s Obs Color:%s",filter_color.c_str(),obs_color.c_str());
-    return (color_it != color_transitions_map_[filter_color].end());
+    ROS_DEBUG("Color Check: Filter Hue: %f Obs Hue: %f", filter_hue, obs_hue);
+    double dist = hueDistance(filter_hue, obs_hue);
+    return (dist < hue_tolerance_);
   }
 
+  double hueDistance(double hue, double hue_ref)
+  {
+    if (abs(hue - hue_ref) <= 90) {
+      return abs(hue - hue_ref);
+    }
+    else {
+      return 180 - abs(hue - hue_ref);
+    }
+  }
 
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
@@ -589,13 +506,13 @@ class KalmanDetectionFilter
     for (int i=0; i<filter_list_.size(); i++) {
       double dist = cv::norm(((filter_list_[i]->filter.measurementMatrix)*(filter_list_[i]->filter.statePost)
         - meas_state));
-      if ((dist < max_dist_) && checkColor(filter_list_[i]->color,msg.name)) {
+      if ((dist < max_dist_) && checkColor(filter_list_[i]->hue,msg.hue)) {
         ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, i);
-        filter_list_[i]->color = msg.name;
+        filter_list_[i]->hue = msg.hue;
         return;
       }
-      else if ((dist < max_dist_) && not checkColor(filter_list_[i]->color,msg.name)) {
+      else if ((dist < max_dist_) && not checkColor(filter_list_[i]->hue,msg.hue)) {
         ROS_DEBUG("Color Check Failed");
         return;
       }
@@ -685,12 +602,17 @@ class KalmanDetectionFilter
 
   void clearMarker(std::shared_ptr<ColoredKF> ckf) {
     visualization_msgs::MarkerArray marker_array;
-    visualization_msgs::Marker marker;
+    visualization_msgs::Marker marker, text_marker;
     marker.header.frame_id = _filter_frame_id;
     marker.header.stamp = ros::Time::now();
+    text_marker.header.frame_id = _filter_frame_id;
+    text_marker.header.stamp = ros::Time::now();
     marker.id = ckf->filter_id;
+    text_marker.id = 100 + ckf->filter_id;
     marker.action = visualization_msgs::Marker::DELETE;
+    text_marker.action = visualization_msgs::Marker::DELETE;
     marker_array.markers.push_back(marker);
+    marker_array.markers.push_back(text_marker);
     pub_filter_marker_array.publish(marker_array);
   }
 
@@ -710,13 +632,24 @@ class KalmanDetectionFilter
       cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
       cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
 
-      visualization_msgs::Marker cov;
+      visualization_msgs::Marker cov, cov_text;
       cov.type = visualization_msgs::Marker::CYLINDER;
+      cov_text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
       /* The radius of the marker is positional covariance, the alpha
        * is the certainty of the observation, squashed from 0-1 to 0.5-1 */
       cov.id = filter_ptr->filter_id;
       cov.header.frame_id = _filter_frame_id;
       cov.header.stamp = ros::Time::now();
+      cov_text.id = 100 + filter_ptr->filter_id;
+      cov_text.header.frame_id = _filter_frame_id;
+      cov_text.header.stamp = ros::Time::now();
+      std::stringstream ss;
+      ss << "H: " << filter_ptr->hue;
+      cov_text.text = ss.str();
+      cov_text.color.r = 1.0;
+      cov_text.color.g = 1.0;
+      cov_text.color.b = 1.0;
+      cov_text.color.a = 1.0;
       if (filter_ptr->filter_id == current_published_id_) {
         cov.color.r = 0.0;
         cov.color.g = 1.0;
@@ -732,6 +665,9 @@ class KalmanDetectionFilter
       cov.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
       cov.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
       cov.pose.position.z = 0.0;
+      cov_text.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
+      cov_text.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
+      cov_text.pose.position.z = 1.0;
       cov.pose.orientation.x = 0;
       cov.pose.orientation.y = 0;
       cov.pose.orientation.z = 0;
@@ -739,8 +675,11 @@ class KalmanDetectionFilter
       cov.scale.x = filter_ptr->filter.errorCovPost.at<float>(0,0);
       cov.scale.y = filter_ptr->filter.errorCovPost.at<float>(1,1);
       cov.scale.z = 1.0;
+      cov_text.scale.z = 1.0;
       cov.lifetime = ros::Duration();
+      cov_text.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
+      marker_array.markers.push_back(cov_text);
     }
 
     for (int i=0; i<exclusion_list_.size(); i++) {
