@@ -6,17 +6,18 @@
         machine="search"
         pkg="linemod_detector"
         type="linemod_detector_2d"
-        name="manipulator_linemod_detector_2d"
+        name="hard_manipulator_linemod_detector_2d"
         ns="/processes/sample_detection/manipulator">
       <remap from="color" to="/cameras/manipulator/left/rect_color"/>
       <remap from="disparity" to="/cameras/manipulator/disparity"/>
       <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
       <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
-      <param name="template_file" type="string" value="$(find linemod_detector)/config/easy_intermediate_test.yaml"/>
-      <param name="pub_threshold" type="double" value="80.0"/>
+      <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
+      <param name="pub_threshold" type="double" value="90.0"/>
       <param name="min_depth" type="double" value="0.4"/>
-      <param name="max_depth" type="double" value="0.58"/>
+      <param name="max_depth" type="double" value="0.65"/>
       <param name="min_count" type="double" value="100.0"/>
+      <param name="hard_samples" type="bool" value="True"/>
       <rosparam>
           bms_dilation_width_1: 1
           bms_dilation_width_2: 1
@@ -45,24 +46,6 @@
           minThreshold: 10.0
           thresholdStep: 10.0
       </rosparam>
-    </node>
-
-      <node
-        machine="search"
-        pkg="linemod_detector"
-        type="linemod_detector_2d"
-        name="hard_manipulator_linemod_detector_2d"
-        ns="/processes/sample_detection/manipulator">
-      <remap from="color" to="/cameras/manipulator/left/rect_color"/>
-      <remap from="disparity" to="/cameras/manipulator/disparity"/>
-      <remap from="left_cam_info" to="/cameras/manipulator/left/camera_info"/>
-      <remap from="right_cam_info" to="/cameras/manipulator/right/camera_info"/>
-      <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
-      <param name="pub_threshold" type="double" value="90.0"/>
-      <param name="min_depth" type="double" value="0.4"/>
-      <param name="max_depth" type="double" value="0.65"/>
-      <param name="min_count" type="double" value="100.0"/>
-      <param name="hard_samples" type="bool" value="True"/>
     </node>
 
   <node
