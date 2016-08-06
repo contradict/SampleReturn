@@ -93,8 +93,8 @@ class KalmanDetectionFilter
 
   int16_t exclusion_count_;
 
-  double certainty_inc_;
-  double certainty_dec_;
+  double PDgO_, PDgo_;
+  double PO_init_;
   double certainty_thresh_;
 
   double last_x_;
@@ -150,9 +150,9 @@ class KalmanDetectionFilter
     private_node_handle_.param("period", period_, double(2));
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
 
-    private_node_handle_.param("certainty_inc", certainty_inc_, double(1.0));
-    private_node_handle_.param("certainty_dec", certainty_dec_, double(0.7));
-    private_node_handle_.param("certainty_thresh", certainty_thresh_, double(3.0));
+    private_node_handle_.param("PDgO", PDgO_, double(0.9));
+    private_node_handle_.param("PDgo", PDgo_, double(0.1));
+    private_node_handle_.param("certainty_thresh", certainty_thresh_, double(0.9));
 
     private_node_handle_.param("is_manipulator", is_manipulator_, false);
 
@@ -310,8 +310,8 @@ class KalmanDetectionFilter
     error_cov_post_ = config.error_cov_post;
     period_ = config.period;
 
-    certainty_inc_ = config.certainty_inc;
-    certainty_dec_ = config.certainty_dec;
+    PDgO_ = config.PDgO;
+    PDgo_ = config.PDgo;
     certainty_thresh_ = config.certainty_thresh;
 
     odometry_tick_dist_ = config.odometry_tick_dist;
@@ -407,7 +407,8 @@ class KalmanDetectionFilter
         if (isInView(filter_list_[i]->filter)) {
           filter_list_[i]->filter.predict();
           filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
-          filter_list_[i]->certainty -= certainty_dec_;
+          double current_PO = filter_list_[i]->certainty;
+          filter_list_[i]->certainty = updateProb(current_PO, false, PDgO_, PDgo_);
         }
       }
     }
@@ -430,7 +431,8 @@ class KalmanDetectionFilter
           // Manage filters
           filter_list_[i]->filter.predict();
           filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
-          filter_list_[i]->certainty -= certainty_dec_;
+          double current_PO = filter_list_[i]->certainty;
+          filter_list_[i]->certainty = updateProb(current_PO, false, PDgO_, PDgo_);
           // Manage exclusion zones
           auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
               [this](std::tuple<float,float,float,int16_t,float> zone)
@@ -541,7 +543,7 @@ class KalmanDetectionFilter
     KF.statePost.at<float>(5) = 0;
 
     KF.predict();
-    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.name,filter_id_count_,0));
+    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.name,filter_id_count_,PO_init_));
     filter_list_.push_back(CKF);
     filter_id_count_++;
     checkObservation(msg);
@@ -551,7 +553,8 @@ class KalmanDetectionFilter
   {
     ROS_DEBUG("Adding measurement to filter: %i", filter_index);
     filter_list_[filter_index]->filter.correct(meas_state);
-    filter_list_[filter_index]->certainty += (certainty_inc_+certainty_dec_);
+    double current_PO = filter_list_[filter_index]->certainty;
+    filter_list_[filter_index]->certainty = updateProb(current_PO, true, PDgO_, PDgo_);
   }
 
   bool checkColor(std::string filter_color, std::string obs_color)
@@ -657,11 +660,27 @@ class KalmanDetectionFilter
         return true;
       }
     }
-    if (ckf->certainty < -1.0) {
+    if (ckf->certainty < 0.0) {
       clearMarker(ckf);
       return true;
     }
     return false;
+  }
+
+  double updateProb(double PO, bool detection, double PDgO, double PDgo) {
+    if (detection) {
+      // Probability of a detection
+      double PD = PDgO * PO + PDgo * (1 - PO);
+      // Update
+      PO = PDgO * PO / PD;
+    }
+    else {
+      // Probability of no detection
+      double Pd = (1 - PDgO) * PO + (1.0 - PDgo) * (1.0 - PO);
+      // Update
+      PO = (1.0 - PDgO) * PO / Pd;
+    }
+    return PO;
   }
 
   void clearMarker(std::shared_ptr<ColoredKF> ckf) {
@@ -693,8 +712,8 @@ class KalmanDetectionFilter
 
       visualization_msgs::Marker cov;
       cov.type = visualization_msgs::Marker::CYLINDER;
-      /* The radius of the marker is positional covariance, the height
-       * is the certainty of the observation */
+      /* The radius of the marker is positional covariance, the alpha
+       * is the certainty of the observation, squashed from 0-1 to 0.5-1 */
       cov.id = filter_ptr->filter_id;
       cov.header.frame_id = _filter_frame_id;
       cov.header.stamp = ros::Time::now();
@@ -702,13 +721,13 @@ class KalmanDetectionFilter
         cov.color.r = 0.0;
         cov.color.g = 1.0;
         cov.color.b = 0.0;
-        cov.color.a = 1.0;
+        cov.color.a = (2 * filter_ptr->certainty) - 0.5;
       }
       else {
         cov.color.r = 1.0;
         cov.color.g = 1.0;
         cov.color.b = 1.0;
-        cov.color.a = 0.5;
+        cov.color.a = (2 * filter_ptr->certainty) - 0.5;
       }
       cov.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
       cov.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
@@ -719,7 +738,7 @@ class KalmanDetectionFilter
       cov.pose.orientation.w = 1;
       cov.scale.x = filter_ptr->filter.errorCovPost.at<float>(0,0);
       cov.scale.y = filter_ptr->filter.errorCovPost.at<float>(1,1);
-      cov.scale.z = filter_ptr->certainty;
+      cov.scale.z = 1.0;
       cov.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
     }
