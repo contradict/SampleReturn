@@ -16,19 +16,7 @@
         <param name="serial_number" type="string" value="21920610"/>
         <param name="AcquisitionFrameRate" type="double" value="3"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <remap from="basler_camera/image_raw" to="image_raw"/>
-    </node>
-
-    <node machine="search"
-        pkg="image_proc"
-        type="image_proc"
-        name="image_proc"
-        ns="/cameras/search/port"
-        >
-        <!-- this is a terrible hack so this node
-             does not see our custom opencv3 build.
-        -->
-        <env name="LD_LIBRARY_PATH" value="/opt/ros/indigo/lib"/>
+        <remap from="basler_camera/image_raw" to="image_color"/>
     </node>
 
     <node machine="search"
@@ -43,20 +31,7 @@
         <param name="serial_number" type="string" value="21864021"/>
         <param name="AcquisitionFrameRate" type="double" value="3"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <remap from="basler_camera/image_raw" to="image_raw"/>
-    </node>
-    </group>
-
-    <node machine="search"
-        pkg="image_proc"
-        type="image_proc"
-        name="image_proc"
-        ns="/cameras/search/center"
-        >
-        <!-- this is a terrible hack so this node
-             does not see our custom opencv3 build.
-        -->
-        <env name="LD_LIBRARY_PATH" value="/opt/ros/indigo/lib"/>
+        <remap from="basler_camera/image_raw" to="image_color"/>
     </node>
 
     <node machine="search"
@@ -71,18 +46,8 @@
         <param name="serial_number" type="string" value="21864049"/>
         <param name="AcquisitionFrameRate" type="double" value="3"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <remap from="basler_camera/image_raw" to="image_raw"/>
+        <remap from="basler_camera/image_raw" to="image_color"/>
     </node>
+    </group>
 
-    <node machine="search"
-        pkg="image_proc"
-        type="image_proc"
-        name="image_proc"
-        ns="/cameras/search/starboard"
-        >
-        <!-- this is a terrible hack so this node
-             does not see our custom opencv3 build.
-        -->
-        <env name="LD_LIBRARY_PATH" value="/opt/ros/indigo/lib"/>
-    </node>
 </launch>
