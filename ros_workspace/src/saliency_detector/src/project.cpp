@@ -177,7 +177,6 @@ class GroundProjectorNode
         pa_msg.cam_info = msg->patch_array[i].cam_info;
         pa_msg.world_point = world_point;
         out_pa_msg.patch_array.push_back(pa_msg);
-        pub_patch_array.publish(out_pa_msg);
       }
       else {
         if (enable_debug_) {
@@ -199,6 +198,7 @@ class GroundProjectorNode
         continue;
       }
     }
+    pub_patch_array.publish(out_pa_msg);
     if (enable_debug_) {
       sensor_msgs::ImagePtr debug_image_msg =
         cv_bridge::CvImage(msg->patch_array[0].header,"mono8",debug_image_).toImageMsg();
