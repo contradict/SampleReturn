@@ -611,7 +611,7 @@ class KalmanDetectionFilter
     }
     /* This is in base_link, transform it to odom */
     cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
-        1.75, -1.21, 21.75, -13.21, 21.75, 13.21, 1.75, 1.21);
+        1.0, -3.0, 2.6, -3.0, 2.6, 3.0, 1.0, 3.0);
     cv::Mat DSLR_frustum_odom(4,2,CV_32FC1);
     geometry_msgs::PointStamped temp_msg, temp_msg_odom;
     geometry_msgs::PolygonStamped frustum_poly;
