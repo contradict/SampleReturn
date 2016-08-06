@@ -187,14 +187,14 @@ class GroundProjectorNode
               cv::Point2f(msg->patch_array[i].image_roi.x_offset +
                           msg->patch_array[i].image_roi.width,
                           msg->patch_array[i].image_roi.y_offset +
-                          msg->patch_array[i].image_roi.height), 255, 50);
+                          msg->patch_array[i].image_roi.height), 255, 20);
           cv::line(debug_image_,
               cv::Point2f(msg->patch_array[i].image_roi.x_offset +
                           msg->patch_array[i].image_roi.width,
                           msg->patch_array[i].image_roi.y_offset),
               cv::Point2f(msg->patch_array[i].image_roi.x_offset,
                           msg->patch_array[i].image_roi.y_offset +
-                          msg->patch_array[i].image_roi.height), 255, 50);
+                          msg->patch_array[i].image_roi.height), 255, 20);
         }
         continue;
       }

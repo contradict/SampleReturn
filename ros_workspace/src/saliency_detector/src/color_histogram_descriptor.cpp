@@ -71,8 +71,8 @@ class ColorHistogramDescriptorNode
     }
     samplereturn_msgs::PatchArray out_pa_msg;
     if (enable_debug_) {
-      debug_image_ = cv::Mat::ones(msg->patch_array[0].cam_info.height,
-          msg->patch_array[0].cam_info.width, CV_8UC3)*255;
+      debug_image_ = cv::Mat::zeros(msg->patch_array[0].cam_info.height,
+          msg->patch_array[0].cam_info.width, CV_8UC3);
     }
     cv_bridge::CvImagePtr cv_ptr_mask, cv_ptr_img;
     for (int i = 0; i < msg->patch_array.size(); i++) {
@@ -137,11 +137,11 @@ class ColorHistogramDescriptorNode
               cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
           if (y > 100) {
             cv::putText(debug_image_,"Too Similar to BG",cv::Point2d(x, y),
-               cv::FONT_HERSHEY_SIMPLEX,1.0,cv::Scalar(255,0,0),4,cv::LINE_8,true);
+               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
             cv::putText(debug_image_,"Too Similar to BG",cv::Point2d(x, y + h),
-               cv::FONT_HERSHEY_SIMPLEX,1.0,cv::Scalar(255,0,0),4,cv::LINE_8,false);
+               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
         }
         continue;
@@ -175,13 +175,15 @@ class ColorHistogramDescriptorNode
           cv::line(debug_image_,
               cv::Point2f(x + w, y),
               cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
+          char str[200];
+          sprintf(str, "Hue Out of Range: H=%f", dominant_hue);
           if (y > 100) {
-            cv::putText(debug_image_,"Hue Out of Range",cv::Point2d(x, y),
-               cv::FONT_HERSHEY_SIMPLEX,1.0,cv::Scalar(255,0,0),4,cv::LINE_8,true);
+            cv::putText(debug_image_, str, cv::Point2d(x, y),
+               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
-            cv::putText(debug_image_,"Hue Out of Range",cv::Point2d(x, y + h),
-               cv::FONT_HERSHEY_SIMPLEX,1.0,cv::Scalar(255,0,0),4,cv::LINE_8,false);
+            cv::putText(debug_image_, str, cv::Point2d(x, y + h),
+               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
         }
       }
