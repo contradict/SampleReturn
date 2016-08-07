@@ -60,6 +60,9 @@
         <param name="serial_number" type="string" value="21903878"/>
         <param name="AcquisitionFrameRate" type="double" value="2"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
+        <param name="GainAuto" type="string" value="Continuous"/>
+        <param name="ExposureAuto" type="string" value="Off"/>
+        <param name="ExposureTime" type="double" value="1000.0"/>
         <remap from="basler_camera/image_raw" to="image_color"/>
     </node>
     </group>
