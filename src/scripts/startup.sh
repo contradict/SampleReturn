@@ -35,6 +35,13 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
     pidname=`basename ${LAUNCH_FILE} .launch`.pid
     roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
     roslaunch --pid=${HOME}/.ros/logging.pid samplereturn logging.launch &
+else
+    if echo ${OTHER_HOST} | grep -q `hostname`; then
+        # This requires the line
+        # robot ALL=(root) NOPASSWD: /bin/kill
+        # in /etc/sudoers
+        sudo -n kill -USR1 `pidof ptpd`
+    fi
 fi
 MACHINE=`hostname`
 /usr/bin/aplay /home/robot/sounds/${MACHINE}start.wav

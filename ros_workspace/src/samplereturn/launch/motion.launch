@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
+    <arg name="replay" default="false"/>
 
     <arg name="start_paused" default="True"/>
 
@@ -28,6 +29,7 @@
     <remap from="audio_search" to="/io/audio/search"/>
 
     <!-- platform node -->
+    <group unless="$(arg replay)">
     <node name="motion"
           machine="navigate"
           pkg="platform_motion"
@@ -51,6 +53,7 @@
 
         <param name="status_publish_interval" type="double" value="1.0"/>
     </node>
+    </group>
 
     <node name="odometry"
           machine="navigate"
@@ -59,7 +62,8 @@
           output="log"
           ns="/motion">
         <param name="wheel_diameter" type="double" value="0.3112"/>
-        <param name="odom_frame_id" type="string" value="/odom"/>
+        <param name="odom_frame_id" type="string" value="odom"/>
+        <param name="child_frame_id" type="string" value="base_link_flat"/>
 
         <remap from="/motion/odometry/imu_yaw" to="/io/kvh/imu"/>
     </node>
