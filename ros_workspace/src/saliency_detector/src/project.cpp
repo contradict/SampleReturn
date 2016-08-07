@@ -97,6 +97,7 @@ class GroundProjectorNode
   // ground plane, otherwise assume the plane under the wheels.
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
+    enable_debug_ = (pub_debug_image.getNumSubscribers() != 0);
     if (msg->patch_array.empty()) {
       return;
     }
@@ -347,7 +348,6 @@ class GroundProjectorNode
   {
     min_major_axis_ = config.min_major_axis;
     max_major_axis_ = config.max_major_axis;
-    enable_debug_ = config.enable_debug;
   }
 
 };
