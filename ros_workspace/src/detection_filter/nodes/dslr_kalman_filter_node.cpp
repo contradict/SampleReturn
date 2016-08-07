@@ -654,13 +654,13 @@ class KalmanDetectionFilter
         cov.color.r = 0.0;
         cov.color.g = 1.0;
         cov.color.b = 0.0;
-        cov.color.a = (2 * filter_ptr->certainty) - 0.5;
+        cov.color.a = (filter_ptr->certainty / 2) + 0.5;
       }
       else {
         cov.color.r = 1.0;
         cov.color.g = 1.0;
         cov.color.b = 1.0;
-        cov.color.a = (2 * filter_ptr->certainty) - 0.5;
+        cov.color.a = (filter_ptr->certainty / 2) + 0.5;
       }
       cov.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
       cov.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
