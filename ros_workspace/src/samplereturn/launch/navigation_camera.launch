@@ -60,7 +60,7 @@
         <param name="serial_number" type="string" value="21903878"/>
         <param name="AcquisitionFrameRate" type="double" value="2"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <remap from="basler_camera/image_raw" to="image_raw"/>
+        <remap from="basler_camera/image" to="image_raw"/>
     </node>
     </group>
 
