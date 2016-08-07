@@ -60,20 +60,8 @@
         <param name="serial_number" type="string" value="21903878"/>
         <param name="AcquisitionFrameRate" type="double" value="2"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <remap from="basler_camera/image_raw" to="image_raw"/>
+        <remap from="basler_camera/image_raw" to="image_color"/>
     </node>
     </group>
-
-    <node machine="search"
-        pkg="image_proc"
-        type="image_proc"
-        name="image_proc"
-        ns="/cameras/navigation/beacon"
-        >
-        <!-- this is a terrible hack so this node
-             does not see our custom opencv3 build.
-        -->
-        <env name="LD_LIBRARY_PATH" value="/opt/ros/indigo/lib"/>
-    </node>
 
 </launch>
