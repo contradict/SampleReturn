@@ -37,8 +37,8 @@ class BeaconReturn(smach.State):
                                          'beacon_point',
                                          'stop_on_detection',
                                          'manager_dict',
-                                         'world_fixed_frame',
-                                         'odometry_frame'],
+                                         'odometry_frame',
+                                         'platform_frame'],
                              output_keys=['move_target',
                                           'move_point_map',
                                           'simple_move',
@@ -63,13 +63,9 @@ class BeaconReturn(smach.State):
             self.service_preempt()
             return 'preempted'
         
-        #clear previous move_point_map
-        userdata.move_point_map = None
-        map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
-       
         #get our position in map
         current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                   userdata.world_fixed_frame)        
+                                                   userdata.platform_frame)        
         
         #hopeful distance to approach point
         distance_to_approach_point = util.point_distance_2d(current_pose.pose.position,
@@ -103,7 +99,6 @@ class BeaconReturn(smach.State):
                 self.announcer.say("Beacon not in view. Moving to approach point.")
                 userdata.stop_on_detection = True
                 self.tried_spin = False
-                #set move_point_map to enable localization correction
                 userdata.move_target = userdata.beacon_approach_pose
                 return 'move'
             else:
@@ -121,7 +116,7 @@ class BeaconReturn(smach.State):
                 
         else: #beacon is in view
             current_yaw = util.get_current_robot_yaw(self.tf_listener,
-                                                     userdata.world_fixed_frame)
+                                                     userdata.platform_frame)
             yaw_to_platform = util.pointing_yaw(current_pose.pose.position,
                                                 userdata.platform_point.point)
             yaw_error = util.unwind(yaw_to_platform - current_yaw)
@@ -167,7 +162,6 @@ class CalculateMountMove(smach.State):
                                        'aborted'],
                              input_keys=['platform_point',
                                          'odometry_frame',
-                                         'world_fixed_frame',
                                          'beacon_mount_tolerance'],
                              output_keys=['simple_move'])
 

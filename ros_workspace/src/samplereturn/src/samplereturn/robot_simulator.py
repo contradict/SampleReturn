@@ -70,22 +70,22 @@ class RobotSimulator(object):
         self.active_sample_id = None
         self.collected_ids = []
         self.excluded_ids = []
-        self.fake_samples = [{'point':geometry_msg.Point(-28, 58, 0),'id':16},
-                             {'point':geometry_msg.Point(-107, 59, 0),'id':1},
-                             {'point':geometry_msg.Point(-107, 32, 0), 'id':2},
-                             {'point':geometry_msg.Point(-87, 68, 0), 'id':3},
+        self.fake_samples = [{'point':geometry_msg.Point(-27, 58, 0),'id':16},
+                             {'point':geometry_msg.Point(-105, 62, 0),'id':1},
+                             {'point':geometry_msg.Point(-105, 34, 0), 'id':2},
+                             {'point':geometry_msg.Point(-84, 67, 0), 'id':3},
                              {'point':geometry_msg.Point(-51, 64, 0), 'id':4},
-                             {'point':geometry_msg.Point(-31, 30, 0), 'id':5},
-                             {'point':geometry_msg.Point(-30, -13, 0), 'id':6},
-                             {'point':geometry_msg.Point(13, 38, 0), 'id':7},
-                             {'point':geometry_msg.Point(36, 3, 0), 'id':8},
-                             {'point':geometry_msg.Point(27, -24, 0), 'id':9},
-                             {'point':geometry_msg.Point(63, -32, 0), 'id':10},
-                             {'point':geometry_msg.Point(72, -62, 0), 'id':11},
-                             {'point':geometry_msg.Point(103, -25, 0), 'id':12},
-                             {'point':geometry_msg.Point(132, 11, 0), 'id':13},
-                             {'point':geometry_msg.Point(136, 32, 0), 'id':14},
-                             {'point':geometry_msg.Point(163, 43, 0), 'id':15}]
+                             {'point':geometry_msg.Point(-29, 31, 0), 'id':5},
+                             {'point':geometry_msg.Point(-29, -11, 0), 'id':6},
+                             {'point':geometry_msg.Point(14, 37, 0), 'id':7},
+                             {'point':geometry_msg.Point(39, 3, 0), 'id':8},
+                             {'point':geometry_msg.Point(29, -24, 0), 'id':9},
+                             {'point':geometry_msg.Point(65, -34, 0), 'id':10},
+                             {'point':geometry_msg.Point(73, -60, 0), 'id':11},
+                             {'point':geometry_msg.Point(104, -25, 0), 'id':12},
+                             {'point':geometry_msg.Point(133, 9, 0), 'id':13},
+                             {'point':geometry_msg.Point(138, 31, 0), 'id':14},
+                             {'point':geometry_msg.Point(164, 42, 0), 'id':15}]
 
         self.sample_marker = vis_msg.Marker()
         self.sample_marker.header = std_msg.Header(0, rospy.Time(0), self.reality_frame)
@@ -151,6 +151,9 @@ class RobotSimulator(object):
         point_cloud_center_name = "/cameras/navigation/center/points2"
         point_cloud_port_name = "/cameras/navigation/port/points2"
         point_cloud_starboard_name = "/cameras/navigation/starboard/points2"
+        
+        time_remaining_name = '/processes/executive/minutes_remaining'
+        self.time_remaining = 0
 
         #tf stuff
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -314,6 +317,12 @@ class RobotSimulator(object):
         self.pursuit_result_sub = rospy.Subscriber(pursuit_result_name,
                                                    PursuitResult,
                                                    self.handle_pursuit_result)
+        
+        self.time_remaining_sub = rospy.Subscriber(time_remaining_name,
+                                                   std_msg.Int16,
+                                                   self.handle_time_remaining)
+        
+        
         
 
         #visual servo stuff
@@ -662,6 +671,10 @@ class RobotSimulator(object):
             print "Received failure message for sample: " + str(self.active_sample_id)
             print "Excluded IDs: %s" % (self.excluded_ids) 
         self.active_sample_id = None
+        print ("Time remaining: {!s} minutes".format(self.time_remaining))
+        
+    def handle_time_remaining(self, msg):
+        self.time_remaining = msg.data
         
     def check_beacon_pose(self, event):
         if not self.publish_beacon:
@@ -669,12 +682,13 @@ class RobotSimulator(object):
                 
         try:
             #get distances and yaws from reality frame origin
-            reality_origin = PointStamped(std_msg.Header(0, rospy.Time(0), self.reality_frame),
-                                                         Point(0,0,0))
-            angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
-                                                                      reality_origin)        # can't see beacon closer than 10 meters or farther than 40
+            platform_origin = PointStamped(std_msg.Header(0, rospy.Time(0),
+                                                          'platform'),
+                                                          Point(0,0,0))
+            angle_to_platform, dist_from_platform = util.get_robot_strafe(self.tf_listener,
+                                                                          platform_origin)
             angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
-                                                            self.reality_frame)
+                                                            'platform')
         except tf.Exception, exc:
                 print("Transforms not available in publish beacon: {!s}".format(exc))
                 return
@@ -686,12 +700,12 @@ class RobotSimulator(object):
                                         np.degrees(angle_to_origin)))
         '''
 
-        if dist_from_origin < 5.0 or dist_from_origin > 50.0:
+        if dist_from_platform < 5.0 or dist_from_platform > 50.0:
             #print ("NO BEACON PUB: outside beacon view distance: %.2f" %(dist_from_origin))
             return
         
-        # within +/- pi/4 of forward, camera FOV
-        if angle_to_origin > -pi/4 and angle_to_origin < pi/4:
+        # within camera FOV
+        if angle_to_platform > np.radians(-20.0) and angle_to_platform < np.radians(20.0):
 
             #get beacon covar and pose from beacon_finder launch
             #then create the message covariance
@@ -699,7 +713,7 @@ class RobotSimulator(object):
             position_sigma_scale = rospy.get_param("/processes/beacon/april_beacon_finder/position_sigma_scale")
             rotation_sigma = rospy.get_param("/processes/beacon/april_beacon_finder/rotation_sigma_3tag")
 
-            pos_covariance = (position_sigma + dist_from_origin*position_sigma_scale)**2
+            pos_covariance = (position_sigma + dist_from_platform*position_sigma_scale)**2
             rot_covariance = rotation_sigma**2
             
             diagonal = [pos_covariance]*3 + [rot_covariance]*3

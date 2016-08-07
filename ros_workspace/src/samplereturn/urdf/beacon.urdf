@@ -2,10 +2,10 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <!--home beacon transforms-->
 <robot name="home_beacon">   
-    <link name="map"/>
+    <link name="platform"/>
     <link name="beacon"/>
     <joint name="beacon_mount" type="fixed">
-        <parent link="map"/>
+        <parent link="platform"/>
         <child link="beacon"/>
         <!-- beacon origin is center of the front face -->
         <origin xyz="-1.30 0.0 1.243" rpy="-1.5708 0 1.5708"/>

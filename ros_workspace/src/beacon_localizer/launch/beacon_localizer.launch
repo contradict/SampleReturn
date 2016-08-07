@@ -15,14 +15,22 @@
         output="log"
         ns="/processes/beacon">
 
+		<!-- positions and angles in meters and degrees -->
         <param name="world_fixed_frame" value="$(arg world_fixed_frame)"/>
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
+		<param name="platform_frame" value="platform"/>
         <param name="update_period" value="1.0"/>
         <param name="broadcast_period" value="0.05"/>
-
+		
+		<!-- system_noise_covariance: [ 2.5e-5, 0, 0, 2.5e-5, 0, 2.5e-6 ] -->		
+        <!-- map is defined as origin at platform 2, map E = 0 yaw -->
+		<!-- reference point is defined on WPI map -->
+		<!-- platform 1 = (-5.7, 7.3),  platform 3 = (5.4, 5.8) -->
         <rosparam>
-            <!-- system_noise_covariance: [ 2.5e-5, 0, 0, 2.5e-5, 0, 2.5e-6 ] -->
             system_noise_covariance: [ 1.0e-3, 0, 0, 1.0e-3, 0, 1.0e-3 ]
+            platform_origin: [ -5.7, -7.3 ]
+            platform_orientation: -20.0
+            reference_point: [ 81.5, -30.0 ]
         </rosparam>    
     
     </node>

@@ -14,6 +14,7 @@
     
     <param name="/processes/executive/odometry_frame" value="$(arg odometry_frame)"/>
     <param name="/processes/executive/world_fixed_frame" value="$(arg world_fixed_frame)"/>
+    <param name="/processes/executive/platform_frame" value="platform"/>
 
     <!-- motion remaps -->
     <remap from="CAN_select_motion_mode" to="/motion/CAN/select_motion_mode"/>

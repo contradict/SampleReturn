@@ -62,22 +62,22 @@ class LevelTwoWeb(object):
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
+        self.platform_frame =  rospy.get_param("platform_frame", "platform")
         self.local_frame = 'base_link'
  
         #need platform point
-        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+        platform_header = std_msg.Header(0, rospy.Time(0), self.platform_frame)
         platform_point = geometry_msg.Point(node_params.platform_point['x'],
                                             node_params.platform_point['y'], 0)
                                             
-        self.platform_point = geometry_msg.PointStamped(header, platform_point)
+        self.platform_point = geometry_msg.PointStamped(platform_header, platform_point)
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         point = geometry_msg.Point(node_params.beacon_approach_point['x'],
                                    node_params.beacon_approach_point['y'], 0)
         beacon_facing_orientation = util.pointing_quaternion_2d(point, platform_point)
-        geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
         pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
-        self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
+        self.beacon_approach_pose = geometry_msg.PoseStamped(header = platform_header, pose = pose)
         self.last_beacon_point = None
         self.last_correction_error = 0
         
@@ -104,27 +104,22 @@ class LevelTwoWeb(object):
 
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                          SimpleMoveAction)
-
-        #get the star shape
-        self.spokes = self.get_spokes(node_params.spoke_count,
-                                      node_params.max_spoke_length,
-                                      node_params.first_spoke_offset,
-                                      node_params.spoke_hub_radius,
-                                      node_params.next_spoke_sign)
                                                                   
         self.state_machine = smach.StateMachine(
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
-    
+                   
         #lists
-        self.state_machine.userdata.spokes = self.spokes
+        self.web_slices = node_params.web_slices
+        self.state_machine.userdata.web_slices = deque(self.web_slices)
         self.state_machine.userdata.raster_points = deque()
 
         #these are important values! master frame id and return timing
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.local_frame = self.local_frame
+        self.state_machine.userdata.platform_frame = self.platform_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pause_time_offset = rospy.Duration(0)
@@ -152,11 +147,10 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.course_tolerance = None
         self.state_machine.userdata.chord_course_tolerance = node_params.chord_course_tolerance
         self.state_machine.userdata.spoke_hub_radius = node_params.spoke_hub_radius
-        self.state_machine.userdata.next_spoke_sign = node_params.next_spoke_sign
         self.state_machine.userdata.raster_step = node_params.raster_step
-        self.state_machine.userdata.raster_offset = node_params.raster_offset
         self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
+
 
         #web management flags
         self.state_machine.userdata.outbound = True
@@ -596,35 +590,6 @@ class LevelTwoWeb(object):
                     goal = deepcopy(self.state_machine.userdata.move_goal)
                     goal.target_pose.pose.position = saved_point_odom.point
                     self.state_machine.userdata.move_goal = goal                
-                    
-
-    def get_spokes(self, spoke_count, spoke_length, offset, hub_radius, direction):
-        #This creates a list of dictionaries.  The yaw entry is a useful piece of information
-        #for some of the state machine states.  The other entry contains the start and end
-        #points defined by the line yaw
-        
-        offset = np.radians(offset)
-        yaws = list(np.linspace(0 + offset,
-                                direction*2*np.pi + offset,
-                                spoke_count,
-                                endpoint=False))
-        #add the starting spoke again, for raster calcs
-        yaws.append(offset)
-        spokes = deque()
-        for yaw in yaws:
-            yaw = util.unwind(yaw)
-            header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
-            pos = geometry_msg.Point(hub_radius*math.cos(yaw),
-                                     hub_radius*math.sin(yaw), 0)
-            start_point = geometry_msg.PointStamped(header, pos)
-            pos = geometry_msg.Point(spoke_length*math.cos(yaw),
-                                     spoke_length*math.sin(yaw), 0)    
-            end_point = geometry_msg.PointStamped(header, pos)
-            spokes.append({'yaw':yaw,
-                           'start_point':start_point,
-                           'end_point':end_point})
-        
-        return spokes
     
     def shutdown_cb(self):
         self.state_machine.request_preempt()
@@ -686,9 +651,9 @@ class StartLeveLTwo(smach.State):
 class WebManager(smach.State):
     def __init__(self, label, tf_listener, announcer):
         smach.State.__init__(self,
-                             input_keys = ['spoke_yaw',
-                                           'outbound',
-                                           'spokes',
+                             input_keys = ['outbound',
+                                           'web_slices',
+                                           'active_slice',
                                            'raster_active',
                                            'raster_points',
                                            'raster_step',
@@ -701,9 +666,9 @@ class WebManager(smach.State):
                                            'return_time_offset',
                                            'pause_time_offset',
                                            'world_fixed_frame'],
-                             output_keys = ['spoke_yaw',
-                                            'outbound',
-                                            'spokes',
+                             output_keys = ['outbound',
+                                            'web_slices',
+                                            'active_slice',
                                             'raster_active',
                                             'raster_points',
                                             'move_target',
@@ -744,18 +709,21 @@ class WebManager(smach.State):
 
         if userdata.outbound:
             #this flag indicates it's time to make an outbound move
-            spoke = userdata.spokes.popleft()
-            #there is an extra spoke at the end
-            if len(userdata.spokes) == 0:
+            if len(userdata.web_slices) == 0:
                 rospy.loginfo("WEB_MANAGER finished last spoke")
                 return 'return_home'
-            userdata.spoke_yaw = spoke['yaw']
-            next_move = {'point':spoke['end_point'], 'radius':0, 'radial':True}
+            #more slices left!
+            userdata.active_slice = userdata.web_slices.popleft()
+            end_point = get_polar_point(userdata.active_slice['start_angle'],
+                                    userdata.active_slice['max_radius'],
+                                    userdata.world_fixed_frame)
+            next_move = {'point':end_point, 'radius':0, 'radial':True}
             userdata.outbound = False
-            rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.spoke_yaw))
+            rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.active_slice['start_angle']))
             remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
-            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(int(math.degrees(userdata.spoke_yaw)),
-                                                                                         remaining_minutes))
+            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(
+                                int(userdata.active_slice['start_angle']),
+                                remaining_minutes))
             return self.load_move(next_move, userdata)
         else:
             #we are inbound
@@ -780,7 +748,8 @@ class WebManager(smach.State):
 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
-                    self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
+                    self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(
+                                        int(userdata.active_slice['start_angle'])))
                     userdata.raster_active = False
                     userdata.outbound = True #request the next spoke move
                 else:
@@ -795,7 +764,8 @@ class WebManager(smach.State):
                 return self.load_move(next_move, userdata)
             else:
                 #time to start rastering, create the points, and set flag
-                self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(int(math.degrees(userdata.spoke_yaw))))
+                self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(
+                                    int(userdata.active_slice['start_angle'])))
                 userdata.raster_active = True
                 return 'get_raster'
         
@@ -819,12 +789,12 @@ class WebManager(smach.State):
 class CreateRasterPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
-                             input_keys = ['spokes',
+                             input_keys = ['web_slices',
+                                           'active_slice',
                                            'spoke_yaw',
                                            'spoke_hub_radius',
                                            'raster_step',
                                            'raster_offset',
-                                           'next_spoke_sign',
                                            'world_fixed_frame'],
                              output_keys = ['raster_points'],
                              outcomes=['next',
@@ -844,48 +814,40 @@ class CreateRasterPoints(smach.State):
             radius = util.get_robot_distance_to_origin(self.tf_listener,
                                                        userdata.world_fixed_frame)
                        
-            current_yaw = userdata.spoke_yaw
-            next_yaw = userdata.spokes[0]['yaw']
-            yaw_step = np.abs(util.unwind(next_yaw - current_yaw))
-            raster_offset = userdata.raster_offset
-            #get the sign of the rotation to next yaw
-            spoke_sign = userdata.next_spoke_sign
-
-            def raster_point(yaw, offset_sign, inward): 
-                offset_yaw = util.unwind(yaw + offset_sign*raster_offset/radius*spoke_sign)
-                x = radius*math.cos(offset_yaw)
-                y = radius*math.sin(offset_yaw)
-                point = geometry_msg.PointStamped(header, geometry_msg.Point(x,y,0))
-                return {'point':point,'radius':radius,'radial':inward}
-
-            def too_narrow():
-                if (yaw_step*radius) < (2*userdata.raster_offset + 2.0):
-                    raster_points.append({'point':userdata.spokes[0]['start_point'],
-                                          'radius':userdata.spoke_hub_radius,
-                                          'radial':True})
-                    return True
-                else:
-                    return False
+            current_yaw = userdata.active_slice['start_angle']
+            next_yaw = userdata.active_slice['end_angle']
             
+           
             rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
                                                                                     current_yaw,
                                                                                     next_yaw))
             
-            #generate one ccw-inward-cw-inward set of points per loop
-            #if the next chord move < raster offset, go to next spoke
-            while not too_narrow():
+            #generate one end_angle-inward-start_angle-inward set of points per loop
+            while not rospy.is_shutdown():
                 #chord move to next yaw
-                raster_points.append(raster_point(next_yaw, -1, False))
+                point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
+                raster_points.append({'point':point,'radius':radius,'radial':False})
                 radius -= userdata.raster_step
+                #return from end angle if flag is True
+                if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
+                    break
                 #inward move on next yaw
-                raster_points.append(raster_point(next_yaw, -1, True))
-                #if the next chord move < raster offset, go to next spoke
-                if too_narrow(): break
+                point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
+                raster_points.append({'point':point,'radius':radius,'radial':True})
                 #chord move back to current yaw
-                raster_points.append(raster_point(current_yaw, 1, False))               
+                point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
+                raster_points.append({'point':point,'radius':radius,'radial':False})
                 radius -= userdata.raster_step
+                #return from starting angle if specified
+                if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
+                    break
                 #inward move on current yaw
-                raster_points.append(raster_point(current_yaw, 1, True))                              
+                point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
+                raster_points.append({'point':point,'radius':radius,'radial':True})
+                
+            final_yaw = next_yaw if userdata.active_slice['return_on_end'] else current_yaw    
+            point = get_polar_point(final_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
+            raster_points.append({'point':point,'radius':userdata.spoke_hub_radius,'radial':True})
                  
             #debug points
             debug_array = []
@@ -1034,16 +996,22 @@ class RecoveryManager(smach.State):
                                            'recovery_requested',
                                            'manager_dict',
                                            'move_target',
-                                           'raster_points',
-                                           'spokes',
+                                           'raster_active',
+                                           'active_web_slice',
+                                           'web_slices',
                                            'return_time_offset',
                                            'detection_message',
-                                           'local_frame'],
+                                           'world_fixed_frame',
+                                           'local_frame',
+                                           'spoke_hub_radius'],
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
+                                            'active_web_slice',
+                                            'raster_active',
                                             'raster_points',
-                                            'spokes',
+                                            'outbound',
+                                            'web_slices',
                                             'return_time_offset',
                                             'move_target',
                                             'simple_move',
@@ -1083,21 +1051,25 @@ class RecoveryManager(smach.State):
                 time_offset = rospy.Duration(userdata.recovery_parameters['time_offset']*60)
                 userdata.return_time_offset += time_offset
                 
-            #prune requested spokes
-            spokes_to_remove = userdata.recovery_parameters['spokes_to_remove']
-            while spokes_to_remove > 0:
-                #current spoke is already popped, so load the start of the next one first
-                self.exit_move = userdata.spokes[0]['start_point']
-                spokes_to_remove -=1
-                #if there are more spokes to remove, pop 1
-                if (spokes_to_remove > 0):
-                    if (len(userdata.spokes) > 1):
-                        userdata.spokes.popleft()    
-                    else:
-                        #unless there aren't enough spokes left
-                        rospy.loginfo("RECOVERY_MANAGER requested to prune too many spokes")
-                        break
-        
+            #prune requested web_slices
+            web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
+            if web_slices_to_remove > 0:
+                userdata.raster_active = False
+                userdata.raster_points = deque()
+                userdata.outbound = True
+                while web_slices_to_remove > 1:
+                    #current spoke is already popped, so load the start of the next one first
+                    if len(userdata.web_slices) > 0:
+                        userdata.active_web_slice = userdata.web_slices.popleft()    
+                    web_slices_to_remove -= 1                               
+                
+                point = get_polar_point(userdata.active_web_slice['end_angle'],
+                                        userdata.spoke_hub_radius,
+                                        userdata.world_fixed_frame)
+                self.exit_move = point
+                    
+                                    
+                    
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
         
@@ -1226,3 +1198,10 @@ class LevelTwoAborted(smach.State):
         
         return 'next'
     
+def get_polar_point(angle, distance, world_frame):
+    yaw = util.unwind(np.radians(angle))
+    header = std_msg.Header(0, rospy.Time(0), world_frame)
+    pos = geometry_msg.Point(distance*math.cos(yaw),
+                             distance*math.sin(yaw), 0)
+    point = geometry_msg.PointStamped(header, pos)
+    return point
