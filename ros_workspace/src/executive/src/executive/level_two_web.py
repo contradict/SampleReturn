@@ -590,30 +590,6 @@ class LevelTwoWeb(object):
                     goal = deepcopy(self.state_machine.userdata.move_goal)
                     goal.target_pose.pose.position = saved_point_odom.point
                     self.state_machine.userdata.move_goal = goal                
-                    
-
-    def get_spokes(self, web_slices, hub_radius):
-        #This creates a list of dictionaries.  The yaw entry is a useful piece of information
-        #for some of the state machine states.  The other entry contains the start and end
-        #points defined by the line yaw
-        
-        offset = np.radians(offset)
-        yaws = list(np.linspace(0 + offset,
-                                direction*2*np.pi + offset,
-                                spoke_count,
-                                endpoint=False))
-        #add the starting spoke again, for raster calcs
-        yaws.append(offset)
-        spokes = deque()
-        for web_slice in web_slices:
-            for angle in [web_slice['start_angle'], web_slice['end_angle']]:
-
-                spokes.append({'yaw':yaw,
-                               'min_radius':web_slice['min_radius'],
-                               'start_point':start_point,
-                               'end_point':end_point})
-
-        return spokes
     
     def shutdown_cb(self):
         self.state_machine.request_preempt()
