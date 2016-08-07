@@ -23,10 +23,10 @@ pursue_samples: false
 
 #A value of 1 gets rid of the rest of the raster on the
 #current spoke.  Only useful if exiting to web_manager.
-spokes_to_remove: 0 
+slices_to_remove: 0 
 
 #Time offset: modify time remaining by this many minutes
-time_offset: -4
+time_offset: 0
 
 #Available outcomes:
 #web_manager = go back to the web search

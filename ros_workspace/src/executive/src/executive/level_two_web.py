@@ -119,6 +119,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.world_fixed_frame = self.world_fixed_frame
         self.state_machine.userdata.odometry_frame = self.odometry_frame
         self.state_machine.userdata.local_frame = self.local_frame
+        self.state_machine.userdata.platform_frame = self.platform_frame
         self.state_machine.userdata.start_time = rospy.Time.now()
         self.state_machine.userdata.return_time_offset = rospy.Duration(node_params.return_time_minutes*60)
         self.state_machine.userdata.pause_time_offset = rospy.Duration(0)
@@ -846,7 +847,7 @@ class CreateRasterPoints(smach.State):
                                                                                     next_yaw))
             
             #generate one end_angle-inward-start_angle-inward set of points per loop
-            while radius >= userdata.active_slice['min_radius']: 
+            while not rospy.is_shutdown():
                 #chord move to next yaw
                 point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
                 raster_points.append({'point':point,'radius':radius,'radial':False})
@@ -1069,7 +1070,7 @@ class RecoveryManager(smach.State):
                 userdata.return_time_offset += time_offset
                 
             #prune requested web_slices
-            web_slices_to_remove = userdata.recovery_parameters['web_slices_to_remove']
+            web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
             while web_slices_to_remove > 0:
                 #current spoke is already popped, so load the start of the next one first
                 self.exit_move = userdata.web_slices[0]['start_point']
