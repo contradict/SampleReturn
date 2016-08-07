@@ -37,6 +37,8 @@
     name="color_histogram_descriptor"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
+    <remap from="/processes/sample_detection/search/$(arg namespace)/named_point"
+      to="/processes/sample_detection/search/named_point"/>
   </node>
 
 </launch>
