@@ -136,7 +136,69 @@
               <param name="filter_limit_max" type="double" value="1.5"/>
               <param name="input_frame" type="string" value="base_link"/>
               <param name="output_frame" type="string" value="base_link"/>
-          </node>
+        </node>
+        <node name="xlimit"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/PassThrough $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input" to="points2"/>
+
+              <rosparam>
+                  filter_field_name: x
+                  filter_limit_min: 0.0
+                  filter_limit_max: 3.0
+                  input_frame: "base_link"
+                  output_frame: "base_link"
+              </rosparam>
+        </node>
+        <node name="ylimit"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/PassThrough $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input" to="xlimit/output"/>
+
+              <rosparam>
+                  filter_field_name: y
+                  filter_limit_min: -3.0
+                  filter_limit_max:  3.0
+                  input_frame: "base_link"
+                  output_frame: "base_link"
+              </rosparam>
+        </node>
+        <node name="planefit"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/SACSegmentation $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input" to="ylimit/output"/>
+
+              <rosparam>
+                  axis: [0.0,0.0,1.0]
+                  distance_threshold: 0.1
+                  eps_angle: 0.17
+                  max_iterations: 50
+                  min_inliers: 500
+                  model_type: 0
+                  optimize_coefficients: true
+                  probability: 0.99
+                  radius_max: 0.05
+                  radius_min: 0.0
+              </rosparam>
+        </node>
      </group>
 
 
