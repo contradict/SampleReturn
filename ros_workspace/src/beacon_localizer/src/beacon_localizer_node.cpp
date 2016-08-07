@@ -1,5 +1,6 @@
 #include <vector>
 #include <ros/ros.h>
+#include <math.h>
 
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
@@ -33,7 +34,11 @@ class BeaconKFNode
 
         std::string _world_fixed_frame;
         std::string _odometry_frame;
+        std::string _platform_frame;
 
+        tf::Vector3 _platform_origin;
+        tf::Quaternion _platform_orientation;        
+        
         BFL::LinearAnalyticConditionalGaussian *_system_pdf;
         BFL::LinearAnalyticSystemModelGaussianUncertainty *_system_model;
 
@@ -52,6 +57,7 @@ class BeaconKFNode
 
         tf::StampedTransform _T_odom;  //base_link in odom
         tf::StampedTransform _T_map_to_odom;
+        tf::StampedTransform _T_map_to_platform;
 };
 
 BeaconKFNode::BeaconKFNode( void ):
@@ -122,7 +128,22 @@ void BeaconKFNode::initializeRos( void )
 
     private_nh.param("world_fixed_frame", _world_fixed_frame, std::string("map"));
     private_nh.param("odometry_frame", _odometry_frame, std::string("odom"));
-
+    private_nh.param("platform_frame", _platform_frame, std::string("platform"));
+    
+    //setup platform offset position and angle
+    std::vector<double> platform_coords;
+    std::vector<double> reference_coords;
+    double platform_angle;
+    private_nh.getParam("platform_origin", platform_coords);
+    private_nh.getParam("reference_point", reference_coords);
+    private_nh.param("platform_orientation", platform_angle, 0.0);
+    _platform_origin.setX(platform_coords[0]);
+    _platform_origin.setY(platform_coords[1]);
+    _platform_origin.setZ(0);
+    platform_angle = platform_angle*(M_PI/180);
+    platform_angle = platform_angle + atan(reference_coords[1]/reference_coords[0]);
+    _platform_orientation = tf::createQuaternionFromYaw(platform_angle);
+    
     //beacon message subscriber callback
     _beacon_sub = nh.subscribe( "beacon_pose", 1, &BeaconKFNode::beaconCallback, this);
 
@@ -168,14 +189,26 @@ void BeaconKFNode::transformBroadcastCallback( const ros::TimerEvent& e )
         odom_orientation = tf::createQuaternionFromYaw( state(3) );
     }
     
+    std::vector<tf::StampedTransform> _transforms;
+    
     //This is the map to odom transform, broadcast it and save it in a variable.
     _T_map_to_odom = tf::StampedTransform(tf::Transform(odom_orientation, odom_origin),
                                           now,
                                           _world_fixed_frame,
                                           _odometry_frame);
                                           //"beacon_localizer_correction");
-    _tf_broadcast.sendTransform( _T_map_to_odom );
-
+    _transforms.push_back(_T_map_to_odom);
+    
+    //this is the platform to map transform
+    _T_map_to_platform = tf::StampedTransform(tf::Transform(_platform_orientation,
+                                                            _platform_origin),
+                                              now,
+                                              _world_fixed_frame,
+                                              _platform_frame);
+    _transforms.push_back(_T_map_to_platform);
+        
+    _tf_broadcast.sendTransform(_transforms);
+        
 }
 
 void BeaconKFNode::beaconCallback( geometry_msgs::PoseWithCovarianceStampedConstPtr msg )
