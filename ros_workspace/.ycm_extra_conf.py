@@ -48,6 +48,7 @@ flags = [
         '-I', 'src/beacon_finder/src/apriltags/apriltags-c/',
         '-I', 'src/beacon_finder/src/apriltags/apriltags-c/common',
         '-I', '/opt/ros/indigo/include/bfl',
+        '-I', '/opt/pylon5/include/',
 ]
 
 def DirectoryOfThisScript():
