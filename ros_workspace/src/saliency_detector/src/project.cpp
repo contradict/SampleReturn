@@ -38,6 +38,7 @@ class GroundProjectorNode
 
   double min_major_axis_, max_major_axis_;
   bool enable_debug_;
+  int miss_count_;
 
   Eigen::Vector4d ground_plane_;
   image_geometry::PinholeCameraModel cam_model_;
@@ -87,6 +88,8 @@ class GroundProjectorNode
     min_major_axis_ = 0.04;
     max_major_axis_ = 0.12;
     enable_debug_ = false;
+    ground_plane_ << 0.,0.,1.,0.;
+    miss_count_ = 0;
   }
 
   // For a set of candidate sample patches, project them onto the ground to get
@@ -294,6 +297,14 @@ class GroundProjectorNode
   // Take the plane model fit by the pcl_ros nodelets
   void planeModelCallback(const pcl_msgs::ModelCoefficientsPtr& msg)
   {
+    if (msg->values.size() != 4) {
+      ROS_DEBUG("Invalid Plane Fit");
+      miss_count_ += 1;
+      if (miss_count_ > 30) {
+        ground_plane_ << 0.,0.,1.,0.;
+      }
+      return;
+    }
     // Keep the plane around for patch projection, publish a plane normal
     // marker for Rviz
     ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",msg->values[0],
