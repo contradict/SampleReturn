@@ -297,41 +297,49 @@ class GroundProjectorNode
   // Take the plane model fit by the pcl_ros nodelets
   void planeModelCallback(const pcl_msgs::ModelCoefficientsPtr& msg)
   {
+    visualization_msgs::Marker mark;
     if (msg->values.size() != 4) {
       ROS_DEBUG("Invalid Plane Fit");
       miss_count_ += 1;
       if (miss_count_ > 15) {
         ground_plane_ << 0.,0.,1.,0.;
+        mark.color.r = 1.0;
+        mark.color.g = 0.0;
+        mark.color.b = 0.0;
       }
-      return;
+      else {
+        mark.color.r = 0.0;
+        mark.color.g = 1.0;
+        mark.color.b = 1.0;
+      }
     }
-    // Keep the plane around for patch projection, publish a plane normal
-    // marker for Rviz
-    ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",msg->values[0],
-                                                  msg->values[1],
-                                                  msg->values[2],
-                                                  msg->values[3]);
-
-    visualization_msgs::Marker mark;
+    else {
+      // Keep the plane around for patch projection, publish a plane normal
+      // marker for Rviz
+      ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",msg->values[0],
+                                                    msg->values[1],
+                                                    msg->values[2],
+                                                    msg->values[3]);
+      ground_plane_ << msg->values[0],
+                    msg->values[1],
+                    msg->values[2],
+                    msg->values[3];
+      mark.color.r = 0.0;
+      mark.color.g = 0.5;
+      mark.color.b = 1.0;
+    }
     mark.header = msg->header;
     mark.header.frame_id = "/base_link";
     Eigen::Quaterniond orientation;
     Eigen::Vector3d xhat;
     xhat.setZero();
     xhat[0] = 1.0;
-    ground_plane_ << msg->values[0],
-                  msg->values[1],
-                  msg->values[2],
-                  msg->values[3];
     orientation.setFromTwoVectors(xhat, ground_plane_.head(3));
     tf::quaternionEigenToMsg(orientation, mark.pose.orientation);
     mark.scale.x = 1.0;
     mark.scale.y = 0.1;
     mark.scale.z = 0.1;
     mark.color.a = 1.0;
-    mark.color.r = 0.0;
-    mark.color.g = 0.5;
-    mark.color.b = 1.0;
     pub_marker.publish(mark);
   }
 
