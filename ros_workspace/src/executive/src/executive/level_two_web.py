@@ -62,6 +62,7 @@ class LevelTwoWeb(object):
 
         self.world_fixed_frame = rospy.get_param("world_fixed_frame", "map")
         self.odometry_frame = rospy.get_param("odometry_frame", "odom")
+        self.platform_frame =  rospy.get_param("platform_frame", "platform")
         self.local_frame = 'base_link'
  
         #need platform point
