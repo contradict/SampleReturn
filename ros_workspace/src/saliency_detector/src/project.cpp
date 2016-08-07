@@ -300,7 +300,7 @@ class GroundProjectorNode
     if (msg->values.size() != 4) {
       ROS_DEBUG("Invalid Plane Fit");
       miss_count_ += 1;
-      if (miss_count_ > 30) {
+      if (miss_count_ > 15) {
         ground_plane_ << 0.,0.,1.,0.;
       }
       return;
