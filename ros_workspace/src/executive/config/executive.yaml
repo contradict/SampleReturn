@@ -12,7 +12,7 @@ level_two:
     dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
     beacon_approach_point: {x: 6.0, y: 0}
     platform_point: {x: -0.9, y: 0.0}
-    beacon_observation_delay: 10 
+    beacon_observation_delay: 4 
     beacon_calibration_delay: 10
     gyro_calibration_delay: 10
     beacon_mount_tolerance: 0.02 #correction must be less than this before mount
@@ -35,7 +35,7 @@ level_two:
     #localization map.  Slices also specify a maximum and minimum radius
 
     web_slices: [
-        { start_angle: 15, end_angle: 355, min_radius: 31, max_radius: 42, return_on_end: True },
+        { start_angle: 355, end_angle: 15, min_radius: 33, max_radius: 44, return_on_end: True },
         { start_angle: 80, end_angle: 60, min_radius: 34, max_radius: 45, return_on_end: True },
         { start_angle: 133, end_angle: 106, min_radius: 59, max_radius: 88, return_on_end: True },
         { start_angle: 126, end_angle: 146, min_radius: 38, max_radius: 49, return_on_end: True },
