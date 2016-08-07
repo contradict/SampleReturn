@@ -38,7 +38,8 @@ class BeaconReturn(smach.State):
                                          'stop_on_detection',
                                          'manager_dict',
                                          'world_fixed_frame',
-                                         'odometry_frame'],
+                                         'odometry_frame'
+                                         'platform_frame'],
                              output_keys=['move_target',
                                           'move_point_map',
                                           'simple_move',
@@ -63,13 +64,9 @@ class BeaconReturn(smach.State):
             self.service_preempt()
             return 'preempted'
         
-        #clear previous move_point_map
-        userdata.move_point_map = None
-        map_header = std_msg.Header(0, rospy.Time(0), userdata.world_fixed_frame)
-       
         #get our position in map
         current_pose = util.get_current_robot_pose(self.tf_listener,
-                                                   userdata.world_fixed_frame)        
+                                                   userdata.platform_frame)        
         
         #hopeful distance to approach point
         distance_to_approach_point = util.point_distance_2d(current_pose.pose.position,
@@ -103,7 +100,6 @@ class BeaconReturn(smach.State):
                 self.announcer.say("Beacon not in view. Moving to approach point.")
                 userdata.stop_on_detection = True
                 self.tried_spin = False
-                #set move_point_map to enable localization correction
                 userdata.move_target = userdata.beacon_approach_pose
                 return 'move'
             else:
