@@ -682,12 +682,13 @@ class RobotSimulator(object):
                 
         try:
             #get distances and yaws from reality frame origin
-            reality_origin = PointStamped(std_msg.Header(0, rospy.Time(0), self.reality_frame),
-                                                         Point(0,0,0))
-            angle_to_origin, dist_from_origin = util.get_robot_strafe(self.tf_listener,
-                                                                      reality_origin)        # can't see beacon closer than 10 meters or farther than 40
+            platform_origin = PointStamped(std_msg.Header(0, rospy.Time(0),
+                                                          'platform'),
+                                                          Point(0,0,0))
+            angle_to_platform, dist_from_platform = util.get_robot_strafe(self.tf_listener,
+                                                                          platform_origin)
             angle_to_robot = util.get_robot_yaw_from_origin(self.tf_listener,
-                                                            self.reality_frame)
+                                                            'platform')
         except tf.Exception, exc:
                 print("Transforms not available in publish beacon: {!s}".format(exc))
                 return
@@ -699,12 +700,12 @@ class RobotSimulator(object):
                                         np.degrees(angle_to_origin)))
         '''
 
-        if dist_from_origin < 5.0 or dist_from_origin > 50.0:
+        if dist_from_platform < 5.0 or dist_from_platform > 50.0:
             #print ("NO BEACON PUB: outside beacon view distance: %.2f" %(dist_from_origin))
             return
         
-        # within +/- pi/4 of forward, camera FOV
-        if angle_to_origin > np.radians(-22.0) and angle_to_origin < np.radians(22.0):
+        # within camera FOV
+        if angle_to_platform > np.radians(-20.0) and angle_to_platform < np.radians(20.0):
 
             #get beacon covar and pose from beacon_finder launch
             #then create the message covariance
@@ -712,7 +713,7 @@ class RobotSimulator(object):
             position_sigma_scale = rospy.get_param("/processes/beacon/april_beacon_finder/position_sigma_scale")
             rotation_sigma = rospy.get_param("/processes/beacon/april_beacon_finder/rotation_sigma_3tag")
 
-            pos_covariance = (position_sigma + dist_from_origin*position_sigma_scale)**2
+            pos_covariance = (position_sigma + dist_from_platform*position_sigma_scale)**2
             rot_covariance = rotation_sigma**2
             
             diagonal = [pos_covariance]*3 + [rot_covariance]*3
