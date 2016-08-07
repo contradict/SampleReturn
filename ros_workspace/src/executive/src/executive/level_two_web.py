@@ -66,19 +66,18 @@ class LevelTwoWeb(object):
         self.local_frame = 'base_link'
  
         #need platform point
-        header = std_msg.Header(0, rospy.Time(0), self.world_fixed_frame)
+        platform_header = std_msg.Header(0, rospy.Time(0), self.platform_frame)
         platform_point = geometry_msg.Point(node_params.platform_point['x'],
                                             node_params.platform_point['y'], 0)
                                             
-        self.platform_point = geometry_msg.PointStamped(header, platform_point)
+        self.platform_point = geometry_msg.PointStamped(platform_header, platform_point)
         
         #make a Point msg out of beacon_approach_point, and a pose, at that point, facing beacon
         point = geometry_msg.Point(node_params.beacon_approach_point['x'],
                                    node_params.beacon_approach_point['y'], 0)
         beacon_facing_orientation = util.pointing_quaternion_2d(point, platform_point)
-        geometry_msg.Quaternion(*tf.transformations.quaternion_from_euler(0,0,math.pi))
         pose = geometry_msg.Pose(position = point, orientation = beacon_facing_orientation)
-        self.beacon_approach_pose = geometry_msg.PoseStamped(header = header, pose = pose)
+        self.beacon_approach_pose = geometry_msg.PoseStamped(header = platform_header, pose = pose)
         self.last_beacon_point = None
         self.last_correction_error = 0
         
@@ -110,14 +109,9 @@ class LevelTwoWeb(object):
                 outcomes=['complete', 'preempted', 'aborted'],
                 input_keys = ['action_goal'],
                 output_keys = ['action_result'])
-    
-        self.starting_orientation = node_params.starting_orientation
-        
+                   
         #lists
         self.web_slices = node_params.web_slices
-        for web_slice in self.web_slices:
-            web_slice['start_angle'] += self.starting_orientation
-            web_slice['end_angle'] += self.starting_orientation
         self.state_machine.userdata.web_slices = deque(self.web_slices)
         self.state_machine.userdata.raster_points = deque()
 
