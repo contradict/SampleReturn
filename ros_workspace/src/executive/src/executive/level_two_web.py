@@ -1020,15 +1020,21 @@ class RecoveryManager(smach.State):
                                            'recovery_requested',
                                            'manager_dict',
                                            'move_target',
-                                           'raster_points',
+                                           'raster_active',
+                                           'active_web_slice',
                                            'web_slices',
                                            'return_time_offset',
                                            'detection_message',
-                                           'local_frame'],
+                                           'world_fixed_frame',
+                                           'local_frame',
+                                           'spoke_hub_radius'],
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
+                                            'active_web_slice',
+                                            'raster_active',
                                             'raster_points',
+                                            'outbound',
                                             'web_slices',
                                             'return_time_offset',
                                             'move_target',
@@ -1071,19 +1077,23 @@ class RecoveryManager(smach.State):
                 
             #prune requested web_slices
             web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
-            while web_slices_to_remove > 0:
-                #current spoke is already popped, so load the start of the next one first
-                self.exit_move = userdata.web_slices[0]['start_point']
-                web_slices_to_remove -=1
-                #if there are more web_slices to remove, pop 1
-                if (web_slices_to_remove > 0):
-                    if (len(userdata.web_slices) > 1):
-                        userdata.web_slices.popleft()    
-                    else:
-                        #unless there aren't enough web_slices left
-                        rospy.loginfo("RECOVERY_MANAGER requested to prune too many web_slices")
-                        break
-        
+            if web_slices_to_remove > 0:
+                userdata.raster_active = False
+                userdata.raster_points = deque()
+                userdata.outbound = True
+                while web_slices_to_remove > 1:
+                    #current spoke is already popped, so load the start of the next one first
+                    if len(userdata.web_slices) > 0:
+                        userdata.active_web_slice = userdata.web_slices.popleft()    
+                    web_slices_to_remove -= 1                               
+                
+                point = get_polar_point(userdata.active_web_slice['end_angle'],
+                                        userdata.spoke_hub_radius,
+                                        userdata.world_fixed_frame)
+                self.exit_move = point
+                    
+                                    
+                    
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
         
