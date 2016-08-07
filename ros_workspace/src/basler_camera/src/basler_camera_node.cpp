@@ -138,62 +138,6 @@ BaslerNode::handle_basler_parameter(XmlRpc::XmlRpcValue& param)
 }
 
 void
-BaslerNode::handle_parameters(void)
-{
-  ros::NodeHandle private_handle("~");
-  std::vector<std::string> keys;
-  std::string prefix = private_handle.getNamespace() + "/";
-  if(!private_handle.getParamNames(keys))
-  {
-      ROS_INFO("No params found on parameter server, using defaults from dynamic_reconfigure.");
-      return;
-  }
-  for(std::vector<std::string>::iterator k=keys.begin(); k != keys.end(); ++k)
-  {
-      if((*k).size() < prefix.size())
-      {
-          continue;
-      }
-      std::pair<std::string::iterator, std::string::iterator> different = std::mismatch(prefix.begin(), prefix.end(), (*k).begin());
-      if(different.first != prefix.end())
-      {
-          continue;
-      }
-      std::string param_name(different.second, (*k).end());
-      XmlRpc::XmlRpcValue v;
-      private_handle.getParam(*k, v);
-      if((param_name == "camera_info_url") ||
-              (param_name == "frame_id") ||
-              (param_name == "frame_rate") ||
-              (param_name == "serial_number"))
-      {
-          // handled in main before camera is opened
-          continue;
-      }
-      else if(v.getType() == XmlRpc::XmlRpcValue::TypeBoolean)
-      {
-          handle_basler_parameter(param_name, (bool)v);
-      }
-      else if(v.getType() == XmlRpc::XmlRpcValue::TypeInt)
-      {
-          handle_basler_parameter(param_name, (int)v);
-      }
-      else if(v.getType() == XmlRpc::XmlRpcValue::TypeDouble)
-      {
-          handle_basler_parameter(param_name, (double)v);
-      }
-      else if(v.getType() == XmlRpc::XmlRpcValue::TypeString)
-      {
-          handle_basler_parameter(param_name, (std::string)v);
-      }
-      else
-      {
-          ROS_ERROR_STREAM("Unexpected data type for " << param_name);
-      }
-  }
-}
-
-void
 BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t level)
 {
     (void) level;
@@ -294,9 +238,6 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     camera.RegisterImageEventHandler(this, Pylon::RegistrationMode_Append, Pylon::Cleanup_None);
 
     camera.RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration , Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
-
-    // No need for this I think
-    //handle_parameters();
 
     // use dynamic reconfigure to trigger a camera configuration
     dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
