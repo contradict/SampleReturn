@@ -644,7 +644,7 @@ class KalmanDetectionFilter
       cov_text.header.frame_id = _filter_frame_id;
       cov_text.header.stamp = ros::Time::now();
       std::stringstream ss;
-      ss << "H: " << filter_ptr->hue;
+      ss << "H: " << filter_ptr->hue << "Prob: " << filter_ptr->certainty;
       cov_text.text = ss.str();
       cov_text.color.r = 1.0;
       cov_text.color.g = 1.0;
@@ -675,7 +675,7 @@ class KalmanDetectionFilter
       cov.scale.x = filter_ptr->filter.errorCovPost.at<float>(0,0);
       cov.scale.y = filter_ptr->filter.errorCovPost.at<float>(1,1);
       cov.scale.z = 1.0;
-      cov_text.scale.z = 1.0;
+      cov_text.scale.z = 0.5;
       cov.lifetime = ros::Duration();
       cov_text.lifetime = ros::Duration();
       marker_array.markers.push_back(cov);
