@@ -37,8 +37,7 @@ class BeaconReturn(smach.State):
                                          'beacon_point',
                                          'stop_on_detection',
                                          'manager_dict',
-                                         'world_fixed_frame',
-                                         'odometry_frame'
+                                         'odometry_frame',
                                          'platform_frame'],
                              output_keys=['move_target',
                                           'move_point_map',
@@ -117,7 +116,7 @@ class BeaconReturn(smach.State):
                 
         else: #beacon is in view
             current_yaw = util.get_current_robot_yaw(self.tf_listener,
-                                                     userdata.world_fixed_frame)
+                                                     userdata.platform_frame)
             yaw_to_platform = util.pointing_yaw(current_pose.pose.position,
                                                 userdata.platform_point.point)
             yaw_error = util.unwind(yaw_to_platform - current_yaw)
@@ -163,7 +162,6 @@ class CalculateMountMove(smach.State):
                                        'aborted'],
                              input_keys=['platform_point',
                                          'odometry_frame',
-                                         'world_fixed_frame',
                                          'beacon_mount_tolerance'],
                              output_keys=['simple_move'])
 
