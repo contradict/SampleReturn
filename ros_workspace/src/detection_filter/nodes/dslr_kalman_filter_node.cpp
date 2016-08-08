@@ -31,14 +31,16 @@ class ColoredKF
     cv::KalmanFilter filter;
     double hue;
     int16_t filter_id;
+    std::string frame_id;
     float certainty;
-    ColoredKF(cv::KalmanFilter, double, int16_t, float);
+    ColoredKF(cv::KalmanFilter, double, int16_t, std::string, float);
 };
 
-ColoredKF::ColoredKF (cv::KalmanFilter kf, double h, int16_t id, float cert) {
+ColoredKF::ColoredKF (cv::KalmanFilter kf, double h, int16_t id, std::string f_id, float cert) {
   filter = kf;
   hue = h;
   filter_id = id;
+  frame_id = f_id;
   certainty = cert;
 }
 
@@ -68,13 +70,13 @@ class KalmanDetectionFilter
   std::string frustum_poly_topic;
 
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
+  std::map<std::string, std::vector<std::shared_ptr<ColoredKF> > > not_updated_filter_list_;
   // Exclusion sites are center,radius,id (x,y,r,id,odometer reading)
   std::vector<std::tuple<float,float,float,int16_t,float> > exclusion_list_;
   // Filters that have ever been published, in case we need their position
   // to create an exclusion zone
   std::map<int16_t, std::shared_ptr<ColoredKF> > published_filters_;
 
-  ros::Time last_time_;
   double max_dist_;
   double max_cov_;
   double max_pub_cov_;
@@ -95,7 +97,8 @@ class KalmanDetectionFilter
 
   double PDgO_, PDgo_;
   double PO_init_;
-  double certainty_thresh_;
+  double pub_certainty_thresh_;
+  double min_certainty_;
 
   double last_x_;
   double last_y_;
@@ -108,6 +111,7 @@ class KalmanDetectionFilter
   bool is_manipulator_;
 
   double hue_tolerance_;
+  cv::Mat DSLR_frustum_;
 
   tf::TransformListener listener_;
 
@@ -151,7 +155,7 @@ class KalmanDetectionFilter
 
     private_node_handle_.param("PDgO", PDgO_, double(0.9));
     private_node_handle_.param("PDgo", PDgo_, double(0.1));
-    private_node_handle_.param("certainty_thresh", certainty_thresh_, double(0.9));
+    private_node_handle_.param("pub_certainty_thresh", pub_certainty_thresh_, double(0.9));
 
     private_node_handle_.param("is_manipulator", is_manipulator_, false);
 
@@ -181,9 +185,6 @@ class KalmanDetectionFilter
     pub_frustum_poly =
       nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
 
-    last_time_.sec = 0.0;
-    last_time_.nsec = 0.0;
-
     filter_id_count_ = 1;
     current_published_id_ = 0;
     exclusion_count_ = 0;
@@ -193,6 +194,9 @@ class KalmanDetectionFilter
     last_y_ = 0.0;
     odometer_ = 0.0;
     last_odometry_tick_ = 0.0;
+
+    cv::Mat DSLR_frustum_ = (cv::Mat_<float>(4,2) <<
+        1.0, -3.0, 2.6, -3.0, 2.6, 3.0, 1.0, 3.0);
   }
 
   void exclusionZoneCallback(const std_msgs::Float32 radius)
@@ -221,7 +225,8 @@ class KalmanDetectionFilter
 
     PDgO_ = config.PDgO;
     PDgo_ = config.PDgo;
-    certainty_thresh_ = config.certainty_thresh;
+    pub_certainty_thresh_ = config.pub_certainty_thresh;
+    min_certainty_ = config.min_certainty;
 
     odometry_tick_dist_ = config.odometry_tick_dist;
 
@@ -232,6 +237,7 @@ class KalmanDetectionFilter
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
+      not_updated_filter_list_.clear();
       exclusion_list_.clear();
       current_published_id_ = 0;
     }
@@ -312,20 +318,7 @@ class KalmanDetectionFilter
       addFilter(msg);
       return;
     }
-    if (last_time_ < msg.header.stamp) {
-      last_time_ = msg.header.stamp;
-      for (int i=0; i<filter_list_.size(); i++) {
-        if (isInView(filter_list_[i]->filter)) {
-          filter_list_[i]->filter.predict();
-          filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
-          double current_PO = filter_list_[i]->certainty;
-          filter_list_[i]->certainty = updateProb(current_PO, false, PDgO_, PDgo_);
-        }
-      }
-    }
-
     checkObservation(msg);
-    drawFilterStates();
   }
 
   /* The process tick for all filters */
@@ -334,31 +327,43 @@ class KalmanDetectionFilter
     if (filter_list_.size()==0) {
       return;
     }
-    if (last_time_ < msg.header.stamp) {
-      last_time_ = msg.header.stamp;
-      for (int i=0; i<filter_list_.size(); i++) {
-        if (isInView(filter_list_[i]->filter) or
-            ((odometer_-last_odometry_tick_)>odometry_tick_dist_)) {
-          // Manage filters
-          filter_list_[i]->filter.predict();
-          filter_list_[i]->filter.errorCovPre.copyTo(filter_list_[i]->filter.errorCovPost);;
-          double current_PO = filter_list_[i]->certainty;
-          filter_list_[i]->certainty = updateProb(current_PO, false, PDgO_, PDgo_);
-          // Manage exclusion zones
-          auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
-              [this](std::tuple<float,float,float,int16_t,float> zone)
-              {return (odometer_ - std::get<4>(zone)) > exclusion_zone_range_;});
-          exclusion_list_.erase(new_end, exclusion_list_.end());
-        }
+    // Get filters in msg frame that weren't updated, decrement them
+    for (auto ckf : not_updated_filter_list_[msg.header.frame_id]) {
+      if (isInView(ckf->filter) or (odometer_-last_odometry_tick_)>odometry_tick_dist_) {
+        ckf->filter.predict();
+        ckf->filter.errorCovPre.copyTo(ckf->filter.errorCovPost);
+        ckf->certainty = updateProb(ckf->certainty, false, PDgO_, PDgo_);
       }
     }
+    // Clear NUF
+    not_updated_filter_list_[msg.header.frame_id].clear();
+    // Toss too uncertain filters
+    checkFilterAges();
+    // Repopulate NUF for next cycle
+    for (auto ckf : filter_list_) {
+      if (ckf->frame_id.compare(msg.header.frame_id) == 0) {
+        not_updated_filter_list_[msg.header.frame_id].push_back(ckf);
+      }
+    }
+    // Manage exclusion zones
+    auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
+        [this](std::tuple<float,float,float,int16_t,float> zone)
+        {return (odometer_ - std::get<4>(zone)) > exclusion_zone_range_;});
+    exclusion_list_.erase(new_end, exclusion_list_.end());
+
+    // Update odometer
     if ((odometer_-last_odometry_tick_) > odometry_tick_dist_) {
       last_odometry_tick_ = odometer_;
     }
-    checkFilterAges();
+
+    // Draw in Rviz
     drawFilterStates();
 
+    // Publish top filter for pursuit
     publishTop();
+
+    // Publish view frustum
+    publishViewFrustum();
   }
 
   void publishTop() {
@@ -368,7 +373,7 @@ class KalmanDetectionFilter
     if (current_published_id_ != 0) {
       for (auto filter_ptr : filter_list_) {
         if (filter_ptr->filter_id == current_published_id_) {
-          if (filter_ptr->certainty > certainty_thresh_ &&
+          if (filter_ptr->certainty > pub_certainty_thresh_ &&
               filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_) {
             published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
@@ -398,7 +403,7 @@ class KalmanDetectionFilter
     if (filter_list_.size() > 0) {
       if (current_published_id_ == 0) {
         for (auto filter_ptr : filter_list_) {
-          if ((filter_ptr->certainty > certainty_thresh_) &&
+          if ((filter_ptr->certainty > pub_certainty_thresh_) &&
               (filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_)) {
             dist = sqrt(pow((transform.getOrigin().x()-filter_ptr->filter.statePost.at<float>(0)),2) +
                    pow((transform.getOrigin().y()-filter_ptr->filter.statePost.at<float>(1)),2));
@@ -454,18 +459,33 @@ class KalmanDetectionFilter
     KF.statePost.at<float>(5) = 0;
 
     KF.predict();
-    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.hue,filter_id_count_,PO_init_));
+    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.hue,filter_id_count_,
+          msg.header.frame_id,PO_init_));
     filter_list_.push_back(CKF);
     filter_id_count_++;
-    checkObservation(msg);
+    //checkObservation(msg);
   }
 
-  void addMeasurement(const cv::Mat meas_state, int filter_index)
+  void addMeasurement(const cv::Mat meas_state, std::string meas_frame_id, int filter_id)
   {
-    ROS_DEBUG("Adding measurement to filter: %i", filter_index);
-    filter_list_[filter_index]->filter.correct(meas_state);
-    double current_PO = filter_list_[filter_index]->certainty;
-    filter_list_[filter_index]->certainty = updateProb(current_PO, true, PDgO_, PDgo_);
+    ROS_DEBUG("Adding measurement to filter: %i", filter_id);
+    // Iterate over appropriate NUF list, remove the matching filter
+    std::vector<std::shared_ptr<ColoredKF> >::iterator iter =
+      not_updated_filter_list_[meas_frame_id].begin();
+    while ( iter != not_updated_filter_list_[meas_frame_id].end() ) {
+      if ((*iter)->filter_id == filter_id) {
+        iter = not_updated_filter_list_[meas_frame_id].erase(iter);
+      }
+      else {
+        ++iter;
+      }
+    }
+    for (auto ckf : filter_list_) {
+      if (ckf->filter_id == filter_id) {
+        ckf->filter.correct(meas_state);
+        ckf->certainty = updateProb(ckf->certainty, true, PDgO_, PDgo_);
+      }
+    }
   }
 
   bool checkColor(double filter_hue, double obs_hue)
@@ -503,21 +523,36 @@ class KalmanDetectionFilter
       }
     }
 
-    for (int i=0; i<filter_list_.size(); i++) {
-      double dist = cv::norm(((filter_list_[i]->filter.measurementMatrix)*(filter_list_[i]->filter.statePost)
-        - meas_state));
-      if ((dist < max_dist_) && checkColor(filter_list_[i]->hue,msg.hue)) {
+    for (auto ckf : filter_list_) {
+      double dist = cv::norm(ckf->filter.measurementMatrix * ckf->filter.statePost
+            - meas_state);
+      if ((dist < max_dist_) and checkColor(ckf->hue, msg.hue)) {
         ROS_DEBUG("Color Check Passed");
-        addMeasurement(meas_state, i);
-        filter_list_[i]->hue = msg.hue;
+        addMeasurement(meas_state, msg.header.frame_id, ckf->filter_id);
+        ckf->hue = msg.hue;
         return;
       }
-      else if ((dist < max_dist_) && not checkColor(filter_list_[i]->hue,msg.hue)) {
+      else if ((dist < max_dist_) and not checkColor(ckf->hue, msg.hue)) {
         ROS_DEBUG("Color Check Failed");
         return;
       }
     }
     addFilter(msg);
+  }
+
+  void publishViewFrustum () {
+    geometry_msgs::PolygonStamped frustum_poly;
+    frustum_poly.header.frame_id = "base_link";
+    frustum_poly.header.stamp = ros::Time::now();
+    for (int i=0; i<DSLR_frustum_.rows; i++) {
+      geometry_msgs::Point32 temp_pt;
+      temp_pt.x = DSLR_frustum_.at<float>(i,0);
+      temp_pt.y = DSLR_frustum_.at<float>(i,1);
+      temp_pt.z = 0.0;
+      frustum_poly.polygon.points.push_back(temp_pt);
+    }
+    pub_frustum_poly.publish(frustum_poly);
+    return;
   }
 
   /* This will check if each hypothesis is in view currently */
@@ -527,21 +562,15 @@ class KalmanDetectionFilter
       return true;
     }
     /* This is in base_link, transform it to odom */
-    cv::Mat DSLR_frustum = (cv::Mat_<float>(4,2) <<
-        1.0, -3.0, 2.6, -3.0, 2.6, 3.0, 1.0, 3.0);
-    cv::Mat DSLR_frustum_odom(4,2,CV_32FC1);
+    cv::Mat DSLR_frustum_odom(DSLR_frustum_.rows,2,CV_32FC1);
     geometry_msgs::PointStamped temp_msg, temp_msg_odom;
-    geometry_msgs::PolygonStamped frustum_poly;
-    frustum_poly.header.frame_id = _filter_frame_id;
-    frustum_poly.header.stamp = ros::Time::now();
     temp_msg.header.frame_id = "base_link";
     temp_msg.header.stamp = ros::Time(0);
-    for (int i=0; i<4; i++) {
-      temp_msg.point.x = DSLR_frustum.at<float>(i,0);
-      temp_msg.point.y = DSLR_frustum.at<float>(i,1);
+    for (int i=0; i<DSLR_frustum_.rows; i++) {
+      temp_msg.point.x = DSLR_frustum_.at<float>(i,0);
+      temp_msg.point.y = DSLR_frustum_.at<float>(i,1);
       temp_msg.point.z = 0.0;
       try {
-        //listener_.waitForTransform("odom", "base_link", temp_msg.header.stamp, ros::Duration(0.2));
         listener_.transformPoint(_filter_frame_id,temp_msg,temp_msg_odom);
       }
       catch (tf::TransformException e) {
@@ -550,13 +579,7 @@ class KalmanDetectionFilter
       }
       DSLR_frustum_odom.at<float>(i,0) = temp_msg_odom.point.x;
       DSLR_frustum_odom.at<float>(i,1) = temp_msg_odom.point.y;
-      geometry_msgs::Point32 temp_point;
-      temp_point.x = temp_msg_odom.point.x;
-      temp_point.y = temp_msg_odom.point.y;
-      temp_point.z = 0.0;
-      frustum_poly.polygon.points.push_back(temp_point);
     }
-    pub_frustum_poly.publish(frustum_poly);
     double retval = cv::pointPolygonTest(DSLR_frustum_odom,
         cv::Point2f(kf.statePost.at<float>(0),kf.statePost.at<float>(1)), false);
     return (retval == 1);
@@ -577,7 +600,7 @@ class KalmanDetectionFilter
         return true;
       }
     }
-    if (ckf->certainty < 0.0) {
+    if (ckf->certainty < min_certainty_) {
       clearMarker(ckf);
       return true;
     }
