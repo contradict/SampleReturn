@@ -821,29 +821,30 @@ class CreateRasterPoints(smach.State):
             rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
                                                                                     current_yaw,
                                                                                     next_yaw))
-            
-            #generate one end_angle-inward-start_angle-inward set of points per loop
-            while not rospy.is_shutdown():
-                #chord move to next yaw
-                point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':False})
-                radius -= userdata.raster_step
-                #return from end angle if flag is True
-                if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
-                    break
-                #inward move on next yaw
-                point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':True})
-                #chord move back to current yaw
-                point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':False})
-                radius -= userdata.raster_step
-                #return from starting angle if specified
-                if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
-                    break
-                #inward move on current yaw
-                point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':True})
+            #generate no raster points if we didn't reach min radius
+            if radius > userdata.active_slice['min_radius']:
+                #generate one end_angle-inward-start_angle-inward set of points per loop
+                while not rospy.is_shutdown():
+                    #chord move to next yaw
+                    point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':False})
+                    radius -= userdata.raster_step
+                    #return from end angle if flag is True
+                    if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
+                        break
+                    #inward move on next yaw
+                    point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':True})
+                    #chord move back to current yaw
+                    point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':False})
+                    radius -= userdata.raster_step
+                    #return from starting angle if specified
+                    if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
+                        break
+                    #inward move on current yaw
+                    point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':True})
                 
             final_yaw = next_yaw if userdata.active_slice['return_on_end'] else current_yaw    
             point = get_polar_point(final_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
