@@ -4,6 +4,9 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <basler_camera/basler_node.h>
 
+#include <sys/types.h>
+#include <signal.h>
+
 #include <XmlRpcValue.h>
 
 namespace BaslerCamera
@@ -166,6 +169,7 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
             ROS_FATAL_STREAM("Unknown param type for config parameter " << (*_i)->name << ": " << (*_i)->type);
         }
     }
+    frame_rate = config.AcquisitionFrameRate;
 }
 
 bool
@@ -187,10 +191,12 @@ BaslerNode::do_enable(bool state)
   enabled = state;
   if(enabled && !camera.IsGrabbing())
   {
+      watchdog.start();
       camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
   }
   else if(!enabled && camera.IsGrabbing())
   {
+      watchdog.stop();
       camera.StopGrabbing();
   }
   return enabled;
@@ -218,10 +224,27 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
         info.header.stamp = img_msg.header.stamp;
         info.header.frame_id = img_msg.header.frame_id;
         cam_pub_.publish(img_msg, info);
+        watchdog.stop();
+        watchdog.setPeriod(ros::Duration(watchdog_frames/frame_rate));
+        watchdog.start();
     }
     else
     {
         ROS_ERROR_STREAM("Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription());
+    }
+}
+
+void
+BaslerNode::watchdog_timeout(ros::TimerEvent e)
+{
+    (void)e;
+    if(enabled)
+    {
+        kill(0, SIGTERM);
+    }
+    else
+    {
+        watchdog.stop();
     }
 }
 
@@ -230,6 +253,7 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     frame_id(nh.param("frame_id", std::string("camera"))),
     serial_number(nh.param("serial_number", std::string(""))),
     camera_name(nh.getNamespace()),
+    watchdog_frames(nh.param("watchdog_frames", 3)),
     enabled(nh.param("start_enabled", false))
 {
 
@@ -263,6 +287,8 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     enable_service = nh.advertiseService("enable_publish", &BaslerNode::service_enable, this);
 
     enable_sub = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable, this);
+
+    watchdog = nh.createTimer( ros::Duration(watchdog_frames/frame_rate), &BaslerNode::watchdog_timeout, false, false);
 
     do_enable(enabled);
 }

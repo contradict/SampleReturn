@@ -4,6 +4,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <platform_motion_msgs/Enable.h>
 #include <std_msgs/Bool.h>
+#include <ros/timer.h>
 
 // Include files to use the PYLON API.
 #include <pylon/PylonIncludes.h>
@@ -18,7 +19,8 @@ class BaslerNode : public Pylon::CImageEventHandler
     std::string frame_id;
     std::string serial_number;
     std::string camera_name;
-
+    int watchdog_frames;
+    double frame_rate;
 
     bool enabled;
     ros::ServiceServer enable_service;
@@ -27,6 +29,8 @@ class BaslerNode : public Pylon::CImageEventHandler
     image_transport::ImageTransport *it_;
     image_transport::CameraPublisher cam_pub_;
     camera_info_manager::CameraInfoManager *cinfo_manager_;
+
+    ros::Timer watchdog;
 
     Pylon::CImageFormatConverter converter_;
     Pylon::CPylonImage pylon_image_;
@@ -62,6 +66,9 @@ class BaslerNode : public Pylon::CImageEventHandler
     topic_enable(std_msgs::BoolConstPtr msg);
     bool
     do_enable(bool state);
+
+    void
+    watchdog_timeout(ros::TimerEvent e);
 
     public:
     BaslerNode(ros::NodeHandle &nh);
