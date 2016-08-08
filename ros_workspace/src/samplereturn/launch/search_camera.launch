@@ -20,6 +20,7 @@
         <param name="ExposureAuto" type="string" value="Off"/>
         <param name="ExposureTime" type="double" value="1000.0"/>
         <remap from="basler_camera/image" to="image_color"/>
+        <remap from="basler_camera/enable_publish" to="/cameras/search/enable_publish"/>
     </node>
 
     <node machine="search"
@@ -38,6 +39,7 @@
         <param name="ExposureAuto" type="string" value="Off"/>
         <param name="ExposureTime" type="double" value="1000.0"/>
         <remap from="basler_camera/image" to="image_color"/>
+        <remap from="basler_camera/enable_publish" to="/cameras/search/enable_publish"/>
     </node>
 
     <node machine="search"
@@ -56,6 +58,7 @@
         <param name="ExposureAuto" type="string" value="Off"/>
         <param name="ExposureTime" type="double" value="1000.0"/>
         <remap from="basler_camera/image" to="image_color"/>
+        <remap from="basler_camera/enable_publish" to="/cameras/search/enable_publish"/>
     </node>
     </group>
 
