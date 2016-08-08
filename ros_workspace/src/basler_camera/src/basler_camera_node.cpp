@@ -235,7 +235,7 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
 }
 
 void
-BaslerNode::watchdog_timeout(ros::TimerEvent e)
+BaslerNode::watchdog_timeout(const ros::TimerEvent &e)
 {
     (void)e;
     if(enabled)
@@ -288,7 +288,7 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
 
     enable_sub = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable, this);
 
-    watchdog = nh.createTimer( ros::Duration(watchdog_frames/frame_rate), &BaslerNode::watchdog_timeout, false, false);
+    watchdog = nh.createTimer( ros::Duration(watchdog_frames/frame_rate), &BaslerNode::watchdog_timeout, this, false, false);
 
     do_enable(enabled);
 }

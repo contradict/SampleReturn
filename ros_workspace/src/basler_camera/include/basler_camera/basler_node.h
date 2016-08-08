@@ -68,7 +68,7 @@ class BaslerNode : public Pylon::CImageEventHandler
     do_enable(bool state);
 
     void
-    watchdog_timeout(ros::TimerEvent e);
+    watchdog_timeout(const ros::TimerEvent &e);
 
     public:
     BaslerNode(ros::NodeHandle &nh);
