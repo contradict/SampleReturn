@@ -5,8 +5,8 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     image_transport
     camera_info_manager
-    cv_bridge
     dynamic_reconfigure
+    sensor_msgs
 )
 find_package(OpenCV REQUIRED)
 

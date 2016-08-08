@@ -66,6 +66,7 @@ class ColorHistogramDescriptorNode
 
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
+    enable_debug_ = (pub_debug_image.getNumSubscribers() != 0);
     if (msg->patch_array.empty()) {
       return;
     }
@@ -202,7 +203,6 @@ class ColorHistogramDescriptorNode
     min_target_hue_ = config.min_target_hue;
     max_target_hue_ = config.max_target_hue;
     hue_slop_ = config.hue_slop;
-    enable_debug_ = config.enable_debug;
   }
 
   double hueDistance(double hue, double hue_ref)
