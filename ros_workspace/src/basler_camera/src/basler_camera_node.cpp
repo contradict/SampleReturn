@@ -171,7 +171,20 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
 bool
 BaslerNode::service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
 {
-  enabled = req.state;
+  resp.state = do_enable(req.state);
+  return true;
+}
+
+void
+BaslerNode::topic_enable(std_msgs::BoolConstPtr msg)
+{
+    do_enable(msg->data);
+}
+
+bool
+BaslerNode::do_enable(bool state)
+{
+  enabled = state;
   if(enabled && !camera.IsGrabbing())
   {
       camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
@@ -180,8 +193,7 @@ BaslerNode::service_enable(platform_motion_msgs::Enable::Request &req, platform_
   {
       camera.StopGrabbing();
   }
-  resp.state = req.state;
-  return true;  
+  return enabled;
 }
 
 
@@ -250,12 +262,12 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
 
     enable_service = nh.advertiseService("enable_publish", &BaslerNode::service_enable, this);
 
-    if(enabled)
-        camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+    enable_sub = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable, this);
 
+    do_enable(enabled);
 }
 
-    void
+void
 BaslerNode::shutdown(void)
 {
     if(camera.IsPylonDeviceAttached())
