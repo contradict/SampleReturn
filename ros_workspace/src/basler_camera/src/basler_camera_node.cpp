@@ -188,20 +188,34 @@ BaslerNode::topic_enable(std_msgs::BoolConstPtr msg)
 bool
 BaslerNode::do_enable(bool state)
 {
-  enabled = state;
-  if(enabled && !camera.IsGrabbing())
+  if(state && !camera.IsGrabbing())
   {
-      watchdog.start();
-      camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+      try
+      {
+          camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+          enabled = state;
+          watchdog.start();
+      }
+      catch(Pylon::RuntimeException &e)
+      {
+          ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
+      }
   }
   else if(!enabled && camera.IsGrabbing())
   {
-      watchdog.stop();
-      camera.StopGrabbing();
+      try
+      {
+          camera.StopGrabbing();
+          enabled = state;
+          watchdog.stop();
+      }
+      catch(Pylon::RuntimeException &e)
+      {
+          ROS_ERROR_STREAM("Unable to stop grabbing: " << e.GetDescription());
+      }
   }
   return enabled;
 }
-
 
 void
 BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::CGrabResultPtr& ptrGrabResult)
@@ -225,7 +239,6 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
         info.header.frame_id = img_msg.header.frame_id;
         cam_pub_.publish(img_msg, info);
         watchdog.stop();
-        watchdog.setPeriod(ros::Duration(watchdog_frames/frame_rate));
         watchdog.start();
     }
     else
@@ -240,6 +253,7 @@ BaslerNode::watchdog_timeout(const ros::TimerEvent &e)
     (void)e;
     if(enabled)
     {
+        ROS_ERROR_STREAM("Watchdog timeout");
         kill(0, SIGTERM);
     }
     else
@@ -351,9 +365,17 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "basler_camera");
     ros::NodeHandle nh("~");
 
-    BaslerCamera::BaslerNode node(nh);
+    try
+    {
+        BaslerCamera::BaslerNode node(nh);
 
-    ros::spin();
+        ros::spin();
 
-    node.shutdown();
+        node.shutdown();
+    }
+    catch(std::exception &e)
+    {
+        ROS_ERROR_STREAM("Exception thrown: " << e.what());
+    }
+
 }
