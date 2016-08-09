@@ -41,4 +41,13 @@
       to="/processes/sample_detection/search/named_point"/>
   </node>
 
+  <node
+    pkg="topic_tools"
+    type="relay"
+    name="search_camera_info_relay"
+    machine="search"
+    ns="/processes/sample_detection/search"
+    args="/cameras/search/$(arg namespace)/camera_info kalman_filter/camera_info">
+  </node>
+
 </launch>
