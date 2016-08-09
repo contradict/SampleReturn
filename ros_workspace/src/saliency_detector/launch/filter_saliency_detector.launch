@@ -18,7 +18,6 @@
     name="kalman_filter_node"
     machine="search"
     ns="/processes/sample_detection/search">
-    <remap from="camera_info" to="/cameras/search/center/camera_info"/>
     <remap from="ack" to="/processes/executive/pursuit_result"/>
     <remap from="odometry" to="/motion/odometry"/>
     <param name="max_dist" type="double" value="1.5"/>
