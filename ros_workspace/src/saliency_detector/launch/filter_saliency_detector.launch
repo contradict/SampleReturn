@@ -20,6 +20,7 @@
     ns="/processes/sample_detection/search">
     <remap from="ack" to="/processes/executive/pursuit_result"/>
     <remap from="odometry" to="/motion/odometry"/>
+    <remap from="pause_state" to="/io/pause_state"/>
     <param name="max_dist" type="double" value="1.5"/>
     <param name="max_cov" type="double" value="1.5"/>
     <param name="max_pub_cov" type="double" value="0.3"/>

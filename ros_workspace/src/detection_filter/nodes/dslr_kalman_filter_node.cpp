@@ -9,6 +9,7 @@
 #include <ros/time.h>
 #include <ros/console.h>
 #include <std_msgs/Float32.h>
+#include <std_msgs/Bool.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
@@ -52,6 +53,7 @@ class KalmanDetectionFilter
   ros::Subscriber sub_ack;
   ros::Subscriber sub_odometry;
   ros::Subscriber sub_exclusion_zone;
+  ros::Subscriber sub_pause_state;
 
   ros::Publisher pub_detection;
   ros::Publisher pub_debug_img;
@@ -63,6 +65,7 @@ class KalmanDetectionFilter
   std::string ack_topic;
   std::string odometry_topic;
   std::string exclusion_zone_topic;
+  std::string pause_state_topic;
 
   std::string filtered_detection_topic;
   std::string debug_img_topic;
@@ -110,6 +113,8 @@ class KalmanDetectionFilter
   double exclusion_zone_range_;
   bool is_manipulator_;
 
+  bool is_paused_;
+
   double hue_tolerance_;
   cv::Mat DSLR_frustum_;
 
@@ -132,6 +137,7 @@ class KalmanDetectionFilter
     ack_topic = "ack";
     odometry_topic = "odometry";
     exclusion_zone_topic = "exclusion_zone";
+    pause_state_topic = "pause_state";
 
     filtered_detection_topic = "filtered_point";
     debug_img_topic = "debug_img";
@@ -173,6 +179,9 @@ class KalmanDetectionFilter
     sub_exclusion_zone =
       nh.subscribe(exclusion_zone_topic.c_str(), 3, &KalmanDetectionFilter::exclusionZoneCallback, this);
 
+    sub_pause_state =
+      nh.subscribe(pause_state_topic.c_str(), 1, &KalmanDetectionFilter::pauseStateCallback, this);
+
     pub_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>(filtered_detection_topic.c_str(), 3);
 
@@ -188,6 +197,7 @@ class KalmanDetectionFilter
     filter_id_count_ = 1;
     current_published_id_ = 0;
     exclusion_count_ = 0;
+    is_paused_ = false;
 
     odometry_received_ = false;
     last_x_ = 0.0;
@@ -197,6 +207,11 @@ class KalmanDetectionFilter
 
     cv::Mat DSLR_frustum_ = (cv::Mat_<float>(4,2) <<
         1.0, -3.0, 2.6, -3.0, 2.6, 3.0, 1.0, 3.0);
+  }
+
+  void pauseStateCallback(const std_msgs::Bool pause_state)
+  {
+    is_paused_ = pause_state.data;
   }
 
   void exclusionZoneCallback(const std_msgs::Float32 radius)
@@ -314,6 +329,9 @@ class KalmanDetectionFilter
 
   void detectionCallback(const samplereturn_msgs::NamedPoint& msg)
   {
+    if (is_paused_) {
+      return;
+    }
     if (filter_list_.size() == 0) {
       addFilter(msg);
       return;
@@ -324,36 +342,38 @@ class KalmanDetectionFilter
   /* The process tick for all filters */
   void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
-    if (filter_list_.size()==0) {
-      return;
-    }
-    // Get filters in msg frame that weren't updated, decrement them
-    for (auto ckf : not_updated_filter_list_[msg.header.frame_id]) {
-      if (isInView(ckf->filter) or (odometer_-last_odometry_tick_)>odometry_tick_dist_) {
-        ckf->filter.predict();
-        ckf->filter.errorCovPre.copyTo(ckf->filter.errorCovPost);
-        ckf->certainty = updateProb(ckf->certainty, false, PDgO_, PDgo_);
+    if (!is_paused_) {
+      if (filter_list_.size()==0) {
+        return;
       }
-    }
-    // Clear NUF
-    not_updated_filter_list_[msg.header.frame_id].clear();
-    // Toss too uncertain filters
-    checkFilterAges();
-    // Repopulate NUF for next cycle
-    for (auto ckf : filter_list_) {
-      if (ckf->frame_id.compare(msg.header.frame_id) == 0) {
-        not_updated_filter_list_[msg.header.frame_id].push_back(ckf);
+      // Get filters in msg frame that weren't updated, decrement them
+      for (auto ckf : not_updated_filter_list_[msg.header.frame_id]) {
+        if (isInView(ckf->filter) or (odometer_-last_odometry_tick_)>odometry_tick_dist_) {
+          ckf->filter.predict();
+          ckf->filter.errorCovPre.copyTo(ckf->filter.errorCovPost);
+          ckf->certainty = updateProb(ckf->certainty, false, PDgO_, PDgo_);
+        }
       }
-    }
-    // Manage exclusion zones
-    auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
-        [this](std::tuple<float,float,float,int16_t,float> zone)
-        {return (odometer_ - std::get<4>(zone)) > exclusion_zone_range_;});
-    exclusion_list_.erase(new_end, exclusion_list_.end());
+      // Clear NUF
+      not_updated_filter_list_[msg.header.frame_id].clear();
+      // Toss too uncertain filters
+      checkFilterAges();
+      // Repopulate NUF for next cycle
+      for (auto ckf : filter_list_) {
+        if (ckf->frame_id.compare(msg.header.frame_id) == 0) {
+          not_updated_filter_list_[msg.header.frame_id].push_back(ckf);
+        }
+      }
+      // Manage exclusion zones
+      auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
+          [this](std::tuple<float,float,float,int16_t,float> zone)
+          {return (odometer_ - std::get<4>(zone)) > exclusion_zone_range_;});
+      exclusion_list_.erase(new_end, exclusion_list_.end());
 
-    // Update odometer
-    if ((odometer_-last_odometry_tick_) > odometry_tick_dist_) {
-      last_odometry_tick_ = odometer_;
+      // Update odometer
+      if ((odometer_-last_odometry_tick_) > odometry_tick_dist_) {
+        last_odometry_tick_ = odometer_;
+      }
     }
 
     // Draw in Rviz
