@@ -47,7 +47,7 @@
     name="search_camera_info_relay"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)"
-    args="/cameras/search/$(arg namespace)/camera_info kalman_filter/camera_info">
+    args="/cameras/search/$(arg namespace)/camera_info /processes/sample_detection/search/kalman_filter/camera_info">
   </node>
 
 </launch>
