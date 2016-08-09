@@ -11,8 +11,7 @@
         ns="/processes/beacon"
         machine="search"
         >
-        <remap from="image" to="/cameras/navigation/beacon/image_color"/>
-        <remap from="/cameras/search/camera_info" to="/cameras/navigation/beacon/camera_info"/>
+        <remap from="image" to="/cameras/navigation/beacon/basler_camera/image"/>
 
         <rosparam param="tag_descriptions">
          [{
