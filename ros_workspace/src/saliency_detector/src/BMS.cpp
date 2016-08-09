@@ -45,25 +45,13 @@ void BMS::computeSaliency(const Mat& src, float step)
 	cvtColor(_src,lab,CV_RGB2Lab);
 	cvtColor(_src,hsv,CV_RGB2HSV);
 
-	vector<Mat> maps;
-	maps.push_back(lab);
-	maps.push_back(hsv);
+  int from_to[] = {4,0 , 1,1 , 2,2};
+  Mat in[] = {lab, hsv};
+  Mat mix(lab.rows, lab.cols, CV_8UC3);
+  mixChannels(in, 2, &mix, 1, from_to, 3);
 
-	for (int i=0;i<maps.size();i++)
-	{
-		vector<Mat> sp;
-		split(maps[i],sp);
-    if (i==0) {
-		  //_feature_maps.push_back(sp[0]);
-	    _feature_maps.push_back(sp[1]);
-		  _feature_maps.push_back(sp[2]);
-    }
-    else {
-		  _feature_maps.push_back(sp[0]);
-	  //  _feature_maps.push_back(sp[1]);
-		//_feature_maps.push_back(sp[2]);
-    }
-	}
+  whitenFeatMap(mix,50.0,false);
+
 	_sm=Mat::zeros(src.size(),CV_64FC1);
 
 	for (int i=0;i<_feature_maps.size();++i)
@@ -151,6 +139,49 @@ Mat BMS::getAttentionMap(const Mat& bm)
 	else
 		normalize(ret,ret,1.0,0.0,NORM_MINMAX);
 	return ret;
+}
+
+void BMS::whitenFeatMap(const cv::Mat& img, float reg, bool mWhitening)
+{
+	assert(img.channels() == 3 && img.type() == CV_8UC3);
+
+	vector<Mat> featureMaps;
+
+	if (!mWhitening)
+	{
+		split(img, featureMaps);
+		for (int i = 0; i < featureMaps.size(); i++)
+		{
+			normalize(featureMaps[i], featureMaps[i], 255.0, 0.0, NORM_MINMAX);
+			medianBlur(featureMaps[i], featureMaps[i], 3);
+			_feature_maps.push_back(featureMaps[i]);
+		}
+		return;
+	}
+
+	Mat srcF,meanF,covF;
+	img.convertTo(srcF, CV_32FC3);
+	Mat samples = srcF.reshape(1, img.rows*img.cols);
+	calcCovarMatrix(samples, covF, meanF, CV_COVAR_NORMAL | CV_COVAR_ROWS | CV_COVAR_SCALE, CV_32F);
+
+	covF += Mat::eye(covF.rows, covF.cols, CV_32FC1)*reg;
+	SVD svd(covF);
+	Mat sqrtW;
+	sqrt(svd.w,sqrtW);
+	Mat sqrtInvCovF = svd.u * Mat::diag(1.0/sqrtW);
+
+	Mat whitenedSrc = srcF.reshape(1, img.rows*img.cols)*sqrtInvCovF;
+	whitenedSrc = whitenedSrc.reshape(3, img.rows);
+
+	split(whitenedSrc, featureMaps);
+
+	for (int i = 0; i < featureMaps.size(); i++)
+	{
+		normalize(featureMaps[i], featureMaps[i], 255.0, 0.0, NORM_MINMAX);
+		featureMaps[i].convertTo(featureMaps[i], CV_8U);
+		medianBlur(featureMaps[i], featureMaps[i], 3);
+		_feature_maps.push_back(featureMaps[i]);
+	}
 }
 
 Mat BMS::getSaliencyMap()
