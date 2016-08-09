@@ -195,6 +195,7 @@ BaslerNode::do_enable(bool state)
           camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
           enabled = state;
           watchdog.start();
+          ROS_INFO_STREAM("Started grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
@@ -208,6 +209,7 @@ BaslerNode::do_enable(bool state)
           camera.StopGrabbing();
           enabled = state;
           watchdog.stop();
+          ROS_INFO_STREAM("Stopped grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
@@ -290,7 +292,6 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     camera.RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration , Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
 
     // use dynamic reconfigure to trigger a camera configuration
-    dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
     server.setCallback(boost::bind(&BaslerNode::configure_callback, this, _1, _2));
 
     // This should be a param!
