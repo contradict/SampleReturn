@@ -177,38 +177,6 @@ class PursueSample(object):
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'move_goal':'pursuit_goal'})
 
-            '''
-            @smach.cb_interface(outcomes=['verified','not_verified'])
-            def sample_verify_resp(userdata, response):
-                if response.verified:
-                    return 'verified'
-                else:
-                    return 'not_verified'
-            
-            @smach.cb_interface(input_keys=['target_sample'])
-            def sample_verify_req(userdata, request):
-                return samplereturn_srv.VerifyRequest(target = userdata.target_sample)
-            
-            smach.StateMachine.add('SAMPLE_VERIFY',
-                smach_ros.ServiceState('close_range_verify', samplereturn_srv.Verify,
-                request_cb = sample_verify_req,
-                response_cb = sample_verify_resp),
-                transitions = {'verified':'ANNOUNCE_VERIFIED',
-                               'not_verified':'ANNOUNCE_NOT_VERIFIED',
-                               'succeeded':'PUBLISH_FAILURE', #means cb error I think
-                               'aborted':'PUBLISH_FAILURE'})
-
-            smach.StateMachine.add('ANNOUNCE_VERIFIED',
-                                   AnnounceState(self.announcer,
-                                                 'Sample verified.  Prepare ing final approach.'),
-                                   transitions = {'next':'CALCULATE_MANIPULATOR_APPROACH'})    
-
-            smach.StateMachine.add('ANNOUNCE_NOT_VERIFIED',
-                                   AnnounceState(self.announcer,
-                                                 'Sample not verified.'),
-                                   transitions = {'next':'PUBLISH_FAILURE'})    
-            '''
-
             smach.StateMachine.add('ANNOUNCE_MANIPULATOR_APPROACH',
                                            AnnounceState(self.announcer,
                                                          'Prepare ing final approach.'),

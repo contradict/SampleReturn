@@ -4,6 +4,9 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <basler_camera/basler_node.h>
 
+#include <sys/types.h>
+#include <signal.h>
+
 #include <XmlRpcValue.h>
 
 namespace BaslerCamera
@@ -166,24 +169,53 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
             ROS_FATAL_STREAM("Unknown param type for config parameter " << (*_i)->name << ": " << (*_i)->type);
         }
     }
+    frame_rate = config.AcquisitionFrameRate;
 }
 
 bool
 BaslerNode::service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
 {
-  enabled = req.state;
-  if(enabled && !camera.IsGrabbing())
+  resp.state = do_enable(req.state);
+  return true;
+}
+
+void
+BaslerNode::topic_enable(std_msgs::BoolConstPtr msg)
+{
+    do_enable(msg->data);
+}
+
+bool
+BaslerNode::do_enable(bool state)
+{
+  if(state && !camera.IsGrabbing())
   {
-      camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+      try
+      {
+          camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+          enabled = state;
+          watchdog.start();
+      }
+      catch(Pylon::RuntimeException &e)
+      {
+          ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
+      }
   }
   else if(!enabled && camera.IsGrabbing())
   {
-      camera.StopGrabbing();
+      try
+      {
+          camera.StopGrabbing();
+          enabled = state;
+          watchdog.stop();
+      }
+      catch(Pylon::RuntimeException &e)
+      {
+          ROS_ERROR_STREAM("Unable to stop grabbing: " << e.GetDescription());
+      }
   }
-  resp.state = req.state;
-  return true;  
+  return enabled;
 }
-
 
 void
 BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::CGrabResultPtr& ptrGrabResult)
@@ -206,10 +238,27 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
         info.header.stamp = img_msg.header.stamp;
         info.header.frame_id = img_msg.header.frame_id;
         cam_pub_.publish(img_msg, info);
+        watchdog.stop();
+        watchdog.start();
     }
     else
     {
         ROS_ERROR_STREAM("Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription());
+    }
+}
+
+void
+BaslerNode::watchdog_timeout(const ros::TimerEvent &e)
+{
+    (void)e;
+    if(enabled)
+    {
+        ROS_ERROR_STREAM("Watchdog timeout");
+        kill(0, SIGTERM);
+    }
+    else
+    {
+        watchdog.stop();
     }
 }
 
@@ -218,6 +267,7 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     frame_id(nh.param("frame_id", std::string("camera"))),
     serial_number(nh.param("serial_number", std::string(""))),
     camera_name(nh.getNamespace()),
+    watchdog_frames(nh.param("watchdog_frames", 3)),
     enabled(nh.param("start_enabled", false))
 {
 
@@ -250,12 +300,14 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
 
     enable_service = nh.advertiseService("enable_publish", &BaslerNode::service_enable, this);
 
-    if(enabled)
-        camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+    enable_sub = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable, this);
 
+    watchdog = nh.createTimer( ros::Duration(watchdog_frames/frame_rate), &BaslerNode::watchdog_timeout, this, false, false);
+
+    do_enable(enabled);
 }
 
-    void
+void
 BaslerNode::shutdown(void)
 {
     if(camera.IsPylonDeviceAttached())
@@ -313,9 +365,17 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "basler_camera");
     ros::NodeHandle nh("~");
 
-    BaslerCamera::BaslerNode node(nh);
+    try
+    {
+        BaslerCamera::BaslerNode node(nh);
 
-    ros::spin();
+        ros::spin();
 
-    node.shutdown();
+        node.shutdown();
+    }
+    catch(std::exception &e)
+    {
+        ROS_ERROR_STREAM("Exception thrown: " << e.what());
+    }
+
 }

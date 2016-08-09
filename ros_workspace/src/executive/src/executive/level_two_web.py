@@ -84,19 +84,13 @@ class LevelTwoWeb(object):
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")
         self.CAN_interface = util.CANInterface()
-        self.camera_services = []
-        self.camera_services.append(rospy.ServiceProxy('enable_search_center',
-                                                        platform_srv.Enable,
-                                                        persistent=True))
-        self.camera_services.append(rospy.ServiceProxy('enable_search_port',
-                                                        platform_srv.Enable,
-                                                        persistent=True))
-        self.camera_services.append(rospy.ServiceProxy('enable_search_starboard',
-                                                        platform_srv.Enable,
-                                                        persistent=True))
-        self.camera_services.append(rospy.ServiceProxy('enable_navigation_beacon',
-                                                        platform_srv.Enable,
-                                                        persistent=True))
+        self.camera_enablers = []
+        self.camera_enablers.append(rospy.Publisher('enable_search',
+                                                   std_msg.Bool,
+                                                   queue_size=10))
+        self.camera_enablers.append(rospy.Publisher('enable_beacon',
+                                                    std_msg.Bool,
+                                                    queue_size=10))
        
         #movement action servers        
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
@@ -193,7 +187,7 @@ class LevelTwoWeb(object):
         with self.state_machine:
             
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(self.camera_services),
+                                   StartLeveLTwo(self.camera_enablers),
                                    transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
             
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
@@ -425,7 +419,7 @@ class LevelTwoWeb(object):
                                                   'aborted':'CREATE_MOVE_GOAL'})
             
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
-                                  LevelTwoPreempted(self.camera_services),
+                                  LevelTwoPreempted(self.camera_enablers),
                                    transitions = {'recovery':'RECOVERY_MANAGER',
                                                   'calibrate':'CALCULATE_BEACON_ROTATION',
                                                   'exit':'preempted'})
@@ -601,7 +595,7 @@ class LevelTwoWeb(object):
 #searches the globe   
 class StartLeveLTwo(smach.State):
 
-    def __init__(self, camera_services): 
+    def __init__(self, camera_enablers): 
    
         smach.State.__init__(self,
                             input_keys=['paused',
@@ -615,7 +609,7 @@ class StartLeveLTwo(smach.State):
                                         'pause_time_offset'],
                             outcomes=['next']),
 
-        self.camera_services = camera_services
+        self.camera_enablers = camera_enablers
 
     def execute(self, userdata):
         
@@ -632,12 +626,8 @@ class StartLeveLTwo(smach.State):
                                              velocity = userdata.spin_velocity)
         
         #enable all search/beacon cameras
-        try:
-            for service_proxy in self.camera_services:
-                service_proxy(True)
-        except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("LEVEL_TWO unable to enable cameras: %s:", e)
-                
+        for publisher in self.camera_enablers:
+            publisher.publish(True)
         
         userdata.pause_time_offset = rospy.Duration(0)
         userdata.start_time = rospy.Time.now()
@@ -821,29 +811,30 @@ class CreateRasterPoints(smach.State):
             rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
                                                                                     current_yaw,
                                                                                     next_yaw))
-            
-            #generate one end_angle-inward-start_angle-inward set of points per loop
-            while not rospy.is_shutdown():
-                #chord move to next yaw
-                point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':False})
-                radius -= userdata.raster_step
-                #return from end angle if flag is True
-                if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
-                    break
-                #inward move on next yaw
-                point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':True})
-                #chord move back to current yaw
-                point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':False})
-                radius -= userdata.raster_step
-                #return from starting angle if specified
-                if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
-                    break
-                #inward move on current yaw
-                point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
-                raster_points.append({'point':point,'radius':radius,'radial':True})
+            #generate no raster points if we didn't reach min radius
+            if radius > userdata.active_slice['min_radius']:
+                #generate one end_angle-inward-start_angle-inward set of points per loop
+                while not rospy.is_shutdown():
+                    #chord move to next yaw
+                    point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':False})
+                    radius -= userdata.raster_step
+                    #return from end angle if flag is True
+                    if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
+                        break
+                    #inward move on next yaw
+                    point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':True})
+                    #chord move back to current yaw
+                    point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':False})
+                    radius -= userdata.raster_step
+                    #return from starting angle if specified
+                    if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
+                        break
+                    #inward move on current yaw
+                    point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
+                    raster_points.append({'point':point,'radius':radius,'radial':True})
                 
             final_yaw = next_yaw if userdata.active_slice['return_on_end'] else current_yaw    
             point = get_polar_point(final_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
@@ -1163,14 +1154,14 @@ class MoveMUX(smach.State):
         return userdata.active_manager
     
 class LevelTwoPreempted(smach.State):
-    def __init__(self, camera_services):
+    def __init__(self, camera_enablers):
         smach.State.__init__(self,
                              input_keys = ['recovery_requested',
                                            'map_calibration_requested'],
                              output_keys = ['move_point_map'],
                              outcomes=['recovery', 'calibrate', 'exit'])
         
-        self.camera_services = camera_services
+        self.camera_enablers = camera_enablers
         
     def execute(self, userdata):
         
@@ -1182,11 +1173,8 @@ class LevelTwoPreempted(smach.State):
             return 'calibrate'
     
         #disable all search/beacon cameras
-        try:
-            for service_proxy in self.camera_services:
-                service_proxy(False)
-        except (rospy.ServiceException, rospy.ROSSerializationException, TypeError), e:
-            rospy.logerr("LEVEL_TWO unable to disable cameras: %s:", e)    
+        for publisher in self.camera_enablers:
+            publisher.publish(True)
         
         return 'exit'
 
