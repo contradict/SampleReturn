@@ -212,6 +212,12 @@ class KalmanDetectionFilter
   void pauseStateCallback(const std_msgs::Bool pause_state)
   {
     is_paused_ = pause_state.data;
+    if (is_paused_) {
+      ROS_DEBUG("Search Kalman Filter Paused");
+    }
+    else {
+      ROS_DEBUG("Search Kalman Filter Running");
+    }
   }
 
   void exclusionZoneCallback(const std_msgs::Float32 radius)
