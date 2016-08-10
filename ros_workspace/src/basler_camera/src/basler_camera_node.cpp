@@ -195,6 +195,7 @@ BaslerNode::do_enable(bool state)
           camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
           enabled = state;
           watchdog.start();
+          ROS_INFO_STREAM("Started grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
@@ -208,6 +209,7 @@ BaslerNode::do_enable(bool state)
           camera.StopGrabbing();
           enabled = state;
           watchdog.stop();
+          ROS_INFO_STREAM("Stopped grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
@@ -290,7 +292,6 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     camera.RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration , Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
 
     // use dynamic reconfigure to trigger a camera configuration
-    dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
     server.setCallback(boost::bind(&BaslerNode::configure_callback, this, _1, _2));
 
     // This should be a param!
@@ -334,10 +335,15 @@ BaslerNode::find_camera()
         if (serial_number == "") {
             // Create an instant camera object for the camera device found first.
             camera.Attach(Pylon::CTlFactory::GetInstance().CreateFirstDevice());
+            ROS_INFO_STREAM("Empty serial number, using first device");
         } else {
             // Look up the camera by its serial number
             for (size_t i=0; i<devices.size(); i++) {
-                if (devices[i].GetSerialNumber().c_str() == serial_number) {
+                ROS_INFO_STREAM("Checking '" << \
+                        devices[i].GetSerialNumber() << \
+                        "' == '" <<\
+                        serial_number << "'");
+                if (devices[i].GetSerialNumber() == serial_number.c_str()) {
                     camera.Attach(tlFactory.CreateDevice(devices[i]));
                     break;
                 }
@@ -348,7 +354,8 @@ BaslerNode::find_camera()
             }
         }
 
-        ROS_INFO_STREAM("using device " << camera.GetDeviceInfo().GetModelName());
+        ROS_INFO_STREAM("using device " << camera.GetDeviceInfo().GetModelName() << \
+               " serial number " << camera.GetDeviceInfo().GetSerialNumber() );
     }
 
     catch (GenICam::GenericException &e)

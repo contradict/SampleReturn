@@ -29,6 +29,7 @@ class BaslerNode : public Pylon::CImageEventHandler
     image_transport::ImageTransport *it_;
     image_transport::CameraPublisher cam_pub_;
     camera_info_manager::CameraInfoManager *cinfo_manager_;
+    dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
 
     ros::Timer watchdog;
 
