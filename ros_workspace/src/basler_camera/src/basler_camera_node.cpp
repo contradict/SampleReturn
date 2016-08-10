@@ -202,7 +202,7 @@ BaslerNode::do_enable(bool state)
           ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
       }
   }
-  else if(!enabled && camera.IsGrabbing())
+  else if(!state && camera.IsGrabbing())
   {
       try
       {
