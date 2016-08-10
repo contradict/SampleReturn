@@ -161,6 +161,7 @@ class ColorHistogramDescriptorNode
         np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
         np_msg.point = msg->patch_array[i].world_point.point;
         np_msg.hue = dominant_hue;
+        np_msg.sensor_frame = msg->patch_array[i].header.frame_id;
         pub_named_point.publish(np_msg);
       }
       else {

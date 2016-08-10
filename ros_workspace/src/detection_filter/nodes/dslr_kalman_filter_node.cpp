@@ -487,7 +487,7 @@ class KalmanDetectionFilter
 
     KF.predict();
     std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.hue,filter_id_count_,
-          msg.header.frame_id,PO_init_));
+          msg.sensor_frame,PO_init_));
     filter_list_.push_back(CKF);
     filter_id_count_++;
     //checkObservation(msg);
@@ -555,7 +555,7 @@ class KalmanDetectionFilter
             - meas_state);
       if ((dist < max_dist_) and checkColor(ckf->hue, msg.hue)) {
         ROS_DEBUG("Color Check Passed");
-        addMeasurement(meas_state, msg.header.frame_id, ckf->filter_id);
+        addMeasurement(meas_state, msg.sensor_frame, ckf->filter_id);
         ckf->hue = msg.hue;
         return;
       }

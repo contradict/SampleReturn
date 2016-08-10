@@ -17,6 +17,9 @@ geometry_msgs/Point point
 # Replace color name with dominant hue (0-180)
 float32 hue
 
+# This is a bad workaround to avoid touching well-tested executive code
+string sensor_frame
+
 int16 filter_id
 float32 grip_angle
 
