@@ -167,7 +167,7 @@ class LineMOD_Detector
       detector = readInnerLinemod(filename);
       num_modalities = (int)detector->getModalities().size();
     }
-    std::cout << num_modalities << std::endl;
+    ROS_DEBUG("Number of modalities loaded: %i", num_modalities);
 
     enabled_ = false;
     got_right_camera_info_ = false;
@@ -212,7 +212,6 @@ class LineMOD_Detector
         LineMOD_Detector::K.at<double>(i,j) = msg.K.at(3*i+j);
       }
     }
-    //std::cout << LineMOD_Detector::K << std::endl;
   }
 
   void rightCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
@@ -332,16 +331,10 @@ class LineMOD_Detector
       ROS_DEBUG("Matches size: %u", (int)matches.size());
       float best_match_similarity = 0;
       int best_match_idx = -1;
-      //std::cout << "Matches size: " << (int)matches.size() << std::endl;
       for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
       {
-          //std::cout << "Matches size: " << (int)matches.size() << std::endl;
-          //std::cout << i << std::endl;
           cv::linemod::Match m = matches[i];
 
-          //std::cout << "I: " << i << "classes visited: " << classes_visited << std::endl;
-          //std::cout << "matches.size: " << (int)matches.size() << "num classes: " <<
-          //  LineMOD_Detector::num_classes << std::endl;
           if (m.similarity > best_match_similarity) {
               best_match_similarity = m.similarity;
               best_match_idx = i;
@@ -352,8 +345,6 @@ class LineMOD_Detector
           }
       }
       bool sent_something=false;
-      //std::cout << "Best match similarity: " << best_match_similarity << std::endl;
-      //std::cout << "Best match idx: " << best_match_idx << std::endl;
       sensor_msgs::ImagePtr debugmsg;
       if (best_match_idx == -1) {
           if(_publish_debug_img)
@@ -369,8 +360,6 @@ class LineMOD_Detector
           {
               ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
                       m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
-              printf("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                      m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
           }
 
           // Draw matching template
@@ -380,15 +369,9 @@ class LineMOD_Detector
           std::vector<cv::Point> hull;
           hull = templateConvexHull(templates, LineMOD_Detector::num_modalities, cv::Point(m.x,m.y), mask.size(),
                   mask);
-          //cv::imshow("mask", mask);
-          //std::cout << "Mask size: " << mask.size() << std::endl;
-          //std::cout << "Mask channels: " << mask.channels() << std::endl;
-          //cv::imshow("display", LineMOD_Detector::display);
-          //cv::waitKey(10);
           Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
           //interiorColor = cn.computeInteriorColor(LineMOD_Detector::display, mask);
           interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
-          //std::cout << "Interior color: " << interiorColor << std::endl;
           std::string dominant_color = cn.getDominantColor(interiorColor);
           ROS_DEBUG("Dominant color: %s",dominant_color.c_str());
 
@@ -609,7 +592,6 @@ class LineMOD_Detector
       }
       listener_.transformPoint(_detection_frame_id, temp_point, odom_point);
 
-      //std::cout << "Camera 3D point: " << temp_point << std::endl;
       point_msg.name = class_id;
       point_msg.sample_id = sample_id;
       point_msg.header = header;
@@ -651,8 +633,6 @@ class LineMOD_Detector
             "mono8",mask).toImageMsg();
         debug_mask_pub.publish(debugmsg);
       }
-      //cv::imshow("mask",mask);
-      //cv::waitKey(10);
       // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
       if(!maskToHull(mask, &grip_hull))
       {
