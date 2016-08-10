@@ -235,11 +235,6 @@ class LineMOD_Detector
       ROS_ERROR("disp cv_bridge exception: %s", e.what());
       return;
     }
-
-    //float f = msg->f;
-    //float T = msg->T;
-    //cv::Mat depth_img = (f*T*1000)/(disp_ptr->image).clone();
-    //depth_img.convertTo(depth_img, CV_16U);
     disparity_img = (disp_ptr->image).clone();
     min_disp = msg->min_disparity;
     got_disp_ = true;
@@ -296,25 +291,18 @@ class LineMOD_Detector
       }
 
       LineMOD_Detector::got_color = true;
-      //cv::Mat lab_img;
-      //cv::cvtColor(color_ptr->image,lab_img,CV_RGB2Lab);
-
-      cv::Mat blur;
-      cv::medianBlur(color_ptr->image, blur, 13);
-
       LineMOD_Detector::display = color_ptr->image.clone();
-      //LineMOD_Detector::display = blur.clone();
-      //LineMOD_Detector::color_img = lab_img;
-      //LineMOD_Detector::color_img = color_ptr->image.clone();
+
       if (hard_samples) {
           LineMOD_Detector::color_img = color_ptr->image.clone();
       }
       else {
+          cv::Mat blur;
+          cv::medianBlur(color_ptr->image, blur, 13);
           LineMOD_Detector::color_img = blur.clone();
       }
 
       LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
-      //LineMOD_Detector::sources.push_back(blur);
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
@@ -370,7 +358,6 @@ class LineMOD_Detector
           hull = templateConvexHull(templates, LineMOD_Detector::num_modalities, cv::Point(m.x,m.y), mask.size(),
                   mask);
           Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-          //interiorColor = cn.computeInteriorColor(LineMOD_Detector::display, mask);
           interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
           std::string dominant_color = cn.getDominantColor(interiorColor);
           ROS_DEBUG("Dominant color: %s",dominant_color.c_str());
