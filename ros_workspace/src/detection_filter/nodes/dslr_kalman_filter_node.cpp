@@ -246,6 +246,7 @@ class KalmanDetectionFilter
 
     PDgO_ = config.PDgO;
     PDgo_ = config.PDgo;
+    PO_init_ = config.PO_init;
     pub_certainty_thresh_ = config.pub_certainty_thresh;
     min_certainty_ = config.min_certainty;
 
