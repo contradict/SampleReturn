@@ -205,8 +205,7 @@ class KalmanDetectionFilter
     odometer_ = 0.0;
     last_odometry_tick_ = 0.0;
 
-    cv::Mat DSLR_frustum_ = (cv::Mat_<float>(4,2) <<
-        1.0, -3.0, 2.6, -3.0, 2.6, 3.0, 1.0, 3.0);
+    DSLR_frustum_ = (cv::Mat_<float>(4,2) << 1.0, -3.0, 2.6, -3.0, 2.6, 3.0, 1.0, 3.0);
   }
 
   void pauseStateCallback(const std_msgs::Bool pause_state)
