@@ -54,7 +54,6 @@ class PitchRollUKFNode
     void parseProcessSigma(const ros::NodeHandle& privatenh);
     Eigen::MatrixXd process_noise(double dt) const;
     void sendState(void);
-    bool lookupTransform(std::string frame_id, std::string to_id, tf::StampedTransform& transform);
 
     public:
         PitchRollUKFNode();
@@ -198,28 +197,6 @@ PitchRollUKFNode::sendState(void)
     tf::vectorEigenToMsg(ukf_->state().GyroBias, state->gyro_bias);
     state_pub_.publish(state);
     //printState();
-}
-
-bool PitchRollUKFNode::lookupTransform(std::string frame_id, std::string to_id, tf::StampedTransform& transform)
-{
-    if(frame_id=="" || to_id=="")
-    {
-        ROS_WARN_STREAM("Missing frame id \"" << frame_id << "\" -> \"" << to_id << "\"");
-        return false;
-    }
-    try
-    {
-        listener_.lookupTransform(frame_id,
-                to_id,
-                ros::Time(0),
-                transform);
-    }
-    catch(tf::TransformException ex)
-    {
-        ROS_ERROR_STREAM("Unable to look up " << frame_id << "->" << to_id << ": " << ex.what());
-        return false;
-    }
-    return true;
 }
 
 void
