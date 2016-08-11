@@ -32,7 +32,7 @@ class SaliencyDetectorNode
   bool blobDetect_on_;
   int bms_sample_step_;
   double bms_blur_std_;
-  int bms_thresh_;
+  double bms_thresh_fraction_;
   bool bms_thresh_on_;
   double bms_top_trim_;
   double bms_img_width_;
@@ -197,7 +197,7 @@ class SaliencyDetectorNode
         config.bms_normalize, config.bms_handle_border);
     bms_sample_step_ = config.bms_sample_step;
     bms_blur_std_ = config.bms_blur_std;
-    bms_thresh_ = config.bms_thresh;
+    bms_thresh_fraction_ = config.bms_thresh_fraction;
     bms_thresh_on_ = config.bms_thresh_on;
     bms_top_trim_ = config.bms_top_trim;
     bms_img_width_ = config.bms_img_width;
