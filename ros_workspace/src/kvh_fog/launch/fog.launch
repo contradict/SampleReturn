@@ -6,7 +6,7 @@
         type="kvh_fog_node.py"
         ns="/io/kvh"
         machine="navigate"
-        output="screen">
+        >
         <param name="frame_id" type="string" value="gyro"/>
         <param name="port" type="string" value="/dev/ttyUSB0"/>
         <!-- discard measurements after re-open -->
