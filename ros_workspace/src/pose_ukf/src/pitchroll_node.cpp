@@ -143,7 +143,12 @@ PitchRollUKFNode::sendPose(void)
     tf::quaternionEigenToMsg( ukf_->state().Orientation.unit_quaternion().inverse(), msg->pose.orientation);
     pose_pub_.publish(msg);
 
-    if(publish_tf_)
+    if(publish_tf_ && !first_update_)
+    {
+        publishTFIdentity();
+        return;
+    }
+    else if(publish_tf_)
     {
         tf::StampedTransform odometry_in;
         tf::StampedTransform imu_trans;
@@ -244,7 +249,7 @@ PitchRollUKFNode::imuCallback(sensor_msgs::ImuConstPtr msg)
 void
 PitchRollUKFNode::gyroCallback(sensor_msgs::ImuConstPtr msg)
 {
-    if(!listener_.canTransform(imu_frame_, msg->header.frame_id, msg->header.stamp))
+    if(!first_update_ || !listener_.canTransform(imu_frame_, msg->header.frame_id, msg->header.stamp))
     {
        if(!first_update_) publishTFIdentity();
        return;
