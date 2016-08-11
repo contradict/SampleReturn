@@ -241,12 +241,11 @@ class GroundProjectorNode
     camera_point_b.point.z = ray_b.z;
     tf::StampedTransform camera_transform;
     // This is a static link, so Time(0) should be fine
-    listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
-    if (!listener_.canTransform("base_link",camera_point_a.header.frame_id,
-          camera_point_a.header.stamp)) {
+    if (!listener_.canTransform("base_link",header.frame_id, camera_point_a.header.stamp)) {
       ROS_INFO("Couldn't transform base_link to %s\n",camera_point_a.header.frame_id.c_str());
       return false;
     }
+    listener_.lookupTransform("base_link",header.frame_id,ros::Time(0),camera_transform);
     listener_.transformPoint("base_link",camera_point_a,base_link_point_a);
     listener_.transformPoint("base_link",camera_point_b,base_link_point_b);
     Eigen::Vector3d base_link_ray_a, base_link_ray_b, ray_origin;
@@ -275,7 +274,15 @@ class GroundProjectorNode
       ground_point.point.x = mid_ground_point[0];
       ground_point.point.y = mid_ground_point[1];
       ground_point.point.z = mid_ground_point[2];
-      listener_.transformPoint("odom",ground_point,ground_point);
+      try
+      {
+          listener_.transformPoint("odom",ground_point,ground_point);
+      }
+      catch(const std::exception& e)
+      {
+          ROS_ERROR_STREAM("Unable to transform ground_point to \"odom\": " << e.what());
+          return false;
+      }
       return true;
     }
     else {
