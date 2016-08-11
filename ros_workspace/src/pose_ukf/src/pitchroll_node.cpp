@@ -107,12 +107,6 @@ PitchRollUKFNode::connect(void)
 {
     ros::NodeHandle nh;
 
-    ROS_DEBUG_STREAM("Waiting for gyro transform");
-
-    std::string err="Waiting for gyro->imu";
-    while(!listener_.waitForTransform("gyro", "imu_0", ros::Time(0), ros::Duration(1), ros::Duration(0.01), &err)
-            && ros::ok());
-
     imu_subscription_ = nh.subscribe("imu", 1, &PitchRollUKFNode::imuCallback, this);
     gyro_subscription_ = nh.subscribe("gyro", 1, &PitchRollUKFNode::gyroCallback, this);
     ROS_INFO("Subscribers created");
