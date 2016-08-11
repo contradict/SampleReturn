@@ -31,7 +31,7 @@
               type="nodelet"
               args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="5.0"
+              respawn_delay="10.0"
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
             <param name="isMaster" type="bool" value="false"/>
@@ -57,7 +57,7 @@
               type="nodelet"
               args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="5.0"
+              respawn_delay="10.0"
               respawn="true">
 
             <param name="guid" type="string" value="$(arg right_guid)"/>
@@ -89,7 +89,7 @@
             <param name="check_interval" type="double" value="0.05"/>
             <param name="max_desync" type="double" value="0.033"/>
             <param name="max_missing_count" type="int" value="30"/>
-            <param name="startup_delay" type="int" value="15"/>
+            <param name="startup_delay" type="int" value="30"/>
         </node>
     </group>
 
