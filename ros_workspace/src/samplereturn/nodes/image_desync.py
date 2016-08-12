@@ -6,6 +6,7 @@ import rospy
 import rosnode
 import os
 import time
+import rosnode
 
 def get_argv(pid):
     try:
@@ -175,19 +176,22 @@ class image_desync(object):
         self.got_info['right'] = False
         self.check_missing()
 
-    def restart_manager(self, message):
+    def restart_manager(self, message, restart="both"):
         remaining_time =  self.startup_delay - (rospy.Time.now() - self.startup_time).to_sec()
         if remaining_time>0.0:
             rospy.logdebug("Waiting to restart: %f", remaining_time)
             return
-        rospy.logerr("%s, restarting manager", message)
-        self.desync_count = 0
-        # node must be marked respawn in launch file,
-        #if not kill_nodelet_manager(self.manager_node_name):
-        #    rospy.logerr("Unable to kill manager %s", self.manager_node_name)
-        if not masacre_nodelets_in_namespace(self.namespace):
-            rospy.logerr("Unable to kill any nodes in this namespace: %s",
-                    self.namespace)
+        if restart == "both":
+            rospy.logerr("%s, restarting manager", message)
+            self.desync_count = 0
+            # node must be marked respawn in launch file,
+            #if not kill_nodelet_manager(self.manager_node_name):
+            #    rospy.logerr("Unable to kill manager %s", self.manager_node_name)
+            if not masacre_nodelets_in_namespace(self.namespace):
+                rospy.logerr("Unable to kill any nodes in this namespace: %s",
+                        self.namespace)
+        elif restart == "left" or restart == "right":
+            rosnode.kill_nodes([self.namespace+"/"+restart])
         self.startup_time = rospy.Time.now()
 
     def check_desync(self, delta):
@@ -210,11 +214,11 @@ class image_desync(object):
         elif self.missing_count['left'] > self.max_missing_count:
             self.status_pub.publish(String("Left Missing"))
             if self.restart_on_missing:
-                self.restart_manager("Left camera failed")
+                self.restart_manager("Left camera failed", restart="left")
         elif self.missing_count['right'] > self.max_missing_count:
             self.status_pub.publish(String("Right Missing"))
             if self.restart_on_missing:
-                self.restart_manager("Right camera failed")
+                self.restart_manager("Right camera failed", restart="right")
 
 if __name__=="__main__":
     rospy.init_node('image_desync')
