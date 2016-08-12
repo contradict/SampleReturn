@@ -193,13 +193,13 @@ BaslerNode::do_enable(bool state)
       try
       {
           camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
-          enabled = state;
           watchdog.start();
           ROS_INFO_STREAM("Started grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
+          ros::shutdown();
       }
   }
   else if(!state && camera.IsGrabbing())
@@ -207,15 +207,16 @@ BaslerNode::do_enable(bool state)
       try
       {
           camera.StopGrabbing();
-          enabled = state;
           watchdog.stop();
           ROS_INFO_STREAM("Stopped grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to stop grabbing: " << e.GetDescription());
+          ros::shutdown();
       }
   }
+  enabled = camera.IsGrabbing();
   return enabled;
 }
 

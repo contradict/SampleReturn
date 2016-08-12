@@ -139,7 +139,7 @@ target_link_libraries(pitchroll_ukf_node
    ${Boost_LIBRARIES}
    ${eigen_LIBRARIES}
 )
-
+add_dependencies(pitchroll_ukf_node pose_ukf_generate_messages)
 
 add_executable(test_ukf
     src/test/ukf_test.cpp)
