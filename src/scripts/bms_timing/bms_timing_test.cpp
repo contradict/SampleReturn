@@ -55,6 +55,10 @@ int main( int argc, char** argv)
   cv::threshold(bms_out, bms_thresh, atoi(argv[6]), 255, cv::THRESH_BINARY);
 
   cv::cvtColor(img,img,CV_RGB2BGR);
+
+  cv::imwrite("small_image.png", small);
+  cv::imwrite("small_bms.png", bms_out);
+
   cv::namedWindow("BMS",WINDOW_NORMAL);
   cv::namedWindow("BMS Thresh",WINDOW_NORMAL);
   //cv::moveWindow("BMS",1940,0);
