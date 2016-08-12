@@ -6,7 +6,7 @@ executive_master:
 level_two:
     #all values in degrees and meters
     move_velocity: 0.8 
-    spin_velocity: 0.5
+    spin_velocity: 0.3
     return_time_minutes: 110 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
@@ -52,7 +52,7 @@ level_two:
 pursue_sample:
     #sample approach (pursuit) parameters
     pursuit_velocity: 0.8
-    spin_velocity: 0.5
+    spin_velocity: 0.3
     max_pursuit_error: 0.5
     min_pursuit_distance: 1.2
     #if sample is closer than this, strafe to approach point
