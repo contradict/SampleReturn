@@ -108,7 +108,7 @@ class LineMOD_Detector
   bool hard_samples;
   double max_hull_area_;
   double min_hull_area_;
-  int target_width_;
+  double target_width_;
 
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
 
