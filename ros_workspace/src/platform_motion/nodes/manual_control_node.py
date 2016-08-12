@@ -164,10 +164,16 @@ class ManualController(object):
                                      transitions = {'succeeded':'ENABLE_HARD_MANIPULATOR_DETECTOR',
                                                     'aborted':'SELECT_JOYSTICK'})
             
+            @smach.cb_interface()
+            def enable_detector_cb(userdata, response):
+                rospy.sleep(2.0)
+                return 'succeeded'
+
             smach.StateMachine.add('ENABLE_HARD_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
-                                                            request = samplereturn_srv.EnableRequest(True)),
+                                                            request = samplereturn_srv.EnableRequest(True),
+                                                            response_cb = enable_detector_cb),
                                      transitions = {'succeeded':'SELECT_SERVO_MODE',
                                                     'aborted':'SELECT_JOYSTICK'})
             
