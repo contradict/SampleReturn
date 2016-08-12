@@ -111,16 +111,16 @@ class ManualController(object):
                                    transitions = {'next':'SELECT_JOYSTICK',
                                                   'timeout':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'MANUAL_PREEMPTED'})
-            
+
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
-                                   transitions = {'visual_servo_requested':'ENABLE_MANIPULATOR_DETECTOR',
+                                   transitions = {'visual_servo_requested':'ENABLE_HARD_MANIPULATOR_DETECTOR',
                                                   'pursuit_requested':'CONFIRM_SAMPLE_PRESENT',
                                                   'manipulator_grab_requested':'ANNOUNCE_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
-                                                  'aborted':'MANUAL_ABORTED'})           
+                                                  'aborted':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('CONFIRM_SAMPLE_PRESENT',
                                    ConfirmSamplePresent(self.announcer),
@@ -182,9 +182,9 @@ class ManualController(object):
             smach.StateMachine.add('VISUAL_SERVO',
                                    ServoController(self.tf, self.announcer),
                                    transitions = {'move':'SERVO_MOVE',
-                                                  'complete':'DISABLE_MANIPULATOR_DETECTOR',
+                                                  'complete':'DISABLE_HARD_MANIPULATOR_DETECTOR',
                                                   'point_lost':'ANNOUNCE_NO_SAMPLE',
-                                                  'aborted':'DISABLE_MANIPULATOR_DETECTOR'},
+                                                  'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'},
                                    remapping = {'detected_sample':'manipulator_sample'})
 
             smach.StateMachine.add('SERVO_MOVE',
@@ -197,21 +197,21 @@ class ManualController(object):
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled.'),
-                                   transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
-            
-            
+                                   transitions = {'next':'DISABLE_HARD_MANIPULATOR_DETECTOR'})
+
+
             smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled.'),
-                                   transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
-           
+                                   transitions = {'next':'DISABLE_HARD_MANIPULATOR_DETECTOR'})
+
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'DISABLE_HARD_MANIPULATOR_DETECTOR',
-                                                    'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'})           
- 
+                                                    'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'})
+
             smach.StateMachine.add('DISABLE_HARD_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,

@@ -218,16 +218,16 @@ class PursueSample(object):
                                'clear':'ANNOUNCE_CLEAR',
                                'succeeded':'PUBLISH_FAILURE', #means cb error I think
                                'aborted':'PUBLISH_FAILURE'})
-    
+
             smach.StateMachine.add('ANNOUNCE_BLOCKED',
                                    AnnounceState(self.announcer,
                                                  'Obstacles in sample area.'),
                                    transitions = {'next':'PUBLISH_FAILURE'})
-            
+
             smach.StateMachine.add('ANNOUNCE_CLEAR',
                                    AnnounceState(self.announcer,
                                                  'Area clear. Begin ing approach.'),
-                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})
+                                   transitions = {'next':'ENABLE_HARD_MANIPULATOR_DETECTOR'})
 
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
@@ -357,7 +357,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('CONFIRM_SAMPLE_ACQUIRED',
                                    ConfirmSampleAcquired(self.announcer, self.result_pub),
-                                   transitions = {'sample_gone':'DISABLE_MANIPULATOR_DETECTOR',
+                                   transitions = {'sample_gone':'DISABLE_HARD_MANIPULATOR_DETECTOR',
                                                   'sample_present':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'})
 
@@ -387,7 +387,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('PUBLISH_FAILURE',
                                    PublishFailure(self.result_pub),
-                                   transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
+                                   transitions = {'next':'DISABLE_HARD_MANIPULATOR_DETECTOR'})
 
             #beginning of clean exit path
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
