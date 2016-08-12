@@ -29,7 +29,7 @@
         <rosparam>
             system_noise_covariance: [ 1.0e-3, 0, 0, 1.0e-3, 0, 1.0e-3 ]
             platform_origin: [ 5.4, 5.8 ]
-            platform_orientation: 0.0
+            platform_orientation: -20.0
             reference_point: [ 81.5, -30.0 ]
         </rosparam>    
     

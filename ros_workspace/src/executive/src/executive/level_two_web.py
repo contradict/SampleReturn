@@ -1174,7 +1174,7 @@ class LevelTwoPreempted(smach.State):
     
         #disable all search/beacon cameras
         for publisher in self.camera_enablers:
-            publisher.publish(True)
+            publisher.publish(False)
         
         return 'exit'
 
