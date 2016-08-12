@@ -32,7 +32,7 @@ class SaliencyDetectorNode
   bool blobDetect_on_;
   int bms_sample_step_;
   double bms_blur_std_;
-  int bms_thresh_;
+  double bms_thresh_fraction_;
   bool bms_thresh_on_;
   double bms_top_trim_;
   double bms_img_width_;
@@ -106,12 +106,6 @@ class SaliencyDetectorNode
     debug_bms_img_ = bms_.getSaliencyMap().clone();
     ROS_INFO("End BMS Comp");
 
-    // Threshold grayscale saliency into binary
-    if (bms_thresh_on_) {
-      ROS_DEBUG("Thresholding");
-      cv::threshold(debug_bms_img_, debug_bms_img_, bms_thresh_, 255, cv::THRESH_BINARY);
-    }
-
     // Allocate output image and detected region structures
     cv::Mat debug_bms_img_color;
     std::vector<cv::KeyPoint> kp;
@@ -157,6 +151,16 @@ class SaliencyDetectorNode
       sub_img = cv_ptr->image(Range(top_left_y, bot_right_y), Range(top_left_x, bot_right_x));
       sub_mask = debug_bms_img_(Range(top_left_y, bot_right_y), Range(top_left_x, bot_right_x));
 
+      // Threshold grayscale saliency into binary
+      if (bms_thresh_on_) {
+        ROS_DEBUG("Thresholding");
+        // Compute threshold for each segmented blob
+        double minVal, maxVal, thresh;
+        cv::minMaxLoc(sub_mask, &minVal, &maxVal);
+        thresh = minVal + 0.3 * (maxVal - minVal);
+        cv::threshold(sub_mask, sub_mask, thresh, 255, cv::THRESH_BINARY);
+      }
+
       if (cv::countNonZero(sub_mask) == 0) {
         continue;
       }
@@ -193,7 +197,7 @@ class SaliencyDetectorNode
         config.bms_normalize, config.bms_handle_border);
     bms_sample_step_ = config.bms_sample_step;
     bms_blur_std_ = config.bms_blur_std;
-    bms_thresh_ = config.bms_thresh;
+    bms_thresh_fraction_ = config.bms_thresh_fraction;
     bms_thresh_on_ = config.bms_thresh_on;
     bms_top_trim_ = config.bms_top_trim;
     bms_img_width_ = config.bms_img_width;
