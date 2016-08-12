@@ -59,4 +59,15 @@
     args="/cameras/search/$(arg namespace)/camera_info /processes/sample_detection/search/camera_info">
   </node>
 
+  <node
+    machine="search"
+    pkg="linemod_detector"
+    type="linemod_detector_2d"
+    name="hard_linemod_detector_2d"
+    ns="/processes/sample_detection/search/$(arg namespace)">
+    <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
+    <param name="pub_threshold" type="double" value="90.0"/>
+    <param name="hard_samples" type="bool" value="True"/>
+  </node>
+
 </launch>
