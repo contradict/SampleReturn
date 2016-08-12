@@ -177,6 +177,7 @@ class LineMOD_Detector
   void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
   {
       _config = config;
+      pub_threshold = config.pub_threshold;
   }
 
   bool enable(samplereturn_msgs::Enable::Request &req,
