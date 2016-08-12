@@ -278,7 +278,6 @@ class LineMOD_Detector
       if (!got_disp_) {
           return;
       }
-      bool show_match_result = true;
       cv_bridge::CvImagePtr color_ptr;
       try
       {
@@ -343,12 +342,8 @@ class LineMOD_Detector
       else
       {
           cv::linemod::Match m = matches[best_match_idx];
-
-          if (show_match_result)
-          {
-              ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                      m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
-          }
+          ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
+                  m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
 
           // Draw matching template
           const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
@@ -797,10 +792,8 @@ class LineMOD_Detector
       std_msgs::Header header;
       sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
       pub_bms_img.publish(debug_img_msg);
-
       return found;
   }
-
 };
 
 int main(int argc, char ** argv)
