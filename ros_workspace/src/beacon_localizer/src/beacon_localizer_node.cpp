@@ -17,6 +17,10 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
+#include <dynamic_reconfigure/server.h>
+#undef DEFAULT //bfl has a macro named DEFAULT, dynamic_reconfigure tries to use the same name
+#include <beacon_localizer/beacon_localizer_paramsConfig.h>
+
 namespace beacon_filter_node {
 class BeaconKFNode
 {
@@ -31,13 +35,15 @@ class BeaconKFNode
         void transformBroadcastCallback( const ros::TimerEvent& e );
         void beaconCallback( geometry_msgs::PoseWithCovarianceStampedConstPtr msg );
         void filterUpdateCallback( const ros::TimerEvent& e );
-
+        void configCallback( beacon_localizer::beacon_localizer_paramsConfig &config, uint32_t level );
+        
         std::string _world_fixed_frame;
         std::string _odometry_frame;
         std::string _platform_frame;
 
         tf::Vector3 _platform_origin;
-        tf::Quaternion _platform_orientation;        
+        tf::Quaternion _platform_orientation;
+        std::vector<double> _reference_coords;
         
         BFL::LinearAnalyticConditionalGaussian *_system_pdf;
         BFL::LinearAnalyticSystemModelGaussianUncertainty *_system_model;
@@ -58,6 +64,8 @@ class BeaconKFNode
         tf::StampedTransform _T_odom;  //base_link in odom
         tf::StampedTransform _T_map_to_odom;
         tf::StampedTransform _T_map_to_platform;
+
+        dynamic_reconfigure::Server<beacon_localizer::beacon_localizer_paramsConfig> dr_server;
 };
 
 BeaconKFNode::BeaconKFNode( void ):
@@ -132,16 +140,15 @@ void BeaconKFNode::initializeRos( void )
     
     //setup platform offset position and angle
     std::vector<double> platform_coords;
-    std::vector<double> reference_coords;
     double platform_angle;
     private_nh.getParam("platform_origin", platform_coords);
-    private_nh.getParam("reference_point", reference_coords);
+    private_nh.getParam("reference_point", _reference_coords);
     private_nh.param("platform_orientation", platform_angle, 0.0);
     _platform_origin.setX(platform_coords[0]);
     _platform_origin.setY(platform_coords[1]);
     _platform_origin.setZ(0);
     platform_angle = platform_angle*(M_PI/180);
-    platform_angle = platform_angle + atan(reference_coords[1]/reference_coords[0]);
+    platform_angle = platform_angle + atan(_reference_coords[1]/_reference_coords[0]);
     _platform_orientation = tf::createQuaternionFromYaw(platform_angle);
     
     //beacon message subscriber callback
@@ -163,6 +170,9 @@ void BeaconKFNode::initializeRos( void )
                                            &BeaconKFNode::filterUpdateCallback,
                                            this);
 
+    //set dynamic reconfigure callback 
+    dr_server.setCallback(boost::bind(&BeaconKFNode::configCallback, this,  _1, _2));
+    
 }
 
 void BeaconKFNode::transformBroadcastCallback( const ros::TimerEvent& e )
@@ -333,6 +343,19 @@ void BeaconKFNode::filterUpdateCallback( const ros::TimerEvent& e )
     ROS_DEBUG_STREAM("BEACON LOCALIZER Covariance: " << _filter->PostGet()->CovarianceGet() );
 }
 
+/* Dynamic reconfigure callback */
+void BeaconKFNode::configCallback(beacon_localizer::beacon_localizer_paramsConfig &config, uint32_t level)
+{
+    double platform_angle;
+    
+    //get platform orientation in degrees, convert to reference system
+    platform_angle =  config.platform_orientation;
+    platform_angle = platform_angle*(M_PI/180);
+    platform_angle = platform_angle + atan(_reference_coords[1]/_reference_coords[0]);
+    _platform_orientation = tf::createQuaternionFromYaw(platform_angle);
+    
+}
+
 void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::SymmetricMatrix& m)
 {
     ros::NodeHandle private_nh("~");
@@ -381,7 +404,7 @@ void BeaconKFNode::getCovarianceMatrix(std::string param_name, MatrixWrapper::Sy
     }
 }
 
-}
+} //end name_space
 
 int main(int argc, char **argv)
 {

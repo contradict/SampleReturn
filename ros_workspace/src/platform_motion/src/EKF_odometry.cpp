@@ -2,6 +2,7 @@
 #include <pdf/gaussian.h>
 #include <pdf/linearanalyticconditionalgaussian.h>
 #include <iostream>
+#include <tf_conversions/tf_eigen.h>
 
 #include "odometry/EKF_odometry.h"
 #include "odometry/odometrywithcurvature.h"
@@ -197,7 +198,17 @@ void EKFOdometryNode::updateYawPose(geometry_msgs::PoseWithCovarianceStampedCons
 
 void EKFOdometryNode::updateYawImu(sensor_msgs::ImuConstPtr imumsg)
 {
-    updateYaw(tf::getYaw(imumsg->orientation), imumsg->orientation_covariance[8]);
+    if(!listener.canTransform(child_frame_id, imumsg->header.frame_id, imumsg->header.stamp))
+    {
+       return;
+    }
+
+    tf::Quaternion gyro_q;
+    tf::quaternionMsgToTF(imumsg->orientation, gyro_q);
+    tf::StampedTransform gyro_imu;
+    listener.lookupTransform(child_frame_id, imumsg->header.frame_id, imumsg->header.stamp, gyro_imu);
+    tf::Quaternion gyro_imu_tf = gyro_imu.getRotation() * gyro_q * gyro_imu.getRotation().inverse();
+    updateYaw(tf::getYaw(gyro_imu_tf), imumsg->orientation_covariance[8]);
 }
 
 void EKFOdometryNode::updateYaw(double yaw, double cov)
