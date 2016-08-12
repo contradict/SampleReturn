@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     sensor_msgs
     cmake_modules
+    dynamic_reconfigure
     )
 
 find_package(Eigen REQUIRED)
@@ -78,6 +79,10 @@ link_directories(${BFL_LIBRARY_DIRS})
 #   DEPENDENCIES
 #   geometry_msgs#   nav_msgs#   sensor_msgs
 # )
+
+generate_dynamic_reconfigure_options(
+    cfg/beacon_localizer_params.cfg
+)
 
 ###################################
 ## catkin specific configuration ##

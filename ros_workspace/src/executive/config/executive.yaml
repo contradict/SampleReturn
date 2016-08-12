@@ -6,7 +6,7 @@ executive_master:
 level_two:
     #all values in degrees and meters
     move_velocity: 0.8 
-    spin_velocity: 0.5
+    spin_velocity: 0.3
     return_time_minutes: 110 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
@@ -46,13 +46,13 @@ level_two:
         { start_angle: 328, end_angle: 338, min_radius: 67, max_radius: 78, return_on_end: True },
         { start_angle: 325, end_angle: 315, min_radius: 89, max_radius: 100, return_on_end: False },
         { start_angle: 342, end_angle: 352, min_radius: 100, max_radius: 111, return_on_end: True },
-        { start_angle: 1, end_angle: 18, min_radius: 128, max_radius: 172, return_on_end: False }
+        { start_angle: 359, end_angle: 18, min_radius: 128, max_radius: 172, return_on_end: False }
     ]
 
 pursue_sample:
     #sample approach (pursuit) parameters
     pursuit_velocity: 0.8
-    spin_velocity: 0.5
+    spin_velocity: 0.3
     max_pursuit_error: 0.5
     min_pursuit_distance: 1.2
     #if sample is closer than this, strafe to approach point
