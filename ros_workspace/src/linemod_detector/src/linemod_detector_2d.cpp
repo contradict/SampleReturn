@@ -375,94 +375,16 @@ class LineMOD_Detector
               drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
           }
 
-          if (m.similarity > LineMOD_Detector::pub_threshold && dominant_color!="green")
+          if (m.similarity > LineMOD_Detector::pub_threshold)
           {
-              cv::RotatedRect rect = computeGripAngle(hull);
-              ROS_INFO("Measured angle: %f width: %f height: %f", rect.angle, rect.size.width, rect.size.height);
-              cv::circle(display, rect.center, 5, cv::Scalar(255,0,255));
-              if (m.class_id == "red_puck" &&
-                      (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple"
-                       || dominant_color=="orange" || dominant_color=="white" ||
-                       dominant_color=="yellow"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::RED_PUCK);
-              }
-              if (m.class_id == "orange_pipe" &&
-                      (dominant_color=="orange" || dominant_color=="white" || dominant_color=="yellow"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::ORANGE_PIPE);
-              }
-              if (m.class_id == "pre_cached" &&
-                      (dominant_color=="white" || dominant_color=="gray"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::PRE_CACHED);
-              }
-              if (m.class_id == "pre_cached_side" &&
-                      (dominant_color=="white" || dominant_color=="gray"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::PRE_CACHED);
-              }
-              if (m.class_id == "wood_cube" &&
-                      (dominant_color=="yellow" || dominant_color=="brown" || dominant_color=="white"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::WOODEN_CUBE);
-              }
-              if (m.class_id == "pink_tennis_ball" &&
-                      (dominant_color=="pink" || dominant_color=="white" || dominant_color=="red" ||
-                       dominant_color=="orange" || dominant_color=="purple" || dominant_color=="brown"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
-              }
-              if (m.class_id == "colored_ball" &&
-                      dominant_color!="brown" && dominant_color!="white" && dominant_color!="gray")
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::COLORED_BALL);
-              }
-              if (m.class_id == "metal_star")
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_pi" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_tree" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_lines" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_square" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
+            cv::RotatedRect rect = computeGripAngle(hull);
+            ROS_DEBUG("Measured angle: %f width: %f height: %f", rect.angle, rect.size.width, rect.size.height);
+            cv::circle(display, rect.center, 5, cv::Scalar(255, 0, 255));
+            sent_something = true;
+            LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
+                samplereturn_msgs::NamedPoint::METAL_1);
           }
+
           debugmsg = cv_bridge::CvImage(color_ptr->header, color_ptr->encoding, display).toImageMsg();
       }
 
