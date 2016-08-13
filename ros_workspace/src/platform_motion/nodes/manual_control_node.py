@@ -157,7 +157,7 @@ class ManualController(object):
                                   transitions = {'succeeded':'SELECT_JOYSTICK',
                                                  'aborted':'SELECT_JOYSTICK'})
 
-            @smach.cb_interface()
+            @smach.cb_interface(input_keys=['manipulator_sample'])
             def enable_detector_cb(userdata, response):
                 timeout = rospy.Duration(5.0)
                 start = rospy.Time.now()
