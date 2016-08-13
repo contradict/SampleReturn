@@ -30,9 +30,9 @@
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
         <arg name="run_processing" value="$(arg run_processing)"/>
-        <arg name="namespace" value="center"/>
-        <arg name="left_guid" value="00b09d0100bd09ce"/>
-        <arg name="right_guid" value="00b09d0100bb69fb"/>
+        <arg name="namespace" value="starboard"/>
+        <arg name="left_guid" value="00b09d0100ca7fd5"/>
+        <arg name="right_guid" value="00b09d0100ca7fdb"/>
         <arg name="strobe" value="true"/>
         <arg name="machine" value="navigate"/>
     </include>
@@ -40,9 +40,9 @@
     <include file="$(find samplereturn)/launch/navigation_pair_gpu.launch">
         <arg name="run_cameras" value="$(arg run_cameras)"/>
         <arg name="run_processing" value="$(arg run_processing)"/>
-        <arg name="namespace" value="starboard"/>
-        <arg name="left_guid" value="00b09d0100ca7fd5"/>
-        <arg name="right_guid" value="00b09d0100ca7fdb"/>
+        <arg name="namespace" value="center"/>
+        <arg name="left_guid" value="00b09d0100bd09ce"/>
+        <arg name="right_guid" value="00b09d0100bb69fb"/>
         <arg name="strobe" value="true"/>
         <arg name="machine" value="navigate"/>
     </include>

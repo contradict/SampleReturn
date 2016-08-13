@@ -7,9 +7,9 @@ SSH_PORT="22"
 PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOME=/home/robot
 if [ $# -eq 0 ]; then
-    LAUNCH_FILE=driving_test.launch
+    LAUNCH_FILES="start_manipulator_cameras.launch driving_test.launch"
 else
-    LAUNCH_FILE=$1
+    LAUNCH_FILES="$@"
 fi
 
 eval `ssh-agent`
@@ -32,8 +32,11 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
     # wait for roscore and sr2 to be ready
     until nc -z ${MASTER_HOST} ${MASTER_PORT} && nc -z ${OTHER_HOST} ${SSH_PORT}; do sleep 1; done
 
-    pidname=`basename ${LAUNCH_FILE} .launch`.pid
-    roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${LAUNCH_FILE} &
+    for launch in ${LAUNCH_FILES}; do
+        pidname=`basename ${launch} .launch`.pid
+        roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${launch} &
+        sleep 10
+    done
     roslaunch --pid=${HOME}/.ros/logging.pid samplereturn logging.launch &
 else
     if echo ${OTHER_HOST} | grep -q `hostname`; then
