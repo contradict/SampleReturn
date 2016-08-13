@@ -169,7 +169,6 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
             ROS_FATAL_STREAM("Unknown param type for config parameter " << (*_i)->name << ": " << (*_i)->type);
         }
     }
-    frame_rate = config.AcquisitionFrameRate;
 }
 
 bool
@@ -193,12 +192,12 @@ BaslerNode::do_enable(bool state)
       try
       {
           camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
-          watchdog.start();
           ROS_INFO_STREAM("Started grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
+          shutdown();
           ros::shutdown();
       }
   }
@@ -207,12 +206,12 @@ BaslerNode::do_enable(bool state)
       try
       {
           camera.StopGrabbing();
-          watchdog.stop();
           ROS_INFO_STREAM("Stopped grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to stop grabbing: " << e.GetDescription());
+          shutdown();
           ros::shutdown();
       }
   }
@@ -241,27 +240,10 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
         info.header.stamp = img_msg.header.stamp;
         info.header.frame_id = img_msg.header.frame_id;
         cam_pub_.publish(img_msg, info);
-        watchdog.stop();
-        watchdog.start();
     }
     else
     {
         ROS_ERROR_STREAM("Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription());
-    }
-}
-
-void
-BaslerNode::watchdog_timeout(const ros::TimerEvent &e)
-{
-    (void)e;
-    if(enabled)
-    {
-        ROS_ERROR_STREAM("Watchdog timeout");
-        kill(0, SIGTERM);
-    }
-    else
-    {
-        watchdog.stop();
     }
 }
 
@@ -270,7 +252,6 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     frame_id(nh.param("frame_id", std::string("camera"))),
     serial_number(nh.param("serial_number", std::string(""))),
     camera_name(nh.getNamespace()),
-    watchdog_frames(nh.param("watchdog_frames", 3)),
     enabled(nh.param("start_enabled", false))
 {
 
@@ -304,8 +285,6 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
 
     enable_sub = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable, this);
 
-    watchdog = nh.createTimer( ros::Duration(watchdog_frames/frame_rate), &BaslerNode::watchdog_timeout, this, false, false);
-
     do_enable(enabled);
 }
 
@@ -314,10 +293,25 @@ BaslerNode::shutdown(void)
 {
     if(camera.IsPylonDeviceAttached())
     {
+        ROS_INFO("Attached, beginning shutdown");
         if(camera.IsGrabbing())
+        {
+            ROS_INFO("Stopping grab");
             camera.StopGrabbing();
+        }
         if(camera.IsOpen())
+        {
+            ROS_INFO("closing");
             camera.Close();
+        }
+        ROS_INFO("detach");
+        camera.DetachDevice();
+        ROS_INFO("destroy");
+        camera.DestroyDevice();
+    }
+    else
+    {
+        ROS_INFO("Not attached, no shutdown needed");
     }
 }
 

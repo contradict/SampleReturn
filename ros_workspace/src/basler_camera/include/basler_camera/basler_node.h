@@ -19,8 +19,6 @@ class BaslerNode : public Pylon::CImageEventHandler
     std::string frame_id;
     std::string serial_number;
     std::string camera_name;
-    int watchdog_frames;
-    double frame_rate;
 
     bool enabled;
     ros::ServiceServer enable_service;
@@ -30,8 +28,6 @@ class BaslerNode : public Pylon::CImageEventHandler
     image_transport::CameraPublisher cam_pub_;
     camera_info_manager::CameraInfoManager *cinfo_manager_;
     dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
-
-    ros::Timer watchdog;
 
     Pylon::CImageFormatConverter converter_;
     Pylon::CPylonImage pylon_image_;
@@ -67,9 +63,6 @@ class BaslerNode : public Pylon::CImageEventHandler
     topic_enable(std_msgs::BoolConstPtr msg);
     bool
     do_enable(bool state);
-
-    void
-    watchdog_timeout(const ros::TimerEvent &e);
 
     public:
     BaslerNode(ros::NodeHandle &nh);
