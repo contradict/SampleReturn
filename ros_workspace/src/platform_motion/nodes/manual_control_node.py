@@ -32,11 +32,11 @@ from executive.executive_states import WaitForFlagState
 #this state machine provides manual control of the robot
 
 class ManualController(object):
-    
+
     def __init__(self):
-        
+
         rospy.on_shutdown(self.shutdown_cb)
-        
+
         #stuff namedtuple with joystick parameters
         self.node_params = util.get_node_params()
         self.joy_state = JoyState(self.node_params)
@@ -48,20 +48,20 @@ class ManualController(object):
         self.beacon_camera_enable = rospy.Publisher('enable_beacon',
                                                     std_msg.Bool,
                                                     queue_size=10)
-        
+
         self.announcer = util.AnnouncerInterface("audio_search")
         self.tf = tf.TransformListener()
         self.odometry_frame = 'odom'
         self.last_sample = rospy.Time.now()
- 
+
         self.simple_mover = actionlib.SimpleActionClient("simple_move",
                                                        samplereturn_msg.SimpleMoveAction)
-    
+
         self.state_machine = smach.StateMachine(
                   outcomes=['complete', 'preempted', 'aborted'],
                   input_keys = ['action_goal'],
                   output_keys = ['action_result'])
-        
+
         self.state_machine.userdata.button_cancel = self.joy_state.button('BUTTON_CANCEL')
         self.state_machine.userdata.detected_sample = None
         self.state_machine.userdata.manipulator_sample = None
@@ -77,9 +77,9 @@ class ManualController(object):
         #use these as booleans in remaps
         self.state_machine.userdata.true = True
         self.state_machine.userdata.false = False
-        
+
         with self.state_machine:
-            
+
             MODE_JOYSTICK = platform_srv.SelectMotionModeRequest.MODE_JOYSTICK
             MODE_SERVO = platform_srv.SelectMotionModeRequest.MODE_SERVO
             MODE_PLANNER = platform_srv.SelectMotionModeRequest.MODE_PLANNER_TWIST
@@ -89,7 +89,7 @@ class ManualController(object):
             MODE_UNLOCK = platform_srv.SelectMotionModeRequest.MODE_UNLOCK
             MODE_LOCK = platform_srv.SelectMotionModeRequest.MODE_LOCK
             MODE_ENABLE = platform_srv.SelectMotionModeRequest.MODE_ENABLE
-           
+
             smach.StateMachine.add('START_MANUAL_CONTROL',
                                    ProcessGoal(self.announcer),
                                    transitions = {'valid_goal':'SELECT_JOYSTICK',
@@ -101,7 +101,7 @@ class ManualController(object):
                                    transitions = {'next':'JOYSTICK_LISTEN',
                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'MANUAL_ABORTED'})
- 
+
             smach.StateMachine.add('WAIT_FOR_UNPAUSE',
                                    WaitForFlagState('paused',
                                                     flag_trigger_value = False,
@@ -111,7 +111,7 @@ class ManualController(object):
                                    transitions = {'next':'SELECT_JOYSTICK',
                                                   'timeout':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'MANUAL_PREEMPTED'})
-            
+
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
                                    transitions = {'visual_servo_requested':'ENABLE_MANIPULATOR_DETECTOR',
@@ -120,7 +120,7 @@ class ManualController(object):
                                                   'home_wheelpods_requested':'SELECT_HOME',
                                                   'lock_wheelpods_requested':'SELECT_PAUSE_FOR_LOCK',
                                                   'preempted':'MANUAL_PREEMPTED',
-                                                  'aborted':'MANUAL_ABORTED'})           
+                                                  'aborted':'MANUAL_ABORTED'})
 
             smach.StateMachine.add('CONFIRM_SAMPLE_PRESENT',
                                    ConfirmSamplePresent(self.announcer),
@@ -133,7 +133,7 @@ class ManualController(object):
                                                     MODE_PLANNER),
                                    transitions = {'next':'PURSUE_SAMPLE',
                                                   'paused':'WAIT_FOR_UNPAUSE',
-                                                  'failed':'SELECT_JOYSTICK'})            
+                                                  'failed':'SELECT_JOYSTICK'})
 
             @smach.cb_interface(input_keys=['detected_sample'])
             def pursuit_goal_cb(userdata, request):
@@ -142,13 +142,13 @@ class ManualController(object):
                 goal.input_string = "manual_control_pursuit_request"
                 #disable localization checks while in pursuit
                 return goal
-            
+
             @smach.cb_interface(output_keys=['detected_sample'])
             def pursuit_result_cb(userdata, status, result):
                 #clear samples after a pursue action
                 rospy.sleep(2.0) #wait 2 seconds for detector/filter to clear for sure
                 userdata.detected_sample = None
-                                            
+
             smach.StateMachine.add('PURSUE_SAMPLE',
                                   smach_ros.SimpleActionState('/processes/executive/pursue_sample',
                                   samplereturn_msg.GeneralExecutiveAction,
@@ -156,7 +156,7 @@ class ManualController(object):
                                   result_cb = pursuit_result_cb),
                                   transitions = {'succeeded':'SELECT_JOYSTICK',
                                                  'aborted':'SELECT_JOYSTICK'})
-            
+
             @smach.cb_interface()
             def enable_detector_cb(userdata, response):
                 userdata.manipulator_sample = None
@@ -165,8 +165,8 @@ class ManualController(object):
                 while (rospy.Time.now() - start) < timeout:
                     rospy.sleep(0.1)
                     if userdata.manipulator_sample is not None:
-                        break    
-                                    
+                        break
+
                 return 'succeeded'
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
@@ -178,7 +178,7 @@ class ManualController(object):
                                                             output_keys = ['manipulator_sample']),
                                      transitions = {'succeeded':'SELECT_SERVO_MODE',
                                                     'aborted':'SELECT_JOYSTICK'})
-            
+
             smach.StateMachine.add('SELECT_SERVO_MODE',
                                    SelectMotionMode(self.CAN_interface,
                                                     MODE_PLANNER),
@@ -201,30 +201,30 @@ class ManualController(object):
                                                   'object_detected':'VISUAL_SERVO',
                                                   'aborted':'MANUAL_ABORTED'},
                                    remapping = {'stop_on_detection':'false'})
-   
+
             smach.StateMachine.add('ANNOUNCE_NO_SAMPLE',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled.'),
                                    transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
-            
-            
+
+
             smach.StateMachine.add('ANNOUNCE_SERVO_CANCELED',
                                    AnnounceState(self.announcer,
                                                  'Servo canceled.'),
                                    transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
-           
+
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_hard_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'SELECT_JOYSTICK',
-                                                    'aborted':'SELECT_JOYSTICK'})           
-                        
+                                                    'aborted':'SELECT_JOYSTICK'})
+
             smach.StateMachine.add('ANNOUNCE_GRAB',
                                    AnnounceState(self.announcer,
                                                  'Start ing, grab.'),
-                                   transitions = {'next':'MANIPULATOR_GRAB'})            
-             
+                                   transitions = {'next':'MANIPULATOR_GRAB'})
+
             @smach.cb_interface(input_keys = ['manipulator_sample'])
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
@@ -237,7 +237,7 @@ class ManualController(object):
                     grab_msg.target_bin = userdata.manipulator_sample.sample_id
                 rospy.sleep(3.0)
                 return grab_msg
-            
+
             smach.StateMachine.add('MANIPULATOR_GRAB',
                                    InterruptibleActionClientState(
                                        actionname = 'manipulator_action',
@@ -249,7 +249,7 @@ class ManualController(object):
                                                    'canceled':'ANNOUNCE_GRAB_CANCELED',
                                                    'preempted':'MANUAL_PREEMPTED',
                                                    'aborted':'MANUAL_ABORTED'})
-                                
+
 
             smach.StateMachine.add('ANNOUNCE_GRAB_COMPLETE',
                                    AnnounceState(self.announcer,
@@ -277,7 +277,7 @@ class ManualController(object):
                                    transitions = {'next':'ANNOUNCE_HOMING',
                                                   'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'SELECT_JOYSTICK'})
-            
+
             smach.StateMachine.add('ANNOUNCE_HOMING',
                                    AnnounceState(self.announcer, 'Home ing.'),
                                    transitions = {'next':'PERFORM_HOME'})
@@ -339,7 +339,7 @@ class ManualController(object):
 
              #end with state_machine
 
-        #action server wrapper    
+        #action server wrapper
         manual_control_server = smach_ros.ActionServerWrapper(
             'manual_control', platform_msg.ManualControlAction,
             wrapped_container = self.state_machine,
@@ -348,24 +348,24 @@ class ManualController(object):
             aborted_outcomes = ['aborted'],
             goal_key = 'action_goal',
             result_key = 'action_result')
-        
+
         sls = smach_ros.IntrospectionServer('smach_grab_introspection',
                                             self.state_machine,
                                             '/START_MANUAL_CONTROL')
         sls.start()
 
         rospy.Subscriber("pause_state", std_msg.Bool, self.pause_state_update)
-        
+
         joy_sub = rospy.Subscriber("joy", sensor_msg.Joy, self.joy_callback)
-        
+
         rospy.Subscriber('detected_sample_search',
                         samplereturn_msg.NamedPoint,
-                        self.sample_update)        
-        
+                        self.sample_update)
+
         rospy.Subscriber('detected_sample_manipulator',
                           samplereturn_msg.NamedPoint,
                           self.sample_detection_manipulator)
-        
+
         #start action servers and services
         manual_control_server.run_server()
         rospy.spin()
@@ -391,10 +391,10 @@ class ManualController(object):
                     TypeError), e:
                 rospy.logerr("Unable to set search camera enable %s: %s",
                             newstate, e)
-        
+
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data
-        
+
     def sample_detection_manipulator(self, sample):
         self.state_machine.userdata.manipulator_sample = sample
 
@@ -412,7 +412,7 @@ class ManualController(object):
                     if ((rospy.Time.now() -  self.last_sample) > rospy.Duration(5.0)):
                         self.announcer.say("Sample published.")
                         self.last_sample = rospy.Time.now()
-                
+
             except tf.Exception:
                 rospy.logwarn("MANUAL_CONTROL failed to transform search detection point %s->%s",
                               sample.header.frame_id, self.odometry_frame)
@@ -423,7 +423,7 @@ class ManualController(object):
             rospy.sleep(0.1)
         rospy.sleep(0.2) #hideous hack delay to let action server get its final message out
         rospy.logwarn("MANUAL CONTROL STATE MACHINE EXIT")
-   
+
 class ProcessGoal(smach.State):
     def __init__(self, announcer):
         smach.State.__init__(self,
@@ -435,21 +435,21 @@ class ProcessGoal(smach.State):
                                           'allow_driving',
                                           'allow_manipulator',
                                           'search_camera_state'])
-        
+
         self.announcer = announcer
-            
+
     def execute(self, userdata):
-        
+
         fb = platform_msg.ManualControlFeedback()
         fb.state = "PROCESS_GOAL"
         result = platform_msg.ManualControlResult('initialized')
-        userdata.action_result = result        
+        userdata.action_result = result
 
         self.announcer.say("Entering manual mode.")
-                        
+
         userdata.allow_driving = False
         userdata.allow_manipulator = False
-        
+
         mcg = platform_msg.ManualControlGoal()
         if userdata.action_goal.mode == mcg.FULL_CONTROL:
             userdata.allow_driving = True
@@ -478,7 +478,7 @@ class ConfirmSamplePresent(smach.State):
         self.announcer = announcer
 
     def execute(self, userdata):
-        
+
         #wait for 3 seconds, see if sample is present in view
         userdata.detected_sample = None
         rospy.sleep(3.0)
@@ -503,29 +503,29 @@ class JoystickListen(smach.State):
                                          'allow_manipulator'],
                              output_keys=['action_feedback',
                                           'announce_sample'])
-        
+
         self.CAN_interface = CAN_interface
         self.joy_state = joy_state
         self.button_CV = threading.Condition()
-        
+
     def execute(self, userdata):
-    
+
         self.allow_driving = userdata.allow_driving
         self.allow_manipulator = userdata.allow_manipulator
         self.button_outcome = None
         userdata.announce_sample = True
- 
-        #publish the joystick defined twist every 50ms    
+
+        #publish the joystick defined twist every 50ms
         driving_timer = rospy.Timer(rospy.Duration(.05), self.driving_callback)
-        
+
         #wait here, driving, until another button is pressed
         self.button_CV.acquire()
         self.button_CV.wait()
         self.button_CV.release()
-        
-        driving_timer.shutdown()       
-        userdata.announce_sample = False       
-                
+
+        driving_timer.shutdown()
+        userdata.announce_sample = False
+
         return self.button_outcome
 
 
@@ -536,13 +536,13 @@ class JoystickListen(smach.State):
         self.button_CV.release()
 
     def driving_callback(self, event):
-        
+
         if self.preempt_requested():
             rospy.loginfo("MANUAL CONTROL PREEMPTED")
             self.service_preempt()
             self.set_outcome('preempted')
             return
-        
+
         if self.allow_manipulator:
             if self.joy_state.button('BUTTON_SERVO'):
                 self.set_outcome('visual_servo_requested')
@@ -553,7 +553,7 @@ class JoystickListen(smach.State):
             if self.joy_state.button('BUTTON_PURSUE'):
                 self.set_outcome('pursuit_requested')
                 return
-        
+
         if self.allow_driving:
             if self.joy_state.button('BUTTON_HOME'):
                 self.set_outcome( 'home_wheelpods_requested' )
@@ -614,7 +614,7 @@ class InterruptibleActionClientState(smach.State):
             goal_cb = None,
             feedback_cb = None,
             timeout= None):
-        
+
         smach.State.__init__(self,
                              input_keys=['button_cancel', 'sample'],
                              outcomes=['complete', 'timeout', 'canceled',
@@ -628,9 +628,9 @@ class InterruptibleActionClientState(smach.State):
         self.timeout = timeout
 
         #get keys from goal callback
-        if smach.has_smach_interface(goal_cb): 
-            self.register_input_keys(goal_cb.get_registered_input_keys()) 
-            self.register_output_keys(goal_cb.get_registered_output_keys()) 
+        if smach.has_smach_interface(goal_cb):
+            self.register_input_keys(goal_cb.get_registered_input_keys())
+            self.register_output_keys(goal_cb.get_registered_output_keys())
 
     def execute(self, userdata):
         action_client = actionlib.SimpleActionClient(self.actionname,
@@ -672,7 +672,7 @@ class InterruptibleActionClientState(smach.State):
         timer.shutdown()
 
         return self.action_outcome
- 
+
     def goal_done(self, state, result):
         if state == action_msg.GoalStatus.SUCCEEDED:
             self.action_outcome = 'complete'
@@ -680,7 +680,7 @@ class InterruptibleActionClientState(smach.State):
             self.action_outcome = 'canceled'
         if state == action_msg.GoalStatus.ABORTED:
             self.action_outcome = 'aborted'
-        
+
     def goal_feedback(self, feedback):
         if self.feedback_cb is not None:
             result = self.feedback_cb(feedback, self.announcer)
@@ -691,61 +691,61 @@ class ManualPreempted(smach.State):
     def __init__(self, CAN_interface):
         smach.State.__init__(self, outcomes=['complete','fail'],
                                    output_keys=['action_result'])
-        
+
         self.CAN_interface = CAN_interface
-         
+
     def execute(self, userdata):
 
         self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_PAUSE)
 
         self.CAN_interface.select_mode(platform_srv.SelectMotionModeRequest.MODE_ENABLE)
-        
+
         result = platform_msg.ManualControlResult('preempted')
         userdata.action_result = result
-        
+
         return 'complete'
 
 class ManualAborted(smach.State):
     def __init__(self, CAN_interface):
         smach.State.__init__(self, outcomes=['recover','fail'],
                                    output_keys=['action_result'])
-        
+
         self.CAN_interface = CAN_interface
-         
+
     def execute(self, userdata):
- 
+
         result = platform_msg.ManualControlResult('aborted')
         userdata.action_result = result
-        
+
         return 'fail'
 
 #classes to handle joystick and CAN interfacing
-    
+
 class JoyState(object):
     def __init__(self, node_params):
         self.msg = sensor_msg.Joy()
         self.msg.axes = [0,0,0,0,0,0]
         self.timestamp = rospy.get_time()
         self.joy_params = node_params
-    
+
     def update(self, joy_msg):
         self.msg = joy_msg
         self.timestamp = rospy.get_time()
-        
+
     def button(self, button_name):
         #rospy.loginfo("MANUAL CONTROL, msg.buttons = " + str(self.msg.buttons))
         #rospy.loginfo("MANUAL CONTROL, button index = " + str(getattr(self.joy_params, button_name)))
 
         button_index = getattr(self.joy_params, button_name)
-        
+
         if button_index >= len(self.msg.buttons):
             return False #always return false if the requested button is not in the list
         else:
             return bool(self.msg.buttons[button_index])
-    
+
     def scale_axis(self, scale, exponent, value):
         return math.copysign( scale*(abs(value)**exponent), value)
-    
+
     def get_twist(self):
         twist = geometry_msg.Twist()
         twist.linear.x = self.scale_axis(self.joy_params.LINEAR_SCALE,
@@ -757,11 +757,11 @@ class JoyState(object):
         twist.angular.z = self.scale_axis(self.joy_params.ANGULAR_SCALE,
                                           self.joy_params.ANGULAR_EXP,
                                           self.msg.axes[self.joy_params.ANGULAR_Z])
-        
+
         return twist
-        
+
 if __name__ == '__main__':
     rospy.init_node("manual_control_node")
     mcn = ManualController()
     rospy.spin()
-    
+
