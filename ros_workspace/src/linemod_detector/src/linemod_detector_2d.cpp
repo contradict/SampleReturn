@@ -108,6 +108,7 @@ class LineMOD_Detector
   double max_hull_area_;
   double min_hull_area_;
   double target_width_;
+  int flood_fill_offset_;
 
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
 
@@ -195,6 +196,7 @@ class LineMOD_Detector
       _config = config;
       pub_threshold = config.pub_threshold;
       target_width_ = config.target_width;
+      flood_fill_offset_ = config.flood_fill_offset;
   }
 
   void leftCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
@@ -545,20 +547,22 @@ class LineMOD_Detector
     // points on it to get a mask for grip computation.
     for (int i = 0; i < 1; i++)
     {
-      float offset_x = hull[i].x-cx;
-      float offset_y = hull[i].y-cy;
-      float length = std::sqrt(pow(offset_x,2)+pow(offset_y,2));
-      cv::Point offset_pt((hull[i].x+10*(offset_x/length)),
-                          (hull[i].y+10*(offset_y/length)));
+      float offset_x = hull[i].x - cx;
+      float offset_y = hull[i].y - cy;
+      float length = std::sqrt(pow(offset_x,2) + pow(offset_y,2));
+      cv::Point offset_pt((hull[i].x + flood_fill_offset_ * (offset_x / length)),
+                          (hull[i].y + flood_fill_offset_ * (offset_y / length)));
       cv::Point trunc_offset_pt((offset_pt.x>=color_image.cols)?(color_image.cols-1):offset_pt.x,
                                 (offset_pt.y>=color_image.rows)?(color_image.rows-1):offset_pt.y);
-      cv::Mat mask;
+      cv::Mat mask, draw_mask;
       mask = cv::Mat::zeros(color_image.rows+2, color_image.cols+2, CV_8UC1);
       cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
           0, cv::Scalar(8,8,8), cv::Scalar(8,8,8),
           (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
+      cv::cvtColor(mask, draw_mask, CV_GRAY2RGB);
+      cv::circle(draw_mask, trunc_offset_pt, 10, CV_RGB(255,0,255), 2, CV_AA);
       sensor_msgs::ImagePtr debugmsg = cv_bridge::CvImage(header,
-          "mono8",mask).toImageMsg();
+          "rgb8",mask).toImageMsg();
       debug_mask_pub.publish(debugmsg);
       // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
       if(!maskToHull(mask, &grip_hull))
