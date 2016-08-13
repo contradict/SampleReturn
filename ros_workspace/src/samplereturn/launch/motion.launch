@@ -76,19 +76,6 @@
           ns="/motion/carousel">
     </node>
 
-    <param name="robot_description"
-           command="$(find xacro)/xacro.py '$(find samplereturn)/urdf/robot.xacro'" />
-
-    <node name="state_publisher"
-          machine="navigate" 
-          pkg="robot_state_publisher" 
-          type="robot_state_publisher"
-          output="log"
-          ns="/motion">
-        <remap from="joint_states" to="platform_joint_state"/>
-        <param name="publish_frequency" type="double" value="10"/>
-    </node>
-
     <node name="pause_switch"
           machine="navigate"
           pkg="samplereturn"

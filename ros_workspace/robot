@@ -1,5 +1,5 @@
 #!/bin/bash
-LAUNCH_FILES="start_motherboard_cameras.launch robot.launch"
+LAUNCH_FILES="stage1.launch robot.launch"
 DELAY=5
 PIDPATH=${HOME}/.ros
 

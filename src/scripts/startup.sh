@@ -8,7 +8,7 @@ PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin
 HOME=/home/robot
 DELAY=5
 if [ $# -eq 0 ]; then
-    LAUNCH_FILES="start_motherboard_cameras.launch robot.launch"
+    LAUNCH_FILES="stage1.launch robot.launch"
 else
     LAUNCH_FILES="$@"
 fi
