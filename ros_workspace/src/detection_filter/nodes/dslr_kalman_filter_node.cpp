@@ -354,6 +354,8 @@ class KalmanDetectionFilter
   void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
   {
     ROS_DEBUG("Camera Info Callback");
+    // Publish view frustum
+    publishViewFrustum();
     if (!is_paused_) {
       if (filter_list_.size()==0) {
         return;
@@ -396,12 +398,8 @@ class KalmanDetectionFilter
 
     // Draw in Rviz
     drawFilterStates();
-
     // Publish top filter for pursuit
     publishTop();
-
-    // Publish view frustum
-    publishViewFrustum();
   }
 
   void publishTop() {
