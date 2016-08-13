@@ -318,6 +318,8 @@ BaslerNode::shutdown(void)
             camera.StopGrabbing();
         if(camera.IsOpen())
             camera.Close();
+        camera.DetachDevice();
+        camera.DestroyDevice();
     }
 }
 
