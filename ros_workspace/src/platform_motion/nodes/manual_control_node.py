@@ -745,18 +745,28 @@ class JoyState(object):
     def scale_axis(self, scale, exponent, value):
         return math.copysign( scale*(abs(value)**exponent), value)
 
+    def rate_curvature_interp(self, velocity, steering):
+        rate = self.joy_params.ANGULAR_SCALE * steering
+        curvature = rate/velocity
+        if velocity<0.01:
+            return rate
+        interp = min(velocity, self.joy_params.MAX_RATE_VELOCITY)/self.joy_params.MAX_RATE_VELOCITY
+        command = interp*curvature + (1-interp)*rate
+        return command
+
     def get_twist(self):
         twist = geometry_msg.Twist()
-        twist.linear.x = self.scale_axis(self.joy_params.LINEAR_SCALE,
+        vx = twist.linear.x = self.scale_axis(self.joy_params.LINEAR_SCALE,
                                          self.joy_params.LINEAR_EXP,
                                          self.msg.axes[self.joy_params.LINEAR_X])
-        twist.linear.y = self.scale_axis(self.joy_params.LINEAR_SCALE,
+        vy = twist.linear.y = self.scale_axis(self.joy_params.LINEAR_SCALE,
                                          self.joy_params.LINEAR_EXP,
                                          self.msg.axes[self.joy_params.LINEAR_Y])
-        twist.angular.z = self.scale_axis(self.joy_params.ANGULAR_SCALE,
-                                          self.joy_params.ANGULAR_EXP,
-                                          self.msg.axes[self.joy_params.ANGULAR_Z])
-
+        v = math.hypot(vx, vy)
+        steering = self.scale_axis(1.0,
+                                   self.joy_params.ANGULAR_EXP,
+                                   self.msg.axes[self.joy_params.ANGULAR_Z])
+        twist.angular.z = self.rate_curvature_interp(v, steering)
         return twist
 
 if __name__ == '__main__':
