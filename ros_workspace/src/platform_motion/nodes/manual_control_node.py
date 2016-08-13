@@ -159,7 +159,6 @@ class ManualController(object):
 
             @smach.cb_interface()
             def enable_detector_cb(userdata, response):
-                userdata.manipulator_sample = None
                 timeout = rospy.Duration(5.0)
                 start = rospy.Time.now()
                 while (rospy.Time.now() - start) < timeout:
