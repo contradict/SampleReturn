@@ -98,7 +98,6 @@ class LineMOD_Detector
   sensor_msgs::CameraInfo right_camera_info_msg;
   int matching_threshold;
   int num_modalities;
-  bool got_color;
   bool got_right_camera_info_;
   bool got_disp_;
   float pub_threshold;
@@ -129,7 +128,6 @@ class LineMOD_Detector
     img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
     point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
     matching_threshold = 80;
-    got_color = false;
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
@@ -390,8 +388,6 @@ class LineMOD_Detector
           ROS_ERROR("color cv_bridge exception: %s", e.what());
           return;
       }
-
-      LineMOD_Detector::got_color = true;
       LineMOD_Detector::display = color_ptr->image.clone();
 
       if (hard_samples) {
@@ -463,6 +459,7 @@ class LineMOD_Detector
                   sent_something = false;
               }
           }
+      }
 
       if (dominant_color != "green") {
           drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
