@@ -165,7 +165,8 @@ class ManualController(object):
                 while (rospy.Time.now() - start) < timeout:
                     rospy.sleep(0.1)
                     if userdata.manipulator_sample is not None:
-                        break
+                        if userdata.manipulator_sample.header.stamp > start:
+                            break
 
                 return 'succeeded'
 
@@ -174,8 +175,7 @@ class ManualController(object):
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True),
                                                             response_cb = enable_detector_cb,
-                                                            input_keys = ['manipulator_sample'],
-                                                            output_keys = ['manipulator_sample']),
+                                                            input_keys = ['manipulator_sample']),
                                      transitions = {'succeeded':'SELECT_SERVO_MODE',
                                                     'aborted':'SELECT_JOYSTICK'})
 
