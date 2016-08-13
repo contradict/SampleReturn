@@ -430,10 +430,6 @@ class LineMOD_Detector
       }
       else
       {
-          cv::linemod::Match m = matches[best_match_idx];
-          ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                  m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
-
           // Draw matching template
           const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
 
