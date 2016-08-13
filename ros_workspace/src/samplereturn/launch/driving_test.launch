@@ -22,8 +22,8 @@
     <include file="$(find samplereturn)/launch/motion.launch">
         <arg name="start_paused" value="$(arg start_paused)"/>
     </include>
+
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
-    <include file="$(find samplereturn)/launch/manipulator_camera.launch"/>
     <include file="$(find samplereturn)/launch/search_camera.launch"/>
     <!--
     <include file="$(find samplereturn)/launch/costmap.launch"/>
