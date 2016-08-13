@@ -10,9 +10,9 @@ clear_every_send: true
 #footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
 
 rolling_window: true
-width: 20.0
-height: 20.0
-resolution: 0.10
+width: 24.0
+height: 24.0
+resolution: 0.0625
 
 robot_radius: 1.0
 
@@ -34,11 +34,11 @@ port_obstacle_layer:
     z_resolution: 0.0625
     z_voxels: 16
     unknown_threshold: 8
-    mark_threshold: 4
+    mark_threshold: 5
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 6.0
+    obstacle_range: 10.0
     raytrace_range: 12
 
     observation_sources: port_point_cloud
@@ -51,7 +51,7 @@ port_obstacle_layer:
         clearing: true,
         min_obstacle_height: -0.5,
         max_obstacle_height: 1.5,
-        obstacle_range: 6.0,
+        obstacle_range: 10.0,
         raytrace_range: 12.0,
         }
 
@@ -59,11 +59,11 @@ center_obstacle_layer:
     z_resolution: 0.0625
     z_voxels: 16
     unknown_threshold: 8
-    mark_threshold: 4
+    mark_threshold: 5
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 6.0
+    obstacle_range: 10.0
     raytrace_range: 12.0
 
     observation_sources: center_point_cloud
@@ -76,18 +76,18 @@ center_obstacle_layer:
         clearing: true,
         min_obstacle_height: -0.5,
         max_obstacle_height: 1.5,
-        obstacle_range: 6.0,
+        obstacle_range: 10.0,
         raytrace_range: 12.0,
         }
 starboard_obstacle_layer:
     z_resolution: 0.0625
     z_voxels: 16
     unknown_threshold: 8
-    mark_threshold: 4
+    mark_threshold: 5
     #set if you want the voxel map published
     publish_voxel_map: true
     track_unknown_space: true
-    obstacle_range: 6.0
+    obstacle_range: 10.0
     raytrace_range: 12.0
 
     observation_sources: starboard_point_cloud
@@ -100,7 +100,7 @@ starboard_obstacle_layer:
         clearing: true,
         min_obstacle_height: -0.5,
         max_obstacle_height: 1.5,
-        obstacle_range: 6.0,
+        obstacle_range: 10.0,
         raytrace_range: 12.0,
         }
 
