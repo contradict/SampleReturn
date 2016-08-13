@@ -304,6 +304,7 @@ class LineMOD_Detector
       if (!got_disp_) {
           return;
       }
+      // Handle Image
       cv_bridge::CvImagePtr color_ptr;
       try
       {
@@ -324,80 +325,57 @@ class LineMOD_Detector
           cv::medianBlur(color_ptr->image, blur, 13);
           LineMOD_Detector::color_img = blur.clone();
       }
-
       LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
 
+      // Compute Match
       cv::linemod::Match m;
       bool ret = matchLineMOD(m);
 
+      // Allocate debug image
       sensor_msgs::ImagePtr debugmsg;
       debugmsg = cv_bridge::CvImage(color_ptr->header, color_ptr->encoding, display).toImageMsg();
       bool sent_something=false;
 
+      // Get the matched template and its convex hull
       const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
       std::vector<cv::Point> hull;
       cv::Mat mask = cv::Mat::zeros(display.size(), CV_8U);
       hull = templateConvexHull(templates, LineMOD_Detector::num_modalities, cv::Point(m.x,m.y), mask.size(),
               mask);
+
+      // If it's a hard sample, floodFill the hull to get sample outline
+      if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
+              m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
+              m.class_id == "metal_square") {
+          hull = floodFillHull(hull, display, color_ptr->header);
+      }
+
+      // Check for valid hull area
+      double hull_area = cv::contourArea(hull);
+      if(hull_area>max_hull_area_ || hull_area<min_hull_area_)
+      {
+        ROS_DEBUG_STREAM("Hull area " << hull_area << " pixels rejected");
+      }
+
+      // Check the color if the hull is valid
       Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
       interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
       std::string dominant_color = cn.getDominantColor(interiorColor);
       ROS_DEBUG("Dominant color: %s",dominant_color.c_str());
 
-      hull = floodFillHull(hull, display, color_ptr->header);
-      double hull_area = cv::contourArea(hull);
-      ROS_DEBUG_STREAM("Metal sample hull area: " << hull_area);
-      if(hull_area>max_hull_area_ || hull_area<min_hull_area_)
-      {
-          ROS_DEBUG_STREAM("Hull area rejected.");
-          debug_img_pub.publish(debugmsg);
-          LineMOD_Detector::sources.clear();
-          return;
-      }
-      else
-      {
-          // Draw matching template
-          const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
-
-          cv::Mat mask = cv::Mat::zeros(display.size(), CV_8U);
-          std::vector<cv::Point> hull;
-          hull = templateConvexHull(templates, LineMOD_Detector::num_modalities, cv::Point(m.x,m.y), mask.size(),
-                  mask);
-          Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-          interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
-          std::string dominant_color = cn.getDominantColor(interiorColor);
-          ROS_DEBUG("Dominant color: %s",dominant_color.c_str());
-
-          if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
-                  m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
-                  m.class_id == "metal_square") {
-              hull = floodFillHull(hull, display, color_ptr->header);
-              double hull_area = cv::contourArea(hull);
-              ROS_DEBUG_STREAM("Metal sample hull area: " << hull_area);
-              if(hull_area>max_hull_area_ || hull_area<min_hull_area_)
-              {
-                  ROS_DEBUG_STREAM("Hull area rejected.");
-                  LineMOD_Detector::sources.clear();
-                  sent_something = false;
-              }
-          }
-      }
-
-      if (dominant_color != "green") {
-          drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
-      }
-
-      if (m.similarity > LineMOD_Detector::pub_threshold)
-      {
+      // If the hull, color, and similarity pass, draw the template
+      if (dominant_color != "green" and m.similarity > pub_threshold and
+          (hull_area < max_hull_area_ and hull_area > min_hull_area_)) {
+        drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
         cv::RotatedRect rect = computeGripAngle(hull);
         ROS_DEBUG("Measured angle: %f width: %f height: %f", rect.angle, rect.size.width, rect.size.height);
         cv::circle(display, rect.center, 5, cv::Scalar(255, 0, 255));
-        sent_something = true;
         LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
             samplereturn_msgs::NamedPoint::METAL_1);
+        sent_something = true;
       }
 
-      // If no template, try BMS
+      // If no template match, try BMS
       if(!sent_something)
       {
           cv::Point bms_centroid;
