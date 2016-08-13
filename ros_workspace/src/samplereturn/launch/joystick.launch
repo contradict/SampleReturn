@@ -37,7 +37,7 @@
     <param name="LINEAR_SCALE" value="2.0" type="double"/>
     <param name="LINEAR_EXP" value="2.0" type="double"/>
     <param name="ANGULAR_SCALE" value="3.14" type="double"/>
-    <param name="ANGULAR_EXP" value="2.5" type="double"/>
+    <param name="ANGULAR_EXP" value="3.0" type="double"/>
     <param name="MAX_RATE_VELOCITY" value="0.25" type="double"/>
 
     <!-- this file loads the velocities and such for servoing onto sample,

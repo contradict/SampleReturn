@@ -747,9 +747,9 @@ class JoyState(object):
 
     def rate_curvature_interp(self, velocity, steering):
         rate = self.joy_params.ANGULAR_SCALE * steering
-        curvature = rate/velocity
         if velocity<0.01:
             return rate
+        curvature = rate/velocity
         interp = min(velocity, self.joy_params.MAX_RATE_VELOCITY)/self.joy_params.MAX_RATE_VELOCITY
         command = interp*curvature + (1-interp)*rate
         return command
