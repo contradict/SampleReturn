@@ -1,0 +1,49 @@
+#!/bin/bash
+SHUTDOWN_LAUNCH_FILES="robot.launch stage1.launch"
+NREADY=10
+PIDPATH=${HOME}/.ros
+
+pidname() {
+    echo ${PIDPATH}/$(basename ${1} .launch).pid
+}
+
+wait_for_ready() {
+    echo "Waiting for ${1}"
+    rostopic echo ${1} | \
+        grep --line-buffered 'Ready' | \
+        head -n ${NREADY} >>/dev/null
+    echo "${1} ready"
+}
+
+launch() {
+    launchname=${1}
+    shift
+    roslaunch --pid=$(pidname ${launchname}) samplereturn ${launchname} "$@" &
+}
+
+launch_and_wait() {
+    launchname=${1}
+    shift
+    topicname=${1}
+    shift
+    launch ${launchname} "$@"
+    wait_for_ready ${topicname}
+}
+
+case ${1} in
+    start)
+        shift
+        launch_and_wait stage1.launch /cameras/manipulator/status "$@"
+        wait_for_ready /cameras/navigation/starboard/status
+        launch robot.launch "$@"
+        ;;
+    stop)
+        for launch in ${SHUTDOWN_LAUNCH_FILES}; do
+            kill -INT $(cat $(pidname ${launch}))
+        done
+        ;;
+    *)
+        echo "Must specify \"start\" or \"stop\" as first argument"
+        exit 1
+        ;;
+esac 

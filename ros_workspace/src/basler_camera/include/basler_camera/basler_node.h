@@ -19,19 +19,18 @@ class BaslerNode : public Pylon::CImageEventHandler
     std::string frame_id;
     std::string serial_number;
     std::string camera_name;
-    int watchdog_frames;
-    double frame_rate;
 
-    bool enabled;
+    bool grab_enabled;
+    bool publish_enabled;
+    ros::ServiceServer grab_service;
+    ros::Subscriber grab_topic;
     ros::ServiceServer enable_service;
-    ros::Subscriber enable_sub;
+    ros::Subscriber enable_topic;
 
     image_transport::ImageTransport *it_;
     image_transport::CameraPublisher cam_pub_;
     camera_info_manager::CameraInfoManager *cinfo_manager_;
     dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
-
-    ros::Timer watchdog;
 
     Pylon::CImageFormatConverter converter_;
     Pylon::CPylonImage pylon_image_;
@@ -62,14 +61,16 @@ class BaslerNode : public Pylon::CImageEventHandler
     configure_callback(basler_camera::CameraConfig &config, uint32_t level);
 
     bool
-    service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp);
+    service_enable_grab(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp);
     void
-    topic_enable(std_msgs::BoolConstPtr msg);
+    topic_enable_grab(std_msgs::BoolConstPtr msg);
     bool
-    do_enable(bool state);
-
+    do_enable_grab(bool state);
+    bool
+    service_enable_publish(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp);
     void
-    watchdog_timeout(const ros::TimerEvent &e);
+    topic_enable_publish(std_msgs::BoolConstPtr msg);
+
 
     public:
     BaslerNode(ros::NodeHandle &nh);

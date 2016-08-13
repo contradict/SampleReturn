@@ -169,36 +169,50 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
             ROS_FATAL_STREAM("Unknown param type for config parameter " << (*_i)->name << ": " << (*_i)->type);
         }
     }
-    frame_rate = config.AcquisitionFrameRate;
 }
 
 bool
-BaslerNode::service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
+BaslerNode::service_enable_publish(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
 {
-  resp.state = do_enable(req.state);
+  publish_enabled = req.state;
+  resp.state = req.state;
   return true;
 }
 
 void
-BaslerNode::topic_enable(std_msgs::BoolConstPtr msg)
+BaslerNode::topic_enable_publish(std_msgs::BoolConstPtr msg)
 {
-    do_enable(msg->data);
+    publish_enabled = msg->data;
+}
+
+
+bool
+BaslerNode::service_enable_grab(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
+{
+  resp.state = do_enable_grab(req.state);
+  return true;
+}
+
+void
+BaslerNode::topic_enable_grab(std_msgs::BoolConstPtr msg)
+{
+    do_enable_grab(msg->data);
 }
 
 bool
-BaslerNode::do_enable(bool state)
+BaslerNode::do_enable_grab(bool state)
 {
   if(state && !camera.IsGrabbing())
   {
       try
       {
           camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
-          watchdog.start();
           ROS_INFO_STREAM("Started grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
+          shutdown();
           ros::shutdown();
       }
   }
@@ -207,17 +221,17 @@ BaslerNode::do_enable(bool state)
       try
       {
           camera.StopGrabbing();
-          watchdog.stop();
           ROS_INFO_STREAM("Stopped grabbing.");
       }
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to stop grabbing: " << e.GetDescription());
+          shutdown();
           ros::shutdown();
       }
   }
-  enabled = camera.IsGrabbing();
-  return enabled;
+  grab_enabled = camera.IsGrabbing();
+  return grab_enabled;
 }
 
 void
@@ -228,40 +242,26 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
     ros::Time timestamp = ros::Time::now();
     if (ptrGrabResult->GrabSucceeded())
     {
-        converter_.Convert(pylon_image_, ptrGrabResult);
-        img_msg.header.stamp = timestamp;
-        img_msg.header.frame_id = frame_id;
-        sensor_msgs::fillImage(img_msg,
-                output_encoding,
-                ptrGrabResult->GetHeight(),
-                ptrGrabResult->GetWidth(),
-                output_bytes_per_pixel*ptrGrabResult->GetWidth(),
-                pylon_image_.GetBuffer());
-        sensor_msgs::CameraInfo info = cinfo_manager_->getCameraInfo();
-        info.header.stamp = img_msg.header.stamp;
-        info.header.frame_id = img_msg.header.frame_id;
-        cam_pub_.publish(img_msg, info);
-        watchdog.stop();
-        watchdog.start();
+        if(publish_enabled)
+        {
+            converter_.Convert(pylon_image_, ptrGrabResult);
+            img_msg.header.stamp = timestamp;
+            img_msg.header.frame_id = frame_id;
+            sensor_msgs::fillImage(img_msg,
+                    output_encoding,
+                    ptrGrabResult->GetHeight(),
+                    ptrGrabResult->GetWidth(),
+                    output_bytes_per_pixel*ptrGrabResult->GetWidth(),
+                    pylon_image_.GetBuffer());
+            sensor_msgs::CameraInfo info = cinfo_manager_->getCameraInfo();
+            info.header.stamp = img_msg.header.stamp;
+            info.header.frame_id = img_msg.header.frame_id;
+            cam_pub_.publish(img_msg, info);
+        }
     }
     else
     {
         ROS_ERROR_STREAM("Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription());
-    }
-}
-
-void
-BaslerNode::watchdog_timeout(const ros::TimerEvent &e)
-{
-    (void)e;
-    if(enabled)
-    {
-        ROS_ERROR_STREAM("Watchdog timeout");
-        kill(0, SIGTERM);
-    }
-    else
-    {
-        watchdog.stop();
     }
 }
 
@@ -270,8 +270,8 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     frame_id(nh.param("frame_id", std::string("camera"))),
     serial_number(nh.param("serial_number", std::string(""))),
     camera_name(nh.getNamespace()),
-    watchdog_frames(nh.param("watchdog_frames", 3)),
-    enabled(nh.param("start_enabled", false))
+    grab_enabled(nh.param("start_grabbing", true)),
+    publish_enabled(nh.param("start_enabled", false))
 {
 
     if(nh.hasParam("frame_rate"))
@@ -300,13 +300,13 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     output_encoding = "rgb8";
     output_bytes_per_pixel = 3;
 
-    enable_service = nh.advertiseService("enable_publish", &BaslerNode::service_enable, this);
+    grab_service = nh.advertiseService("enable_grabbing", &BaslerNode::service_enable_grab, this);
+    grab_topic = nh.subscribe("enable_grabbing", 1, &BaslerNode::topic_enable_grab, this);
 
-    enable_sub = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable, this);
+    enable_service = nh.advertiseService("enable_publish", &BaslerNode::service_enable_grab, this);
+    enable_topic = nh.subscribe("enable_publish", 1, &BaslerNode::topic_enable_publish, this);
 
-    watchdog = nh.createTimer( ros::Duration(watchdog_frames/frame_rate), &BaslerNode::watchdog_timeout, this, false, false);
-
-    do_enable(enabled);
+    do_enable_grab(grab_enabled);
 }
 
 void
@@ -314,10 +314,25 @@ BaslerNode::shutdown(void)
 {
     if(camera.IsPylonDeviceAttached())
     {
+        ROS_INFO("Attached, beginning shutdown");
         if(camera.IsGrabbing())
+        {
+            ROS_INFO("Stopping grab");
             camera.StopGrabbing();
+        }
         if(camera.IsOpen())
+        {
+            ROS_INFO("closing");
             camera.Close();
+        }
+        ROS_INFO("detach");
+        camera.DetachDevice();
+        ROS_INFO("destroy");
+        camera.DestroyDevice();
+    }
+    else
+    {
+        ROS_INFO("Not attached, no shutdown needed");
     }
 }
 
