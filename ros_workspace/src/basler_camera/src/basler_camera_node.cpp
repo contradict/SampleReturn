@@ -200,6 +200,7 @@ BaslerNode::do_enable(bool state)
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to start grabbing: " << e.GetDescription());
+          shutdown();
           ros::shutdown();
       }
   }
@@ -214,6 +215,7 @@ BaslerNode::do_enable(bool state)
       catch(Pylon::RuntimeException &e)
       {
           ROS_ERROR_STREAM("Unable to stop grabbing: " << e.GetDescription());
+          shutdown();
           ros::shutdown();
       }
   }
@@ -331,12 +333,25 @@ BaslerNode::shutdown(void)
 {
     if(camera.IsPylonDeviceAttached())
     {
+        ROS_INFO("Attached, beginning shutdown");
         if(camera.IsGrabbing())
+        {
+            ROS_INFO("Stopping grab");
             camera.StopGrabbing();
+        }
         if(camera.IsOpen())
+        {
+            ROS_INFO("closing");
             camera.Close();
+        }
+        ROS_INFO("detach");
         camera.DetachDevice();
+        ROS_INFO("destroy");
         camera.DestroyDevice();
+    }
+    else
+    {
+        ROS_INFO("Not attached, no shutdown needed");
     }
 }
 
