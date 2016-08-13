@@ -6,6 +6,7 @@ OTHER_HOST="sr2"
 SSH_PORT="22"
 PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOME=/home/robot
+DELAY=5
 if [ $# -eq 0 ]; then
     LAUNCH_FILES="start_manipulator_cameras.launch driving_test.launch"
 else
@@ -35,7 +36,7 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
     for launch in ${LAUNCH_FILES}; do
         pidname=`basename ${launch} .launch`.pid
         roslaunch --pid=${HOME}/.ros/${pidname} samplereturn ${launch} &
-        sleep 10
+        sleep ${DELAY}
     done
     roslaunch --pid=${HOME}/.ros/logging.pid samplereturn logging.launch &
 else
