@@ -169,13 +169,6 @@ class LineMOD_Detector
     got_disp_ = false;
   }
 
-  void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
-  {
-      _config = config;
-      pub_threshold = config.pub_threshold;
-      target_width_ = config.target_width;
-  }
-
   bool enable(samplereturn_msgs::Enable::Request &req,
               samplereturn_msgs::Enable::Response &res) {
     enabled_ = req.state;
@@ -195,6 +188,13 @@ class LineMOD_Detector
     }
     res.state = enabled_;
     return true;
+  }
+
+  void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
+  {
+      _config = config;
+      pub_threshold = config.pub_threshold;
+      target_width_ = config.target_width;
   }
 
   void leftCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
@@ -230,80 +230,6 @@ class LineMOD_Detector
     disparity_img = (disp_ptr->image).clone();
     min_disp = msg->min_disparity;
     got_disp_ = true;
-  }
-
-  double unwrap90(double angle)
-  {
-      while(angle>M_PI/2)
-          angle -= M_PI;
-      while(angle<-M_PI/2)
-          angle += M_PI;
-      return angle;
-  }
-
-  cv::RotatedRect computeGripAngle(const std::vector<cv::Point>& hull)
-  {
-      float angle;
-      cv::RotatedRect rect = cv::minAreaRect(hull);
-      ROS_INFO("Meausred angle: %f width: %f height: %f",
-              rect.angle, rect.size.width, rect.size.height);
-      if(rect.size.width>rect.size.height)
-      {
-          angle = -rect.angle*M_PI/180+M_PI_2;
-      }
-      else
-      {
-          angle = -rect.angle*M_PI/180;
-      }
-      angle = unwrap90(angle);
-      rect.angle = angle;
-
-      ROS_INFO("Angle: %f", angle);
-      return rect;
-  }
-
-  bool matchLineMOD(cv::linemod::Match &best_match)
-  {
-      // Perform matching
-      std::vector<cv::linemod::Match> matches;
-      std::vector<cv::String> class_ids;
-      std::vector<cv::Mat> quantized_images;
-
-      LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
-
-      int num_classes = detector->numClasses();
-      ROS_DEBUG("Num Classes: %u", num_classes);
-      int classes_visited = 0;
-      std::set<std::string> visited;
-
-      ROS_DEBUG("Matches size: %u", (int)matches.size());
-      float best_match_similarity = 0;
-      int best_match_idx = -1;
-      for (int i = 0; (i < (int)matches.size()) && (classes_visited < num_classes); ++i)
-      {
-          cv::linemod::Match m = matches[i];
-          ROS_DEBUG("Matching count: %u", i);
-
-          if (m.similarity > best_match_similarity) {
-              best_match_similarity = m.similarity;
-              best_match_idx = i;
-          }
-          if (visited.insert(m.class_id).second)
-          {
-              ++classes_visited;
-          }
-      }
-
-      if (best_match_idx == -1) {
-        return false;
-      }
-      else {
-        best_match = matches[best_match_idx];
-        ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                best_match.similarity, best_match.x, best_match.y,
-                best_match.class_id.c_str(), best_match.template_id);
-        return true;
-      }
   }
 
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
@@ -490,6 +416,50 @@ class LineMOD_Detector
       }
       debug_img_pub.publish(debugmsg);
       LineMOD_Detector::sources.clear();
+  }
+
+  bool matchLineMOD(cv::linemod::Match &best_match)
+  {
+      // Perform matching
+      std::vector<cv::linemod::Match> matches;
+      std::vector<cv::String> class_ids;
+      std::vector<cv::Mat> quantized_images;
+
+      LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
+
+      int num_classes = detector->numClasses();
+      ROS_DEBUG("Num Classes: %u", num_classes);
+      int classes_visited = 0;
+      std::set<std::string> visited;
+
+      ROS_DEBUG("Matches size: %u", (int)matches.size());
+      float best_match_similarity = 0;
+      int best_match_idx = -1;
+      for (int i = 0; (i < (int)matches.size()) && (classes_visited < num_classes); ++i)
+      {
+          cv::linemod::Match m = matches[i];
+          ROS_DEBUG("Matching count: %u", i);
+
+          if (m.similarity > best_match_similarity) {
+              best_match_similarity = m.similarity;
+              best_match_idx = i;
+          }
+          if (visited.insert(m.class_id).second)
+          {
+              ++classes_visited;
+          }
+      }
+
+      if (best_match_idx == -1) {
+        return false;
+      }
+      else {
+        best_match = matches[best_match_idx];
+        ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
+                best_match.similarity, best_match.x, best_match.y,
+                best_match.class_id.c_str(), best_match.template_id);
+        return true;
+      }
   }
 
   void publishPoint(cv::RotatedRect rect, std::string class_id,
@@ -791,6 +761,37 @@ class LineMOD_Detector
       pub_bms_img.publish(debug_img_msg);
       return found;
   }
+
+  double unwrap90(double angle)
+  {
+      while(angle>M_PI/2)
+          angle -= M_PI;
+      while(angle<-M_PI/2)
+          angle += M_PI;
+      return angle;
+  }
+
+  cv::RotatedRect computeGripAngle(const std::vector<cv::Point>& hull)
+  {
+      float angle;
+      cv::RotatedRect rect = cv::minAreaRect(hull);
+      ROS_INFO("Meausred angle: %f width: %f height: %f",
+              rect.angle, rect.size.width, rect.size.height);
+      if(rect.size.width>rect.size.height)
+      {
+          angle = -rect.angle*M_PI/180+M_PI_2;
+      }
+      else
+      {
+          angle = -rect.angle*M_PI/180;
+      }
+      angle = unwrap90(angle);
+      rect.angle = angle;
+
+      ROS_INFO("Angle: %f", angle);
+      return rect;
+  }
+
 };
 
 int main(int argc, char ** argv)
