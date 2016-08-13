@@ -21,6 +21,7 @@ class BaslerNode : public Pylon::CImageEventHandler
     std::string camera_name;
     int watchdog_frames;
     double frame_rate;
+    int watchdog_count;
 
     bool enabled;
     ros::ServiceServer enable_service;

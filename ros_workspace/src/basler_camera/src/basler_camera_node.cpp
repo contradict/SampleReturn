@@ -193,6 +193,7 @@ BaslerNode::do_enable(bool state)
       try
       {
           camera.StartGrabbing( Pylon::GrabStrategy_LatestImageOnly, Pylon::GrabLoop_ProvidedByInstantCamera);
+          watchdog_count = 0;
           watchdog.start();
           ROS_INFO_STREAM("Started grabbing.");
       }
@@ -242,6 +243,7 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
         info.header.frame_id = img_msg.header.frame_id;
         cam_pub_.publish(img_msg, info);
         watchdog.stop();
+        watchdog_count = 0;
         watchdog.start();
     }
     else
@@ -256,8 +258,22 @@ BaslerNode::watchdog_timeout(const ros::TimerEvent &e)
     (void)e;
     if(enabled)
     {
-        ROS_ERROR_STREAM("Watchdog timeout");
-        kill(0, SIGTERM);
+        if(watchdog_count == 0)
+        {
+            ROS_ERROR_STREAM("Watchdog timeout 1, trying shutdown.");
+            ros::shutdown();
+        }
+        else if(watchdog_count == 1)
+        {
+            ROS_ERROR_STREAM("Watchdog timeout 2, trying SIGINT.");
+            kill(0, SIGINT);
+        }
+        else
+        {
+            ROS_ERROR_STREAM("Watchdog timeout 3, SIGTERM.");
+            kill(0, SIGTERM);
+        }
+        watchdog_count++;
     }
     else
     {
@@ -271,6 +287,7 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     serial_number(nh.param("serial_number", std::string(""))),
     camera_name(nh.getNamespace()),
     watchdog_frames(nh.param("watchdog_frames", 3)),
+    watchdog_count(0),
     enabled(nh.param("start_enabled", false))
 {
 
