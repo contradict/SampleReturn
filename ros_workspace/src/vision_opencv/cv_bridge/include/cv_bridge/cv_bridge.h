@@ -1,7 +1,8 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2011, Willow Garage, Inc.
+*  Copyright (c) 2011, Willow Garage, Inc,
+*  Copyright (c) 2015, Tal Regev.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -36,8 +37,12 @@
 #define CV_BRIDGE_CV_BRIDGE_H
 
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/CompressedImage.h>
+#include <sensor_msgs/image_encodings.h>
 #include <ros/static_assert.h>
 #include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/imgproc/types_c.h>
 #include <stdexcept>
 
 namespace cv_bridge {
@@ -52,6 +57,17 @@ class CvImage;
 
 typedef boost::shared_ptr<CvImage> CvImagePtr;
 typedef boost::shared_ptr<CvImage const> CvImageConstPtr;
+
+//from: http://docs.opencv.org/modules/highgui/doc/reading_and_writing_images_and_video.html#Mat imread(const string& filename, int flags)
+typedef enum {
+	BMP, DIP,
+	JPG, JPEG, JPE,
+	JP2,
+	PNG,
+	PBM, PGM, PPM,
+	SR, RAS,
+	TIFF, TIF,
+} Format;
 
 /**
  * \brief Image message class that is interoperable with sensor_msgs/Image but uses a
@@ -86,12 +102,31 @@ public:
   sensor_msgs::ImagePtr toImageMsg() const;
 
   /**
+   * dst_format is compress the image to desire format.
+   * Default value is empty string that will convert to jpg format.
+   * can be: jpg, jp2, bmp, png, tif at the moment
+   * support this format from opencv:
+   * http://docs.opencv.org/modules/highgui/doc/reading_and_writing_images_and_video.html#Mat imread(const string& filename, int flags)
+   */
+  sensor_msgs::CompressedImagePtr toCompressedImageMsg(const Format dst_format = JPG) const;
+
+  /**
    * \brief Copy the message data to a ROS sensor_msgs::Image message.
    *
    * This overload is intended mainly for aggregate messages such as stereo_msgs::DisparityImage,
    * which contains a sensor_msgs::Image as a data member.
    */
   void toImageMsg(sensor_msgs::Image& ros_image) const;
+
+  /**
+   * dst_format is compress the image to desire format.
+   * Default value is empty string that will convert to jpg format.
+   * can be: jpg, jp2, bmp, png, tif at the moment
+   * support this format from opencv:
+   * http://docs.opencv.org/modules/highgui/doc/reading_and_writing_images_and_video.html#Mat imread(const string& filename, int flags)
+   */
+  void toCompressedImageMsg(sensor_msgs::CompressedImage& ros_image, const Format dst_format = JPG) const;
+
 
   typedef boost::shared_ptr<CvImage> Ptr;
   typedef boost::shared_ptr<CvImage const> ConstPtr;
@@ -106,6 +141,7 @@ protected:
                             const std::string& encoding);
   /// @endcond
 };
+
 
 /**
  * \brief Convert a sensor_msgs::Image message to an OpenCV-compatible CvImage, copying the
@@ -124,6 +160,9 @@ protected:
  * as \a source.
  */
 CvImagePtr toCvCopy(const sensor_msgs::ImageConstPtr& source,
+                    const std::string& encoding = std::string());
+
+CvImagePtr toCvCopy(const sensor_msgs::CompressedImageConstPtr& source,
                     const std::string& encoding = std::string());
 
 /**
@@ -146,6 +185,9 @@ CvImagePtr toCvCopy(const sensor_msgs::ImageConstPtr& source,
  * function are applied (capping): http://docs.opencv.org/modules/core/doc/basic_structures.html#mat-convertto
  */
 CvImagePtr toCvCopy(const sensor_msgs::Image& source,
+                    const std::string& encoding = std::string());
+
+CvImagePtr toCvCopy(const sensor_msgs::CompressedImage& source,
                     const std::string& encoding = std::string());
 
 /**
@@ -205,6 +247,50 @@ CvImageConstPtr toCvShare(const sensor_msgs::Image& source,
 CvImagePtr cvtColor(const CvImageConstPtr& source,
                     const std::string& encoding);
 
+struct CvtColorForDisplayOptions {
+  CvtColorForDisplayOptions() : do_dynamic_scaling(false), min_image_value(0.0), max_image_value(0.0), colormap(-1) {}
+  bool do_dynamic_scaling;
+  double min_image_value;
+  double max_image_value;
+  int colormap;
+};
+
+
+/**
+ * \brief Converts an immutable sensor_msgs::Image message to another CvImage for display purposes,
+ * using practical conversion rules if needed.
+ *
+ * Data will be shared between input and output if possible.
+ *
+ * Recall: sensor_msgs::image_encodings::isColor and isMono tell whether an image contains R,G,B,A, mono
+ * (or any combination/subset) with 8 or 16 bit depth.
+ *
+ * The following rules apply:
+ * - if the output encoding is empty, the fact that the input image is mono or multiple-channel is
+ * preserved in the ouput image. The bit depth will be 8. it tries to convert to BGR no matter what
+ * encoding image is passed.
+ * - if the output encoding is not empty, it must have sensor_msgs::image_encodings::isColor and
+ * isMono return true. It must also be 8 bit in depth
+ * - if the input encoding is an OpenCV format (e.g. 8UC1), and if we have 1,3 or 4 channels, it is
+ * respectively converted to mono, BGR or BGRA.
+ * - if the input encoding is 32SC1, this estimate that image as label image and will convert it as
+ * bgr image with different colors for each label.
+ *
+ * \param source   A shared_ptr to a sensor_msgs::Image message
+ * \param encoding Either an encoding string that returns true in sensor_msgs::image_encodings::isColor
+ * isMono or the empty string as explained above.
+ * \param options (cv_bridge::CvtColorForDisplayOptions) Options to convert the source image with.
+ * - do_dynamic_scaling If true, the image is dynamically scaled between its minimum and maximum value
+ * before being converted to its final encoding.
+ * - min_image_value Independently from do_dynamic_scaling, if min_image_value and max_image_value are
+ * different, the image is scaled between these two values before being converted to its final encoding.
+ * - max_image_value Maximum image value
+ * - colormap Colormap which the source image converted with.
+ */
+CvImageConstPtr cvtColorForDisplay(const CvImageConstPtr& source,
+                                   const std::string& encoding = std::string(),
+                                   const CvtColorForDisplayOptions options = CvtColorForDisplayOptions());
+
 /**
  * \brief Get the OpenCV type enum corresponding to the encoding.
  *
@@ -213,7 +299,6 @@ CvImagePtr cvtColor(const CvImageConstPtr& source,
 int getCvType(const std::string& encoding);
 
 } // namespace cv_bridge
-
 
 
 // CvImage as a first class message type

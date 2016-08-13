@@ -6,7 +6,7 @@
         type="kvh_fog_node.py"
         ns="/io/kvh"
         machine="navigate"
-        output="screen">
+        >
         <param name="frame_id" type="string" value="gyro"/>
         <param name="port" type="string" value="/dev/ttyUSB0"/>
         <!-- discard measurements after re-open -->
@@ -21,6 +21,6 @@
         <!--
         -->
         <param name="bias" type="double" value="-6.7e-5"/>
-        <param name="invert_rotation" type="bool" value="true"/>
+        <param name="invert_rotation" type="bool" value="false"/>
      </node>
 </launch>

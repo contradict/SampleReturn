@@ -12,23 +12,32 @@
 
     <!-- rosbag record -->
     <!--
+            /io/microstrain_3dm_gx3_35/imu
+            /io/microstrain_3dm_gx3_35/gps
+            /io/microstrain_3dm_gx3_35/magnetometer
   -->
   <node machine="navigate"
       pkg="rosbag"
       type="record"
       name="navigate_record"
       output="log"
-      args="tf
+      args="--lz4
+            tf
             tf_static
             diagnostics
             /cameras/navigation/center/right/image_raw
             /cameras/navigation/center/right/camera_info
             /cameras/navigation/center/left/image_raw
             /cameras/navigation/center/left/camera_info
+            /cameras/navigation/center/desync
+            /cameras/navigation/center/status
             /cameras/navigation/starboard/right/image_raw
             /cameras/navigation/starboard/right/camera_info
             /cameras/navigation/starboard/left/image_raw
             /cameras/navigation/starboard/left/camera_info
+            /cameras/navigation/starboard/desync
+            /cameras/navigation/starboard/status
+            /io/audio/navigate_soundplay
             /io/battery_voltage
             /io/gpio_read
             /io/gpio_write
@@ -38,9 +47,6 @@
             /io/phidget_0/data_raw
             /io/phidget_0/is_calibrated
             /io/phidget_0/mag
-            /io/microstrain_3dm_gx3_35/imu
-            /io/microstrain_3dm_gx3_35/gps
-            /io/microstrain_3dm_gx3_35/magnetometer
             /io/kvh/imu
             /motion/odometry
             /motion/platform_joint_state
@@ -50,35 +56,51 @@
             /motion/current_motion_mode
             /motion/joystick_command
             /motion/manipulator/motor_states/ttyUSB0
+            /motion/manipulator/arm_joint/command
+            /motion/manipulator/hand_joint/command
+            /motion/manipulator/wrist_joint/command
             /motion/planner_command
             /motion/servo_command
             "
       >
   </node>
 
+    <!--
+             /cameras/sun_cam/image_raw
+             /cameras/sun_cam/camera_info
+    -->
    <node machine="search"
        pkg="rosbag"
        type="record"
        name="search_record"
        output="log"
-       args="tf
+       args="--lz4
+             tf
              tf_static
              /cameras/navigation/port/right/image_raw
              /cameras/navigation/port/right/camera_info
              /cameras/navigation/port/left/image_raw
              /cameras/navigation/port/left/camera_info
-             /cameras/search/image
-             /cameras/search/info
-             /cameras/search/status
+             /cameras/navigation/port/desync
+             /cameras/navigation/port/status
+             /cameras/navigation/beacon/image_raw
+             /cameras/navigation/beacon/camera_info
+             /cameras/search/port/image_raw
+             /cameras/search/port/camera_info
+             /cameras/search/center/image_raw
+             /cameras/search/center/camera_info
+             /cameras/search/starboard/image_raw
+             /cameras/search/starboard/camera_info
              /cameras/manipulator/left/image_raw
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
              /cameras/manipulator/right/camera_info
-             /cameras/sun_cam/image_raw
-             /cameras/sun_cam/camera_info
+             /cameras/manipulator/desync
+             /cameras/manipulator/status
              /process/beacon_finder/beacon_pose
              /process/sample_detection/named_point
              /process/sample_detection/manipulator/named_point
+             /io/audio/search_soundplay
              "
        >
    </node>

@@ -22,7 +22,6 @@ find_package(catkin REQUIRED
         platform_motion_msgs
 	    visual_servo_msgs
 	    manipulator_msgs
-        rviz
         cmake_modules
         )
 
@@ -48,10 +47,10 @@ add_definitions(-DQT_NO_KEYWORDS)
 
 ## Here we specify which header files need to be run through "moc",
 ## Qt's meta-object compiler.
-qt4_wrap_cpp(MOC_FILES
-  include/visualization/path_display.h
-)
-
+# qt4_wrap_cpp(MOC_FILES
+#   include/visualization/path_display.h
+# )
+#
 
 # dynamic reconfigure
 generate_dynamic_reconfigure_options(
@@ -87,6 +86,15 @@ target_link_libraries(motion_node
     ${catkin_LIBRARIES}
 )
 add_dependencies(motion_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
+
+add_executable(lls_odometry
+    src/odometry_node.cpp
+    src/LLS_odometry.cpp
+    )
+target_link_libraries(lls_odometry
+    ${Boost_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
 
 add_executable(least_squares_odometry
     src/odometry_node.cpp
@@ -130,14 +138,14 @@ target_link_libraries(test_path
     )
 add_dependencies(test_path platform_motion_msgs_generate_messages)
 
-add_library(path_viz
-  src/path_display.cpp
-  src/path_visual.cpp
-  ${MOC_FILES}
-  )
-target_link_libraries(path_viz ${QT_LIBRARIES} ${catkin_LIBRARIES})
-
-add_dependencies(path_viz ${PROJECT_NAME}_gencfg)
+# add_library(path_viz
+#   src/path_display.cpp
+#   src/path_visual.cpp
+#   ${MOC_FILES}
+#   )
+# target_link_libraries(path_viz ${QT_LIBRARIES} ${catkin_LIBRARIES})
+#
+# add_dependencies(path_viz ${PROJECT_NAME}_gencfg)
 
 catkin_add_gtest(test_acceleration_limit test/test_acceleration_limit.cpp
     src/acceleration_limit.cpp)
@@ -147,8 +155,9 @@ install(
       motion_node
       least_squares_odometry
       EKF_odometry
+      lls_odometry
       test_path
-      path_viz
+      #path_viz
 
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

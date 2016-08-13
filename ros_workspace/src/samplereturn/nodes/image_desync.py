@@ -101,9 +101,9 @@ def masacre_nodelets_in_namespace(namespace):
 class image_desync(object):
     def __init__(self):
         self.timestamps={'left':[], 'right':[]}
-        self.pub = rospy.Publisher('desync', Float64)
+        self.pub = rospy.Publisher('desync', Float64, queue_size = 10)
 
-        self.status_pub = rospy.Publisher('status', String)
+        self.status_pub = rospy.Publisher('status', String, queue_size = 10)
 
         self.check_interval    = rospy.get_param("~check_interval",     1.0)
         self.max_desync        = rospy.get_param("~max_desync",         0.10)
@@ -163,8 +163,10 @@ class image_desync(object):
         elif not self.got_info['left']:
             self.pub.publish(Float64(-float('inf')))
             self.missing_count['left']  += 1
+            self.missing_count['right']  = 0
         elif not self.got_info['right']:
             self.pub.publish(Float64(float('inf')))
+            self.missing_count['left']   = 0
             self.missing_count['right'] += 1
         else:
             self.missing_count['left'] = 0

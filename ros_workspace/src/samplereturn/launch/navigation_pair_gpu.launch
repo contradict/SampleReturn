@@ -31,7 +31,7 @@
               type="nodelet"
               args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="5.0"
+              respawn_delay="10.0"
               respawn="true">
             <param name="guid" type="string" value="$(arg left_guid)"/>
             <param name="isMaster" type="bool" value="false"/>
@@ -57,7 +57,7 @@
               type="nodelet"
               args="load camera1394/driver $(arg camera_manager_node_name)"
               ns="/cameras/navigation/$(arg namespace)"
-              respawn_delay="5.0"
+              respawn_delay="10.0"
               respawn="true">
 
             <param name="guid" type="string" value="$(arg right_guid)"/>
@@ -86,9 +86,10 @@
               type="image_desync.py"
               ns="/cameras/navigation/$(arg namespace)">
             <param name="manager_node_name" type="string" value="/cameras/navigation/$(arg namespace)/$(arg camera_manager_node_name)"/>
+            <param name="check_interval" type="double" value="0.05"/>
             <param name="max_desync" type="double" value="0.033"/>
-            <param name="desync_count" type="int" value="2"/>
-            <param name="startup_delay" type="int" value="15"/>
+            <param name="max_missing_count" type="int" value="30"/>
+            <param name="startup_delay" type="int" value="30"/>
         </node>
     </group>
 
@@ -102,7 +103,6 @@
               output="log"
               respawn_delay="5.0"
               respawn="true">
-            <remap from="pointcloud" to="points2"/>
             <param name="approximate_sync" type="bool" value="true"/>
             <param name="publisher_queue_size" type="int" value="5"/>
             <param name="correlation_window_size" type="int" value="21"/>
@@ -110,10 +110,96 @@
             <param name="disparity_range" type="int" value="48"/>
             <param name="xsobel" type="bool" value="true"/>
             <param name="refine_disparity" type="bool" value="true"/>
-            <param name="max_speckle_size" type="int" value="800"/>
-            <param name="max_diff" type="double" value="5"/>
+            <param name="max_speckle_size" type="int" value="2000"/>
+            <param name="max_diff" type="double" value="0.025"/>
+            <param name="bilateral_filter" type="bool" value="true"/>
+            <param name="filter_edge_threshold" type="double" value="1.0"/>
+            <param name="filter_iters" type="int" value="5"/>
+            <param name="filter_max_disc_threshold" type="double" value="1.0"/>
+            <param name="filter_ndisp" type="int" value="48"/>
+            <param name="filter_radius" type="int" value="4"/>
+            <param name="filter_sigma_range" type="double" value="30"/>
         </node>
-    </group>
+        <node name="voxelfilter"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/VoxelGrid $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input"  to="pointcloud" />
+              <remap from="~output" to="points2"/>
+              <param name="leaf_size" type="double" value="0.025"/>
+              <param name="filter_limit_min" type="double" value="-0.5"/>
+              <param name="filter_limit_max" type="double" value="1.5"/>
+              <param name="input_frame" type="string" value="base_link"/>
+              <param name="output_frame" type="string" value="base_link"/>
+        </node>
+        <node name="xlimit"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/PassThrough $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input" to="points2"/>
+
+              <rosparam>
+                  filter_field_name: x
+                  filter_limit_min: 0.0
+                  filter_limit_max: 3.0
+                  input_frame: "base_link"
+                  output_frame: "base_link"
+              </rosparam>
+        </node>
+        <node name="ylimit"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/PassThrough $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input" to="xlimit/output"/>
+
+              <rosparam>
+                  filter_field_name: y
+                  filter_limit_min: -3.0
+                  filter_limit_max:  3.0
+                  input_frame: "base_link"
+                  output_frame: "base_link"
+              </rosparam>
+        </node>
+        <node name="planefit"
+              machine="$(arg machine)"
+              pkg="nodelet"
+              type="nodelet"
+              args="load pcl/SACSegmentation $(arg processing_manager_node_name)"
+              ns="/cameras/navigation/$(arg namespace)"
+              output="log"
+              respawn_delay="5.0"
+              respawn="true">
+              <remap from="~input" to="ylimit/output"/>
+
+              <rosparam>
+                  axis: [0.0,0.0,1.0]
+                  distance_threshold: 0.1
+                  eps_angle: 0.17
+                  max_iterations: 50
+                  min_inliers: 500
+                  model_type: 0
+                  optimize_coefficients: true
+                  probability: 0.99
+                  radius_max: 0.05
+                  radius_min: 0.0
+              </rosparam>
+        </node>
+     </group>
 
 
 </launch>

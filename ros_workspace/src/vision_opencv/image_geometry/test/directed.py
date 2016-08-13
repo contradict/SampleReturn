@@ -1,6 +1,3 @@
-import roslib
-PKG = 'image_geometry'
-roslib.load_manifest(PKG)
 import rostest
 import rospy
 import unittest
@@ -20,7 +17,7 @@ class TestDirected(unittest.TestCase):
         print ci
         cam = PinholeCameraModel()
         cam.fromCameraInfo(ci)
-        #print cam.rectifyPoint((0, 0))
+        print cam.rectifyPoint((0, 0))
 
         print cam.project3dToPixel((0,0,0))
 

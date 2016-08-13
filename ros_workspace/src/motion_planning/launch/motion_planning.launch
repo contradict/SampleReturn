@@ -24,7 +24,7 @@
         <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
         <param name="clear_distance" value="4.0"/><!-- dist to move after rotating to clear -->
         <param name="clear_first_angle" value="120"/><!--rotate this angle first to check for clear, then rotate other way-->
-        <param name="course_tolerance" value="5.0"/>
+        <param name="course_tolerance" value="6.0"/>
 
         <!--VFH algorithm parameters, angles in degrees -->
         <param name="active_window" value="120"/>

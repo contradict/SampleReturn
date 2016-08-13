@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     sensor_msgs
     cmake_modules
+    dynamic_reconfigure
     )
 
 find_package(Eigen REQUIRED)
@@ -79,6 +80,10 @@ link_directories(${BFL_LIBRARY_DIRS})
 #   geometry_msgs#   nav_msgs#   sensor_msgs
 # )
 
+generate_dynamic_reconfigure_options(
+    cfg/beacon_localizer_params.cfg
+)
+
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -120,6 +125,7 @@ add_executable(beacon_localizer src/beacon_localizer_node.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(beacon_localizer_node beacon_localizer_generate_messages_cpp)
+add_dependencies(beacon_localizer ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(beacon_localizer

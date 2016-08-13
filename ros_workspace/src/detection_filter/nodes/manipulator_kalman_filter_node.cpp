@@ -13,7 +13,7 @@
 #include <samplereturn_msgs/PursuitResult.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <detection_filter/kalman_filter_paramsConfig.h>
+#include <detection_filter/manipulator_kalman_filter_paramsConfig.h>
 
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections
@@ -80,7 +80,7 @@ class KalmanDetectionFilter
 
   std::string _filter_frame_id;
 
-  dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig> dr_srv;
+  dynamic_reconfigure::Server<detection_filter::manipulator_kalman_filter_paramsConfig> dr_srv;
 
   XmlRpc::XmlRpcValue color_transitions_;
   std::map<std::string,std::vector<std::string> > color_transitions_map_;
@@ -88,7 +88,7 @@ class KalmanDetectionFilter
   public:
   KalmanDetectionFilter()
   {
-    dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig>::CallbackType cb;
+    dynamic_reconfigure::Server<detection_filter::manipulator_kalman_filter_paramsConfig>::CallbackType cb;
 
     cb = boost::bind(&KalmanDetectionFilter::configCallback, this,  _1, _2);
     dr_srv.setCallback(cb);
@@ -225,7 +225,7 @@ class KalmanDetectionFilter
   }
 
   /* Dynamic reconfigure callback */
-  void configCallback(detection_filter::kalman_filter_paramsConfig &config, uint32_t level)
+  void configCallback(detection_filter::manipulator_kalman_filter_paramsConfig &config, uint32_t level)
   {
     ROS_INFO("configCallback");
     max_dist_ = config.max_dist;

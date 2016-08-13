@@ -27,7 +27,7 @@
               respawn_delay="5.0"
               >
 
-            <param name="guid" type="string" value="00b09d0100a85650"/>
+            <param name="guid" type="string" value="00b09d0100bd09cf"/>
             <param name="video_mode" value="640x480_mono8"/>
             <param name="frame_id" value="manipulator_left_camera"/>
             <param name="frame_rate" value="30"/>
@@ -86,8 +86,11 @@
               type="image_desync.py"
               ns="/cameras/manipulator">
             <param name="manager_node_name" type="string" value="/cameras/manipulator/manager"/>
-            <param name="max_desync" type="double" value="0.02"/>
-        </node>
+            <param name="check_interval" type="double" value="0.05"/>
+            <param name="max_desync" type="double" value="0.033"/>
+            <param name="max_missing_count" type="int" value="30"/>
+            <param name="startup_delay" type="int" value="15"/>
+         </node>
     </group>
 
     <!-- Compute Stereo -->

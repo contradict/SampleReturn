@@ -51,7 +51,6 @@ void BMS::computeSaliency(const Mat& src, float step)
 
 	for (int i=0;i<maps.size();i++)
 	{
-    cout << "I: " << i << endl;
 		vector<Mat> sp;
 		split(maps[i],sp);
     if (i==0) {
@@ -61,7 +60,7 @@ void BMS::computeSaliency(const Mat& src, float step)
     }
     else {
 		  _feature_maps.push_back(sp[0]);
-	  //_feature_maps.push_back(sp[1]);
+	  //  _feature_maps.push_back(sp[1]);
 		//_feature_maps.push_back(sp[2]);
     }
 	}
@@ -140,8 +139,8 @@ Mat BMS::getAttentionMap(const Mat& bm)
 		}
 	}
 
-	double max_, min_;
-	minMaxLoc(ret,&min_,&max_);
+	//double max_, min_;
+	//minMaxLoc(ret,&min_,&max_);
 	ret=ret != 1;
 
 	if(_dilation_width_1>0)

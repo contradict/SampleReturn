@@ -61,7 +61,7 @@
 
             wrist_zero_position: 1.82
 
-            arm_down_maximum: 2.9
+            arm_down_maximum: 3.0
         </rosparam>
     
         <remap from="select_carousel_bin" to="/motion/carousel/select_bin"/>

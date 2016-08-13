@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="machine" default="navigate"/>
+    <node
+        machine="$(arg machine)"
+        name="filter"
+        pkg="pose_ukf"
+        type="pitchroll_ukf_node"
+        >
+        <!--
+        launch-prefix="tmux_new_window gdb - -args "
+        launch-prefix="tmux_new_window gdb -ex run - -args "
+        launch-prefix="tmux_new_window valgrind "
+        -->
+        <remap from="imu" to="/io/phidget_0/data_raw"/>
+        <remap from="gyro" to="/io/kvh/imu"/>
+        <param name="alpha" type="double" value="1.0"/>
+        <rosparam param="process_sigma">
+            orientation: [ 0.01, 0.01, 0.1 ]
+            omega: [ 1.0e-4, 1.0e-4, 1.0e-2 ]
+            gyro_bias: [ 1.0e-5, 1.0e-5, 1.0e-5 ]
+            accel_bias: [ 1.0e-5, 1.0e-5, 1.0e-5 ]
+        </rosparam>
+        <!-- orientation(r,p,y), omega(x,y,z), gyro bias(x,y,z), accel bias(x,y,z) -->
+        <rosparam param="initial_covariance">
+             [0.001, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.001, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.001, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.001, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.001, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.001,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1.0e-9,  0.000,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000, 1.0e-9,  0.000,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000, 1.0e-9,  0.000,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000, 1.0e-9,  0.000,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000, 1.0e-9,  0.000,
+              0.000, 0.000, 0.000, 0.000, 0.000, 0.000,  0.000,  0.000,  0.000,  0.000,  0.000, 1.0e-9]
+          </rosparam>
+
+          <param name="publish_tf" type="bool" value="true"/>
+          <param name="odometry_frame" type="string" value="odom"/>
+          <param name="parent_frame" type="string" value="base_link_flat"/>
+          <param name="child_frame" type="string" value="base_link"/>
+    </node>
+</launch>

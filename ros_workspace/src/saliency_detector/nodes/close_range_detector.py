@@ -42,8 +42,7 @@ class CloseRangeDetector(object):
 
         rospack = rospkg.RosPack()
 
-        self.classifier = cv2.SVM()
-        self.classifier.load(rospack.get_path('saliency_detector')+'/config/trained_svm')
+        self.classifier = cv2.ml.SVM_load(rospack.get_path('saliency_detector')+'/config/trained_svm')
 
     def verify_callback(self, req):
         resp = VerifyResponse(True)

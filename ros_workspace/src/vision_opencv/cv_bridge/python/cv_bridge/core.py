@@ -30,13 +30,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import roslib
-import rostest
-import rospy
-import unittest
-
 import sensor_msgs.msg
-import warnings
 
 class CvBridgeError(TypeError):
     """
@@ -44,7 +38,7 @@ class CvBridgeError(TypeError):
     """
     pass
 
-class CvBridge:
+class CvBridge(object):
     """
     The CvBridge is an object that converts between OpenCV Images and ROS Image messages.
 
@@ -70,7 +64,7 @@ class CvBridge:
         for t in ["8U", "8S", "16U", "16S", "32S", "32F", "64F" ]:
             for c in [1,2,3,4]:
                 nm = "%sC%d" % (t, c)
-                self.cvtype_to_name[eval("cv2.CV_%s" % nm)] = nm
+                self.cvtype_to_name[getattr(cv2, "CV_%s" % nm)] = nm
 
         self.numpy_type_to_cvtype = {'uint8':'8U', 'int8':'8S', 'uint16':'16U',
                                         'int16':'16S', 'int32':'32S', 'float32':'32F',
@@ -83,7 +77,7 @@ class CvBridge:
     def cvtype2_to_dtype_with_channels(self, cvtype):
         import re
         vals = re.split('(.+)C(.+)', self.cvtype_to_name[cvtype])
-        return self.numpy_type_to_cvtype[vals[1]], eval(vals[2])
+        return self.numpy_type_to_cvtype[vals[1]], int(vals[2])
 
     def encoding_to_cvtype2(self, encoding):
         from cv_bridge.boost.cv_bridge_boost import getCvType
@@ -98,21 +92,21 @@ class CvBridge:
 
     def imgmsg_to_cv2(self, img_msg, desired_encoding = "passthrough"):
         """
-        Convert a sensor_msgs::Image message to an OpenCV :ctype:`cv::Mat`.
+        Convert a sensor_msgs::Image message to an OpenCV :cpp:type:`cv::Mat`.
 
-        :param img_msg:   A sensor_msgs::Image message
+        :param img_msg:   A :cpp:type:`sensor_msgs::Image` message
         :param desired_encoding:  The encoding of the image data, one of the following strings:
 
            * ``"passthrough"``
            * one of the standard strings in sensor_msgs/image_encodings.h
 
-        :rtype: :ctype:`cv::Mat`
+        :rtype: :cpp:type:`cv::Mat`
         :raises CvBridgeError: when conversion is not possible.
 
         If desired_encoding is ``"passthrough"``, then the returned image has the same format as img_msg.
         Otherwise desired_encoding must be one of the standard image encodings
 
-        This function returns an OpenCV :ctype:`cv::Mat` message on success, or raises :exc:`cv_bridge.CvBridgeError` on failure.
+        This function returns an OpenCV :cpp:type:`cv::Mat` message on success, or raises :exc:`cv_bridge.CvBridgeError` on failure.
 
         If the image only has one channel, the shape has size 2 (width and height)
         """
@@ -140,9 +134,9 @@ class CvBridge:
 
     def cv2_to_imgmsg(self, cvim, encoding = "passthrough"):
         """
-        Convert an OpenCV :ctype:`cv::Mat` type to a ROS sensor_msgs::Image message.
+        Convert an OpenCV :cpp:type:`cv::Mat` type to a ROS sensor_msgs::Image message.
 
-        :param cvim:      An OpenCV :ctype:`cv::Mat`
+        :param cvim:      An OpenCV :cpp:type:`cv::Mat`
         :param encoding:  The encoding of the image data, one of the following strings:
 
            * ``"passthrough"``
@@ -173,7 +167,7 @@ class CvBridge:
             img_msg.encoding = encoding
             # Verify that the supplied encoding is compatible with the type of the OpenCV image
             if self.cvtype_to_name[self.encoding_to_cvtype2(encoding)] != cv_type:
-              raise CvBridgeError, "encoding specified as %s, but image has incompatible type %s" % (encoding, cv_type)
+                raise CvBridgeError("encoding specified as %s, but image has incompatible type %s" % (encoding, cv_type))
         img_msg.data = cvim.tostring()
         img_msg.step = len(img_msg.data) / img_msg.height
         return img_msg

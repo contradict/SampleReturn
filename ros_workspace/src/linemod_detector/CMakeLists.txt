@@ -24,6 +24,8 @@ find_package(catkin REQUIRED
 
 find_package(Eigen REQUIRED)
 
+find_package(OpenCV)
+
 add_definitions("-std=c++11")
 
 ## System dependencies are found with CMake's conventions
@@ -127,7 +129,6 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencfg)
  )
  target_link_libraries(linemod_detector_2d
    new_modalities
-   #color_naming
    ${catkin_LIBRARIES}
  )
 

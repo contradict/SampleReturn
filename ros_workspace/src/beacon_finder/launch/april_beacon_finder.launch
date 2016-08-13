@@ -11,8 +11,7 @@
         ns="/processes/beacon"
         machine="search"
         >
-        <remap from="image" to="/cameras/search/image"/>
-        <remap from="/cameras/search/camera_info" to="/cameras/search/info"/>
+        <remap from="image" to="/cameras/navigation/beacon/basler_camera/image"/>
 
         <rosparam param="tag_descriptions">
          [{
@@ -61,7 +60,7 @@
         <!--scale in sigma/meter. With .05, sigma should be about 5m at 100m range-->
         <!--1 radians per second with 50ms timing inaccuracy????-->
         <param name="position_sigma" value="0.01"/>
-        <param name="position_sigma_scale" value="0.02"/>
+        <param name="position_sigma_scale" value="0.01"/>
         <!-- old beacon finder variance: 0.02 -->
         <param name="rotation_sigma" value="0.25"/>
 

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+    <arg name="user" default="robot"/>
+    <arg name="path" default="Desktop"/>
+    <arg name="kind" default="install"/>
+    <include file="$(find samplereturn)/launch/machine_definitions.launch">
+        <arg name="user" value="$(arg user)"/>
+        <arg name="path" value="$(arg path)"/>
+        <arg name="kind" value="$(arg kind)"/>
+        <arg name="replay" default="true"/>
+    </include>
+
+    <include file="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
+</launch>

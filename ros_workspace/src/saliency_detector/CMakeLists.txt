@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(saliency_detector)
 
-set(CMAKE_BUILD_TYPE Debug)
-
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -16,9 +14,16 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   image_geometry
   tf
+  image_transport
+  pcl_ros
+  pcl_conversions
+  eigen_conversions
+  tf_conversions
   cmake_modules)
 
 find_package(Eigen REQUIRED)
+find_package(OpenCV)
+find_package(PCL REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -80,7 +85,9 @@ find_package(Eigen REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
-generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg)
+generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg
+  cfg/ground_projector_params.cfg
+  cfg/color_histogram_descriptor_params.cfg)
 
 ###################################
 ## catkin specific configuration ##
@@ -109,6 +116,7 @@ catkin_package(
  include_directories(include
    ${Eigen_INCLUDE_DIRS}
    ${catkin_INCLUDE_DIRS}
+   ${PCL_INCLUDE_DIRS}
 )
 
 add_definitions(${Eigen_DEFINITIONS})
@@ -128,16 +136,22 @@ add_library(color_naming
 
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
+ add_executable(ground_projector_node src/project.cpp)
+ add_executable(color_histogram_descriptor_node src/color_histogram_descriptor.cpp)
  # add_executable(BMS_standalone src/BMS.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
  add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
+ add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
+ add_dependencies(color_histogram_descriptor_node ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+   ${PCL_LIBRARIES}
    )
 
  target_link_libraries(saliency_detector_node
@@ -145,6 +159,16 @@ add_library(color_naming
    color_naming
    ${catkin_LIBRARIES}
    BMS
+ )
+
+ target_link_libraries(ground_projector_node
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+ )
+
+ target_link_libraries(color_histogram_descriptor_node
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
  )
 
 #############
@@ -163,6 +187,7 @@ add_library(color_naming
 
 ## Mark executables and/or libraries for installation
 install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
+   ground_projector_node color_histogram_descriptor_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

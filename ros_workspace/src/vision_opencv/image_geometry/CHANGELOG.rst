@@ -2,6 +2,32 @@
 Changelog for package image_geometry
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.11.12 (2016-03-10)
+--------------------
+* issue `#117 <https://github.com/ros-perception/vision_opencv/issues/117>`_ pull request `#118 <https://github.com/ros-perception/vision_opencv/issues/118>`_ check all distortion coefficients to see if rectification ought to be done
+* Contributors: Lucas Walter
+
+1.11.11 (2016-01-31)
+--------------------
+* clean up the doc files
+* fix a few warnings in doc jobs
+* Contributors: Vincent Rabaud
+
+1.11.10 (2016-01-16)
+--------------------
+
+1.11.9 (2015-11-29)
+-------------------
+* add a condition if D=None
+* fix compilation warnings
+* Contributors: Vincent Rabaud, YuOhara
+
+1.11.8 (2015-07-15)
+-------------------
+* fixes `#62 <https://github.com/ros-perception/vision_opencv/issues/62>`_, bug in Python rectifyPoint old opencv1 API
+* Simplify some OpenCV3 distinction
+* Contributors: Basheer Subei, Vincent Rabaud
+
 1.11.7 (2014-12-14)
 -------------------
 * Merge pull request `#53 <https://github.com/ros-perception/vision_opencv/issues/53>`_ from carnegieroboticsllc/patch-1

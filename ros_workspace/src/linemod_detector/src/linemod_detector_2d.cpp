@@ -127,10 +127,6 @@ class LineMOD_Detector
   public:
   LineMOD_Detector(): it(nh)
   {
-    color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
-    left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
-    right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
-    disparity_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
     img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
     point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
     matching_threshold = 80;
@@ -186,6 +182,18 @@ class LineMOD_Detector
   bool enable(samplereturn_msgs::Enable::Request &req,
               samplereturn_msgs::Enable::Response &res) {
     enabled_ = req.state;
+    if (req.state) {
+      color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
+      disparity_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
+      left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
+      right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
+    }
+    else {
+      color_sub.shutdown();
+      disparity_sub.shutdown();
+      left_cam_info_sub.shutdown();
+      right_cam_info_sub.shutdown();
+    }
     res.state = enabled_;
     return true;
   }
@@ -311,7 +319,7 @@ class LineMOD_Detector
 
       // Perform matching
       std::vector<cv::linemod::Match> matches;
-      std::vector<std::string> class_ids;
+      std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
       LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
@@ -495,7 +503,7 @@ class LineMOD_Detector
       }
 
       // If no template, try BMS
-      if(!sent_something && !hard_samples)
+      if(!sent_something)
       {
           cv::Point bms_centroid;
           std::string bms_color;
@@ -744,14 +752,15 @@ class LineMOD_Detector
       blob_params.thresholdStep = _config.thresholdStep;
       blob_params.minRepeatability = _config.minRepeatability;
 
-      cv::SimpleBlobDetector blob(blob_params);
+      cv::Ptr<cv::SimpleBlobDetector> blob;
+      blob = cv::SimpleBlobDetector::create(blob_params);
 
-      vector<cv::KeyPoint> kp;
+      std::vector<cv::KeyPoint> kp;
 
       cv::Mat debug_bms_img_color;
 
       cv::Mat blob_copy = debug_bms_img.clone();
-      blob.detect(blob_copy, kp);
+      blob->detect(blob_copy, kp);
       ROS_DEBUG("Keypoints Detected: %lu", kp.size());
       cv::cvtColor(debug_bms_img, debug_bms_img_color, CV_GRAY2RGB);
       cv::Mat sub_img, sub_mask;
@@ -781,7 +790,7 @@ class LineMOD_Detector
 
           *dominant_color = cn.getDominantColor(interiorColor);
           ROS_DEBUG_STREAM("Dominant color " << *dominant_color);
-          string dominant_exterior_color = cn.getDominantColor(exteriorColor);
+          std::string dominant_exterior_color = cn.getDominantColor(exteriorColor);
           ROS_DEBUG_STREAM("Dominant exterior color " << dominant_exterior_color);
 
           cv::putText(debug_bms_img_color, *dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,

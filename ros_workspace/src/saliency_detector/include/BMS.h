@@ -26,7 +26,7 @@
 
 #include <fstream>
 #include <vector>
-#include "opencv2/opencv.hpp"
+#include <opencv2/opencv.hpp>
 
 using namespace cv;
 
@@ -42,7 +42,7 @@ private:
   Mat getAttentionMap(const Mat& bm);
   Mat _sm;
   Mat _src;
-  vector<Mat> _feature_maps;
+  std::vector<Mat> _feature_maps;
   RNG _rng;
   int _dilation_width_1;
   int _opening_width;
