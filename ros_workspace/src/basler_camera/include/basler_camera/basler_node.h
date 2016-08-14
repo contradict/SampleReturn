@@ -46,13 +46,13 @@ class BaslerNode : public Pylon::CImageEventHandler
     void
     find_camera(void);
 
-    void
+    bool
     handle_basler_parameter(std::string name, bool value);
-    void
+    int
     handle_basler_parameter(std::string name, int value);
-    void
+    double
     handle_basler_parameter(std::string name, double value);
-    void
+    std::string
     handle_basler_parameter(std::string name, std::string value);
     void
     handle_basler_parameter(XmlRpc::XmlRpcValue& param);
