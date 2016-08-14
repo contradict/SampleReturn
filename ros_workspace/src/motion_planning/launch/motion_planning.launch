@@ -13,7 +13,7 @@
           ns="/processes">
 
         <remap from="odometry" to="/motion/odometry"/>
-        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="local_costmap" to="/processes/local_costmap/costmap/costmap"/>
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
 
@@ -23,7 +23,7 @@
         <param name="goal_orientation_tolerance" value="2"/><!--degrees!-->
         <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
         <param name="clear_distance" value="4.0"/><!-- dist to move after rotating to clear -->
-        <param name="clear_first_angle" value="120"/><!--rotate this angle first to check for clear, then rotate other way-->
+        <param name="clear_first_angle" value="120"/><!--spin this angle first to check for clear, then spin other way-->
         <param name="course_tolerance" value="6.0"/>
 
         <!--VFH algorithm parameters, angles in degrees -->
@@ -58,7 +58,6 @@
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
 
         <remap from="odometry" to="/motion/odometry"/>
-        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
         
