@@ -55,5 +55,5 @@ pursue_sample:
     settle_time: 4.0
     sample_obstacle_check_width: 0.6
     final_pursuit_step: 0.4
-    square_search_size: 0.3 
+    spiral_search_step: 0.15 
     search_velocity: 0.05

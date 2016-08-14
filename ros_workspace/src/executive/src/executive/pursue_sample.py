@@ -104,7 +104,6 @@ class PursueSample(object):
         #area search and servo settings, search_count limits the number of times we can enter the
         #sample_lost search pattern
         self.state_machine.userdata.search_velocity = self.node_params.search_velocity
-        self.state_machine.userdata.square_search_size = self.node_params.square_search_size
         self.state_machine.userdata.settle_time = rospy.Duration(self.node_params.settle_time)
         self.state_machine.userdata.manipulator_search_angle = math.pi/4
         self.state_machine.userdata.search_count = 0
@@ -113,6 +112,18 @@ class PursueSample(object):
         self.state_machine.userdata.grab_count_limit = 2
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
         self.state_machine.userdata.servo_params = self.node_params.servo_params
+
+        spiral_step = self.node_params.spiral_search_step
+        spiral_search_positions = [ {'x':spiral_step,'y':0},
+                                    {'x':spiral_step,'y':spiral_step},
+                                    {'x':-spiral_step,'y':spiral_step},
+                                    {'x':-spiral_step,'y':-spiral_step},
+                                    {'x':2*spiral_step,'y':-spiral_step},
+                                    {'x':2*spiral_step,'y':2*spiral_step},
+                                    {'x':-2*spiral_step,'y':2*spiral_step},
+                                    {'x':-2*spiral_step,'y':-2*spiral_step},
+                                    {'x':2*spiral_step,'y':-2*spiral_step} ]
+        self.state_machine.userdata.spiral_search_positions = spiral_search_positions
 
         #total bullshit for bins
         self.state_machine.userdata.available_small_bins = [1,2,3,8,9,10]
@@ -247,7 +258,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('MANIPULATOR_FINAL_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'ANNOUNCE_SUN_POINTING',
+                                   transitions = {'complete':'HANDLE_SEARCH',
                                                   'object_detected':'VISUAL_SERVO',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'simple_move':'final_move',
@@ -270,6 +281,7 @@ class PursueSample(object):
             smach.StateMachine.add('HANDLE_SEARCH',
                                    HandleSearch(self.tf_listener, self.announcer),
                                    transitions = {'sample_search':'HANDLE_SEARCH_MOVES',
+                                                  'optimize_lighting':'ANNOUNCE_SUN_POINTING',
                                                   'no_sample':'PUBLISH_FAILURE'})
 
             smach.StateMachine.add('HANDLE_SEARCH_MOVES',
@@ -488,6 +500,7 @@ class StartSamplePursuit(smach.State):
                                          'simple_pursuit_threshold',
                                          'odometry_frame'],
                              output_keys=['latched_filter_id',
+                                          'lighting_optimized',
                                           'return_goal',
                                           'pursuit_goal',
                                           'approach_strafe',
@@ -506,6 +519,7 @@ class StartSamplePursuit(smach.State):
         userdata.action_result = result
         #default velocity for all moves is in simple_mover!
         #initial approach pursuit done at pursuit_velocity
+        userdata.lighting_optimized = False
         userdata.search_count = 0
         userdata.grab_count = 0
 
@@ -633,13 +647,17 @@ class CalculateManipulatorApproach(smach.State):
 class HandleSearch(smach.State):
     def __init__(self, tf_listener, announcer):
         smach.State.__init__(self,
-                             outcomes=['sample_search', 'no_sample'],
-                             input_keys=['square_search_size',
+                             outcomes=['sample_search',
+                                       'optimize_lighting',
+                                       'no_sample'],
+                             input_keys=['spiral_search_positions',
+                                         'lighting_optimized',
                                          'search_count',
                                          'search_try_limit',
                                          'odometry_frame',
                                          'detected_sample'],
                              output_keys=['point_list',
+                                          'lighting_optimized',
                                           'search_count'])
 
         self.tf_listener = tf_listener
@@ -650,28 +668,24 @@ class HandleSearch(smach.State):
         if userdata.search_count >= userdata.search_try_limit:
             self.announcer.say("Search limit reached")
             return 'no_sample'
+        
+        if not userdata.lighting_optimized:
+            userdata.lighting_optimized = True
+            return 'optimize_lighting'
 
         point_list = collections.deque([])
-        square_step = userdata.square_search_size
 
         try:
-            start_pose = util.get_current_robot_pose(self.tf_listener,
+            for position in userdata.spiral_search_positions:                     
+                start_pose = util.get_current_robot_pose(self.tf_listener,
                     userdata.odometry_frame)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose,
-                    square_step, 0, userdata.odometry_frame)
-            point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose,
-                    square_step, square_step, userdata.odometry_frame)
-            point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose,
-                    -square_step, square_step, userdata.odometry_frame)
-            point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose,
-                    -square_step, -square_step, userdata.odometry_frame)
-            point_list.append(next_pose.pose.position)
-            next_pose = util.translate_base_link(self.tf_listener, start_pose,
-                    square_step, -square_step, userdata.odometry_frame)
-            point_list.append(next_pose.pose.position)
+                next_pose = util.translate_base_link(self.tf_listener,
+                                                     start_pose,
+                                                     position['x'],
+                                                     position['y'],
+                                                     userdata.odometry_frame)
+                point_list.append(next_pose.pose.position)
+                
             userdata.point_list = point_list
             self.announcer.say("Search ing area")
             userdata.search_count += 1
