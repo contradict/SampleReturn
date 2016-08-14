@@ -1,0 +1,112 @@
+robot_base_frame: base_link
+global_frame: odom
+transform_tolerance: 0.3
+
+update_frequency: 3.0
+publish_frequency: 1.0
+
+clear_every_send: true
+
+#footprint: [[0.2, -0.90], [0.2, 0.90], [-1.55, 0.0]]
+
+rolling_window: true
+width: 24.0
+height: 24.0
+resolution: 0.0625
+
+robot_radius: 1.0
+
+plugins:
+    -
+        name: port_obstacle_layer
+        type: "costmap_2d::VoxelLayer"
+    -
+        name: center_obstacle_layer
+        type: "costmap_2d::VoxelLayer"
+    -
+        name: starboard_obstacle_layer
+        type: "costmap_2d::VoxelLayer"
+    -
+        name: inflation_layer
+        type: "costmap_2d::InflationLayer"
+
+port_obstacle_layer:
+    z_resolution: 0.0625
+    z_voxels: 16
+    unknown_threshold: 8
+    mark_threshold: 5
+    #set if you want the voxel map published
+    publish_voxel_map: true
+    track_unknown_space: true
+    obstacle_range: 10.0
+    raytrace_range: 12
+
+    observation_sources: port_point_cloud
+    port_point_cloud: {
+        topic: /cameras/navigation/port/points2,
+        data_type: PointCloud2,
+        expected_update_rate: 0.3,
+        observation_persistence: 0.0,
+        marking: true,
+        clearing: true,
+        min_obstacle_height: -0.5,
+        max_obstacle_height: 1.5,
+        obstacle_range: 10.0,
+        raytrace_range: 12.0,
+        }
+
+center_obstacle_layer:
+    z_resolution: 0.0625
+    z_voxels: 16
+    unknown_threshold: 8
+    mark_threshold: 5
+    #set if you want the voxel map published
+    publish_voxel_map: true
+    track_unknown_space: true
+    obstacle_range: 10.0
+    raytrace_range: 12.0
+
+    observation_sources: center_point_cloud
+    center_point_cloud: {
+        topic: /cameras/navigation/center/points2,
+        data_type: PointCloud2,
+        expected_update_rate: 0.3,
+        observation_persistence: 0.0,
+        marking: true,
+        clearing: true,
+        min_obstacle_height: -0.5,
+        max_obstacle_height: 1.5,
+        obstacle_range: 10.0,
+        raytrace_range: 12.0,
+        }
+starboard_obstacle_layer:
+    z_resolution: 0.0625
+    z_voxels: 16
+    unknown_threshold: 8
+    mark_threshold: 5
+    #set if you want the voxel map published
+    publish_voxel_map: true
+    track_unknown_space: true
+    obstacle_range: 10.0
+    raytrace_range: 12.0
+
+    observation_sources: starboard_point_cloud
+    starboard_point_cloud: {
+        topic: /cameras/navigation/starboard/points2,
+        data_type: PointCloud2,
+        expected_update_rate: 0.3,
+        observation_persistence: 0.0,
+        marking: true,
+        clearing: true,
+        min_obstacle_height: -0.5,
+        max_obstacle_height: 1.5,
+        obstacle_range: 10.0,
+        raytrace_range: 12.0,
+        }
+
+inflation_layer:
+    cost_scaling_factor: 1.0
+    inflation_radius: 2.0 
+
+
+
