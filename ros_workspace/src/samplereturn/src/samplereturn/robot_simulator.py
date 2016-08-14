@@ -250,7 +250,7 @@ class RobotSimulator(object):
         #io publishers
         self.GPIO_pub = rospy.Publisher(gpio_read_name, platform_msg.GPIO, queue_size=2)
         rospy.Timer(rospy.Duration(0.2), self.publish_GPIO)
-        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, queue_size=2)
+        self.pause_pub = rospy.Publisher(pause_state_name, std_msg.Bool, latch=True, queue_size=2)
         
         #platform motion publishers, services, and action servers
         rospy.Service(select_motion_name,
