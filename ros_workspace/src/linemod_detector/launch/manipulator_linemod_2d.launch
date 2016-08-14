@@ -29,7 +29,7 @@
           bms_thresh: 40
           bms_thresh_on: true
 
-          exterior_colors: [green, brown]
+          exterior_colors: [green, brown, black]
           interior_colors: [red, orange, pink, white, purple, blue, yellow]
 
           filterByArea: true
