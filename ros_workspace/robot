@@ -1,5 +1,5 @@
 #!/bin/bash
-SHUTDOWN_LAUNCH_FILES="robot.launch stage1.launch"
+SHUTDOWN_LAUNCH_FILES="robot.launch stage1.launch logging.launch"
 NREADY=10
 PIDPATH=${HOME}/.ros
 
