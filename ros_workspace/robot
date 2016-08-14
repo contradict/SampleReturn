@@ -1,0 +1,64 @@
+#!/bin/bash
+SHUTDOWN_LAUNCH_FILES="robot.launch stage1.launch logging.launch"
+NREADY=10
+PIDPATH=${HOME}/.ros
+
+pidname() {
+    echo ${PIDPATH}/$(basename ${1} .launch).pid
+}
+
+wait_for_ready() {
+    echo "Waiting for ${1}"
+    rostopic echo ${1} | \
+        grep --line-buffered 'Ready' | \
+        head -n ${NREADY} >>/dev/null
+    echo "${1} ready"
+}
+
+launch() {
+    launchname=${1}
+    shift
+    pidfile=$(pidname ${launchname})
+    if [ -e ${pidfile} ] && kill -0 $(cat ${pidfile}); then
+        echo "Launch ${launchname} still running, not restarting"
+        return 1
+    fi
+    roslaunch --pid=${pidfile} samplereturn ${launchname} "$@" &
+}
+
+launch_and_wait() {
+    launchname=${1}
+    shift
+    topicname=${1}
+    shift
+    launch ${launchname} "$@" && wait_for_ready ${topicname}
+}
+
+case ${1} in
+    start)
+        shift
+        if [ ${1} = "log" ]; then dolog=1; shift; else dolog=0; fi
+        launch_and_wait stage1.launch /cameras/manipulator/status "$@"
+        wait_for_ready /cameras/navigation/starboard/status
+        launch robot.launch "$@"
+        if [ ${dolog} = "1" ]; then
+            launch logging.launch "$@"
+        fi
+        ;;
+    stop)
+        for launch in ${SHUTDOWN_LAUNCH_FILES}; do
+            pidfile=$(pidname ${launch})
+            if [ -e ${pidfile} ]; then
+                kill -INT $(cat ${pidfile})
+            fi
+        done
+        ;;
+    log)
+        shift
+        launch logging.launch "$@"
+        ;;
+    *)
+        echo "Must specify \"start\" or \"stop\" as first argument"
+        exit 1
+        ;;
+esac 

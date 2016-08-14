@@ -2,3 +2,4 @@ devel
 build
 install
 .catkin_workspace
+*.pyc

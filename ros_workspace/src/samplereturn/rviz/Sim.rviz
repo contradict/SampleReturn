@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Static Map1/Position1
+        - /Costmap1
         - /Debug Map1/Status1
         - /Map1/Status1
         - /Samples1/Status1
@@ -97,7 +98,7 @@ Visualization Manager:
       Draw Behind: false
       Enabled: true
       Name: Costmap
-      Topic: /processes/planner/dumb/local_costmap/costmap/costmap
+      Topic: /processes/local_costmap/costmap/costmap
       Unreliable: false
       Value: true
     - Alpha: 0.7
@@ -142,6 +143,14 @@ Visualization Manager:
           Show Trail: false
           Value: true
         fake_laser:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        gyro:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        imu_0:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -450,6 +459,10 @@ Visualization Manager:
           Value: false
         fake_laser:
           Value: false
+        gyro:
+          Value: false
+        imu_0:
+          Value: false
         manipulator_arm:
           Value: false
         manipulator_baseline_bar:
@@ -508,6 +521,8 @@ Visualization Manager:
           Value: true
         perfect_odometry_in_static_frame:
           Value: false
+        platform:
+          Value: true
         port_suspension:
           Value: false
         port_wheel:
@@ -556,27 +571,6 @@ Visualization Manager:
           perfect_odometry_in_static_frame:
             {}
           sim_map:
-            beacon:
-              beacon_back_left:
-                {}
-              beacon_back_lower:
-                {}
-              beacon_back_right:
-                {}
-              beacon_front_left:
-                {}
-              beacon_front_lower:
-                {}
-              beacon_front_right:
-                {}
-              beacon_left_bottom:
-                {}
-              beacon_left_top:
-                {}
-              beacon_right_bottom:
-                {}
-              beacon_right_top:
-                {}
             noisy_odometry_in_sim_map:
               {}
             odom:
@@ -585,6 +579,10 @@ Visualization Manager:
                   carousel:
                     {}
                   fake_laser:
+                    {}
+                  gyro:
+                    {}
+                  imu_0:
                     {}
                   manipulator_arm:
                     {}
@@ -646,6 +644,28 @@ Visualization Manager:
                     {}
                   top_triangle:
                     {}
+            platform:
+              beacon:
+                beacon_back_left:
+                  {}
+                beacon_back_lower:
+                  {}
+                beacon_back_right:
+                  {}
+                beacon_front_left:
+                  {}
+                beacon_front_lower:
+                  {}
+                beacon_front_right:
+                  {}
+                beacon_left_bottom:
+                  {}
+                beacon_left_top:
+                  {}
+                beacon_right_bottom:
+                  {}
+                beacon_right_top:
+                  {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -680,11 +700,11 @@ Visualization Manager:
         Value: false
       Name: Current View
       Near Clip Distance: 0.01
-      Scale: 14.9211
+      Scale: 33.3772
       Target Frame: base_link
       Value: TopDownOrtho (rviz)
-      X: 2.34934
-      Y: 4.61667
+      X: 3.96344
+      Y: 2.1879
     Saved: ~
 Window Geometry:
   Displays:
@@ -703,4 +723,4 @@ Window Geometry:
     collapsed: false
   Width: 1752
   X: 125
-  Y: 186
+  Y: 176

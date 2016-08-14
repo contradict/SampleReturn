@@ -1,6 +1,7 @@
 robot_base_frame: base_link
 global_frame: odom
 transform_tolerance: 0.3
+always_send_full_costmap: true
 
 update_frequency: 3.0
 publish_frequency: 1.0
