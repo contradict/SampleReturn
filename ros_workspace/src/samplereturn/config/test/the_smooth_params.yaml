@@ -1,5 +1,0 @@
-TheSmoothPlanner:
-    maximum_linear_velocity: 1.0
-    maximum_angular_velocity: 1.0
-    linear_acceleration: 1.0
-    angular_acceleration: 1.0
