@@ -139,7 +139,7 @@ class SaliencyDetectorNode
 
     // Scale keypoint params back up from smaller BMS image
     ROS_DEBUG("Begin publish loop");
-    for (int i = 0; i < kp.size(); i++) {
+    for (size_t i = 0; i < kp.size(); i++) {
       int x = kp[i].pt.x * scale_;
       int y = kp[i].pt.y * scale_;
       // Pad a bit to avoid clipping
@@ -186,6 +186,7 @@ class SaliencyDetectorNode
   /* Dynamic reconfigure callback */
   void configCallback(saliency_detector::saliency_detector_paramsConfig &config, uint32_t level)
   {
+      (void)level;
     saliency_mutex_.lock();
     ROS_DEBUG("configCallback");
     // Construct and configure BMS
