@@ -260,20 +260,32 @@ class LineMOD_Detector
         ROS_ERROR("cv_bridge image exception: %s", e.what());
       }
       // Resize image from PA to constant size to reduce number of templates needed
-      cv::Mat det_img;
+      cv::Mat det_patch;
       int orig_height, orig_width;
       orig_height = msg->patch_array[i].image_roi.height;
       orig_width = msg->patch_array[i].image_roi.width;
-      cv::resize(cv_ptr_img->image, det_img,
-          cv::Size(target_width_, orig_height*(target_width_/orig_width)),
-          0.0, 0.0, cv::INTER_NEAREST);
+      ROS_INFO("Patch Width: %d, Height: %d", orig_width, orig_height);
+      cv::Size det_size = cv::Size(target_width_, target_width_*(float(orig_height)/orig_width));
+      ROS_INFO("Resized Width: %d, Height: %d", det_size.width, det_size.height);
+      cv::resize(cv_ptr_img->image, det_patch, det_size, 0.0, 0.0, cv::INTER_NEAREST);
 
       // Rectify to get "head-on" view?
+
+      // Place in 640x480 image to match manipulators, otherwise templates can
+      // run off edge.
+      cv::Mat det_img = cv::Mat::zeros(480, 640, CV_8UC3);
+      det_patch.copyTo(det_img(cv::Rect(0, 0, det_size.width, det_size.height)));
+
+      // Add a mask to this?
 
       // Detect
       sources.push_back(det_img);
       cv::linemod::Match m;
       bool ret = matchLineMOD(m);
+      sources.clear();
+      if (!ret) {
+        return;
+      }
       const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
 
       // Draw Response on output image
@@ -285,12 +297,17 @@ class LineMOD_Detector
         drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
             cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
         // Resize back to original and place in output image
-        cv::resize(det_img, det_img, cv::Size(orig_width, orig_height),
+        cv::resize(det_img(cv::Rect(0, 0, det_size.width, det_size.height)), det_img, cv::Size(orig_width, orig_height),
             0.0, 0.0, cv::INTER_NEAREST);
         det_img.copyTo(debug_image(draw_rect));
 
-      // If a positive match, publish NamedPoint
-
+        // If a positive match, publish NamedPoint
+        if (m.similarity > pub_threshold) {
+          samplereturn_msgs::NamedPoint np;
+          np.header = msg->patch_array[i].header;
+          np.point = msg->patch_array[i].world_point.point;
+          point_pub.publish(np);
+        }
       }
     }
     sensor_msgs::ImagePtr debug_image_msg =
@@ -332,6 +349,10 @@ class LineMOD_Detector
       // Compute Match
       cv::linemod::Match m;
       bool ret = matchLineMOD(m);
+      sources.clear();
+      if (!ret) {
+        return;
+      }
 
       // Allocate debug image
       sensor_msgs::ImagePtr debugmsg;
@@ -395,7 +416,6 @@ class LineMOD_Detector
           }
       }
       debug_img_pub.publish(debugmsg);
-      LineMOD_Detector::sources.clear();
   }
 
   bool matchLineMOD(cv::linemod::Match &best_match)
@@ -405,7 +425,7 @@ class LineMOD_Detector
       std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
-      LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
+      detector->match(sources, (float)matching_threshold, matches, class_ids, quantized_images);
 
       int num_classes = detector->numClasses();
       ROS_DEBUG("Num Classes: %u", num_classes);
