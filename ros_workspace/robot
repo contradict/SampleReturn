@@ -18,7 +18,12 @@ wait_for_ready() {
 launch() {
     launchname=${1}
     shift
-    roslaunch --pid=$(pidname ${launchname}) samplereturn ${launchname} "$@" &
+    pidfile=$(pidname ${launchname})
+    if [ -e ${pidfile} ] && kill -0 $(cat ${pidfile}); then
+        echo "Launch ${launchname} still running, not restarting"
+        return 1
+    fi
+    roslaunch --pid=${pidfile} samplereturn ${launchname} "$@" &
 }
 
 launch_and_wait() {
@@ -26,8 +31,7 @@ launch_and_wait() {
     shift
     topicname=${1}
     shift
-    launch ${launchname} "$@"
-    wait_for_ready ${topicname}
+    launch ${launchname} "$@" && wait_for_ready ${topicname}
 }
 
 case ${1} in
@@ -43,7 +47,10 @@ case ${1} in
         ;;
     stop)
         for launch in ${SHUTDOWN_LAUNCH_FILES}; do
-            kill -INT $(cat $(pidname ${launch}))
+            pidfile=$(pidname ${launch})
+            if [ -e ${pidfile} ]; then
+                kill -INT $(cat ${pidfile})
+            fi
         done
         ;;
     log)
