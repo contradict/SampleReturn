@@ -204,6 +204,7 @@ class ColorHistogramDescriptorNode
     min_target_hue_ = config.min_target_hue;
     max_target_hue_ = config.max_target_hue;
     hue_slop_ = config.hue_slop;
+    max_inner_outer_hist_correl_ = config.max_inner_outer_hist_correl;
   }
 
   double hueDistance(double hue, double hue_ref)

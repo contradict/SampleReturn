@@ -36,6 +36,7 @@ class SaliencyDetectorNode
   bool bms_thresh_on_;
   double bms_top_trim_;
   double bms_img_width_;
+  double patch_scaling_factor_;
 
   double scale_;
 
@@ -137,7 +138,7 @@ class SaliencyDetectorNode
       int x = kp[i].pt.x * scale_;
       int y = kp[i].pt.y * scale_;
       // Pad a bit to avoid clipping
-      int size = 1.2*kp[i].size * scale_;
+      int size = patch_scaling_factor_*kp[i].size * scale_;
       int top_left_x = max(x-size,0);
       int top_left_y = max(y-size,0);
       int bot_right_x = min(x+size,cv_ptr->image.cols - 1);
@@ -224,6 +225,8 @@ class SaliencyDetectorNode
     blob_params_.minRepeatability = config.minRepeatability;
 
     blob_ = cv::SimpleBlobDetector::create(blob_params_);
+
+    patch_scaling_factor_ = config.patch_scaling_factor;
 
     saliency_mutex_.unlock();
   }

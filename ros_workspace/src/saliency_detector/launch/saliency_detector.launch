@@ -24,6 +24,7 @@
     <param name="maxThreshold" type="double" value="200.0"/>
     <param name="thresholdStep" type="double" value="20.0"/>
     <param name="minRepeatability" type="double" value="3.0"/>
+    <param name="patch_scaling_factor" type="double" value="2.0"/>
   </node>
 
   <node
@@ -46,6 +47,7 @@
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="/processes/sample_detection/search/$(arg namespace)/named_point"
       to="/processes/sample_detection/search/named_point"/>
+    <param name="max_inner_outer_hist_correl" type="double" value="0.5"/>
   </node>
 
   <node
