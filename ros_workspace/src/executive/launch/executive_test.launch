@@ -38,7 +38,7 @@
     <include file="$(find samplereturn)/launch/joystick.launch"/>
     <include file="$(find sun_pointing)/launch/sun_pointing.launch"/>
     
-    <include file="$(find samplereturn)/launch/planner_dumb.launch">
+    <include file="$(find samplereturn)/launch/costmap.launch">
         <arg name="odometry_frame" value="$(arg odometry_frame)"/>
     </include>
 
