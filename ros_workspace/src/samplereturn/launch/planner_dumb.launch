@@ -12,7 +12,7 @@
         >
 
         <param name="costmap/global_frame" type="string" value="$(arg odometry_frame)"/>
-        <rosparam file="$(find samplereturn)/config/costmap_dumb_params.yaml" ns="costmap" command="load"/>
+        <rosparam file="$(find samplereturn)/config/costmap_params.yaml" ns="costmap" command="load"/>
 
     </node>
 
