@@ -48,11 +48,11 @@
             /io/phidget_0/is_calibrated
             /io/phidget_0/mag
             /io/kvh/imu
+            /io/search_lights
             /motion/odometry
             /motion/platform_joint_state
             /motion/carousel/angle
             /motion/CAN/status_word
-            /motion/carousel/angle
             /motion/current_motion_mode
             /motion/joystick_command
             /motion/manipulator/motor_states/ttyUSB0
@@ -61,6 +61,9 @@
             /motion/manipulator/wrist_joint/command
             /motion/planner_command
             /motion/servo_command
+            /filter/state
+            /filter/estimated_pose
+            /processes/executive/minutes_remaining
             "
       >
   </node>
