@@ -136,45 +136,6 @@ BaslerNode::handle_basler_parameter(std::string name, std::string value)
 }
 
 void
-BaslerNode::handle_basler_parameter(XmlRpc::XmlRpcValue& param)
-{
-  ros::NodeHandle nh("~");
-  std::string type = param["type"];
-  if ("boolean" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeBoolean,
-                   "Type of value for %s must be boolean", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (bool)param["value"]);
-    nh.setParam(param["name"], (bool)param["value"]);
-  }
-  else if ("int" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeInt,
-                   "Type of value for %s must be int", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (int)param["value"]);
-    nh.setParam(param["name"], (int)param["value"]);
-  }
-  else if ("float" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeDouble,
-                   "Type of value for %s must be float", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (double)param["value"]);
-    nh.setParam(param["name"], (double)param["value"]);
-  }
-  else if ("enum" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeString,
-                   "Type of value for %s must be string", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (std::string)param["value"]);
-    nh.setParam(param["name"], (std::string)param["value"]);
-  }
-  else
-  {
-    ROS_FATAL_STREAM("Unknown param type for parameter " << param["name"] << ": " << type);
-  }
-}
-
-void
 BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t level)
 {
     ros::NodeHandle nh("~");
