@@ -83,13 +83,13 @@
              /cameras/navigation/port/left/camera_info
              /cameras/navigation/port/desync
              /cameras/navigation/port/status
-             /cameras/navigation/beacon/image_raw
+             /cameras/navigation/beacon/image
              /cameras/navigation/beacon/camera_info
-             /cameras/search/port/image_raw
+             /cameras/search/port/image_color
              /cameras/search/port/camera_info
-             /cameras/search/center/image_raw
+             /cameras/search/center/image_color
              /cameras/search/center/camera_info
-             /cameras/search/starboard/image_raw
+             /cameras/search/starboard/image_color
              /cameras/search/starboard/camera_info
              /cameras/manipulator/left/image_raw
              /cameras/manipulator/right/image_raw
