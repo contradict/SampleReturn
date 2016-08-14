@@ -13,7 +13,7 @@
           ns="/processes">
 
         <remap from="odometry" to="/motion/odometry"/>
-        <remap from="local_costmap" to="/processes/planner/dumb/local_costmap/costmap/costmap"/>
+        <remap from="local_costmap" to="/processes/local_costmap/costmap/costmap"/>
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
 
