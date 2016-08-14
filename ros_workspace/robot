@@ -54,6 +54,7 @@ case ${1} in
         done
         ;;
     log)
+        shift
         launch logging.launch "$@"
         ;;
     *)
