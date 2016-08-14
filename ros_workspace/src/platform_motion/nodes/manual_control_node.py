@@ -114,7 +114,7 @@ class ManualController(object):
 
             smach.StateMachine.add('JOYSTICK_LISTEN',
                                    JoystickListen(self.CAN_interface, self.joy_state),
-                                   transitions = {'visual_servo_requested':'ENABLE_MANIPULATOR_DETECTOR',
+                                   transitions = {'visual_servo_requested':'ENABLE_HARD_MANIPULATOR_DETECTOR',
                                                   'pursuit_requested':'CONFIRM_SAMPLE_PRESENT',
                                                   'manipulator_grab_requested':'ANNOUNCE_GRAB',
                                                   'home_wheelpods_requested':'SELECT_HOME',
@@ -189,9 +189,9 @@ class ManualController(object):
             smach.StateMachine.add('VISUAL_SERVO',
                                    ServoController(self.tf, self.announcer),
                                    transitions = {'move':'SERVO_MOVE',
-                                                  'complete':'DISABLE_MANIPULATOR_DETECTOR',
+                                                  'complete':'DISABLE_HARD_MANIPULATOR_DETECTOR',
                                                   'point_lost':'ANNOUNCE_NO_SAMPLE',
-                                                  'aborted':'DISABLE_MANIPULATOR_DETECTOR'},
+                                                  'aborted':'DISABLE_HARD_MANIPULATOR_DETECTOR'},
                                    remapping = {'detected_sample':'manipulator_sample'})
 
             smach.StateMachine.add('SERVO_MOVE',

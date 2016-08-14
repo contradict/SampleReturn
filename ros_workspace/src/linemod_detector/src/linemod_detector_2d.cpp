@@ -403,7 +403,7 @@ class LineMOD_Detector
               {
                   ROS_DEBUG_STREAM("Hull area rejected.");
                   LineMOD_Detector::sources.clear();
-                  return;
+                  sent_something = false;
               }
           }
 
