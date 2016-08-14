@@ -203,7 +203,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_RETRY_APPROACH',
                                    AnnounceState(self.announcer,
-                                                 'Sample not in tolerance, retry ing approach'),
+                                                 'Sample not in tolerance, retry ing.'),
                                    transitions = {'next':'APPROACH_SAMPLE'})
 
             @smach.cb_interface(outcomes=['clear','blocked'])
@@ -267,7 +267,7 @@ class PursueSample(object):
 
             smach.StateMachine.add('ANNOUNCE_SUN_POINTING',
                                    AnnounceState(self.announcer,
-                                                 "No sample detected, rotate ing to optimal light condition."),
+                                                 "Rotate ing to optimal light condition."),
                                    transitions = {'next':'SUN_POINTING_ROTATION'})
 
             smach.StateMachine.add('SUN_POINTING_ROTATION',
@@ -750,16 +750,12 @@ class ConfirmSampleAcquired(smach.State):
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
             return 'sample_gone'
         else:
-            if userdata.detected_sample.sample_id == userdata.latched_sample.sample_id:
-                if userdata.grab_count > userdata.grab_count_limit:
-                    self.announcer.say("Sample acquisition failed.")
-                    return 'aborted'
-                else:
-                    self.announcer.say("Sample acquisition failed. Retry ing")
-                    return 'sample_present'
+            if userdata.grab_count > userdata.grab_count_limit:
+                self.announcer.say("Sample acquisition failed.")
+                return 'aborted'
             else:
-                self.announcer.say("New sample in view, confuse ing")
-                return 'sample_gone'
+                self.announcer.say("Sample acquisition failed. Retry ing")
+                return 'sample_present'
 
 class SearchLightSwitch(smach.State):
     def __init__(self):
