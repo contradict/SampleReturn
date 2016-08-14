@@ -30,7 +30,7 @@
           bms_thresh_on: true
 
           exterior_colors: [green, brown]
-          interior_colors: [red, orange, pink, white]
+          interior_colors: [red, orange, pink, white, purple, blue, yellow]
 
           filterByArea: true
           filterByColor: true
