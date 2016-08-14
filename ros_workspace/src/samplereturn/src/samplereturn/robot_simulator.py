@@ -770,6 +770,7 @@ class RobotSimulator(object):
         return req.state
 
     def enable_hard_manipulator_detector(self, req):
+        self.manipulator_detector_enabled = req.state
         rospy.sleep(0.25)
         return req.state
     
