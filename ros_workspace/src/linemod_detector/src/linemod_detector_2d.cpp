@@ -109,6 +109,7 @@ class LineMOD_Detector
   double min_hull_area_;
   double target_width_;
   int flood_fill_offset_;
+  std::string template_filename;
 
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
 
@@ -136,13 +137,12 @@ class LineMOD_Detector
     pub_bms_img = pnh.advertise<sensor_msgs::Image>("bms_debug", 1);
     service_ = pnh.advertiseService("enable",&LineMOD_Detector::enable,this);
 
-    std::string filename;
-    ros::param::get("~template_file", filename);
+    ros::param::param<std::string>("~template_file", template_filename, "/home/zlizer/src/SampleReturn/ros_workspace/src/linemod_detector/config/metal_samples.yaml");
     ros::param::get("~pub_threshold", LineMOD_Detector::pub_threshold);
     ros::param::get("~min_depth", LineMOD_Detector::min_depth);
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
-    ros::param::get("~hard_samples", LineMOD_Detector::hard_samples);
+    ros::param::param<bool>("~hard_samples", LineMOD_Detector::hard_samples, true);
     ros::param::param<std::string>("~detection_frame_id", _detection_frame_id, "odom");
     ros::param::param<double>("~max_hull_area", max_hull_area_, 18000);
     ros::param::param<double>("~min_hull_area", min_hull_area_, 2500);
@@ -156,11 +156,11 @@ class LineMOD_Detector
 
     // Initialize LINEMOD data structures
     if (!hard_samples) {
-      detector = readLinemod(filename);
+      detector = readLinemod(template_filename);
       num_modalities = (int)detector->getModalities().size();
     }
     else {
-      detector = readInnerLinemod(filename);
+      detector = readInnerLinemod(template_filename);
       num_modalities = (int)detector->getModalities().size();
     }
     ROS_DEBUG("Number of modalities loaded: %i", num_modalities);
