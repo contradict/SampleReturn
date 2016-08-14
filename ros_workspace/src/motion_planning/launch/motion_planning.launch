@@ -17,9 +17,6 @@
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
 
-        <!--load costmap params -->
-        <rosparam file="$(find samplereturn)/config/costmap_params.yaml" command="load"/>  
- 
         <!-- general params-->
         <param name="publish_debug" value="True"/><!-- this is a lot of stuff, turn it off when possible!-->
         <param name="odometry_frame" value="$(arg odometry_frame)"/>
