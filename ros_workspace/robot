@@ -33,14 +33,21 @@ launch_and_wait() {
 case ${1} in
     start)
         shift
+        if [ ${1} = "log" ]; then dolog=1; shift; else dolog=0; fi
         launch_and_wait stage1.launch /cameras/manipulator/status "$@"
         wait_for_ready /cameras/navigation/starboard/status
         launch robot.launch "$@"
+        if [ ${dolog} = "1" ]; then
+            launch logging.launch "$@"
+        fi
         ;;
     stop)
         for launch in ${SHUTDOWN_LAUNCH_FILES}; do
             kill -INT $(cat $(pidname ${launch}))
         done
+        ;;
+    log)
+        launch logging.launch "$@"
         ;;
     *)
         echo "Must specify \"start\" or \"stop\" as first argument"
