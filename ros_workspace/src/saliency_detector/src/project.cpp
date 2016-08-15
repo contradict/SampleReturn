@@ -85,8 +85,6 @@ class GroundProjectorNode
     pub_debug_image =
       nh.advertise<sensor_msgs::Image>(pub_debug_image_topic.c_str(), 1);
 
-    min_major_axis_ = 0.04;
-    max_major_axis_ = 0.12;
     enable_debug_ = false;
     ground_plane_ << 0.,0.,1.,0.;
     miss_count_ = 0;
