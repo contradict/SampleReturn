@@ -737,7 +737,7 @@ class KalmanDetectionFilter
       }
       cov.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
       cov.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
-      cov.pose.position.z = 0.0;
+      cov.pose.position.z = 0.5;
       cov_text.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
       cov_text.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
       cov_text.pose.position.z = 1.0;
