@@ -38,7 +38,7 @@
     <param name="min_certainty" type="double" value="0.01"/>
     <param name="odometry_tick_dist" type="double" value="5.0"/>
     <param name="exclusion_zone_range" type="double" value="30.0"/>
-    <param name="correlation_tolerance" type="double" value="0.8"/>
+    <param name="max_colormodel_distance" type="double" value="0.2"/>
     <param name="positive_exclusion_radius" type="double" value="10.0"/>
     <param name="negative_exclusion_radius" type="double" value="3.0"/>
   </node>
