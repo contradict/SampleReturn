@@ -26,6 +26,7 @@
  * It will also age out filters that have too large a convariance.
  */
 
+namespace detection_filter {
 class ColoredKF
 {
   public:
@@ -60,18 +61,6 @@ class KalmanDetectionFilter
   ros::Publisher pub_filter_marker_array;
   ros::Publisher pub_frustum_poly;
 
-  std::string detection_topic;
-  std::string cam_info_topic;
-  std::string ack_topic;
-  std::string odometry_topic;
-  std::string exclusion_zone_topic;
-  std::string pause_state_topic;
-
-  std::string filtered_detection_topic;
-  std::string debug_img_topic;
-  std::string filter_marker_array_topic;
-  std::string frustum_poly_topic;
-
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
   std::map<std::string, std::vector<std::shared_ptr<ColoredKF> > > not_updated_filter_list_;
   // Exclusion sites are center,radius,id (x,y,r,id,odometer reading)
@@ -80,42 +69,23 @@ class KalmanDetectionFilter
   // to create an exclusion zone
   std::map<int16_t, std::shared_ptr<ColoredKF> > published_filters_;
 
-  double max_dist_;
-  double max_cov_;
-  double max_pub_cov_;
-  double max_pub_vel_;
-
-  double pos_exclusion_radius_;
-  double neg_exclusion_radius_;
-
-  double process_noise_cov_;
-  double measurement_noise_cov_;
-  double error_cov_post_;
-  double period_;
+  kalman_filter_paramsConfig config_;
 
   int16_t filter_id_count_;
   int16_t current_published_id_;
 
   int16_t exclusion_count_;
 
-  double PDgO_, PDgo_;
-  double PO_init_;
-  double pub_certainty_thresh_;
-  double min_certainty_;
-
   double last_x_;
   double last_y_;
   bool odometry_received_;
   double odometer_;
   double last_odometry_tick_;
-  double odometry_tick_dist_;
 
-  double exclusion_zone_range_;
   bool is_manipulator_;
 
   bool is_paused_;
 
-  double hue_tolerance_;
   cv::Mat DSLR_frustum_;
 
   tf::TransformListener listener_;
@@ -132,67 +102,39 @@ class KalmanDetectionFilter
     cb = boost::bind(&KalmanDetectionFilter::configCallback, this,  _1, _2);
     dr_srv.setCallback(cb);
 
-    cam_info_topic = "camera_info";
-    detection_topic = "named_point";
-    ack_topic = "ack";
-    odometry_topic = "odometry";
-    exclusion_zone_topic = "exclusion_zone";
-    pause_state_topic = "pause_state";
-
-    filtered_detection_topic = "filtered_point";
-    debug_img_topic = "debug_img";
-    filter_marker_array_topic = "filter_markers";
-    frustum_poly_topic = "frustum_polygon";
-
     ros::NodeHandle private_node_handle_("~");
-    private_node_handle_.param("max_dist", max_dist_, double(0.1));
-    private_node_handle_.param("max_cov", max_cov_, double(10.0));
-    private_node_handle_.param("max_pub_cov", max_pub_cov_, double(0.1));
-    private_node_handle_.param("max_pub_vel", max_pub_vel_, double(0.02));
 
-    private_node_handle_.param("positive_exclusion_radius", pos_exclusion_radius_, double(10.0));
-    private_node_handle_.param("negative_exclusion_radius", neg_exclusion_radius_, double(1.5));
-
-    private_node_handle_.param("process_noise_cov", process_noise_cov_, double(0.05));
-    private_node_handle_.param("measurement_noise_cov", measurement_noise_cov_, double(0.5));
-    private_node_handle_.param("error_cov_post", error_cov_post_, double(0.5));
-    private_node_handle_.param("period", period_, double(2));
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
-
-    private_node_handle_.param("PDgO", PDgO_, double(0.9));
-    private_node_handle_.param("PDgo", PDgo_, double(0.1));
-    private_node_handle_.param("pub_certainty_thresh", pub_certainty_thresh_, double(0.9));
-
     private_node_handle_.param("is_manipulator", is_manipulator_, false);
 
     sub_cam_info =
-      nh.subscribe(cam_info_topic.c_str(), 3, &KalmanDetectionFilter::cameraInfoCallback, this);
+      nh.subscribe("camera_info", 3, &KalmanDetectionFilter::cameraInfoCallback, this);
 
     sub_detection =
-      nh.subscribe(detection_topic.c_str(), 12, &KalmanDetectionFilter::detectionCallback, this);
+      nh.subscribe("named_point", 12, &KalmanDetectionFilter::detectionCallback, this);
 
-    sub_ack = nh.subscribe(ack_topic.c_str(), 3, &KalmanDetectionFilter::ackCallback, this);
+    sub_ack = nh.subscribe("ack", 3, &KalmanDetectionFilter::ackCallback, this);
 
     sub_odometry =
-      nh.subscribe(odometry_topic.c_str(), 3, &KalmanDetectionFilter::odometryCallback, this);
+      nh.subscribe("odometry", 3, &KalmanDetectionFilter::odometryCallback, this);
 
     sub_exclusion_zone =
-      nh.subscribe(exclusion_zone_topic.c_str(), 3, &KalmanDetectionFilter::exclusionZoneCallback, this);
+      nh.subscribe("exclusion_zone", 3, &KalmanDetectionFilter::exclusionZoneCallback, this);
 
     sub_pause_state =
-      nh.subscribe(pause_state_topic.c_str(), 1, &KalmanDetectionFilter::pauseStateCallback, this);
+      nh.subscribe("pause_state", 1, &KalmanDetectionFilter::pauseStateCallback, this);
 
     pub_detection =
-      nh.advertise<samplereturn_msgs::NamedPoint>(filtered_detection_topic.c_str(), 3);
+      nh.advertise<samplereturn_msgs::NamedPoint>("filtered_point", 3);
 
     pub_debug_img =
-      nh.advertise<sensor_msgs::Image>(debug_img_topic.c_str(), 3);
+      nh.advertise<sensor_msgs::Image>("debug_img", 3);
 
     pub_filter_marker_array =
-      nh.advertise<visualization_msgs::MarkerArray>(filter_marker_array_topic.c_str(), 3);
+      nh.advertise<visualization_msgs::MarkerArray>("filtered_markers", 3);
 
     pub_frustum_poly =
-      nh.advertise<geometry_msgs::PolygonStamped>(frustum_poly_topic.c_str(), 3);
+      nh.advertise<geometry_msgs::PolygonStamped>("frustum_polygon", 3);
 
     filter_id_count_ = 1;
     current_published_id_ = 0;
@@ -237,27 +179,8 @@ class KalmanDetectionFilter
   /* Dynamic reconfigure callback */
   void configCallback(detection_filter::kalman_filter_paramsConfig &config, uint32_t level)
   {
-    max_dist_ = config.max_dist;
-    max_cov_ = config.max_cov;
-    max_pub_cov_ = config.max_pub_cov;
-    max_pub_vel_ = config.max_pub_vel;
-
-    process_noise_cov_ = config.process_noise_cov;
-    measurement_noise_cov_ = config.measurement_noise_cov;
-    error_cov_post_ = config.error_cov_post;
-    period_ = config.period;
-
-    PDgO_ = config.PDgO;
-    PDgo_ = config.PDgo;
-    PO_init_ = config.PO_init;
-    pub_certainty_thresh_ = config.pub_certainty_thresh;
-    min_certainty_ = config.min_certainty;
-
-    odometry_tick_dist_ = config.odometry_tick_dist;
-
-    exclusion_zone_range_ = config.exclusion_zone_range;
-
-    hue_tolerance_ = config.hue_tolerance;
+      (void)level;
+      config_ = config;
 
     if(config.clear_filters) {
       //clear all filters
@@ -265,6 +188,7 @@ class KalmanDetectionFilter
       not_updated_filter_list_.clear();
       exclusion_list_.clear();
       current_published_id_ = 0;
+      config.clear_filters = false;
     }
   }
 
@@ -290,8 +214,6 @@ class KalmanDetectionFilter
 
   /* For incoming detections: assign to filter or create new filter
    * For each filter, predict, (update), check for deletion
-   * If accumulate_, move to list of points to inspect
-   * Publish closest point to inspect
    * When done, delete and add exclusion zone, deleting other filters and inspection points
    */
   void ackCallback(const samplereturn_msgs::PursuitResult& msg)
@@ -321,10 +243,10 @@ class KalmanDetectionFilter
     x = ackedFilter->second->filter.statePost.at<float>(0);
     y = ackedFilter->second->filter.statePost.at<float>(1);
     if (msg.success) {
-      r = pos_exclusion_radius_;
+      r = config_.positive_exclusion_radius;
     }
     else {
-      r = neg_exclusion_radius_;
+      r = config_.negative_exclusion_radius;
     }
     exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_,odometer_));
     exclusion_count_ += 1;
@@ -363,10 +285,10 @@ class KalmanDetectionFilter
       // Get filters in msg frame that weren't updated, decrement them
       for (auto ckf : not_updated_filter_list_[msg.header.frame_id]) {
         ROS_DEBUG("Checking NUF");
-        if (isInView(ckf->filter) or (odometer_-last_odometry_tick_)>odometry_tick_dist_) {
+        if (isInView(ckf->filter) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
           ckf->filter.predict();
           ckf->filter.errorCovPre.copyTo(ckf->filter.errorCovPost);
-          ckf->certainty = updateProb(ckf->certainty, false, PDgO_, PDgo_);
+          ckf->certainty = updateProb(ckf->certainty, false, config_.PDgO, config_.PDgo);
           ROS_DEBUG("Cam Info Updated Prob: %f",ckf->certainty);
         }
       }
@@ -387,11 +309,11 @@ class KalmanDetectionFilter
       // Manage exclusion zones
       auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
           [this](std::tuple<float,float,float,int16_t,float> zone)
-          {return (odometer_ - std::get<4>(zone)) > exclusion_zone_range_;});
+          {return (odometer_ - std::get<4>(zone)) > config_.exclusion_zone_range;});
       exclusion_list_.erase(new_end, exclusion_list_.end());
 
       // Update odometer
-      if ((odometer_-last_odometry_tick_) > odometry_tick_dist_) {
+      if ((odometer_-last_odometry_tick_) > config_.odometry_tick_dist) {
         last_odometry_tick_ = odometer_;
       }
     }
@@ -409,8 +331,8 @@ class KalmanDetectionFilter
     if (current_published_id_ != 0) {
       for (auto filter_ptr : filter_list_) {
         if (filter_ptr->filter_id == current_published_id_) {
-          if (filter_ptr->certainty > pub_certainty_thresh_ &&
-              filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_) {
+          if (filter_ptr->certainty > config_.pub_certainty_thresh &&
+              filter_ptr->filter.errorCovPost.at<float>(0,0) < config_.max_pub_cov) {
             published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
             point_msg.header.frame_id = _filter_frame_id;
@@ -439,8 +361,8 @@ class KalmanDetectionFilter
     if (filter_list_.size() > 0) {
       if (current_published_id_ == 0) {
         for (auto filter_ptr : filter_list_) {
-          if ((filter_ptr->certainty > pub_certainty_thresh_) &&
-              (filter_ptr->filter.errorCovPost.at<float>(0,0) < max_pub_cov_)) {
+          if ((filter_ptr->certainty > config_.pub_certainty_thresh) &&
+              (filter_ptr->filter.errorCovPost.at<float>(0,0) < config_.max_pub_cov)) {
             dist = sqrt(pow((transform.getOrigin().x()-filter_ptr->filter.statePost.at<float>(0)),2) +
                    pow((transform.getOrigin().y()-filter_ptr->filter.statePost.at<float>(1)),2));
             ROS_DEBUG("Transform X: %f, Transform Y: %f",
@@ -477,16 +399,16 @@ class KalmanDetectionFilter
     cv::Mat state(6, 1, CV_32F); /* x, y, z, vx, vy, vz */
     cv::Mat processNoise(6, 1, CV_32F);
 
-    KF.transitionMatrix = (cv::Mat_<float>(6,6) << 1, 0, 0, period_, 0, 0,
-                                                    0, 1, 0, 0, period_, 0,
-                                                    0, 0, 1, 0, 0, period_,
+    KF.transitionMatrix = (cv::Mat_<float>(6,6) << 1, 0, 0, config_.period, 0, 0,
+                                                    0, 1, 0, 0, config_.period, 0,
+                                                    0, 0, 1, 0, 0, config_.period,
                                                     0, 0, 0, 1, 0, 0,
                                                     0, 0, 0, 0, 1, 0,
                                                     0, 0, 0, 0, 0, 1);
     cv::setIdentity(KF.measurementMatrix);
-    cv::setIdentity(KF.processNoiseCov, cv::Scalar(process_noise_cov_));
-    cv::setIdentity(KF.measurementNoiseCov, cv::Scalar(measurement_noise_cov_));
-    cv::setIdentity(KF.errorCovPost, cv::Scalar(error_cov_post_));
+    cv::setIdentity(KF.processNoiseCov, cv::Scalar(config_.process_noise_cov));
+    cv::setIdentity(KF.measurementNoiseCov, cv::Scalar(config_.measurement_noise_cov));
+    cv::setIdentity(KF.errorCovPost, cv::Scalar(config_.error_cov_post));
 
     KF.statePost.at<float>(0) = msg.point.x;
     KF.statePost.at<float>(1) = msg.point.y;
@@ -523,7 +445,7 @@ class KalmanDetectionFilter
       if (ckf->filter_id == filter_id) {
         ckf->filter.correct(meas_state);
         ROS_DEBUG("Pre Meas Prob: %f",ckf->certainty);
-        ckf->certainty = updateProb(ckf->certainty, true, PDgO_, PDgo_);
+        ckf->certainty = updateProb(ckf->certainty, true, config_.PDgO, config_.PDgo);
         ROS_DEBUG("Measurement Updated Prob: %f",ckf->certainty);
       }
     }
@@ -643,13 +565,13 @@ class KalmanDetectionFilter
     cv::Mat eigenvalues;
     cv::eigen(ckf->filter.errorCovPost, eigenvalues);
     for (int i=0; i<eigenvalues.rows; i++) {
-      if (eigenvalues.at<float>(i) > max_cov_) {
+      if (eigenvalues.at<float>(i) > config_.max_cov) {
         ROS_DEBUG("Position Cov Too High. Removing Filter: %d",ckf->filter_id);
         clearMarker(ckf);
         return true;
       }
     }
-    if (ckf->certainty < min_certainty_) {
+    if (ckf->certainty < config_.min_certainty) {
       ROS_DEBUG("Certainty Too Low. Removing Filter: %d",ckf->filter_id);
       clearMarker(ckf);
       return true;
@@ -798,10 +720,11 @@ class KalmanDetectionFilter
   }
 
 };
+}
 
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "kalman_detection_filter");
-  KalmanDetectionFilter kdf;
+  detection_filter::KalmanDetectionFilter kdf;
   ros::spin();
 }

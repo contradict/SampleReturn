@@ -25,13 +25,22 @@
     <param name="max_cov" type="double" value="1.5"/>
     <param name="max_pub_cov" type="double" value="0.3"/>
     <param name="max_pub_vel" type="double" value="0.1"/>
-    <param name="accumulate" type="bool" value="true"/>
     <param name="positive_exclusion_radius" type="double" value="10.0"/>
     <param name="negative_exclusion_radius" type="double" value="3.0"/>
     <param name="error_cov_post" type="double" value="0.3"/>
     <param name="process_noise_cov" type="double" value="0.01"/>
     <param name="measurement_noise_cov" type="double" value="0.1"/>
     <param name="period" type="double" value="0.33"/>
+    <param name="PDgO" type="double" value="0.9"/> <!-- true positive rate -->
+    <param name="PDgo" type="double" value="0.1"/> <!-- false positive rate -->
+    <param name="PO_init" type="double" value="0.01"/>
+    <param name="pub_certainty_thresh" type="double" value="0.9"/>
+    <param name="min_certainty" type="double" value="0.01"/>
+    <param name="odometry_tick_dist" type="double" value="5.0"/>
+    <param name="exclusion_zone_range" type="double" value="30.0"/>
+    <param name="correlation_tolerance" type="double" value="0.8"/>
+    <param name="positive_exclusion_radius" type="double" value="10.0"/>
+    <param name="negative_exclusion_radius" type="double" value="3.0"/>
   </node>
 
   <!--
