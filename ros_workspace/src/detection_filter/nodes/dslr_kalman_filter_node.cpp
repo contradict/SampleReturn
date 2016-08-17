@@ -495,7 +495,7 @@ class KalmanDetectionFilter
     meas_state.at<float>(1) = msg.point.y;
     meas_state.at<float>(2) = msg.point.z;
 
-    for (int i=0; i<exclusion_list_.size(); i++) {
+    for (size_t i=0; i<exclusion_list_.size(); i++) {
       float dist = sqrt(pow((std::get<0>(exclusion_list_[i]) - msg.point.x),2) +
         pow((std::get<1>(exclusion_list_[i]) - msg.point.y),2));
       if (dist < std::get<2>(exclusion_list_[i])) {
@@ -693,7 +693,7 @@ class KalmanDetectionFilter
       marker_array.markers.push_back(cov_text);
     }
 
-    for (int i=0; i<exclusion_list_.size(); i++) {
+    for (size_t i=0; i<exclusion_list_.size(); i++) {
       cv::circle(img, cv::Point(std::get<0>(exclusion_list_[i])*px_per_meter,
             std::get<1>(exclusion_list_[i])*px_per_meter),
           std::get<2>(exclusion_list_[i])*px_per_meter, cv::Scalar(255,255,255));
