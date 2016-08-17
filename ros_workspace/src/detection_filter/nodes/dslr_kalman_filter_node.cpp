@@ -443,7 +443,7 @@ class KalmanDetectionFilter
     filter_id_count_++;
     ROS_DEBUG("Filter ID Count: %d", filter_id_count_);
     ROS_DEBUG("Initial Certainty: %f", CKF->certainty);
-    //checkObservation(msg);
+    checkObservation(msg);
   }
 
   void addMeasurement(const cv::Mat meas_state, std::string meas_frame_id, int filter_id)
