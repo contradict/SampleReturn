@@ -490,8 +490,8 @@ class KalmanDetectionFilter
       double dist = cv::norm(ckf->filter.measurementMatrix * ckf->filter.statePost
             - meas_state);
       saliency_detector::HueHistogram hh(msg.model.hue);
-      double correlation = hh.correlation(ckf->huemodel);
-      bool color_check = (is_manipulator_ || (correlation>config_.correlation_tolerance));
+      double distance = hh.distance(ckf->huemodel);
+      bool color_check = (is_manipulator_ || (distance<config_.max_colormodel_distance));
       if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, msg.sensor_frame, ckf->filter_id);
