@@ -170,7 +170,15 @@ class KalmanDetectionFilter
     // This is for recovery mode. When a message is published to this topic,
     // drop an exclusion zone at current base_link of radius.
     tf::StampedTransform transform;
-    listener_.lookupTransform(_filter_frame_id, "base_link", ros::Time(0), transform);
+    try
+    {
+        listener_.lookupTransform(_filter_frame_id, "base_link", ros::Time(0), transform);
+    }
+    catch(tf::TransformException e)
+    {
+        ROS_INFO_STREAM("Could not transform to " << _filter_frame_id << " : " << e.what());
+        return;
+    }
     exclusion_list_.push_back(std::make_tuple(transform.getOrigin().x(),
                                               transform.getOrigin().y(),
                                               radius.data,exclusion_count_,odometer_));
@@ -352,7 +360,15 @@ class KalmanDetectionFilter
     }
 
     tf::StampedTransform transform;
-    listener_.lookupTransform(_filter_frame_id, "base_link", ros::Time(0), transform);
+    try
+    {
+        listener_.lookupTransform(_filter_frame_id, "base_link", ros::Time(0), transform);
+    }
+    catch(tf::TransformException e)
+    {
+        ROS_INFO_STREAM("Could not transform to " << _filter_frame_id << " : " << e.what());
+        return;
+    }
     float nearest_dist = 10000;
     float dist;
     int nearest_id = 0;
