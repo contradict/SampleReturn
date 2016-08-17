@@ -84,6 +84,7 @@ add_message_files(
   CostmapCheck.msg
   Patch.msg
   PatchArray.msg
+  SearchAreaCheck.msg
 )
 
 add_service_files(
