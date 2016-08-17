@@ -26,9 +26,6 @@
 #include "new_modalities.hpp"
 
 // Function prototypes
-void drawResponse(const std::vector<cv::linemod::Template>& templates,
-                  int num_modalities, cv::Mat& dst, cv::Point offset, int T);
-
 static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
 {
   cv::Ptr<cv::linemod::Detector> detector = new cv::linemod::Detector;
@@ -54,31 +51,6 @@ static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filena
   return detector;
 }
 
-void drawResponse(const std::vector<cv::linemod::Template>& templates,
-                  int num_modalities, cv::Mat& dst, cv::Point offset, int T)
-{
-  static const cv::Scalar COLORS[5] = { CV_RGB(0, 0, 255),
-                                        CV_RGB(0, 255, 0),
-                                        CV_RGB(255, 255, 0),
-                                        CV_RGB(255, 140, 0),
-                                        CV_RGB(255, 0, 0) };
-
-  for (int m = 0; m < num_modalities; ++m)
-  {
-    // NOTE: Original demo recalculated max response for each feature in the TxT
-    // box around it and chose the display color based on that response. Here
-    // the display color just depends on the modality.
-    cv::Scalar color = COLORS[m];
-
-    for (int i = 0; i < (int)templates[m].features.size(); ++i)
-    {
-      cv::linemod::Feature f = templates[m].features[i];
-      cv::Point pt(f.x + offset.x, f.y + offset.y);
-      cv::circle(dst, pt, T / 2, color);
-    }
-  }
-}
-
 class LineMOD_Detector
 {
   ros::NodeHandle nh;
@@ -102,11 +74,11 @@ class LineMOD_Detector
   cv::Mat display;
   cv::Ptr<cv::linemod::Detector> detector;
   sensor_msgs::CameraInfo right_camera_info_msg;
-  int matching_threshold;
   int num_modalities;
   bool got_right_camera_info_;
   bool got_disp_;
-  float pub_threshold;
+  float pub_threshold_;
+  float matching_threshold_;
   float min_depth;
   float max_depth;
   float min_count;
@@ -137,7 +109,6 @@ class LineMOD_Detector
   {
     img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
     point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
-    matching_threshold = 80;
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
@@ -146,7 +117,8 @@ class LineMOD_Detector
     service_ = pnh.advertiseService("enable",&LineMOD_Detector::enable,this);
 
     ros::param::param<std::string>("~template_file", template_filename, "/home/zlizer/src/SampleReturn/ros_workspace/src/linemod_detector/config/metal_samples.yaml");
-    ros::param::get("~pub_threshold", LineMOD_Detector::pub_threshold);
+    ros::param::get("~pub_threshold", pub_threshold_);
+    ros::param::get("~matching_threshold", matching_threshold_);
     ros::param::get("~min_depth", LineMOD_Detector::min_depth);
     ros::param::get("~max_depth", LineMOD_Detector::max_depth);
     ros::param::get("~min_count", LineMOD_Detector::min_count);
@@ -159,8 +131,6 @@ class LineMOD_Detector
     ros::param::get("~exterior_colors", exterior_colors_vec_);
 
     reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
-
-    ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
 
     // Initialize LINEMOD data structures
     if (!hard_samples) {
@@ -216,7 +186,8 @@ class LineMOD_Detector
   void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
   {
       _config = config;
-      pub_threshold = config.pub_threshold;
+      pub_threshold_ = config.pub_threshold;
+      matching_threshold_ = config.matching_threshold;
       target_width_ = config.target_width;
       flood_fill_offset_ = config.flood_fill_offset;
   }
@@ -399,12 +370,12 @@ class LineMOD_Detector
             target_width_,
             target_width_);
         drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
-            cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
+            cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
         // Place in output image
         det_img(cv::Rect(0, 0, target_width_, target_width_)).copyTo(debug_image(draw_rect));
 
         // If a positive match, publish NamedPoint
-        if (m.similarity > pub_threshold) {
+        if (m.similarity > pub_threshold_) {
           samplereturn_msgs::NamedPoint np;
           np.header = msg->patch_array[i].header;
           np.point = msg->patch_array[i].world_point.point;
@@ -489,9 +460,10 @@ class LineMOD_Detector
       ROS_DEBUG("Dominant color: %s",dominant_color.c_str());
 
       // If the hull, color, and similarity pass, draw the template
-      if (dominant_color != "green" and m.similarity > pub_threshold and
+      if (dominant_color != "green" and m.similarity > pub_threshold_ and
           (hull_area < max_hull_area_ and hull_area > min_hull_area_)) {
-        drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
+        drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display,
+            cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
         cv::RotatedRect rect = computeGripAngle(hull);
         ROS_DEBUG("Measured angle: %f width: %f height: %f", rect.angle, rect.size.width, rect.size.height);
         cv::circle(display, rect.center, 5, cv::Scalar(255, 0, 255));
@@ -895,6 +867,42 @@ class LineMOD_Detector
       ROS_INFO("Angle: %f", angle);
       return rect;
   }
+
+  void drawResponse(const std::vector<cv::linemod::Template>& templates,
+                    int num_modalities, cv::Mat& dst, cv::Point offset, int T,
+                    double similarity)
+  {
+    static const cv::Scalar COLORS[5] = { CV_RGB(0, 0, 255),
+                                          CV_RGB(0, 255, 0),
+                                          CV_RGB(255, 255, 0),
+                                          CV_RGB(255, 140, 0),
+                                          CV_RGB(255, 0, 0) };
+
+    for (int m = 0; m < num_modalities; ++m)
+    {
+      // NOTE: Original demo recalculated max response for each feature in the TxT
+      // box around it and chose the display color based on that response. Here
+      // the display color just depends on the modality.
+      cv::Scalar color = COLORS[2];
+      if (similarity > pub_threshold_) {
+        color = COLORS[0];
+      }
+      else if (similarity > matching_threshold_) {
+        color = COLORS[5];
+      }
+      else {
+        ROS_ERROR("Call to drawResponse with below matching response");
+      }
+
+      for (int i = 0; i < (int)templates[m].features.size(); ++i)
+      {
+        cv::linemod::Feature f = templates[m].features[i];
+        cv::Point pt(f.x + offset.x, f.y + offset.y);
+        cv::circle(dst, pt, T / 2, color);
+      }
+    }
+  }
+
 
 };
 
