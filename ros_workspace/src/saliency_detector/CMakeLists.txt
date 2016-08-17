@@ -19,11 +19,14 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   eigen_conversions
   tf_conversions
-  cmake_modules)
+  cmake_modules
+  )
 
 find_package(Eigen REQUIRED)
 find_package(OpenCV)
 find_package(PCL REQUIRED)
+
+add_definitions("-std=c++11" "-Wall")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -134,6 +137,13 @@ add_library(color_naming
   src/color_naming.cpp
 )
 
+add_library(colormodel
+    src/colormodel.cpp
+)
+target_link_libraries(colormodel
+    ${OpenCV_LIBRARIES}
+    )
+
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
  add_executable(ground_projector_node src/project.cpp)
@@ -167,6 +177,7 @@ add_library(color_naming
  )
 
  target_link_libraries(color_histogram_descriptor_node
+     colormodel
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
  )

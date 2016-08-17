@@ -14,8 +14,8 @@ int8 METAL_3=10
 
 Header header
 geometry_msgs/Point point
-# Replace color name with dominant hue (0-180)
-float32 hue
+# Replace color name with color model
+samplereturn_msgs/ColorModel model
 
 # This is a bad workaround to avoid touching well-tested executive code
 string sensor_frame
