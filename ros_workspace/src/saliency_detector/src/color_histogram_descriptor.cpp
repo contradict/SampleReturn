@@ -29,14 +29,7 @@ class ColorHistogramDescriptorNode
   dynamic_reconfigure::Server<saliency_detector::color_histogram_descriptor_paramsConfig> dr_srv;
 
   // OpenCV HSV represents H between 0-180, remember that
-  int min_target_hue_;
-  int max_target_hue_;
-  int min_color_saturation_;
-  // Acknowledge that measurements are noisy, put some slop into stated ranges
-  int hue_slop_;
-  // Maximum correlation allowed between inner and outer regions of patches
-  double max_inner_outer_hist_correl_;
-  double intersection_threshold_;
+  saliency_detector::color_histogram_descriptor_paramsConfig config_;
 
   bool enable_debug_;
   cv::Mat debug_image_;
@@ -103,13 +96,13 @@ class ColorHistogramDescriptorNode
                 msg->patch_array[i].image_roi.height)));
       }
       ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
-      HueHistogram hh_inner = cm.getInnerHueHistogram(min_color_saturation_);
-      HueHistogram hh_outer = cm.getOuterHueHistogram(min_color_saturation_);
+      HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation);
+      HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation);
       double corr = hh_inner.correlation(hh_outer);
     
       // Compare inner and outer hists. If they're insufficiently different,
       // count this as a falsely salient positive.
-      if (corr > max_inner_outer_hist_correl_) {
+      if (corr > config_.max_inner_outer_hist_correl) {
         // Nix region, with explanatory text
         if (enable_debug_) {
           int x,y,w,h;
@@ -138,11 +131,11 @@ class ColorHistogramDescriptorNode
       // Check inner hist against targets, either well-saturated in the specified
       // hue range, or unsaturated with a high value (metal and pre-cached)
       std::vector<std::tuple<double, double>> edges;
-      edges.push_back(std::make_tuple(0, min_target_hue_));
-      edges.push_back(std::make_tuple(max_target_hue_, 180));
+      edges.push_back(std::make_tuple(0, config_.min_target_hue));
+      edges.push_back(std::make_tuple(config_.max_target_hue, 180));
       HueHistogram hh_sample = ColorModel::getColoredSampleModel(edges);
       double intersection = hh_sample.intersection(hh_inner);
-      if (intersection>intersection_threshold_)
+      if (intersection>config_.intersection_threshold)
       {
         samplereturn_msgs::NamedPoint np_msg;
         np_msg.header.stamp = msg->patch_array[i].header.stamp;
@@ -191,12 +184,7 @@ class ColorHistogramDescriptorNode
   void configCallback(saliency_detector::color_histogram_descriptor_paramsConfig &config, uint32_t level)
   {
       (void)level;
-    min_target_hue_ = config.min_target_hue;
-    max_target_hue_ = config.max_target_hue;
-    hue_slop_ = config.hue_slop;
-    min_color_saturation_ = config.min_color_saturation;
-    max_inner_outer_hist_correl_ = config.max_inner_outer_hist_correl;
-    intersection_threshold_ = config.intersection_threshold;
+      config_ = config;
   }
 
 };
