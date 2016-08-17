@@ -387,7 +387,9 @@ class RobotSimulator(object):
                                                      geometry_msg.PoseStamped,
                                                      queue_size=2)
         rospy.Timer(rospy.Duration(2.0), self.check_beacon_pose)
-
+        
+        #this should latch and start the sim unpaused
+        self.unpause()
              
         #rospy.spin()
        
