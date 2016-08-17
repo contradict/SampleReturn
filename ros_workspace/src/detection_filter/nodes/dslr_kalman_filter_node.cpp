@@ -19,6 +19,7 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
+#include <saliency_detector/colormodel.h>
 
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections
@@ -31,19 +32,20 @@ class ColoredKF
 {
   public:
     cv::KalmanFilter filter;
-    double hue;
+    saliency_detector::HueHistogram huemodel;
     int16_t filter_id;
     std::string frame_id;
     float certainty;
-    ColoredKF(cv::KalmanFilter, double, int16_t, std::string, float);
+    ColoredKF(cv::KalmanFilter, const saliency_detector::HueHistogram &, int16_t, std::string, float);
 };
 
-ColoredKF::ColoredKF (cv::KalmanFilter kf, double h, int16_t id, std::string f_id, float cert) {
-  filter = kf;
-  hue = h;
-  filter_id = id;
-  frame_id = f_id;
-  certainty = cert;
+ColoredKF::ColoredKF (cv::KalmanFilter kf, const saliency_detector::HueHistogram& h, int16_t id, std::string f_id, float cert) :
+    filter(kf),
+    huemodel(h),
+    filter_id(id),
+    frame_id(f_id),
+    certainty(cert)
+{
 }
 
 class KalmanDetectionFilter
@@ -434,8 +436,9 @@ class KalmanDetectionFilter
     KF.statePost.at<float>(5) = 0;
 
     KF.predict();
-    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,msg.hue,filter_id_count_,
-          msg.sensor_frame,PO_init_));
+    saliency_detector::HueHistogram hh(msg.model.hue);
+    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,hh,filter_id_count_,
+          msg.sensor_frame,config_.PO_init));
     filter_list_.push_back(CKF);
     filter_id_count_++;
     ROS_DEBUG("Filter ID Count: %d", filter_id_count_);
@@ -467,26 +470,6 @@ class KalmanDetectionFilter
     }
   }
 
-  bool checkColor(double filter_hue, double obs_hue)
-  {
-    if (is_manipulator_) {
-      return true;
-    }
-    ROS_DEBUG("Color Check: Filter Hue: %f Obs Hue: %f", filter_hue, obs_hue);
-    double dist = hueDistance(filter_hue, obs_hue);
-    return (dist < hue_tolerance_);
-  }
-
-  double hueDistance(double hue, double hue_ref)
-  {
-    if (abs(hue - hue_ref) <= 90) {
-      return abs(hue - hue_ref);
-    }
-    else {
-      return 180 - abs(hue - hue_ref);
-    }
-  }
-
   void checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
     ROS_DEBUG("Check Observation");
@@ -506,13 +489,16 @@ class KalmanDetectionFilter
     for (auto ckf : filter_list_) {
       double dist = cv::norm(ckf->filter.measurementMatrix * ckf->filter.statePost
             - meas_state);
-      if ((dist < max_dist_) and checkColor(ckf->hue, msg.hue)) {
+      saliency_detector::HueHistogram hh(msg.model.hue);
+      double correlation = hh.correlation(ckf->huemodel);
+      bool color_check = (is_manipulator_ || (correlation>config_.correlation_tolerance));
+      if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, msg.sensor_frame, ckf->filter_id);
-        ckf->hue = msg.hue;
+        ckf->huemodel = hh;
         return;
       }
-      else if ((dist < max_dist_) and not checkColor(ckf->hue, msg.hue)) {
+      else if ((dist < config_.max_dist) and not color_check) {
         ROS_DEBUG("Color Check Failed");
         return;
       }
@@ -655,7 +641,7 @@ class KalmanDetectionFilter
       cov_text.header.frame_id = _filter_frame_id;
       cov_text.header.stamp = ros::Time::now();
       std::stringstream ss;
-      ss << "H: " << filter_ptr->hue << "Prob: " << filter_ptr->certainty;
+      ss << "H: " << filter_ptr->huemodel.dominant_hue() << "Prob: " << filter_ptr->certainty;
       cov_text.text = ss.str();
       cov_text.color.r = 1.0;
       cov_text.color.g = 1.0;
