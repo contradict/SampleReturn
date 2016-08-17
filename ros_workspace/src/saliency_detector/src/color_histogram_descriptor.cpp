@@ -96,9 +96,9 @@ class ColorHistogramDescriptorNode
                 msg->patch_array[i].image_roi.height)));
       }
       ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
-      HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation);
-      HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation);
-      double distance = hh_inner.distance(hh_outer, config_.low_saturation_limit, config_.high_saturation_limit);
+      HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
+      HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
+      double distance = hh_inner.distance(hh_outer);
     
       if (enable_debug_) {
           int x,y,w,h;
@@ -154,10 +154,10 @@ class ColorHistogramDescriptorNode
       std::vector<std::tuple<double, double>> edges;
       edges.push_back(std::make_tuple(0, config_.min_target_hue));
       edges.push_back(std::make_tuple(config_.max_target_hue, 180));
-      HueHistogram hh_colored_sample = ColorModel::getColoredSampleModel(edges);
-      HueHistogram hh_value_sample = ColorModel::getValuedSampleModel();
-      double hue_exemplar_distance = hh_colored_sample.distance(hh_inner, config_.low_saturation_limit, config_.high_saturation_limit);
-      double value_exemplar_distance = hh_value_sample.distance(hh_inner, config_.low_saturation_limit, config_.high_saturation_limit);
+      HueHistogram hh_colored_sample = ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
+      HueHistogram hh_value_sample = ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
+      double hue_exemplar_distance = hh_colored_sample.distance(hh_inner);
+      double value_exemplar_distance = hh_value_sample.distance(hh_inner);
       bool is_sample = (hue_exemplar_distance<config_.max_exemplar_distance) ||
                        (value_exemplar_distance<config_.max_exemplar_distance);
       if(enable_debug_)

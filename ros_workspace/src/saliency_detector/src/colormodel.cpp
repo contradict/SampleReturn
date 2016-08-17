@@ -16,9 +16,9 @@ ColorModel::outer_mask(cv::Mat& mask) const
 }
 
 HueHistogram
-ColorModel::createHueHistogram(const cv::Mat& mask, double min_color_saturation, int hbins) const
+ColorModel::createHueHistogram(const cv::Mat& mask, double min_color_saturation, double ll, double hl, int hbins) const
 {
-    HueHistogram hh(min_color_saturation, hbins);
+    HueHistogram hh(min_color_saturation, ll, hl, hbins);
     cv::Mat image_hsv, combined_mask;
     cv::Mat saturation_mask, saturation, value;
     cv::cvtColor(image_, image_hsv, cv::COLOR_RGB2HSV);
@@ -43,28 +43,30 @@ ColorModel::createHueHistogram(const cv::Mat& mask, double min_color_saturation,
 }
 
 HueHistogram
-ColorModel::getInnerHueHistogram(double min_color_saturation, int hbins) const
+ColorModel::getInnerHueHistogram(double min_color_saturation, double ll, double hl, int hbins) const
 {
     cv::Mat mask;
     inner_mask(mask);
-    return createHueHistogram(mask, min_color_saturation, hbins);
+    return createHueHistogram(mask, min_color_saturation, ll, hl, hbins);
 }
 
 HueHistogram
-ColorModel::getOuterHueHistogram(double min_color_saturation, int hbins) const
+ColorModel::getOuterHueHistogram(double min_color_saturation, double ll, double hl, int hbins) const
 {
     cv::Mat mask;
     outer_mask(mask);
-    return createHueHistogram(mask, min_color_saturation, hbins);
+    return createHueHistogram(mask, min_color_saturation, ll, hl, hbins);
 }
 
 HueHistogramExemplar
-ColorModel::getColoredSampleModel(std::vector<std::tuple<double, double>> edges, int hbins)
+ColorModel::getColoredSampleModel(std::vector<std::tuple<double, double>> edges, double ll, double hl, int hbins)
 {
-    HueHistogramExemplar hh(0, hbins);
+    HueHistogramExemplar hh(0, ll, hl, hbins);
 
     hh.saturation_score_ = 1.0;
     hh.value_mean_ = 128.0;
+    hh.low_saturation_limit_ = ll;
+    hh.high_saturation_limit_ = hl;
     hh.histogram_ = cv::Mat(hbins, 1, CV_32F);
     hh.histogram_.setTo(cv::Scalar(0.0));
     for( auto& edge : edges )
@@ -75,12 +77,14 @@ ColorModel::getColoredSampleModel(std::vector<std::tuple<double, double>> edges,
 }
 
 HueHistogramExemplar
-ColorModel::getValuedSampleModel(int hbins)
+ColorModel::getValuedSampleModel(double ll, double hl, int hbins)
 {
-    HueHistogramExemplar hh(0, hbins);
+    HueHistogramExemplar hh(0, ll, hl, hbins);
 
     hh.saturation_score_ = 0.0;
     hh.value_mean_ = 255.0;
+    hh.low_saturation_limit_ = ll;
+    hh.high_saturation_limit_ = hl;
     hh.histogram_ = cv::Mat(hbins, 1, CV_32F);
     hh.histogram_.setTo(cv::Scalar(0.0));
     return hh;
@@ -91,6 +95,8 @@ HueHistogram::HueHistogram(const samplereturn_msgs::HueHistogram& msg) :
     min_color_saturation_(msg.min_color_saturation),
     saturation_score_(msg.saturation_score),
     value_mean_(msg.value_mean),
+    low_saturation_limit_(msg.low_saturation_limit),
+    high_saturation_limit_(msg.high_saturation_limit),
     histogram_(msg.histogram)
 {
 }
@@ -110,12 +116,12 @@ HueHistogram::intersection(const HueHistogram& other) const
 }
 
 double
-HueHistogram::distance(const HueHistogram& other, double low_saturation, double high_saturation) const
+HueHistogram::distance(const HueHistogram& other) const
 {
-    if( (this->saturation_score_<low_saturation) && (other.saturation_score_<low_saturation) ) {
+    if( (this->saturation_score_<low_saturation_limit_) && (other.saturation_score_<low_saturation_limit_) ) {
         return fabs(double(this->value_mean_ - other.value_mean_)/std::max(this->value_mean_, other.value_mean_));
     }
-    else if( (this->saturation_score_>high_saturation) && (other.saturation_score_>high_saturation) )
+    else if( (this->saturation_score_>high_saturation_limit_) && (other.saturation_score_>high_saturation_limit_) )
     {
         return 1.0 - correlation(other);
     }
@@ -126,13 +132,13 @@ HueHistogram::distance(const HueHistogram& other, double low_saturation, double 
 }
 
 double
-HueHistogram::distance(const HueHistogramExemplar& other, double low_saturation, double high_saturation) const
+HueHistogram::distance(const HueHistogramExemplar& other) const
 {
-    if( (this->saturation_score_<low_saturation) && (other.saturation_score_<low_saturation) )
+    if( (this->saturation_score_<low_saturation_limit_) && (other.saturation_score_<low_saturation_limit_) )
     {
         return 1.0-(other.value_mean_ - this->value_mean_)/other.value_mean_;
     }
-    else if( (this->saturation_score_>high_saturation) && (other.saturation_score_>high_saturation) )
+    else if( (this->saturation_score_>high_saturation_limit_) && (other.saturation_score_>high_saturation_limit_) )
     {
         return intersection(other);
     }
@@ -159,6 +165,8 @@ HueHistogram::to_msg(samplereturn_msgs::HueHistogram* msg) const
     msg->min_color_saturation = min_color_saturation_;
     msg->saturation_score = saturation_score_;
     msg->value_mean = value_mean_;
+    msg->low_saturation_limit = low_saturation_limit_;
+    msg->high_saturation_limit = high_saturation_limit_;
     for(int i=0;i<histogram_.rows;i++)
     {
         msg->histogram.push_back(histogram_.at<float>(i));
@@ -194,9 +202,9 @@ HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
 }
 
 double
-HueHistogramExemplar::distance(const HueHistogram& other, double low_saturation, double high_saturation) const
+HueHistogramExemplar::distance(const HueHistogram& other) const
 {
-    return other.distance(*this, low_saturation, high_saturation);
+    return other.distance(*this);
 }
 
 }

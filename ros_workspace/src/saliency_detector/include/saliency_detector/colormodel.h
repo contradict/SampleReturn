@@ -21,7 +21,7 @@ class ColorModel
     void outer_mask(cv::Mat& mask) const;
 
     HueHistogram
-    createHueHistogram(const cv::Mat& mask, double min_color_saturation, int hbins) const;
+    createHueHistogram(const cv::Mat& mask, double min_color_saturation, double low_saturation_limit, double high_saturation_limit, int hbins) const;
 
     public:
     ColorModel() {};
@@ -30,10 +30,10 @@ class ColorModel
         mask_(mask)
     {};
 
-    HueHistogram getInnerHueHistogram(double min_color_saturation, int hbins = 60) const;
-    HueHistogram getOuterHueHistogram(double min_color_saturation, int hbins = 60) const;
-    static HueHistogramExemplar getColoredSampleModel(std::vector<std::tuple<double, double>> edges, int hbins = 60);
-    static HueHistogramExemplar getValuedSampleModel(int hbins = 60);
+    HueHistogram getInnerHueHistogram(double min_color_saturation, double low_saturation_limit, double high_saturation_limit, int hbins = 60) const;
+    HueHistogram getOuterHueHistogram(double min_color_saturation, double low_saturation_limit, double high_saturation_limit, int hbins = 60) const;
+    static HueHistogramExemplar getColoredSampleModel(std::vector<std::tuple<double, double>> edges, double low_saturation_limit, double high_saturation_limit, int hbins = 60);
+    static HueHistogramExemplar getValuedSampleModel(double low_saturation_limit, double high_saturation_limit, int hbins = 60);
 };
 
 class HueHistogram
@@ -41,12 +41,15 @@ class HueHistogram
     int hbins_;
     double min_color_saturation_;
     double saturation_score_, value_mean_;
+    double low_saturation_limit_, high_saturation_limit_;
     cv::Mat histogram_;
 
     protected:
-    HueHistogram(double min_color_saturation, int hbins=60) :
+    HueHistogram(double min_color_saturation, double low_saturation_limit, double high_saturation_limit, int hbins=60) :
         hbins_(hbins),
-        min_color_saturation_(min_color_saturation)
+        min_color_saturation_(min_color_saturation),
+        low_saturation_limit_(low_saturation_limit),
+        high_saturation_limit_(high_saturation_limit)
     {};
 
     public:
@@ -58,9 +61,9 @@ class HueHistogram
     void to_msg(samplereturn_msgs::HueHistogram* msg) const;
 
     virtual double
-    distance(const HueHistogram& other, double low_saturation, double high_saturation) const;
+    distance(const HueHistogram& other) const;
     virtual double
-    distance(const HueHistogramExemplar& other, double low_saturation, double high_saturation) const;
+    distance(const HueHistogramExemplar& other) const;
 
     char * str() const;
     void draw_histogram(cv::Mat image, int x, int y) const;
@@ -70,12 +73,12 @@ class HueHistogram
 
 class HueHistogramExemplar : public HueHistogram
 {
-    HueHistogramExemplar(double min_color_saturation, int hbins = 60) :
-        HueHistogram(min_color_saturation, hbins)
+    HueHistogramExemplar(double min_color_saturation, double low_saturation_limit, double high_saturation_limit, int hbins = 60) :
+        HueHistogram(min_color_saturation, low_saturation_limit, high_saturation_limit, hbins)
     {};
     public:
     virtual double
-    distance(const HueHistogram& other, double low_saturation, double high_saturation) const;
+    distance(const HueHistogram& other) const;
     friend class ColorModel;
 };
 
