@@ -7,8 +7,7 @@
     name="saliency_detector"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
-    <param name="img_topic" type="string" value="/cameras/search/$(arg namespace)/image_color"/>
-    <remap from="/cameras/search/info" to="/cameras/search/$(arg namespace)/camera_info"/>
+    <remap from="image" to="/cameras/search/$(arg namespace)/image_color"/>
     <param name="bms_opening_width" type="int" value="3"/>
     <param name="bms_dilation_width_1" type="int" value="0"/>
     <param name="bms_thresh_fraction" type="double" value="0.3"/>
@@ -24,7 +23,7 @@
     <param name="maxThreshold" type="double" value="200.0"/>
     <param name="thresholdStep" type="double" value="20.0"/>
     <param name="minRepeatability" type="double" value="3.0"/>
-    <param name="patch_scaling_factor" type="double" value="2.0"/>
+    <param name="patch_scaling_factor" type="double" value="4.0"/>
   </node>
 
   <node
