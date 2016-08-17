@@ -125,10 +125,8 @@ class PursueSample(object):
                                     {'x':2*spiral_step,'y':-2*spiral_step} ]
         self.state_machine.userdata.spiral_search_positions = spiral_search_positions
 
-        #total bullshit for bins
-        self.state_machine.userdata.available_small_bins = [1,2,3,8,9,10]
-        self.state_machine.userdata.available_big_bins = [4,5,6,7]
-        self.state_machine.userdata.big_sample_ids = [4,6,7,10]
+        #allocate 10 bins from 1 to 10, bin 0 is the closed carousel position
+        self.state_machine.userdata.available_bins = range(1,11)
         self.state_machine.userdata.active_bin_id = 0
 
         #use these as booleans in remaps
@@ -325,29 +323,20 @@ class PursueSample(object):
                                    transitions = {'next':'GRAB_SAMPLE'})
 
             @smach.cb_interface(input_keys=['latched_sample',
-                                            'available_small_bins',
-                                            'available_big_bins',
-                                            'big_sample_ids'],
-                                output_keys=['available_small_bins',
-                                             'available_big_bins',
+                                            'available_bins'],
+                                output_keys=['available_bins',
                                              'active_bin_id'])
             def grab_goal_cb(userdata, request):
                 goal = manipulator_msg.ManipulatorGoal()
                 goal.type = goal.GRAB
                 goal.wrist_angle = userdata.latched_sample.grip_angle
-                #decide to put in next small or big bin
-                if (userdata.latched_sample.sample_id in userdata.big_sample_ids):
-                    goal.target_bin = userdata.available_big_bins[0]
-                    userdata.active_bin_id = goal.target_bin
-                else:
-                    goal.target_bin = userdata.available_small_bins[0]
-                    userdata.active_bin_id = goal.target_bin
-                goal.grip_torque = 0.7
+                goal.target_bin = userdata.available_bins[0]
+                userdata.active_bin_id = goal.target_bin
+                goal.grip_torque = 0.8
                 rospy.loginfo("PURSUE_SAMPLE target_bin: {!s}, sample_id: {!s}, goal: {!s}".format(goal.target_bin,
                                                                                                    userdata.latched_sample.sample_id,
                                                                                                    goal))
-                rospy.loginfo("PURSUE_SAMPLE available_small_bins: {!s}".format(userdata.available_small_bins))
-                rospy.loginfo("PURSUE_SAMPLE available_big_bins: {!s}".format(userdata.available_big_bins))
+                rospy.loginfo("PURSUE_SAMPLE available_bins: {!s}".format(userdata.available_bins))
                 return goal
 
             #if Steve pauses the robot during this action, it returns preempted,
@@ -710,14 +699,12 @@ class ConfirmSampleAcquired(smach.State):
                                          'grab_count',
                                          'grab_count_limit',
                                          'active_bin_id',
-                                         'available_small_bins',
-                                         'available_big_bins'],
+                                         'available_bins'],
                              output_keys=['detected_sample',
                                           'grab_count',
                                           'action_result',
                                           'pursuit_goal',
-                                          'available_small_bins',
-                                          'available_big_bins'])
+                                          'available_bins'])
 
         self.announcer = announcer
         self.result_pub = result_pub
@@ -739,14 +726,9 @@ class ConfirmSampleAcquired(smach.State):
             userdata.action_result.result_int = userdata.latched_sample.sample_id
             #de-allocate the bin if it isn't the last one in the list
             rospy.loginfo("PURSUE_SAMPLE placed sample in bin: {!s}".format(userdata.active_bin_id))
-            if (userdata.active_bin_id in userdata.available_small_bins) \
-            and (len(userdata.available_small_bins) > 1):
-                used_bin = userdata.available_small_bins.pop(0)
-                rospy.loginfo("PURSUE_SAMPLE removing small_bin: {!s}".format(used_bin))
-            if (userdata.active_bin_id in userdata.available_big_bins) \
-            and (len(userdata.available_big_bins) > 1):
-                used_bin = userdata.available_big_bins.pop(0)
-                rospy.loginfo("PURSUE_SAMPLE removing big_bin: {!s}".format(used_bin))
+            if (len(userdata.available_bins) > 1):
+                used_bin = userdata.available_bins.pop(0)
+                rospy.loginfo("PURSUE_SAMPLE removing bin: {!s}".format(used_bin))
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
             return 'sample_gone'
         else:
