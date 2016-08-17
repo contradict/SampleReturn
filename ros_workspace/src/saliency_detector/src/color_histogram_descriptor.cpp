@@ -98,11 +98,30 @@ class ColorHistogramDescriptorNode
       ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
       HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation);
       HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation);
-      double corr = hh_inner.correlation(hh_outer);
+      double distance = hh_inner.distance(hh_outer, config_.low_saturation_limit, config_.high_saturation_limit);
     
+      if (enable_debug_) {
+          int x,y,w,h;
+          x = msg->patch_array[i].image_roi.x_offset;
+          y = msg->patch_array[i].image_roi.y_offset;
+          w = msg->patch_array[i].image_roi.width;
+          h = msg->patch_array[i].image_roi.height;
+          char *str=hh_inner.str();
+          if (y > 100) {
+              cv::putText(debug_image_, str, cv::Point2d(x, y),
+                      cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+          }
+          else {
+              cv::putText(debug_image_, str, cv::Point2d(x, y + h),
+                      cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+          }
+          free(str);
+          hh_inner.draw_histogram(debug_image_, x, y+w);
+      }
+
       // Compare inner and outer hists. If they're insufficiently different,
       // count this as a falsely salient positive.
-      if (corr > config_.max_inner_outer_hist_correl) {
+      if (distance < config_.min_inner_outer_distance) {
         // Nix region, with explanatory text
         if (enable_debug_) {
           int x,y,w,h;
@@ -116,12 +135,14 @@ class ColorHistogramDescriptorNode
           cv::line(debug_image_,
               cv::Point2f(x + w, y),
               cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
+          char bgdist[100];
+          snprintf(bgdist, 100, "Too similar to bg: %4.3f", distance);
           if (y > 100) {
-            cv::putText(debug_image_,"Too Similar to BG",cv::Point2d(x, y),
+            cv::putText(debug_image_,bgdist,cv::Point2d(x, y-50),
                cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
-            cv::putText(debug_image_,"Too Similar to BG",cv::Point2d(x, y + h),
+            cv::putText(debug_image_,bgdist,cv::Point2d(x, y + h),
                cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
         }
@@ -133,9 +154,25 @@ class ColorHistogramDescriptorNode
       std::vector<std::tuple<double, double>> edges;
       edges.push_back(std::make_tuple(0, config_.min_target_hue));
       edges.push_back(std::make_tuple(config_.max_target_hue, 180));
-      HueHistogram hh_sample = ColorModel::getColoredSampleModel(edges);
-      double intersection = hh_sample.intersection(hh_inner);
-      if (intersection>config_.intersection_threshold)
+      HueHistogram hh_colored_sample = ColorModel::getColoredSampleModel(edges);
+      HueHistogram hh_value_sample = ColorModel::getValuedSampleModel();
+      double hue_exemplar_distance = hh_colored_sample.distance(hh_inner, config_.low_saturation_limit, config_.high_saturation_limit);
+      double value_exemplar_distance = hh_value_sample.distance(hh_inner, config_.low_saturation_limit, config_.high_saturation_limit);
+      bool is_sample = (hue_exemplar_distance<config_.max_exemplar_distance) ||
+                       (value_exemplar_distance<config_.max_exemplar_distance);
+      if(enable_debug_)
+      {
+          int x,y,h;
+          x = msg->patch_array[i].image_roi.x_offset;
+          y = msg->patch_array[i].image_roi.y_offset;
+          h = msg->patch_array[i].image_roi.height;
+          char edist[100];
+          snprintf(edist, 100, "h:%4.3f v:%4.3f", hue_exemplar_distance, value_exemplar_distance);
+          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 50),
+                  cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+      }
+      // Maybe check outer hist against known background?
+      if (is_sample)
       {
         samplereturn_msgs::NamedPoint np_msg;
         np_msg.header.stamp = msg->patch_array[i].header.stamp;
@@ -146,33 +183,20 @@ class ColorHistogramDescriptorNode
         np_msg.sensor_frame = msg->patch_array[i].header.frame_id;
         pub_named_point.publish(np_msg);
       }
-      else {
-        if (enable_debug_) {
+      else if(enable_debug_)
+      {
           int x,y,w,h;
           x = msg->patch_array[i].image_roi.x_offset;
           y = msg->patch_array[i].image_roi.y_offset;
           w = msg->patch_array[i].image_roi.width;
           h = msg->patch_array[i].image_roi.height;
           cv::line(debug_image_,
-              cv::Point2f(x, y),
-              cv::Point2f(x + w, y + h), cv::Scalar(255,0,0), 20);
+                  cv::Point2f(x, y),
+                  cv::Point2f(x + w, y + h), cv::Scalar(255,0,0), 20);
           cv::line(debug_image_,
-              cv::Point2f(x + w, y),
-              cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
-          char str[200];
-          sprintf(str, "Hue Out of Range: H=%f", hh_inner.dominant_hue());
-          if (y > 100) {
-            cv::putText(debug_image_, str, cv::Point2d(x, y),
-               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
-          }
-          else {
-            cv::putText(debug_image_, str, cv::Point2d(x, y + h),
-               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
-          }
-        }
+                  cv::Point2f(x + w, y),
+                  cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
       }
-
-      // Maybe check outer hist against known background?
     }
     if (enable_debug_) {
       sensor_msgs::ImagePtr debug_image_msg =

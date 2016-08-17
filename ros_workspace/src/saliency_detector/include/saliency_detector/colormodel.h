@@ -9,6 +9,8 @@ namespace saliency_detector
 
 class HueHistogram;
 
+class HueHistogramExemplar;
+
 class ColorModel
 {
     protected:
@@ -30,15 +32,18 @@ class ColorModel
 
     HueHistogram getInnerHueHistogram(double min_color_saturation, int hbins = 60) const;
     HueHistogram getOuterHueHistogram(double min_color_saturation, int hbins = 60) const;
-    static HueHistogram getColoredSampleModel(std::vector<std::tuple<double, double>> edges, int hbins = 60);
+    static HueHistogramExemplar getColoredSampleModel(std::vector<std::tuple<double, double>> edges, int hbins = 60);
+    static HueHistogramExemplar getValuedSampleModel(int hbins = 60);
 };
 
 class HueHistogram
 {
     int hbins_;
-    float min_color_saturation_;
+    double min_color_saturation_;
+    double saturation_score_, value_mean_;
     cv::Mat histogram_;
 
+    protected:
     HueHistogram(double min_color_saturation, int hbins=60) :
         hbins_(hbins),
         min_color_saturation_(min_color_saturation)
@@ -47,11 +52,30 @@ class HueHistogram
     public:
     HueHistogram(const samplereturn_msgs::HueHistogram &msg);
 
-    double correlation(const HueHistogram& other);
-    double intersection(const HueHistogram& other);
-    double dominant_hue();
-    void to_msg(samplereturn_msgs::HueHistogram* msg);
+    double correlation(const HueHistogram& other) const;
+    double intersection(const HueHistogram& other) const;
+    double dominant_hue() const;
+    void to_msg(samplereturn_msgs::HueHistogram* msg) const;
 
+    virtual double
+    distance(const HueHistogram& other, double low_saturation, double high_saturation) const;
+    virtual double
+    distance(const HueHistogramExemplar& other, double low_saturation, double high_saturation) const;
+
+    char * str() const;
+    void draw_histogram(cv::Mat image, int x, int y) const;
+
+    friend class ColorModel;
+};
+
+class HueHistogramExemplar : public HueHistogram
+{
+    HueHistogramExemplar(double min_color_saturation, int hbins = 60) :
+        HueHistogram(min_color_saturation, hbins)
+    {};
+    public:
+    virtual double
+    distance(const HueHistogram& other, double low_saturation, double high_saturation) const;
     friend class ColorModel;
 };
 
