@@ -1,9 +1,13 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <algorithm>
+
 #include <stereo_msgs/DisparityImage.h>
 #include <samplereturn_msgs/NamedPoint.h>
 #include <samplereturn_msgs/PatchArray.h>
+#include <pcl_msgs/ModelCoefficients.h>
+#include <samplereturn_msgs/Enable.h>
+
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
@@ -14,10 +18,11 @@
 #include <color_naming.h>
 #include <image_geometry/stereo_camera_model.h>
 #include <tf/transform_listener.h>
-#include <samplereturn_msgs/Enable.h>
 #include <BMS.h>
 #include <linemod_detector/LinemodConfig.h>
 #include <dynamic_reconfigure/server.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <tf_conversions/tf_eigen.h>
 #include "new_modalities.hpp"
 
 // Function prototypes
@@ -83,6 +88,7 @@ class LineMOD_Detector
   ros::Subscriber left_cam_info_sub;
   ros::Subscriber right_cam_info_sub;
   ros::Subscriber patch_array_sub;
+  ros::Subscriber plane_model_sub;
   ros::Publisher img_point_pub;
   ros::Publisher point_pub;
   ros::Publisher debug_img_pub;
@@ -110,6 +116,8 @@ class LineMOD_Detector
   double target_width_;
   int flood_fill_offset_;
   std::string template_filename;
+
+  tf::Stamped<tf::Vector3> ground_normal_;
 
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
 
@@ -168,6 +176,7 @@ class LineMOD_Detector
     enabled_ = false;
     got_right_camera_info_ = false;
     got_disp_ = false;
+    ground_normal_ = tf::Stamped<tf::Vector3>(tf::Vector3(0,0,1.),ros::Time(0),"base_link");
   }
 
   bool enable(samplereturn_msgs::Enable::Request &req,
@@ -179,6 +188,7 @@ class LineMOD_Detector
       left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
       right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
       patch_array_sub = nh.subscribe("projected_patch_array", 1, &LineMOD_Detector::patchArrayCallback, this);
+      plane_model_sub = nh.subscribe("plane_model", 1, &LineMOD_Detector::planeModelCallback, this);
     }
     else {
       color_sub.shutdown();
@@ -189,6 +199,18 @@ class LineMOD_Detector
     }
     res.state = enabled_;
     return true;
+  }
+
+  void planeModelCallback(const pcl_msgs::ModelCoefficientsPtr& msg)
+  {
+    if (msg->values.size() != 4) {
+      ROS_DEBUG("Invalid Plane Fit");
+    }
+    else {
+      ground_normal_.setData(tf::Vector3(msg->values[0], msg->values[1], msg->values[2]));
+      ground_normal_.stamp_ = msg->header.stamp;
+      ground_normal_.frame_id_ = msg->header.frame_id;
+    }
   }
 
   void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
@@ -234,6 +256,86 @@ class LineMOD_Detector
     got_disp_ = true;
   }
 
+  cv::Mat rectifyPatch(samplereturn_msgs::Patch msg, int tw, cv::Mat& img)
+  {
+    // Take ground plane and patch camera info, compute rotation matrix
+    // to ground, get square ground patch
+
+    // Get ground plane homography
+    tf::Stamped<tf::Vector3> ground_normal_cam;
+    try {
+      listener_.transformVector(msg.header.frame_id, ground_normal_, ground_normal_cam);
+    }
+    catch (tf::TransformException ex) {
+      ROS_ERROR("%s",ex.what());
+      ground_normal_.setData(tf::Vector3(0,0,1.));
+      ground_normal_.stamp_ = ros::Time(0);
+      ground_normal_.frame_id_ = "base_link";
+    }
+    Eigen::Vector3d eigen_cam_axis, eigen_ground_normal_cam;
+    eigen_cam_axis << 0,0,-1;
+    tf::vectorTFToEigen(ground_normal_cam, eigen_ground_normal_cam);
+    Eigen::Matrix3d R = Eigen::Quaterniond().FromTwoVectors(eigen_cam_axis,
+        eigen_ground_normal_cam).toRotationMatrix();
+    Eigen::Matrix3d K = Eigen::Matrix3d::Map(msg.cam_info.K.data());
+    K(0,2) = K(2,0);
+    K(1,2) = K(2,1);
+    K(2,0) = 0;
+    K(2,1) = 0;
+    Eigen::Matrix3d H = K*R*K.inverse();
+    cv::Mat H_cv(3,3,CV_64F);
+    for (int i=0; i<3; i++) {
+      for (int j=0; j<3; j++) {
+        H_cv.at<double>(i,j) = H(i,j);
+      }
+    }
+
+    // Transform image points to ground
+    int x,y,w,h;
+    x = msg.image_roi.x_offset;
+    y = msg.image_roi.y_offset;
+    w = msg.image_roi.width;
+    h = msg.image_roi.height;
+    std::vector<cv::Point2f> img_points(4);
+    img_points[0] = cv::Point(x, y);
+    img_points[1] = cv::Point(x, y+h);
+    img_points[2] = cv::Point(x+w, y+h);
+    img_points[3] = cv::Point(x+w, y);
+    std::vector<cv::Point2f> ground_points(4);
+    cv::perspectiveTransform(img_points, ground_points, H_cv.inv());
+
+    // Square up the ground points
+    double sq_x = ground_points[0].x;
+    double width = fabs(ground_points[1].x - ground_points[2].x);
+    double mid_y = (ground_points[0].y + ground_points[1].y)/2.;
+    std::vector<cv::Point2f> sq_ground_points(4);
+    sq_ground_points[0] = cv::Point(sq_x, mid_y-width/2.);
+    sq_ground_points[1] = cv::Point(sq_x, mid_y+width/2.);
+    sq_ground_points[2] = cv::Point(sq_x + width, mid_y+width/2.);
+    sq_ground_points[3] = cv::Point(sq_x + width, mid_y-width/2.);
+
+    // Project them back into the image
+    std::vector<cv::Point2f> sq_img_points(4);
+    cv::perspectiveTransform(sq_ground_points, sq_img_points, H_cv);
+
+    // Remove RoI offset
+    for (int i=0; i<sq_img_points.size(); i++) {
+      sq_img_points[i].x -= msg.image_roi.x_offset;
+      sq_img_points[i].y -= msg.image_roi.y_offset;
+    }
+
+    // Reproject the region into the target square
+    std::vector<cv::Point2f> out_win_points(4);
+    out_win_points[0] = cv::Point(0, 0);
+    out_win_points[1] = cv::Point(0, tw);
+    out_win_points[2] = cv::Point(tw, tw);
+    out_win_points[3] = cv::Point(tw, 0);
+    cv::Mat win_transform = cv::getPerspectiveTransform(sq_img_points, out_win_points);
+    cv::Mat out_win;
+    cv::warpPerspective(img, out_win, win_transform, cv::Size(tw, tw));
+    return out_win;
+  }
+
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
     // The patch array will have some images and saliency masks, and will
@@ -259,22 +361,21 @@ class LineMOD_Detector
       catch (cv_bridge::Exception& e) {
         ROS_ERROR("cv_bridge image exception: %s", e.what());
       }
-      // Resize image from PA to constant size to reduce number of templates needed
-      cv::Mat det_patch;
-      int orig_height, orig_width;
+
+      // Get original patch size and location
+      int orig_height, orig_width, orig_x, orig_y;
       orig_height = msg->patch_array[i].image_roi.height;
       orig_width = msg->patch_array[i].image_roi.width;
-      ROS_INFO("Patch Width: %d, Height: %d", orig_width, orig_height);
-      cv::Size det_size = cv::Size(target_width_, target_width_*(float(orig_height)/orig_width));
-      ROS_INFO("Resized Width: %d, Height: %d", det_size.width, det_size.height);
-      cv::resize(cv_ptr_img->image, det_patch, det_size, 0.0, 0.0, cv::INTER_NEAREST);
+      orig_x = msg->patch_array[i].image_roi.x_offset;
+      orig_y = msg->patch_array[i].image_roi.y_offset;
 
-      // Rectify to get "head-on" view?
+      // Rectify to get "head-on" view, constant size
+      cv::Mat det_patch = rectifyPatch(msg->patch_array[i], target_width_, cv_ptr_img->image);
 
       // Place in 640x480 image to match manipulators, otherwise templates can
       // run off edge.
       cv::Mat det_img = cv::Mat::zeros(480, 640, CV_8UC3);
-      det_patch.copyTo(det_img(cv::Rect(0, 0, det_size.width, det_size.height)));
+      det_patch.copyTo(det_img(cv::Rect(0, 0, target_width_, target_width_)));
 
       // Add a mask to this?
 
@@ -288,18 +389,19 @@ class LineMOD_Detector
       }
       const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
 
+      // Do a background/foreground color histogram comparison, drop if
+      // too similar
+
       // Draw Response on output image
       if (ret) {
-        cv::Rect draw_rect = cv::Rect(msg->patch_array[i].image_roi.x_offset,
-            msg->patch_array[i].image_roi.y_offset,
-            msg->patch_array[i].image_roi.width,
-            msg->patch_array[i].image_roi.height);
+        cv::Rect draw_rect = cv::Rect(orig_x + orig_width/2. - target_width_/2.,
+            orig_y + orig_height/2. - target_width_/2.,
+            target_width_,
+            target_width_);
         drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
             cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
-        // Resize back to original and place in output image
-        cv::resize(det_img(cv::Rect(0, 0, det_size.width, det_size.height)), det_img, cv::Size(orig_width, orig_height),
-            0.0, 0.0, cv::INTER_NEAREST);
-        det_img.copyTo(debug_image(draw_rect));
+        // Place in output image
+        det_img(cv::Rect(0, 0, target_width_, target_width_)).copyTo(debug_image(draw_rect));
 
         // If a positive match, publish NamedPoint
         if (m.similarity > pub_threshold) {
