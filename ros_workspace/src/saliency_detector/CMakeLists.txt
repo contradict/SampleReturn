@@ -157,6 +157,8 @@ target_link_libraries(colormodel
  add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(color_histogram_descriptor_node ${PROJECT_NAME}_gencfg)
 
+ add_dependencies(colormodel samplereturn_msgs_gencpp)
+
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
    ${catkin_LIBRARIES}
