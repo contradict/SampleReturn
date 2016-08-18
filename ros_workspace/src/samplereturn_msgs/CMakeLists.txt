@@ -85,6 +85,8 @@ add_message_files(
   Patch.msg
   PatchArray.msg
   SearchAreaCheck.msg
+  ColorModel.msg
+  HueHistogram.msg
 )
 
 add_service_files(
