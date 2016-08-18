@@ -592,16 +592,11 @@ class VFHMoveServer( object ):
                                                                 self.search_check_points['starboard']['y'])
             self.search_area_check_pub.publish(msg)
 
-        
-            #rospy.loginfo("CHECKING for obstacles at: {!s}".format(self.search_check_points))        
-            #rospy.loginfo("Inflation radius: {:f}".format(inflation_radius))        
-
     def base_link_coords_lethal(self, origin, yaw, x, y,):
         x_rot = x*np.cos(yaw) - y*np.sin(yaw)        
         y_rot = y*np.cos(yaw) + x*np.sin(yaw)        
         x_index = np.trunc(origin[1] + x_rot/self.costmap_info.resolution).astype('i2')
         y_index = np.trunc(origin[0] + y_rot/self.costmap_info.resolution).astype('i2')
-        rospy.loginfo("CHECKING costmap coords: {:d}, {:d}".format(x_index,y_index))        
         return self.costmap[y_index, x_index] > self._lethal_threshold
 
     def world2map(self, world, info):
