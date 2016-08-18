@@ -24,21 +24,7 @@ class PauseSwitch(object):
         self.wheelpod_servo_status = dict([(x,None) for x in
             self.wheelpod_servo_ids])
         self.carousel_servo_status = None
-
-        rospy.loginfo('Pause_switch waiting for servo controller enable service...')
-        rospy.wait_for_service('enable_carousel')
-        self.enable_carousel_service = rospy.ServiceProxy('enable_carousel', Enable)
-        rospy.wait_for_service('CAN_select_motion_mode')
-        self.select_motion_mode = rospy.ServiceProxy( 'CAN_select_motion_mode',
-                SelectMotionMode )
-
-        rospy.loginfo('Pause_switch waiting for manipulator pause service...')
-        rospy.wait_for_service('manipulator_pause')
-        self.manipulator_pause_service = rospy.ServiceProxy('manipulator_pause', Enable)
-        rospy.Subscriber("gpio_read", GPIO, self.gpio)
-        rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
-        rospy.Subscriber("current_motion_mode", SelectMotionModeResponse, self.motion_mode_update)
-
+ 
         self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True, queue_size = 0)
         self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement, queue_size = 1)
 
@@ -58,6 +44,20 @@ class PauseSwitch(object):
         else:        
             self.paused = False
             self.pause(False)
+   
+        rospy.loginfo('Pause_switch waiting for servo controller enable service...')
+        rospy.wait_for_service('enable_carousel')
+        self.enable_carousel_service = rospy.ServiceProxy('enable_carousel', Enable)
+        rospy.wait_for_service('CAN_select_motion_mode')
+        self.select_motion_mode = rospy.ServiceProxy( 'CAN_select_motion_mode',
+                SelectMotionMode )
+
+        rospy.loginfo('Pause_switch waiting for manipulator pause service...')
+        rospy.wait_for_service('manipulator_pause')
+        self.manipulator_pause_service = rospy.ServiceProxy('manipulator_pause', Enable)
+        rospy.Subscriber("gpio_read", GPIO, self.gpio)
+        rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
+        rospy.Subscriber("current_motion_mode", SelectMotionModeResponse, self.motion_mode_update)
 
     def clear_guard(self, event):
         self.guarded = False
