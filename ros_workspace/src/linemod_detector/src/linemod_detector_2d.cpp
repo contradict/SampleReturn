@@ -499,7 +499,7 @@ class LineMOD_Detector
       std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
-      detector->match(sources, (float)matching_threshold, matches, class_ids, quantized_images);
+      detector->match(sources, matching_threshold_, matches, class_ids, quantized_images);
 
       int num_classes = detector->numClasses();
       ROS_DEBUG("Num Classes: %u", num_classes);
