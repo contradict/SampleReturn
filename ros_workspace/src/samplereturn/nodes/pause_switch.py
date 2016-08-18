@@ -35,16 +35,8 @@ class PauseSwitch(object):
         self.pause_bit_state = self.button_mask
         self.guarded = False #this flag is set to true after a pause
         
-        ##### CAUTION ####
-        # At NASA request, machine should start un paused.
-        #################        
-        if self.start_paused:
-            self.paused = True
-            self.pause(True)
-        else:        
-            self.paused = False
-            self.pause(False)
-   
+
+        #setup service proxies and subscribers
         rospy.loginfo('Pause_switch waiting for servo controller enable service...')
         rospy.wait_for_service('enable_carousel')
         self.enable_carousel_service = rospy.ServiceProxy('enable_carousel', Enable)
@@ -58,6 +50,17 @@ class PauseSwitch(object):
         rospy.Subscriber("gpio_read", GPIO, self.gpio)
         rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
         rospy.Subscriber("current_motion_mode", SelectMotionModeResponse, self.motion_mode_update)
+
+        ##### CAUTION ####
+        # At NASA request, machine should start un paused.
+        #################        
+        if self.start_paused:
+            self.paused = True
+            self.pause(True)
+        else:        
+            self.paused = False
+            self.pause(False)
+
 
     def clear_guard(self, event):
         self.guarded = False
