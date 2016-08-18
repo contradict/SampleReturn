@@ -314,13 +314,13 @@ class GroundProjectorNode
         mark.color.b = 0.0;
       }
       else {
-        miss_count_ = 0;
         mark.color.r = 0.0;
         mark.color.g = 1.0;
         mark.color.b = 1.0;
       }
     }
     else {
+      miss_count_ = 0;
       // Keep the plane around for patch projection, publish a plane normal
       // marker for Rviz
       ROS_DEBUG("Model Coefficients: %f, %f, %f, %f",msg->values[0],
