@@ -19,6 +19,9 @@
         <remap from="local_costmap" to="/processes/local_costmap/costmap/costmap"/>
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+        
+        <!-- remap parameter from costmap -->
+        <remap from="inflation_radius" to="/processes/local_costmap/costmap/inflation_layer/inflation_radius"/>
 
         <!-- general params-->
         <param name="publish_debug" value="True"/><!-- this is a lot of stuff, turn it off when possible!-->
@@ -40,6 +43,16 @@
         <param name="threshold_high" value="2000"/>
         <param name="threshold_low" value="1000"/>
 
+        <!-- shoehorned in crap for checking obstacles in search cam view -->        
+        <param name="search_check_rate" value="10"/>
+        <rosparam>
+            search_check_points: 
+                port: { x: 1.1, y: 1.67 }
+                center: { x: 1.5, y: 0.0 }
+                starboard: { x: 1.1, y: -1.67 }
+        </rosparam>
+
+        <!-- underlying motion params for the simple move inside vfh -->
         <rosparam>
             vfh_motion_params:
                 max_velocity: 1.5

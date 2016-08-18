@@ -20,7 +20,8 @@ from std_msgs.msg import Float64
 from geometry_msgs.msg import Pose, PoseStamped, Point, PointStamped, Quaternion
 from samplereturn_msgs.msg import (VFHMoveAction,
                                    VFHMoveResult,
-                                   VFHMoveFeedback)
+                                   VFHMoveFeedback,
+                                   SearchAreaCheck)
 from samplereturn_msgs.srv import ObstacleCheck, ObstacleCheckRequest
 from motion_planning.simple_motion import SimpleMover
 
@@ -124,7 +125,16 @@ class VFHMoveServer( object ):
 
         #this loop controls the strafe angle using vfh sauce
         rospy.Timer(rospy.Duration(0.2), self.vfh_planner)
+
+        #this loop publishes true/false for search area check points
+        self.search_check_points = node_params.search_check_points
+        rospy.Timer(rospy.Duration(1.0/node_params.search_check_rate),
+                    self.search_area_check)
         
+        self.search_area_check_pub = rospy.Publisher('search_area_check',
+                                                      SearchAreaCheck,
+                                                      queue_size=2)
+
         #service to allow other nodes to look at spots in the costmap for obstacles
         self.obstacle_check_service = rospy.Service('obstacle_check',
                                                     ObstacleCheck,
@@ -559,7 +569,41 @@ class VFHMoveServer( object ):
                 #once an obstacle is found no need to keep checking this angle
                 return True
         return False
+
+    def search_area_check(self, event):
+        robot_position = self._mover.current_position
+        if (self.costmap is not None) and (robot_position is not None):
+            robot_yaw = self._mover.current_yaw
+            inflation_radius = rospy.get_param("inflation_radius", 1.0)
+            valid, robot_cmap_coords = self.world2map(robot_position[:2], self.costmap_info)            
+            header = std_msg.Header(0, rospy.Time.now(), 'base_link')
+            msg = SearchAreaCheck(header, False, False, False)            
+            msg.port_blocked = self.base_link_coords_lethal(robot_cmap_coords,
+                                                            robot_yaw,
+                                                            self.search_check_points['port']['x'],
+                                                            self.search_check_points['port']['y'])
+            msg.center_blocked = self.base_link_coords_lethal(robot_cmap_coords,
+                                                            robot_yaw,
+                                                            self.search_check_points['center']['x'],
+                                                            self.search_check_points['center']['y'])
+            msg.starboard_blocked = self.base_link_coords_lethal(robot_cmap_coords,
+                                                                robot_yaw,
+                                                                self.search_check_points['starboard']['x'],
+                                                                self.search_check_points['starboard']['y'])
+            self.search_area_check_pub.publish(msg)
+
         
+            #rospy.loginfo("CHECKING for obstacles at: {!s}".format(self.search_check_points))        
+            #rospy.loginfo("Inflation radius: {:f}".format(inflation_radius))        
+
+    def base_link_coords_lethal(self, origin, yaw, x, y,):
+        x_rot = x*np.cos(yaw) - y*np.sin(yaw)        
+        y_rot = y*np.cos(yaw) + x*np.sin(yaw)        
+        x_index = np.trunc(origin[1] + x_rot/self.costmap_info.resolution).astype('i2')
+        y_index = np.trunc(origin[0] + y_rot/self.costmap_info.resolution).astype('i2')
+        rospy.loginfo("CHECKING costmap coords: {:d}, {:d}".format(x_index,y_index))        
+        return self.costmap[y_index, x_index] > self._lethal_threshold
+
     def world2map(self, world, info):
         origin = np.r_[info.origin.position.x,
                        info.origin.position.y]
