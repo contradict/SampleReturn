@@ -19,11 +19,14 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   eigen_conversions
   tf_conversions
-  cmake_modules)
+  cmake_modules
+  )
 
 find_package(Eigen REQUIRED)
 find_package(OpenCV)
 find_package(PCL REQUIRED)
+
+add_definitions("-std=c++11" "-Wall")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -102,7 +105,7 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS color_naming saliency_detector_core
+    LIBRARIES BMS color_naming saliency_detector_core colormodel
   CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
@@ -133,6 +136,13 @@ add_library(saliency_detector_core
 add_library(color_naming
   src/color_naming.cpp
 )
+
+add_library(colormodel
+    src/colormodel.cpp
+)
+target_link_libraries(colormodel
+    ${OpenCV_LIBRARIES}
+    )
 
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
@@ -167,6 +177,7 @@ add_library(color_naming
  )
 
  target_link_libraries(color_histogram_descriptor_node
+     colormodel
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
  )
@@ -187,7 +198,7 @@ add_library(color_naming
 
 ## Mark executables and/or libraries for installation
 install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
-   ground_projector_node color_histogram_descriptor_node
+   ground_projector_node color_histogram_descriptor_node colormodel
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

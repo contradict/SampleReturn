@@ -12,7 +12,8 @@ find_package(catkin REQUIRED COMPONENTS tf rospy
   cv_bridge
   dynamic_reconfigure
   image_geometry
-  samplereturn_msgs)
+  samplereturn_msgs
+  saliency_detector)
 
 find_package(OpenCV)
 ## System dependencies are found with CMake's conventions
@@ -68,7 +69,7 @@ catkin_package(
 ## Specify additional locations of header files
 # include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
- include_directories(include
+include_directories(include
    ${catkin_INCLUDE_DIRS}
 )
 
