@@ -314,6 +314,7 @@ class GroundProjectorNode
         mark.color.b = 0.0;
       }
       else {
+        miss_count_ = 0;
         mark.color.r = 0.0;
         mark.color.g = 1.0;
         mark.color.b = 1.0;
