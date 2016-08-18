@@ -4,6 +4,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <samplereturn_msgs/PatchArray.h>
+#include <samplereturn_msgs/SearchAreaCheck.h>
 #include <image_transport/image_transport.h>
 
 #include <dynamic_reconfigure/server.h>
@@ -17,12 +18,16 @@ class SaliencyDetectorNode
 {
   image_transport::ImageTransport *it;
   image_transport::CameraSubscriber sub_img;
+  ros::Subscriber sub_search_area_check;
   ros::Publisher pub_bms_img;
   ros::Publisher pub_patch_array;
 
   boost::mutex saliency_mutex_;
 
   BMS bms_;
+
+  std::string position_;
+  bool blocked_;
 
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
   saliency_detector::saliency_detector_paramsConfig config_;
@@ -33,26 +38,48 @@ class SaliencyDetectorNode
 
     it = new image_transport::ImageTransport(nh);
 
-    dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig>::CallbackType cb;
+    blocked_ = false;
 
+    dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig>::CallbackType cb;
     cb = boost::bind(&SaliencyDetectorNode::configCallback, this,  _1, _2);
     dr_srv.setCallback(cb);
 
     ros::NodeHandle private_node_handle_("~");
+    private_node_handle_.param("position", position_, std::string("center"));
 
     sub_img =
       it->subscribeCamera("image", 10, &SaliencyDetectorNode::messageCallback, this);
+
+    sub_search_area_check =
+      nh.subscribe("search_area_check", 3, &SaliencyDetectorNode::searchAreaCheckCallback, this);
 
     pub_bms_img =
       nh.advertise<sensor_msgs::Image>("bms_img", 3);
 
     pub_patch_array =
       nh.advertise<samplereturn_msgs::PatchArray>("patch_array", 3);
+  }
 
+  void searchAreaCheckCallback(const samplereturn_msgs::SearchAreaCheckPtr& msg)
+  {
+    if (position_.compare(std::string("port"))) {
+      blocked_ = msg->port_blocked;
+    }
+    else if (position_.compare(std::string("center"))) {
+      blocked_ = msg->center_blocked;
+    }
+    else if (position_.compare(std::string("starboard"))) {
+      blocked_ = msg->starboard_blocked;
+    }
   }
 
   void messageCallback(const sensor_msgs::ImageConstPtr& msg, const sensor_msgs::CameraInfoConstPtr& cam_info)
   {
+    if (blocked_) {
+      ROS_DEBUG("%s is blocked by obstacle", position_.c_str());
+      return;
+    }
+
     saliency_mutex_.lock();
 
     bool have_debug_listener = pub_bms_img.getNumSubscribers()>0;

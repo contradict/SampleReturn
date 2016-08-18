@@ -8,6 +8,8 @@
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="image" to="/cameras/search/$(arg namespace)/image_color"/>
+    <remap from="search_area_check" to="/processes/search_area_check"/>
+    <param name="position" type="str" value="$(arg namespace)"/>
     <param name="bms_opening_width" type="int" value="3"/>
     <param name="bms_dilation_width_1" type="int" value="0"/>
     <param name="bms_thresh_fraction" type="double" value="0.3"/>
