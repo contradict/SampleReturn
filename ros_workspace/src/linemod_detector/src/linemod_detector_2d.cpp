@@ -68,6 +68,7 @@ class LineMOD_Detector
   ros::Publisher pub_bms_img;
   dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
   std::vector<cv::Mat> sources;
+  std::vector<cv::Mat> masks;
   cv::Mat color_img;
   cv::Mat disparity_img;
   float min_disp;
@@ -341,20 +342,27 @@ class LineMOD_Detector
       orig_y = msg->patch_array[i].image_roi.y_offset;
 
       // Rectify to get "head-on" view, constant size
-      cv::Mat det_patch = rectifyPatch(msg->patch_array[i], target_width_, cv_ptr_img->image);
+      cv::Mat det_patch_img = rectifyPatch(msg->patch_array[i], target_width_, cv_ptr_img->image);
+      cv::Mat det_patch_mask = rectifyPatch(msg->patch_array[i], target_width_, cv_ptr_mask->image);
+      cv::dilate(det_patch_mask, det_patch_mask, cv::Mat());
+      cv::dilate(det_patch_mask, det_patch_mask, cv::Mat());
 
       // Place in 640x480 image to match manipulators, otherwise templates can
       // run off edge.
       cv::Mat det_img = cv::Mat::zeros(480, 640, CV_8UC3);
-      det_patch.copyTo(det_img(cv::Rect(0, 0, target_width_, target_width_)));
+      cv::Mat det_mask = cv::Mat::zeros(480, 640, CV_8UC1);
+      det_patch_img.copyTo(det_img(cv::Rect(0, 0, target_width_, target_width_)));
+      det_patch_mask.copyTo(det_mask(cv::Rect(0, 0, target_width_, target_width_)));
 
       // Add a mask to this?
 
       // Detect
       sources.push_back(det_img);
+      masks.push_back(det_mask);
       cv::linemod::Match m;
       bool ret = matchLineMOD(m);
       sources.clear();
+      masks.clear();
       if (!ret) {
         return;
       }
@@ -499,7 +507,7 @@ class LineMOD_Detector
       std::vector<cv::String> class_ids;
       std::vector<cv::Mat> quantized_images;
 
-      detector->match(sources, matching_threshold_, matches, class_ids, quantized_images);
+      detector->match(sources, matching_threshold_, matches, class_ids, quantized_images, masks);
 
       int num_classes = detector->numClasses();
       ROS_DEBUG("Num Classes: %u", num_classes);
