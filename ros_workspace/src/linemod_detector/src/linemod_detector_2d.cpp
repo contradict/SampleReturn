@@ -380,7 +380,8 @@ class LineMOD_Detector
         drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
             cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
         // Place in output image
-        det_img(cv::Rect(0, 0, target_width_, target_width_)).copyTo(debug_image(draw_rect));
+        det_img(cv::Rect(0, 0, target_width_, target_width_)).copyTo(debug_image(draw_rect),
+            det_mask(cv::Rect(0, 0, target_width_, target_width_)));
 
         // If a positive match, publish NamedPoint
         if (m.similarity > pub_threshold_) {
@@ -520,8 +521,6 @@ class LineMOD_Detector
       for (int i = 0; (i < (int)matches.size()) && (classes_visited < num_classes); ++i)
       {
           cv::linemod::Match m = matches[i];
-          ROS_DEBUG("Matching count: %u", i);
-
           if (m.similarity > best_match_similarity) {
               best_match_similarity = m.similarity;
               best_match_idx = i;
