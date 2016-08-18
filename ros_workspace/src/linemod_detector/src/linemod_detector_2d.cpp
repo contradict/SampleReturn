@@ -373,15 +373,36 @@ class LineMOD_Detector
 
       // Draw Response on output image
       if (ret) {
+        int draw_x_off = 0; int draw_y_off = 0;
+        int draw_w_off = 0; int draw_h_off = 0;
         cv::Rect draw_rect = cv::Rect(orig_x + orig_width/2. - target_width_/2.,
             orig_y + orig_height/2. - target_width_/2.,
             target_width_,
             target_width_);
+        if (draw_rect.x < 0) {
+          draw_x_off = -draw_rect.x;
+          draw_rect.x = 0;
+        }
+        if (draw_rect.y < 0) {
+          draw_y_off = -draw_rect.y;
+          draw_rect.y = 0;
+        }
+        if (draw_rect.x + draw_rect.width > debug_image.cols) {
+          draw_w_off = draw_rect.x + draw_rect.width - debug_image.cols;
+          draw_rect.width = debug_image.cols;
+        }
+        if (draw_rect.y + draw_rect.height > debug_image.rows) {
+          draw_h_off = draw_rect.y + draw_rect.height - debug_image.rows;
+          draw_rect.height = debug_image.rows;
+        }
+
         drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
             cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
         // Place in output image
-        det_img(cv::Rect(0, 0, target_width_, target_width_)).copyTo(debug_image(draw_rect),
-            det_mask(cv::Rect(0, 0, target_width_, target_width_)));
+        det_img(cv::Rect(draw_x_off, draw_y_off, target_width_ - draw_w_off,
+              target_width_ - draw_h_off)).copyTo(debug_image(draw_rect),
+            det_mask(cv::Rect(draw_x_off, draw_y_off, target_width_ - draw_w_off,
+                target_width_ - draw_h_off)));
 
         // If a positive match, publish NamedPoint
         if (m.similarity > pub_threshold_) {
