@@ -23,22 +23,21 @@
         <arg name="start_paused" value="$(arg start_paused)"/>
     </include>
 
+    <!--motion_planning brings up the costmap, vfh_driving and simple_driving-->
+    <include file="$(find motion_planning)/launch/motion_planning.launch"/>
+
+    <!-- bring up the cameras... hopefuly-->
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
     <include file="$(find samplereturn)/launch/search_camera.launch"/>
 
+    <!--joystick launch also brings up the manual control node-->
     <include file="$(find samplereturn)/launch/joystick.launch"/>
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/>
-    <!--
-    <include file="$(find sample_detection)/launch/color_name_sample_detection_manipulator.launch"/>
-    <include file="$(find samplereturn)/launch/search_detection.launch"/>
-    -->
+    
     <include file="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
     <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
-    <include file="$(find samplereturn)/launch/costmap.launch"/>
-    <include file="$(find motion_planning)/launch/motion_planning.launch"/>
-    <!--
-    -->
+
     <include file="$(find samplereturn)/launch/imu.launch"/>
     <include file="$(find kvh_fog)/launch/fog.launch"/>
     <include file="$(find pose_ukf)/launch/pitchroll_ukf.launch"/>
@@ -47,8 +46,7 @@
 
     <include file="$(find beacon_finder)/launch/april_beacon_finder.launch"/>
     <include file="$(find beacon_localizer)/launch/beacon_localizer.launch"/>
-    <include file="$(find fence_detection)/launch/fence_detection.launch"/>
-
+    
     <!--
     <include file="$(find solar_fisheye)/launch/molamola.launch"/>
     -->

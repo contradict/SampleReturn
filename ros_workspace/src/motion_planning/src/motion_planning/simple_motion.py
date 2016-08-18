@@ -37,6 +37,7 @@ class SimpleMover(object):
     
     #this is a hack to allow changes in strafe direction
     self.strafe_angle = None
+    self.current_position = None
 
     #get stern wheel transform
     try:
