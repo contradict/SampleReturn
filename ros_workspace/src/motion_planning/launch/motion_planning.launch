@@ -5,6 +5,9 @@
     <arg name="odometry_frame" default="odom"/>
     <arg name="world_fixed_frame" default="map"/>
     
+    <!--load the costmap node -->
+    <include file="$(find samplereturn)/launch/costmap.launch"/>
+        
     <node name="vfh_driver"
           pkg="motion_planning" 
           type="vfh_driving.py"
