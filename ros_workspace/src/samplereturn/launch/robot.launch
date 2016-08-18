@@ -35,7 +35,7 @@
     <include file="$(find manipulator)/launch/manipulator.launch"/>
     <include file="$(find samplereturn)/launch/audio.launch"/>
     
-    <include ifile="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
+    <include file="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
     <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
 
     <include file="$(find samplereturn)/launch/imu.launch"/>
