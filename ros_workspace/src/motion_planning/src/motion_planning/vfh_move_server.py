@@ -597,7 +597,14 @@ class VFHMoveServer( object ):
         y_rot = y*np.cos(yaw) + x*np.sin(yaw)        
         x_index = np.trunc(origin[1] + x_rot/self.costmap_info.resolution).astype('i2')
         y_index = np.trunc(origin[0] + y_rot/self.costmap_info.resolution).astype('i2')
-        return self.costmap[y_index, x_index] > self._lethal_threshold
+        if ( x_index < self.costmap_info.height and
+             y_index < self.costmap_info.height and  
+             x_index >= 0 and
+             y_index >= 0 ):
+            return self.costmap[y_index, x_index] > self._lethal_threshold
+        else:
+            rospy.logwarn("SEARCH_AREA_CHECK off costmap! Returning True.")
+            return True
 
     def world2map(self, world, info):
         origin = np.r_[info.origin.position.x,
