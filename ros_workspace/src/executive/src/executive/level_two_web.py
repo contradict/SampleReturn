@@ -107,6 +107,8 @@ class LevelTwoWeb(object):
         #lists
         self.web_slices = node_params.web_slices
         self.state_machine.userdata.web_slices = deque(self.web_slices)
+        self.state_machine.userdata.web_slice_indices = deque(range(len(self.web_slices)))
+        
         self.state_machine.userdata.raster_points = deque()
 
         #these are important values! master frame id and return timing
@@ -643,7 +645,7 @@ class WebManager(smach.State):
         smach.State.__init__(self,
                              input_keys = ['outbound',
                                            'web_slices',
-                                           'active_slice',
+                                           'web_slice_indices',
                                            'raster_active',
                                            'raster_points',
                                            'raster_step',
@@ -657,8 +659,7 @@ class WebManager(smach.State):
                                            'pause_time_offset',
                                            'world_fixed_frame'],
                              output_keys = ['outbound',
-                                            'web_slices',
-                                            'active_slice',
+                                            'web_slice_indices',
                                             'raster_active',
                                             'raster_points',
                                             'move_target',
@@ -682,6 +683,7 @@ class WebManager(smach.State):
     def execute(self, userdata):
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
+        active_slice = userdata.web_slices[userdata.web_slice_indices[0]]        
         userdata.report_sample = True #always act on samples if this manager is working
         userdata.stop_on_detection = True
 
@@ -699,20 +701,21 @@ class WebManager(smach.State):
 
         if userdata.outbound:
             #this flag indicates it's time to make an outbound move
-            if len(userdata.web_slices) == 0:
+            if len(userdata.web_slice_indices) == 0:
                 rospy.loginfo("WEB_MANAGER finished last spoke")
                 return 'return_home'
             #more slices left!
-            userdata.active_slice = userdata.web_slices.popleft()
-            end_point = get_polar_point(userdata.active_slice['start_angle'],
-                                    userdata.active_slice['max_radius'],
-                                    userdata.world_fixed_frame)
+            
+            end_point = get_polar_point(active_slice['start_angle'],
+                                        active_slice['max_radius'],
+                                        userdata.world_fixed_frame)
             next_move = {'point':end_point, 'radius':0, 'radial':True}
             userdata.outbound = False
-            rospy.loginfo("WEB_MANAGER starting spoke: %.2f" %(userdata.active_slice['start_angle']))
+            rospy.loginfo("WEB_MANAGER starting spoke: %.2f:" %(active_slice['start_angle']))
+            rospy.loginfo("WEB_MANAGER remaining indices: {!s}".format(userdata.web_slice_indices))
             remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
             self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(
-                                int(userdata.active_slice['start_angle']),
+                                int(active_slice['start_angle']),
                                 remaining_minutes))
             return self.load_move(next_move, userdata)
         else:
@@ -739,8 +742,9 @@ class WebManager(smach.State):
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
                     self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(
-                                        int(userdata.active_slice['start_angle'])))
+                                        int(active_slice['start_angle'])))
                     userdata.raster_active = False
+                    userdata.web_slice_indices.popleft() #remove the current index
                     userdata.outbound = True #request the next spoke move
                 else:
                 #if not, do we happen to aleady be close enough to the next point
@@ -755,7 +759,7 @@ class WebManager(smach.State):
             else:
                 #time to start rastering, create the points, and set flag
                 self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(
-                                    int(userdata.active_slice['start_angle'])))
+                                    int(active_slice['start_angle'])))
                 userdata.raster_active = True
                 return 'get_raster'
 
@@ -780,7 +784,7 @@ class CreateRasterPoints(smach.State):
     def __init__(self, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['web_slices',
-                                           'active_slice',
+                                           'web_slice_indices',
                                            'spoke_yaw',
                                            'spoke_hub_radius',
                                            'raster_step',
@@ -804,15 +808,16 @@ class CreateRasterPoints(smach.State):
             radius = util.get_robot_distance_to_origin(self.tf_listener,
                                                        userdata.world_fixed_frame)
 
-            current_yaw = userdata.active_slice['start_angle']
-            next_yaw = userdata.active_slice['end_angle']
+            active_slice = userdata.web_slices[userdata.web_slice_indices[0]]
+            current_yaw = active_slice['start_angle']
+            next_yaw = active_slice['end_angle']
 
 
             rospy.loginfo("STARTING RADIUS, YAW, NEXT YAW: {!s}, {!s}, {!s}".format(radius,
                                                                                     current_yaw,
                                                                                     next_yaw))
             #generate no raster points if we didn't reach min radius
-            if radius > userdata.active_slice['min_radius']:
+            if radius > active_slice['min_radius']:
                 #generate one end_angle-inward-start_angle-inward set of points per loop
                 while not rospy.is_shutdown():
                     #chord move to next yaw
@@ -820,7 +825,7 @@ class CreateRasterPoints(smach.State):
                     raster_points.append({'point':point,'radius':radius,'radial':False})
                     radius -= userdata.raster_step
                     #return from end angle if flag is True
-                    if radius < userdata.active_slice['min_radius'] and userdata.active_slice['return_on_end']:
+                    if radius < active_slice['min_radius'] and active_slice['return_on_end']:
                         break
                     #inward move on next yaw
                     point = get_polar_point(next_yaw, radius, userdata.world_fixed_frame)
@@ -830,13 +835,13 @@ class CreateRasterPoints(smach.State):
                     raster_points.append({'point':point,'radius':radius,'radial':False})
                     radius -= userdata.raster_step
                     #return from starting angle if specified
-                    if radius < userdata.active_slice['min_radius'] and not userdata.active_slice['return_on_end']:
+                    if radius < active_slice['min_radius'] and not active_slice['return_on_end']:
                         break
                     #inward move on current yaw
                     point = get_polar_point(current_yaw, radius, userdata.world_fixed_frame)
                     raster_points.append({'point':point,'radius':radius,'radial':True})
 
-            final_yaw = next_yaw if userdata.active_slice['return_on_end'] else current_yaw
+            final_yaw = next_yaw if active_slice['return_on_end'] else current_yaw
             point = get_polar_point(final_yaw, userdata.spoke_hub_radius, userdata.world_fixed_frame)
             raster_points.append({'point':point,'radius':userdata.spoke_hub_radius,'radial':True})
 
@@ -988,7 +993,7 @@ class RecoveryManager(smach.State):
                                            'manager_dict',
                                            'move_target',
                                            'raster_active',
-                                           'active_web_slice',
+                                           'web_slice_indices',
                                            'web_slices',
                                            'return_time_offset',
                                            'detection_message',
@@ -998,11 +1003,10 @@ class RecoveryManager(smach.State):
                              output_keys = ['recovery_parameters',
                                             'recovery_requested',
                                             'active_manager',
-                                            'active_web_slice',
+                                            'web_slice_indices',
                                             'raster_active',
                                             'raster_points',
                                             'outbound',
-                                            'web_slices',
                                             'return_time_offset',
                                             'move_target',
                                             'simple_move',
@@ -1048,18 +1052,16 @@ class RecoveryManager(smach.State):
                 userdata.raster_active = False
                 userdata.raster_points = deque()
                 userdata.outbound = True
-                while web_slices_to_remove > 1:
-                    #current spoke is already popped, so load the start of the next one first
-                    if len(userdata.web_slices) > 0:
-                        userdata.active_web_slice = userdata.web_slices.popleft()
+                while web_slices_to_remove > 0:
+                    #current spoke is leftmost index
+                    if len(userdata.web_slice_indices) > 0:
+                        userdata.web_slice_indices.popleft()
                     web_slices_to_remove -= 1
 
-                point = get_polar_point(userdata.active_web_slice['end_angle'],
+                point = get_polar_point(userdata.web_slices[userdata.web_slice_indices[0]]['end_angle'],
                                         userdata.spoke_hub_radius,
                                         userdata.world_fixed_frame)
                 self.exit_move = point
-
-
 
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
