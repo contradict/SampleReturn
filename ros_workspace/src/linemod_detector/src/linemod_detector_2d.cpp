@@ -119,7 +119,7 @@ class LineMOD_Detector
       _config = config;
   }
 
-  cv::Mat rectifyPatch(samplereturn_msgs::Patch msg, int tw, cv::Mat& img)
+  cv::Mat rectifyPatch(samplereturn_msgs::Patch msg, int tw, int th, const cv::Mat& img)
   {
     // Take ground plane and patch camera info, compute rotation matrix
     // to ground, get square ground patch
@@ -190,12 +190,12 @@ class LineMOD_Detector
     // Reproject the region into the target square
     std::vector<cv::Point2f> out_win_points(4);
     out_win_points[0] = cv::Point(0, 0);
-    out_win_points[1] = cv::Point(0, tw);
-    out_win_points[2] = cv::Point(tw, tw);
+    out_win_points[1] = cv::Point(0, th);
+    out_win_points[2] = cv::Point(tw, th);
     out_win_points[3] = cv::Point(tw, 0);
     cv::Mat win_transform = cv::getPerspectiveTransform(sq_img_points, out_win_points);
     cv::Mat out_win;
-    cv::warpPerspective(img, out_win, win_transform, cv::Size(tw, tw));
+    cv::warpPerspective(img, out_win, win_transform, cv::Size(tw, th));
     return out_win;
   }
 
@@ -237,43 +237,55 @@ class LineMOD_Detector
       // Add a mask to this
       cv::Mat det_img = cv::Mat::zeros(480, 640, CV_8UC3);
       cv::Mat det_mask = cv::Mat::zeros(480, 640, CV_8UC1);
+
+      int w = _config.target_width;
+      int h = _config.target_width * msg->patch_array[i].image_roi.height/
+          msg->patch_array[i].image_roi.width;
+      cv::Rect boundingbox;
+      if(computeBoundingBox(cv_ptr_mask->image, &boundingbox))
+      {
+          double s=msg->patch_array[i].image_roi.width/double(boundingbox.size().width);
+          w *= s;
+          h *= s;
+      }
+      if(w>640)
+      {
+          h = h*(640.0/w);
+          w = 640;
+      }
+      if(h>480)
+      {
+          w = w*(480.0/h);
+          h = 480;
+      }
+
       if(_config.rectify_patch)
       {
+
           // Rectify to get "head-on" view, constant size
-          cv::Mat det_patch_img = rectifyPatch(msg->patch_array[i], _config.target_width, cv_ptr_img->image);
-          cv::Mat det_patch_mask = rectifyPatch(msg->patch_array[i], _config.target_width, cv_ptr_mask->image);
+          cv::Mat det_patch_img = rectifyPatch(msg->patch_array[i],
+                  w, h,
+                  cv_ptr_img->image);
+          cv::Mat det_patch_mask = rectifyPatch(msg->patch_array[i],
+                  w, h,
+                  cv_ptr_mask->image);
           // Place in 640x480 image to match templates, otherwise templates can
           // run off edge.
-          det_patch_img.copyTo(det_img(cv::Rect(0, 0, _config.target_width, _config.target_width)));
-          det_patch_mask.copyTo(det_mask(cv::Rect(0, 0, _config.target_width, _config.target_width)));
+          det_patch_img.copyTo(det_img(cv::Rect(0, 0, w, h)));
+          det_patch_mask.copyTo(det_mask(cv::Rect(0, 0, w, h)));
 
       }
       else
       {
           cv::resize(cv_ptr_img->image,
-                  det_img(
-                      cv::Rect(
-                          0,
-                          0,
-                          _config.target_width,
-                          _config.target_width
-                          )),
-                  cv::Size(_config.target_width,
-                           _config.target_width),
+                  det_img( cv::Rect( 0, 0, w, h) ),
+                  cv::Size(w, h),
                   0, 0, cv::INTER_AREA);
 
           cv::resize(cv_ptr_mask->image,
-                  det_mask(
-                      cv::Rect(
-                          0,
-                          0,
-                          _config.target_width,
-                          _config.target_width
-                          )),
-                  cv::Size(_config.target_width,
-                           _config.target_width),
+                  det_mask( cv::Rect( 0, 0, w, h) ),
+                  cv::Size(w, h),
                   0, 0, cv::INTER_AREA);
-
       }
 
       cv::dilate(det_mask, det_mask, cv::Mat(), cv::Point(-1,-1), _config.mask_dilation_iterations);
@@ -302,10 +314,10 @@ class LineMOD_Detector
       if (debug_img_pub.getNumSubscribers()>0) {
         int draw_x_off = 0; int draw_y_off = 0;
         int draw_w_off = 0; int draw_h_off = 0;
-        draw_rect = cv::Rect(orig_x + orig_width/2. - _config.target_width/2.,
-            orig_y + orig_height/2. - _config.target_width/2.,
-            _config.target_width,
-            _config.target_width);
+        draw_rect = cv::Rect(orig_x + orig_width/2. - w/2.,
+            orig_y + orig_height/2. - h/2.,
+            w,
+            h);
         if (draw_rect.x < 0) {
           draw_x_off = -draw_rect.x;
           draw_rect.x = 0;
@@ -328,13 +340,13 @@ class LineMOD_Detector
         // Place in output image
         det_img(cv::Rect(draw_x_off,
                          draw_y_off,
-                         _config.target_width - draw_w_off,
-                         _config.target_width - draw_h_off)).copyTo(
+                         w - draw_w_off,
+                         h - draw_h_off)).copyTo(
                             debug_image(draw_rect),
                             det_mask(cv::Rect(draw_x_off,
                                               draw_y_off,
-                                              _config.target_width - draw_w_off,
-                                              _config.target_width - draw_h_off)));
+                                              w - draw_w_off,
+                                              h - draw_h_off)));
 
       }
 
@@ -386,8 +398,8 @@ class LineMOD_Detector
               np.grip_angle = griprect.angle;
               if(debug_img_pub.getNumSubscribers()>0)
               {
-                  griprect.center += cv::Point2f(orig_x + orig_width/2 - _config.target_width/2,
-                          orig_y + orig_height/2 - _config.target_width/2);
+                  griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
+                          orig_y + orig_height/2 - h/2);
                   cv::Mat pts(4,1,CV_32FC2);
                   griprect.points((cv::Point2f*)pts.data);
                   pts.convertTo( pts, CV_32S);
@@ -449,10 +461,12 @@ class LineMOD_Detector
       }
   }
 
-  bool maskToHull(cv::Mat mask, std::vector<cv::Point> *hull)
+  bool maskToHull(const cv::Mat& mask_in, std::vector<cv::Point> *hull)
   {
+      cv::Mat localcopy;
+      mask_in.copyTo(localcopy); // findContours is destructive
       std::vector<std::vector<cv::Point> > contours;
-      cv::findContours(mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+      cv::findContours(localcopy, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       double maxArea = 0;
       int max_idx = 0;
       for (size_t i=0; i<contours.size(); i++) {
@@ -482,7 +496,7 @@ class LineMOD_Detector
       return angle;
   }
 
-  bool computeGripAngle(cv::Mat mask, cv::RotatedRect* griprect)
+  bool computeGripAngle(const cv::Mat& mask, cv::RotatedRect* griprect)
   {
       std::vector<cv::Point> hull;
       if(!maskToHull(mask, &hull))
@@ -491,10 +505,24 @@ class LineMOD_Detector
           return false;
       }
       *griprect = cv::minAreaRect(hull);
-      ROS_DEBUG("Meausred angle: %f width: %f height: %f",
+      ROS_DEBUG("Measured angle: %f width: %f height: %f",
               griprect->angle, griprect->size.width, griprect->size.height);
       return true;
   }
+
+  bool computeBoundingBox(const cv::Mat& mask, cv::Rect* rect)
+  {
+      std::vector<cv::Point> hull;
+      if(!maskToHull(mask, &hull))
+      {
+          ROS_ERROR("Failed to generate hull from mask, cannot compute bounding rect.");
+          return false;
+      }
+      *rect = cv::boundingRect(hull);
+      ROS_DEBUG("Measured width: %d height: %d", rect->size().width, rect->size().height);
+      return true;
+  }
+
 
   void drawResponse(const std::vector<cv::linemod::Template>& templates,
                     int num_modalities, cv::Mat& dst, cv::Point offset, int T,
