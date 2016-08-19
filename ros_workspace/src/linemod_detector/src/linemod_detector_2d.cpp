@@ -119,7 +119,7 @@ class LineMOD_Detector
       _config = config;
   }
 
-  cv::Mat rectifyPatch(samplereturn_msgs::Patch msg, int tw, int th, const cv::Mat& img)
+  cv::Mat rectifyPatch(std::string frame_id, const Eigen::Matrix3d& K, cv::Rect roi, const cv::Mat& img, int tw, int th)
   {
     // Take ground plane and patch camera info, compute rotation matrix
     // to ground, get square ground patch
@@ -127,7 +127,7 @@ class LineMOD_Detector
     // Get ground plane homography
     tf::Stamped<tf::Vector3> ground_normal_cam;
     try {
-      listener_.transformVector(msg.header.frame_id, ground_normal_, ground_normal_cam);
+      listener_.transformVector(frame_id, ground_normal_, ground_normal_cam);
     }
     catch (tf::TransformException ex) {
       ROS_ERROR("%s",ex.what());
@@ -140,11 +140,6 @@ class LineMOD_Detector
     tf::vectorTFToEigen(ground_normal_cam, eigen_ground_normal_cam);
     Eigen::Matrix3d R = Eigen::Quaterniond().FromTwoVectors(eigen_cam_axis,
         eigen_ground_normal_cam).toRotationMatrix();
-    Eigen::Matrix3d K = Eigen::Matrix3d::Map(msg.cam_info.K.data());
-    K(0,2) = K(2,0);
-    K(1,2) = K(2,1);
-    K(2,0) = 0;
-    K(2,1) = 0;
     Eigen::Matrix3d H = K*R*K.inverse();
     cv::Mat H_cv(3,3,CV_64F);
     for (int i=0; i<3; i++) {
@@ -155,10 +150,10 @@ class LineMOD_Detector
 
     // Transform image points to ground
     int x,y,w,h;
-    x = msg.image_roi.x_offset;
-    y = msg.image_roi.y_offset;
-    w = msg.image_roi.width;
-    h = msg.image_roi.height;
+    x = roi.x;
+    y = roi.y;
+    w = roi.width;
+    h = roi.height;
     std::vector<cv::Point2f> img_points(4);
     img_points[0] = cv::Point(x, y);
     img_points[1] = cv::Point(x, y+h);
@@ -183,8 +178,8 @@ class LineMOD_Detector
 
     // Remove RoI offset
     for (size_t i=0; i<sq_img_points.size(); i++) {
-      sq_img_points[i].x -= msg.image_roi.x_offset;
-      sq_img_points[i].y -= msg.image_roi.y_offset;
+      sq_img_points[i].x -= roi.x;
+      sq_img_points[i].y -= roi.y;
     }
 
     // Reproject the region into the target square
@@ -209,8 +204,8 @@ class LineMOD_Detector
       return;
     }
 
-    cv::Mat debug_image = cv::Mat::zeros(msg->patch_array[0].cam_info.height,
-        msg->patch_array[0].cam_info.width, CV_8UC3);
+    cv::Mat debug_image = cv::Mat::zeros(msg->cam_info.height,
+        msg->cam_info.width, CV_8UC3);
 
     cv_bridge::CvImagePtr cv_ptr_mask, cv_ptr_img;
     for (size_t i = 0; i < msg->patch_array.size(); i++) {
@@ -261,14 +256,24 @@ class LineMOD_Detector
 
       if(_config.rectify_patch)
       {
+          Eigen::Matrix3d K = Eigen::Matrix3d::Map(msg->cam_info.K.data());
+          K(0,2) = K(2,0);
+          K(1,2) = K(2,1);
+          K(2,0) = 0;
+          K(2,1) = 0;
+
+          cv::Rect roi(msg->patch_array[i].image_roi.x_offset,
+                       msg->patch_array[i].image_roi.y_offset,
+                       msg->patch_array[i].image_roi.width,
+                       msg->patch_array[i].image_roi.height);
 
           // Rectify to get "head-on" view, constant size
-          cv::Mat det_patch_img = rectifyPatch(msg->patch_array[i],
-                  w, h,
-                  cv_ptr_img->image);
-          cv::Mat det_patch_mask = rectifyPatch(msg->patch_array[i],
-                  w, h,
-                  cv_ptr_mask->image);
+          cv::Mat det_patch_img = rectifyPatch(msg->header.frame_id, K, roi,
+                  cv_ptr_img->image,
+                  w, h);
+          cv::Mat det_patch_mask = rectifyPatch(msg->header.frame_id, K, roi,
+                  cv_ptr_mask->image,
+                  w, h);
           // Place in 640x480 image to match templates, otherwise templates can
           // run off edge.
           det_patch_img.copyTo(det_img(cv::Rect(0, 0, w, h)));
@@ -377,7 +382,7 @@ class LineMOD_Detector
       }
  
       samplereturn_msgs::NamedPoint np;
-      np.header = msg->patch_array[i].header;
+      np.header = msg->header;
       np.point = msg->patch_array[i].world_point.point;
       if(_config.compute_grip_angle)
       {
@@ -413,7 +418,7 @@ class LineMOD_Detector
     if(debug_img_pub.getNumSubscribers() > 0)
     {
         sensor_msgs::ImagePtr debug_image_msg =
-            cv_bridge::CvImage(msg->patch_array[0].header,"rgb8",debug_image).toImageMsg();
+            cv_bridge::CvImage(msg->header,"rgb8",debug_image).toImageMsg();
         debug_img_pub.publish(debug_image_msg);
     }
   }
