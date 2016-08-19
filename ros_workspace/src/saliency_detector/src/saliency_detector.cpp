@@ -138,6 +138,8 @@ class SaliencyDetectorNode
     cv::Mat sub_img;
     cv::Mat sub_mask;
     samplereturn_msgs::PatchArray pa_msg;
+    pa_msg.header = msg->header;
+    pa_msg.cam_info = *cam_info;
 
     // Scale keypoint params back up from smaller BMS image
     ROS_DEBUG("Begin publish loop");
@@ -178,14 +180,12 @@ class SaliencyDetectorNode
         continue;
       }
       samplereturn_msgs::Patch p_msg;
-      p_msg.header = msg->header;
       p_msg.image = *(cv_bridge::CvImage(msg->header,"rgb8",sub_img).toImageMsg());
       p_msg.mask = *(cv_bridge::CvImage(msg->header,"mono8",sub_mask).toImageMsg());
       p_msg.image_roi.x_offset = top_left_x;
       p_msg.image_roi.y_offset = top_left_y;
       p_msg.image_roi.height = height;
       p_msg.image_roi.width = width;
-      p_msg.cam_info = *cam_info;
       pa_msg.patch_array.push_back(p_msg);
     }
     ROS_DEBUG("End publish loop");
