@@ -20,13 +20,17 @@ find_package(catkin REQUIRED
         tf
         cmake_modules
         dynamic_reconfigure
+        pcl_ros
+        pcl_conversions
         )
 
 find_package(Eigen REQUIRED)
 
 find_package(OpenCV)
 
-add_definitions("-std=c++11")
+find_package(PCL REQUIRED)
+
+add_definitions("-std=c++11" "-Wall")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -105,6 +109,9 @@ add_definitions(${Eigen_DEFINITIONS})
      src/linemod_detector_2d.cpp
      src/mask_utils.cpp)
  add_executable(stereo_linemod_trainer src/stereo_linemod_trainer.cpp)
+add_executable(pointcloud_projector
+    src/pointcloud_projector.cpp
+    src/mask_utils.cpp)
 
 add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
 add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
@@ -133,6 +140,10 @@ add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencfg)
    new_modalities
    ${catkin_LIBRARIES}
  )
+target_link_libraries(pointcloud_projector
+     ${catkin_LIBRARIES}
+     ${PCL_LIBRARIES}
+)
 
 #############
 ## Install ##
