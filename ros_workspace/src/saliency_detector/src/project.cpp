@@ -116,7 +116,7 @@ class GroundProjectorNode
     // Take the saliency contour, find the major axis, cast rays to
     // the ground plane
     cv_bridge::CvImagePtr cv_ptr;
-    for (int i = 0; i < msg->patch_array.size(); i++) {
+    for (size_t i = 0; i < msg->patch_array.size(); i++) {
       try {
         cv_ptr = cv_bridge::toCvCopy(msg->patch_array[i].mask, "");
       }
@@ -130,12 +130,12 @@ class GroundProjectorNode
       cv::Mat contour_copy = cv_ptr->image.clone();
       cv::findContours(contour_copy, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       if (contours.size() == 0) {
-        ROS_DEBUG("No contours found in patch %i", i);
+        ROS_DEBUG("No contours found in patch %ld", i);
         continue;
       }
       double maxArea = 0;
       int max_idx = 0;
-      for (int j=0; j<contours.size(); j++) {
+      for (size_t j=0; j<contours.size(); j++) {
         double area = cv::contourArea(cv::Mat(contours[j]));
         if (area > maxArea) {
           maxArea = area;
