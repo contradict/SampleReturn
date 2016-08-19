@@ -18,7 +18,9 @@
 #include <tf_conversions/tf_eigen.h>
 #include "new_modalities.hpp"
 #include <saliency_detector/colormodel.h>
+#include <linemod_detector/mask_utils.h>
 
+namespace linemod_detector {
 // Function prototypes
 static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
 {
@@ -466,32 +468,7 @@ class LineMOD_Detector
       }
   }
 
-  bool maskToHull(const cv::Mat& mask_in, std::vector<cv::Point> *hull)
-  {
-      cv::Mat localcopy;
-      mask_in.copyTo(localcopy); // findContours is destructive
-      std::vector<std::vector<cv::Point> > contours;
-      cv::findContours(localcopy, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-      double maxArea = 0;
-      int max_idx = 0;
-      for (size_t i=0; i<contours.size(); i++) {
-          double area = cv::contourArea(cv::Mat(contours[i]));
-          if (area > maxArea) {
-              maxArea = area;
-              max_idx = i;
-          }
-      }
-      if(contours.size()>0)
-      {
-          cv::convexHull(contours[max_idx], *hull);
-          return true;
-      }
-      else
-      {
-          return false;
-      }
-  }
-  
+
   double unwrap90(double angle)
   {
       while(angle>M_PI/2)
@@ -500,34 +477,6 @@ class LineMOD_Detector
           angle += M_PI;
       return angle;
   }
-
-  bool computeGripAngle(const cv::Mat& mask, cv::RotatedRect* griprect)
-  {
-      std::vector<cv::Point> hull;
-      if(!maskToHull(mask, &hull))
-      {
-          ROS_ERROR("Failed to generate hull from mask, cannot compute grip angle.");
-          return false;
-      }
-      *griprect = cv::minAreaRect(hull);
-      ROS_DEBUG("Measured angle: %f width: %f height: %f",
-              griprect->angle, griprect->size.width, griprect->size.height);
-      return true;
-  }
-
-  bool computeBoundingBox(const cv::Mat& mask, cv::Rect* rect)
-  {
-      std::vector<cv::Point> hull;
-      if(!maskToHull(mask, &hull))
-      {
-          ROS_ERROR("Failed to generate hull from mask, cannot compute bounding rect.");
-          return false;
-      }
-      *rect = cv::boundingRect(hull);
-      ROS_DEBUG("Measured width: %d height: %d", rect->size().width, rect->size().height);
-      return true;
-  }
-
 
   void drawResponse(const std::vector<cv::linemod::Template>& templates,
                     int num_modalities, cv::Mat& dst, cv::Point offset, int T,
@@ -565,10 +514,11 @@ class LineMOD_Detector
   }
 
 };
+}
 
 int main(int argc, char ** argv)
 {
   ros::init(argc, argv, "Line2D_Detector");
-  LineMOD_Detector ld;
+  linemod_detector::LineMOD_Detector ld;
   ros::spin();
 }

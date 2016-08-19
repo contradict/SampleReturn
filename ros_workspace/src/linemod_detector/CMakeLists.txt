@@ -101,7 +101,9 @@ add_definitions(${Eigen_DEFINITIONS})
 ## Declare a cpp executable
  add_executable(linemod_trainer src/linemod_trainer.cpp)
  add_executable(linemod_detector src/linemod_detector.cpp)
- add_executable(linemod_detector_2d src/linemod_detector_2d.cpp)
+ add_executable(linemod_detector_2d
+     src/linemod_detector_2d.cpp
+     src/mask_utils.cpp)
  add_executable(stereo_linemod_trainer src/stereo_linemod_trainer.cpp)
 
 add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
