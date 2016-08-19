@@ -683,7 +683,6 @@ class WebManager(smach.State):
     def execute(self, userdata):
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
-        active_slice = userdata.web_slices[userdata.web_slice_indices[0]]        
         userdata.report_sample = True #always act on samples if this manager is working
         userdata.stop_on_detection = True
 
@@ -695,17 +694,18 @@ class WebManager(smach.State):
             userdata.allow_rotate_to_clear = True
             userdata.stop_on_detection = False
             return 'return_home'
+        
+        if len(userdata.web_slice_indices) == 0:
+            rospy.loginfo("WEB_MANAGER finished last spoke")
+            return 'return_home'
+        else:
+            active_slice = userdata.web_slices[userdata.web_slice_indices[0]] 
 
         if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
             return 'sample_detected'
 
         if userdata.outbound:
             #this flag indicates it's time to make an outbound move
-            if len(userdata.web_slice_indices) == 0:
-                rospy.loginfo("WEB_MANAGER finished last spoke")
-                return 'return_home'
-            #more slices left!
-            
             end_point = get_polar_point(active_slice['start_angle'],
                                         active_slice['max_radius'],
                                         userdata.world_fixed_frame)
@@ -1045,23 +1045,30 @@ class RecoveryManager(smach.State):
             if 'time_offset' in userdata.recovery_parameters:
                 time_offset = rospy.Duration(userdata.recovery_parameters['time_offset']*60)
                 userdata.return_time_offset += time_offset
-
+            
             #prune requested web_slices
             web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
+            slices_to_add = userdata.recovery_parameters['slices_to_add']
             if web_slices_to_remove > 0:
                 userdata.raster_active = False
                 userdata.raster_points = deque()
                 userdata.outbound = True
+                point = get_polar_point(userdata.web_slices[userdata.web_slice_indices[0]]['end_angle'],
+                                        userdata.spoke_hub_radius,
+                                        userdata.world_fixed_frame)
+                self.exit_move = point
                 while web_slices_to_remove > 0:
                     #current spoke is leftmost index
                     if len(userdata.web_slice_indices) > 0:
                         userdata.web_slice_indices.popleft()
                     web_slices_to_remove -= 1
 
-                point = get_polar_point(userdata.web_slices[userdata.web_slice_indices[0]]['end_angle'],
-                                        userdata.spoke_hub_radius,
-                                        userdata.world_fixed_frame)
-                self.exit_move = point
+            elif len(slices_to_add) > 0:
+                #if we don't remove any spokes, we must add new slices after index 0
+                slices_to_add.insert(0, userdata.web_slice_indices.popleft())
+
+            while (len(slices_to_add)>0):
+                userdata.web_slice_indices.appendleft(slices_to_add.pop())                
 
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
