@@ -289,9 +289,13 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
         }
 
         // project center of patch until it hits z_peak
-        cv::Point2d uv(rect.x + rect.width/2, rect.y + rect.height/2);
-        cv::Point3d cvxyz = model.projectPixelTo3dRay(uv + patch_origin);
-        tf::Stamped<tf::Vector3> patch_ray(tf::Vector3(cvxyz.x, cvxyz.y, cvxyz.z),
+        cv::Point2d uv = cv::Point2d(rect.x + rect.width/2, rect.y + rect.height/2) + patch_origin;
+        cv::Point3d cvxyz = model.projectPixelTo3dRay(uv);
+        tf::Stamped<tf::Vector3> patch_ray(
+                tf::Vector3(
+                    cvxyz.x,
+                    cvxyz.y,
+                    cvxyz.z),
                 patches_msg->header.stamp,
                 patches_msg->header.frame_id);
         tf::Stamped<tf::Vector3> clipping_ray;
