@@ -105,7 +105,7 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS color_naming saliency_detector_core colormodel
+    LIBRARIES BMS saliency_detector_core colormodel
   CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
@@ -132,10 +132,6 @@ add_library(BMS
 add_library(saliency_detector_core
   src/saliency_detector_core.cpp
  )
-
-add_library(color_naming
-  src/color_naming.cpp
-)
 
 add_library(colormodel
     src/colormodel.cpp
@@ -168,7 +164,6 @@ target_link_libraries(colormodel
 
  target_link_libraries(saliency_detector_node
    saliency_detector_core
-   color_naming
    ${catkin_LIBRARIES}
    BMS
  )
@@ -199,7 +194,7 @@ target_link_libraries(colormodel
  )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
+install(TARGETS saliency_detector_core BMS saliency_detector_node
    ground_projector_node color_histogram_descriptor_node colormodel
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

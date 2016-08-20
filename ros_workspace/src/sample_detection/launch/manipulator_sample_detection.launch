@@ -1,0 +1,122 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+
+    <node
+        pkg="saliency_detector"
+        type="saliency_detector_node"
+        name="saliency_detector"
+        machine="search"
+        ns="/processes/sample_detection/manipulator">
+        <remap from="image" to="/cameras/manipulator/left/rect_color"/>
+        <param name="bms_opening_width" type="int" value="3"/>
+        <param name="bms_dilation_width_1" type="int" value="0"/>
+        <param name="bms_thresh_fraction" type="double" value="0.25"/>
+        <param name="bms_thresh_on" type="bool" value="true"/>
+        <param name="bms_img_width" type="double" value="400"/>
+        <param name="bms_top_trim" type="double" value="0"/>
+        <param name="filterByConvexity" type="bool" value="True"/>
+        <param name="filterByArea" type="bool" value="True"/>
+        <param name="minArea" type="double" value="2500.0"/>
+        <param name="maxArea" type="double" value="100000.0"/>
+        <param name="minDistBetweenBlobs" type="double" value="100.0"/>
+        <param name="minThreshold" type="double" value="20.0"/>
+        <param name="maxThreshold" type="double" value="150.0"/>
+        <param name="thresholdStep" type="double" value="10.0"/>
+        <param name="minRepeatability" type="double" value="3.0"/>
+        <param name="patch_scaling_factor" type="double" value="3.0"/>
+    </node>
+
+    <node
+        pkg="linemod_detector"
+        type="pointcloud_projector"
+        name="pointcloud_projector"
+        machine="search"
+        ns="/processes/sample_detection/manipulator">
+        <remap from="pointcloud" to="/cameras/manipulator/points2"/>
+        <remap from="patches" to="patch_array"/>
+        <param name="pointcloud_scale" type="double" value="1.1"/>
+        <param name="hist_min_scale" type="double" value="1.0"/>
+        <param name="maximum_patch_height" type="double" value="10.0"/>
+    </node>
+
+    <node
+        pkg="saliency_detector"
+        type="color_histogram_descriptor_node"
+        name="color_histogram_descriptor"
+        machine="search"
+        ns="/processes/sample_detection/manipulator">
+        <remap from="projected_patch_array" to="positioned_patches"/>
+        <param name="min_target_hue" type="double" value="120"/>
+        <param name="max_target_hue" type="double" value="30"/>
+        <param name="min_color_saturation" type="double" value="100"/>
+        <param name="high_saturation_limit" type="double" value="0.7"/>
+        <param name="low_saturation_limit" type="double" value="0.5"/>
+        <param name="min_inner_outer_distance" type="double" value="0.9"/>
+        <param name="max_exemplar_distance" type="double" value="0.7"/>
+    </node>
+
+    <node
+        machine="search"
+        pkg="linemod_detector"
+        type="linemod_detector_2d"
+        name="linemod_detector_2d"
+        ns="/processes/sample_detection/manipulator">
+        <remap from="projected_patch_array" to="positioned_patches"/>
+        <remap from="point" to="named_point"/>
+        <param name="min_target_hue" type="double" value="120"/>
+        <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
+        <param name="load_inner_linemod" type="bool" value="true"/>
+        <param name="pub_threshold" type="double" value="90.0"/>
+        <param name="check_color_model" type="bool" value="false"/>
+        <param name="compute_grip_angle" type="bool" value="true"/>
+        <param name="do_median_blur" type="bool" value="false"/>
+        <param name="median_blur_size" type="int" value="13"/>
+        <param name="high_saturation_limit" type="double" value="0.5"/>
+        <param name="low_saturation_limit" type="double" value="0.1"/>
+        <param name="mask_dilation_iterations" type="int" value="2"/>
+        <param name="matching_threshold" type="double" value="70.0"/>
+        <param name="max_exemplar_distance" type="double" value="0.3"/>
+        <param name="min_color_saturation" type="double" value="150"/>
+        <param name="min_inner_outer_distance" type="double" value="0.5"/>
+        <param name="pub_threshold" type="double" value="85.0"/>
+        <param name="rectify_patch" type="bool" value="false"/>
+        <param name="target_width" type="double" value="150.0"/>
+    </node>
+
+    <node
+        machine="search"
+        pkg="detection_filter"
+        type="manipulator_kalman_filter_node"
+        name="manipulator_kalman_filter_node"
+        ns="/processes/sample_detection/manipulator">
+        <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
+        <remap from="point" to="named_point"/>
+        <param name="max_dist" type="double" value="0.1"/>
+        <param name="max_cov" type="double" value="0.4"/>
+        <param name="max_pub_cov" type="double" value="0.05"/>
+        <param name="max_pub_vel" type="double" value="0.02"/>
+        <param name="is_manipulator" type="bool" value="true"/>
+        <param name="error_cov_post" type="double" value="0.1"/>
+        <param name="process_noise_cov" type="double" value="0.00003"/>
+        <param name="measurement_noise_cov" type="double" value="0.02"/>
+        <param name="period" type="double" value="0.03"/>
+        <rosparam param="color_transitions">
+            white: [gray, blue, green, white, pink]
+            black: []
+            gray: [gray, white, blue]
+            brown: [brown, orange, red]
+            pink: [pink, red, purple, white]
+            red: [red, pink, purple, orange, brown]
+            orange: [orange, yellow, red, brown]
+            yellow: [yellow, orange]
+            green: [green, white]
+            blue: [blue, gray, white]
+            purple: [purple, red, pink]
+        </rosparam>
+        <param name="certainty_inc" type="double" value="1.0"/>
+        <param name="certainty_dec" type="double" value="0.0"/>
+        <param name="certainty_thresh" type="double" value="3.0"/>
+    </node>
+
+</launch>

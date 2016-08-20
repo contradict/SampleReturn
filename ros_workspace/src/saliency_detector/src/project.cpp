@@ -100,13 +100,15 @@ class GroundProjectorNode
       return;
     }
     samplereturn_msgs::PatchArray out_pa_msg;
+    out_pa_msg.header = msg->header;
+    out_pa_msg.cam_info = msg->cam_info;
     if (enable_debug_) {
-      debug_image_ = cv::Mat::ones(msg->patch_array[0].cam_info.height,
-          msg->patch_array[0].cam_info.width, CV_8U)*255;
+      debug_image_ = cv::Mat::ones(msg->cam_info.height,
+          msg->cam_info.width, CV_8U)*255;
     }
     if (!cam_model_.initialized())
     {
-      cam_model_.fromCameraInfo(msg->patch_array[0].cam_info);
+      cam_model_.fromCameraInfo(msg->cam_info);
     }
     // For each patch, project onto the available ground plane and make
     // accurate 3D position and size estimates. Filter out candidate patches
@@ -114,7 +116,7 @@ class GroundProjectorNode
     // Take the saliency contour, find the major axis, cast rays to
     // the ground plane
     cv_bridge::CvImagePtr cv_ptr;
-    for (int i = 0; i < msg->patch_array.size(); i++) {
+    for (size_t i = 0; i < msg->patch_array.size(); i++) {
       try {
         cv_ptr = cv_bridge::toCvCopy(msg->patch_array[i].mask, "");
       }
@@ -128,12 +130,12 @@ class GroundProjectorNode
       cv::Mat contour_copy = cv_ptr->image.clone();
       cv::findContours(contour_copy, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
       if (contours.size() == 0) {
-        ROS_DEBUG("No contours found in patch %i", i);
+        ROS_DEBUG("No contours found in patch %ld", i);
         continue;
       }
       double maxArea = 0;
       int max_idx = 0;
-      for (int j=0; j<contours.size(); j++) {
+      for (size_t j=0; j<contours.size(); j++) {
         double area = cv::contourArea(cv::Mat(contours[j]));
         if (area > maxArea) {
           maxArea = area;
@@ -170,14 +172,12 @@ class GroundProjectorNode
       ROS_DEBUG("Ray A: %f, %f, %f",ray_a.x,ray_a.y,ray_a.z);
       ROS_DEBUG("Ray B: %f, %f, %f",ray_b.x,ray_b.y,ray_b.z);
       geometry_msgs::PointStamped world_point;
-      if (checkContourSize(ray_a, ray_b, msg->patch_array[0].header, world_point)) {
+      if (checkContourSize(ray_a, ray_b, msg->header, world_point)) {
         pub_point.publish(world_point);
         samplereturn_msgs::Patch pa_msg;
         pa_msg.image = msg->patch_array[i].image;
         pa_msg.mask = msg->patch_array[i].mask;
         pa_msg.image_roi = msg->patch_array[i].image_roi;
-        pa_msg.header = msg->patch_array[i].header;
-        pa_msg.cam_info = msg->patch_array[i].cam_info;
         pa_msg.world_point = world_point;
         out_pa_msg.patch_array.push_back(pa_msg);
       }
@@ -204,7 +204,7 @@ class GroundProjectorNode
     pub_patch_array.publish(out_pa_msg);
     if (enable_debug_) {
       sensor_msgs::ImagePtr debug_image_msg =
-        cv_bridge::CvImage(msg->patch_array[0].header,"mono8",debug_image_).toImageMsg();
+        cv_bridge::CvImage(msg->header,"mono8",debug_image_).toImageMsg();
       pub_debug_image.publish(debug_image_msg);
     }
   }

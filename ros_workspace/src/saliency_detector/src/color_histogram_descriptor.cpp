@@ -70,8 +70,8 @@ class ColorHistogramDescriptorNode
     }
     samplereturn_msgs::PatchArray out_pa_msg;
     if (enable_debug_) {
-      debug_image_ = cv::Mat::zeros(msg->patch_array[0].cam_info.height,
-          msg->patch_array[0].cam_info.width, CV_8UC3);
+      debug_image_ = cv::Mat::zeros(msg->cam_info.height,
+          msg->cam_info.width, CV_8UC3);
     }
     for (size_t i = 0; i < msg->patch_array.size(); i++) {
       cv_bridge::CvImageConstPtr cv_ptr_mask, cv_ptr_img;
@@ -175,12 +175,12 @@ class ColorHistogramDescriptorNode
       if (is_sample)
       {
         samplereturn_msgs::NamedPoint np_msg;
-        np_msg.header.stamp = msg->patch_array[i].header.stamp;
+        np_msg.header.stamp = msg->header.stamp;
         //np_msg.header.frame_id = "odom";
         np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
         np_msg.point = msg->patch_array[i].world_point.point;
         hh_inner.to_msg(&np_msg.model.hue);
-        np_msg.sensor_frame = msg->patch_array[i].header.frame_id;
+        np_msg.sensor_frame = msg->header.frame_id;
         pub_named_point.publish(np_msg);
       }
       else if(enable_debug_)
@@ -200,7 +200,7 @@ class ColorHistogramDescriptorNode
     }
     if (enable_debug_) {
       sensor_msgs::ImagePtr debug_image_msg =
-        cv_bridge::CvImage(msg->patch_array[0].header,"rgb8",debug_image_).toImageMsg();
+        cv_bridge::CvImage(msg->header,"rgb8",debug_image_).toImageMsg();
       pub_debug_image.publish(debug_image_msg);
     }
   }
