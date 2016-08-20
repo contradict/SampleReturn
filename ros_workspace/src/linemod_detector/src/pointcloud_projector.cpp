@@ -148,12 +148,19 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
         cv::Rect rect;
         computeBoundingBox(cv_ptr_mask->image, &rect);
 
+        cv::Point2d patch_origin(patch.image_roi.x_offset,
+                patch.image_roi.y_offset);
         std::vector<cv::Point2d> rpoints;
-        rpoints.push_back(cv::Point2d(rect.x,            rect.y));
-        rpoints.push_back(cv::Point2d(rect.x,            rect.y+rect.height));
-        rpoints.push_back(cv::Point2d(rect.x+rect.width, rect.y+rect.height));
-        rpoints.push_back(cv::Point2d(rect.x+rect.width, rect.y));
+        rpoints.push_back(cv::Point2d(rect.x,            rect.y) +
+                patch_origin);
+        rpoints.push_back(cv::Point2d(rect.x,            rect.y+rect.height) +
+                patch_origin);
+        rpoints.push_back(cv::Point2d(rect.x+rect.width, rect.y+rect.height) +
+                patch_origin);
+        rpoints.push_back(cv::Point2d(rect.x+rect.width, rect.y) +
+                patch_origin);
         std::vector<Eigen::Vector3d> rays;
+        rays.resize(rpoints.size());
         std::transform(rpoints.begin(), rpoints.end(), rays.begin(),
                 [model, patches_msg, this](cv::Point2d uv) -> Eigen::Vector3d
                 {
