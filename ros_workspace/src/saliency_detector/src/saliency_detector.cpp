@@ -6,6 +6,7 @@
 #include <samplereturn_msgs/PatchArray.h>
 #include <samplereturn_msgs/SearchAreaCheck.h>
 #include <image_transport/image_transport.h>
+#include <platform_motion_msgs/Enable.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/saliency_detector_paramsConfig.h>
@@ -19,6 +20,7 @@ class SaliencyDetectorNode
   image_transport::ImageTransport *it;
   image_transport::CameraSubscriber sub_img;
   ros::Subscriber sub_search_area_check;
+  ros::ServiceServer enable_service;
   ros::Publisher pub_bms_img;
   ros::Publisher pub_patch_array;
 
@@ -28,6 +30,7 @@ class SaliencyDetectorNode
 
   std::string position_;
   bool blocked_;
+  bool enabled_;
 
   dynamic_reconfigure::Server<saliency_detector::saliency_detector_paramsConfig> dr_srv;
   saliency_detector::saliency_detector_paramsConfig config_;
@@ -58,6 +61,10 @@ class SaliencyDetectorNode
 
     pub_patch_array =
       nh.advertise<samplereturn_msgs::PatchArray>("patch_array", 3);
+
+    ros::NodeHandle pnh("~");
+    enable_service = pnh.advertiseService("enable", &SaliencyDetectorNode::service_enable, this);
+    pnh.param("start_enabled", enabled_, true);
   }
 
   void searchAreaCheckCallback(const samplereturn_msgs::SearchAreaCheckPtr& msg)
@@ -79,6 +86,11 @@ class SaliencyDetectorNode
       ROS_DEBUG("%s is blocked by obstacle", position_.c_str());
       return;
     }
+    if (!enabled_) {
+      ROS_DEBUG("%s is disabled", position_.c_str());
+      return;
+    }
+
 
     saliency_mutex_.lock();
 
@@ -242,6 +254,15 @@ class SaliencyDetectorNode
 
     saliency_mutex_.unlock();
   }
+
+  bool
+  service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
+  {
+    enabled_ = req.state;
+    resp.state = req.state;
+    return true;
+  }
+
 };
 
 int main(int argc, char **argv)
