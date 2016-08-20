@@ -335,11 +335,11 @@ class LineMOD_Detector
         }
         if (draw_rect.x + draw_rect.width > debug_image.cols) {
           draw_w_off = draw_rect.x + draw_rect.width - debug_image.cols;
-          draw_rect.width = debug_image.cols;
+          draw_rect.width -= draw_w_off;
         }
         if (draw_rect.y + draw_rect.height > debug_image.rows) {
           draw_h_off = draw_rect.y + draw_rect.height - debug_image.rows;
-          draw_rect.height = debug_image.rows;
+          draw_rect.height -= draw_h_off;
         }
 
         drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
