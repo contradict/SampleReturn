@@ -199,8 +199,6 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
 
         if(debug_points_out.getNumSubscribers()>0)
         {
-            pcl::PointCloud<pcl::PointXYZRGB>::Ptr colorpoints(new pcl::PointCloud<pcl::PointXYZRGB>);
-            pcl::fromROSMsg(*points_msg, *colorpoints);
             pcl::PointCloud<pcl::PointXYZRGB> clipped_pts;
             pcl::ExtractIndices<pcl::PointXYZRGB> extract;
             extract.setInputCloud(colorpoints);
