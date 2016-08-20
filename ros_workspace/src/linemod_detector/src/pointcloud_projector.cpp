@@ -176,13 +176,25 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                 });
 
         pcl::PointIndices::Ptr clipped(new pcl::PointIndices);
-        for(int i=0;i<4;i++)
+        for(size_t i=0;i<rays.size()+1;i++)
         {
             Eigen::Vector4f plane;
-            plane.segment<3>(0) = rays[i].cross(rays[(i+1)%4]).cast<float>();
-            plane[3] = -float(camera_origin[2]);
-            pcl::PlaneClipper3D<pcl::PointXYZ> clip(plane);
-            clip.clipPointCloud3D(points,  clipped->indices, clipped->indices);
+            if(i<rays.size())
+            {
+                plane.segment<3>(0) = -rays[i].cross(rays[(i+1)%4]).cast<float>();
+                plane[3] = -plane.segment<3>(0).dot(camera_origin.cast<float>());
+            }
+            else
+            {
+                plane << 0,0,1,0;
+            }
+            pcl::PlaneClipper3D<pcl::PointXYZRGB> clip(plane);
+            std::vector<int> newclipped;
+            clip.clipPointCloud3D(*colorpoints,  newclipped, clipped->indices);
+            clipped->indices.resize(newclipped.size());
+            std::copy(newclipped.begin(), newclipped.end(),
+                    clipped->indices.begin());
+            ROS_DEBUG_STREAM("Clipped to " << clipped->indices.size());
         }
 
         if(debug_points_out.getNumSubscribers()>0)
