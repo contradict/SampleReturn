@@ -1085,7 +1085,7 @@ class RecoveryManager(smach.State):
         if len(userdata.recovery_parameters['simple_moves']) > 0:
             simple_move = userdata.recovery_parameters['simple_moves'].pop(0)
             userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                                  angle = simple_move['angle'],
+                                                  angle = np.radians(simple_move['angle']),
                                                   distance = simple_move['distance'],
                                                   velocity = simple_move['velocity'])
             return 'simple_move'
