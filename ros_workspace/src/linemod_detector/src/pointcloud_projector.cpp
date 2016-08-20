@@ -223,6 +223,57 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
             debug_points_out.publish( clipped_msg );
         }
 
+        // compute suitable z value for this patch
+        // First, find min, max and sum
+        typedef std::tuple<float, float, float> stats_tuple;
+        stats_tuple z_stats = std::accumulate(
+                clipped->indices.begin(), clipped->indices.end(),
+                std::make_tuple(std::numeric_limits<float>().max(),
+                                std::numeric_limits<float>().min(),
+                                0.0f),
+                [colorpoints](stats_tuple sum, int idx) -> stats_tuple
+                {
+                    return std::make_tuple(
+                        std::min(std::get<0>(sum), colorpoints->points[idx].z),
+                        std::max(std::get<1>(sum), colorpoints->points[idx].z),
+                        std::get<2>(sum) + colorpoints->points[idx].z);
+                });
+        // use sum to find mean
+        float z_mean = std::get<2>(z_stats)/colorpoints->size();
+        float z_max = std::get<1>(z_stats);
+        // build histogram of values larger than mean
+        const int NHIST = 20;
+        int z_hist[NHIST];
+        bzero(z_hist, NHIST);
+        std::accumulate(clipped->indices.begin(), clipped->indices.end(), z_hist,
+                [colorpoints, z_mean, z_max](int *z_hist, int idx) -> int *
+                {
+                    float z = colorpoints->points[idx].z;
+                    if(z>z_mean)
+                    {
+                        int zidx = floor((z-z_mean)*NHIST/(z_max-z_mean));
+                        z_hist[zidx] ++;
+                    }
+                    return z_hist;
+                });
+        // select the most common value larger than the mean
+        int * argmax = std::max_element( z_hist, z_hist + NHIST );
+        float z_peak = (argmax - z_hist)*(z_max - z_mean)/NHIST + z_mean;
+
+        // project center of patch until it hits z_peak
+        cv::Point2d uv(rect.x + rect.width/2, rect.y + rect.height/2);
+        cv::Point3d cvxyz = model.projectPixelTo3dRay(uv + patch_origin);
+        Eigen::Vector3d xyz(cvxyz.x, cvxyz.y, cvxyz.z);
+        double r = (z_peak - camera_origin.z())/xyz.z();
+        // finally, compute expected object position
+        Eigen::Vector3d object_position = camera_origin + r*xyz;
+
+        // put corresponding point_stamped in output message
+        tf::Stamped<tf::Point> point(
+                tf::Point(object_position.x(), object_position.y(), object_position.z()),
+                patches_msg->header.stamp,
+                clipping_frame_id_);
+        tf::pointStampedTFToMsg(point, positioned_patch.world_point);
         positioned_patches.patch_array.push_back(positioned_patch);
     }
 
