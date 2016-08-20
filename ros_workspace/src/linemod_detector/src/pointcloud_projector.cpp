@@ -200,7 +200,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
             }
             else
             {
-                plane << 0,0,1,0;
+                plane << 0,0,1, config_.bottom_clipping_depth;
             }
             pcl::PlaneClipper3D<pcl::PointXYZRGB> clip(plane);
             std::vector<int> newclipped;
