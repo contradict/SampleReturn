@@ -49,6 +49,7 @@
         machine="search"
         ns="/processes/sample_detection/manipulator">
         <remap from="projected_patch_array" to="positioned_patches"/>
+        <param name="output_frame_id" type="string" value="odom"/>
         <param name="min_target_hue" type="double" value="120"/>
         <param name="max_target_hue" type="double" value="30"/>
         <param name="min_color_saturation" type="double" value="100"/>
