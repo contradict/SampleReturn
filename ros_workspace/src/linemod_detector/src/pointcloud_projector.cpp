@@ -9,6 +9,7 @@
 #include <pcl/filters/impl/plane_clipper3D.hpp>
 #include <pcl/filters/extract_indices.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/transforms.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/exact_time.h>
@@ -17,6 +18,8 @@
 #include <tf/transform_listener.h>
 #include <tf/transform_datatypes.h>
 #include <tf_conversions/tf_eigen.h>
+#include <dynamic_reconfigure/server.h>
+#include <linemod_detector/PointCloudProjectorConfig.h>
 
 namespace linemod_detector {
 
@@ -26,8 +29,11 @@ class PointCloudProjector {
     typedef message_filters::sync_policies::ExactTime<sensor_msgs::PointCloud2, samplereturn_msgs::PatchArray> ExactSyncPolicy;
     message_filters::Synchronizer<ExactSyncPolicy> sync;
     ros::ServiceServer enable_service;
+    dynamic_reconfigure::Server<PointCloudProjectorConfig> reconfigure_server;
 
     bool enabled_;
+
+    PointCloudProjectorConfig config_;
 
     tf::TransformListener listener_;
 
@@ -41,6 +47,8 @@ class PointCloudProjector {
             const samplereturn_msgs::PatchArrayConstPtr& patches_msg);
     bool
     enable(platform_motion_msgs::Enable::Request& req, platform_motion_msgs::Enable::Response& resp);
+    void
+    configure_callback(PointCloudProjectorConfig &config, uint32_t level);
 
     public:
     PointCloudProjector(ros::NodeHandle nh);
@@ -66,7 +74,14 @@ PointCloudProjector::PointCloudProjector(ros::NodeHandle nh) :
     {
         enabled_ = false;
     }
+    reconfigure_server.setCallback(boost::bind(&PointCloudProjector::configure_callback, this,  _1, _2));
     enable_service = pnh.advertiseService( "enable", &PointCloudProjector::enable, this);
+}
+
+void
+PointCloudProjector::configure_callback(PointCloudProjectorConfig &config, uint32_t level)
+{
+    config_ = config;
 }
 
 bool
@@ -109,8 +124,15 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
     Eigen::Vector3d camera_origin;
     tf::vectorTFToEigen(camera.getOrigin(), camera_origin);
 
-    pcl::PointCloud<pcl::PointXYZ> points;
-    pcl::fromROSMsg(*points_msg, points);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr colorpoints(new pcl::PointCloud<pcl::PointXYZRGB>),
+        points_native(new pcl::PointCloud<pcl::PointXYZRGB>),
+        points_scaled(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::fromROSMsg(*points_msg, *points_native);
+    Eigen::Transform<float, 3, Eigen::Affine> trans;
+    trans.setIdentity();
+    trans.scale(config_.pointcloud_scale);
+    pcl::transformPointCloud(*points_native, *points_scaled, trans);
+    pcl_ros::transformPointCloud(clipping_frame_id_, *points_scaled, *colorpoints, listener_);
 
     for(const auto& patch : patches_msg->patch_array)
     {

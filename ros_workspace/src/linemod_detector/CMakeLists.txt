@@ -67,7 +67,10 @@ add_definitions("-std=c++11" "-Wall")
 # )
 #
 
-generate_dynamic_reconfigure_options(cfg/Linemod.cfg)
+generate_dynamic_reconfigure_options(
+    cfg/Linemod.cfg
+    cfg/PointCloudProjector.cfg
+    )
 
 ###################################
 ## catkin specific configuration ##
@@ -116,6 +119,7 @@ add_executable(pointcloud_projector
 add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
 add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)
 add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencfg)
+add_dependencies(pointcloud_projector ${PROJECT_NAME}_gencfg)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(cv_test_node cv_test_generate_messages_cpp)
