@@ -87,7 +87,7 @@ class SaliencyDetectorNode
     ROS_DEBUG("messageCallback");
     cv_bridge::CvImagePtr cv_ptr;
     try {
-      cv_ptr = cv_bridge::toCvCopy(msg, "");
+      cv_ptr = cv_bridge::toCvCopy(msg, "rgb8");
     }
     catch (cv_bridge::Exception& e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
