@@ -53,7 +53,7 @@
         <param name="high_saturation_limit" type="double" value="0.7"/>
         <param name="low_saturation_limit" type="double" value="0.5"/>
         <param name="min_inner_outer_distance" type="double" value="0.9"/>
-        <param name="max_exemplar_distance" type="double" value="0.7"/>
+        <param name="max_exemplar_distance" type="double" value="0.21"/>
     </node>
 
     <node
@@ -81,7 +81,7 @@
         <param name="min_inner_outer_distance" type="double" value="0.5"/>
         <param name="pub_threshold" type="double" value="85.0"/>
         <param name="rectify_patch" type="bool" value="false"/>
-        <param name="target_width" type="double" value="150.0"/>
+        <param name="target_width" type="double" value="100.0"/>
     </node>
 
     <node
