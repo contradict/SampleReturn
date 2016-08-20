@@ -36,7 +36,7 @@
     <include file="$(find samplereturn)/launch/audio.launch"/>
     
     <include file="$(find saliency_detector)/launch/filter_saliency_detector.launch"/>
-    <include file="$(find linemod_detector)/launch/manipulator_linemod_2d.launch"/>
+    <include file="$(find sample_detection)/launch/manipulator_sample_detection.launch"/>
 
     <include file="$(find samplereturn)/launch/imu.launch"/>
     <include file="$(find kvh_fog)/launch/fog.launch"/>
