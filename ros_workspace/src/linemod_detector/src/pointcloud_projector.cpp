@@ -20,6 +20,7 @@
 #include <tf_conversions/tf_eigen.h>
 #include <dynamic_reconfigure/server.h>
 #include <linemod_detector/PointCloudProjectorConfig.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace linemod_detector {
 
@@ -39,6 +40,7 @@ class PointCloudProjector {
 
     ros::Publisher patches_out;
     ros::Publisher debug_points_out;
+    ros::Publisher debug_marker_out;
 
     std::string clipping_frame_id_;
     std::string output_frame_id_;
@@ -62,6 +64,7 @@ PointCloudProjector::PointCloudProjector(ros::NodeHandle nh) :
 {
     patches_out = nh.advertise<samplereturn_msgs::PatchArray>("positioned_patches", 1);
     debug_points_out = nh.advertise<sensor_msgs::PointCloud2>("debug_pointcloud", 1);
+    debug_marker_out = nh.advertise<visualization_msgs::MarkerArray>("debug_marker", 1);
     sync.registerCallback(boost::bind(&PointCloudProjector::synchronized_callback, this, _1, _2));
     ros::NodeHandle pnh("~");
     pnh.param("clipping_frame_id", clipping_frame_id_, std::string("base_link"));
@@ -115,6 +118,9 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
     positioned_patches.header = patches_msg->header;
     positioned_patches.cam_info = patches_msg->cam_info;
 
+    // create marker array debug message
+    visualization_msgs::MarkerArray vis_markers;
+
     // create camera model object
     image_geometry::PinholeCameraModel model;
     model.fromCameraInfo(patches_msg->cam_info);
@@ -143,6 +149,8 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
     pcl::transformPointCloud(*points_native, *points_scaled, trans);
     pcl_ros::transformPointCloud(clipping_frame_id_, *points_scaled, *colorpoints, listener_);
 
+    // id counter for debug markers
+    int mid = 0;
     for(const auto& patch : patches_msg->patch_array)
     {
         samplereturn_msgs::Patch positioned_patch(patch);
@@ -318,9 +326,31 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
             tf::pointStampedTFToMsg(point, positioned_patch.world_point);
         }
         positioned_patches.patch_array.push_back(positioned_patch);
+
+        if(debug_marker_out.getNumSubscribers()>0)
+        {
+            visualization_msgs::Marker marker;
+            marker.id = mid++;
+            marker.type = visualization_msgs::Marker::SPHERE;
+            marker.action = visualization_msgs::Marker::ADD;
+            marker.header = positioned_patch.world_point.header;
+            marker.pose.position = positioned_patch.world_point.point;
+            marker.scale.x = 0.02;
+            marker.scale.y = 0.02;
+            marker.scale.z = 0.02;
+            marker.color.r = 0.0;
+            marker.color.g = 0.0;
+            marker.color.b = 1.0;
+            marker.color.a = 1.0;
+            vis_markers.markers.push_back(marker);
+        }
     }
 
     patches_out.publish( positioned_patches );
+    if(debug_marker_out.getNumSubscribers()>0)
+    {
+        debug_marker_out.publish(vis_markers);
+    }
 }
 
 }
