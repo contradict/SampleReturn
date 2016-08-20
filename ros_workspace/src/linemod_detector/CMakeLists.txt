@@ -164,7 +164,12 @@ target_link_libraries(pointcloud_projector
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS new_modalities linemod_trainer linemod_detector linemod_detector_2d
+install(TARGETS
+    new_modalities
+    linemod_trainer
+    linemod_detector
+    linemod_detector_2d
+    pointcloud_projector
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
