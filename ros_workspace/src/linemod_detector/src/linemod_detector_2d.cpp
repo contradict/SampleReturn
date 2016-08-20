@@ -498,7 +498,7 @@ class LineMOD_Detector
         color = COLORS[0];
       }
       else if (similarity > _config.matching_threshold) {
-        color = COLORS[5];
+        color = COLORS[4];
       }
       else {
         ROS_ERROR("Call to drawResponse with below matching response");
