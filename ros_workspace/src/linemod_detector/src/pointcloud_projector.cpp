@@ -41,6 +41,7 @@ class PointCloudProjector {
     ros::Publisher debug_points_out;
 
     std::string clipping_frame_id_;
+    std::string output_frame_id_;
 
     void
     synchronized_callback(const sensor_msgs::PointCloud2ConstPtr& points_msg,
@@ -64,6 +65,7 @@ PointCloudProjector::PointCloudProjector(ros::NodeHandle nh) :
     sync.registerCallback(boost::bind(&PointCloudProjector::synchronized_callback, this, _1, _2));
     ros::NodeHandle pnh("~");
     pnh.param("clipping_frame_id", clipping_frame_id_, std::string("base_link"));
+    pnh.param("output_frame_id", output_frame_id_, std::string("odom"));
     if(!pnh.param("start_enabled", true))
     {
         enabled_ = true;
@@ -305,7 +307,16 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                 object_position,
                 patches_msg->header.stamp,
                 clipping_frame_id_);
-        tf::pointStampedTFToMsg(point, positioned_patch.world_point);
+        if(listener_.canTransform(output_frame_id_, point.frame_id_, point.stamp_))
+        {
+            tf::Stamped<tf::Vector3> output_point;
+            listener_.transformVector(output_frame_id_, point, output_point);
+            tf::pointStampedTFToMsg(output_point, positioned_patch.world_point);
+        }
+        else
+        {
+            tf::pointStampedTFToMsg(point, positioned_patch.world_point);
+        }
         positioned_patches.patch_array.push_back(positioned_patch);
     }
 
