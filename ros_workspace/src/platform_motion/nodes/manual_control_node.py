@@ -171,7 +171,7 @@ class ManualController(object):
                 return 'succeeded'
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
-                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True),
                                                             response_cb = enable_detector_cb,
@@ -214,7 +214,7 @@ class ManualController(object):
                                    transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
 
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
-                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'SELECT_JOYSTICK',

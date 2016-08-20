@@ -240,7 +240,7 @@ class PursueSample(object):
 
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
-                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
                                      transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
@@ -385,7 +385,7 @@ class PursueSample(object):
 
             #beginning of clean exit path
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
-                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'ANNOUNCE_CONTINUE',

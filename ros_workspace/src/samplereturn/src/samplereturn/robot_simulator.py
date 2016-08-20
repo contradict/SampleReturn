@@ -112,9 +112,8 @@ class RobotSimulator(object):
         enable_wheelpods_name = "/motion/wheel_pods/enable"
         enable_carousel_name = "/motion/carousel/enable"
 
-        enable_manipulator_detector_name = "/processes/sample_detection/manipulator/manipulator_linemod_detector_2d/enable"
-        enable_hard_manipulator_detector_name = "/processes/sample_detection/manipulator/hard_manipulator_linemod_detector_2d/enable"
-        
+        enable_manipulator_detector_name = "/processes/sample_detection/manipulator/saliency_detector/enable"
+                
         enable_search_center_name = "/cameras/search/center/basler_camera/enable_publish"
         enable_search_port_name = "/cameras/search/port/basler_camera/enable_publish"
         enable_search_starboard_name = "/cameras/search/starboard/basler_camera/enable_publish"
@@ -233,9 +232,6 @@ class RobotSimulator(object):
         rospy.Service(enable_manipulator_detector_name,
                       samplereturn_srv.Enable,
                       self.enable_manipulator_detector)
-        rospy.Service(enable_hard_manipulator_detector_name,
-                      samplereturn_srv.Enable,
-                      self.enable_hard_manipulator_detector)
         self.manipulator_detector_enabled = False
         
         #publisher for blank images to sun_pointing
@@ -771,11 +767,6 @@ class RobotSimulator(object):
         rospy.sleep(0.25)
         return req.state
 
-    def enable_hard_manipulator_detector(self, req):
-        self.manipulator_detector_enabled = req.state
-        rospy.sleep(0.25)
-        return req.state
-    
     #camera enable handlers
     def service_enable_search_center_request(self, req):
         rospy.sleep(0.05)
