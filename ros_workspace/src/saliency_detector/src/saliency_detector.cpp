@@ -118,7 +118,7 @@ class SaliencyDetectorNode
 
     // Detect blobs matching criteria
     blob->detect(saliency_map, kp);
-    ROS_INFO("Keypoints Detected: %lu", kp.size());
+    ROS_DEBUG("Keypoints Detected: %lu", kp.size());
     ROS_DEBUG("End Blob Comp");
 
     // Scale back up
