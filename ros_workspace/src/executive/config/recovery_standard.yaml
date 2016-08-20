@@ -5,15 +5,15 @@
 #Use with extreme caution, no obstacle checking.
 #example: - { angle: 45, distance: 2.0, velocity: 0.2 }
 simple_moves: [
-    #{ angle: 45, distance: 2.0, velocity: 0.2 }
+    { angle: 3.1, distance: 6.0, velocity: 0.2 }
 ]
 
 #These moves are executed with VFH control. Rotations
 #and distance all specified relative to base_link.
 #example: - { rotate: -45, distance: 10 }
 moves: [
-    { rotate: -170, distance: 2 },
-    { rotate: -90, distance: 2 }
+    #{ rotate: -170, distance: 2 },
+    #{ rotate: -90, distance: 2 }
 ]
 
 #Pursue samples during the recovery moves?
@@ -23,11 +23,11 @@ pursue_samples: true
 
 #A value of 1 gets rid of the rest of the raster on the
 #current spoke.  Only useful if exiting to web_manager.
-slices_to_remove: 5
+slices_to_remove: 15 
 
 #Add the indices of web slices to be appended to remaining
 #list of indices.  New indices added to front of list
-slices_to_add: [1]
+slices_to_add: [9]
 
 #Time offset: modify time remaining by this many minutes
 time_offset: 0

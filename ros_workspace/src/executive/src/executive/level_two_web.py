@@ -123,8 +123,10 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
 
         #dismount move
-        self.state_machine.userdata.dismount_move = node_params.dismount_move
-
+        dismount_move =  node_params.dismount_move
+        dismount_move['angle'] = np.radians(dismount_move['angle'])
+        self.state_machine.userdata.dismount_move = dismount_move
+        
         #beacon and localization
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
         self.state_machine.userdata.beacon_observation_delay = rospy.Duration(node_params.beacon_observation_delay)
@@ -1049,26 +1051,27 @@ class RecoveryManager(smach.State):
             #prune requested web_slices
             web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
             slices_to_add = userdata.recovery_parameters['slices_to_add']
-            if web_slices_to_remove > 0:
-                userdata.raster_active = False
-                userdata.raster_points = deque()
-                userdata.outbound = True
-                point = get_polar_point(userdata.web_slices[userdata.web_slice_indices[0]]['end_angle'],
-                                        userdata.spoke_hub_radius,
-                                        userdata.world_fixed_frame)
-                self.exit_move = point
-                while web_slices_to_remove > 0:
-                    #current spoke is leftmost index
-                    if len(userdata.web_slice_indices) > 0:
-                        userdata.web_slice_indices.popleft()
-                    web_slices_to_remove -= 1
-
-            elif len(slices_to_add) > 0:
-                #if we don't remove any spokes, we must add new slices after index 0
-                slices_to_add.insert(0, userdata.web_slice_indices.popleft())
+            if len(userdata.web_slice_indices) > 0:
+                if web_slices_to_remove > 0:
+                    userdata.raster_active = False
+                    userdata.raster_points = deque()
+                    userdata.outbound = True
+                    point = get_polar_point(userdata.web_slices[userdata.web_slice_indices[0]]['end_angle'],
+                                            userdata.spoke_hub_radius,
+                                            userdata.world_fixed_frame)
+                    self.exit_move = point
+                    while web_slices_to_remove > 0:
+                        #current spoke is leftmost index
+                        if len(userdata.web_slice_indices) > 0:
+                            userdata.web_slice_indices.popleft()
+                        web_slices_to_remove -= 1
+                elif len(slices_to_add) > 0:
+                    #if we don't remove any spokes, we must add new slices after index 0
+                    slices_to_add.insert(0, userdata.web_slice_indices.popleft())
 
             while (len(slices_to_add)>0):
-                userdata.web_slice_indices.appendleft(slices_to_add.pop())                
+                if slices_to_add[-1] < len(userdata.web_slices):
+                        userdata.web_slice_indices.appendleft(slices_to_add.pop())                
 
         #set the move manager key for the move mux
         userdata.active_manager = userdata.manager_dict[self.label]
