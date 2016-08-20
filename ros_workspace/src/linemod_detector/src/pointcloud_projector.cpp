@@ -300,6 +300,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                 patches_msg->header.frame_id);
         tf::Stamped<tf::Vector3> clipping_ray;
         listener_.transformVector( clipping_frame_id_, patch_ray, clipping_ray);
+        clipping_ray.normalize();
         double r = (z_peak - camera_origin.z())/clipping_ray.z();
         // finally, compute expected object position
         tf::Stamped<tf::Vector3> stamped_camera_origin(
@@ -307,10 +308,12 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                     camera_origin.y(),
                     camera_origin.z()),
                 patches_msg->header.stamp,
-                patches_msg->header.frame_id);
+                clipping_frame_id_);
 
         tf::Vector3 object_position = stamped_camera_origin + r*clipping_ray;
 
+        ROS_DEBUG_STREAM("patch_ray: (" <<
+                patch_ray.x() << ", " << patch_ray.y() << ", " << patch_ray.z() << ") ");
         ROS_DEBUG_STREAM("clipping_ray: (" <<
                 clipping_ray.x() << ", " << clipping_ray.y() << ", " << clipping_ray.z() << ") " << " z_peak: " << z_peak << " r: " << r);
 
