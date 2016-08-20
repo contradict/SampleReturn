@@ -239,7 +239,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                         std::get<2>(sum) + colorpoints->points[idx].z);
                 });
         // use sum to find mean
-        float z_mean = std::get<2>(z_stats)/colorpoints->size();
+        float z_mean = std::get<2>(z_stats)/float(clipped->indices.size());
         float z_max = std::get<1>(z_stats);
         // build histogram of values larger than mean
         const int NHIST = 20;
