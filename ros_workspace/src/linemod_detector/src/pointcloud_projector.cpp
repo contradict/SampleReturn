@@ -281,14 +281,28 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
         // project center of patch until it hits z_peak
         cv::Point2d uv(rect.x + rect.width/2, rect.y + rect.height/2);
         cv::Point3d cvxyz = model.projectPixelTo3dRay(uv + patch_origin);
-        Eigen::Vector3d xyz(cvxyz.x, cvxyz.y, cvxyz.z);
-        double r = (z_peak - camera_origin.z())/xyz.z();
+        tf::Stamped<tf::Vector3> patch_ray(tf::Vector3(cvxyz.x, cvxyz.y, cvxyz.z),
+                patches_msg->header.stamp,
+                patches_msg->header.frame_id);
+        tf::Stamped<tf::Vector3> clipping_ray;
+        listener_.transformVector( clipping_frame_id_, patch_ray, clipping_ray);
+        double r = (z_peak - camera_origin.z())/clipping_ray.z();
         // finally, compute expected object position
-        Eigen::Vector3d object_position = camera_origin + r*xyz;
+        tf::Stamped<tf::Vector3> stamped_camera_origin(
+                tf::Vector3(camera_origin.x(),
+                    camera_origin.y(),
+                    camera_origin.z()),
+                patches_msg->header.stamp,
+                patches_msg->header.frame_id);
+
+        tf::Vector3 object_position = stamped_camera_origin + r*clipping_ray;
+
+        ROS_DEBUG_STREAM("clipping_ray: (" <<
+                clipping_ray.x() << ", " << clipping_ray.y() << ", " << clipping_ray.z() << ") " << " z_peak: " << z_peak << " r: " << r);
 
         // put corresponding point_stamped in output message
-        tf::Stamped<tf::Point> point(
-                tf::Point(object_position.x(), object_position.y(), object_position.z()),
+        tf::Stamped<tf::Vector3> point(
+                object_position,
                 patches_msg->header.stamp,
                 clipping_frame_id_);
         tf::pointStampedTFToMsg(point, positioned_patch.world_point);
