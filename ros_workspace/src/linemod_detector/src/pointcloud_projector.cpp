@@ -81,6 +81,7 @@ PointCloudProjector::PointCloudProjector(ros::NodeHandle nh) :
 void
 PointCloudProjector::configure_callback(PointCloudProjectorConfig &config, uint32_t level)
 {
+    (void)level;
     config_ = config;
 }
 
@@ -107,27 +108,33 @@ void
 PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPtr& points_msg,
         const samplereturn_msgs::PatchArrayConstPtr& patches_msg)
 {
+    // create patch output message
     samplereturn_msgs::PatchArray positioned_patches;
     positioned_patches.header = patches_msg->header;
     positioned_patches.cam_info = patches_msg->cam_info;
 
+    // create camera model object
     image_geometry::PinholeCameraModel model;
     model.fromCameraInfo(patches_msg->cam_info);
 
+    // ensure tf is ready
     if(!listener_.canTransform(clipping_frame_id_, patches_msg->header.frame_id,
                 patches_msg->header.stamp))
         return;
 
+    // get camera origin in clipping frame
     tf::StampedTransform camera;
     listener_.lookupTransform(clipping_frame_id_, patches_msg->header.frame_id,
             patches_msg->header.stamp, camera);
     Eigen::Vector3d camera_origin;
     tf::vectorTFToEigen(camera.getOrigin(), camera_origin);
 
+    // scale and transform pointcloud into clipping frame
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr colorpoints(new pcl::PointCloud<pcl::PointXYZRGB>),
         points_native(new pcl::PointCloud<pcl::PointXYZRGB>),
         points_scaled(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::fromROSMsg(*points_msg, *points_native);
+    // this scale is a horible hack to fix the manipulator point clouds
     Eigen::Transform<float, 3, Eigen::Affine> trans;
     trans.setIdentity();
     trans.scale(config_.pointcloud_scale);
@@ -145,9 +152,12 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
             ROS_ERROR("cv_bridge mask exception: %s", e.what());
             continue;
         }
+
+        // find bounding box of mask
         cv::Rect rect;
         computeBoundingBox(cv_ptr_mask->image, &rect);
 
+        // turn image space bounding box into 4 3d rays
         cv::Point2d patch_origin(patch.image_roi.x_offset,
                 patch.image_roi.y_offset);
         std::vector<cv::Point2d> rpoints;
@@ -175,6 +185,10 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                     return ray;
                 });
 
+        // clip point cloud by the planes of the bounding volume
+        // described by the rays above
+        // Add one more clipping plane at z=0 in the clipping frame
+        // to remove noise points below the ground
         pcl::PointIndices::Ptr clipped(new pcl::PointIndices);
         for(size_t i=0;i<rays.size()+1;i++)
         {
@@ -194,9 +208,9 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
             clipped->indices.resize(newclipped.size());
             std::copy(newclipped.begin(), newclipped.end(),
                     clipped->indices.begin());
-            ROS_DEBUG_STREAM("Clipped to " << clipped->indices.size());
         }
 
+        // publish clipped pointcloud if anybody is listening
         if(debug_points_out.getNumSubscribers()>0)
         {
             pcl::PointCloud<pcl::PointXYZRGB> clipped_pts;
@@ -214,48 +228,6 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
 
     patches_out.publish( positioned_patches );
 }
-
-/*
-
-void publishPoint(cv::RotatedRect rect, std::string class_id,
-      std_msgs::Header header, int sample_id)
-{
-    ROS_DEBUG("Median Disp: %f", median_disp);
-
-    cam_model_.projectDisparityTo3d(cv::Point2d(rect.center.x,rect.center.y),
-            median_disp, xyz);
-    temp_point.point.x = xyz.x;
-    temp_point.point.y = xyz.y;
-    ROS_DEBUG("Projected z: %f", xyz.z);
-    if (xyz.z > max_depth) {
-        temp_point.point.z = max_depth;
-        temp_point.point.x /= (xyz.z/max_depth);
-        temp_point.point.y /= (xyz.z/max_depth);
-    }
-    else if (xyz.z < min_depth) {
-        temp_point.point.z = min_depth;
-        temp_point.point.x /= (xyz.z/min_depth);
-        temp_point.point.y /= (xyz.z/min_depth);
-    }
-    else {
-        temp_point.point.z = xyz.z;
-    }
-    bool wait =
-        listener_.waitForTransform(_detection_frame_id, header.frame_id, header.stamp, ros::Duration(0.03));
-    if (!wait) {
-        return;
-    }
-    listener_.transformPoint(_detection_frame_id, temp_point, odom_point);
-
-    point_msg.name = class_id;
-    point_msg.sample_id = sample_id;
-    point_msg.header = header;
-    point_msg.header.frame_id = _detection_frame_id;
-    point_msg.grip_angle = rect.angle;
-    point_msg.point = odom_point.point;
-    LineMOD_Detector::point_pub.publish(point_msg);
-}
-*/
 
 }
 
