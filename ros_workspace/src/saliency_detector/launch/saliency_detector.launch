@@ -72,6 +72,8 @@
     type="linemod_detector_2d"
     name="hard_linemod_detector_2d"
     ns="/processes/sample_detection/search/$(arg namespace)">
+    <remap from="/processes/sample_detection/search/$(arg namespace)/point"
+      to="/processes/sample_detection/search/named_point"/>
     <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
     <param name="load_inner_linemod" type="bool" value="true"/>
     <param name="pub_threshold" type="double" value="90.0"/>
