@@ -239,26 +239,44 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                         std::get<2>(sum) + colorpoints->points[idx].z);
                 });
         // use sum to find mean
-        float z_mean = std::get<2>(z_stats)/float(clipped->indices.size());
+        float z_min = std::get<0>(z_stats);
         float z_max = std::get<1>(z_stats);
+        float z_mean = std::get<2>(z_stats)/float(clipped->indices.size());
         // build histogram of values larger than mean
+        float hist_min = z_min + (z_mean-z_min)*config_.hist_min_scale;
+        ROS_DEBUG("z_min: %04.3f z_mean: %04.3f z_max: %04.3f z_sum: %4.2f hist_min:%04.3f",
+                z_min, z_mean, z_max, std::get<2>(z_stats), hist_min);
         const int NHIST = 20;
         int z_hist[NHIST];
-        bzero(z_hist, NHIST);
+        bzero(z_hist, NHIST*sizeof(int));
         std::accumulate(clipped->indices.begin(), clipped->indices.end(), z_hist,
-                [colorpoints, z_mean, z_max](int *z_hist, int idx) -> int *
+                [colorpoints, hist_min, z_max](int *z_hist, int idx) -> int *
                 {
                     float z = colorpoints->points[idx].z;
-                    if(z>z_mean)
+                    if(z>hist_min)
                     {
-                        int zidx = floor((z-z_mean)*NHIST/(z_max-z_mean));
+                        int zidx = floor((z-hist_min)*NHIST/(z_max-hist_min));
                         z_hist[zidx] ++;
                     }
                     return z_hist;
                 });
+        char debughist[2048];
+        int pos=0;
+        for(int i=0;i<NHIST;i++)
+        {
+            pos += snprintf(debughist+pos, 2048-pos, "%d, ", z_hist[i]);
+        }
+        debughist[pos] = '\x00';
+        ROS_DEBUG("hist: %s", debughist);
         // select the most common value larger than the mean
         int * argmax = std::max_element( z_hist, z_hist + NHIST );
-        float z_peak = (argmax - z_hist)*(z_max - z_mean)/NHIST + z_mean;
+        ROS_DEBUG("argmax: %d", int(argmax - z_hist));
+        float z_peak = (argmax - z_hist)*(z_max - hist_min)/NHIST + hist_min;
+        if(z_peak>config_.maximum_patch_height)
+        {
+            ROS_INFO("Clipping z to max, was %f", z_peak);
+            z_peak = config_.maximum_patch_height;
+        }
 
         // project center of patch until it hits z_peak
         cv::Point2d uv(rect.x + rect.width/2, rect.y + rect.height/2);
