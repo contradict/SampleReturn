@@ -62,13 +62,13 @@ class SaliencyDetectorNode
 
   void searchAreaCheckCallback(const samplereturn_msgs::SearchAreaCheckPtr& msg)
   {
-    if (position_.compare(std::string("port"))) {
+    if (position_ == "port") {
       blocked_ = msg->port_blocked;
     }
-    else if (position_.compare(std::string("center"))) {
+    else if (position_ == "center") {
       blocked_ = msg->center_blocked;
     }
-    else if (position_.compare(std::string("starboard"))) {
+    else if (position_ == "starboard") {
       blocked_ = msg->starboard_blocked;
     }
   }
