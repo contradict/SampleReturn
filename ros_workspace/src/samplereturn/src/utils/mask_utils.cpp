@@ -1,4 +1,4 @@
-#include <linemod_detector/mask_utils.h>
+#include <samplereturn/mask_utils.h>
 
 #include <ros/console.h>
 
@@ -31,7 +31,16 @@ maskToHull(const cv::Mat& mask_in, std::vector<cv::Point> *hull)
     }
 }
 
-bool computeGripAngle(const cv::Mat& mask, cv::RotatedRect* griprect)
+double unwrap90(double angle)
+{
+    while(angle>M_PI/2)
+        angle -= M_PI;
+    while(angle<-M_PI/2)
+        angle += M_PI;
+    return angle;
+}
+
+bool computeGripAngle(const cv::Mat& mask, cv::RotatedRect* griprect, float *grip_angle)
 {
     std::vector<cv::Point> hull;
     if(!maskToHull(mask, &hull))
@@ -42,7 +51,26 @@ bool computeGripAngle(const cv::Mat& mask, cv::RotatedRect* griprect)
     *griprect = cv::minAreaRect(hull);
     ROS_DEBUG("Measured angle: %f width: %f height: %f",
             griprect->angle, griprect->size.width, griprect->size.height);
+    if(griprect->size.width>griprect->size.height)
+    {
+        *grip_angle = -griprect->angle*M_PI/180+M_PI_2;
+    }
+    else
+    {
+        *grip_angle = -griprect->angle*M_PI/180;
+    }
+    *grip_angle = unwrap90(*grip_angle);
+    ROS_DEBUG("reported angle: %f", *grip_angle);
+
     return true;
+}
+
+void drawGripRect(cv::Mat& debug_image, const cv::RotatedRect& griprect)
+{
+    cv::Mat pts(4,1,CV_32FC2);
+    griprect.points((cv::Point2f*)pts.data);
+    pts.convertTo( pts, CV_32S);
+    cv::polylines(debug_image, (cv::Point2i**)&pts.data, &pts.rows, 1, true, cv::Scalar(255,0,0), 3, CV_AA, 0);
 }
 
 bool computeBoundingBox(const cv::Mat& mask, cv::Rect* rect)

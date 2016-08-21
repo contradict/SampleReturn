@@ -6,7 +6,7 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/color_histogram_descriptor_paramsConfig.h>
-#include <saliency_detector/colormodel.h>
+#include <samplereturn/colormodel.h>
 
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>

@@ -12,12 +12,13 @@ find_package(catkin REQUIRED
         stereo_msgs
         std_msgs
         samplereturn_msgs
+        samplereturn
         image_transport
         cv_bridge
         message_generation
         image_geometry
-        saliency_detector
         tf
+        tf_conversions
         cmake_modules
         dynamic_reconfigure
         pcl_ros
@@ -110,11 +111,11 @@ add_definitions(${Eigen_DEFINITIONS})
  add_executable(linemod_detector src/linemod_detector.cpp)
  add_executable(linemod_detector_2d
      src/linemod_detector_2d.cpp
-     src/mask_utils.cpp)
+     )
  add_executable(stereo_linemod_trainer src/stereo_linemod_trainer.cpp)
 add_executable(pointcloud_projector
     src/pointcloud_projector.cpp
-    src/mask_utils.cpp)
+    )
 
 add_dependencies(linemod_detector ${PROJECT_NAME}_gencpp)
 add_dependencies(linemod_detector_2d ${PROJECT_NAME}_gencpp)

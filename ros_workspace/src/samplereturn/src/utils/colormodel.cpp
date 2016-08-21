@@ -1,4 +1,4 @@
-#include <saliency_detector/colormodel.h>
+#include <samplereturn/colormodel.h>
 
 namespace saliency_detector
 {
