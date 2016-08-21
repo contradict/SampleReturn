@@ -47,7 +47,7 @@ level_two:
         { start_angle: 328, end_angle: 338, min_radius: 67, max_radius: 78, return_on_end: True },
         { start_angle: 315, end_angle: 325, min_radius: 89, max_radius: 100, return_on_end: True },
         { start_angle: 342, end_angle: 352, min_radius: 100, max_radius: 111, return_on_end: True },
-        { start_angle: 359, end_angle: 17, min_radius: 127, max_radius: 145, return_on_end: False },
+        { start_angle: 359, end_angle: 17, min_radius: 131, max_radius: 148, return_on_end: False },
         { start_angle: 5, end_angle: 18, min_radius: 164, max_radius: 176, return_on_end: False }
     ]
 
