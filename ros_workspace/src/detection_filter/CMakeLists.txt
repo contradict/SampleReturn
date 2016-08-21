@@ -82,7 +82,9 @@ add_definitions( -std=gnu++0x )
 
 ## Declare a cpp executable
 #add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
- add_executable(dslr_kalman_filter_node nodes/dslr_kalman_filter_node.cpp)
+ add_executable(dslr_kalman_filter_node
+     nodes/dslr_kalman_filter_node.cpp
+     src/probability.cpp)
  add_executable(manipulator_kalman_filter_node nodes/manipulator_kalman_filter_node.cpp)
 
  #add_dependencies(kalman_filter_node ${PROJECT_NAME}_gencfg)
@@ -132,11 +134,11 @@ install(TARGETS dslr_kalman_filter_node
 )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+  PATTERN ".svn" EXCLUDE
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
