@@ -49,12 +49,13 @@
         machine="search"
         ns="/processes/sample_detection/manipulator">
         <remap from="projected_patch_array" to="positioned_patches"/>
+        <param name="output_frame_id" type="string" value="odom"/>
         <param name="min_target_hue" type="double" value="120"/>
         <param name="max_target_hue" type="double" value="30"/>
         <param name="min_color_saturation" type="double" value="100"/>
         <param name="high_saturation_limit" type="double" value="0.7"/>
         <param name="low_saturation_limit" type="double" value="0.5"/>
-        <param name="min_inner_outer_distance" type="double" value="0.9"/>
+        <param name="min_inner_outer_distance" type="double" value="0.7"/>
         <param name="max_exemplar_distance" type="double" value="0.21"/>
     </node>
 
