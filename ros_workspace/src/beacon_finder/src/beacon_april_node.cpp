@@ -66,6 +66,7 @@ class BeaconAprilDetector{
   double rvec_tolerance_;
   int point_size_;
   int min_tag_size_;
+  int min_tags_;
  protected:
   std::string famname_;
   apriltag_family_t *tag_fam_;
@@ -102,6 +103,7 @@ BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& p
   }
 
   pnh.param("min_tag_size", min_tag_size_, 100);
+  pnh.param("min_tags", min_tags_, 2);
 
   //get tag family parametre
   pnh.param("tag_family", famname_, std::string("tag36h11"));
@@ -201,8 +203,8 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
     double detection_time = (ros::Time::now() - start_time).toSec();
     ROS_DEBUG("APRIL BEACON FINDER tag detection executed in: %lf", detection_time);
   
-    //if less than 3, don't solve
-    if (zarray_size(detections) >= 3) {
+    //if less than min_tags, don't solve
+    if (zarray_size(detections) >= min_tags_) {
       
       model_.fromCameraInfo(cam_info);
       
@@ -273,7 +275,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       
       } //end detections iteration
         
-      //try the multi_tag (3+) solution
+      //try the multi_tag 3d solution
       cv::Vec3d rvec, tvec;
       bool solved = false;
       solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE);
