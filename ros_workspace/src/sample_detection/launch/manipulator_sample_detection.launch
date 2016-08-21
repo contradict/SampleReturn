@@ -58,6 +58,7 @@
         <param name="low_saturation_limit" type="double" value="0.5"/>
         <param name="min_inner_outer_distance" type="double" value="0.7"/>
         <param name="max_exemplar_distance" type="double" value="0.21"/>
+        <param name="compute_grip_angle" type="bool" value="true"/>
     </node>
 
     <node
