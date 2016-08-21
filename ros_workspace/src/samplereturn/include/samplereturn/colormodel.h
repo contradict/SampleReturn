@@ -4,6 +4,8 @@
 #include <opencv2/opencv.hpp>
 #include <samplereturn_msgs/HueHistogram.h>
 
+#pragma once
+
 namespace samplereturn
 {
 
