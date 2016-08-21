@@ -87,8 +87,12 @@ class GroundProjectorNode
   // Use ground plane and camera info to publish a view frustum on the ground
   // in odom. This should be called by the plane update, and listen to blocked
   // search area messages.
-  void publishFrustum(sensor_msgs::CameraInfo cam_info)
+  void publishFrustum(std_msgs::Header plane_header)
   {
+    if (!cam_model_.initialized()) {
+      return;
+    }
+    sensor_msgs::CameraInfo cam_info = cam_model_.cameraInfo();
     // Take corners of image, buffer inward by param
     std::vector<cv::Point2d> corners, rect_corners;
     corners.push_back(cv::Point2d(0 + frustum_buffer_,
@@ -111,11 +115,11 @@ class GroundProjectorNode
     std::vector<Eigen::Vector3d> base_link_rays;
     base_link_rays.resize(corners.size());
     std::transform(corners.begin(), corners.end(), base_link_rays.begin(),
-        [cam_info, this](cv::Point2d uv) -> Eigen::Vector3d
+        [cam_info, plane_header, this](cv::Point2d uv) -> Eigen::Vector3d
         {
           cv::Point3d xyz = cam_model_.projectPixelTo3dRay(uv);
           tf::Stamped<tf::Vector3> vect(tf::Vector3(xyz.x, xyz.y, xyz.z),
-              cam_info.header.stamp,
+              plane_header.stamp,
               cam_info.header.frame_id);
           tf::Stamped<tf::Vector3> vect_t;
           listener_.transformVector("base_link", vect, vect_t);
@@ -141,7 +145,8 @@ class GroundProjectorNode
         });
     // Publish polygon of points
     geometry_msgs::PolygonStamped ground_polygon;
-    ground_polygon.header = cam_info.header;
+    ground_polygon.header.stamp = plane_header.stamp;
+    ground_polygon.header.frame_id = "base_link";
     for (auto pt : ground_points)
     {
       geometry_msgs::Point32 p;
@@ -412,6 +417,9 @@ class GroundProjectorNode
     mark.scale.z = 0.1;
     mark.color.a = 1.0;
     pub_marker.publish(mark);
+
+    // Compute and publish the view frustum, given the ground plane
+    publishFrustum(msg->header);
   }
 
   void configCallback(saliency_detector::ground_projector_paramsConfig &config, uint32_t level)
