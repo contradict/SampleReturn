@@ -322,12 +322,7 @@ class KalmanDetectionFilter
               filter_ptr->errorCovPost.at<float>(0,0) < config_.max_pub_cov) {
             published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
-            point_msg.header.frame_id = _filter_frame_id;
-            point_msg.header.stamp = ros::Time::now();
-            point_msg.point.x = filter_ptr->statePost.at<float>(0);
-            point_msg.point.y = filter_ptr->statePost.at<float>(1);
-            point_msg.point.z = 0;
-            point_msg.filter_id = filter_ptr->filter_id;
+            filter_ptr->toMsg(point_msg, ros::Time::now());
             pub_detection.publish(point_msg);
             return;
           }
@@ -377,12 +372,7 @@ class KalmanDetectionFilter
       published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(nearest_filter->filter_id, nearest_filter));
       current_published_id_ = nearest_id;
       samplereturn_msgs::NamedPoint point_msg;
-      point_msg.header.frame_id = _filter_frame_id;
-      point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = nearest_filter->statePost.at<float>(0);
-      point_msg.point.y = nearest_filter->statePost.at<float>(1);
-      point_msg.point.z = 0;
-      point_msg.filter_id = nearest_filter->filter_id;
+      nearest_filter->toMsg(point_msg, ros::Time::now());
       pub_detection.publish(point_msg);
     }
   }
