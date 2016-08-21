@@ -461,7 +461,7 @@ class KalmanDetectionFilter
     {
       cv::Mat frustum_odom(frustum.second.rows,2,CV_32FC1);
       geometry_msgs::PointStamped temp_msg, temp_msg_odom;
-      temp_msg.header.frame_id = "base_link";
+      temp_msg.header.frame_id = frustum.first;
       temp_msg.header.stamp = ros::Time(0);
       for (int i=0; i<frustum.second.rows; i++) {
         temp_msg.point.x = frustum.second.at<float>(i,0);
