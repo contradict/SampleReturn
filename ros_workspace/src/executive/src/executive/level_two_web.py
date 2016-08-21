@@ -140,7 +140,9 @@ class LevelTwoWeb(object):
         self.recalibrate_threshold = node_params.recalibrate_threshold
 
         #search parameters
+        self.state_machine.userdata.default_velocity = node_params.move_velocity
         self.state_machine.userdata.move_velocity = node_params.move_velocity
+        self.state_machine.userdata.raster_velocity = node_params.raster_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
         self.state_machine.userdata.course_tolerance = None
         self.state_machine.userdata.chord_course_tolerance = node_params.chord_course_tolerance
@@ -638,6 +640,8 @@ class WebManager(smach.State):
                              input_keys = ['outbound',
                                            'web_slices',
                                            'web_slice_indices',
+                                           'default_velocity',
+                                           'raster_velocity',
                                            'raster_active',
                                            'raster_points',
                                            'raster_step',
@@ -655,6 +659,7 @@ class WebManager(smach.State):
                                             'raster_active',
                                             'raster_points',
                                             'move_target',
+                                            'move_velocity',
                                             'course_tolerance',
                                             'allow_rotate_to_clear',
                                             'report_sample',
@@ -686,10 +691,12 @@ class WebManager(smach.State):
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
             userdata.stop_on_detection = False
+            userdata.move_velocity = userdata.default_velocity
             return 'return_home'
         
         if len(userdata.web_slice_indices) == 0:
             rospy.loginfo("WEB_MANAGER finished last spoke")
+            userdata.move_velocity = userdata.default_velocity
             return 'return_home'
         else:
             active_slice = userdata.web_slices[userdata.web_slice_indices[0]] 
@@ -764,8 +771,10 @@ class WebManager(smach.State):
         #use tighter course tolerance for chord moves (no point in getting into next chord)
         if next_move['radial']:
             userdata.allow_rotate_to_clear = True
+            userdata.move_velocity = userdata.default_velocity
         else:
             userdata.course_tolerance = userdata.chord_course_tolerance
+            userdata.move_velocity = userdata.raster_velocity
             userdata.allow_rotate_to_clear = False
         #load the target into move_point, and save the move
         #move_point is consumed by the general move_goal transformer,

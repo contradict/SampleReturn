@@ -6,14 +6,15 @@ executive_master:
 level_two:
     #all values in degrees and meters
     move_velocity: 0.8 
+    raster_velocity: 0.6
     spin_velocity: 0.3
     return_time_minutes: 110 
     #dismount and beacon approach
     dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
     beacon_approach_point: {x: 6.0, y: 0}
     platform_point: {x: -0.9, y: 0.0}
-    beacon_observation_delay: 4 
-    beacon_calibration_delay: 10
+    beacon_observation_delay: 5 
+    beacon_calibration_delay: 30
     beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan.
     #if greater than recalibrate, wait and observe beacon, and set gyro bias

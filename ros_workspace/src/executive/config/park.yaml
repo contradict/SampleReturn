@@ -5,7 +5,8 @@ executive_master:
         
 level_two:
     #all values in degrees and meters
-    move_velocity: 0.8 
+    move_velocity: 0.8
+    raster_velocity: 0.6
     spin_velocity: 0.3
     return_time_minutes: 110 
     #dismount and beacon approach
