@@ -131,6 +131,7 @@ class KalmanDetectionFilter
   {
     // Take in a frustum message, write into matching field in map from frame_id
     std::vector<cv::Point2f> cv_points;
+    cv_points.resize(view_frustum.polygon.points.size());
     std::transform(view_frustum.polygon.points.begin(), view_frustum.polygon.points.end(),
         cv_points.begin(),
         [](geometry_msgs::Point32 pt) -> cv::Point2f
