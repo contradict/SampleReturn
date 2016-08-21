@@ -206,7 +206,7 @@ class RobotSimulator(object):
         self.search_sample_queue = collections.deque()
         self.search_sample_delay = rospy.Duration(3.0)
         self.beacon_pose_queue = collections.deque()
-        self.beacon_pose_delay = rospy.Duration(2.0)
+        self.beacon_pose_delay = rospy.Duration(1.0)
         self.cam_publishers = []
         for topic in cam_status_list:
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
@@ -381,7 +381,7 @@ class RobotSimulator(object):
         self.beacon_debug_pose_pub = rospy.Publisher(beacon_debug_pose_name,
                                                      geometry_msg.PoseStamped,
                                                      queue_size=2)
-        rospy.Timer(rospy.Duration(2.0), self.check_beacon_pose)
+        rospy.Timer(rospy.Duration(1.0), self.check_beacon_pose)
         
         #this should latch and start the sim unpaused
         self.unpause()
