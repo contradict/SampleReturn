@@ -21,6 +21,10 @@ moves: [
 #cancel the remaining recovery moves.
 pursue_samples: true
 
+#Enable beacon camera
+beacon_enabled_on_entry: false
+beacon_enabled_on_exit: false
+
 #A value of 1 gets rid of the rest of the raster on the
 #current spoke.  Only useful if exiting to web_manager.
 slices_to_remove: 15 
