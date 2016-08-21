@@ -325,7 +325,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
         if(listener_.canTransform(output_frame_id_, point.frame_id_, point.stamp_))
         {
             tf::Stamped<tf::Vector3> output_point;
-            listener_.transformVector(output_frame_id_, point, output_point);
+            listener_.transformPoint(output_frame_id_, point, output_point);
             tf::pointStampedTFToMsg(output_point, positioned_patch.world_point);
         }
         else
