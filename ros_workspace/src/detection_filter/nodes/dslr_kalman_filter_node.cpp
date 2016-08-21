@@ -12,7 +12,7 @@
 #include <std_msgs/Bool.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <samplereturn_msgs/NamedPoint.h>
+#include <samplereturn_msgs/NamedPointArray.h>
 #include <samplereturn_msgs/PursuitResult.h>
 #include <geometry_msgs/PolygonStamped.h>
 #include <nav_msgs/Odometry.h>
@@ -33,7 +33,6 @@ class KalmanDetectionFilter
 {
   ros::NodeHandle nh;
   ros::Subscriber sub_detection;
-  ros::Subscriber sub_cam_info;
   ros::Subscriber sub_ack;
   ros::Subscriber sub_odometry;
   ros::Subscriber sub_exclusion_zone;
@@ -45,7 +44,6 @@ class KalmanDetectionFilter
   ros::Publisher pub_frustum_poly;
 
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
-  std::map<std::string, std::vector<std::shared_ptr<ColoredKF> > > not_updated_filter_list_;
   // Exclusion sites are center,radius,id (x,y,r,id,odometer reading)
   std::vector<std::tuple<float,float,float,int16_t,float> > exclusion_list_;
   // Filters that have ever been published, in case we need their position
@@ -86,9 +84,6 @@ class KalmanDetectionFilter
     ros::NodeHandle private_node_handle_("~");
 
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
-
-    sub_cam_info =
-      nh.subscribe("camera_info", 3, &KalmanDetectionFilter::cameraInfoCallback, this);
 
     sub_detection =
       nh.subscribe("named_point", 12, &KalmanDetectionFilter::detectionCallback, this);
@@ -173,7 +168,6 @@ class KalmanDetectionFilter
     if(config.clear_filters) {
       //clear all filters
       filter_list_.clear();
-      not_updated_filter_list_.clear();
       exclusion_list_.clear();
       current_published_id_ = 0;
       config.clear_filters = false;
@@ -247,69 +241,74 @@ class KalmanDetectionFilter
     drawFilterStates();
   }
 
-  void detectionCallback(const samplereturn_msgs::NamedPoint& msg)
+  void detectionCallback(const samplereturn_msgs::NamedPointArrayConstPtr& msg)
   {
     ROS_DEBUG("Detection Callback");
-    if (is_paused_) {
-      return;
-    }
-    if (filter_list_.size() == 0) {
-      addFilter(msg);
-      return;
-    }
-    checkObservation(msg);
-  }
-
-  /* The process tick for all filters */
-  void cameraInfoCallback(const sensor_msgs::CameraInfo& msg)
-  {
-    ROS_DEBUG("Camera Info Callback");
-    // Publish view frustum
-    publishViewFrustum();
-    if (!is_paused_) {
-      if (filter_list_.size()==0) {
-        return;
-      }
-      // Get filters in msg frame that weren't updated, decrement them
-      for (auto ckf : not_updated_filter_list_[msg.header.frame_id]) {
-        ROS_DEBUG("Checking NUF");
-        if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
-          ckf->predict();
-          ckf->errorCovPre.copyTo(ckf->errorCovPost);
-          ckf->certainty = updateProb(ckf->certainty, false, config_.PDgO, config_.PDgo);
-          ROS_DEBUG("Cam Info Updated Prob: %f",ckf->certainty);
-        }
-      }
-      // Clear NUF
-      not_updated_filter_list_[msg.header.frame_id].clear();
-      // Toss too uncertain filters
-      checkFilterAges();
-      // Repopulate NUF for next cycle
-      for (auto ckf : filter_list_) {
-        ROS_DEBUG("Checking Filter to NUF");
-        ROS_DEBUG("%s",ckf->frame_id.c_str());
-        ROS_DEBUG("%s",msg.header.frame_id.c_str());
-        if (ckf->frame_id.compare(msg.header.frame_id) == 0) {
-          ROS_DEBUG("Adding Filter to NUF");
-          not_updated_filter_list_[msg.header.frame_id].push_back(ckf);
-        }
-      }
-      // Manage exclusion zones
-      auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
-          [this](std::tuple<float,float,float,int16_t,float> zone)
-          {return (odometer_ - std::get<4>(zone)) > config_.exclusion_zone_range;});
-      exclusion_list_.erase(new_end, exclusion_list_.end());
-
-      // Update odometer
-      if ((odometer_-last_odometry_tick_) > config_.odometry_tick_dist) {
-        last_odometry_tick_ = odometer_;
-      }
-    }
-
     // Draw in Rviz
     drawFilterStates();
     // Publish top filter for pursuit
     publishTop();
+    // Publish view frustum
+    publishViewFrustum();
+    // no filter changes if paused
+    if (is_paused_) {
+      return;
+    }
+
+    // write down all filters to be sure they get some update
+    std::vector<std::shared_ptr<ColoredKF> > not_updated_filter_list;
+    for (auto ckf : filter_list_) {
+      ROS_DEBUG("Checking Filter to NUF");
+      ROS_DEBUG("%s",ckf->frame_id.c_str());
+      ROS_DEBUG("%s",msg->header.frame_id.c_str());
+      if (ckf->frame_id.compare(msg->header.frame_id) == 0) {
+        ROS_DEBUG("Adding Filter to NUF");
+        not_updated_filter_list.push_back(ckf);
+      }
+    }
+
+    for(const auto& np : msg->points)
+    {
+
+        int filter_id = checkObservation(np);
+
+        // Iterate over appropriate NUF list, remove the matching filter
+        std::vector<std::shared_ptr<ColoredKF> >::iterator iter =
+            not_updated_filter_list.begin();
+        while ( iter != not_updated_filter_list.end() ) {
+            if ((*iter)->filter_id == filter_id) {
+                iter = not_updated_filter_list.erase(iter);
+                break;
+            }
+            ++iter;
+        }
+    }
+
+    // Get filters in msg that weren't updated, decrement them
+    for (auto ckf : not_updated_filter_list)
+    {
+      ROS_DEBUG("Checking NUF");
+      if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
+        ckf->predict();
+        ckf->measure(config_.PDgO, config_.PDgo);
+        ROS_DEBUG("Negative observation Updated Prob: %f",ckf->certainty);
+      }
+    }
+
+    // Toss too uncertain filters
+    checkFilterAges();
+
+    // Manage exclusion zones
+    auto new_end = std::remove_if(exclusion_list_.begin(),exclusion_list_.end(),
+        [this](std::tuple<float,float,float,int16_t,float> zone)
+        {return (odometer_ - std::get<4>(zone)) > config_.exclusion_zone_range;});
+    exclusion_list_.erase(new_end, exclusion_list_.end());
+
+    // Update odometer tick
+    if ((odometer_-last_odometry_tick_) > config_.odometry_tick_dist) {
+      last_odometry_tick_ = odometer_;
+    }
+
   }
 
   void publishTop() {
@@ -388,59 +387,36 @@ class KalmanDetectionFilter
     }
   }
 
-  void addFilter(const samplereturn_msgs::NamedPoint& msg)
+  int addFilter(const samplereturn_msgs::NamedPoint& msg)
   {
     ROS_DEBUG("Adding New Filter");
 
     samplereturn::HueHistogram hh(msg.model.hue);
     std::shared_ptr<ColoredKF> CKF(new ColoredKF(config_, msg, filter_id_count_++));
     CKF->predict();
+    CKF->measure(msg, config_.PDgO, config_.PDgo);
     filter_list_.push_back(CKF);
     ROS_DEBUG("Filter ID Count: %d", filter_id_count_);
     ROS_DEBUG("Initial Certainty: %f", CKF->certainty);
-    checkObservation(msg);
+    return CKF->filter_id;
   }
 
-  void addMeasurement(const cv::Mat meas_state, std::string meas_frame_id, int filter_id)
-  {
-    ROS_DEBUG("Adding measurement to filter: %i", filter_id);
-    // Iterate over appropriate NUF list, remove the matching filter
-    std::vector<std::shared_ptr<ColoredKF> >::iterator iter =
-      not_updated_filter_list_[meas_frame_id].begin();
-    while ( iter != not_updated_filter_list_[meas_frame_id].end() ) {
-      if ((*iter)->filter_id == filter_id) {
-        iter = not_updated_filter_list_[meas_frame_id].erase(iter);
-      }
-      else {
-        ++iter;
-      }
-    }
-    for (auto ckf : filter_list_) {
-      if (ckf->filter_id == filter_id) {
-        ckf->predict();
-        ckf->correct(meas_state);
-        ROS_DEBUG("Pre Meas Prob: %f",ckf->certainty);
-        ckf->certainty = updateProb(ckf->certainty, true, config_.PDgO, config_.PDgo);
-        ROS_DEBUG("Measurement Updated Prob: %f",ckf->certainty);
-      }
-    }
-  }
-
-  void checkObservation(const samplereturn_msgs::NamedPoint& msg)
+  int checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
     ROS_DEBUG("Check Observation");
-    cv::Mat meas_state(3, 1, CV_32F);
-    meas_state.at<float>(0) = msg.point.x;
-    meas_state.at<float>(1) = msg.point.y;
-    meas_state.at<float>(2) = msg.point.z;
 
     for (size_t i=0; i<exclusion_list_.size(); i++) {
       float dist = sqrt(pow((std::get<0>(exclusion_list_[i]) - msg.point.x),2) +
         pow((std::get<1>(exclusion_list_[i]) - msg.point.y),2));
       if (dist < std::get<2>(exclusion_list_[i])) {
-        return;
+        return 0;
       }
     }
+
+    cv::Mat meas_state(3, 1, CV_32F);
+    meas_state.at<float>(0) = msg.point.x;
+    meas_state.at<float>(1) = msg.point.y;
+    meas_state.at<float>(2) = msg.point.z;
 
     for (auto ckf : filter_list_) {
       double dist = cv::norm(ckf->measurementMatrix * ckf->statePost
@@ -450,16 +426,21 @@ class KalmanDetectionFilter
       bool color_check = (distance<config_.max_colormodel_distance);
       if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
-        addMeasurement(meas_state, msg.sensor_frame, ckf->filter_id);
-        ckf->huemodel = hh;
-        return;
+        ROS_DEBUG("Adding measurement to filter: %i", ckf->filter_id);
+        ROS_DEBUG("Pre Meas Prob: %f",ckf->certainty);
+        ckf->predict();
+        ckf->measure(msg, config_.PDgO, config_.PDgo);
+        ROS_DEBUG("Measurement Updated Prob: %f",ckf->certainty);
+        return ckf->filter_id;
       }
       else if ((dist < config_.max_dist) and not color_check) {
         ROS_DEBUG("Color Check Failed");
-        return;
+        return 0;
       }
     }
-    addFilter(msg);
+
+    // close to no existing filter, add a new one
+    return addFilter(msg);
   }
 
   void publishViewFrustum () {
