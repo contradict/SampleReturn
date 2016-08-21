@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <samplereturn_msgs/NamedPoint.h>
+#include <samplereturn_msgs/NamedPointArray.h>
 #include <samplereturn_msgs/PatchArray.h>
 #include <pcl_msgs/ModelCoefficients.h>
 
@@ -51,7 +52,7 @@ class LineMOD_Detector
 {
   ros::Subscriber patch_array_sub;
   ros::Subscriber plane_model_sub;
-  ros::Publisher point_pub;
+  ros::Publisher points_pub;
   ros::Publisher debug_img_pub;
   ros::Publisher debug_mask_pub;
   dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
@@ -73,7 +74,7 @@ class LineMOD_Detector
   LineMOD_Detector()
   {
     ros::NodeHandle nh;
-    point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
+    points_pub = nh.advertise<samplereturn_msgs::NamedPointArray>("point", 1);
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
@@ -202,7 +203,10 @@ class LineMOD_Detector
     // already have the world point projected. Resize image to fixed size,
     // check for a LineMOD match, background color difference, and publish a
     // NamedPoint if it's good.
+    samplereturn_msgs::NamedPointArray points_out;
+    points_out.header = msg->header;
     if (msg->patch_array.empty()) {
+      points_pub.publish(points_out);
       return;
     }
 
@@ -397,8 +401,9 @@ class LineMOD_Detector
               samplereturn::drawGripRect(debug_image, griprect);
           }
       }
-      point_pub.publish(np);
+      points_out.points.push_back(np);
     }
+    points_pub.publish(points_out);
 
     if(debug_img_pub.getNumSubscribers() > 0)
     {
