@@ -113,11 +113,11 @@ class ColorHistogramDescriptorNode
           char *str=hh_inner.str();
           if (y > 100) {
               cv::putText(debug_image_, str, cv::Point2d(x, y),
-                      cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+                      cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
               cv::putText(debug_image_, str, cv::Point2d(x, y + h),
-                      cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+                      cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           free(str);
           hh_inner.draw_histogram(debug_image_, x, y+w);
@@ -142,12 +142,12 @@ class ColorHistogramDescriptorNode
           char bgdist[100];
           snprintf(bgdist, 100, "Too similar to bg: %4.3f", distance);
           if (y > 100) {
-            cv::putText(debug_image_,bgdist,cv::Point2d(x, y-50),
-               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+            cv::putText(debug_image_,bgdist,cv::Point2d(x, y-25*config_.debug_font_scale),
+               cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
             cv::putText(debug_image_,bgdist,cv::Point2d(x, y + h),
-               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+               cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
         }
         continue;
@@ -172,8 +172,8 @@ class ColorHistogramDescriptorNode
           h = msg->patch_array[i].image_roi.height;
           char edist[100];
           snprintf(edist, 100, "h:%4.3f v:%4.3f", hue_exemplar_distance, value_exemplar_distance);
-          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 50),
-                  cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 25*config_.debug_font_scale),
+                  cv::FONT_HERSHEY_SIMPLEX, config_.debug_font_scale, cv::Scalar(255,0,0),4,cv::LINE_8);
       }
 
       samplereturn_msgs::NamedPoint np_msg;
