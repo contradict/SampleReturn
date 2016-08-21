@@ -128,7 +128,10 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
     // ensure tf is ready
     if(!listener_.canTransform(clipping_frame_id_, patches_msg->header.frame_id,
                 patches_msg->header.stamp))
+    {
+        patches_out.publish( positioned_patches );
         return;
+    }
 
     // get camera origin in clipping frame
     tf::StampedTransform camera;
@@ -354,6 +357,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
     }
 
     patches_out.publish( positioned_patches );
+
     if(debug_marker_out.getNumSubscribers()>0)
     {
         debug_marker_out.publish(vis_markers);

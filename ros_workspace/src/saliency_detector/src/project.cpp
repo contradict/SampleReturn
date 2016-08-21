@@ -171,12 +171,13 @@ class GroundProjectorNode
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
     enable_debug_ = (pub_debug_image.getNumSubscribers() != 0);
-    if (msg->patch_array.empty()) {
-      return;
-    }
     samplereturn_msgs::PatchArray out_pa_msg;
     out_pa_msg.header = msg->header;
     out_pa_msg.cam_info = msg->cam_info;
+    if (msg->patch_array.empty()) {
+      pub_patch_array.publish(out_pa_msg);
+      return;
+    }
     if (enable_debug_) {
       debug_image_ = cv::Mat::ones(msg->cam_info.height,
           msg->cam_info.width, CV_8U)*255;
