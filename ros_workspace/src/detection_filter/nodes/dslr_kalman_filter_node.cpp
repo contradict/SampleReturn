@@ -19,7 +19,7 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
-#include <saliency_detector/colormodel.h>
+#include <samplereturn/colormodel.h>
 
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections

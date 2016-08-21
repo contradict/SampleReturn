@@ -50,9 +50,6 @@ class SaliencyDetectorNode
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("position", position_, std::string("center"));
 
-    sub_img =
-      it->subscribeCamera("image", 10, &SaliencyDetectorNode::messageCallback, this);
-
     sub_search_area_check =
       nh.subscribe("search_area_check", 3, &SaliencyDetectorNode::searchAreaCheckCallback, this);
 
@@ -65,6 +62,12 @@ class SaliencyDetectorNode
     ros::NodeHandle pnh("~");
     enable_service = pnh.advertiseService("enable", &SaliencyDetectorNode::service_enable, this);
     pnh.param("start_enabled", enabled_, true);
+    if(enabled_)
+    {
+        sub_img =
+            it->subscribeCamera("image", 10, &SaliencyDetectorNode::messageCallback, this);
+    }
+
   }
 
   void searchAreaCheckCallback(const samplereturn_msgs::SearchAreaCheckPtr& msg)
@@ -86,11 +89,6 @@ class SaliencyDetectorNode
       ROS_DEBUG("%s is blocked by obstacle", position_.c_str());
       return;
     }
-    if (!enabled_) {
-      ROS_DEBUG("%s is disabled", position_.c_str());
-      return;
-    }
-
 
     saliency_mutex_.lock();
 
@@ -258,9 +256,19 @@ class SaliencyDetectorNode
   bool
   service_enable(platform_motion_msgs::Enable::Request &req, platform_motion_msgs::Enable::Response &resp)
   {
-    enabled_ = req.state;
-    resp.state = req.state;
-    return true;
+      if(req.state && !enabled_)
+      {
+          sub_img =
+              it->subscribeCamera("image", 10, &SaliencyDetectorNode::messageCallback, this);
+      }
+      else if(!req.state && enabled_)
+      {
+          sub_img.shutdown();
+      }
+
+      enabled_ = req.state;
+      resp.state = req.state;
+      return true;
   }
 
 };
