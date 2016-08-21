@@ -19,7 +19,9 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
+#include <detection_filter/probability.h>
 #include <samplereturn/colormodel.h>
+#include <detection_filter/coloredkf.hpp>
 
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections
@@ -28,26 +30,6 @@
  */
 
 namespace detection_filter {
-class ColoredKF
-{
-  public:
-    cv::KalmanFilter filter;
-    samplereturn::HueHistogram huemodel;
-    int16_t filter_id;
-    std::string frame_id;
-    float certainty;
-    ColoredKF(cv::KalmanFilter, const samplereturn::HueHistogram &, int16_t, std::string, float);
-};
-
-ColoredKF::ColoredKF (cv::KalmanFilter kf, const samplereturn::HueHistogram& h, int16_t id, std::string f_id, float cert) :
-    filter(kf),
-    huemodel(h),
-    filter_id(id),
-    frame_id(f_id),
-    certainty(cert)
-{
-}
-
 class KalmanDetectionFilter
 {
   ros::NodeHandle nh;
@@ -84,8 +66,6 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
 
-  bool is_manipulator_;
-
   bool is_paused_;
 
   cv::Mat DSLR_frustum_;
@@ -107,7 +87,6 @@ class KalmanDetectionFilter
     ros::NodeHandle private_node_handle_("~");
 
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
-    private_node_handle_.param("is_manipulator", is_manipulator_, false);
 
     sub_cam_info =
       nh.subscribe("camera_info", 3, &KalmanDetectionFilter::cameraInfoCallback, this);
@@ -250,8 +229,8 @@ class KalmanDetectionFilter
         filter_list_.erase(new_end, filter_list_.end());
     }
     double x, y, r;
-    x = ackedFilter->second->filter.statePost.at<float>(0);
-    y = ackedFilter->second->filter.statePost.at<float>(1);
+    x = ackedFilter->second->statePost.at<float>(0);
+    y = ackedFilter->second->statePost.at<float>(1);
     if (msg.success) {
       r = config_.positive_exclusion_radius;
     }
@@ -295,9 +274,9 @@ class KalmanDetectionFilter
       // Get filters in msg frame that weren't updated, decrement them
       for (auto ckf : not_updated_filter_list_[msg.header.frame_id]) {
         ROS_DEBUG("Checking NUF");
-        if (isInView(ckf->filter) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
-          ckf->filter.predict();
-          ckf->filter.errorCovPre.copyTo(ckf->filter.errorCovPost);
+        if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
+          ckf->predict();
+          ckf->errorCovPre.copyTo(ckf->errorCovPost);
           ckf->certainty = updateProb(ckf->certainty, false, config_.PDgO, config_.PDgo);
           ROS_DEBUG("Cam Info Updated Prob: %f",ckf->certainty);
         }
@@ -342,13 +321,13 @@ class KalmanDetectionFilter
       for (auto filter_ptr : filter_list_) {
         if (filter_ptr->filter_id == current_published_id_) {
           if (filter_ptr->certainty > config_.pub_certainty_thresh &&
-              filter_ptr->filter.errorCovPost.at<float>(0,0) < config_.max_pub_cov) {
+              filter_ptr->errorCovPost.at<float>(0,0) < config_.max_pub_cov) {
             published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
             point_msg.header.frame_id = _filter_frame_id;
             point_msg.header.stamp = ros::Time::now();
-            point_msg.point.x = filter_ptr->filter.statePost.at<float>(0);
-            point_msg.point.y = filter_ptr->filter.statePost.at<float>(1);
+            point_msg.point.x = filter_ptr->statePost.at<float>(0);
+            point_msg.point.y = filter_ptr->statePost.at<float>(1);
             point_msg.point.z = 0;
             point_msg.filter_id = filter_ptr->filter_id;
             pub_detection.publish(point_msg);
@@ -380,9 +359,9 @@ class KalmanDetectionFilter
       if (current_published_id_ == 0) {
         for (auto filter_ptr : filter_list_) {
           if ((filter_ptr->certainty > config_.pub_certainty_thresh) &&
-              (filter_ptr->filter.errorCovPost.at<float>(0,0) < config_.max_pub_cov)) {
-            dist = sqrt(pow((transform.getOrigin().x()-filter_ptr->filter.statePost.at<float>(0)),2) +
-                   pow((transform.getOrigin().y()-filter_ptr->filter.statePost.at<float>(1)),2));
+              (filter_ptr->errorCovPost.at<float>(0,0) < config_.max_pub_cov)) {
+            dist = sqrt(pow((transform.getOrigin().x()-filter_ptr->statePost.at<float>(0)),2) +
+                   pow((transform.getOrigin().y()-filter_ptr->statePost.at<float>(1)),2));
             ROS_DEBUG("Transform X: %f, Transform Y: %f",
                 transform.getOrigin().x(),transform.getOrigin().y());
             ROS_DEBUG("Filter Distance: %f",dist);
@@ -402,8 +381,8 @@ class KalmanDetectionFilter
       samplereturn_msgs::NamedPoint point_msg;
       point_msg.header.frame_id = _filter_frame_id;
       point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = nearest_filter->filter.statePost.at<float>(0);
-      point_msg.point.y = nearest_filter->filter.statePost.at<float>(1);
+      point_msg.point.x = nearest_filter->statePost.at<float>(0);
+      point_msg.point.y = nearest_filter->statePost.at<float>(1);
       point_msg.point.z = 0;
       point_msg.filter_id = nearest_filter->filter_id;
       pub_detection.publish(point_msg);
@@ -413,34 +392,11 @@ class KalmanDetectionFilter
   void addFilter(const samplereturn_msgs::NamedPoint& msg)
   {
     ROS_DEBUG("Adding New Filter");
-    cv::KalmanFilter KF = cv::KalmanFilter(6,3);
-    cv::Mat state(6, 1, CV_32F); /* x, y, z, vx, vy, vz */
-    cv::Mat processNoise(6, 1, CV_32F);
 
-    KF.transitionMatrix = (cv::Mat_<float>(6,6) << 1, 0, 0, config_.period, 0, 0,
-                                                    0, 1, 0, 0, config_.period, 0,
-                                                    0, 0, 1, 0, 0, config_.period,
-                                                    0, 0, 0, 1, 0, 0,
-                                                    0, 0, 0, 0, 1, 0,
-                                                    0, 0, 0, 0, 0, 1);
-    cv::setIdentity(KF.measurementMatrix);
-    cv::setIdentity(KF.processNoiseCov, cv::Scalar(config_.process_noise_cov));
-    cv::setIdentity(KF.measurementNoiseCov, cv::Scalar(config_.measurement_noise_cov));
-    cv::setIdentity(KF.errorCovPost, cv::Scalar(config_.error_cov_post));
-
-    KF.statePost.at<float>(0) = msg.point.x;
-    KF.statePost.at<float>(1) = msg.point.y;
-    KF.statePost.at<float>(2) = msg.point.z;
-    KF.statePost.at<float>(3) = 0;
-    KF.statePost.at<float>(4) = 0;
-    KF.statePost.at<float>(5) = 0;
-
-    KF.predict();
     samplereturn::HueHistogram hh(msg.model.hue);
-    std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,hh,filter_id_count_,
-          msg.sensor_frame,config_.PO_init));
+    std::shared_ptr<ColoredKF> CKF(new ColoredKF(config_, msg, filter_id_count_++));
+    CKF->predict();
     filter_list_.push_back(CKF);
-    filter_id_count_++;
     ROS_DEBUG("Filter ID Count: %d", filter_id_count_);
     ROS_DEBUG("Initial Certainty: %f", CKF->certainty);
     checkObservation(msg);
@@ -462,7 +418,8 @@ class KalmanDetectionFilter
     }
     for (auto ckf : filter_list_) {
       if (ckf->filter_id == filter_id) {
-        ckf->filter.correct(meas_state);
+        ckf->predict();
+        ckf->correct(meas_state);
         ROS_DEBUG("Pre Meas Prob: %f",ckf->certainty);
         ckf->certainty = updateProb(ckf->certainty, true, config_.PDgO, config_.PDgo);
         ROS_DEBUG("Measurement Updated Prob: %f",ckf->certainty);
@@ -487,11 +444,11 @@ class KalmanDetectionFilter
     }
 
     for (auto ckf : filter_list_) {
-      double dist = cv::norm(ckf->filter.measurementMatrix * ckf->filter.statePost
+      double dist = cv::norm(ckf->measurementMatrix * ckf->statePost
             - meas_state);
       samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
-      bool color_check = (is_manipulator_ || (distance<config_.max_colormodel_distance));
+      bool color_check = (distance<config_.max_colormodel_distance);
       if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, msg.sensor_frame, ckf->filter_id);
@@ -524,11 +481,8 @@ class KalmanDetectionFilter
   }
 
   /* This will check if each hypothesis is in view currently */
-  bool isInView (cv::KalmanFilter kf) {
+  bool isInView (const std::shared_ptr<ColoredKF>& kf) {
     ROS_DEBUG("Is In View Check");
-    if (is_manipulator_) {
-      return true;
-    }
     /* This is in base_link, transform it to odom */
     cv::Mat DSLR_frustum_odom(DSLR_frustum_.rows,2,CV_32FC1);
     geometry_msgs::PointStamped temp_msg, temp_msg_odom;
@@ -551,7 +505,7 @@ class KalmanDetectionFilter
       ROS_DEBUG("DSLR_frustum_odom Points: X %f, Y: %f", temp_msg_odom.point.x, temp_msg_odom.point.y);
     }
     double retval = cv::pointPolygonTest(DSLR_frustum_odom,
-        cv::Point2f(kf.statePost.at<float>(0),kf.statePost.at<float>(1)), false);
+        cv::Point2f(kf->statePost.at<float>(0),kf->statePost.at<float>(1)), false);
     ROS_DEBUG("In View?: %f", retval);
     return (retval == 1);
   }
@@ -565,7 +519,7 @@ class KalmanDetectionFilter
   bool isOld (std::shared_ptr<ColoredKF> ckf) {
     ROS_DEBUG("Is Old Call");
     cv::Mat eigenvalues;
-    cv::eigen(ckf->filter.errorCovPost, eigenvalues);
+    cv::eigen(ckf->errorCovPost, eigenvalues);
     for (int i=0; i<eigenvalues.rows; i++) {
       if (eigenvalues.at<float>(i) > config_.max_cov) {
         ROS_DEBUG("Position Cov Too High. Removing Filter: %d",ckf->filter_id);
@@ -579,22 +533,6 @@ class KalmanDetectionFilter
       return true;
     }
     return false;
-  }
-
-  double updateProb(double PO, bool detection, double PDgO, double PDgo) {
-    if (detection) {
-      // Probability of a detection
-      double PD = PDgO * PO + PDgo * (1 - PO);
-      // Update
-      PO = PDgO * PO / PD;
-    }
-    else {
-      // Probability of no detection
-      double Pd = (1 - PDgO) * PO + (1.0 - PDgo) * (1.0 - PO);
-      // Update
-      PO = (1.0 - PDgO) * PO / Pd;
-    }
-    return PO;
   }
 
   void clearMarker(std::shared_ptr<ColoredKF> ckf) {
@@ -622,10 +560,10 @@ class KalmanDetectionFilter
     float px_per_meter = 50.0;
     float offset = 250;
     for (auto filter_ptr : filter_list_){
-      cv::Point mean(filter_ptr->filter.statePost.at<float>(0) * px_per_meter,
-          filter_ptr->filter.statePost.at<float>(1) * px_per_meter);
-      float rad_x = filter_ptr->filter.errorCovPost.at<float>(0,0) * px_per_meter;
-      float rad_y = filter_ptr->filter.errorCovPost.at<float>(1,1) * px_per_meter;
+      cv::Point mean(filter_ptr->statePost.at<float>(0) * px_per_meter,
+          filter_ptr->statePost.at<float>(1) * px_per_meter);
+      float rad_x = filter_ptr->errorCovPost.at<float>(0,0) * px_per_meter;
+      float rad_y = filter_ptr->errorCovPost.at<float>(1,1) * px_per_meter;
       cv::circle(img, mean+cv::Point(0,offset), 5, cv::Scalar(255,0,0));
       cv::ellipse(img, mean+cv::Point(0,offset), cv::Size(rad_x, rad_y), 0, 0, 360, cv::Scalar(0,255,0));
 
@@ -659,18 +597,18 @@ class KalmanDetectionFilter
         cov.color.b = 1.0;
         cov.color.a = (filter_ptr->certainty / 2) + 0.5;
       }
-      cov.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
-      cov.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
+      cov.pose.position.x = filter_ptr->statePost.at<float>(0);
+      cov.pose.position.y = filter_ptr->statePost.at<float>(1);
       cov.pose.position.z = 0.5;
-      cov_text.pose.position.x = filter_ptr->filter.statePost.at<float>(0);
-      cov_text.pose.position.y = filter_ptr->filter.statePost.at<float>(1);
+      cov_text.pose.position.x = filter_ptr->statePost.at<float>(0);
+      cov_text.pose.position.y = filter_ptr->statePost.at<float>(1);
       cov_text.pose.position.z = 1.0;
       cov.pose.orientation.x = 0;
       cov.pose.orientation.y = 0;
       cov.pose.orientation.z = 0;
       cov.pose.orientation.w = 1;
-      cov.scale.x = filter_ptr->filter.errorCovPost.at<float>(0,0);
-      cov.scale.y = filter_ptr->filter.errorCovPost.at<float>(1,1);
+      cov.scale.x = filter_ptr->errorCovPost.at<float>(0,0);
+      cov.scale.y = filter_ptr->errorCovPost.at<float>(1,1);
       cov.scale.z = 1.0;
       cov_text.scale.z = 0.5;
       cov.lifetime = ros::Duration();
@@ -717,7 +655,7 @@ class KalmanDetectionFilter
 
   void printFilterState() {
     for (auto filter_ptr : filter_list_) {
-      std::cout << "State: " << filter_ptr->filter.statePost << std::endl;
+      std::cout << "State: " << filter_ptr->statePost << std::endl;
     }
   }
 
