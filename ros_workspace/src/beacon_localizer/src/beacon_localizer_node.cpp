@@ -41,6 +41,8 @@ class BeaconKFNode
         std::string _odometry_frame;
         std::string _platform_frame;
 
+        std::vector<double> _platform_x_coords;
+        std::vector<double> _platform_y_coords;
         tf::Vector3 _platform_origin;
         tf::Quaternion _platform_orientation;
         std::vector<double> _reference_coords;
@@ -137,15 +139,25 @@ void BeaconKFNode::initializeRos( void )
     private_nh.param("world_fixed_frame", _world_fixed_frame, std::string("map"));
     private_nh.param("odometry_frame", _odometry_frame, std::string("odom"));
     private_nh.param("platform_frame", _platform_frame, std::string("platform"));
-    
+
     //setup platform offset position and angle
-    std::vector<double> platform_coords;
+    int platform_index;
+    std::vector<double> empty_vec;    
+    private_nh.param("platform_index", platform_index, 0);
+    private_nh.param("platform_x_coords", _platform_x_coords, empty_vec);
+    private_nh.param("platform_y_coords", _platform_y_coords, empty_vec); 
+
+    double reference_x;
+    double reference_y;
+    private_nh.param("reference_x", reference_x, 1.0);
+    private_nh.param("reference_y", reference_y, 0.0);
+    _reference_coords.push_back(reference_x);
+    _reference_coords.push_back(reference_y);
+    
     double platform_angle;
-    private_nh.getParam("platform_origin", platform_coords);
-    private_nh.getParam("reference_point", _reference_coords);
     private_nh.param("platform_orientation", platform_angle, 0.0);
-    _platform_origin.setX(platform_coords[0]);
-    _platform_origin.setY(platform_coords[1]);
+    _platform_origin.setX(_platform_x_coords[platform_index]);
+    _platform_origin.setY(_platform_y_coords[platform_index]);
     _platform_origin.setZ(0);
     platform_angle = platform_angle*(M_PI/180);
     platform_angle = platform_angle + atan(_reference_coords[1]/_reference_coords[0]);
@@ -347,12 +359,20 @@ void BeaconKFNode::filterUpdateCallback( const ros::TimerEvent& e )
 void BeaconKFNode::configCallback(beacon_localizer::beacon_localizer_paramsConfig &config, uint32_t level)
 {
     double platform_angle;
+    int platform_index;
     
+    _reference_coords[0] = config.reference_x;
+    _reference_coords[1] = config.reference_y;
+
     //get platform orientation in degrees, convert to reference system
     platform_angle =  config.platform_orientation;
     platform_angle = platform_angle*(M_PI/180);
     platform_angle = platform_angle + atan(_reference_coords[1]/_reference_coords[0]);
     _platform_orientation = tf::createQuaternionFromYaw(platform_angle);
+
+    platform_index = config.platform_index;
+    _platform_origin.setX(_platform_x_coords[platform_index]);
+    _platform_origin.setY(_platform_y_coords[platform_index]);
     
 }
 
