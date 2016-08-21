@@ -19,7 +19,6 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
-#include <detection_filter/probability.h>
 #include <samplereturn/colormodel.h>
 #include <detection_filter/coloredkf.hpp>
 
