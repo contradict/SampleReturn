@@ -137,6 +137,7 @@ class GroundProjectorNode
     tf::vectorTFToEigen(pos, ray_origin);
     // These are the ground points in base_link
     std::vector<Eigen::Vector3d> ground_points;
+    ground_points.resize(base_link_rays.size());
     std::transform(base_link_rays.begin(), base_link_rays.end(), ground_points.begin(),
         [ray_origin, this](Eigen::Vector3d ray) -> Eigen::Vector3d
         {
