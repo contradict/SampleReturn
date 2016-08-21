@@ -69,7 +69,7 @@ PointCloudProjector::PointCloudProjector(ros::NodeHandle nh) :
     ros::NodeHandle pnh("~");
     pnh.param("clipping_frame_id", clipping_frame_id_, std::string("base_link"));
     pnh.param("output_frame_id", output_frame_id_, std::string("odom"));
-    if(!pnh.param("start_enabled", true))
+    if(pnh.param("start_enabled", true))
     {
         enabled_ = true;
         pointcloud_sub.subscribe(nh, "pointcloud", 1);
