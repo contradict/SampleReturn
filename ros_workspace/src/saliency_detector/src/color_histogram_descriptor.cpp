@@ -156,8 +156,8 @@ class ColorHistogramDescriptorNode
       // Check inner hist against targets, either well-saturated in the specified
       // hue range, or unsaturated with a high value (metal and pre-cached)
       std::vector<std::tuple<double, double>> edges;
-      edges.push_back(std::make_tuple(0, config_.min_target_hue));
-      edges.push_back(std::make_tuple(config_.max_target_hue, 180));
+      edges.push_back(std::make_tuple(0, config_.max_target_hue));
+      edges.push_back(std::make_tuple(config_.min_target_hue, 180));
       samplereturn::HueHistogram hh_colored_sample = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
       samplereturn::HueHistogram hh_value_sample = samplereturn::ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
       double hue_exemplar_distance = hh_colored_sample.distance(hh_inner);
