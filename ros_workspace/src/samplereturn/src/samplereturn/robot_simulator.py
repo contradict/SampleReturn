@@ -113,7 +113,8 @@ class RobotSimulator(object):
         enable_carousel_name = "/motion/carousel/enable"
 
         enable_manipulator_detector_name = "/processes/sample_detection/manipulator/saliency_detector/enable"
-                
+        enable_manipulator_projector_name = "/processes/sample_detection/manipulator/pointcloud_projector/enable"              
+        
         enable_search_name = "/cameras/search/enable_publish"
         enable_navigation_beacon_name =  "/cameras/navigation/beacon/basler_camera/enable_publish"
         
@@ -227,6 +228,9 @@ class RobotSimulator(object):
         rospy.Service(enable_manipulator_detector_name,
                       samplereturn_srv.Enable,
                       self.enable_manipulator_detector)
+        rospy.Service(enable_manipulator_projector_name,
+                      samplereturn_srv.Enable,
+                      self.enable_manipulator_projector)
         self.manipulator_detector_enabled = False
         
         #publisher for blank images to sun_pointing
@@ -763,6 +767,10 @@ class RobotSimulator(object):
     def enable_manipulator_detector(self, req):
         self.manipulator_detector_enabled = req.state
         rospy.sleep(0.25)
+        return req.state
+
+    def enable_manipulator_projector(self, req):
+        rospy.sleep(0.05)
         return req.state
 
     #camera enable handlers
