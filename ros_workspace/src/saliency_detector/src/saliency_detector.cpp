@@ -85,8 +85,13 @@ class SaliencyDetectorNode
 
   void messageCallback(const sensor_msgs::ImageConstPtr& msg, const sensor_msgs::CameraInfoConstPtr& cam_info)
   {
+    samplereturn_msgs::PatchArray pa_msg;
+    pa_msg.header = msg->header;
+    pa_msg.cam_info = *cam_info;
+
     if (blocked_) {
       ROS_DEBUG("%s is blocked by obstacle", position_.c_str());
+      pub_patch_array.publish(pa_msg);
       return;
     }
 
@@ -147,9 +152,6 @@ class SaliencyDetectorNode
     // Allocate images and mask for patch publishing
     cv::Mat sub_img;
     cv::Mat sub_mask;
-    samplereturn_msgs::PatchArray pa_msg;
-    pa_msg.header = msg->header;
-    pa_msg.cam_info = *cam_info;
 
     // Scale keypoint params back up from smaller BMS image
     ROS_DEBUG("Begin publish loop");

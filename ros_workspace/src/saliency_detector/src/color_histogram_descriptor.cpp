@@ -3,6 +3,7 @@
 #include <ros/console.h>
 #include <samplereturn_msgs/PatchArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
+#include <samplereturn_msgs/NamedPointArray.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/color_histogram_descriptor_paramsConfig.h>
@@ -21,7 +22,7 @@ namespace saliency_detector {
 class ColorHistogramDescriptorNode
 {
   ros::Subscriber sub_patch_array;
-  ros::Publisher pub_named_point;
+  ros::Publisher pub_named_points;
   ros::Publisher pub_debug_image;
   std::string sub_patch_array_topic;
   std::string pub_named_point_topic;
@@ -54,8 +55,8 @@ class ColorHistogramDescriptorNode
     sub_patch_array =
       nh.subscribe(sub_patch_array_topic, 1, &ColorHistogramDescriptorNode::patchArrayCallback, this);
 
-    pub_named_point =
-      nh.advertise<samplereturn_msgs::NamedPoint>(pub_named_point_topic.c_str(), 1);
+    pub_named_points =
+      nh.advertise<samplereturn_msgs::NamedPointArray>(pub_named_point_topic.c_str(), 1);
 
     pub_debug_image =
       nh.advertise<sensor_msgs::Image>(pub_debug_image_topic.c_str(), 1);
@@ -65,11 +66,13 @@ class ColorHistogramDescriptorNode
 
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
+    samplereturn_msgs::NamedPointArray points_out;
+    points_out.header = msg->header;
     enable_debug_ = (pub_debug_image.getNumSubscribers() != 0);
     if (msg->patch_array.empty()) {
+      pub_named_points.publish(points_out);
       return;
     }
-    samplereturn_msgs::PatchArray out_pa_msg;
     if (enable_debug_) {
       debug_image_ = cv::Mat::zeros(msg->cam_info.height,
           msg->cam_info.width, CV_8UC3);
@@ -194,7 +197,7 @@ class ColorHistogramDescriptorNode
         np_msg.point = msg->patch_array[i].world_point.point;
         hh_inner.to_msg(&np_msg.model.hue);
         np_msg.sensor_frame = msg->header.frame_id;
-        pub_named_point.publish(np_msg);
+        points_out.points.push_back(np_msg);
       }
       else if(enable_debug_)
       {
@@ -211,6 +214,7 @@ class ColorHistogramDescriptorNode
                   cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
       }
     }
+    pub_named_points.publish(points_out);
     if (enable_debug_) {
       sensor_msgs::ImagePtr debug_image_msg =
         cv_bridge::CvImage(msg->header,"rgb8",debug_image_).toImageMsg();
