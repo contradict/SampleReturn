@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   roslib
   sensor_msgs
+  samplereturn
   samplereturn_msgs
   cv_bridge
   dynamic_reconfigure
@@ -105,7 +106,7 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS saliency_detector_core colormodel
+    LIBRARIES BMS saliency_detector_core
   CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
@@ -133,13 +134,6 @@ add_library(saliency_detector_core
   src/saliency_detector_core.cpp
  )
 
-add_library(colormodel
-    src/colormodel.cpp
-)
-target_link_libraries(colormodel
-    ${OpenCV_LIBRARIES}
-    )
-
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
  add_executable(ground_projector_node src/project.cpp)
@@ -152,8 +146,6 @@ target_link_libraries(colormodel
  add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
  add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(color_histogram_descriptor_node ${PROJECT_NAME}_gencfg)
-
- add_dependencies(colormodel samplereturn_msgs_gencpp)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(saliency_detector_core
@@ -174,7 +166,6 @@ target_link_libraries(colormodel
  )
 
  target_link_libraries(color_histogram_descriptor_node
-     colormodel
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
  )
@@ -195,7 +186,7 @@ target_link_libraries(colormodel
 
 ## Mark executables and/or libraries for installation
 install(TARGETS saliency_detector_core BMS saliency_detector_node
-   ground_projector_node color_histogram_descriptor_node colormodel
+   ground_projector_node color_histogram_descriptor_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

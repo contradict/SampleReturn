@@ -37,6 +37,7 @@
         ns="/processes/sample_detection/manipulator">
         <remap from="pointcloud" to="/cameras/manipulator/points2"/>
         <remap from="patches" to="patch_array"/>
+        <param name="start_enabled" type="bool" value="false"/>
         <param name="pointcloud_scale" type="double" value="1.1"/>
         <param name="hist_min_scale" type="double" value="1.0"/>
         <param name="maximum_patch_height" type="double" value="10.0"/>

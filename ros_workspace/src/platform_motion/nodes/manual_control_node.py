@@ -173,6 +173,13 @@ class ManualController(object):
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'ENABLE_MANIPULATOR_PROJECTOR',
+                                                    'aborted':'SELECT_JOYSTICK'})
+
+            smach.StateMachine.add('ENABLE_MANIPULATOR_PROJECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_projector',
+                                                            samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True),
                                                             response_cb = enable_detector_cb,
                                                             input_keys = ['manipulator_sample']),
@@ -215,6 +222,13 @@ class ManualController(object):
 
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'DISABLE_MANIPULATOR_PROJECTOR',
+                                                    'aborted':'SELECT_JOYSTICK'})
+
+            smach.StateMachine.add('DISABLE_MANIPULATOR_PROJECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'SELECT_JOYSTICK',

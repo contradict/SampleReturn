@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS tf rospy
   dynamic_reconfigure
   image_geometry
   samplereturn_msgs
-  saliency_detector)
+  samplereturn)
 
 find_package(OpenCV)
 ## System dependencies are found with CMake's conventions
