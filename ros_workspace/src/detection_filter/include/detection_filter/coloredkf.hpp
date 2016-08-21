@@ -26,6 +26,8 @@ class ColoredKF : public cv::KalmanFilter
     // negative measurement
     void measure(double PDgO, double PDgo);
 
+    double distance(const samplereturn_msgs::NamedPoint& msg);
+
     void toMsg(samplereturn_msgs::NamedPoint& msg, ros::Time stamp);
 };
 
@@ -98,6 +100,17 @@ ColoredKF::toMsg(samplereturn_msgs::NamedPoint& msg, ros::Time stamp)
     msg.point.x = statePost.at<float>(0);
     msg.point.y = statePost.at<float>(1);
     msg.point.z = 0;
+}
+
+double
+ColoredKF::distance(const samplereturn_msgs::NamedPoint& msg)
+{
+    cv::Mat meas_state(3, 1, CV_32F);
+    meas_state.at<float>(0) = msg.point.x;
+    meas_state.at<float>(1) = msg.point.y;
+    meas_state.at<float>(2) = msg.point.z;
+
+    return cv::norm(measurementMatrix * statePost - meas_state);
 }
 
 }

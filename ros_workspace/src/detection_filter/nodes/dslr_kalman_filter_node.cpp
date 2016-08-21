@@ -403,14 +403,8 @@ class KalmanDetectionFilter
       }
     }
 
-    cv::Mat meas_state(3, 1, CV_32F);
-    meas_state.at<float>(0) = msg.point.x;
-    meas_state.at<float>(1) = msg.point.y;
-    meas_state.at<float>(2) = msg.point.z;
-
     for (auto ckf : filter_list_) {
-      double dist = cv::norm(ckf->measurementMatrix * ckf->statePost
-            - meas_state);
+      double dist = ckf->distance(msg);
       samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
       bool color_check = (distance<config_.max_colormodel_distance);
