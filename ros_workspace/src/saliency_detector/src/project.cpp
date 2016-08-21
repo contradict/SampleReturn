@@ -3,6 +3,7 @@
 #include <ros/console.h>
 #include <samplereturn_msgs/PatchArray.h>
 #include <samplereturn_msgs/Patch.h>
+#include <geometry_msgs/PolygonStamped.h>
 #include <pcl_msgs/ModelCoefficients.h>
 #include <visualization_msgs/Marker.h>
 #include <tf/transform_listener.h>
@@ -25,6 +26,7 @@ class GroundProjectorNode
   ros::Publisher pub_marker;
   ros::Publisher pub_point;
   ros::Publisher pub_debug_image;
+  ros::Publisher pub_frustum;
   std::string sub_patch_array_topic;
   std::string pub_patch_array_topic;
   std::string sub_plane_model_topic;
@@ -39,6 +41,7 @@ class GroundProjectorNode
   double min_major_axis_, max_major_axis_;
   bool enable_debug_;
   int miss_count_;
+  int frustum_buffer_;
 
   Eigen::Vector4d ground_plane_;
   image_geometry::PinholeCameraModel cam_model_;
@@ -54,40 +57,101 @@ class GroundProjectorNode
     dr_srv.setCallback(cb);
 
     ros::NodeHandle private_node_handle_("~");
-    private_node_handle_.param("sub_patch_array_topic", sub_patch_array_topic,
-        std::string("patch_array"));
-    private_node_handle_.param("pub_patch_array_topic", pub_patch_array_topic,
-        std::string("projected_patch_array"));
-    private_node_handle_.param("sub_plane_model_topic", sub_plane_model_topic,
-        std::string("model"));
-    private_node_handle_.param("marker_topic", marker_topic,
-        std::string("ground_marker"));
-    private_node_handle_.param("point_topic", point_topic,
-        std::string("ground_point"));
-    private_node_handle_.param("pub_debug_image_topic", pub_debug_image_topic,
-        std::string("projector_debug_image"));
 
     sub_patch_array =
-      nh.subscribe(sub_patch_array_topic, 1, &GroundProjectorNode::patchArrayCallback, this);
+      nh.subscribe("patch_array", 1, &GroundProjectorNode::patchArrayCallback, this);
 
     sub_plane_model =
-      nh.subscribe(sub_plane_model_topic, 1, &GroundProjectorNode::planeModelCallback, this);
+      nh.subscribe("model", 1, &GroundProjectorNode::planeModelCallback, this);
 
     pub_patch_array =
-      nh.advertise<samplereturn_msgs::PatchArray>(pub_patch_array_topic.c_str(), 1);
+      nh.advertise<samplereturn_msgs::PatchArray>("projected_patch_array", 1);
 
     pub_marker =
-      nh.advertise<visualization_msgs::Marker>(marker_topic.c_str(), 1);
+      nh.advertise<visualization_msgs::Marker>("ground_marker", 1);
 
     pub_point =
-      nh.advertise<geometry_msgs::PointStamped>(point_topic.c_str(), 1);
+      nh.advertise<geometry_msgs::PointStamped>("ground_point", 1);
 
     pub_debug_image =
-      nh.advertise<sensor_msgs::Image>(pub_debug_image_topic.c_str(), 1);
+      nh.advertise<sensor_msgs::Image>("projector_debug_image", 1);
+
+    pub_frustum =
+      nh.advertise<sensor_msgs::Image>("view_frustum", 3);
 
     enable_debug_ = false;
     ground_plane_ << 0.,0.,1.,0.;
     miss_count_ = 0;
+  }
+
+  // Use ground plane and camera info to publish a view frustum on the ground
+  // in odom. This should be called by the plane update, and listen to blocked
+  // search area messages.
+  void publishFrustum(sensor_msgs::CameraInfo cam_info)
+  {
+    // Take corners of image, buffer inward by param
+    std::vector<cv::Point2d> corners, rect_corners;
+    corners.push_back(cv::Point2d(0 + frustum_buffer_,
+          0 + frustum_buffer_));
+    corners.push_back(cv::Point2d(0 + frustum_buffer_,
+          cam_info.height + frustum_buffer_));
+    corners.push_back(cv::Point2d(cam_info.width + frustum_buffer_,
+          cam_info.height + frustum_buffer_));
+    corners.push_back(cv::Point2d(cam_info.width + frustum_buffer_,
+          0 + frustum_buffer_));
+    // Rectify points
+    rect_corners.resize(corners.size());
+    std::transform(corners.begin(), corners.end(), rect_corners.begin(),
+        [this](cv::Point2d uv) -> cv::Point2d
+        {
+          cv::Point2d rect_uv = cam_model_.rectifyPoint(uv);
+          return rect_uv;
+        });
+    // Project to ray, intersect with ground plane
+    std::vector<Eigen::Vector3d> base_link_rays;
+    base_link_rays.resize(corners.size());
+    std::transform(corners.begin(), corners.end(), base_link_rays.begin(),
+        [cam_info, this](cv::Point2d uv) -> Eigen::Vector3d
+        {
+          cv::Point3d xyz = cam_model_.projectPixelTo3dRay(uv);
+          tf::Stamped<tf::Vector3> vect(tf::Vector3(xyz.x, xyz.y, xyz.z),
+              cam_info.header.stamp,
+              cam_info.header.frame_id);
+          tf::Stamped<tf::Vector3> vect_t;
+          listener_.transformVector("base_link", vect, vect_t);
+          Eigen::Vector3d ray;
+          tf::vectorTFToEigen(vect_t, ray);
+          return ray;
+        });
+    // Get ray origin, shared for all rays
+    Eigen::Vector3d ray_origin;
+    tf::Vector3 pos;
+    tf::StampedTransform camera_transform;
+    listener_.lookupTransform("base_link", cam_info.header.frame_id,
+        ros::Time(0), camera_transform);
+    pos = camera_transform.getOrigin();
+    tf::vectorTFToEigen(pos, ray_origin);
+    // These are the ground points in base_link
+    std::vector<Eigen::Vector3d> ground_points;
+    std::transform(base_link_rays.begin(), base_link_rays.end(), ground_points.begin(),
+        [ray_origin, this](Eigen::Vector3d ray) -> Eigen::Vector3d
+        {
+          Eigen::Vector3d ground_point = intersectRayPlane(ray, ray_origin, ground_plane_);
+          return ground_point;
+        });
+    // Publish polygon of points
+    geometry_msgs::PolygonStamped ground_polygon;
+    ground_polygon.header = cam_info.header;
+    for (auto pt : ground_points)
+    {
+      geometry_msgs::Point32 p;
+      p.x = pt[0];
+      p.y = pt[1];
+      p.z = pt[2];
+      ground_polygon.polygon.points.push_back(p);
+    }
+
+    pub_frustum.publish(ground_polygon);
   }
 
   // For a set of candidate sample patches, project them onto the ground to get
@@ -354,6 +418,7 @@ class GroundProjectorNode
   {
     min_major_axis_ = config.min_major_axis;
     max_major_axis_ = config.max_major_axis;
+    frustum_buffer_ = config.frustum_buffer;
   }
 
 };
