@@ -135,19 +135,24 @@ class GroundProjectorNode
         ros::Time(0), camera_transform);
     pos = camera_transform.getOrigin();
     tf::vectorTFToEigen(pos, ray_origin);
-    // These are the ground points in base_link
-    std::vector<Eigen::Vector3d> ground_points;
+    // These are the ground points in the camera frame
+    std::vector<tf::Stamped<tf::Point> > ground_points;
     ground_points.resize(base_link_rays.size());
     std::transform(base_link_rays.begin(), base_link_rays.end(), ground_points.begin(),
-        [ray_origin, this](Eigen::Vector3d ray) -> Eigen::Vector3d
+        [plane_header, cam_info, ray_origin, this](Eigen::Vector3d ray) -> tf::Stamped<tf::Point>
         {
           Eigen::Vector3d ground_point = intersectRayPlane(ray, ray_origin, ground_plane_);
-          return ground_point;
+          tf::Stamped<tf::Point> ground_point_tf(tf::Point(ground_point[0],
+              ground_point[1],ground_point[2]),
+            plane_header.stamp, "base_link");
+          tf::Stamped<tf::Point> cam_point;
+          listener_.transformPoint(cam_info.header.frame_id, ground_point_tf, cam_point);
+          return cam_point;
         });
     // Publish polygon of points
     geometry_msgs::PolygonStamped ground_polygon;
     ground_polygon.header.stamp = plane_header.stamp;
-    ground_polygon.header.frame_id = "base_link";
+    ground_polygon.header.frame_id = cam_info.header.frame_id;
     for (auto pt : ground_points)
     {
       geometry_msgs::Point32 p;
