@@ -96,7 +96,7 @@ PointCloudProjector::enable(platform_motion_msgs::Enable::Request& req, platform
     ros::NodeHandle nh;
     if(req.state && !enabled_)
     {
-        pointcloud_sub.subscribe(nh, "pointclouds", 1);
+        pointcloud_sub.subscribe(nh, "pointcloud", 1);
         patch_sub.subscribe(nh, "patches", 1);
     }
     else if(enabled_)
