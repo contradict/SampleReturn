@@ -1,6 +1,6 @@
 #include <samplereturn/colormodel.h>
 
-namespace saliency_detector
+namespace samplereturn
 {
 
 void

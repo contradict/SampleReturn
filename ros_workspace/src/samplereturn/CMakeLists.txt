@@ -59,7 +59,8 @@ foreach( d
         )
 endforeach()
 
-install(DIRECTORY include
+install(
+    DIRECTORY include/samplereturn/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
     USE_SOURCE_PERMISSIONS
 )

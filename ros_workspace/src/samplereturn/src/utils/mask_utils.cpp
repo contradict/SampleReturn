@@ -2,7 +2,8 @@
 
 #include <ros/console.h>
 
-namespace linemod_detector {
+namespace samplereturn
+{
 
 static bool
 maskToHull(const cv::Mat& mask_in, std::vector<cv::Point> *hull)

@@ -16,6 +16,7 @@
 
     </node>
 
+    <!--
     <node
         machine="navigate"
         pkg="costmap_2d"
@@ -37,6 +38,7 @@
         name="voxel_visualizer_cloud"
         ns="/processes/local_costmap/costmap/starboard_obstacle_layer">
     </node>
+    -->
 
 
 </launch>

@@ -96,9 +96,9 @@ class ColorHistogramDescriptorNode
                 msg->patch_array[i].image_roi.width,
                 msg->patch_array[i].image_roi.height)));
       }
-      ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
-      HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
-      HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
+      samplereturn::ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
+      samplereturn::HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
+      samplereturn::HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
       double distance = hh_inner.distance(hh_outer);
     
       if (enable_debug_) {
@@ -155,8 +155,8 @@ class ColorHistogramDescriptorNode
       std::vector<std::tuple<double, double>> edges;
       edges.push_back(std::make_tuple(0, config_.min_target_hue));
       edges.push_back(std::make_tuple(config_.max_target_hue, 180));
-      HueHistogram hh_colored_sample = ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
-      HueHistogram hh_value_sample = ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
+      samplereturn::HueHistogram hh_colored_sample = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
+      samplereturn::HueHistogram hh_value_sample = samplereturn::ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
       double hue_exemplar_distance = hh_colored_sample.distance(hh_inner);
       double value_exemplar_distance = hh_value_sample.distance(hh_inner);
       bool is_sample = (hue_exemplar_distance<config_.max_exemplar_distance) ||
@@ -178,10 +178,10 @@ class ColorHistogramDescriptorNode
       if(is_sample && config_.compute_grip_angle)
       {
           cv::RotatedRect griprect;
-          if(linemod_detector::computeGripAngle(cv_ptr_mask->image, &griprect, &np_msg.grip_angle) &&
+          if(samplereturn::computeGripAngle(cv_ptr_mask->image, &griprect, &np_msg.grip_angle) &&
                   enable_debug_)
           {
-              linemod_detector::drawGripRect(debug_image_, griprect);
+              samplereturn::drawGripRect(debug_image_, griprect);
           }
       }
 

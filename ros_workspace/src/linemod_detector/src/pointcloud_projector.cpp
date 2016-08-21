@@ -69,7 +69,7 @@ PointCloudProjector::PointCloudProjector(ros::NodeHandle nh) :
     ros::NodeHandle pnh("~");
     pnh.param("clipping_frame_id", clipping_frame_id_, std::string("base_link"));
     pnh.param("output_frame_id", output_frame_id_, std::string("odom"));
-    if(!pnh.param("start_enabled", true))
+    if(pnh.param("start_enabled", true))
     {
         enabled_ = true;
         pointcloud_sub.subscribe(nh, "pointcloud", 1);
@@ -96,7 +96,7 @@ PointCloudProjector::enable(platform_motion_msgs::Enable::Request& req, platform
     ros::NodeHandle nh;
     if(req.state && !enabled_)
     {
-        pointcloud_sub.subscribe(nh, "pointclouds", 1);
+        pointcloud_sub.subscribe(nh, "pointcloud", 1);
         patch_sub.subscribe(nh, "patches", 1);
     }
     else if(enabled_)
@@ -165,7 +165,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
 
         // find bounding box of mask
         cv::Rect rect;
-        computeBoundingBox(cv_ptr_mask->image, &rect);
+        samplereturn::computeBoundingBox(cv_ptr_mask->image, &rect);
 
         // turn image space bounding box into 4 3d rays
         cv::Point2d patch_origin(patch.image_roi.x_offset,

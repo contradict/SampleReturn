@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 
-namespace linemod_detector {
+namespace samplereturn
+{
 
 bool computeGripAngle(const cv::Mat& mask, cv::RotatedRect* griprect, float *grip_angle);
 bool computeBoundingBox(const cv::Mat& mask, cv::Rect* rect);
