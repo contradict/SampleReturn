@@ -184,6 +184,9 @@ class ColorHistogramDescriptorNode
           if(samplereturn::computeGripAngle(cv_ptr_mask->image, &griprect, &np_msg.grip_angle) &&
                   enable_debug_)
           {
+              griprect.center += cv::Point2f(
+                      msg->patch_array[i].image_roi.x_offset,
+                      msg->patch_array[i].image_roi.y_offset);
               samplereturn::drawGripRect(debug_image_, griprect);
           }
       }
