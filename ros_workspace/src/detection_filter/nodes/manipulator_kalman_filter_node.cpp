@@ -40,8 +40,7 @@ class KalmanDetectionFilter
 
     std::shared_ptr<ColoredKF> current_filter_;
 
-    ros::Time last_time_;
-
+    ros::Time last_negative_measurement_;
 
     int16_t filter_id_count_;
 
@@ -94,8 +93,7 @@ KalmanDetectionFilter::KalmanDetectionFilter()
     ros::NodeHandle private_node_handle_("~");
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
 
-    last_time_.sec = 0.0;
-    last_time_.nsec = 0.0;
+    last_negative_measurement_ = ros::Time(0);
 
     filter_id_count_ = 0;
     sub_detections =
@@ -136,6 +134,7 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
         if(!current_filter_)
         {
             addFilter(np);
+            updated = true;
         }
         else
         {
@@ -143,7 +142,7 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
         }
     }
 
-    if(!updated && current_filter_)
+    if(current_filter_ && !updated && (msg->header.stamp > last_negative_measurement_))
     {
         current_filter_->predict();
         current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
@@ -151,6 +150,7 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
                 current_filter_->certainty,
                 false,
                 config_.PDgO, config_.PDgo);
+        last_negative_measurement_ = msg->header.stamp;
     }
 
     checkFilterAges();
