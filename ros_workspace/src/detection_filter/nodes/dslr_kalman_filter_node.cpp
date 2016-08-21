@@ -418,6 +418,7 @@ class KalmanDetectionFilter
     }
     for (auto ckf : filter_list_) {
       if (ckf->filter_id == filter_id) {
+        ckf->predict();
         ckf->correct(meas_state);
         ROS_DEBUG("Pre Meas Prob: %f",ckf->certainty);
         ckf->certainty = updateProb(ckf->certainty, true, config_.PDgO, config_.PDgo);
