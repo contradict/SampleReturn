@@ -98,10 +98,10 @@ class GroundProjectorNode
     corners.push_back(cv::Point2d(0 + frustum_buffer_,
           0 + frustum_buffer_));
     corners.push_back(cv::Point2d(0 + frustum_buffer_,
-          cam_info.height + frustum_buffer_));
-    corners.push_back(cv::Point2d(cam_info.width + frustum_buffer_,
-          cam_info.height + frustum_buffer_));
-    corners.push_back(cv::Point2d(cam_info.width + frustum_buffer_,
+          cam_info.height - frustum_buffer_));
+    corners.push_back(cv::Point2d(cam_info.width - frustum_buffer_,
+          cam_info.height - frustum_buffer_));
+    corners.push_back(cv::Point2d(cam_info.width - frustum_buffer_,
           0 + frustum_buffer_));
     // Rectify points
     rect_corners.resize(corners.size());
