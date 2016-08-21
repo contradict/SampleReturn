@@ -32,14 +32,14 @@ class ColoredKF
 {
   public:
     cv::KalmanFilter filter;
-    saliency_detector::HueHistogram huemodel;
+    samplereturn::HueHistogram huemodel;
     int16_t filter_id;
     std::string frame_id;
     float certainty;
-    ColoredKF(cv::KalmanFilter, const saliency_detector::HueHistogram &, int16_t, std::string, float);
+    ColoredKF(cv::KalmanFilter, const samplereturn::HueHistogram &, int16_t, std::string, float);
 };
 
-ColoredKF::ColoredKF (cv::KalmanFilter kf, const saliency_detector::HueHistogram& h, int16_t id, std::string f_id, float cert) :
+ColoredKF::ColoredKF (cv::KalmanFilter kf, const samplereturn::HueHistogram& h, int16_t id, std::string f_id, float cert) :
     filter(kf),
     huemodel(h),
     filter_id(id),
@@ -436,7 +436,7 @@ class KalmanDetectionFilter
     KF.statePost.at<float>(5) = 0;
 
     KF.predict();
-    saliency_detector::HueHistogram hh(msg.model.hue);
+    samplereturn::HueHistogram hh(msg.model.hue);
     std::shared_ptr<ColoredKF> CKF (new ColoredKF(KF,hh,filter_id_count_,
           msg.sensor_frame,config_.PO_init));
     filter_list_.push_back(CKF);
@@ -489,7 +489,7 @@ class KalmanDetectionFilter
     for (auto ckf : filter_list_) {
       double dist = cv::norm(ckf->filter.measurementMatrix * ckf->filter.statePost
             - meas_state);
-      saliency_detector::HueHistogram hh(msg.model.hue);
+      samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
       bool color_check = (is_manipulator_ || (distance<config_.max_colormodel_distance));
       if ((dist < config_.max_dist) and color_check){

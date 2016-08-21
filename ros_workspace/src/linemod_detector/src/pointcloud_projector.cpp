@@ -165,7 +165,7 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
 
         // find bounding box of mask
         cv::Rect rect;
-        computeBoundingBox(cv_ptr_mask->image, &rect);
+        samplereturn::computeBoundingBox(cv_ptr_mask->image, &rect);
 
         // turn image space bounding box into 4 3d rays
         cv::Point2d patch_origin(patch.image_roi.x_offset,

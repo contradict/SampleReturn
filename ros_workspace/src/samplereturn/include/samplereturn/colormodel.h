@@ -4,7 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <samplereturn_msgs/HueHistogram.h>
 
-namespace saliency_detector
+namespace samplereturn
 {
 
 class HueHistogram;

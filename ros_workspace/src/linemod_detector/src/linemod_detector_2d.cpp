@@ -239,7 +239,7 @@ class LineMOD_Detector
       int h = _config.target_width * msg->patch_array[i].image_roi.height/
           msg->patch_array[i].image_roi.width;
       cv::Rect boundingbox;
-      if(computeBoundingBox(cv_ptr_mask->image, &boundingbox))
+      if(samplereturn::computeBoundingBox(cv_ptr_mask->image, &boundingbox))
       {
           double s=msg->patch_array[i].image_roi.width/double(boundingbox.size().width);
           w *= s;
@@ -367,9 +367,9 @@ class LineMOD_Detector
       // too similar
       if(_config.check_color_model)
       {
-          saliency_detector::ColorModel cm(det_img, det_mask);
-          saliency_detector::HueHistogram hh_inner = cm.getInnerHueHistogram(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit);
-          saliency_detector::HueHistogram hh_outer = cm.getOuterHueHistogram(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit);
+          samplereturn::ColorModel cm(det_img, det_mask);
+          samplereturn::HueHistogram hh_inner = cm.getInnerHueHistogram(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit);
+          samplereturn::HueHistogram hh_outer = cm.getOuterHueHistogram(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit);
           double d_background = hh_inner.distance(hh_outer);
           double d_value = cm.getValuedSampleModel(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit).distance(hh_inner);
           if(debug_img_pub.getNumSubscribers()>0)
@@ -389,12 +389,12 @@ class LineMOD_Detector
       if(_config.compute_grip_angle)
       {
           cv::RotatedRect griprect;
-          if(computeGripAngle(det_mask, &griprect, &np.grip_angle) &&
+          if(samplereturn::computeGripAngle(det_mask, &griprect, &np.grip_angle) &&
                   (debug_img_pub.getNumSubscribers()>0))
           {
               griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
                       orig_y + orig_height/2 - h/2);
-              drawGripRect(debug_image, griprect);
+              samplereturn::drawGripRect(debug_image, griprect);
           }
       }
       point_pub.publish(np);
