@@ -60,6 +60,7 @@
     <remap from="enable_search" to="/cameras/search/enable_publish"/>
     <remap from="enable_beacon" to="/cameras/navigation/beacon/basler_camera/enable_publish"/>
     <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/saliency_detector/enable"/>
+    <remap from="enable_manipulator_projector" to="/processes/sample_detection/manipulator/pointcloud_projector/enable"/>
 
 </node>
 

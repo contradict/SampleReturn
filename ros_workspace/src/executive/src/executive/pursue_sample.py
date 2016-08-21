@@ -243,6 +243,13 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_detector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'ENABLE_MANIPULATOR_PROJECTOR',
+                                                    'aborted':'PUBLISH_FAILURE'})
+
+            smach.StateMachine.add('ENABLE_MANIPULATOR_PROJECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_projector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
                                      transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
                                                     'aborted':'PUBLISH_FAILURE'})
 
@@ -386,6 +393,13 @@ class PursueSample(object):
             #beginning of clean exit path
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'DISABLE_MANIPULATOR_PROJECTOR',
+                                                    'aborted':'DISABLE_MANIPULATOR_PROJECTOR'})
+
+            smach.StateMachine.add('DISABLE_MANIPULATOR_PROJECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'ANNOUNCE_CONTINUE',
