@@ -77,7 +77,7 @@ class GroundProjectorNode
       nh.advertise<sensor_msgs::Image>("projector_debug_image", 1);
 
     pub_frustum =
-      nh.advertise<sensor_msgs::Image>("view_frustum", 3);
+      nh.advertise<geometry_msgs::PolygonStamped>("view_frustum", 3);
 
     enable_debug_ = false;
     ground_plane_ << 0.,0.,1.,0.;
