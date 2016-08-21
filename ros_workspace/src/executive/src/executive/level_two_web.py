@@ -134,7 +134,6 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
         self.beacon_calibration_delay = node_params.beacon_calibration_delay
-        self.gyro_calibration_delay = node_params.gyro_calibration_delay
         #store the intial planned goal in map, check for the need to replan
         self.state_machine.userdata.move_point_map = None
         self.replan_threshold = node_params.replan_threshold
@@ -256,19 +255,7 @@ class LevelTwoWeb(object):
                                                      outcomes = ['first', 'recalibration']),
                                    transitions = {'first':'WEB_MANAGER',
                                                   'recalibration':'CREATE_MOVE_GOAL',})
-
-            '''
-            #request kvh_fog node to measure and set the current bias.
-            #only do this while stopped!
-            kvh_request = kvh_fog_srv.MeasureBiasRequest(self.gyro_calibration_delay)
-            smach.StateMachine.add('CALIBRATE_GYRO',
-                                    smach_ros.ServiceState('measure_bias',
-                                                            kvh_fog_srv.MeasureBias,
-                                                            request = kvh_request),
-                                    transitions = {'succeeded':'WEB_MANAGER',
-                                                   'aborted':'LEVEL_TWO_ABORTED'})
-            '''
-
+ 
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
                                               self.tf_listener,
@@ -362,7 +349,7 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('RETURN_MANAGER',
                                    BeaconReturn('RETURN_MANAGER',
-                                                self.tf_listener, self.announcer),
+                                                self.tf_listener, self.beacon_enable, self.announcer),
                                    transitions = {'mount':'CALCULATE_MOUNT_MOVE',
                                                   'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
