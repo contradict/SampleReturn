@@ -84,13 +84,14 @@ class LevelTwoWeb(object):
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")
         self.CAN_interface = util.CANInterface()
+        self.beacon_enable = rospy.Publisher('enable_beacon',
+                                              std_msg.Bool,
+                                              queue_size=10)       
         self.camera_enablers = []
         self.camera_enablers.append(rospy.Publisher('enable_search',
                                                    std_msg.Bool,
                                                    queue_size=10))
-        self.camera_enablers.append(rospy.Publisher('enable_beacon',
-                                                    std_msg.Bool,
-                                                    queue_size=10))
+        self.camera_enablers.append(self.beacon_enable)
 
         #movement action servers
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
@@ -133,14 +134,15 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.beacon_mount_tolerance = node_params.beacon_mount_tolerance
         self.state_machine.userdata.platform_point = self.platform_point
         self.beacon_calibration_delay = node_params.beacon_calibration_delay
-        self.gyro_calibration_delay = node_params.gyro_calibration_delay
         #store the intial planned goal in map, check for the need to replan
         self.state_machine.userdata.move_point_map = None
         self.replan_threshold = node_params.replan_threshold
         self.recalibrate_threshold = node_params.recalibrate_threshold
 
         #search parameters
+        self.state_machine.userdata.default_velocity = node_params.move_velocity
         self.state_machine.userdata.move_velocity = node_params.move_velocity
+        self.state_machine.userdata.raster_velocity = node_params.raster_velocity
         self.state_machine.userdata.spin_velocity = node_params.spin_velocity
         self.state_machine.userdata.course_tolerance = None
         self.state_machine.userdata.chord_course_tolerance = node_params.chord_course_tolerance
@@ -255,22 +257,11 @@ class LevelTwoWeb(object):
                                                      outcomes = ['first', 'recalibration']),
                                    transitions = {'first':'WEB_MANAGER',
                                                   'recalibration':'CREATE_MOVE_GOAL',})
-
-            '''
-            #request kvh_fog node to measure and set the current bias.
-            #only do this while stopped!
-            kvh_request = kvh_fog_srv.MeasureBiasRequest(self.gyro_calibration_delay)
-            smach.StateMachine.add('CALIBRATE_GYRO',
-                                    smach_ros.ServiceState('measure_bias',
-                                                            kvh_fog_srv.MeasureBias,
-                                                            request = kvh_request),
-                                    transitions = {'succeeded':'WEB_MANAGER',
-                                                   'aborted':'LEVEL_TWO_ABORTED'})
-            '''
-
+ 
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
                                               self.tf_listener,
+                                              self.beacon_enable,
                                               self.announcer),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
@@ -360,7 +351,7 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('RETURN_MANAGER',
                                    BeaconReturn('RETURN_MANAGER',
-                                                self.tf_listener, self.announcer),
+                                                self.tf_listener, self.beacon_enable, self.announcer),
                                    transitions = {'mount':'CALCULATE_MOUNT_MOVE',
                                                   'move':'CREATE_MOVE_GOAL',
                                                   'spin':'BEACON_SEARCH_SPIN',
@@ -401,6 +392,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('RECOVERY_MANAGER',
                                    RecoveryManager('RECOVERY_MANAGER',
                                                    self.announcer,
+                                                   self.beacon_enable,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'simple_move':'RECOVERY_SIMPLE_MOVE',
@@ -643,11 +635,13 @@ class StartLeveLTwo(smach.State):
         return 'next'
 
 class WebManager(smach.State):
-    def __init__(self, label, tf_listener, announcer):
+    def __init__(self, label, tf_listener, beacon_enable, announcer):
         smach.State.__init__(self,
                              input_keys = ['outbound',
                                            'web_slices',
                                            'web_slice_indices',
+                                           'default_velocity',
+                                           'raster_velocity',
                                            'raster_active',
                                            'raster_points',
                                            'raster_step',
@@ -665,6 +659,7 @@ class WebManager(smach.State):
                                             'raster_active',
                                             'raster_points',
                                             'move_target',
+                                            'move_velocity',
                                             'course_tolerance',
                                             'allow_rotate_to_clear',
                                             'report_sample',
@@ -677,6 +672,7 @@ class WebManager(smach.State):
                                        'preempted', 'aborted'])
 
         self.tf_listener = tf_listener
+        self.beacon_enable = beacon_enable
         self.announcer = announcer
         self.label = label
         self.last_web_move = None
@@ -695,10 +691,12 @@ class WebManager(smach.State):
             userdata.report_sample = False
             userdata.allow_rotate_to_clear = True
             userdata.stop_on_detection = False
+            userdata.move_velocity = userdata.default_velocity
             return 'return_home'
         
         if len(userdata.web_slice_indices) == 0:
             rospy.loginfo("WEB_MANAGER finished last spoke")
+            userdata.move_velocity = userdata.default_velocity
             return 'return_home'
         else:
             active_slice = userdata.web_slices[userdata.web_slice_indices[0]] 
@@ -713,10 +711,11 @@ class WebManager(smach.State):
                                         userdata.world_fixed_frame)
             next_move = {'point':end_point, 'radius':0, 'radial':True}
             userdata.outbound = False
+            self.beacon_enable.publish(False)
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f:" %(active_slice['start_angle']))
             rospy.loginfo("WEB_MANAGER remaining indices: {!s}".format(userdata.web_slice_indices))
             remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
-            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(
+            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left.  Beacon camera disabled.".format(
                                 int(active_slice['start_angle']),
                                 remaining_minutes))
             return self.load_move(next_move, userdata)
@@ -743,8 +742,9 @@ class WebManager(smach.State):
 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
-                    self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(
+                    self.announcer.say("Return ing from raster on spoke, yaw {!s}. Beacon camera enabled.".format(
                                         int(active_slice['start_angle'])))
+                    self.beacon_enable.publish(True)
                     userdata.raster_active = False
                     userdata.web_slice_indices.popleft() #remove the current index
                     userdata.outbound = True #request the next spoke move
@@ -771,8 +771,10 @@ class WebManager(smach.State):
         #use tighter course tolerance for chord moves (no point in getting into next chord)
         if next_move['radial']:
             userdata.allow_rotate_to_clear = True
+            userdata.move_velocity = userdata.default_velocity
         else:
             userdata.course_tolerance = userdata.chord_course_tolerance
+            userdata.move_velocity = userdata.raster_velocity
             userdata.allow_rotate_to_clear = False
         #load the target into move_point, and save the move
         #move_point is consumed by the general move_goal transformer,
@@ -988,7 +990,7 @@ class RetryCheck(smach.State):
 
 
 class RecoveryManager(smach.State):
-    def __init__(self, label, announcer, tf_listener):
+    def __init__(self, label, announcer, enable_beacon, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
@@ -1025,6 +1027,7 @@ class RecoveryManager(smach.State):
                                        'aborted'])
 
         self.label = label
+        self.enable_beacon = enable_beacon
         self.announcer = announcer
         self.tf_listener = tf_listener
         self.exit_move = None
@@ -1034,7 +1037,7 @@ class RecoveryManager(smach.State):
         if userdata.recovery_requested == True:
             #first time through
             rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
-            self.announcer.say("Enter ing recovery state")
+            self.announcer.say("Enter ing recovery state.")
             #save these in case we are returning to the web manager
             self.exit_move = userdata.move_target
             userdata.detection_message = False
@@ -1042,6 +1045,11 @@ class RecoveryManager(smach.State):
             userdata.report_beacon = False
             userdata.stop_on_detection = True
             userdata.report_sample = userdata.recovery_parameters['pursue_samples']
+
+            if userdata.recovery_parameters['beacon_enabled_on_entry']:
+                self.enable_beacon.publish(True)
+            else:
+                self.enable_beacon.publish(False)
 
             #modify return time
             if 'time_offset' in userdata.recovery_parameters:
@@ -1101,6 +1109,10 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)
             return 'move'
         else:
+            if userdata.recovery_parameters['beacon_enabled_on_exit']:
+                self.enable_beacon.publish(True)
+            else:
+                self.enable_beacon.publish(False)
             userdata.stop_on_detection = False
             #setting the active manager is for the return to web_manager
             #it's the only way I could think of to return to the previous goal

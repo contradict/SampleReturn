@@ -5,7 +5,8 @@ executive_master:
         
 level_two:
     #all values in degrees and meters
-    move_velocity: 0.8 
+    move_velocity: 0.8
+    raster_velocity: 0.6
     spin_velocity: 0.3
     return_time_minutes: 110 
     #dismount and beacon approach
@@ -14,7 +15,6 @@ level_two:
     platform_point: {x: -0.9, y: 0.0}
     beacon_observation_delay: 4 
     beacon_calibration_delay: 10
-    gyro_calibration_delay: 10
     beacon_mount_tolerance: 0.02 #correction must be less than this before mount
     #if a planned point has changed more than this, replan.
     #if greater than recalibrate, wait and observe beacon, and set gyro bias
@@ -47,7 +47,7 @@ pursue_sample:
     pursuit_velocity: 0.8
     spin_velocity: 0.3
     max_pursuit_error: 0.5
-    min_pursuit_distance: 1.2
+    min_pursuit_distance: 1.5
     #if sample is closer than this, strafe to approach point
     simple_pursuit_threshold: 1.5 
     #after min_pursuit reached, we move to check_distance, wait settle_time
