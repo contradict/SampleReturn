@@ -34,8 +34,7 @@
     name="ground_projector"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
-    <param name="sub_plane_model_topic" type="string"
-      value="/cameras/navigation/$(arg namespace)/planefit/model"/>
+    <remap from="model" value="/cameras/navigation/$(arg namespace)/planefit/model"/>
     <param name="min_major_axis" type="double" value="0.04"/>
     <param name="max_major_axis" type="double" value="0.2"/>
   </node>
