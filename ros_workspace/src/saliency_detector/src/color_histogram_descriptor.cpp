@@ -7,6 +7,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/color_histogram_descriptor_paramsConfig.h>
 #include <samplereturn/colormodel.h>
+#include <samplereturn/mask_utils.h>
 
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -171,10 +172,22 @@ class ColorHistogramDescriptorNode
           cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 50),
                   cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
       }
+
+      samplereturn_msgs::NamedPoint np_msg;
+
+      if(is_sample && config_.compute_grip_angle)
+      {
+          cv::RotatedRect griprect;
+          if(linemod_detector::computeGripAngle(cv_ptr_mask->image, &griprect, &np_msg.grip_angle) &&
+                  enable_debug_)
+          {
+              linemod_detector::drawGripRect(debug_image_, griprect);
+          }
+      }
+
       // Maybe check outer hist against known background?
       if (is_sample)
       {
-        samplereturn_msgs::NamedPoint np_msg;
         np_msg.header.stamp = msg->header.stamp;
         //np_msg.header.frame_id = "odom";
         np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
