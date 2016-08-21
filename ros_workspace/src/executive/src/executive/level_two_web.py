@@ -1050,8 +1050,10 @@ class RecoveryManager(smach.State):
             userdata.stop_on_detection = True
             userdata.report_sample = userdata.recovery_parameters['pursue_samples']
 
-            if userdata.recovery_parameters['enable_beacon']:
+            if userdata.recovery_parameters['beacon_enabled_on_entry']:
                 self.enable_beacon.publish(True)
+            else:
+                self.enable_beacon.publish(False)
 
             #modify return time
             if 'time_offset' in userdata.recovery_parameters:
@@ -1111,6 +1113,10 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)
             return 'move'
         else:
+            if userdata.recovery_parameters['beacon_enabled_on_exit']:
+                self.enable_beacon.publish(True)
+            else:
+                self.enable_beacon.publish(False)
             userdata.stop_on_detection = False
             #setting the active manager is for the return to web_manager
             #it's the only way I could think of to return to the previous goal
