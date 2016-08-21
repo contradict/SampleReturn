@@ -84,13 +84,14 @@ class LevelTwoWeb(object):
         #interfaces
         self.announcer = util.AnnouncerInterface("audio_search")
         self.CAN_interface = util.CANInterface()
+        self.beacon_enable = rospy.Publisher('enable_beacon',
+                                              std_msg.Bool,
+                                              queue_size=10)       
         self.camera_enablers = []
         self.camera_enablers.append(rospy.Publisher('enable_search',
                                                    std_msg.Bool,
                                                    queue_size=10))
-        self.camera_enablers.append(rospy.Publisher('enable_beacon',
-                                                    std_msg.Bool,
-                                                    queue_size=10))
+        self.camera_enablers.append(self.beacon_enable)
 
         #movement action servers
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
@@ -271,6 +272,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
                                               self.tf_listener,
+                                              self.beacon_enable,
                                               self.announcer),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
@@ -401,6 +403,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('RECOVERY_MANAGER',
                                    RecoveryManager('RECOVERY_MANAGER',
                                                    self.announcer,
+                                                   self.beacon_enable,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'simple_move':'RECOVERY_SIMPLE_MOVE',
@@ -643,7 +646,7 @@ class StartLeveLTwo(smach.State):
         return 'next'
 
 class WebManager(smach.State):
-    def __init__(self, label, tf_listener, announcer):
+    def __init__(self, label, tf_listener, beacon_enable, announcer):
         smach.State.__init__(self,
                              input_keys = ['outbound',
                                            'web_slices',
@@ -677,6 +680,7 @@ class WebManager(smach.State):
                                        'preempted', 'aborted'])
 
         self.tf_listener = tf_listener
+        self.beacon_enable = beacon_enable
         self.announcer = announcer
         self.label = label
         self.last_web_move = None
@@ -713,10 +717,11 @@ class WebManager(smach.State):
                                         userdata.world_fixed_frame)
             next_move = {'point':end_point, 'radius':0, 'radial':True}
             userdata.outbound = False
+            self.beacon_enable.publish(False)
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f:" %(active_slice['start_angle']))
             rospy.loginfo("WEB_MANAGER remaining indices: {!s}".format(userdata.web_slice_indices))
             remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
-            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left".format(
+            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left.  Beacon camera disabled.".format(
                                 int(active_slice['start_angle']),
                                 remaining_minutes))
             return self.load_move(next_move, userdata)
@@ -743,8 +748,9 @@ class WebManager(smach.State):
 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
-                    self.announcer.say("Return ing from raster on spoke, yaw {!s}".format(
+                    self.announcer.say("Return ing from raster on spoke, yaw {!s}. Beacon camera enabled.".format(
                                         int(active_slice['start_angle'])))
+                    self.beacon_enable.publish(True)
                     userdata.raster_active = False
                     userdata.web_slice_indices.popleft() #remove the current index
                     userdata.outbound = True #request the next spoke move
@@ -988,7 +994,7 @@ class RetryCheck(smach.State):
 
 
 class RecoveryManager(smach.State):
-    def __init__(self, label, announcer, tf_listener):
+    def __init__(self, label, announcer, enable_beacon, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
@@ -1025,6 +1031,7 @@ class RecoveryManager(smach.State):
                                        'aborted'])
 
         self.label = label
+        self.enable_beacon = enable_beacon
         self.announcer = announcer
         self.tf_listener = tf_listener
         self.exit_move = None
@@ -1034,7 +1041,7 @@ class RecoveryManager(smach.State):
         if userdata.recovery_requested == True:
             #first time through
             rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
-            self.announcer.say("Enter ing recovery state")
+            self.announcer.say("Enter ing recovery state.")
             #save these in case we are returning to the web manager
             self.exit_move = userdata.move_target
             userdata.detection_message = False
@@ -1042,6 +1049,9 @@ class RecoveryManager(smach.State):
             userdata.report_beacon = False
             userdata.stop_on_detection = True
             userdata.report_sample = userdata.recovery_parameters['pursue_samples']
+
+            if userdata.recovery_parameters['enable_beacon']:
+                self.enable_beacon.publish(True)
 
             #modify return time
             if 'time_offset' in userdata.recovery_parameters:
