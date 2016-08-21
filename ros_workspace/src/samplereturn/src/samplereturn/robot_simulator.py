@@ -114,9 +114,7 @@ class RobotSimulator(object):
 
         enable_manipulator_detector_name = "/processes/sample_detection/manipulator/saliency_detector/enable"
                 
-        enable_search_center_name = "/cameras/search/center/basler_camera/enable_publish"
-        enable_search_port_name = "/cameras/search/port/basler_camera/enable_publish"
-        enable_search_starboard_name = "/cameras/search/starboard/basler_camera/enable_publish"
+        enable_search_name = "/cameras/search/enable_publish"
         enable_navigation_beacon_name =  "/cameras/navigation/beacon/basler_camera/enable_publish"
         
         select_motion_name = "/motion/CAN/select_motion_mode"
@@ -213,18 +211,15 @@ class RobotSimulator(object):
             self.cam_publishers.append(rospy.Publisher(topic, std_msg.String, queue_size=2))
         rospy.Timer(rospy.Duration(0.1), self.publish_camera_messages)
         
-        rospy.Service(enable_search_center_name,
-                      platform_srv.Enable,
-                      self.service_enable_search_center_request)
-        rospy.Service(enable_search_port_name,
-                      platform_srv.Enable,
-                      self.service_enable_search_port_request)       
-        rospy.Service(enable_search_starboard_name,
-                      platform_srv.Enable,
-                      self.service_enable_search_starboard_request)        
-        rospy.Service(enable_navigation_beacon_name,
-                      platform_srv.Enable,
-                      self.service_enable_navigation_beacon_request)
+        rospy.Subscriber(enable_search_name,
+                         std_msg.Bool,
+                         self.handle_search_enable)
+
+        rospy.Subscriber(enable_navigation_beacon_name,
+                         std_msg.Bool,
+                         self.handle_beacon_enable)        
+        self.beacon_enabled = True
+        self.search_enabled = False
         
         rospy.Service(search_verify_name,
                       samplereturn_srv.Verify,
@@ -677,6 +672,9 @@ class RobotSimulator(object):
     def check_beacon_pose(self, event):
         if not self.publish_beacon:
             return
+
+        if not self.beacon_enabled:
+            return
                 
         try:
             #get distances and yaws from reality frame origin
@@ -768,22 +766,12 @@ class RobotSimulator(object):
         return req.state
 
     #camera enable handlers
-    def service_enable_search_center_request(self, req):
-        rospy.sleep(0.05)
-        return req.state
+    def handle_beacon_enable(self, msg):
+        self.beacon_enabled = msg.data
 
-    def service_enable_search_port_request(self, req):
-        rospy.sleep(0.05)
-        return req.state
-
-    def service_enable_search_starboard_request(self, req):
-        rospy.sleep(0.05)
-        return req.state
-
-    def service_enable_navigation_beacon_request(self, req):
-        rospy.sleep(0.05)
-        return req.state
-    
+    def handle_search_enable(self, msg):
+        self.search_enabled = msg.data
+            
     #fail 1 out of 3 times to verify a sample
     def service_search_verify_request(self, req):
         rospy.sleep(0.5)
