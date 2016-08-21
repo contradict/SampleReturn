@@ -59,10 +59,10 @@
   <node
     pkg="topic_tools"
     type="relay"
-    name="search_camera_info_relay"
+    name="view_frustum_relay"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)"
-    args="/cameras/search/$(arg namespace)/camera_info /processes/sample_detection/search/camera_info">
+    args="view_frustum /processes/sample_detection/search/view_frusta">
   </node>
 
   <node
