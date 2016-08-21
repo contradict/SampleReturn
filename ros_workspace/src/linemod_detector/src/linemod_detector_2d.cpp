@@ -17,8 +17,8 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <tf_conversions/tf_eigen.h>
 #include "new_modalities.hpp"
-#include <saliency_detector/colormodel.h>
-#include <linemod_detector/mask_utils.h>
+#include <samplereturn/colormodel.h>
+#include <samplereturn/mask_utils.h>
 
 namespace linemod_detector {
 // Function prototypes
@@ -389,29 +389,12 @@ class LineMOD_Detector
       if(_config.compute_grip_angle)
       {
           cv::RotatedRect griprect;
-          if(computeGripAngle(det_mask, &griprect))
+          if(computeGripAngle(det_mask, &griprect, &np.grip_angle) &&
+                  (debug_img_pub.getNumSubscribers()>0))
           {
-              if(griprect.size.width>griprect.size.height)
-              {
-                  np.grip_angle = -griprect.angle*M_PI/180+M_PI_2;
-              }
-              else
-              {
-                  np.grip_angle = -griprect.angle*M_PI/180;
-              }
-              np.grip_angle = unwrap90(np.grip_angle);
-              ROS_DEBUG("reported angle: %f", np.grip_angle);
-
-              np.grip_angle = griprect.angle;
-              if(debug_img_pub.getNumSubscribers()>0)
-              {
-                  griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
-                          orig_y + orig_height/2 - h/2);
-                  cv::Mat pts(4,1,CV_32FC2);
-                  griprect.points((cv::Point2f*)pts.data);
-                  pts.convertTo( pts, CV_32S);
-                  cv::polylines(debug_image, (cv::Point2i**)&pts.data, &pts.rows, 1, true, cv::Scalar(255,0,0), 3, CV_AA, 0);
-              }
+              griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
+                      orig_y + orig_height/2 - h/2);
+              drawGripRect(debug_image, griprect);
           }
       }
       point_pub.publish(np);
@@ -468,15 +451,6 @@ class LineMOD_Detector
       }
   }
 
-
-  double unwrap90(double angle)
-  {
-      while(angle>M_PI/2)
-          angle -= M_PI;
-      while(angle<-M_PI/2)
-          angle += M_PI;
-      return angle;
-  }
 
   void drawResponse(const std::vector<cv::linemod::Template>& templates,
                     int num_modalities, cv::Mat& dst, cv::Point offset, int T,
