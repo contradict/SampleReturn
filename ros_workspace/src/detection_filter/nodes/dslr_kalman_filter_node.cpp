@@ -66,8 +66,6 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
 
-  bool is_manipulator_;
-
   bool is_paused_;
 
   cv::Mat DSLR_frustum_;
@@ -89,7 +87,6 @@ class KalmanDetectionFilter
     ros::NodeHandle private_node_handle_("~");
 
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
-    private_node_handle_.param("is_manipulator", is_manipulator_, false);
 
     sub_cam_info =
       nh.subscribe("camera_info", 3, &KalmanDetectionFilter::cameraInfoCallback, this);
@@ -450,7 +447,7 @@ class KalmanDetectionFilter
             - meas_state);
       samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
-      bool color_check = (is_manipulator_ || (distance<config_.max_colormodel_distance));
+      bool color_check = (distance<config_.max_colormodel_distance);
       if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
         addMeasurement(meas_state, msg.sensor_frame, ckf->filter_id);
@@ -485,9 +482,6 @@ class KalmanDetectionFilter
   /* This will check if each hypothesis is in view currently */
   bool isInView (const std::shared_ptr<ColoredKF>& kf) {
     ROS_DEBUG("Is In View Check");
-    if (is_manipulator_) {
-      return true;
-    }
     /* This is in base_link, transform it to odom */
     cv::Mat DSLR_frustum_odom(DSLR_frustum_.rows,2,CV_32FC1);
     geometry_msgs::PointStamped temp_msg, temp_msg_odom;
