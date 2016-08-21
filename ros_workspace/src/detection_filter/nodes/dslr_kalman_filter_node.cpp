@@ -63,6 +63,8 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
 
+  std::map<std::string, ros::Time> last_negative_measurement_;
+
   bool is_paused_;
 
   cv::Mat DSLR_frustum_;
@@ -257,14 +259,19 @@ class KalmanDetectionFilter
 
     // write down all filters to be sure they get some update
     std::vector<std::shared_ptr<ColoredKF> > not_updated_filter_list;
-    for (auto ckf : filter_list_) {
-      ROS_DEBUG("Checking Filter to NUF");
-      ROS_DEBUG("%s",ckf->frame_id.c_str());
-      ROS_DEBUG("%s",msg->header.frame_id.c_str());
-      if (ckf->frame_id.compare(msg->header.frame_id) == 0) {
-        ROS_DEBUG("Adding Filter to NUF");
-        not_updated_filter_list.push_back(ckf);
-      }
+    if((last_negative_measurement_.find(msg->header.frame_id) == last_negative_measurement_.end())
+        || (msg->header.stamp > last_negative_measurement_[msg->header.frame_id]))
+    {
+        for (auto ckf : filter_list_) {
+            ROS_DEBUG("Checking Filter to NUF");
+            ROS_DEBUG("%s",ckf->frame_id.c_str());
+            ROS_DEBUG("%s",msg->header.frame_id.c_str());
+            if (ckf->frame_id.compare(msg->header.frame_id) == 0) {
+                ROS_DEBUG("Adding Filter to NUF");
+                not_updated_filter_list.push_back(ckf);
+            }
+        }
+        last_negative_measurement_[msg->header.frame_id] = msg->header.stamp;
     }
 
     for(const auto& np : msg->points)
