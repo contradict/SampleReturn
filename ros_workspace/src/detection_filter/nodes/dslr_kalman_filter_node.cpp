@@ -494,6 +494,8 @@ class KalmanDetectionFilter
     {
       // Transform filter location into the camera's frame, project into cam
       tf::Stamped<tf::Point> out_point;
+      if(!listener_.canTransform(kv.first, _filter_frame_id, kv.second.stamp()))
+          continue;
       listener_.transformPoint(kv.first, tf::Stamped<tf::Point>(tf::Point(
             kf->statePost.at<float>(0), kf->statePost.at<float>(1),
             kf->statePost.at<float>(2)), kv.second.stamp(), _filter_frame_id),
