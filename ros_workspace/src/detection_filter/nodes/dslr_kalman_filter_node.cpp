@@ -555,7 +555,19 @@ class KalmanDetectionFilter
       cov_text.header.frame_id = _filter_frame_id;
       cov_text.header.stamp = ros::Time::now();
       std::stringstream ss;
-      ss << "H: " << filter_ptr->huemodel.dominant_hue() << "Prob: " << filter_ptr->certainty;
+
+      if (filter_ptr->name.compare("Hue object") == 0) {
+        ss << filter_ptr->huemodel << "Prob: " << filter_ptr->certainty;
+      }
+      else if (filter_ptr->name.compare("Value object") == 0) {
+        ss << filter_ptr->huemodel << "Prob: " << filter_ptr->certainty;
+      }
+      else if (filter_ptr->name.compare(0,5,"metal") == 0) {
+        ss  << filter_ptr->name << "Prob: " << filter_ptr->certainty;
+      }
+      else {
+        ss << "Prob: " << filter_ptr->certainty;
+      }
       cov_text.text = ss.str();
       cov_text.color.r = 1.0;
       cov_text.color.g = 1.0;

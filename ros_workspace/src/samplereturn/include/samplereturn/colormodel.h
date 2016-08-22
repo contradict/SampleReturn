@@ -71,6 +71,7 @@ class HueHistogram
     void draw_histogram(cv::Mat image, int x, int y) const;
 
     friend class ColorModel;
+    friend std::ostream& operator<<(std::ostream& os, const HueHistogram& hh);
 };
 
 class HueHistogramExemplar : public HueHistogram

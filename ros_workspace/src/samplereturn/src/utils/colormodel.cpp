@@ -201,6 +201,23 @@ HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
     cv::polylines(image, &pts, &npts, 1, false, cv::Scalar(255,0,0), 3, CV_AA, 0);
 }
 
+std::ostream&
+operator<<(std::ostream& os, const HueHistogram& hh)
+{
+  // If saturated enough, return hue info
+  if (hh.saturation_score_ > hh.high_saturation_limit_) {
+    os << "Hue: " << hh.dominant_hue();
+  }
+  // If not, return value info
+  else if (hh.saturation_score_ < hh.low_saturation_limit_) {
+    os << "Value: " << hh.value_mean_;
+  }
+  else {
+    os << "Undefined";
+  }
+  return os;
+}
+
 double
 HueHistogramExemplar::distance(const HueHistogram& other) const
 {
