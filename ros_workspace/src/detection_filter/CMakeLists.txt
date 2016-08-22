@@ -8,6 +8,7 @@ set(CMAKE_BUILD_TYPE Debug)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS tf rospy
   roscpp
+  cmake_modules
   sensor_msgs
   cv_bridge
   dynamic_reconfigure
@@ -16,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS tf rospy
   samplereturn)
 
 find_package(OpenCV)
+find_package(Eigen REQUIRED)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -71,6 +73,7 @@ catkin_package(
 
 include_directories(include
    ${catkin_INCLUDE_DIRS}
+   ${Eigen_INCLUDE_DIRS}
 )
 
 add_definitions( -std=gnu++0x )
@@ -105,6 +108,7 @@ add_definitions( -std=gnu++0x )
 # )
  target_link_libraries(dslr_kalman_filter_node
    ${catkin_LIBRARIES}
+   ${eigen_LIBRARIES}
  )
  target_link_libraries(manipulator_kalman_filter_node
    ${catkin_LIBRARIES}

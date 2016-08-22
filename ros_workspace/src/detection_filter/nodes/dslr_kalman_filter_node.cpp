@@ -22,6 +22,8 @@
 #include <samplereturn/colormodel.h>
 #include <detection_filter/coloredkf.hpp>
 
+#include <Eigen/Dense>
+
 /* This is going to subscribe to a detection channel, maintain some number
  * of Kalman filters for hypothesis, and publish confirmed detections
  * when the covariance and velocity of a filter fall below a threshold.
@@ -54,7 +56,6 @@ class KalmanDetectionFilter
 
   int16_t filter_id_count_;
   int16_t current_published_id_;
-
   int16_t exclusion_count_;
 
   double last_x_;
