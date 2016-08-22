@@ -3,6 +3,7 @@
 #include <ros/console.h>
 #include <samplereturn_msgs/PatchArray.h>
 #include <samplereturn_msgs/NamedPoint.h>
+#include <samplereturn_msgs/NamedPointArray.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <saliency_detector/color_histogram_descriptor_paramsConfig.h>
@@ -21,7 +22,7 @@ namespace saliency_detector {
 class ColorHistogramDescriptorNode
 {
   ros::Subscriber sub_patch_array;
-  ros::Publisher pub_named_point;
+  ros::Publisher pub_named_points;
   ros::Publisher pub_debug_image;
   std::string sub_patch_array_topic;
   std::string pub_named_point_topic;
@@ -54,8 +55,8 @@ class ColorHistogramDescriptorNode
     sub_patch_array =
       nh.subscribe(sub_patch_array_topic, 1, &ColorHistogramDescriptorNode::patchArrayCallback, this);
 
-    pub_named_point =
-      nh.advertise<samplereturn_msgs::NamedPoint>(pub_named_point_topic.c_str(), 1);
+    pub_named_points =
+      nh.advertise<samplereturn_msgs::NamedPointArray>(pub_named_point_topic.c_str(), 1);
 
     pub_debug_image =
       nh.advertise<sensor_msgs::Image>(pub_debug_image_topic.c_str(), 1);
@@ -65,11 +66,13 @@ class ColorHistogramDescriptorNode
 
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
+    samplereturn_msgs::NamedPointArray points_out;
+    points_out.header = msg->header;
     enable_debug_ = (pub_debug_image.getNumSubscribers() != 0);
     if (msg->patch_array.empty()) {
+      pub_named_points.publish(points_out);
       return;
     }
-    samplereturn_msgs::PatchArray out_pa_msg;
     if (enable_debug_) {
       debug_image_ = cv::Mat::zeros(msg->cam_info.height,
           msg->cam_info.width, CV_8UC3);
@@ -110,11 +113,11 @@ class ColorHistogramDescriptorNode
           char *str=hh_inner.str();
           if (y > 100) {
               cv::putText(debug_image_, str, cv::Point2d(x, y),
-                      cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+                      cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
               cv::putText(debug_image_, str, cv::Point2d(x, y + h),
-                      cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+                      cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           free(str);
           hh_inner.draw_histogram(debug_image_, x, y+w);
@@ -139,28 +142,35 @@ class ColorHistogramDescriptorNode
           char bgdist[100];
           snprintf(bgdist, 100, "Too similar to bg: %4.3f", distance);
           if (y > 100) {
-            cv::putText(debug_image_,bgdist,cv::Point2d(x, y-50),
-               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+            cv::putText(debug_image_,bgdist,cv::Point2d(x, y-25*config_.debug_font_scale),
+               cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           else {
             cv::putText(debug_image_,bgdist,cv::Point2d(x, y + h),
-               cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+               cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
           }
         }
         continue;
       }
 
+      // compare background to fence color
+      std::vector<std::tuple<double, double>> edges;
+      edges.push_back(std::make_tuple(0, config_.max_fence_hue));
+      samplereturn::HueHistogram hh_fence = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
+      double fence_distance = hh_fence.distance(hh_outer);
+
       // Check inner hist against targets, either well-saturated in the specified
       // hue range, or unsaturated with a high value (metal and pre-cached)
-      std::vector<std::tuple<double, double>> edges;
-      edges.push_back(std::make_tuple(0, config_.min_target_hue));
-      edges.push_back(std::make_tuple(config_.max_target_hue, 180));
+      edges.clear();
+      edges.push_back(std::make_tuple(0, config_.max_target_hue));
+      edges.push_back(std::make_tuple(config_.min_target_hue, 180));
       samplereturn::HueHistogram hh_colored_sample = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
       samplereturn::HueHistogram hh_value_sample = samplereturn::ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
       double hue_exemplar_distance = hh_colored_sample.distance(hh_inner);
       double value_exemplar_distance = hh_value_sample.distance(hh_inner);
-      bool is_sample = (hue_exemplar_distance<config_.max_exemplar_distance) ||
-                       (value_exemplar_distance<config_.max_exemplar_distance);
+      bool is_sample = ((hue_exemplar_distance<config_.max_exemplar_distance) ||
+                       (value_exemplar_distance<config_.max_exemplar_distance)) &&
+                       (fence_distance>config_.min_fence_distance);
       if(enable_debug_)
       {
           int x,y,h;
@@ -168,9 +178,9 @@ class ColorHistogramDescriptorNode
           y = msg->patch_array[i].image_roi.y_offset;
           h = msg->patch_array[i].image_roi.height;
           char edist[100];
-          snprintf(edist, 100, "h:%4.3f v:%4.3f", hue_exemplar_distance, value_exemplar_distance);
-          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 50),
-                  cv::FONT_HERSHEY_SIMPLEX,2.0,cv::Scalar(255,0,0),4,cv::LINE_8);
+          snprintf(edist, 100, "h:%3.2f v:%3.2f f:%3.2f", hue_exemplar_distance, value_exemplar_distance, fence_distance);
+          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 25*config_.debug_font_scale),
+                  cv::FONT_HERSHEY_SIMPLEX, config_.debug_font_scale, cv::Scalar(255,0,0),4,cv::LINE_8);
       }
 
       samplereturn_msgs::NamedPoint np_msg;
@@ -181,6 +191,9 @@ class ColorHistogramDescriptorNode
           if(samplereturn::computeGripAngle(cv_ptr_mask->image, &griprect, &np_msg.grip_angle) &&
                   enable_debug_)
           {
+              griprect.center += cv::Point2f(
+                      msg->patch_array[i].image_roi.x_offset,
+                      msg->patch_array[i].image_roi.y_offset);
               samplereturn::drawGripRect(debug_image_, griprect);
           }
       }
@@ -189,12 +202,13 @@ class ColorHistogramDescriptorNode
       if (is_sample)
       {
         np_msg.header.stamp = msg->header.stamp;
-        //np_msg.header.frame_id = "odom";
         np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
         np_msg.point = msg->patch_array[i].world_point.point;
         hh_inner.to_msg(&np_msg.model.hue);
         np_msg.sensor_frame = msg->header.frame_id;
-        pub_named_point.publish(np_msg);
+        np_msg.name = (hue_exemplar_distance < value_exemplar_distance) ?
+            std::string("Hue object") : std::string("Value object");
+        points_out.points.push_back(np_msg);
       }
       else if(enable_debug_)
       {
@@ -211,6 +225,7 @@ class ColorHistogramDescriptorNode
                   cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
       }
     }
+    pub_named_points.publish(points_out);
     if (enable_debug_) {
       sensor_msgs::ImagePtr debug_image_msg =
         cv_bridge::CvImage(msg->header,"rgb8",debug_image_).toImageMsg();

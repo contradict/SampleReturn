@@ -80,6 +80,7 @@ add_message_files(
   VoiceAnnouncement.msg
   CameraParams.msg
   NamedPoint.msg
+  NamedPointArray.msg
   PursuitResult.msg
   CostmapCheck.msg
   Patch.msg
