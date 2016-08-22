@@ -63,6 +63,8 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
 
+  std::map<std::string, ros::Time> last_negative_measurement_;
+
   bool is_paused_;
 
   std::map<std::string, image_geometry::PinholeCameraModel> camera_models_;
@@ -277,14 +279,19 @@ class KalmanDetectionFilter
 
     // write down all filters to be sure they get some update
     std::vector<std::shared_ptr<ColoredKF> > not_updated_filter_list;
-    for (auto ckf : filter_list_) {
-      ROS_DEBUG("Checking Filter to NUF");
-      ROS_DEBUG("%s",ckf->frame_id.c_str());
-      ROS_DEBUG("%s",msg->header.frame_id.c_str());
-      if (ckf->frame_id.compare(msg->header.frame_id) == 0) {
-        ROS_DEBUG("Adding Filter to NUF");
-        not_updated_filter_list.push_back(ckf);
-      }
+    if((last_negative_measurement_.find(msg->header.frame_id) == last_negative_measurement_.end())
+        || (msg->header.stamp > last_negative_measurement_[msg->header.frame_id]))
+    {
+        for (auto ckf : filter_list_) {
+            ROS_DEBUG("Checking Filter to NUF");
+            ROS_DEBUG("%s",ckf->frame_id.c_str());
+            ROS_DEBUG("%s",msg->header.frame_id.c_str());
+            if (ckf->frame_id.compare(msg->header.frame_id) == 0) {
+                ROS_DEBUG("Adding Filter to NUF");
+                not_updated_filter_list.push_back(ckf);
+            }
+        }
+        last_negative_measurement_[msg->header.frame_id] = msg->header.stamp;
     }
 
     for(const auto& np : msg->points)
@@ -342,12 +349,7 @@ class KalmanDetectionFilter
               filter_ptr->errorCovPost.at<float>(0,0) < config_.max_pub_cov) {
             published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
-            point_msg.header.frame_id = _filter_frame_id;
-            point_msg.header.stamp = ros::Time::now();
-            point_msg.point.x = filter_ptr->statePost.at<float>(0);
-            point_msg.point.y = filter_ptr->statePost.at<float>(1);
-            point_msg.point.z = 0;
-            point_msg.filter_id = filter_ptr->filter_id;
+            filter_ptr->toMsg(point_msg, ros::Time::now());
             pub_detection.publish(point_msg);
             return;
           }
@@ -397,12 +399,7 @@ class KalmanDetectionFilter
       published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(nearest_filter->filter_id, nearest_filter));
       current_published_id_ = nearest_id;
       samplereturn_msgs::NamedPoint point_msg;
-      point_msg.header.frame_id = _filter_frame_id;
-      point_msg.header.stamp = ros::Time::now();
-      point_msg.point.x = nearest_filter->statePost.at<float>(0);
-      point_msg.point.y = nearest_filter->statePost.at<float>(1);
-      point_msg.point.z = 0;
-      point_msg.filter_id = nearest_filter->filter_id;
+      nearest_filter->toMsg(point_msg, ros::Time::now());
       pub_detection.publish(point_msg);
     }
   }
@@ -433,14 +430,8 @@ class KalmanDetectionFilter
       }
     }
 
-    cv::Mat meas_state(3, 1, CV_32F);
-    meas_state.at<float>(0) = msg.point.x;
-    meas_state.at<float>(1) = msg.point.y;
-    meas_state.at<float>(2) = msg.point.z;
-
     for (auto ckf : filter_list_) {
-      double dist = cv::norm(ckf->measurementMatrix * ckf->statePost
-            - meas_state);
+      double dist = ckf->distance(msg);
       samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
       bool color_check = (distance<config_.max_colormodel_distance);

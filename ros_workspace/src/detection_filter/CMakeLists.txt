@@ -85,7 +85,9 @@ add_definitions( -std=gnu++0x )
  add_executable(dslr_kalman_filter_node
      nodes/dslr_kalman_filter_node.cpp
      src/probability.cpp)
- add_executable(manipulator_kalman_filter_node nodes/manipulator_kalman_filter_node.cpp)
+ add_executable(manipulator_kalman_filter_node
+     nodes/manipulator_kalman_filter_node.cpp
+     src/probability.cpp)
 
  #add_dependencies(kalman_filter_node ${PROJECT_NAME}_gencfg)
  add_dependencies(dslr_kalman_filter_node ${PROJECT_NAME}_gencfg)
