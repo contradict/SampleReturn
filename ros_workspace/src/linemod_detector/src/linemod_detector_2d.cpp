@@ -48,6 +48,37 @@ static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filena
   return detector;
 }
 
+cv::Mat displayQuantized(const cv::Mat& quantized)
+{
+  cv::Mat color(quantized.size(), CV_8UC3);
+  for (int r = 0; r < quantized.rows; ++r)
+  {
+    const uchar* quant_r = quantized.ptr(r);
+    cv::Vec3b* color_r = color.ptr<cv::Vec3b>(r);
+
+    for (int c = 0; c < quantized.cols; ++c)
+    {
+      cv::Vec3b& bgr = color_r[c];
+      switch (quant_r[c])
+      {
+        case 0:   bgr[0]=  0; bgr[1]=  0; bgr[2]=  0;    break;
+        case 1:   bgr[0]= 55; bgr[1]= 55; bgr[2]= 55;    break;
+        case 2:   bgr[0]= 80; bgr[1]= 80; bgr[2]= 80;    break;
+        case 4:   bgr[0]=105; bgr[1]=105; bgr[2]=105;    break;
+        case 8:   bgr[0]=130; bgr[1]=130; bgr[2]=130;    break;
+        case 16:  bgr[0]=155; bgr[1]=155; bgr[2]=155;    break;
+        case 32:  bgr[0]=180; bgr[1]=180; bgr[2]=180;    break;
+        case 64:  bgr[0]=205; bgr[1]=205; bgr[2]=205;    break;
+        case 128: bgr[0]=230; bgr[1]=230; bgr[2]=230;    break;
+        case 255: bgr[0]=  0; bgr[1]=  0; bgr[2]=255;    break;
+        default:  bgr[0]=  0; bgr[1]=255; bgr[2]=  0;    break;
+      }
+    }
+  }
+
+  return color;
+}
+
 class LineMOD_Detector
 {
   ros::Subscriber patch_array_sub;
@@ -362,7 +393,7 @@ class LineMOD_Detector
                                               w - draw_w_off,
                                               h - draw_h_off)));
         // Place in output gradient image
-        quantized_images[0](cv::Rect(draw_x_off,
+        displayQuantized(quantized_images[0])(cv::Rect(draw_x_off,
                          draw_y_off,
                          w - draw_w_off,
                          h - draw_h_off)).copyTo(
