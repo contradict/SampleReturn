@@ -356,7 +356,7 @@ class LineMOD_Detector
 
       // Draw Response on output image
       cv::Rect draw_rect;
-      if (debug_img_pub.getNumSubscribers()>0) {
+      if (debug_img_pub.getNumSubscribers()>0 or debug_grad_pub.getNumSubscribers()>0) {
         int draw_x_off = 0; int draw_y_off = 0;
         int draw_w_off = 0; int draw_h_off = 0;
         draw_rect = cv::Rect(orig_x + orig_width/2. - w/2.,
