@@ -38,7 +38,7 @@ ColorModel::createHueHistogram(const cv::Mat& mask, double min_color_saturation,
     cv::calcHist(&image_hsv, 1, channels, combined_mask, hh.histogram_, 1,
             histSize, ranges , true, false);
     //Normalize histograms to account for different size
-    cv::normalize(hh.histogram_, hh.histogram_, 1.0, 0.0, cv::NORM_MINMAX);
+    cv::normalize(hh.histogram_, hh.histogram_, 1.0, 0.0, cv::NORM_L1);
     return hh;
 }
 
@@ -136,11 +136,11 @@ HueHistogram::distance(const HueHistogramExemplar& other) const
 {
     if( (this->saturation_score_<low_saturation_limit_) && (other.saturation_score_<low_saturation_limit_) )
     {
-        return 1.0-(other.value_mean_ - this->value_mean_)/other.value_mean_;
+        return (other.value_mean_ - this->value_mean_)/other.value_mean_;
     }
     else if( (this->saturation_score_>high_saturation_limit_) && (other.saturation_score_>high_saturation_limit_) )
     {
-        return intersection(other);
+        return 1.0 - intersection(other);
     }
     else
     {
@@ -189,8 +189,8 @@ HueHistogram::str() const
 void
 HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
 {
-    const int height_scale = 50;
-    int y_spark = y + height_scale + 2;
+    const int height_scale = 100;
+    int y_spark = y + height_scale/2 + 2;
     std::vector<cv::Point> points;
     for(int j=0;j<histogram_.rows; j++)
     {
