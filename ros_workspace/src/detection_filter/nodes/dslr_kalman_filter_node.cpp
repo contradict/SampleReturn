@@ -461,7 +461,11 @@ class KalmanDetectionFilter
       double dist = ckf->distance(msg);
       samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
-      bool color_check = (distance<config_.max_colormodel_distance);
+      bool color_check =
+          (((msg.name == "Hue object") && (ckf->name == "Hue object"))||
+           ((msg.name == "Value object") && (ckf->name == "Value object"))) ?
+            (distance<config_.max_colormodel_distance) :
+            true;
       if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
         ROS_DEBUG("Adding measurement to filter: %i", ckf->filter_id);
@@ -472,7 +476,7 @@ class KalmanDetectionFilter
         return ckf->filter_id;
       }
       else if ((dist < config_.max_dist) and not color_check) {
-        ROS_DEBUG("Color Check Failed");
+        ROS_DEBUG("Color Check Failed %s: %f", msg.name.c_str(), distance);
         return 0;
       }
     }
