@@ -57,6 +57,7 @@ class GroundProjectorNode
     dr_srv.setCallback(cb);
 
     ros::NodeHandle private_node_handle_("~");
+    private_node_handle_.param("frustum_buffer_", frustum_buffer_, 200);
 
     sub_patch_array =
       nh.subscribe("patch_array", 1, &GroundProjectorNode::patchArrayCallback, this);
@@ -85,9 +86,8 @@ class GroundProjectorNode
   }
 
   // Use ground plane and camera info to publish a view frustum on the ground
-  // in odom. This should be called by the plane update, and listen to blocked
-  // search area messages.
-  void publishFrustum(std_msgs::Header plane_header)
+  // plane. This should be called by the plane update, and is for visualization.
+  void publishFrustum(pcl_msgs::ModelCoefficients plane)
   {
     if (!cam_model_.initialized()) {
       return;
@@ -115,11 +115,11 @@ class GroundProjectorNode
     std::vector<Eigen::Vector3d> base_link_rays;
     base_link_rays.resize(corners.size());
     std::transform(corners.begin(), corners.end(), base_link_rays.begin(),
-        [cam_info, plane_header, this](cv::Point2d uv) -> Eigen::Vector3d
+        [cam_info, plane, this](cv::Point2d uv) -> Eigen::Vector3d
         {
           cv::Point3d xyz = cam_model_.projectPixelTo3dRay(uv);
           tf::Stamped<tf::Vector3> vect(tf::Vector3(xyz.x, xyz.y, xyz.z),
-              plane_header.stamp,
+              plane.header.stamp,
               cam_info.header.frame_id);
           tf::Stamped<tf::Vector3> vect_t;
           listener_.transformVector("base_link", vect, vect_t);
@@ -135,24 +135,19 @@ class GroundProjectorNode
         ros::Time(0), camera_transform);
     pos = camera_transform.getOrigin();
     tf::vectorTFToEigen(pos, ray_origin);
-    // These are the ground points in the camera frame
-    std::vector<tf::Stamped<tf::Point> > ground_points;
+    // These are the ground points in the base_link frame
+    std::vector<Eigen::Vector3d> ground_points;
     ground_points.resize(base_link_rays.size());
     std::transform(base_link_rays.begin(), base_link_rays.end(), ground_points.begin(),
-        [plane_header, cam_info, ray_origin, this](Eigen::Vector3d ray) -> tf::Stamped<tf::Point>
+        [ray_origin, this](Eigen::Vector3d ray) -> Eigen::Vector3d
         {
           Eigen::Vector3d ground_point = intersectRayPlane(ray, ray_origin, ground_plane_);
-          tf::Stamped<tf::Point> ground_point_tf(tf::Point(ground_point[0],
-              ground_point[1],ground_point[2]),
-            plane_header.stamp, "base_link");
-          tf::Stamped<tf::Point> cam_point;
-          listener_.transformPoint(cam_info.header.frame_id, ground_point_tf, cam_point);
-          return cam_point;
+          return ground_point;
         });
     // Publish polygon of points
     geometry_msgs::PolygonStamped ground_polygon;
-    ground_polygon.header.stamp = plane_header.stamp;
-    ground_polygon.header.frame_id = cam_info.header.frame_id;
+    ground_polygon.header.stamp = plane.header.stamp;
+    ground_polygon.header.frame_id = plane.header.frame_id;
     for (auto pt : ground_points)
     {
       geometry_msgs::Point32 p;
@@ -426,14 +421,13 @@ class GroundProjectorNode
     pub_marker.publish(mark);
 
     // Compute and publish the view frustum, given the ground plane
-    publishFrustum(msg->header);
+    publishFrustum(*msg);
   }
 
   void configCallback(saliency_detector::ground_projector_paramsConfig &config, uint32_t level)
   {
     min_major_axis_ = config.min_major_axis;
     max_major_axis_ = config.max_major_axis;
-    frustum_buffer_ = config.frustum_buffer;
   }
 
 };

@@ -14,9 +14,9 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <samplereturn_msgs/NamedPointArray.h>
 #include <samplereturn_msgs/PursuitResult.h>
-#include <geometry_msgs/PolygonStamped.h>
 #include <nav_msgs/Odometry.h>
 
+#include <image_geometry/pinhole_camera_model.h>
 #include <dynamic_reconfigure/server.h>
 #include <detection_filter/kalman_filter_paramsConfig.h>
 #include <samplereturn/colormodel.h>
@@ -37,12 +37,11 @@ class KalmanDetectionFilter
   ros::Subscriber sub_odometry;
   ros::Subscriber sub_exclusion_zone;
   ros::Subscriber sub_pause_state;
-  ros::Subscriber sub_view_frusta;
+  ros::Subscriber sub_camera_info;
 
   ros::Publisher pub_detection;
   ros::Publisher pub_debug_img;
   ros::Publisher pub_filter_marker_array;
-  ros::Publisher pub_frustum_poly;
 
   std::vector<std::shared_ptr<ColoredKF> > filter_list_;
   // Exclusion sites are center,radius,id (x,y,r,id,odometer reading)
@@ -66,11 +65,12 @@ class KalmanDetectionFilter
 
   bool is_paused_;
 
-  std::map<std::string, cv::Mat> search_frusta_;
+  std::map<std::string, image_geometry::PinholeCameraModel> camera_models_;
 
   tf::TransformListener listener_;
 
   std::string _filter_frame_id;
+  int frustum_buffer_;
 
   dynamic_reconfigure::Server<detection_filter::kalman_filter_paramsConfig> dr_srv;
 
@@ -85,6 +85,7 @@ class KalmanDetectionFilter
     ros::NodeHandle private_node_handle_("~");
 
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
+    private_node_handle_.param("frustum_buffer_", frustum_buffer_, 200);
 
     sub_detection =
       nh.subscribe("named_point", 12, &KalmanDetectionFilter::detectionCallback, this);
@@ -100,8 +101,8 @@ class KalmanDetectionFilter
     sub_pause_state =
       nh.subscribe("pause_state", 1, &KalmanDetectionFilter::pauseStateCallback, this);
 
-    sub_view_frusta =
-      nh.subscribe("view_frusta", 1, &KalmanDetectionFilter::viewFrustaCallback, this);
+    sub_camera_info =
+      nh.subscribe("camera_info", 1, &KalmanDetectionFilter::cameraInfoCallback, this);
 
     pub_detection =
       nh.advertise<samplereturn_msgs::NamedPoint>("filtered_point", 3);
@@ -111,9 +112,6 @@ class KalmanDetectionFilter
 
     pub_filter_marker_array =
       nh.advertise<visualization_msgs::MarkerArray>("filtered_markers", 3);
-
-    pub_frustum_poly =
-      nh.advertise<geometry_msgs::PolygonStamped>("frustum_polygon", 3);
 
     filter_id_count_ = 1;
     current_published_id_ = 0;
@@ -127,19 +125,30 @@ class KalmanDetectionFilter
     last_odometry_tick_ = 0.0;
   }
 
-  void viewFrustaCallback(const geometry_msgs::PolygonStamped view_frustum)
+  // Function to transform plane between coordinate frames
+  void transformPlane(std::string target_frame, Eigen::Vector4d input_plane,
+      std::string input_frame, ros::Time input_time,
+      Eigen::Vector4d& output_plane)
   {
-    // Take in a frustum message, write into matching field in map from frame_id
-    std::vector<cv::Point2f> cv_points;
-    cv_points.resize(view_frustum.polygon.points.size());
-    std::transform(view_frustum.polygon.points.begin(), view_frustum.polygon.points.end(),
-        cv_points.begin(),
-        [](geometry_msgs::Point32 pt) -> cv::Point2f
-        {
-          return cv::Point2f(pt.x, pt.y);
-        });
-    cv::Mat_<float> mat(4, 2, (float*)cv_points.data());
-    search_frusta_[view_frustum.header.frame_id] = mat.clone();
+    // Handle the normal and compute new offset
+    tf::Stamped<tf::Vector3> input_normal(tf::Vector3(input_plane[0], input_plane[1],
+          input_plane[2]), input_time, input_frame);
+    tf::Stamped<tf::Vector3> output_normal;
+    listener_.transformVector(target_frame, input_normal, output_normal);
+
+    Eigen::Vector3d input_point = input_plane.segment<3>(0) * input_plane[3];
+    tf::Stamped<tf::Point> input_point_tf(tf::Point(input_point[0], input_point[1],
+          input_point[0]), input_time, input_frame);
+    tf::Stamped<tf::Point> output_point_tf;
+    listener_.transformPoint(target_frame, input_point_tf, output_point_tf);
+
+    output_plane.segment<3>(0) << output_normal.x(), output_normal.y(), output_normal.z();
+    output_plane[3] = output_point_tf.dot(output_normal);
+  }
+
+  void cameraInfoCallback(const sensor_msgs::CameraInfo msg)
+  {
+    camera_models_[msg.header.frame_id].fromCameraInfo(msg);
   }
 
   void pauseStateCallback(const std_msgs::Bool pause_state)
@@ -457,36 +466,30 @@ class KalmanDetectionFilter
   /* This will check if each hypothesis is in view currently */
   bool isInView (const std::shared_ptr<ColoredKF>& kf) {
     ROS_DEBUG("Is In View Check");
-    /* This is in base_link, transform it to odom */
-    for(auto frustum : search_frusta_)
+    // We're going to check all the camera models and see if the point
+    // is in view of any of them
+    for(auto kv : camera_models_)
     {
-      cv::Mat frustum_odom(frustum.second.rows,2,CV_32FC1);
-      geometry_msgs::PointStamped temp_msg, temp_msg_odom;
-      temp_msg.header.frame_id = frustum.first;
-      temp_msg.header.stamp = ros::Time(0);
-      for (int i=0; i<frustum.second.rows; i++) {
-        temp_msg.point.x = frustum.second.at<float>(i,0);
-        temp_msg.point.y = frustum.second.at<float>(i,1);
-        ROS_DEBUG("Frustum Points: X %f, Y: %f", temp_msg.point.x, temp_msg.point.y);
-        temp_msg.point.z = 0.0;
-        try {
-          listener_.transformPoint(_filter_frame_id,temp_msg,temp_msg_odom);
-        }
-        catch (tf::TransformException e) {
-          ROS_ERROR_STREAM("Aww shit " << e.what());
-          return false;
-        }
-        frustum_odom.at<float>(i,0) = temp_msg_odom.point.x;
-        frustum_odom.at<float>(i,1) = temp_msg_odom.point.y;
-        ROS_DEBUG("Frustum_odom Points: X %f, Y: %f", temp_msg_odom.point.x, temp_msg_odom.point.y);
-      }
-      double retval = cv::pointPolygonTest(frustum_odom,
-          cv::Point2f(kf->statePost.at<float>(0),kf->statePost.at<float>(1)), false);
-      ROS_DEBUG("In View?: %f", retval);
-      if (retval)
+      // Transform filter location into the camera's frame, project into cam
+      tf::Stamped<tf::Point> out_point;
+      listener_.transformPoint(kv.first, tf::Stamped<tf::Point>(tf::Point(
+            kf->statePost.at<float>(0), kf->statePost.at<float>(1),
+            kf->statePost.at<float>(2)), kv.second.stamp(), _filter_frame_id),
+            out_point);
+      cv::Point3d out_point_cv(out_point.x(), out_point.y(), out_point.z());
+      cv::Point2d uv_rect = kv.second.project3dToPixel(out_point_cv);
+      cv::Point uv = kv.second.unrectifyPoint(uv_rect);
+      if ((uv.x > 0 + frustum_buffer_) and
+          (uv.x < kv.second.fullResolution().width - frustum_buffer_) and
+          (uv.y > 0 + frustum_buffer_) and
+          (uv.y < kv.second.fullResolution().height - frustum_buffer_))
+      {
         return true;
+      }
       else
+      {
         continue;
+      }
     }
     return false;
   }
