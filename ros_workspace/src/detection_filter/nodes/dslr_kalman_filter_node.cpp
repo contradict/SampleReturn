@@ -64,7 +64,8 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
 
-  std::map<std::string, ros::Time> last_negative_measurement_;
+  std::map<std::string, ros::Time> last_update_check_;
+  std::map<std::string, std::vector<std::shared_ptr<ColoredKF> > > not_updated_filter_list_;
 
   bool is_paused_;
 
@@ -278,21 +279,36 @@ class KalmanDetectionFilter
       return;
     }
 
-    // write down all filters to be sure they get some update
-    std::vector<std::shared_ptr<ColoredKF> > not_updated_filter_list;
-    if((last_negative_measurement_.find(msg->header.frame_id) == last_negative_measurement_.end())
-        || (msg->header.stamp > last_negative_measurement_[msg->header.frame_id]))
+    // if this timestamp is newer than the last time we checked for negative
+    // updates, apply a negative update to all non-measued filters
+    if((last_update_check_.find(msg->header.frame_id) == last_update_check_.end())
+        || (msg->header.stamp > last_update_check_[msg->header.frame_id]))
     {
+        // Get filters in this camera that were in view but weren't updated,
+        // apply a negative measurement
+        ROS_DEBUG("Checking NUF %s", msg->header.frame_id.c_str());
+        for (auto ckf : not_updated_filter_list_[msg->header.frame_id])
+        {
+          if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
+            ckf->predict();
+            ckf->measure(config_.PDgO, config_.PDgo);
+            ROS_DEBUG("Negative observation for filter id=%d Updated Prob: %f", ckf->filter_id, ckf->certainty);
+          }
+        }
+
+        // copy all filters to not updated list for next time
+        not_updated_filter_list_[msg->header.frame_id].clear();
         for (auto ckf : filter_list_) {
             ROS_DEBUG("Checking Filter to NUF");
-            ROS_DEBUG("%s",ckf->sensor_frame_id.c_str());
             ROS_DEBUG("%s",msg->header.frame_id.c_str());
             if (ckf->sensor_frame_id.compare(msg->header.frame_id) == 0) {
                 ROS_DEBUG("Adding Filter id=%d to NUF", ckf->filter_id);
-                not_updated_filter_list.push_back(ckf);
+                not_updated_filter_list_[msg->header.frame_id].push_back(ckf);
             }
         }
-        last_negative_measurement_[msg->header.frame_id] = msg->header.stamp;
+
+        // don't re-check until a later time stamp arrives
+        last_update_check_[msg->header.frame_id] = msg->header.stamp;
     }
 
     for(const auto& np : msg->points)
@@ -301,31 +317,21 @@ class KalmanDetectionFilter
         if(!transformPointToFilter(fp))
             continue;
 
+        ROS_DEBUG("checking np %s at %f, %f, %f",
+                fp.name.c_str(), fp.point.x, fp.point.y, fp.point.z);
         int filter_id = checkObservation(fp);
         ROS_DEBUG("Updated filter id=%d", filter_id);
 
-        // Iterate over appropriate NUF list, remove the matching filter
-        std::vector<std::shared_ptr<ColoredKF> >::iterator iter =
-            not_updated_filter_list.begin();
-        while ( iter != not_updated_filter_list.end() ) {
-            if ((*iter)->filter_id == filter_id) {
-                iter = not_updated_filter_list.erase(iter);
-                ROS_DEBUG("Removed updated filter id=%d from NUF", filter_id);
-                break;
-            }
-            ++iter;
-        }
-    }
+        // remove the matching filter from NUF
+        auto newend = std::remove_if(not_updated_filter_list_[msg->header.frame_id].begin(),
+                not_updated_filter_list_[msg->header.frame_id].end(),
+                [filter_id](std::shared_ptr<ColoredKF>& ckf) -> bool
+                {
+                    return ckf->filter_id == filter_id;
+                });
+        not_updated_filter_list_[msg->header.frame_id].erase(newend,
+                not_updated_filter_list_[msg->header.frame_id].end());
 
-    // Get filters in msg that weren't updated, decrement them
-    for (auto ckf : not_updated_filter_list)
-    {
-      ROS_DEBUG("Checking NUF");
-      if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
-        ckf->predict();
-        ckf->measure(config_.PDgO, config_.PDgo);
-        ROS_DEBUG("Negative observation or filter id=%d Updated Prob: %f", ckf->filter_id, ckf->certainty);
-      }
     }
 
     // Toss too uncertain filters
