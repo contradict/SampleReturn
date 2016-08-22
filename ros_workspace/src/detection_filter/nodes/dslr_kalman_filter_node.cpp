@@ -297,8 +297,11 @@ class KalmanDetectionFilter
 
     for(const auto& np : msg->points)
     {
+        samplereturn_msgs::NamedPoint fp(np);
+        if(!transformPointToFilter(fp))
+            continue;
 
-        int filter_id = checkObservation(np);
+        int filter_id = checkObservation(fp);
         ROS_DEBUG("Updated filter id=%d", filter_id);
 
         // Iterate over appropriate NUF list, remove the matching filter
@@ -419,6 +422,21 @@ class KalmanDetectionFilter
     ROS_DEBUG("Filter ID Count: %d", filter_id_count_);
     ROS_DEBUG("Initial Certainty: %f", CKF->certainty);
     return CKF->filter_id;
+  }
+
+  bool
+  transformPointToFilter(samplereturn_msgs::NamedPoint& msg)
+  {
+    tf::Point pt;
+    tf::pointMsgToTF(msg.point, pt);
+    tf::Stamped<tf::Point> msg_point(pt, msg.header.stamp, msg.header.frame_id);
+    tf::Stamped<tf::Point> filter_point;
+    if(!listener_.canTransform(_filter_frame_id, msg.header.frame_id, msg.header.stamp))
+        return false;
+    listener_.transformPoint(_filter_frame_id, msg_point, filter_point);
+    tf::pointTFToMsg(filter_point, msg.point);
+    msg.header.frame_id = _filter_frame_id;
+    return true;
   }
 
   int checkObservation(const samplereturn_msgs::NamedPoint& msg)

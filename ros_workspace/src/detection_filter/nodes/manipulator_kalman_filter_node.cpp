@@ -69,6 +69,8 @@ class KalmanDetectionFilter
 
     bool checkColor(const samplereturn::HueHistogram& filter, const samplereturn::HueHistogram& measurement);
 
+    bool transformPointToFilter(samplereturn_msgs::NamedPoint& msg);
+
     bool checkObservation(const samplereturn_msgs::NamedPoint& msg);
 
     bool isOld(const std::shared_ptr<ColoredKF>& ckf);
@@ -131,6 +133,10 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
 
     for(const auto & np : msg->points)
     {
+        samplereturn_msgs::NamedPoint fp(np);
+        if(!transformPointToFilter(fp))
+            continue;
+
         if(!current_filter_)
         {
             addFilter(np);
@@ -190,6 +196,21 @@ KalmanDetectionFilter::checkColor(const samplereturn::HueHistogram& filter, cons
     {
         return true;
     }
+}
+
+bool
+KalmanDetectionFilter::transformPointToFilter(samplereturn_msgs::NamedPoint& msg)
+{
+    tf::Point pt;
+    tf::pointMsgToTF(msg.point, pt);
+    tf::Stamped<tf::Point> msg_point(pt, msg.header.stamp, msg.header.frame_id);
+    tf::Stamped<tf::Point> filter_point;
+    if(!listener_.canTransform(_filter_frame_id, msg.header.frame_id, msg.header.stamp))
+        return false;
+    listener_.transformPoint(_filter_frame_id, msg_point, filter_point);
+    tf::pointTFToMsg(filter_point, msg.point);
+    msg.header.frame_id = _filter_frame_id;
+    return true;
 }
 
 bool
