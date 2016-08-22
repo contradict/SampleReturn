@@ -168,7 +168,7 @@ KalmanDetectionFilter::publishFilteredDetections()
     if (current_filter_->statePost.at<float>(3) < config_.max_pub_vel &&
             current_filter_->statePost.at<float>(4) < config_.max_pub_vel) {
         samplereturn_msgs::NamedPoint point_msg;
-        current_filter_->toMsg(point_msg, ros::Time::now());
+        current_filter_->toMsg(point_msg, ros::Time::now(), _filter_frame_id);
         pub_detection.publish(point_msg);
     }
 }
