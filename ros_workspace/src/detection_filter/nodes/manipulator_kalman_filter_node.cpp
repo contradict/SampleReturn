@@ -250,7 +250,7 @@ KalmanDetectionFilter::isOld(const std::shared_ptr<ColoredKF>& ckf)
 void
 KalmanDetectionFilter::checkFilterAges()
 {
-    if(isOld(current_filter_))
+    if(current_filter_ && isOld(current_filter_))
     {
         current_filter_.reset();
     }
