@@ -97,7 +97,7 @@ HueHistogram::HueHistogram(const samplereturn_msgs::HueHistogram& msg) :
     value_mean_(msg.value_mean),
     low_saturation_limit_(msg.low_saturation_limit),
     high_saturation_limit_(msg.high_saturation_limit),
-    histogram_(msg.histogram)
+    histogram_(msg.histogram, true)
 {
 }
 
