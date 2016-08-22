@@ -77,7 +77,7 @@
     <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
     <param name="load_inner_linemod" type="bool" value="true"/>
     <param name="pub_threshold" type="double" value="90.0"/>
-    <param name="check_color_model" type="bool" value="false"/>
+    <param name="check_color_model" type="bool" value="true"/>
     <param name="compute_grip_angle" type="bool" value="false"/>
     <param name="do_median_blur" type="bool" value="false"/>
     <param name="median_blur_size" type="int" value="13"/>
@@ -88,7 +88,6 @@
     <param name="max_exemplar_distance" type="double" value="0.3"/>
     <param name="min_color_saturation" type="double" value="150"/>
     <param name="min_inner_outer_distance" type="double" value="0.5"/>
-    <param name="pub_threshold" type="double" value="85.0"/>
     <param name="rectify_patch" type="bool" value="true"/>
     <param name="target_width" type="double" value="130.0"/>
   </node>
