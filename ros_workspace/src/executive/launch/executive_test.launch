@@ -4,7 +4,7 @@
 
     <arg name="odometry_frame" value="odom"/>
     <arg name="world_fixed_frame" value="sim_map"/>
-    <arg name="beacon_description" value="$(find samplereturn)/urdf/sim_beacon.urdf"/> 
+    <arg name="beacon_description" value="$(find samplereturn)/urdf/beacon.urdf"/> 
     <arg name="beacon_localization" value="true"/>
     <arg name="executive_config" default="$(find executive)/config/executive.yaml"/>
     
