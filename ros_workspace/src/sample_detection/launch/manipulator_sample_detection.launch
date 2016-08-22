@@ -53,12 +53,15 @@
         <param name="output_frame_id" type="string" value="odom"/>
         <param name="min_target_hue" type="double" value="120"/>
         <param name="max_target_hue" type="double" value="30"/>
+        <param name="max_fence_hue" type="double" value="18"/>
+        <param name="min_fence_distance" type="double" value="1.0"/>
         <param name="min_color_saturation" type="double" value="100"/>
         <param name="high_saturation_limit" type="double" value="0.7"/>
         <param name="low_saturation_limit" type="double" value="0.5"/>
         <param name="min_inner_outer_distance" type="double" value="0.7"/>
         <param name="max_exemplar_distance" type="double" value="0.21"/>
         <param name="compute_grip_angle" type="bool" value="true"/>
+        <param name="debug_font_scale" type="double" value="0.75"/>
     </node>
 
     <node
@@ -84,7 +87,6 @@
         <param name="max_exemplar_distance" type="double" value="0.3"/>
         <param name="min_color_saturation" type="double" value="150"/>
         <param name="min_inner_outer_distance" type="double" value="0.5"/>
-        <param name="pub_threshold" type="double" value="85.0"/>
         <param name="rectify_patch" type="bool" value="false"/>
         <param name="target_width" type="double" value="100.0"/>
     </node>
@@ -105,9 +107,10 @@
         <param name="process_noise_cov" type="double" value="0.00003"/>
         <param name="measurement_noise_cov" type="double" value="0.02"/>
         <param name="period" type="double" value="0.10"/>
-        <param name="certainty_inc" type="double" value="1.0"/>
-        <param name="certainty_dec" type="double" value="0.0"/>
-        <param name="certainty_thresh" type="double" value="3.0"/>
+        <param name="PDgO" type="double" value="0.99"/>
+        <param name="PDgo" type="double" value="0.01"/>
+        <param name="PO_init" type="double" value="0.01"/>
+        <param name="perform_color_check" type="bool" value="false"/>
     </node>
 
 </launch>

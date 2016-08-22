@@ -202,11 +202,12 @@ class ColorHistogramDescriptorNode
       if (is_sample)
       {
         np_msg.header.stamp = msg->header.stamp;
-        //np_msg.header.frame_id = "odom";
         np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
         np_msg.point = msg->patch_array[i].world_point.point;
         hh_inner.to_msg(&np_msg.model.hue);
         np_msg.sensor_frame = msg->header.frame_id;
+        np_msg.name = (hue_exemplar_distance < value_exemplar_distance) ?
+            std::string("Hue object") : std::string("Value object");
         points_out.points.push_back(np_msg);
       }
       else if(enable_debug_)

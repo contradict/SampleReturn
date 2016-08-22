@@ -26,6 +26,7 @@
     <param name="thresholdStep" type="double" value="20.0"/>
     <param name="minRepeatability" type="double" value="3.0"/>
     <param name="patch_scaling_factor" type="double" value="4.0"/>
+    <param name="debug_font_scale" type="double" value="2.0"/>
   </node>
 
   <node

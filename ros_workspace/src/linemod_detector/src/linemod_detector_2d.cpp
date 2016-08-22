@@ -388,8 +388,12 @@ class LineMOD_Detector
       }
  
       samplereturn_msgs::NamedPoint np;
-      np.header = msg->header;
+      np.header.stamp = msg->header.stamp;
+      np.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
       np.point = msg->patch_array[i].world_point.point;
+      np.sensor_frame = msg->header.frame_id;
+      np.name = m.class_id;
+
       if(_config.compute_grip_angle)
       {
           cv::RotatedRect griprect;
