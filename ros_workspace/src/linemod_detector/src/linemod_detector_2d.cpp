@@ -463,7 +463,7 @@ class LineMOD_Detector
     {
         sensor_msgs::ImagePtr debug_grad_msg =
             cv_bridge::CvImage(msg->header,"rgb8",debug_grad_image).toImageMsg();
-        debug_img_pub.publish(debug_grad_msg);
+        debug_grad_pub.publish(debug_grad_msg);
     }
   }
 
