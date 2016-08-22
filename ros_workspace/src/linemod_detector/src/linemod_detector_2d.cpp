@@ -54,7 +54,7 @@ class LineMOD_Detector
   ros::Subscriber plane_model_sub;
   ros::Publisher points_pub;
   ros::Publisher debug_img_pub;
-  ros::Publisher debug_mask_pub;
+  ros::Publisher debug_grad_pub;
   dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
   cv::Ptr<cv::linemod::Detector> detector;
   int num_modalities;
@@ -78,7 +78,7 @@ class LineMOD_Detector
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
-    debug_mask_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_mask", 1);
+    debug_grad_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_grad", 1);
 
     bool load_inner_linemod;
     ros::param::param<std::string>("~template_file", template_filename,
@@ -212,6 +212,8 @@ class LineMOD_Detector
 
     cv::Mat debug_image = cv::Mat::zeros(msg->cam_info.height,
         msg->cam_info.width, CV_8UC3);
+    cv::Mat debug_grad_image = cv::Mat::zeros(msg->cam_info.height,
+        msg->cam_info.width, CV_8UC3);
 
     cv_bridge::CvImagePtr cv_ptr_mask, cv_ptr_img;
     for (size_t i = 0; i < msg->patch_array.size(); i++) {
@@ -312,7 +314,8 @@ class LineMOD_Detector
       sources.push_back(det_img);
       masks.push_back(det_mask);
       cv::linemod::Match m;
-      bool ret = matchLineMOD(sources, masks, m);
+      std::vector<cv::Mat> quantized_images;
+      bool ret = matchLineMOD(sources, masks, m, quantized_images);
 
       if (!ret) {
         continue;
@@ -321,7 +324,7 @@ class LineMOD_Detector
       const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
 
       // Draw Response on output image
-      cv::Rect draw_rect; 
+      cv::Rect draw_rect;
       if (debug_img_pub.getNumSubscribers()>0) {
         int draw_x_off = 0; int draw_y_off = 0;
         int draw_w_off = 0; int draw_h_off = 0;
@@ -358,6 +361,16 @@ class LineMOD_Detector
                                               draw_y_off,
                                               w - draw_w_off,
                                               h - draw_h_off)));
+        // Place in output gradient image
+        quantized_images[0](cv::Rect(draw_x_off,
+                         draw_y_off,
+                         w - draw_w_off,
+                         h - draw_h_off)).copyTo(
+                            debug_grad_image(draw_rect),
+                            det_mask(cv::Rect(draw_x_off,
+                                              draw_y_off,
+                                              w - draw_w_off,
+                                              h - draw_h_off)));
 
       }
 
@@ -386,7 +399,7 @@ class LineMOD_Detector
               continue;
           }
       }
- 
+
       samplereturn_msgs::NamedPoint np;
       np.header.stamp = msg->header.stamp;
       np.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
@@ -415,14 +428,21 @@ class LineMOD_Detector
             cv_bridge::CvImage(msg->header,"rgb8",debug_image).toImageMsg();
         debug_img_pub.publish(debug_image_msg);
     }
+    if(debug_grad_pub.getNumSubscribers() > 0)
+    {
+        sensor_msgs::ImagePtr debug_grad_msg =
+            cv_bridge::CvImage(msg->header,"rgb8",debug_grad_image).toImageMsg();
+        debug_img_pub.publish(debug_grad_msg);
+    }
   }
 
-  bool matchLineMOD(std::vector<cv::Mat> sources, std::vector<cv::Mat> masks, cv::linemod::Match &best_match)
+  bool matchLineMOD(std::vector<cv::Mat> sources, std::vector<cv::Mat> masks,
+      cv::linemod::Match &best_match, std::vector<cv::Mat> &quantized_images)
   {
       // Perform matching
       std::vector<cv::linemod::Match> matches;
       std::vector<cv::String> class_ids;
-      std::vector<cv::Mat> quantized_images;
+      //std::vector<cv::Mat> quantized_images;
 
       detector->match(sources, _config.matching_threshold, matches, class_ids, quantized_images, masks);
 
