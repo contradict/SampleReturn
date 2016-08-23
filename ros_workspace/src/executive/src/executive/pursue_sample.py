@@ -238,8 +238,15 @@ class PursueSample(object):
             smach.StateMachine.add('ANNOUNCE_CLEAR',
                                    AnnounceState(self.announcer,
                                                  'Area clear. Begin ing approach.'),
-                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'})
+                                   transitions = {'next':'MANIPULATOR_APPROACH_MOVE'})
 
+            smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'ENABLE_MANIPULATOR_DETECTOR',
+                                                  'object_detected':'ENABLE_MANIPULATOR_DETECTOR',
+                                                  'aborted':'PUBLISH_FAILURE'},
+                                   remapping = {'detection_message':'detected_sample',
+                                                'stop_on_detection':'false'})
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
@@ -252,16 +259,8 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'MANIPULATOR_APPROACH_MOVE',
+                                     transitions = {'succeeded':'MANIPULATOR_FINAL_MOVE',
                                                     'aborted':'PUBLISH_FAILURE'})
-
-            smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'MANIPULATOR_FINAL_MOVE',
-                                                  'object_detected':'VISUAL_SERVO',
-                                                  'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'detection_message':'detected_sample',
-                                                'stop_on_detection':'true'})
 
             smach.StateMachine.add('MANIPULATOR_FINAL_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),

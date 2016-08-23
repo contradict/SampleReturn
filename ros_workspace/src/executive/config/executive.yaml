@@ -63,6 +63,6 @@ pursue_sample:
     #and check for obstacles.  Then we make the manipulator view approach.
     settle_time: 4.0
     sample_obstacle_check_width: 0.6
-    final_pursuit_step: 0.4
+    final_pursuit_step: 0.2
     spiral_search_step: 0.15 
     search_velocity: 0.05
