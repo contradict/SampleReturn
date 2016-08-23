@@ -41,6 +41,7 @@ class KalmanDetectionFilter
     std::shared_ptr<ColoredKF> current_filter_;
 
     ros::Time last_negative_measurement_;
+    bool updated_;
 
     int16_t filter_id_count_;
 
@@ -96,6 +97,7 @@ KalmanDetectionFilter::KalmanDetectionFilter()
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
 
     last_negative_measurement_ = ros::Time(0);
+    updated_ = false;
 
     filter_id_count_ = 0;
     sub_detections =
@@ -129,7 +131,6 @@ KalmanDetectionFilter::configCallback(detection_filter::ManipulatorKalmanFilterC
 void
 KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArrayConstPtr& msg)
 {
-    bool updated = false;
 
     for(const auto & np : msg->points)
     {
@@ -140,23 +141,28 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
         if(!current_filter_)
         {
             addFilter(np);
-            updated = true;
+            updated_ = true;
         }
         else
         {
-            updated |= checkObservation(np);
+            updated_ |= checkObservation(np);
         }
     }
 
-    if(current_filter_ && !updated && (msg->header.stamp > last_negative_measurement_))
+    if(msg->header.stamp > last_negative_measurement_)
     {
-        current_filter_->predict();
-        current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
-        current_filter_->certainty = updateProb(
-                current_filter_->certainty,
-                false,
-                config_.PDgO, config_.PDgo);
+        if(current_filter_ && !updated_)
+        {
+            ROS_DEBUG("Negative measurement");
+            current_filter_->predict();
+            current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
+            current_filter_->certainty = updateProb(
+                    current_filter_->certainty,
+                    false,
+                    config_.PDgO, config_.PDgo);
+        }
         last_negative_measurement_ = msg->header.stamp;
+        updated_ = false;
     }
 
     checkFilterAges();
