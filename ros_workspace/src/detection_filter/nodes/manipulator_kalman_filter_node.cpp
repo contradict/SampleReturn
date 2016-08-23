@@ -162,6 +162,7 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
     checkFilterAges();
     publishFilteredDetections();
     drawFilterStates();
+    printFilterState();
 }
 
 void
@@ -220,16 +221,19 @@ KalmanDetectionFilter::checkObservation(const samplereturn_msgs::NamedPoint& msg
     bool color_check = checkColor(current_filter_->huemodel, msg.model.hue);
     bool dist_check = dist < config_.max_dist;
     if (dist_check && color_check) {
-        ROS_INFO("Color Check Passed");
-        ROS_INFO("Adding measurement to filter");
+        ROS_DEBUG("Adding measurement to filter");
         current_filter_->predict();
         current_filter_->measure(msg, config_.PDgO, config_.PDgo);
         current_filter_->huemodel = samplereturn::HueHistogram(msg.model.hue);
         return true;
     }
-    else if (dist_check && !color_check) {
-        ROS_INFO("Color Check Failed");
-        return false;
+    else if (dist_check && !color_check)
+    {
+        ROS_DEBUG("Color Check Failed");
+    }
+    else
+    {
+        ROS_DEBUG("Distance check failed");
     }
     return false;
 }
@@ -253,6 +257,7 @@ KalmanDetectionFilter::checkFilterAges()
     if(current_filter_ && isOld(current_filter_))
     {
         current_filter_.reset();
+        ROS_DEBUG("Filter aged out");
     }
 }
 
@@ -300,7 +305,18 @@ KalmanDetectionFilter::printFilterState()
 {
     if(!current_filter_)
         return;
-    std::cout << "State: " << current_filter_->statePost << std::endl;
+
+    std::stringstream ss;
+    ss << "id " << current_filter_->filter_id
+       << " state " << current_filter_->statePost.at<float>(0)
+                    << ", "  << current_filter_->statePost.at<float>(1)
+                    << ", "  << current_filter_->statePost.at<float>(2)
+                    << ", "  << sqrt(pow(current_filter_->statePost.at<float>(3), 2) +
+                                 pow(current_filter_->statePost.at<float>(4), 2) +
+                                 pow(current_filter_->statePost.at<float>(5), 2))
+       << " cov " << current_filter_->errorCovPost.at<float>(0,0)
+                  << ", " << current_filter_->errorCovPost.at<float>(1,1);
+    ROS_DEBUG_STREAM(ss.str());
 }
 
 }
