@@ -131,6 +131,27 @@ KalmanDetectionFilter::configCallback(detection_filter::ManipulatorKalmanFilterC
 void
 KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArrayConstPtr& msg)
 {
+    if(msg->header.stamp > last_negative_measurement_)
+    {
+        double dt = (msg->header.stamp - last_negative_measurement_).toSec();
+        if(dt>config_.max_measurement_interval)
+        {
+            ROS_DEBUG("Large measurement interval, resetting");
+            current_filter_.reset();
+        }
+        if(current_filter_ && !updated_)
+        {
+            ROS_DEBUG("Negative measurement");
+            current_filter_->predict();
+            current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
+            current_filter_->certainty = updateProb(
+                    current_filter_->certainty,
+                    false,
+                    config_.PDgO, config_.PDgo);
+        }
+        last_negative_measurement_ = msg->header.stamp;
+        updated_ = false;
+    }
 
     for(const auto & np : msg->points)
     {
@@ -147,28 +168,6 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
         {
             updated_ |= checkObservation(np);
         }
-    }
-
-    if(msg->header.stamp > last_negative_measurement_)
-    {
-        if(current_filter_ && !updated_)
-        {
-            ROS_DEBUG("Negative measurement");
-            current_filter_->predict();
-            current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
-            current_filter_->certainty = updateProb(
-                    current_filter_->certainty,
-                    false,
-                    config_.PDgO, config_.PDgo);
-        }
-        double dt = (msg->header.stamp - last_negative_measurement_).toSec();
-        if(dt>config_.max_measurement_interval)
-        {
-            ROS_DEBUG("Large measurement interval, resetting");
-            current_filter_.reset();
-        }
-        last_negative_measurement_ = msg->header.stamp;
-        updated_ = false;
     }
 
     checkFilterAges();
