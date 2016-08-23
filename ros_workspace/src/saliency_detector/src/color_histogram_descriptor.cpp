@@ -156,7 +156,7 @@ class ColorHistogramDescriptorNode
       // compare background to fence color
       std::vector<std::tuple<double, double>> edges;
       edges.push_back(std::make_tuple(0, config_.max_fence_hue));
-      samplereturn::HueHistogram hh_fence = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
+      samplereturn::HueHistogramExemplar hh_fence = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
       double fence_distance = hh_fence.distance(hh_outer);
 
       // Check inner hist against targets, either well-saturated in the specified

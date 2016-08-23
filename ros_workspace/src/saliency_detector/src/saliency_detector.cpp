@@ -116,7 +116,7 @@ class SaliencyDetectorNode
         small,
         cv::Size(config_.bms_img_width,
             (cv_ptr->image.rows-config_.bms_top_trim)/scale),
-        0.0,0.0,cv::INTER_NEAREST);
+        0.0,0.0,cv::INTER_AREA);
     ROS_DEBUG("End resize");
 
     // Compute saliency map
@@ -141,7 +141,7 @@ class SaliencyDetectorNode
     cv::Mat saliency_map_large;
     cv::resize(saliency_map, saliency_map_large,
             cv::Size(cv_ptr->image.cols,cv_ptr->image.rows),
-            0.0, 0.0, cv::INTER_NEAREST);
+            0.0, 0.0, cv::INTER_LINEAR);
     cv::Mat debug_bms_img_color;
     if(have_debug_listener)
     {
