@@ -48,13 +48,44 @@ static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filena
   return detector;
 }
 
+cv::Mat displayQuantized(const cv::Mat& quantized)
+{
+  cv::Mat color(quantized.size(), CV_8UC3);
+  for (int r = 0; r < quantized.rows; ++r)
+  {
+    const uchar* quant_r = quantized.ptr(r);
+    cv::Vec3b* color_r = color.ptr<cv::Vec3b>(r);
+
+    for (int c = 0; c < quantized.cols; ++c)
+    {
+      cv::Vec3b& bgr = color_r[c];
+      switch (quant_r[c])
+      {
+        case 0:   bgr[0]=  0; bgr[1]=  0; bgr[2]=  0;    break;
+        case 1:   bgr[0]= 55; bgr[1]= 55; bgr[2]= 55;    break;
+        case 2:   bgr[0]= 80; bgr[1]= 80; bgr[2]= 80;    break;
+        case 4:   bgr[0]=105; bgr[1]=105; bgr[2]=105;    break;
+        case 8:   bgr[0]=130; bgr[1]=130; bgr[2]=130;    break;
+        case 16:  bgr[0]=155; bgr[1]=155; bgr[2]=155;    break;
+        case 32:  bgr[0]=180; bgr[1]=180; bgr[2]=180;    break;
+        case 64:  bgr[0]=205; bgr[1]=205; bgr[2]=205;    break;
+        case 128: bgr[0]=230; bgr[1]=230; bgr[2]=230;    break;
+        case 255: bgr[0]=  0; bgr[1]=  0; bgr[2]=255;    break;
+        default:  bgr[0]=  0; bgr[1]=255; bgr[2]=  0;    break;
+      }
+    }
+  }
+
+  return color;
+}
+
 class LineMOD_Detector
 {
   ros::Subscriber patch_array_sub;
   ros::Subscriber plane_model_sub;
   ros::Publisher points_pub;
   ros::Publisher debug_img_pub;
-  ros::Publisher debug_mask_pub;
+  ros::Publisher debug_grad_pub;
   dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
   cv::Ptr<cv::linemod::Detector> detector;
   int num_modalities;
@@ -78,7 +109,7 @@ class LineMOD_Detector
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
-    debug_mask_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_mask", 1);
+    debug_grad_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_grad", 1);
 
     bool load_inner_linemod;
     ros::param::param<std::string>("~template_file", template_filename,
@@ -212,6 +243,8 @@ class LineMOD_Detector
 
     cv::Mat debug_image = cv::Mat::zeros(msg->cam_info.height,
         msg->cam_info.width, CV_8UC3);
+    cv::Mat debug_grad_image = cv::Mat::zeros(msg->cam_info.height,
+        msg->cam_info.width, CV_8UC3);
 
     cv_bridge::CvImagePtr cv_ptr_mask, cv_ptr_img;
     for (size_t i = 0; i < msg->patch_array.size(); i++) {
@@ -312,7 +345,8 @@ class LineMOD_Detector
       sources.push_back(det_img);
       masks.push_back(det_mask);
       cv::linemod::Match m;
-      bool ret = matchLineMOD(sources, masks, m);
+      std::vector<cv::Mat> quantized_images;
+      bool ret = matchLineMOD(sources, masks, m, quantized_images);
 
       if (!ret) {
         continue;
@@ -325,7 +359,7 @@ class LineMOD_Detector
                          orig_y + orig_height/2. - h/2.,
                          w,
                          h);
-      if (debug_img_pub.getNumSubscribers()>0) {
+      if (debug_img_pub.getNumSubscribers()>0 or debug_grad_pub.getNumSubscribers()>0) {
 
         cv::Rect source_rect(0, 0, w, h);
 
@@ -380,6 +414,10 @@ class LineMOD_Detector
             det_img(source_rect).copyTo(
                                 debug_image(draw_rect),
                                 det_mask(source_rect));
+            // Place in output gradient image
+            displayQuantized(quantized_images[0])(source_rect).copyTo(
+                                debug_grad_image(draw_rect),
+                                det_mask(source_rect));
 
           }
         }
@@ -410,7 +448,7 @@ class LineMOD_Detector
               continue;
           }
       }
- 
+
       samplereturn_msgs::NamedPoint np;
       np.header.stamp = msg->header.stamp;
       np.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
@@ -439,14 +477,21 @@ class LineMOD_Detector
             cv_bridge::CvImage(msg->header,"rgb8",debug_image).toImageMsg();
         debug_img_pub.publish(debug_image_msg);
     }
+    if(debug_grad_pub.getNumSubscribers() > 0)
+    {
+        sensor_msgs::ImagePtr debug_grad_msg =
+            cv_bridge::CvImage(msg->header,"rgb8",debug_grad_image).toImageMsg();
+        debug_grad_pub.publish(debug_grad_msg);
+    }
   }
 
-  bool matchLineMOD(std::vector<cv::Mat> sources, std::vector<cv::Mat> masks, cv::linemod::Match &best_match)
+  bool matchLineMOD(std::vector<cv::Mat> sources, std::vector<cv::Mat> masks,
+      cv::linemod::Match &best_match, std::vector<cv::Mat> &quantized_images)
   {
       // Perform matching
       std::vector<cv::linemod::Match> matches;
       std::vector<cv::String> class_ids;
-      std::vector<cv::Mat> quantized_images;
+      //std::vector<cv::Mat> quantized_images;
 
       detector->match(sources, _config.matching_threshold, matches, class_ids, quantized_images, masks);
 
