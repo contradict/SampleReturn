@@ -2,6 +2,8 @@
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
     <arg name="run_cameras" default="true"/>
+    <arg name="position"/>
+    <arg name="serial_number"/>
 
     <group if="$(arg run_cameras)">
     <node machine="search"
@@ -10,62 +12,20 @@
           name="basler_camera"
           respawn_delay="5.0"
           respawn="true"
-          ns="/cameras/search/port">
+          ns="/cameras/search/$(arg position)">
         <param name="start_enabled" type="bool" value="true" />
-        <param name="watchdog_frames" type="int" value="10" />
-        <param name="frame_id" type="string" value="search_port_camera" />
-        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/search_basler_port.yaml" />
-        <param name="serial_number" type="string" value="21920610"/>
+        <param name="frame_id" type="string" value="search_$(arg position)_camera" />
+        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/search_basler_$(arg position).yaml" />
+        <param name="serial_number" type="string" value="$(arg serial_number)"/>
         <param name="AcquisitionFrameRate" type="double" value="3"/>
         <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
         <param name="GainAuto" type="string" value="Continuous"/>
         <param name="ExposureAuto" type="string" value="Off"/>
-        <param name="ExposureTime" type="double" value="1000.0"/>
+        <param name="ExposureTime" type="double" value="2000.0"/>
         <remap from="basler_camera/image" to="image_color"/>
         <remap from="basler_camera/enable_publish" to="/cameras/search/enable_publish"/>
     </node>
 
-    <node machine="search"
-          pkg="basler_camera"
-          type="basler_camera_node"
-          name="basler_camera"
-          respawn_delay="5.0"
-          respawn="true"
-          ns="/cameras/search/center">
-        <param name="start_enabled" type="bool" value="true" />
-        <param name="watchdog_frames" type="int" value="10" />
-        <param name="frame_id" type="string" value="search_center_camera" />
-        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/search_basler_center.yaml" />
-        <param name="serial_number" type="string" value="21864021"/>
-        <param name="AcquisitionFrameRate" type="double" value="3"/>
-        <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <param name="GainAuto" type="string" value="Continuous"/>
-        <param name="ExposureAuto" type="string" value="Off"/>
-        <param name="ExposureTime" type="double" value="1000.0"/>
-        <remap from="basler_camera/image" to="image_color"/>
-        <remap from="basler_camera/enable_publish" to="/cameras/search/enable_publish"/>
-    </node>
-
-    <node machine="search"
-          pkg="basler_camera"
-          type="basler_camera_node"
-          name="basler_camera"
-          respawn_delay="5.0"
-          respawn="true"
-          ns="/cameras/search/starboard">
-        <param name="start_enabled" type="bool" value="true" />
-        <param name="watchdog_frames" type="int" value="10" />
-        <param name="frame_id" type="string" value="search_starboard_camera" />
-        <param name="camera_info_url" type="string" value="file://$(find samplereturn)/calibration/search_basler_starboard.yaml" />
-        <param name="serial_number" type="string" value="21864049"/>
-        <param name="AcquisitionFrameRate" type="double" value="3"/>
-        <param name="AcquisitionFrameRateEnable" type="bool" value="True"/>
-        <param name="GainAuto" type="string" value="Continuous"/>
-        <param name="ExposureAuto" type="string" value="Off"/>
-        <param name="ExposureTime" type="double" value="1000.0"/>
-        <remap from="basler_camera/image" to="image_color"/>
-        <remap from="basler_camera/enable_publish" to="/cameras/search/enable_publish"/>
-    </node>
     </group>
 
 </launch>

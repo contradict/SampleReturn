@@ -11,7 +11,7 @@ class ColoredKF : public cv::KalmanFilter
   public:
     samplereturn::HueHistogram huemodel;
     int16_t filter_id;
-    std::string frame_id;
+    std::string sensor_frame_id;
     float certainty;
     int sample_id;
     std::string name;
@@ -28,7 +28,7 @@ class ColoredKF : public cv::KalmanFilter
 
     double distance(const samplereturn_msgs::NamedPoint& msg);
 
-    void toMsg(samplereturn_msgs::NamedPoint& msg, ros::Time stamp);
+    void toMsg(samplereturn_msgs::NamedPoint& msg, ros::Time stamp, std::string frame_id);
 };
 
 
@@ -37,7 +37,7 @@ ColoredKF::ColoredKF (configT config, samplereturn_msgs::NamedPoint msg, int16_t
     cv::KalmanFilter(6,3),
     huemodel(msg.model.hue),
     filter_id(id),
-    frame_id(msg.sensor_frame),
+    sensor_frame_id(msg.sensor_frame),
     certainty(config.PO_init),
     sample_id(msg.sample_id),
     name(msg.name),
@@ -76,7 +76,7 @@ ColoredKF::measure(const samplereturn_msgs::NamedPoint& msg, double PDgO, double
     correct(meas_state);
     certainty = updateProb(certainty, true, PDgO, PDgo);
     huemodel = samplereturn::HueHistogram(msg.model.hue);
-    frame_id = msg.sensor_frame;
+    sensor_frame_id = msg.sensor_frame;
     sample_id = msg.sample_id;
     name = msg.name;
     grip_angle = msg.grip_angle;
@@ -90,13 +90,16 @@ ColoredKF::measure(double PDgO, double PDgo)
 }
 
 void
-ColoredKF::toMsg(samplereturn_msgs::NamedPoint& msg, ros::Time stamp)
+ColoredKF::toMsg(samplereturn_msgs::NamedPoint& msg, ros::Time stamp, std::string frame_id)
 {
     msg.filter_id = filter_id;
     msg.header.frame_id = frame_id;
     msg.header.stamp = stamp;
+    msg.sensor_frame = sensor_frame_id;
     msg.grip_angle = grip_angle;
     msg.sample_id = sample_id;
+    msg.name = name;
+    huemodel.to_msg(&msg.model.hue);
     msg.point.x = statePost.at<float>(0);
     msg.point.y = statePost.at<float>(1);
     msg.point.z = 0;

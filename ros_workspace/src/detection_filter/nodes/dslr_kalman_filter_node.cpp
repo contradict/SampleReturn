@@ -64,7 +64,8 @@ class KalmanDetectionFilter
   double odometer_;
   double last_odometry_tick_;
 
-  std::map<std::string, ros::Time> last_negative_measurement_;
+  std::map<std::string, ros::Time> last_update_check_;
+  std::map<std::string, std::vector<std::shared_ptr<ColoredKF> > > not_updated_filter_list_;
 
   bool is_paused_;
 
@@ -278,49 +279,59 @@ class KalmanDetectionFilter
       return;
     }
 
-    // write down all filters to be sure they get some update
-    std::vector<std::shared_ptr<ColoredKF> > not_updated_filter_list;
-    if((last_negative_measurement_.find(msg->header.frame_id) == last_negative_measurement_.end())
-        || (msg->header.stamp > last_negative_measurement_[msg->header.frame_id]))
+    // if this timestamp is newer than the last time we checked for negative
+    // updates, apply a negative update to all non-measued filters
+    if((last_update_check_.find(msg->header.frame_id) == last_update_check_.end())
+        || (msg->header.stamp > last_update_check_[msg->header.frame_id]))
     {
+        // Get filters in this camera that were in view but weren't updated,
+        // apply a negative measurement
+        ROS_DEBUG("Checking NUF %s", msg->header.frame_id.c_str());
+        for (auto ckf : not_updated_filter_list_[msg->header.frame_id])
+        {
+          if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
+            ckf->predict();
+            ckf->measure(config_.PDgO, config_.PDgo);
+            ROS_DEBUG("Negative observation for filter id=%d Updated Prob: %f", ckf->filter_id, ckf->certainty);
+          }
+        }
+
+        // copy all filters to not updated list for next time
+        not_updated_filter_list_[msg->header.frame_id].clear();
         for (auto ckf : filter_list_) {
             ROS_DEBUG("Checking Filter to NUF");
-            ROS_DEBUG("%s",ckf->frame_id.c_str());
             ROS_DEBUG("%s",msg->header.frame_id.c_str());
-            if (ckf->frame_id.compare(msg->header.frame_id) == 0) {
-                ROS_DEBUG("Adding Filter to NUF");
-                not_updated_filter_list.push_back(ckf);
+            if (ckf->sensor_frame_id.compare(msg->header.frame_id) == 0) {
+                ROS_DEBUG("Adding Filter id=%d to NUF", ckf->filter_id);
+                not_updated_filter_list_[msg->header.frame_id].push_back(ckf);
             }
         }
-        last_negative_measurement_[msg->header.frame_id] = msg->header.stamp;
+
+        // don't re-check until a later time stamp arrives
+        last_update_check_[msg->header.frame_id] = msg->header.stamp;
     }
 
     for(const auto& np : msg->points)
     {
+        samplereturn_msgs::NamedPoint fp(np);
+        if(!transformPointToFilter(fp))
+            continue;
 
-        int filter_id = checkObservation(np);
+        ROS_DEBUG("checking np %s at %f, %f, %f",
+                fp.name.c_str(), fp.point.x, fp.point.y, fp.point.z);
+        int filter_id = checkObservation(fp);
+        ROS_DEBUG("Updated filter id=%d", filter_id);
 
-        // Iterate over appropriate NUF list, remove the matching filter
-        std::vector<std::shared_ptr<ColoredKF> >::iterator iter =
-            not_updated_filter_list.begin();
-        while ( iter != not_updated_filter_list.end() ) {
-            if ((*iter)->filter_id == filter_id) {
-                iter = not_updated_filter_list.erase(iter);
-                break;
-            }
-            ++iter;
-        }
-    }
+        // remove the matching filter from NUF
+        auto newend = std::remove_if(not_updated_filter_list_[msg->header.frame_id].begin(),
+                not_updated_filter_list_[msg->header.frame_id].end(),
+                [filter_id](std::shared_ptr<ColoredKF>& ckf) -> bool
+                {
+                    return ckf->filter_id == filter_id;
+                });
+        not_updated_filter_list_[msg->header.frame_id].erase(newend,
+                not_updated_filter_list_[msg->header.frame_id].end());
 
-    // Get filters in msg that weren't updated, decrement them
-    for (auto ckf : not_updated_filter_list)
-    {
-      ROS_DEBUG("Checking NUF");
-      if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
-        ckf->predict();
-        ckf->measure(config_.PDgO, config_.PDgo);
-        ROS_DEBUG("Negative observation Updated Prob: %f",ckf->certainty);
-      }
     }
 
     // Toss too uncertain filters
@@ -350,7 +361,7 @@ class KalmanDetectionFilter
               filter_ptr->errorCovPost.at<float>(0,0) < config_.max_pub_cov) {
             published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(filter_ptr->filter_id, filter_ptr));
             samplereturn_msgs::NamedPoint point_msg;
-            filter_ptr->toMsg(point_msg, ros::Time::now());
+            filter_ptr->toMsg(point_msg, ros::Time::now(), _filter_frame_id);
             pub_detection.publish(point_msg);
             return;
           }
@@ -400,7 +411,7 @@ class KalmanDetectionFilter
       published_filters_.insert(std::pair<int16_t, std::shared_ptr<ColoredKF> >(nearest_filter->filter_id, nearest_filter));
       current_published_id_ = nearest_id;
       samplereturn_msgs::NamedPoint point_msg;
-      nearest_filter->toMsg(point_msg, ros::Time::now());
+      nearest_filter->toMsg(point_msg, ros::Time::now(), _filter_frame_id);
       pub_detection.publish(point_msg);
     }
   }
@@ -419,6 +430,21 @@ class KalmanDetectionFilter
     return CKF->filter_id;
   }
 
+  bool
+  transformPointToFilter(samplereturn_msgs::NamedPoint& msg)
+  {
+    tf::Point pt;
+    tf::pointMsgToTF(msg.point, pt);
+    tf::Stamped<tf::Point> msg_point(pt, msg.header.stamp, msg.header.frame_id);
+    tf::Stamped<tf::Point> filter_point;
+    if(!listener_.canTransform(_filter_frame_id, msg.header.frame_id, msg.header.stamp))
+        return false;
+    listener_.transformPoint(_filter_frame_id, msg_point, filter_point);
+    tf::pointTFToMsg(filter_point, msg.point);
+    msg.header.frame_id = _filter_frame_id;
+    return true;
+  }
+
   int checkObservation(const samplereturn_msgs::NamedPoint& msg)
   {
     ROS_DEBUG("Check Observation");
@@ -435,7 +461,11 @@ class KalmanDetectionFilter
       double dist = ckf->distance(msg);
       samplereturn::HueHistogram hh(msg.model.hue);
       double distance = hh.distance(ckf->huemodel);
-      bool color_check = (distance<config_.max_colormodel_distance);
+      bool color_check =
+          (((msg.name == "Hue object") && (ckf->name == "Hue object"))||
+           ((msg.name == "Value object") && (ckf->name == "Value object"))) ?
+            (distance<config_.max_colormodel_distance) :
+            true;
       if ((dist < config_.max_dist) and color_check){
         ROS_DEBUG("Color Check Passed");
         ROS_DEBUG("Adding measurement to filter: %i", ckf->filter_id);
@@ -446,7 +476,7 @@ class KalmanDetectionFilter
         return ckf->filter_id;
       }
       else if ((dist < config_.max_dist) and not color_check) {
-        ROS_DEBUG("Color Check Failed");
+        ROS_DEBUG("Color Check Failed %s: %f", msg.name.c_str(), distance);
         return 0;
       }
     }
@@ -464,6 +494,8 @@ class KalmanDetectionFilter
     {
       // Transform filter location into the camera's frame, project into cam
       tf::Stamped<tf::Point> out_point;
+      if(!listener_.canTransform(kv.first, _filter_frame_id, kv.second.stamp()))
+          continue;
       listener_.transformPoint(kv.first, tf::Stamped<tf::Point>(tf::Point(
             kf->statePost.at<float>(0), kf->statePost.at<float>(1),
             kf->statePost.at<float>(2)), kv.second.stamp(), _filter_frame_id),

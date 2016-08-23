@@ -41,6 +41,7 @@ class KalmanDetectionFilter
     std::shared_ptr<ColoredKF> current_filter_;
 
     ros::Time last_negative_measurement_;
+    bool updated_;
 
     int16_t filter_id_count_;
 
@@ -69,6 +70,8 @@ class KalmanDetectionFilter
 
     bool checkColor(const samplereturn::HueHistogram& filter, const samplereturn::HueHistogram& measurement);
 
+    bool transformPointToFilter(samplereturn_msgs::NamedPoint& msg);
+
     bool checkObservation(const samplereturn_msgs::NamedPoint& msg);
 
     bool isOld(const std::shared_ptr<ColoredKF>& ckf);
@@ -94,6 +97,7 @@ KalmanDetectionFilter::KalmanDetectionFilter()
     private_node_handle_.param("filter_frame_id", _filter_frame_id, std::string("odom"));
 
     last_negative_measurement_ = ros::Time(0);
+    updated_ = false;
 
     filter_id_count_ = 0;
     sub_detections =
@@ -127,35 +131,44 @@ KalmanDetectionFilter::configCallback(detection_filter::ManipulatorKalmanFilterC
 void
 KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArrayConstPtr& msg)
 {
-    bool updated = false;
 
     for(const auto & np : msg->points)
     {
+        samplereturn_msgs::NamedPoint fp(np);
+        if(!transformPointToFilter(fp))
+            continue;
+
         if(!current_filter_)
         {
             addFilter(np);
-            updated = true;
+            updated_ = true;
         }
         else
         {
-            updated |= checkObservation(np);
+            updated_ |= checkObservation(np);
         }
     }
 
-    if(current_filter_ && !updated && (msg->header.stamp > last_negative_measurement_))
+    if(msg->header.stamp > last_negative_measurement_)
     {
-        current_filter_->predict();
-        current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
-        current_filter_->certainty = updateProb(
-                current_filter_->certainty,
-                false,
-                config_.PDgO, config_.PDgo);
+        if(current_filter_ && !updated_)
+        {
+            ROS_DEBUG("Negative measurement");
+            current_filter_->predict();
+            current_filter_->errorCovPre.copyTo(current_filter_->errorCovPost);;
+            current_filter_->certainty = updateProb(
+                    current_filter_->certainty,
+                    false,
+                    config_.PDgO, config_.PDgo);
+        }
         last_negative_measurement_ = msg->header.stamp;
+        updated_ = false;
     }
 
     checkFilterAges();
     publishFilteredDetections();
     drawFilterStates();
+    printFilterState();
 }
 
 void
@@ -168,7 +181,7 @@ KalmanDetectionFilter::publishFilteredDetections()
     if (current_filter_->statePost.at<float>(3) < config_.max_pub_vel &&
             current_filter_->statePost.at<float>(4) < config_.max_pub_vel) {
         samplereturn_msgs::NamedPoint point_msg;
-        current_filter_->toMsg(point_msg, ros::Time::now());
+        current_filter_->toMsg(point_msg, ros::Time::now(), _filter_frame_id);
         pub_detection.publish(point_msg);
     }
 }
@@ -193,22 +206,40 @@ KalmanDetectionFilter::checkColor(const samplereturn::HueHistogram& filter, cons
 }
 
 bool
+KalmanDetectionFilter::transformPointToFilter(samplereturn_msgs::NamedPoint& msg)
+{
+    tf::Point pt;
+    tf::pointMsgToTF(msg.point, pt);
+    tf::Stamped<tf::Point> msg_point(pt, msg.header.stamp, msg.header.frame_id);
+    tf::Stamped<tf::Point> filter_point;
+    if(!listener_.canTransform(_filter_frame_id, msg.header.frame_id, msg.header.stamp))
+        return false;
+    listener_.transformPoint(_filter_frame_id, msg_point, filter_point);
+    tf::pointTFToMsg(filter_point, msg.point);
+    msg.header.frame_id = _filter_frame_id;
+    return true;
+}
+
+bool
 KalmanDetectionFilter::checkObservation(const samplereturn_msgs::NamedPoint& msg)
 {
     double dist = current_filter_->distance(msg);
     bool color_check = checkColor(current_filter_->huemodel, msg.model.hue);
     bool dist_check = dist < config_.max_dist;
     if (dist_check && color_check) {
-        ROS_INFO("Color Check Passed");
-        ROS_INFO("Adding measurement to filter");
+        ROS_DEBUG("Adding measurement to filter");
         current_filter_->predict();
         current_filter_->measure(msg, config_.PDgO, config_.PDgo);
         current_filter_->huemodel = samplereturn::HueHistogram(msg.model.hue);
         return true;
     }
-    else if (dist_check && !color_check) {
-        ROS_INFO("Color Check Failed");
-        return false;
+    else if (dist_check && !color_check)
+    {
+        ROS_DEBUG("Color Check Failed");
+    }
+    else
+    {
+        ROS_DEBUG("Distance check failed");
     }
     return false;
 }
@@ -229,9 +260,10 @@ KalmanDetectionFilter::isOld(const std::shared_ptr<ColoredKF>& ckf)
 void
 KalmanDetectionFilter::checkFilterAges()
 {
-    if(isOld(current_filter_))
+    if(current_filter_ && isOld(current_filter_))
     {
         current_filter_.reset();
+        ROS_DEBUG("Filter aged out");
     }
 }
 
@@ -279,7 +311,18 @@ KalmanDetectionFilter::printFilterState()
 {
     if(!current_filter_)
         return;
-    std::cout << "State: " << current_filter_->statePost << std::endl;
+
+    std::stringstream ss;
+    ss << "id " << current_filter_->filter_id
+       << " state " << current_filter_->statePost.at<float>(0)
+                    << ", "  << current_filter_->statePost.at<float>(1)
+                    << ", "  << current_filter_->statePost.at<float>(2)
+                    << ", "  << sqrt(pow(current_filter_->statePost.at<float>(3), 2) +
+                                 pow(current_filter_->statePost.at<float>(4), 2) +
+                                 pow(current_filter_->statePost.at<float>(5), 2))
+       << " cov " << current_filter_->errorCovPost.at<float>(0,0)
+                  << ", " << current_filter_->errorCovPost.at<float>(1,1);
+    ROS_DEBUG_STREAM(ss.str());
 }
 
 }
