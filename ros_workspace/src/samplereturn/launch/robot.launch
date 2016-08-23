@@ -28,7 +28,18 @@
 
     <!-- bring up the cameras... hopefuly-->
     <include file="$(find samplereturn)/launch/navigation_camera.launch"/>
-    <include file="$(find samplereturn)/launch/search_camera.launch"/>
+    <include file="$(find samplereturn)/launch/search_camera.launch">
+        <arg name="position" value="port"/>
+        <arg name="serial_number" value="21920610"/>
+    </include>
+    <include file="$(find samplereturn)/launch/search_camera.launch">
+        <arg name="position" value="center"/>
+        <arg name="serial_number" value="21864021"/>
+    </include>
+    <include file="$(find samplereturn)/launch/search_camera.launch">
+        <arg name="position" value="starboard"/>
+        <arg name="serial_number" value="21864049"/>
+    </include>
 
     <!--joystick launch also brings up the manual control node-->
     <include file="$(find samplereturn)/launch/joystick.launch"/>
