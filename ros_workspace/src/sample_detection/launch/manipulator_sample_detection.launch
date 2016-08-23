@@ -104,7 +104,7 @@
         <param name="max_pub_cov" type="double" value="0.05"/>
         <param name="max_pub_vel" type="double" value="0.02"/>
         <param name="error_cov_post" type="double" value="0.1"/>
-        <param name="process_noise_cov" type="double" value="0.00003"/>
+        <param name="process_noise_cov" type="double" value="0.01"/>
         <param name="measurement_noise_cov" type="double" value="0.02"/>
         <param name="period" type="double" value="0.10"/>
         <param name="PDgO" type="double" value="0.99"/>
