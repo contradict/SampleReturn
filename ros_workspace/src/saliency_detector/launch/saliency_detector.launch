@@ -8,7 +8,6 @@
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="image" to="/cameras/search/$(arg namespace)/image_color"/>
-    <remap from="search_area_check" to="/processes/search_area_check"/>
     <param name="position" type="str" value="$(arg namespace)"/>
     <param name="bms_opening_width" type="int" value="3"/>
     <param name="bms_dilation_width_1" type="int" value="0"/>
@@ -21,7 +20,7 @@
     <param name="minArea" type="double" value="2500.0"/>
     <param name="maxArea" type="double" value="100000.0"/>
     <param name="minDistBetweenBlobs" type="double" value="100.0"/>
-    <param name="minThreshold" type="double" value="100.0"/>
+    <param name="minThreshold" type="double" value="70.0"/>
     <param name="maxThreshold" type="double" value="200.0"/>
     <param name="thresholdStep" type="double" value="20.0"/>
     <param name="minRepeatability" type="double" value="3.0"/>
