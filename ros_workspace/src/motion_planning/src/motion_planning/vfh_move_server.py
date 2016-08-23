@@ -126,14 +126,16 @@ class VFHMoveServer( object ):
         #this loop controls the strafe angle using vfh sauce
         rospy.Timer(rospy.Duration(0.2), self.vfh_planner)
 
-        #this loop publishes true/false for search area check points
-        self.search_check_points = node_params.search_check_points
-        rospy.Timer(rospy.Duration(1.0/node_params.search_check_rate),
-                    self.search_area_check)
         
-        self.search_area_check_pub = rospy.Publisher('search_area_check',
-                                                      SearchAreaCheck,
-                                                      queue_size=2)
+        if node_params.publish_search_area_check:
+            #this loop publishes true/false for search area check points
+            self.search_check_points = node_params.search_check_points
+            rospy.Timer(rospy.Duration(1.0/node_params.search_check_rate),
+                        self.search_area_check)
+        
+            self.search_area_check_pub = rospy.Publisher('search_area_check',
+                                                          SearchAreaCheck,
+                                                          queue_size=2)
 
         #service to allow other nodes to look at spots in the costmap for obstacles
         self.obstacle_check_service = rospy.Service('obstacle_check',
