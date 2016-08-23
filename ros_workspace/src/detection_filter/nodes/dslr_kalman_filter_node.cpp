@@ -183,6 +183,21 @@ class KalmanDetectionFilter
     exclusion_list_.push_back(std::make_tuple(transform.getOrigin().x(),
                                               transform.getOrigin().y(),
                                               radius.data,exclusion_count_,odometer_));
+    exclusion_count_ += 1;
+
+    // When exclusion zone is added, clear all filters in the zone
+    filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
+        [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
+        filter_list_.end());
+  }
+
+  // Check whether a filter is in an exclusion zone
+  bool filterInZone(std::shared_ptr<ColoredKF> ckf,
+      std::tuple<float,float,float,int16_t,float> zone)
+  {
+    float dist = sqrt(pow((std::get<0>(zone) - ckf->statePost.at<float>(0)),2) +
+        pow((std::get<1>(zone) - ckf->statePost.at<float>(1)),2));
+    return (dist < std::get<2>(zone));
   }
 
   /* Dynamic reconfigure callback */
@@ -258,6 +273,10 @@ class KalmanDetectionFilter
     }
     exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_,odometer_));
     exclusion_count_ += 1;
+    // When exclusion zone is added, clear all filters in the zone
+    filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
+        [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
+        filter_list_.end());
 
     // Clear this Marker from Rviz
     clearMarker(ackedFilter->second);
