@@ -54,7 +54,9 @@
     <param name="low_saturation_limit" type="double" value="0.1"/>
     <param name="min_inner_outer_distance" type="double" value="0.9"/>
     <param name="max_exemplar_distance" type="double" value="0.7"/>
-    <param name="min_fence_distance" type="double" value="0.7"/>
+    <param name="min_fence_distance" type="double" value="0.5"/>
+    <param name="min_fence_color_saturation" type="double" value="90"/>
+    <param name="fence_high_saturation_limit" type="double" value="0.25"/>
   </node>
 
   <node
