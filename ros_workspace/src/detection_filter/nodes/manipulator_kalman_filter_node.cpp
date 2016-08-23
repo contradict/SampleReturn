@@ -161,6 +161,12 @@ KalmanDetectionFilter::detectionCallback(const samplereturn_msgs::NamedPointArra
                     false,
                     config_.PDgO, config_.PDgo);
         }
+        double dt = (msg->header.stamp - last_negative_measurement_).toSec();
+        if(dt>config_.max_measurement_interval)
+        {
+            ROS_DEBUG("Large measurement interval, resetting");
+            current_filter_.reset();
+        }
         last_negative_measurement_ = msg->header.stamp;
         updated_ = false;
     }
