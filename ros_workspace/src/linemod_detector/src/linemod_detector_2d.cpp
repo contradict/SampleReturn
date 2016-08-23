@@ -321,44 +321,68 @@ class LineMOD_Detector
       const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
 
       // Draw Response on output image
-      cv::Rect draw_rect; 
+      cv::Rect draw_rect(orig_x + orig_width/2. - w/2.,
+                         orig_y + orig_height/2. - h/2.,
+                         w,
+                         h);
       if (debug_img_pub.getNumSubscribers()>0) {
-        int draw_x_off = 0; int draw_y_off = 0;
-        int draw_w_off = 0; int draw_h_off = 0;
-        draw_rect = cv::Rect(orig_x + orig_width/2. - w/2.,
-            orig_y + orig_height/2. - h/2.,
-            w,
-            h);
-        if (draw_rect.x < 0) {
-          draw_x_off = -draw_rect.x;
-          draw_rect.x = 0;
+
+        cv::Rect source_rect(0, 0, w, h);
+
+        if(draw_rect.x<0)
+        {
+            source_rect.x = -draw_rect.x;
+            source_rect.width += draw_rect.x;
+            draw_rect.width += draw_rect.x;
+            draw_rect.x = 0;
         }
-        if (draw_rect.y < 0) {
-          draw_y_off = -draw_rect.y;
-          draw_rect.y = 0;
+        if(draw_rect.x+draw_rect.width>debug_image.cols)
+        {
+            source_rect.width += debug_image.cols - (draw_rect.x+draw_rect.width);
+            draw_rect.width += debug_image.cols - (draw_rect.x+draw_rect.width);
         }
-        if (draw_rect.x + draw_rect.width > debug_image.cols) {
-          draw_w_off = draw_rect.x + draw_rect.width - debug_image.cols;
-          draw_rect.width -= draw_w_off;
+        if(draw_rect.y<0)
+        {
+            source_rect.y = -draw_rect.y;
+            source_rect.height += draw_rect.y;
+            draw_rect.height += draw_rect.y;
+            draw_rect.y = 0;
         }
-        if (draw_rect.y + draw_rect.height > debug_image.rows) {
-          draw_h_off = draw_rect.y + draw_rect.height - debug_image.rows;
-          draw_rect.height -= draw_h_off;
+        if(draw_rect.y+draw_rect.height>debug_image.rows)
+        {
+            source_rect.height += debug_image.rows - (draw_rect.y+draw_rect.height);
+            draw_rect.height += debug_image.rows - (draw_rect.y+draw_rect.height);
         }
 
-        drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
-            cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
-        // Place in output image
-        det_img(cv::Rect(draw_x_off,
-                         draw_y_off,
-                         w - draw_w_off,
-                         h - draw_h_off)).copyTo(
-                            debug_image(draw_rect),
-                            det_mask(cv::Rect(draw_x_off,
-                                              draw_y_off,
-                                              w - draw_w_off,
-                                              h - draw_h_off)));
+        if(draw_rect.x<0 || draw_rect.x>debug_image.cols ||
+           draw_rect.y<0 || draw_rect.y>debug_image.rows ||
+           draw_rect.x + draw_rect.width>debug_image.cols ||
+           draw_rect.y + draw_rect.height>debug_image.rows)
+        {
+            ROS_ERROR("Bad draw rect");
+        }
+        else
+        {
+          if(source_rect.x<0 || source_rect.x>det_img.cols ||
+             source_rect.y<0 || source_rect.y>det_img.rows ||
+             source_rect.width<0 || source_rect.x+source_rect.width>det_img.cols ||
+             source_rect.height<0 || source_rect.y+source_rect.height>det_img.rows)
+          {
+              ROS_ERROR("Bad offset rect");
+          }
+          else
+          {
 
+
+            drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
+                cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
+            // Place in output image
+            det_img(source_rect).copyTo(
+                                debug_image(draw_rect),
+                                det_mask(source_rect));
+
+          }
+        }
       }
 
       // If a positive match, publish NamedPoint
