@@ -344,6 +344,13 @@ class LineMOD_Detector
           cv::medianBlur(det_img, blur, _config.median_blur_size);
           blur.copyTo(det_img);
       }
+      if (_config.grayscale) {
+        cv::cvtColor(det_img, det_img, cv::COLOR_RGB2GRAY);
+        cv::Mat gray_stack(det_img.rows, det_img.cols, CV_8UC3);
+        int from_to[] = { 0,0, 0,1, 0,2 };
+        cv::mixChannels(&det_img, 1, &gray_stack, 1, from_to, 3);
+        det_img = gray_stack;
+      }
       sources.push_back(det_img);
       masks.push_back(det_mask);
       cv::linemod::Match m;
