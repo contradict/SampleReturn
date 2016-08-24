@@ -590,7 +590,7 @@ class StartLeveLTwo(smach.State):
         userdata.move_target = None
 
         #load the initial behavior
-        userdata.recovery_parameters = userdata.initial_behavior
+        userdata.recovery_parameters = deepcopy(userdata.initial_behavior)
         userdata.recovery_requested = True
 
         #enable all search/beacon cameras
