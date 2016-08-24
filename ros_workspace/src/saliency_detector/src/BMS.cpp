@@ -33,7 +33,11 @@ using namespace std;
 BMS::BMS() {};
 
 BMS::BMS(const int dw1, const int ow, const bool nm, const bool hb)
-	:_rng(),_dilation_width_1(dw1),_opening_width(ow),_normalize(nm),_handle_border(hb)
+	:_rng(),
+    _dilation_width_1(dw1),
+    _opening_width(ow),
+    _handle_border(hb),
+    _normalize(nm)
 {
 }
 
@@ -54,7 +58,7 @@ void BMS::computeSaliency(const Mat& src, float step)
 
 	_sm=Mat::zeros(src.size(),CV_64FC1);
 
-	for (int i=0;i<_feature_maps.size();++i)
+	for (size_t i=0;i<_feature_maps.size();++i)
 	{
 		double max_,min_;
 		minMaxLoc(_feature_maps[i],&min_,&max_);
@@ -150,7 +154,7 @@ void BMS::whitenFeatMap(const cv::Mat& img, float reg, bool mWhitening)
 	if (!mWhitening)
 	{
 		split(img, featureMaps);
-		for (int i = 0; i < featureMaps.size(); i++)
+		for (size_t i = 0; i < featureMaps.size(); i++)
 		{
 			normalize(featureMaps[i], featureMaps[i], 255.0, 0.0, NORM_MINMAX);
 			medianBlur(featureMaps[i], featureMaps[i], 3);
@@ -175,7 +179,7 @@ void BMS::whitenFeatMap(const cv::Mat& img, float reg, bool mWhitening)
 
 	split(whitenedSrc, featureMaps);
 
-	for (int i = 0; i < featureMaps.size(); i++)
+	for (size_t i = 0; i < featureMaps.size(); i++)
 	{
 		normalize(featureMaps[i], featureMaps[i], 255.0, 0.0, NORM_MINMAX);
 		featureMaps[i].convertTo(featureMaps[i], CV_8U);
