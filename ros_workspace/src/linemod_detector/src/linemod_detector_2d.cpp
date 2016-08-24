@@ -116,8 +116,6 @@ class LineMOD_Detector
             "/home/zlizer/src/SampleReturn/ros_workspace/src/linemod_detector/config/metal_samples.yaml");
     ros::param::param<bool>("~load_inner_linemod", load_inner_linemod, false);
 
-    reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
-
     // Initialize LINEMOD data structures
     if (load_inner_linemod) {
       detector = readInnerLinemod(template_filename);
@@ -128,6 +126,8 @@ class LineMOD_Detector
       num_modalities = (int)detector->getModalities().size();
     }
     ROS_DEBUG("Number of modalities loaded: %i", num_modalities);
+
+    reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
 
     ground_normal_ = tf::Stamped<tf::Vector3>(tf::Vector3(0,0,1.),ros::Time(0),"base_link");
     patch_array_sub = nh.subscribe("projected_patch_array", 1, &LineMOD_Detector::patchArrayCallback, this);
@@ -151,6 +151,8 @@ class LineMOD_Detector
   {
       (void)level;
       _config = config;
+      cv::Ptr<cv::linemod::Modality> mod = detector->getModalities()[0];
+      mod.dynamicCast<cv::linemod::InnerColorGradient>()->weak_threshold = float(config.weak_threshold);
   }
 
   cv::Mat rectifyPatch(std::string frame_id, const Eigen::Matrix3d& K, cv::Rect roi, const cv::Mat& img, int tw, int th)
@@ -341,6 +343,13 @@ class LineMOD_Detector
           cv::Mat blur;
           cv::medianBlur(det_img, blur, _config.median_blur_size);
           blur.copyTo(det_img);
+      }
+      if (_config.grayscale) {
+        cv::cvtColor(det_img, det_img, cv::COLOR_RGB2GRAY);
+        cv::Mat gray_stack(det_img.rows, det_img.cols, CV_8UC3);
+        int from_to[] = { 0,0, 0,1, 0,2 };
+        cv::mixChannels(&det_img, 1, &gray_stack, 1, from_to, 3);
+        det_img = gray_stack;
       }
       sources.push_back(det_img);
       masks.push_back(det_mask);
