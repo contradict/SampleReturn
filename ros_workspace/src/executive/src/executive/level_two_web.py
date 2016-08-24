@@ -126,6 +126,7 @@ class LevelTwoWeb(object):
         dismount_move =  node_params.dismount_move
         dismount_move['angle'] = np.radians(dismount_move['angle'])
         self.state_machine.userdata.dismount_move = dismount_move
+        self.state_machine.userdata.initial_behavior = node_params.initial_behavior
         
         #beacon and localization
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
@@ -202,7 +203,7 @@ class LevelTwoWeb(object):
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
-                                    transitions = {'next':'DISMOUNT_MOVE',
+                                    transitions = {'next':'RECOVERY_MANAGER',
                                                    'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'LEVEL_TWO_ABORTED'})
 
@@ -464,6 +465,7 @@ class LevelTwoWeb(object):
             rospy.loginfo("START_RECOVERY failed to parse params: {!s}".format(exc))
             return False
 
+        self.announcer.say("Enter ing recovery state.")
         self.state_machine.userdata.recovery_requested = True
         self.state_machine.userdata.recovery_parameters = params
         self.state_machine.request_preempt()
@@ -585,8 +587,11 @@ class StartLeveLTwo(smach.State):
         smach.State.__init__(self,
                             input_keys=['paused',
                                         'dismount_move',
+                                        'initial_behavior',
                                         'spin_velocity'],
                             output_keys=['action_result',
+                                        'recovery_parameters',
+                                        'recovery_requested',
                                         'move_target',
                                         'simple_move',
                                         'beacon_turn',
@@ -611,6 +616,9 @@ class StartLeveLTwo(smach.State):
         userdata.beacon_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
                                              angle = np.pi,
                                              velocity = userdata.spin_velocity)
+
+        userdata.recovery_parameters = userdata.initial_behavior
+        userdata.recovery_requested = True
 
         #enable all search/beacon cameras
         for publisher in self.camera_enablers:
@@ -1034,29 +1042,41 @@ class RecoveryManager(smach.State):
 
         if userdata.recovery_requested == True:
             #first time through
-            rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
-            self.announcer.say("Enter ing recovery state.")
+            params_dict = userdata.recovery_parameters #make this name shorter for the love of god
+            rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(params_dict))
+            
             #save these in case we are returning to the web manager
             self.exit_move = userdata.move_target
             userdata.detection_message = False
             userdata.recovery_requested = False
             userdata.report_beacon = False
             userdata.stop_on_detection = True
-            userdata.report_sample = userdata.recovery_parameters['pursue_samples']
+            
+            if ('pursue_samples' in params_dict) and params_dict['pursue_samples']:
+                userdata.report_sample = True
+            else:
+                userdata.report_sample = False
 
-            if userdata.recovery_parameters['beacon_enabled_on_entry']:
+            if 'beacon_enabled_on_entry' in params_dict and \
+                params_dict['beacon_enabled_on_entry']:
                 self.enable_beacon.publish(True)
             else:
                 self.enable_beacon.publish(False)
 
             #modify return time
-            if 'time_offset' in userdata.recovery_parameters:
-                time_offset = rospy.Duration(userdata.recovery_parameters['time_offset']*60)
+            if 'time_offset' in params_dict:
+                time_offset = rospy.Duration(params_dict['time_offset']*60)
                 userdata.return_time_offset += time_offset
             
             #prune requested web_slices
-            web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
-            slices_to_add = userdata.recovery_parameters['slices_to_add']
+            if 'slices_to_remove' in params_dict:
+                web_slices_to_remove = params_dict['slices_to_remove']
+            else:
+                web_slices_to_remove = 0
+            if 'slices_to_add' in params_dict:
+                slices_to_add = userdata.recovery_parameters['slices_to_add']
+            else:
+                slices_to_add = []
             if len(userdata.web_slice_indices) > 0:
                 if web_slices_to_remove > 0:
                     userdata.raster_active = False
@@ -1088,15 +1108,22 @@ class RecoveryManager(smach.State):
             userdata.move_target = self.exit_move
             return 'sample_detected'
 
-        if len(userdata.recovery_parameters['simple_moves']) > 0:
+        if 'simple_moves' in userdata.recovery_parameters and \
+         len(userdata.recovery_parameters['simple_moves']) > 0:
             simple_move = userdata.recovery_parameters['simple_moves'].pop(0)
-            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                                  angle = np.radians(simple_move['angle']),
-                                                  distance = simple_move['distance'],
-                                                  velocity = simple_move['velocity'])
+            if 'distance' in simple_move:
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                      angle = np.radians(simple_move['angle']),
+                                                      distance = simple_move['distance'],
+                                                      velocity = simple_move['velocity'])
+            else:
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                      angle = np.radians(simple_move['angle']),
+                                                      velocity = simple_move['velocity'])
             return 'simple_move'
 
-        if len(userdata.recovery_parameters['moves']) > 0:
+        if 'moves' in userdata.recovery_parameters and \
+         len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
             base_header = std_msg.Header(0, rospy.Time(0), userdata.local_frame)
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
@@ -1107,7 +1134,8 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)
             return 'move'
         else:
-            if userdata.recovery_parameters['beacon_enabled_on_exit']:
+            if 'beacon_enabled_on_exit' in userdata.recovery_parameters and \
+             userdata.recovery_parameters['beacon_enabled_on_exit']:
                 self.enable_beacon.publish(True)
             else:
                 self.enable_beacon.publish(False)
