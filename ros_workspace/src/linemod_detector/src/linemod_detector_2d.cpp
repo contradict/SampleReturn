@@ -432,12 +432,6 @@ class LineMOD_Detector
         }
       }
 
-      // If a positive match, publish NamedPoint
-      if (m.similarity < _config.pub_threshold)
-      {
-          continue;
-      }
-
       // Do a background/foreground color histogram comparison, drop if
       // too similar
       if(_config.check_color_model)
@@ -449,7 +443,12 @@ class LineMOD_Detector
           double d_value = cm.getValuedSampleModel(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit).distance(hh_inner);
           if(debug_img_pub.getNumSubscribers()>0)
           {
-              hh_inner.draw_histogram(debug_image, draw_rect.x, draw_rect.y+draw_rect.height);
+              hh_inner.draw_histogram(debug_image, draw_rect.x, draw_rect.y, _config.debug_font_scale);
+              hh_outer.draw_histogram(debug_image, draw_rect.x, draw_rect.y+draw_rect.height+25*_config.debug_font_scale, _config.debug_font_scale);
+              char edist[100];
+              snprintf(edist, 100, "b:%3.2f v:%3.2f", d_background, d_value);
+              cv::putText(debug_image,edist,cv::Point2d(draw_rect.x+70, draw_rect.y + draw_rect.height + 50*_config.debug_font_scale),
+                      cv::FONT_HERSHEY_SIMPLEX, _config.debug_font_scale, cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           if( (d_background<_config.min_inner_outer_distance) ||
               (d_value>_config.max_exemplar_distance))
@@ -458,24 +457,36 @@ class LineMOD_Detector
           }
       }
 
+      float grip_angle = 0.0;
+      if(_config.compute_grip_angle)
+      {
+          cv::RotatedRect griprect;
+          if(samplereturn::computeGripAngle(det_mask, &griprect, &grip_angle) &&
+                  (debug_img_pub.getNumSubscribers()>0))
+          {
+              griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
+                      orig_y + orig_height/2 - h/2);
+              if(debug_img_pub.getNumSubscribers()>0)
+              {
+                  samplereturn::drawGripRect(debug_image, griprect);
+              }
+          }
+      }
+
+      // If a positive match, publish NamedPoint
+      if (m.similarity < _config.pub_threshold)
+      {
+          continue;
+      }
+
       samplereturn_msgs::NamedPoint np;
       np.header.stamp = msg->header.stamp;
       np.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
       np.point = msg->patch_array[i].world_point.point;
       np.sensor_frame = msg->header.frame_id;
       np.name = m.class_id;
+      np.grip_angle = grip_angle;
 
-      if(_config.compute_grip_angle)
-      {
-          cv::RotatedRect griprect;
-          if(samplereturn::computeGripAngle(det_mask, &griprect, &np.grip_angle) &&
-                  (debug_img_pub.getNumSubscribers()>0))
-          {
-              griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
-                      orig_y + orig_height/2 - h/2);
-              samplereturn::drawGripRect(debug_image, griprect);
-          }
-      }
       points_out.points.push_back(np);
     }
     points_pub.publish(points_out);

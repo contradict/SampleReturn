@@ -187,10 +187,10 @@ HueHistogram::str() const
 }
 
 void
-HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
+HueHistogram::draw_histogram(cv::Mat image, int x, int y, double font_scale) const
 {
     const int height_scale = 100;
-    int y_spark = y + height_scale/2 + 2;
+    int y_spark = y;
     std::vector<cv::Point> points;
     for(int j=0;j<histogram_.rows; j++)
     {
@@ -199,6 +199,10 @@ HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
     const cv::Point *pts = (const cv::Point*) cv::Mat(points).data;
     int npts = cv::Mat(points).rows;
     cv::polylines(image, &pts, &npts, 1, false, cv::Scalar(255,0,0), 3, CV_AA, 0);
+    char *description=str();
+    cv::putText(image, description, cv::Point2d(x + histogram_.rows + 5, y),
+             cv::FONT_HERSHEY_SIMPLEX,font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
+    free(description);
 }
 
 std::ostream&
