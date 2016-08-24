@@ -185,7 +185,7 @@ class KalmanDetectionFilter
                                               radius.data,exclusion_count_,odometer_));
     exclusion_count_ += 1;
 
-    // When exclusion zone is added, clear all filters in the zone
+    // When any exclusion zone is added in recovery, clear all filters in the zone
     filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
         [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
         filter_list_.end());
@@ -273,10 +273,13 @@ class KalmanDetectionFilter
     }
     exclusion_list_.push_back(std::make_tuple(x,y,r,exclusion_count_,odometer_));
     exclusion_count_ += 1;
-    // When exclusion zone is added, clear all filters in the zone
-    filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
-        [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
-        filter_list_.end());
+
+    // When positive exclusion zone is added, clear all filters in the zone
+    if (msg.success) {
+      filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
+          [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
+          filter_list_.end());
+    }
 
     // Clear this Marker from Rviz
     clearMarker(ackedFilter->second);
