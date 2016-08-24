@@ -107,7 +107,7 @@ starboard_obstacle_layer:
 
 inflation_layer:
     cost_scaling_factor: 1.0
-    inflation_radius: 2.0 
+    inflation_radius: 1.5 
 
 
 

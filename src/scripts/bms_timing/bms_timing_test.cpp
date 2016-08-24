@@ -23,7 +23,8 @@ int main( int argc, char** argv)
 
   // Load an image
   std::string path = "/home/zlizer/src/SampleReturn/ros_workspace/";
-  cv::Mat img = cv::imread(path+"Basler_outdoor_exp5000_tree_pre_red.png");
+  cv::Mat img = cv::imread(argv[5]);
+  //cv::Mat img = cv::imread(path+"Basler_outdoor_exp5000_tree_pre_red.png");
   cv::cvtColor(img,img,CV_BGR2RGB);
   // Do whatever resizing we're going to do
   int height = width * (float(img.rows)/img.cols);
@@ -50,12 +51,21 @@ int main( int argc, char** argv)
   elapsed_resize = get_sal_end-comp_sal_end;
   std::cout << "elapsed time get sal: " << elapsed_get_sal.count() << std::endl;
 
+  cv::Mat bms_thresh;
+  cv::threshold(bms_out, bms_thresh, atoi(argv[6]), 255, cv::THRESH_BINARY);
+
   cv::cvtColor(img,img,CV_RGB2BGR);
-  cv::namedWindow("BMS");
-  cv::moveWindow("BMS",1940,0);
+
+  cv::imwrite("small_image.png", small);
+  cv::imwrite("small_bms.png", bms_out);
+
+  cv::namedWindow("BMS",WINDOW_NORMAL);
+  cv::namedWindow("BMS Thresh",WINDOW_NORMAL);
+  //cv::moveWindow("BMS",1940,0);
   cv::imshow("BMS",bms_out);
+  cv::imshow("BMS Thresh",bms_thresh);
   cv::namedWindow("Image",WINDOW_NORMAL);
-  cv::moveWindow("Image",2900,0);
+  //cv::moveWindow("Image",2900,0);
   cv::imshow("Image",img);
   for(;;) {
     int keycode = waitKey(0);

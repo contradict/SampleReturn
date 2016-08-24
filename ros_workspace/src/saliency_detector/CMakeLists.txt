@@ -6,9 +6,9 @@ project(saliency_detector)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  rospy
   roslib
   sensor_msgs
+  samplereturn
   samplereturn_msgs
   cv_bridge
   dynamic_reconfigure
@@ -19,11 +19,14 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   eigen_conversions
   tf_conversions
-  cmake_modules)
+  cmake_modules
+  )
 
 find_package(Eigen REQUIRED)
 find_package(OpenCV)
 find_package(PCL REQUIRED)
+
+add_definitions("-std=c++11" "-Wall")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -102,8 +105,8 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS color_naming saliency_detector_core
-  CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
+    LIBRARIES BMS saliency_detector_core
+  CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
 
@@ -130,10 +133,6 @@ add_library(saliency_detector_core
   src/saliency_detector_core.cpp
  )
 
-add_library(color_naming
-  src/color_naming.cpp
-)
-
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
  add_executable(ground_projector_node src/project.cpp)
@@ -156,7 +155,6 @@ add_library(color_naming
 
  target_link_libraries(saliency_detector_node
    saliency_detector_core
-   color_naming
    ${catkin_LIBRARIES}
    BMS
  )
@@ -180,13 +178,8 @@ add_library(color_naming
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
- install(PROGRAMS
-   nodes/close_range_detector.py
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
-
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS color_naming saliency_detector_node
+install(TARGETS saliency_detector_core BMS saliency_detector_node
    ground_projector_node color_histogram_descriptor_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -200,9 +193,6 @@ install(DIRECTORY launch
 install(DIRECTORY include
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
     USE_SOURCE_PERMISSIONS
-)
-install(FILES config/w2c.txt
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
 )
 
 

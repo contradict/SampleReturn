@@ -5,6 +5,9 @@
     <arg name="odometry_frame" default="odom"/>
     <arg name="world_fixed_frame" default="map"/>
     
+    <!--load the costmap node -->
+    <include file="$(find samplereturn)/launch/costmap.launch"/>
+        
     <node name="vfh_driver"
           pkg="motion_planning" 
           type="vfh_driving.py"
@@ -16,10 +19,13 @@
         <remap from="local_costmap" to="/processes/local_costmap/costmap/costmap"/>
         <remap from="twist" to="/motion/planner_command"/>
         <remap from="platform_joint_state" to="/motion/platform_joint_state"/>
+         
+        <!-- remap parameter from costmap -->
+        <remap from="inflation_radius" to="/processes/local_costmap/costmap/inflation_layer/inflation_radius"/>
 
         <!-- general params-->
         <param name="publish_debug" value="True"/><!-- this is a lot of stuff, turn it off when possible!-->
-        <param name="odometry_frame" value="$(arg odometry_frame)"/>
+        <param name="odometry_frame" value="$(arg odometry_frame)"/>        
         <param name="goal_orientation_tolerance" value="2"/><!--degrees!-->
         <param name="goal_obstacle_radius" value="1.0"/><!--dist past goal to check obstacles-->
         <param name="clear_distance" value="4.0"/><!-- dist to move after rotating to clear -->
@@ -37,6 +43,17 @@
         <param name="threshold_high" value="2000"/>
         <param name="threshold_low" value="1000"/>
 
+        <!-- shoehorned in crap for checking obstacles in search cam view -->        
+        <param name="publish_search_area_check" value="False"/>                
+        <param name="search_check_rate" value="10"/>
+        <rosparam>
+            search_check_points: 
+                port: { x: 1.1, y: 1.67 }
+                center: { x: 1.5, y: 0.0 }
+                starboard: { x: 1.1, y: -1.67 }
+        </rosparam>
+
+        <!-- underlying motion params for the simple move inside vfh -->
         <rosparam>
             vfh_motion_params:
                 max_velocity: 1.5

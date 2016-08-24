@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(apriltags)
 
-set(CMAKE_C_FLAGS "-std=gnu99 -Wall -Wno-unused-parameter -Wno-unused-function ${CMAKE_C_FLAGS}")
 
 find_package (Threads REQUIRED)
 

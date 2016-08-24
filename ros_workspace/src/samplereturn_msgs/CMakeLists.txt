@@ -80,10 +80,14 @@ add_message_files(
   VoiceAnnouncement.msg
   CameraParams.msg
   NamedPoint.msg
+  NamedPointArray.msg
   PursuitResult.msg
   CostmapCheck.msg
   Patch.msg
   PatchArray.msg
+  SearchAreaCheck.msg
+  ColorModel.msg
+  HueHistogram.msg
 )
 
 add_service_files(

@@ -48,6 +48,7 @@ private:
   int _opening_width;
   bool _handle_border;
   bool _normalize;
+	void whitenFeatMap(const cv::Mat& img, float reg, bool mWhiten);
 };
 
 

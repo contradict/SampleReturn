@@ -28,10 +28,8 @@
   <build_depend>geometry_msgs</build_depend>
   <build_depend>tf</build_depend>
   <build_depend>tf_conversions</build_depend>
-  <build_depend>rospy</build_depend>
   <build_depend>cv</build_depend>
   <build_depend>cv2</build_depend>
-  <build_depend>numpy</build_depend>
   <build_depend>cmake_modules</build_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>cv_bridge</run_depend>
@@ -42,9 +40,7 @@
   <run_depend>geometry_msgs</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>tf_conversions</run_depend>
-  <run_depend>rospy</run_depend>
   <run_depend>cv</run_depend>
   <run_depend>cv2</run_depend>
-  <run_depend>numpy</run_depend>
 
 </package>

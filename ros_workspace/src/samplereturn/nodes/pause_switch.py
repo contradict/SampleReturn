@@ -24,7 +24,19 @@ class PauseSwitch(object):
         self.wheelpod_servo_status = dict([(x,None) for x in
             self.wheelpod_servo_ids])
         self.carousel_servo_status = None
+ 
+        self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True, queue_size = 0)
+        self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement, queue_size = 1)
 
+        # retrieve initial motion mode
+        self.motion_mode = None
+
+        #pullup on pause input, 1->0 is transition edge
+        self.pause_bit_state = self.button_mask
+        self.guarded = False #this flag is set to true after a pause
+        
+
+        #setup service proxies and subscribers
         rospy.loginfo('Pause_switch waiting for servo controller enable service...')
         rospy.wait_for_service('enable_carousel')
         self.enable_carousel_service = rospy.ServiceProxy('enable_carousel', Enable)
@@ -39,16 +51,6 @@ class PauseSwitch(object):
         rospy.Subscriber("CAN_status_word", ServoStatus, self.status_word)
         rospy.Subscriber("current_motion_mode", SelectMotionModeResponse, self.motion_mode_update)
 
-        self.pause_pub = rospy.Publisher("pause_state", Bool, latch=True, queue_size = 0)
-        self.audio_pub = rospy.Publisher("audio_search", VoiceAnnouncement, queue_size = 1)
-
-        # retrieve initial motion mode
-        self.motion_mode = None
-
-        #pullup on pause input, 1->0 is transition edge
-        self.pause_bit_state = self.button_mask
-        self.guarded = False #this flag is set to true after a pause
-        
         ##### CAUTION ####
         # At NASA request, machine should start un paused.
         #################        
@@ -58,6 +60,7 @@ class PauseSwitch(object):
         else:        
             self.paused = False
             self.pause(False)
+
 
     def clear_guard(self, event):
         self.guarded = False

@@ -1,28 +1,28 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <algorithm>
-#include <stereo_msgs/DisparityImage.h>
+
 #include <samplereturn_msgs/NamedPoint.h>
-#include <image_transport/image_transport.h>
+#include <samplereturn_msgs/NamedPointArray.h>
+#include <samplereturn_msgs/PatchArray.h>
+#include <pcl_msgs/ModelCoefficients.h>
+
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc_c.h> // cvFindContours
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/objdetect/objdetect.hpp>
-#include <color_naming.h>
-#include <image_geometry/stereo_camera_model.h>
 #include <tf/transform_listener.h>
-#include <samplereturn_msgs/Enable.h>
-#include <BMS.h>
 #include <linemod_detector/LinemodConfig.h>
 #include <dynamic_reconfigure/server.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <tf_conversions/tf_eigen.h>
 #include "new_modalities.hpp"
+#include <samplereturn/colormodel.h>
+#include <samplereturn/mask_utils.h>
 
+namespace linemod_detector {
 // Function prototypes
-void drawResponse(const std::vector<cv::linemod::Template>& templates,
-                  int num_modalities, cv::Mat& dst, cv::Point offset, int T);
-
 static cv::Ptr<cv::linemod::Detector> readLinemod(const std::string& filename)
 {
   cv::Ptr<cv::linemod::Detector> detector = new cv::linemod::Detector;
@@ -48,301 +48,464 @@ static cv::Ptr<cv::linemod::Detector> readInnerLinemod(const std::string& filena
   return detector;
 }
 
-void drawResponse(const std::vector<cv::linemod::Template>& templates,
-                  int num_modalities, cv::Mat& dst, cv::Point offset, int T)
+cv::Mat displayQuantized(const cv::Mat& quantized)
 {
-  static const cv::Scalar COLORS[5] = { CV_RGB(0, 0, 255),
-                                        CV_RGB(0, 255, 0),
-                                        CV_RGB(255, 255, 0),
-                                        CV_RGB(255, 140, 0),
-                                        CV_RGB(255, 0, 0) };
-
-  for (int m = 0; m < num_modalities; ++m)
+  cv::Mat color(quantized.size(), CV_8UC3);
+  for (int r = 0; r < quantized.rows; ++r)
   {
-    // NOTE: Original demo recalculated max response for each feature in the TxT
-    // box around it and chose the display color based on that response. Here
-    // the display color just depends on the modality.
-    cv::Scalar color = COLORS[m];
+    const uchar* quant_r = quantized.ptr(r);
+    cv::Vec3b* color_r = color.ptr<cv::Vec3b>(r);
 
-    for (int i = 0; i < (int)templates[m].features.size(); ++i)
+    for (int c = 0; c < quantized.cols; ++c)
     {
-      cv::linemod::Feature f = templates[m].features[i];
-      cv::Point pt(f.x + offset.x, f.y + offset.y);
-      cv::circle(dst, pt, T / 2, color);
+      cv::Vec3b& bgr = color_r[c];
+      switch (quant_r[c])
+      {
+        case 0:   bgr[0]=  0; bgr[1]=  0; bgr[2]=  0;    break;
+        case 1:   bgr[0]= 55; bgr[1]= 55; bgr[2]= 55;    break;
+        case 2:   bgr[0]= 80; bgr[1]= 80; bgr[2]= 80;    break;
+        case 4:   bgr[0]=105; bgr[1]=105; bgr[2]=105;    break;
+        case 8:   bgr[0]=130; bgr[1]=130; bgr[2]=130;    break;
+        case 16:  bgr[0]=155; bgr[1]=155; bgr[2]=155;    break;
+        case 32:  bgr[0]=180; bgr[1]=180; bgr[2]=180;    break;
+        case 64:  bgr[0]=205; bgr[1]=205; bgr[2]=205;    break;
+        case 128: bgr[0]=230; bgr[1]=230; bgr[2]=230;    break;
+        case 255: bgr[0]=  0; bgr[1]=  0; bgr[2]=255;    break;
+        default:  bgr[0]=  0; bgr[1]=255; bgr[2]=  0;    break;
+      }
     }
   }
+
+  return color;
 }
 
 class LineMOD_Detector
 {
-  ros::NodeHandle nh;
-  image_transport::ImageTransport it;
-  image_transport::Subscriber color_sub;
-  ros::Subscriber disparity_sub;
-  ros::Subscriber left_cam_info_sub;
-  ros::Subscriber right_cam_info_sub;
-  ros::Publisher img_point_pub;
-  ros::Publisher point_pub;
+  ros::Subscriber patch_array_sub;
+  ros::Subscriber plane_model_sub;
+  ros::Publisher points_pub;
   ros::Publisher debug_img_pub;
-  ros::Publisher debug_mask_pub;
-  ros::Publisher pub_bms_img;
+  ros::Publisher debug_grad_pub;
   dynamic_reconfigure::Server<linemod_detector::LinemodConfig> reconfigure;
-  std::vector<cv::Mat> sources;
-  cv::Mat color_img;
-  cv::Mat disparity_img;
-  float min_disp;
-  cv::Mat display;
-  cv::Mat K;
   cv::Ptr<cv::linemod::Detector> detector;
-  sensor_msgs::CameraInfo right_camera_info_msg;
-  int matching_threshold;
   int num_modalities;
-  int num_classes;
-  bool got_color;
-  bool got_right_camera_info_;
-  bool got_disp_;
-  float pub_threshold;
-  float min_depth;
-  float max_depth;
-  float min_count;
-  bool hard_samples;
-  bool _publish_debug_img;
-  double max_hull_area_;
-  double min_hull_area_;
+  int flood_fill_offset_;
+  std::string template_filename;
+
+  tf::Stamped<tf::Vector3> ground_normal_;
 
   std::vector<std::string> interior_colors_vec_, exterior_colors_vec_;
 
   linemod_detector::LinemodConfig _config;
 
-  ColorNaming cn;
-  //image_geometry::PinholeCameraModel cam_model_;
-  image_geometry::StereoCameraModel cam_model_;
-
   tf::TransformListener listener_;
   ros::ServiceServer service_;
-  bool enabled_;
-
-  std::string _detection_frame_id;
 
   public:
-  LineMOD_Detector(): it(nh)
+  LineMOD_Detector()
   {
-    img_point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("img_point", 1);
-    point_pub = nh.advertise<samplereturn_msgs::NamedPoint>("point", 1);
-    matching_threshold = 80;
-    got_color = false;
-    K = cv::Mat(3,3,CV_64FC1);
+    ros::NodeHandle nh;
+    points_pub = nh.advertise<samplereturn_msgs::NamedPointArray>("point", 1);
 
     ros::NodeHandle pnh("~");
     debug_img_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_img", 1);
-    debug_mask_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_mask", 1);
-    pub_bms_img = pnh.advertise<sensor_msgs::Image>("bms_debug", 1);
-    service_ = pnh.advertiseService("enable",&LineMOD_Detector::enable,this);
+    debug_grad_pub = pnh.advertise<sensor_msgs::Image>("linemod_2d_debug_grad", 1);
 
-    std::string filename;
-    ros::param::get("~template_file", filename);
-    ros::param::get("~pub_threshold", LineMOD_Detector::pub_threshold);
-    ros::param::get("~min_depth", LineMOD_Detector::min_depth);
-    ros::param::get("~max_depth", LineMOD_Detector::max_depth);
-    ros::param::get("~min_count", LineMOD_Detector::min_count);
-    ros::param::get("~hard_samples", LineMOD_Detector::hard_samples);
-    ros::param::param<bool>("~publish_debug_img", _publish_debug_img, true);
-    ros::param::param<std::string>("~detection_frame_id", _detection_frame_id, "odom");
-    ros::param::param<double>("~max_hull_area", max_hull_area_, 18000);
-    ros::param::param<double>("~min_hull_area", min_hull_area_, 2500);
-
-    ros::param::get("~interior_colors", interior_colors_vec_);
-    ros::param::get("~exterior_colors", exterior_colors_vec_);
+    bool load_inner_linemod;
+    ros::param::param<std::string>("~template_file", template_filename,
+            "/home/zlizer/src/SampleReturn/ros_workspace/src/linemod_detector/config/metal_samples.yaml");
+    ros::param::param<bool>("~load_inner_linemod", load_inner_linemod, false);
 
     reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
 
-    ROS_DEBUG("Pub Threshold:%f ", LineMOD_Detector::pub_threshold);
-
     // Initialize LINEMOD data structures
-    if (!hard_samples) {
-      detector = readLinemod(filename);
+    if (load_inner_linemod) {
+      detector = readInnerLinemod(template_filename);
       num_modalities = (int)detector->getModalities().size();
     }
     else {
-      detector = readInnerLinemod(filename);
+      detector = readLinemod(template_filename);
       num_modalities = (int)detector->getModalities().size();
     }
-    std::cout << num_modalities << std::endl;
+    ROS_DEBUG("Number of modalities loaded: %i", num_modalities);
 
-    enabled_ = false;
-    got_right_camera_info_ = false;
-    got_disp_ = false;
+    ground_normal_ = tf::Stamped<tf::Vector3>(tf::Vector3(0,0,1.),ros::Time(0),"base_link");
+    patch_array_sub = nh.subscribe("projected_patch_array", 1, &LineMOD_Detector::patchArrayCallback, this);
+    plane_model_sub = nh.subscribe("plane_model", 1, &LineMOD_Detector::planeModelCallback, this);
+
+  }
+
+  void planeModelCallback(const pcl_msgs::ModelCoefficientsPtr& msg)
+  {
+    if (msg->values.size() != 4) {
+      ROS_DEBUG("Invalid Plane Fit");
+    }
+    else {
+      ground_normal_.setData(tf::Vector3(msg->values[0], msg->values[1], msg->values[2]));
+      ground_normal_.stamp_ = msg->header.stamp;
+      ground_normal_.frame_id_ = msg->header.frame_id;
+    }
   }
 
   void configCallback(linemod_detector::LinemodConfig &config, uint32_t level)
   {
+      (void)level;
       _config = config;
   }
 
-  bool enable(samplereturn_msgs::Enable::Request &req,
-              samplereturn_msgs::Enable::Response &res) {
-    enabled_ = req.state;
-    if (req.state) {
-      color_sub = it.subscribe("color", 1, &LineMOD_Detector::colorCallback, this);
-      disparity_sub = nh.subscribe("disparity", 1, &LineMOD_Detector::disparityCallback, this);
-      left_cam_info_sub = nh.subscribe("left_cam_info", 1, &LineMOD_Detector::leftCameraInfoCallback, this);
-      right_cam_info_sub = nh.subscribe("right_cam_info", 1, &LineMOD_Detector::rightCameraInfoCallback, this);
-    }
-    else {
-      color_sub.shutdown();
-      disparity_sub.shutdown();
-      left_cam_info_sub.shutdown();
-      right_cam_info_sub.shutdown();
-    }
-    res.state = enabled_;
-    return true;
-  }
-
-  void leftCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  cv::Mat rectifyPatch(std::string frame_id, const Eigen::Matrix3d& K, cv::Rect roi, const cv::Mat& img, int tw, int th)
   {
-    if (!got_right_camera_info_) {
-      return;
+    // Take ground plane and patch camera info, compute rotation matrix
+    // to ground, get square ground patch
+
+    // Get ground plane homography
+    tf::Stamped<tf::Vector3> ground_normal_cam;
+    try {
+      listener_.transformVector(frame_id, ground_normal_, ground_normal_cam);
     }
-    right_camera_info_msg.header.frame_id = msg.header.frame_id;
-    cam_model_.fromCameraInfo(msg, right_camera_info_msg);
-    for (int i = 0; (i < 3); i++)
-    {
-      for (int j = 0; (j < 3); j++)
-      {
-        LineMOD_Detector::K.at<double>(i,j) = msg.K.at(3*i+j);
+    catch (tf::TransformException ex) {
+      ROS_ERROR("%s",ex.what());
+      ground_normal_.setData(tf::Vector3(0,0,1.));
+      ground_normal_.stamp_ = ros::Time(0);
+      ground_normal_.frame_id_ = "base_link";
+    }
+    Eigen::Vector3d eigen_cam_axis, eigen_ground_normal_cam;
+    eigen_cam_axis << 0,0,-1;
+    tf::vectorTFToEigen(ground_normal_cam, eigen_ground_normal_cam);
+    Eigen::Matrix3d R = Eigen::Quaterniond().FromTwoVectors(eigen_cam_axis,
+        eigen_ground_normal_cam).toRotationMatrix();
+    Eigen::Matrix3d H = K*R*K.inverse();
+    cv::Mat H_cv(3,3,CV_64F);
+    for (int i=0; i<3; i++) {
+      for (int j=0; j<3; j++) {
+        H_cv.at<double>(i,j) = H(i,j);
       }
     }
-    //std::cout << LineMOD_Detector::K << std::endl;
+
+    // Transform image points to ground
+    int x,y,w,h;
+    x = roi.x;
+    y = roi.y;
+    w = roi.width;
+    h = roi.height;
+    std::vector<cv::Point2f> img_points(4);
+    img_points[0] = cv::Point(x, y);
+    img_points[1] = cv::Point(x, y+h);
+    img_points[2] = cv::Point(x+w, y+h);
+    img_points[3] = cv::Point(x+w, y);
+    std::vector<cv::Point2f> ground_points(4);
+    cv::perspectiveTransform(img_points, ground_points, H_cv.inv());
+
+    // Square up the ground points
+    double sq_x = ground_points[0].x;
+    double width = fabs(ground_points[1].x - ground_points[2].x);
+    double mid_y = (ground_points[0].y + ground_points[1].y)/2.;
+    std::vector<cv::Point2f> sq_ground_points(4);
+    sq_ground_points[0] = cv::Point(sq_x, mid_y-width/2.);
+    sq_ground_points[1] = cv::Point(sq_x, mid_y+width/2.);
+    sq_ground_points[2] = cv::Point(sq_x + width, mid_y+width/2.);
+    sq_ground_points[3] = cv::Point(sq_x + width, mid_y-width/2.);
+
+    // Project them back into the image
+    std::vector<cv::Point2f> sq_img_points(4);
+    cv::perspectiveTransform(sq_ground_points, sq_img_points, H_cv);
+
+    // Remove RoI offset
+    for (size_t i=0; i<sq_img_points.size(); i++) {
+      sq_img_points[i].x -= roi.x;
+      sq_img_points[i].y -= roi.y;
+    }
+
+    // Reproject the region into the target square
+    std::vector<cv::Point2f> out_win_points(4);
+    out_win_points[0] = cv::Point(0, 0);
+    out_win_points[1] = cv::Point(0, th);
+    out_win_points[2] = cv::Point(tw, th);
+    out_win_points[3] = cv::Point(tw, 0);
+    cv::Mat win_transform = cv::getPerspectiveTransform(sq_img_points, out_win_points);
+    cv::Mat out_win;
+    cv::warpPerspective(img, out_win, win_transform, cv::Size(tw, th));
+    return out_win;
   }
 
-  void rightCameraInfoCallback(const sensor_msgs::CameraInfo& msg)
+  void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
-    right_camera_info_msg = msg;
-    got_right_camera_info_ = true;
-  }
-
-  void disparityCallback(const stereo_msgs::DisparityImageConstPtr& msg)
-  {
-    if (!enabled_) {
+    // The patch array will have some images and saliency masks, and will
+    // already have the world point projected. Resize image to fixed size,
+    // check for a LineMOD match, background color difference, and publish a
+    // NamedPoint if it's good.
+    samplereturn_msgs::NamedPointArray points_out;
+    points_out.header = msg->header;
+    if (msg->patch_array.empty()) {
+      points_pub.publish(points_out);
       return;
     }
-    cv_bridge::CvImagePtr disp_ptr;
-    try
-    {
-      disp_ptr = cv_bridge::toCvCopy(msg->image, "");
-    }
-    catch (cv_bridge::Exception& e)
-    {
-      ROS_ERROR("disp cv_bridge exception: %s", e.what());
-      return;
-    }
 
-    //float f = msg->f;
-    //float T = msg->T;
-    //cv::Mat depth_img = (f*T*1000)/(disp_ptr->image).clone();
-    //depth_img.convertTo(depth_img, CV_16U);
-    disparity_img = (disp_ptr->image).clone();
-    min_disp = msg->min_disparity;
-    got_disp_ = true;
-  }
+    cv::Mat debug_image = cv::Mat::zeros(msg->cam_info.height,
+        msg->cam_info.width, CV_8UC3);
+    cv::Mat debug_grad_image = cv::Mat::zeros(msg->cam_info.height,
+        msg->cam_info.width, CV_8UC3);
 
-  double unwrap90(double angle)
-  {
-      while(angle>M_PI/2)
-          angle -= M_PI;
-      while(angle<-M_PI/2)
-          angle += M_PI;
-      return angle;
-  }
+    cv_bridge::CvImagePtr cv_ptr_mask, cv_ptr_img;
+    for (size_t i = 0; i < msg->patch_array.size(); i++) {
+      try {
+        cv_ptr_mask = cv_bridge::toCvCopy(msg->patch_array[i].mask, "mono8");
+      }
+      catch (cv_bridge::Exception& e) {
+        ROS_ERROR("cv_bridge mask exception: %s", e.what());
+      }
+      try {
+        cv_ptr_img = cv_bridge::toCvCopy(msg->patch_array[i].image, "rgb8");
+      }
+      catch (cv_bridge::Exception& e) {
+        ROS_ERROR("cv_bridge image exception: %s", e.what());
+      }
 
-  cv::RotatedRect computeGripAngle(const std::vector<cv::Point>& hull)
-  {
-      float angle;
-      cv::RotatedRect rect = cv::minAreaRect(hull);
-      ROS_INFO("Meausred angle: %f width: %f height: %f",
-              rect.angle, rect.size.width, rect.size.height);
-      if(rect.size.width>rect.size.height)
+      // Get original patch size and location
+      int orig_height, orig_width, orig_x, orig_y;
+      orig_height = msg->patch_array[i].image_roi.height;
+      orig_width = msg->patch_array[i].image_roi.width;
+      orig_x = msg->patch_array[i].image_roi.x_offset;
+      orig_y = msg->patch_array[i].image_roi.y_offset;
+
+      // Add a mask to this
+      cv::Mat det_img = cv::Mat::zeros(480, 640, CV_8UC3);
+      cv::Mat det_mask = cv::Mat::zeros(480, 640, CV_8UC1);
+
+      int w = _config.target_width;
+      int h = _config.target_width * msg->patch_array[i].image_roi.height/
+          msg->patch_array[i].image_roi.width;
+      cv::Rect boundingbox;
+      if(samplereturn::computeBoundingBox(cv_ptr_mask->image, &boundingbox))
       {
-          angle = -rect.angle*M_PI/180+M_PI_2;
+          double s=msg->patch_array[i].image_roi.width/double(boundingbox.size().width);
+          w *= s;
+          h *= s;
+      }
+      if(w>640)
+      {
+          h = h*(640.0/w);
+          w = 640;
+      }
+      if(h>480)
+      {
+          w = w*(480.0/h);
+          h = 480;
+      }
+
+      if(_config.rectify_patch)
+      {
+          Eigen::Matrix3d K = Eigen::Matrix3d::Map(msg->cam_info.K.data());
+          K(0,2) = K(2,0);
+          K(1,2) = K(2,1);
+          K(2,0) = 0;
+          K(2,1) = 0;
+
+          cv::Rect roi(msg->patch_array[i].image_roi.x_offset,
+                       msg->patch_array[i].image_roi.y_offset,
+                       msg->patch_array[i].image_roi.width,
+                       msg->patch_array[i].image_roi.height);
+
+          // Rectify to get "head-on" view, constant size
+          cv::Mat det_patch_img = rectifyPatch(msg->header.frame_id, K, roi,
+                  cv_ptr_img->image,
+                  w, h);
+          cv::Mat det_patch_mask = rectifyPatch(msg->header.frame_id, K, roi,
+                  cv_ptr_mask->image,
+                  w, h);
+          // Place in 640x480 image to match templates, otherwise templates can
+          // run off edge.
+          det_patch_img.copyTo(det_img(cv::Rect(0, 0, w, h)));
+          det_patch_mask.copyTo(det_mask(cv::Rect(0, 0, w, h)));
+
       }
       else
       {
-          angle = -rect.angle*M_PI/180;
-      }
-      angle = unwrap90(angle);
-      rect.angle = angle;
+          cv::resize(cv_ptr_img->image,
+                  det_img( cv::Rect( 0, 0, w, h) ),
+                  cv::Size(w, h),
+                  0, 0, cv::INTER_AREA);
 
-      ROS_INFO("Angle: %f", angle);
-      return rect;
+          cv::resize(cv_ptr_mask->image,
+                  det_mask( cv::Rect( 0, 0, w, h) ),
+                  cv::Size(w, h),
+                  0, 0, cv::INTER_AREA);
+      }
+
+      cv::dilate(det_mask, det_mask, cv::Mat(), cv::Point(-1,-1), _config.mask_dilation_iterations);
+
+      // Detect
+      std::vector<cv::Mat> sources;
+      std::vector<cv::Mat> masks;
+      if (_config.do_median_blur) {
+          cv::Mat blur;
+          cv::medianBlur(det_img, blur, _config.median_blur_size);
+          blur.copyTo(det_img);
+      }
+      sources.push_back(det_img);
+      masks.push_back(det_mask);
+      cv::linemod::Match m;
+      std::vector<cv::Mat> quantized_images;
+      bool ret = matchLineMOD(sources, masks, m, quantized_images);
+
+      if (!ret) {
+        continue;
+      }
+
+      const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
+
+      // Draw Response on output image
+      cv::Rect draw_rect(orig_x + orig_width/2. - w/2.,
+                         orig_y + orig_height/2. - h/2.,
+                         w,
+                         h);
+      if (debug_img_pub.getNumSubscribers()>0 or debug_grad_pub.getNumSubscribers()>0) {
+
+        cv::Rect source_rect(0, 0, w, h);
+
+        if(draw_rect.x<0)
+        {
+            source_rect.x = -draw_rect.x;
+            source_rect.width += draw_rect.x;
+            draw_rect.width += draw_rect.x;
+            draw_rect.x = 0;
+        }
+        if(draw_rect.x+draw_rect.width>debug_image.cols)
+        {
+            source_rect.width += debug_image.cols - (draw_rect.x+draw_rect.width);
+            draw_rect.width += debug_image.cols - (draw_rect.x+draw_rect.width);
+        }
+        if(draw_rect.y<0)
+        {
+            source_rect.y = -draw_rect.y;
+            source_rect.height += draw_rect.y;
+            draw_rect.height += draw_rect.y;
+            draw_rect.y = 0;
+        }
+        if(draw_rect.y+draw_rect.height>debug_image.rows)
+        {
+            source_rect.height += debug_image.rows - (draw_rect.y+draw_rect.height);
+            draw_rect.height += debug_image.rows - (draw_rect.y+draw_rect.height);
+        }
+
+        if(draw_rect.x<0 || draw_rect.x>debug_image.cols ||
+           draw_rect.y<0 || draw_rect.y>debug_image.rows ||
+           draw_rect.x + draw_rect.width>debug_image.cols ||
+           draw_rect.y + draw_rect.height>debug_image.rows)
+        {
+            ROS_ERROR("Bad draw rect");
+        }
+        else
+        {
+          if(source_rect.x<0 || source_rect.x>det_img.cols ||
+             source_rect.y<0 || source_rect.y>det_img.rows ||
+             source_rect.width<0 || source_rect.x+source_rect.width>det_img.cols ||
+             source_rect.height<0 || source_rect.y+source_rect.height>det_img.rows)
+          {
+              ROS_ERROR("Bad offset rect");
+          }
+          else
+          {
+
+
+            drawResponse(templates, LineMOD_Detector::num_modalities, det_img,
+                cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0), m.similarity);
+            // Place in output image
+            det_img(source_rect).copyTo(
+                                debug_image(draw_rect),
+                                det_mask(source_rect));
+            // Place in output gradient image
+            displayQuantized(quantized_images[0])(source_rect).copyTo(
+                                debug_grad_image(draw_rect),
+                                det_mask(source_rect));
+
+          }
+        }
+      }
+
+      // If a positive match, publish NamedPoint
+      if (m.similarity < _config.pub_threshold)
+      {
+          continue;
+      }
+
+      // Do a background/foreground color histogram comparison, drop if
+      // too similar
+      if(_config.check_color_model)
+      {
+          samplereturn::ColorModel cm(det_img, det_mask);
+          samplereturn::HueHistogram hh_inner = cm.getInnerHueHistogram(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit);
+          samplereturn::HueHistogram hh_outer = cm.getOuterHueHistogram(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit);
+          double d_background = hh_inner.distance(hh_outer);
+          double d_value = cm.getValuedSampleModel(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit).distance(hh_inner);
+          if(debug_img_pub.getNumSubscribers()>0)
+          {
+              hh_inner.draw_histogram(debug_image, draw_rect.x, draw_rect.y+draw_rect.height);
+          }
+          if( (d_background<_config.min_inner_outer_distance) ||
+              (d_value>_config.max_exemplar_distance))
+          {
+              continue;
+          }
+      }
+
+      samplereturn_msgs::NamedPoint np;
+      np.header.stamp = msg->header.stamp;
+      np.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
+      np.point = msg->patch_array[i].world_point.point;
+      np.sensor_frame = msg->header.frame_id;
+      np.name = m.class_id;
+
+      if(_config.compute_grip_angle)
+      {
+          cv::RotatedRect griprect;
+          if(samplereturn::computeGripAngle(det_mask, &griprect, &np.grip_angle) &&
+                  (debug_img_pub.getNumSubscribers()>0))
+          {
+              griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
+                      orig_y + orig_height/2 - h/2);
+              samplereturn::drawGripRect(debug_image, griprect);
+          }
+      }
+      points_out.points.push_back(np);
+    }
+    points_pub.publish(points_out);
+
+    if(debug_img_pub.getNumSubscribers() > 0)
+    {
+        sensor_msgs::ImagePtr debug_image_msg =
+            cv_bridge::CvImage(msg->header,"rgb8",debug_image).toImageMsg();
+        debug_img_pub.publish(debug_image_msg);
+    }
+    if(debug_grad_pub.getNumSubscribers() > 0)
+    {
+        sensor_msgs::ImagePtr debug_grad_msg =
+            cv_bridge::CvImage(msg->header,"rgb8",debug_grad_image).toImageMsg();
+        debug_grad_pub.publish(debug_grad_msg);
+    }
   }
 
-  void colorCallback(const sensor_msgs::ImageConstPtr& msg)
+  bool matchLineMOD(std::vector<cv::Mat> sources, std::vector<cv::Mat> masks,
+      cv::linemod::Match &best_match, std::vector<cv::Mat> &quantized_images)
   {
-      if (!enabled_) {
-          return;
-      }
-      if (!got_disp_) {
-          return;
-      }
-      bool show_match_result = true;
-      cv_bridge::CvImagePtr color_ptr;
-      try
-      {
-          color_ptr = cv_bridge::toCvCopy(msg, "rgb8");
-      }
-      catch (cv_bridge::Exception& e)
-      {
-          ROS_ERROR("color cv_bridge exception: %s", e.what());
-          return;
-      }
-
-      LineMOD_Detector::got_color = true;
-      //cv::Mat lab_img;
-      //cv::cvtColor(color_ptr->image,lab_img,CV_RGB2Lab);
-
-      cv::Mat blur;
-      cv::medianBlur(color_ptr->image, blur, 13);
-
-      LineMOD_Detector::display = color_ptr->image.clone();
-      //LineMOD_Detector::display = blur.clone();
-      //LineMOD_Detector::color_img = lab_img;
-      //LineMOD_Detector::color_img = color_ptr->image.clone();
-      if (hard_samples) {
-          LineMOD_Detector::color_img = color_ptr->image.clone();
-      }
-      else {
-          LineMOD_Detector::color_img = blur.clone();
-      }
-
-      LineMOD_Detector::sources.push_back(LineMOD_Detector::color_img);
-      //LineMOD_Detector::sources.push_back(blur);
-
       // Perform matching
       std::vector<cv::linemod::Match> matches;
       std::vector<cv::String> class_ids;
-      std::vector<cv::Mat> quantized_images;
+      //std::vector<cv::Mat> quantized_images;
 
-      LineMOD_Detector::detector->match(sources, (float)LineMOD_Detector::matching_threshold, matches, class_ids, quantized_images);
+      detector->match(sources, _config.matching_threshold, matches, class_ids, quantized_images, masks);
 
-      LineMOD_Detector::num_classes = detector->numClasses();
-      ROS_DEBUG("Num Classes: %u", LineMOD_Detector::num_classes);
+      int num_classes = detector->numClasses();
+      ROS_DEBUG("Num Classes: %u", num_classes);
       int classes_visited = 0;
       std::set<std::string> visited;
 
       ROS_DEBUG("Matches size: %u", (int)matches.size());
       float best_match_similarity = 0;
       int best_match_idx = -1;
-      //std::cout << "Matches size: " << (int)matches.size() << std::endl;
-      for (int i = 0; (i < (int)matches.size()) && (classes_visited < LineMOD_Detector::num_classes); ++i)
+      for (int i = 0; (i < (int)matches.size()) && (classes_visited < num_classes); ++i)
       {
-          //std::cout << "Matches size: " << (int)matches.size() << std::endl;
-          //std::cout << i << std::endl;
           cv::linemod::Match m = matches[i];
-          ROS_DEBUG("Matching count: %u", i);
-
-          //std::cout << "I: " << i << "classes visited: " << classes_visited << std::endl;
-          //std::cout << "matches.size: " << (int)matches.size() << "num classes: " <<
-          //  LineMOD_Detector::num_classes << std::endl;
           if (m.similarity > best_match_similarity) {
               best_match_similarity = m.similarity;
               best_match_idx = i;
@@ -352,494 +515,62 @@ class LineMOD_Detector
               ++classes_visited;
           }
       }
-      bool sent_something=false;
-      //std::cout << "Best match similarity: " << best_match_similarity << std::endl;
-      //std::cout << "Best match idx: " << best_match_idx << std::endl;
-      sensor_msgs::ImagePtr debugmsg;
+
       if (best_match_idx == -1) {
-          if(_publish_debug_img)
-          {
-              debugmsg = cv_bridge::CvImage(color_ptr->header, color_ptr->encoding, display).toImageMsg();
-          }
-      }
-      else
-      {
-          cv::linemod::Match m = matches[best_match_idx];
-
-          if (show_match_result)
-          {
-              ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                      m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
-              printf("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
-                      m.similarity, m.x, m.y, m.class_id.c_str(), m.template_id);
-          }
-
-          // Draw matching template
-          const std::vector<cv::linemod::Template>& templates = LineMOD_Detector::detector->getTemplates(m.class_id, m.template_id);
-
-          cv::Mat mask = cv::Mat::zeros(display.size(), CV_8U);
-          std::vector<cv::Point> hull;
-          hull = templateConvexHull(templates, LineMOD_Detector::num_modalities, cv::Point(m.x,m.y), mask.size(),
-                  mask);
-          //cv::imshow("mask", mask);
-          //std::cout << "Mask size: " << mask.size() << std::endl;
-          //std::cout << "Mask channels: " << mask.channels() << std::endl;
-          //cv::imshow("display", LineMOD_Detector::display);
-          //cv::waitKey(10);
-          Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-          //interiorColor = cn.computeInteriorColor(LineMOD_Detector::display, mask);
-          interiorColor = cn.computeInteriorColorStats(LineMOD_Detector::display, mask);
-          //std::cout << "Interior color: " << interiorColor << std::endl;
-          std::string dominant_color = cn.getDominantColor(interiorColor);
-          ROS_DEBUG("Dominant color: %s",dominant_color.c_str());
-
-          if (m.class_id == "metal_tree" || m.class_id == "metal_star" ||
-                  m.class_id == "metal_lines" || m.class_id == "metal_pi" ||
-                  m.class_id == "metal_square") {
-              hull = floodFillHull(hull, display, color_ptr->header);
-              double hull_area = cv::contourArea(hull);
-              ROS_DEBUG_STREAM("Metal sample hull area: " << hull_area);
-              if(hull_area>max_hull_area_ || hull_area<min_hull_area_)
-              {
-                  ROS_DEBUG_STREAM("Hull area rejected.");
-                  LineMOD_Detector::sources.clear();
-                  return;
-              }
-          }
-
-          if (dominant_color != "green") {
-              drawResponse(templates, LineMOD_Detector::num_modalities, LineMOD_Detector::display, cv::Point(m.x, m.y), LineMOD_Detector::detector->getT(0));
-          }
-
-          if (m.similarity > LineMOD_Detector::pub_threshold && dominant_color!="green")
-          {
-              cv::RotatedRect rect = computeGripAngle(hull);
-              ROS_INFO("Measured angle: %f width: %f height: %f", rect.angle, rect.size.width, rect.size.height);
-              cv::circle(display, rect.center, 5, cv::Scalar(255,0,255));
-              if (m.class_id == "red_puck" &&
-                      (dominant_color=="red" || dominant_color=="pink" || dominant_color=="purple"
-                       || dominant_color=="orange" || dominant_color=="white" ||
-                       dominant_color=="yellow"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::RED_PUCK);
-              }
-              if (m.class_id == "orange_pipe" &&
-                      (dominant_color=="orange" || dominant_color=="white" || dominant_color=="yellow"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::ORANGE_PIPE);
-              }
-              if (m.class_id == "pre_cached" &&
-                      (dominant_color=="white" || dominant_color=="gray"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::PRE_CACHED);
-              }
-              if (m.class_id == "pre_cached_side" &&
-                      (dominant_color=="white" || dominant_color=="gray"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::PRE_CACHED);
-              }
-              if (m.class_id == "wood_cube" &&
-                      (dominant_color=="yellow" || dominant_color=="brown" || dominant_color=="white"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::WOODEN_CUBE);
-              }
-              if (m.class_id == "pink_tennis_ball" &&
-                      (dominant_color=="pink" || dominant_color=="white" || dominant_color=="red" ||
-                       dominant_color=="orange" || dominant_color=="purple" || dominant_color=="brown"))
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::PINK_TENNIS_BALL);
-              }
-              if (m.class_id == "colored_ball" &&
-                      dominant_color!="brown" && dominant_color!="white" && dominant_color!="gray")
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::COLORED_BALL);
-              }
-              if (m.class_id == "metal_star")
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_pi" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_tree" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_lines" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-              if (m.class_id == "metal_square" )
-              {
-                  sent_something = true;
-                  LineMOD_Detector::publishPoint(rect, m.class_id, color_ptr->header,
-                          samplereturn_msgs::NamedPoint::METAL_1);
-              }
-          }
-          debugmsg = cv_bridge::CvImage(color_ptr->header, color_ptr->encoding, display).toImageMsg();
-      }
-
-      // If no template, try BMS
-      if(!sent_something)
-      {
-          cv::Point bms_centroid;
-          std::string bms_color;
-          std::vector<cv::Point> hull;
-          if(performBMSCheck(color_ptr->image, &bms_centroid, &bms_color, &hull))
-          {
-              cv::RotatedRect rect = computeGripAngle(hull);
-              ROS_DEBUG_STREAM("BMS success centroid: " << bms_centroid << " color: " << bms_color << " angle: " << rect.angle);
-              publishPoint(rect, "bms_blob", color_ptr->header, samplereturn_msgs::NamedPoint::BLUE_ROCK);
-          }
-          else
-          {
-              ROS_DEBUG_STREAM("BMS fail");
-          }
-      }
-
-      if(_publish_debug_img)
-      {
-          debug_img_pub.publish(debugmsg);
-      }
-
-      LineMOD_Detector::sources.clear();
-  }
-
-  void publishPoint(cv::RotatedRect rect, std::string class_id,
-      std_msgs::Header header, int sample_id)
-  {
-    ROS_DEBUG("Publishing Img Point");
-    samplereturn_msgs::NamedPoint img_point_msg;
-    img_point_msg.name = class_id;
-    img_point_msg.sample_id = sample_id;
-    img_point_msg.header = header;
-    // We only care about the base pyramid level gradient modality
-    //img_point_msg.point.x = m.x + templates[1].width/2;
-    //img_point_msg.point.y = m.y + templates[1].height/2;
-    img_point_msg.point.x = rect.center.x;
-    img_point_msg.point.y = rect.center.y;
-    img_point_msg.grip_angle = rect.angle;
-    ROS_DEBUG("Point x and y: %f, %f", img_point_msg.point.x, img_point_msg.point.y);
-
-    if (cam_model_.initialized()) {
-      samplereturn_msgs::NamedPoint point_msg;
-      geometry_msgs::PointStamped temp_point;
-      geometry_msgs::PointStamped odom_point;
-      temp_point.header = header;
-      cv::Point3d xyz;
-      cv::Point2f rect_points2f[4];
-      rect.points(rect_points2f);
-      std::vector<cv::Point> rect_points;
-      for(int i=0;i<4;i++)
-      {
-          rect_points.push_back(rect_points2f[i]);
-      }
-      std::vector<float> interesting_disparities;
-      for(int row=0;row<disparity_img.rows;row++)
-      {
-          for(int col=0;col<disparity_img.cols;col++)
-          {
-              if((cv::pointPolygonTest(rect_points, cv::Point(col, row), false)>0) &&
-                 (disparity_img.at<float>(row, col)>min_disp))
-              {
-                  interesting_disparities.push_back(disparity_img.at<float>(row, col));
-              }
-          }
-      }
-
-      float median_disp;
-      if(interesting_disparities.size()>0)
-      {
-          std::nth_element(interesting_disparities.begin(),
-                  interesting_disparities.begin() + interesting_disparities.size()/2,
-                  interesting_disparities.end());
-          median_disp = interesting_disparities[interesting_disparities.size()/2];
-      }
-      else
-      {
-          ROS_ERROR("No disparities present, cannot emit point.");
-          return;
-      }
-      ROS_DEBUG("Median Disp: %f", median_disp);
-
-      cam_model_.projectDisparityTo3d(cv::Point2d(rect.center.x,rect.center.y),
-          median_disp, xyz);
-      temp_point.point.x = xyz.x;
-      temp_point.point.y = xyz.y;
-      ROS_DEBUG("Projected z: %f", xyz.z);
-      if (xyz.z > max_depth) {
-        temp_point.point.z = max_depth;
-        temp_point.point.x /= (xyz.z/max_depth);
-        temp_point.point.y /= (xyz.z/max_depth);
-      }
-      else if (xyz.z < min_depth) {
-        temp_point.point.z = min_depth;
-        temp_point.point.x /= (xyz.z/min_depth);
-        temp_point.point.y /= (xyz.z/min_depth);
+          ROS_DEBUG("No linemode matches found");
+        return false;
       }
       else {
-        temp_point.point.z = xyz.z;
+        best_match = matches[best_match_idx];
+        ROS_DEBUG("Similarity: %5.1f%%; x: %3d; y: %3d; class: %s; template: %3d\n",
+                best_match.similarity, best_match.x, best_match.y,
+                best_match.class_id.c_str(), best_match.template_id);
+        return true;
       }
-      bool wait =
-        listener_.waitForTransform(_detection_frame_id, header.frame_id, header.stamp, ros::Duration(0.03));
-      if (!wait) {
-        return;
-      }
-      listener_.transformPoint(_detection_frame_id, temp_point, odom_point);
-
-      //std::cout << "Camera 3D point: " << temp_point << std::endl;
-      point_msg.name = class_id;
-      point_msg.sample_id = sample_id;
-      point_msg.header = header;
-      point_msg.header.frame_id = _detection_frame_id;
-      point_msg.grip_angle = rect.angle;
-      point_msg.point = odom_point.point;
-      LineMOD_Detector::point_pub.publish(point_msg);
-    }
-
-    LineMOD_Detector::img_point_pub.publish(img_point_msg);
   }
 
-  std::vector<cv::Point> floodFillHull(const std::vector<cv::Point>& hull,
-      const cv::Mat color_image, std_msgs::Header header)
+
+  void drawResponse(const std::vector<cv::linemod::Template>& templates,
+                    int num_modalities, cv::Mat& dst, cv::Point offset, int T,
+                    double similarity)
   {
-    cv::Moments M = cv::moments(hull);
-    float cx = M.m10/M.m00;
-    float cy = M.m01/M.m00;
-    std::vector<cv::Point> grip_hull;
-    // Take the convex hull of a metal sample symbol, floodFill from some
-    // points on it to get a mask for grip computation.
-    for (int i = 0; i < 1; i++)
-    {
-      float offset_x = hull[i].x-cx;
-      float offset_y = hull[i].y-cy;
-      float length = std::sqrt(pow(offset_x,2)+pow(offset_y,2));
-      cv::Point offset_pt((hull[i].x+10*(offset_x/length)),
-                          (hull[i].y+10*(offset_y/length)));
-      cv::Point trunc_offset_pt((offset_pt.x>=color_image.cols)?(color_image.cols-1):offset_pt.x,
-                                (offset_pt.y>=color_image.rows)?(color_image.rows-1):offset_pt.y);
-      cv::Mat mask;
-      mask = cv::Mat::zeros(color_image.rows+2, color_image.cols+2, CV_8UC1);
-      cv::floodFill(color_image, mask, trunc_offset_pt, cv::Scalar(255),
-          0, cv::Scalar(8,8,8), cv::Scalar(8,8,8),
-          (4|(255<<8)|CV_FLOODFILL_MASK_ONLY));
-      if (_publish_debug_img)
-      {
-        sensor_msgs::ImagePtr debugmsg = cv_bridge::CvImage(header,
-            "mono8",mask).toImageMsg();
-        debug_mask_pub.publish(debugmsg);
-      }
-      //cv::imshow("mask",mask);
-      //cv::waitKey(10);
-      // Do some area bounds check, between 5x5cm and max gripper size (11x11cm)
-      if(!maskToHull(mask, &grip_hull))
-      {
-          ROS_ERROR("Failed to find convex hull, no contours exist");
-      }
-    }
-    return grip_hull;
-  }
+    static const cv::Scalar COLORS[5] = { CV_RGB(0, 0, 255),
+                                          CV_RGB(0, 255, 0),
+                                          CV_RGB(255, 255, 0),
+                                          CV_RGB(255, 140, 0),
+                                          CV_RGB(255, 0, 0) };
 
-  bool maskToHull(cv::Mat mask, std::vector<cv::Point> *hull)
-  {
-      std::vector<std::vector<cv::Point> > contours;
-      cv::findContours(mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-      double maxArea = 0;
-      int max_idx = 0;
-      for (size_t i=0; i<contours.size(); i++) {
-          double area = cv::contourArea(cv::Mat(contours[i]));
-          if (area > maxArea) {
-              maxArea = area;
-              max_idx = i;
-          }
-      }
-      if(contours.size()>0)
-      {
-          cv::convexHull(contours[max_idx], *hull);
-          return true;
-      }
-      else
-      {
-          return false;
-      }
-  }
-
-  cv::Mat trimDisparity(cv::Mat flat_disparity, float min_disparity) {
-    int i = 0;
-    while (i < flat_disparity.cols && flat_disparity.at<float>(0,i) < min_disparity) {
-      i++;
-    }
-    return flat_disparity.colRange(i,flat_disparity.cols);
-  }
-
-  std::vector<cv::Point> templateConvexHull(const std::vector<cv::linemod::Template>& templates,
-                          int num_modalities, cv::Point offset, cv::Size size,
-                          cv::Mat& dst)
-  {
-    std::vector<cv::Point> points;
     for (int m = 0; m < num_modalities; ++m)
     {
+      // NOTE: Original demo recalculated max response for each feature in the TxT
+      // box around it and chose the display color based on that response. Here
+      // the display color just depends on the modality.
+      cv::Scalar color = COLORS[2];
+      if (similarity > _config.pub_threshold) {
+        color = COLORS[0];
+      }
+      else if (similarity > _config.matching_threshold) {
+        color = COLORS[4];
+      }
+      else {
+        ROS_ERROR("Call to drawResponse with below matching response");
+      }
+
       for (int i = 0; i < (int)templates[m].features.size(); ++i)
       {
         cv::linemod::Feature f = templates[m].features[i];
-        points.push_back(cv::Point(f.x, f.y) + offset);
+        cv::Point pt(f.x + offset.x, f.y + offset.y);
+        cv::circle(dst, pt, T / 2, color);
       }
     }
-
-    std::vector<cv::Point> hull;
-    cv::convexHull(points, hull);
-
-    //dst = cv::Mat::zeros(size, CV_8U);
-    const int hull_count = (int)hull.size();
-    const cv::Point* hull_pts = &hull[0];
-    cv::fillPoly(dst, &hull_pts, &hull_count, 1, cv::Scalar(255));
-    return hull;
-  }
-
-  bool performBMSCheck(const cv::Mat& image, cv::Point *bms_centroid, std::string *dominant_color,
-          std::vector<cv::Point> *hull)
-  {
-      BMS bms(_config.bms_dilation_width_1, _config.bms_opening_width,
-              _config.bms_normalize, _config.bms_handle_border);
-      cv::Mat small;
-      cv::resize(image,
-              small,cv::Size(_config.bms_img_width,image.rows*(_config.bms_img_width/image.cols)),
-              0.0,0.0,cv::INTER_AREA);
-
-      bms.computeSaliency(small, _config.bms_sample_step);
-      cv::Mat debug_bms_img = bms.getSaliencyMap().clone();
-
-      if (_config.bms_thresh_on) {
-          ROS_DEBUG("Thresholding");
-          cv::threshold(debug_bms_img, debug_bms_img, _config.bms_thresh, 255, cv::THRESH_BINARY);
-      }
-
-      cv::SimpleBlobDetector::Params blob_params;
-      blob_params.blobColor = _config.blobColor;
-      blob_params.filterByColor = _config.filterByColor;
-      blob_params.filterByArea = _config.filterByArea;
-      blob_params.filterByConvexity = _config.filterByConvexity;
-      blob_params.minDistBetweenBlobs = _config.minDistBetweenBlobs;
-      blob_params.minArea = _config.minArea;
-      blob_params.maxArea = _config.maxArea;
-      blob_params.minConvexity = _config.minConvexity;
-      blob_params.maxConvexity = _config.maxConvexity;
-      blob_params.minThreshold = _config.minThreshold;
-      blob_params.maxThreshold = _config.maxThreshold;
-      blob_params.thresholdStep = _config.thresholdStep;
-      blob_params.minRepeatability = _config.minRepeatability;
-
-      cv::Ptr<cv::SimpleBlobDetector> blob;
-      blob = cv::SimpleBlobDetector::create(blob_params);
-
-      std::vector<cv::KeyPoint> kp;
-
-      cv::Mat debug_bms_img_color;
-
-      cv::Mat blob_copy = debug_bms_img.clone();
-      blob->detect(blob_copy, kp);
-      ROS_DEBUG("Keypoints Detected: %lu", kp.size());
-      cv::cvtColor(debug_bms_img, debug_bms_img_color, CV_GRAY2RGB);
-      cv::Mat sub_img, sub_mask;
-      bool found = false;
-      for (size_t i=0; i < kp.size(); i++)
-      {
-          cv::circle(debug_bms_img_color, kp[i].pt, 3*kp[i].size, CV_RGB(255,0,0), 1, 4);
-          int x = kp[i].pt.x;
-          int y = kp[i].pt.y;
-          int size = 2*kp[i].size;
-          int minrow, maxrow, mincol, maxcol;
-          minrow = max(y-size,0);
-          maxrow = min(y+size,small.rows);
-          mincol = max(x-size,0);
-          maxcol = min(x+size,small.cols);
-          sub_img = small(Range(minrow, maxrow), Range(mincol, maxcol));
-          sub_mask = debug_bms_img(Range(max(y-size,0), min(y+size,small.rows)), Range(max(x-size,0), min(x+size,small.cols)));
-          if (cv::countNonZero(sub_mask) == 0) {
-              ROS_DEBUG_STREAM("Skipping all zero blob at (" << x << ", " << y << ").");
-              continue;
-          }
-
-          Eigen::Matrix<float,11,1> interiorColor(Eigen::Matrix<float,11,1>::Zero());
-          Eigen::Matrix<float,11,1> exteriorColor(Eigen::Matrix<float,11,1>::Zero());
-          exteriorColor = cn.computeExteriorColor(sub_img,sub_mask);
-          interiorColor = cn.computeInteriorColor(sub_img,sub_mask,exteriorColor);
-
-          *dominant_color = cn.getDominantColor(interiorColor);
-          ROS_DEBUG_STREAM("Dominant color " << *dominant_color);
-          std::string dominant_exterior_color = cn.getDominantColor(exteriorColor);
-          ROS_DEBUG_STREAM("Dominant exterior color " << dominant_exterior_color);
-
-          cv::putText(debug_bms_img_color, *dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
-                  CV_RGB(100,100,100));
-
-          std::vector<std::string>::iterator in_it, ex_it;
-          in_it = std::find(interior_colors_vec_.begin(),interior_colors_vec_.end(),*dominant_color);
-          ex_it = std::find(exterior_colors_vec_.begin(),exterior_colors_vec_.end(),dominant_exterior_color);
-
-          if (in_it != interior_colors_vec_.end() &&
-                  ex_it != exterior_colors_vec_.end()){
-              float scale = image.cols/_config.bms_img_width;
-              bms_centroid->x = kp[i].pt.x*scale;
-              bms_centroid->y = kp[i].pt.y*scale;
-              cv::circle(debug_bms_img_color, kp[i].pt, 2*kp[i].size, CV_RGB(0,0,255), 2, CV_AA);
-              cv::putText(debug_bms_img_color, *dominant_color, kp[i].pt, FONT_HERSHEY_SIMPLEX, 0.5,
-                      CV_RGB(0,255,0));
-              ROS_DEBUG_STREAM( "BMS Coords: x: "<<kp[i].pt.x<<" y: "<<kp[i].pt.y );
-              ROS_DEBUG_STREAM( "Pixel coords: x:" << kp[i].pt.x*scale <<"y: " << kp[i].pt.y*scale);
-              found = true;
-              if(maskToHull(sub_mask, hull))
-              {
-                  for(auto &pt : *hull)
-                  {
-                      pt.x += mincol;
-                      pt.x *= scale;
-                      pt.y += minrow;
-                      pt.y *= scale;
-                  }
-                  std::vector<std::vector<cv::Point> > contours;
-                  contours.push_back(*hull);
-                  cv::drawContours(debug_bms_img_color, contours, 0, cv::Scalar(255,0,255));
-                  break;
-              }
-          }
-      }
-
-      std_msgs::Header header;
-      sensor_msgs::ImagePtr debug_img_msg = cv_bridge::CvImage(header,"rgb8",debug_bms_img_color).toImageMsg();
-      pub_bms_img.publish(debug_img_msg);
-
-      return found;
   }
 
 };
+}
 
 int main(int argc, char ** argv)
 {
   ros::init(argc, argv, "Line2D_Detector");
-  LineMOD_Detector ld;
+  linemod_detector::LineMOD_Detector ld;
   ros::spin();
 }

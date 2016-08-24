@@ -16,6 +16,7 @@
     <buildtool_depend>catkin</buildtool_depend>
 
     <build_depend>rospy</build_depend>
+    <build_depend>samplereturn_msgs</build_depend>
 
     <run_depend>rospy</run_depend>
     <run_depend>nodelet</run_depend>
@@ -30,5 +31,6 @@
     <run_depend>photo</run_depend>
     <run_depend>sound_play</run_depend>
     <run_depend>navigation</run_depend>
+    <run_depend>samplereturn_msgs</run_depend>
 
 </package>

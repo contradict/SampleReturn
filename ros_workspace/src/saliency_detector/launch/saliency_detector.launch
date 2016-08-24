@@ -7,11 +7,11 @@
     name="saliency_detector"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
-    <param name="img_topic" type="string" value="/cameras/search/$(arg namespace)/image_color"/>
-    <remap from="/cameras/search/info" to="/cameras/search/$(arg namespace)/camera_info"/>
+    <remap from="image" to="/cameras/search/$(arg namespace)/image_color"/>
+    <param name="position" type="str" value="$(arg namespace)"/>
     <param name="bms_opening_width" type="int" value="3"/>
     <param name="bms_dilation_width_1" type="int" value="0"/>
-    <param name="bms_thresh" type="double" value="20"/>
+    <param name="bms_thresh_fraction" type="double" value="0.3"/>
     <param name="bms_thresh_on" type="bool" value="True"/>
     <param name="bms_img_width" type="double" value="400"/>
     <param name="bms_top_trim" type="double" value="0"/>
@@ -19,6 +19,13 @@
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="2500.0"/>
     <param name="maxArea" type="double" value="100000.0"/>
+    <param name="minDistBetweenBlobs" type="double" value="100.0"/>
+    <param name="minThreshold" type="double" value="70.0"/>
+    <param name="maxThreshold" type="double" value="200.0"/>
+    <param name="thresholdStep" type="double" value="20.0"/>
+    <param name="minRepeatability" type="double" value="3.0"/>
+    <param name="patch_scaling_factor" type="double" value="4.0"/>
+    <param name="debug_font_scale" type="double" value="2.0"/>
   </node>
 
   <node
@@ -27,8 +34,9 @@
     name="ground_projector"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
-    <param name="sub_plane_model_topic" type="string"
-      value="/cameras/navigation/$(arg namespace)/planefit/model"/>
+    <remap from="model" to="/cameras/navigation/$(arg namespace)/planefit/model"/>
+    <param name="min_major_axis" type="double" value="0.04"/>
+    <param name="max_major_axis" type="double" value="0.2"/>
   </node>
 
   <node
@@ -39,6 +47,51 @@
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="/processes/sample_detection/search/$(arg namespace)/named_point"
       to="/processes/sample_detection/search/named_point"/>
+    <param name="min_target_hue" type="double" value="120"/>
+    <param name="max_target_hue" type="double" value="30"/>
+    <param name="min_color_saturation" type="double" value="90"/>
+    <param name="high_saturation_limit" type="double" value="0.7"/>
+    <param name="low_saturation_limit" type="double" value="0.1"/>
+    <param name="min_inner_outer_distance" type="double" value="0.9"/>
+    <param name="max_exemplar_distance" type="double" value="0.7"/>
+    <param name="min_fence_distance" type="double" value="0.5"/>
+    <param name="min_fence_color_saturation" type="double" value="90"/>
+    <param name="fence_high_saturation_limit" type="double" value="0.25"/>
+  </node>
+
+  <node
+    pkg="topic_tools"
+    type="relay"
+    name="search_camera_info_relay"
+    machine="search"
+    ns="/processes/sample_detection/search/$(arg namespace)"
+    args="/cameras/search/$(arg namespace)/camera_info /processes/sample_detection/search/camera_info">
+  </node>
+
+  <node
+    machine="search"
+    pkg="linemod_detector"
+    type="linemod_detector_2d"
+    name="hard_linemod_detector_2d"
+    ns="/processes/sample_detection/search/$(arg namespace)">
+    <remap from="/processes/sample_detection/search/$(arg namespace)/point"
+      to="/processes/sample_detection/search/named_point"/>
+    <param name="template_file" type="string" value="$(find linemod_detector)/config/metal_samples.yaml"/>
+    <param name="load_inner_linemod" type="bool" value="true"/>
+    <param name="pub_threshold" type="double" value="90.0"/>
+    <param name="check_color_model" type="bool" value="true"/>
+    <param name="compute_grip_angle" type="bool" value="false"/>
+    <param name="do_median_blur" type="bool" value="false"/>
+    <param name="median_blur_size" type="int" value="13"/>
+    <param name="high_saturation_limit" type="double" value="0.5"/>
+    <param name="low_saturation_limit" type="double" value="0.1"/>
+    <param name="mask_dilation_iterations" type="int" value="2"/>
+    <param name="matching_threshold" type="double" value="70.0"/>
+    <param name="max_exemplar_distance" type="double" value="0.3"/>
+    <param name="min_color_saturation" type="double" value="150"/>
+    <param name="min_inner_outer_distance" type="double" value="0.5"/>
+    <param name="rectify_patch" type="bool" value="true"/>
+    <param name="target_width" type="double" value="130.0"/>
   </node>
 
 </launch>

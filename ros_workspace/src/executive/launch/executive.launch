@@ -31,8 +31,8 @@
     <remap from="planner_move_base" to="/processes/planner/move_base"/>        
     <remap from="detected_sample_manipulator" to="/processes/sample_detection/manipulator/filtered_point"/>
     <remap from="detected_sample_search" to="/processes/sample_detection/search/filtered_point"/>
-    <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/manipulator_linemod_detector_2d/enable"/>
-    <remap from="enable_hard_manipulator_detector" to="/processes/sample_detection/manipulator/hard_manipulator_linemod_detector_2d/enable"/>
+    <remap from="enable_manipulator_detector" to="/processes/sample_detection/manipulator/saliency_detector/enable"/>
+    <remap from="enable_manipulator_projector" to="/processes/sample_detection/manipulator/pointcloud_projector/enable"/>    
     <remap from="enable_search" to="/cameras/search/enable_publish"/>
     <remap from="enable_beacon" to="/cameras/navigation/beacon/basler_camera/enable_publish"/>
     <remap from="beacon_pose" to="/processes/beacon/beacon_pose"/>
@@ -95,8 +95,7 @@
 
         <!-- remaps -->
         <remap from="search_lights" to="search_lights"/>
-        <remap from="close_range_verify" to="/processes/sample_detection/search/close_range_verify"/>
-        <remap from="sun_pointing" to="/processes/compute_sun_angle/sun_pointing_action"/>
+         <remap from="sun_pointing" to="/processes/compute_sun_angle/sun_pointing_action"/>
 
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>

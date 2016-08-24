@@ -1,0 +1,1 @@
+samplereturn_msgs/HueHistogram hue

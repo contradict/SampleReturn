@@ -12,137 +12,133 @@
 namespace BaslerCamera
 {
 
-void
+bool
 BaslerNode::handle_basler_parameter(std::string name, bool value)
 {
+    bool current=value;
     GenApi::INodeMap& nodemap = camera.GetNodeMap();
     try
     {
         ROS_INFO_STREAM("Setting boolean param " << name << " to " << value << ".");
         GenApi::CBooleanPtr this_node(nodemap.GetNode(name.c_str()));
-        if (!IsWritable(this_node))
+        if (IsWritable(this_node))
+        {
+            this_node->SetValue(value);
+        }
+        else
         {
             ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
-            return;
         }
-        this_node->SetValue(value);
+        if(IsReadable(this_node))
+        {
+            current = this_node->GetValue();
+        }
     }
     catch (const GenericException& e)
     {
         ROS_ERROR_STREAM(e.GetDescription());
     }
+    return current;
 }
 
-void
+int
 BaslerNode::handle_basler_parameter(std::string name, int value)
 {
+    int current=value;
     GenApi::INodeMap& nodemap = camera.GetNodeMap();
     try
     {
         ROS_INFO_STREAM("Setting int param " << name << " to " << value << ".");
         GenApi::CIntegerPtr this_node(nodemap.GetNode(name.c_str()));
-        if (!IsWritable(this_node))
+        if (IsWritable(this_node))
+        {
+            this_node->SetValue(value);
+        }
+        else
         {
             ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
-            return;
         }
-        this_node->SetValue(value);
+        if (IsReadable(this_node))
+        {
+            current = this_node->GetValue();
+        }
     }
     catch (const GenericException& e)
     {
         ROS_ERROR_STREAM(e.GetDescription());
     }
+    return current;
 }
 
-void
+double
 BaslerNode::handle_basler_parameter(std::string name, double value)
 {
+    double current=value;
     GenApi::INodeMap& nodemap = camera.GetNodeMap();
     try
     {
         ROS_INFO_STREAM("Setting float param " << name << " to " << value << ".");
         GenApi::CFloatPtr this_node(nodemap.GetNode(name.c_str()));
-        if (!IsWritable(this_node))
+        if (IsWritable(this_node))
+        {
+            this_node->SetValue(value);
+        }
+        else
         {
             ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
-            return;
         }
-        this_node->SetValue(value);
+        if (IsReadable(this_node))
+        {
+            current = this_node->GetValue();
+        }
     }
     catch (const GenericException& e)
     {
         ROS_ERROR_STREAM(e.GetDescription());
     }
+    return current;
 }
 
-void
+std::string
 BaslerNode::handle_basler_parameter(std::string name, std::string value)
 {
+    std::string current=value;
     GenApi::INodeMap& nodemap = camera.GetNodeMap();
     try
     {
         ROS_INFO_STREAM("Setting enum param " << name << " to " << value << ".");
         GenApi::CEnumerationPtr this_node(nodemap.GetNode(name.c_str()));
-        if (!IsWritable(this_node))
+        if (IsWritable(this_node))
+        {
+            if (!IsAvailable(this_node->GetEntryByName(value.c_str())))
+            {
+                ROS_ERROR_STREAM("Value '" << value << "' isn't available for basler param '" << name << "'.");
+            }
+            else
+            {
+                this_node->FromString(value.c_str());
+            }
+        }
+        else
         {
             ROS_ERROR_STREAM("Basler parameter '" << name << "' isn't writable or doesn't exist.");
-            return;
         }
-        if (!IsAvailable(this_node->GetEntryByName(value.c_str())))
+        if (IsReadable(this_node))
         {
-            ROS_ERROR_STREAM("Valuer '" << value << "' isn't available for basler param '" << name << "'.");
-            return;
+            current = this_node->ToString();
         }
-        this_node->FromString(value.c_str());
     }
     catch (const GenericException& e)
     {
         ROS_ERROR_STREAM(e.GetDescription());
     }
-}
-
-void
-BaslerNode::handle_basler_parameter(XmlRpc::XmlRpcValue& param)
-{
-  ros::NodeHandle nh("~");
-  std::string type = param["type"];
-  if ("boolean" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeBoolean,
-                   "Type of value for %s must be boolean", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (bool)param["value"]);
-    nh.setParam(param["name"], (bool)param["value"]);
-  }
-  else if ("int" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeInt,
-                   "Type of value for %s must be int", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (int)param["value"]);
-    nh.setParam(param["name"], (int)param["value"]);
-  }
-  else if ("float" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeDouble,
-                   "Type of value for %s must be float", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (double)param["value"]);
-    nh.setParam(param["name"], (double)param["value"]);
-  }
-  else if ("enum" == type)
-  {
-    ROS_ASSERT_MSG(param["value"].getType() == XmlRpc::XmlRpcValue::TypeString,
-                   "Type of value for %s must be string", std::string(param["name"]).c_str());
-    handle_basler_parameter(param["name"], (std::string)param["value"]);
-    nh.setParam(param["name"], (std::string)param["value"]);
-  }
-  else
-  {
-    ROS_FATAL_STREAM("Unknown param type for parameter " << param["name"] << ": " << type);
-  }
+    return current;
 }
 
 void
 BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t level)
 {
+    ros::NodeHandle nh("~");
     (void) level;
     for (std::vector<basler_camera::CameraConfig::AbstractParamDescriptionConstPtr>::const_iterator _i = config.__getParamDescriptions__().begin(); _i != config.__getParamDescriptions__().end(); ++_i)
     {
@@ -150,19 +146,23 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
         (*_i)->getValue(config, val);
         if("bool" == (*_i)->type)
         {
-            handle_basler_parameter((*_i)->name,  boost::any_cast<bool>(val));
+            bool bval = handle_basler_parameter((*_i)->name,  boost::any_cast<bool>(val));
+            nh.setParam((*_i)->name, bval);
         }
         else if("double" == (*_i)->type)
         {
-            handle_basler_parameter((*_i)->name,  boost::any_cast<double>(val));
+            double dval = handle_basler_parameter((*_i)->name,  boost::any_cast<double>(val));
+            nh.setParam((*_i)->name, dval);
         }
         else if("int" == (*_i)->type)
         {
-            handle_basler_parameter((*_i)->name,  boost::any_cast<int>(val));
+            int ival = handle_basler_parameter((*_i)->name,  boost::any_cast<int>(val));
+            nh.setParam((*_i)->name, ival);
         }
         else if("str" == (*_i)->type)
         {
-            handle_basler_parameter((*_i)->name,  boost::any_cast<std::string>(val));
+            std::string sval = handle_basler_parameter((*_i)->name,  boost::any_cast<std::string>(val));
+            nh.setParam((*_i)->name, sval);
         }
         else
         {

@@ -20,7 +20,6 @@ find_package(catkin REQUIRED
 	    smach
         smach_ros
         platform_motion_msgs
-	    visual_servo_msgs
 	    manipulator_msgs
         cmake_modules
         )

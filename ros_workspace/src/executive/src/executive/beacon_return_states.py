@@ -22,7 +22,7 @@ import samplereturn.util as util
             
 class BeaconReturn(smach.State):
     
-    def __init__(self, label, tf_listener, announcer):
+    def __init__(self, label, tf_listener, beacon_enable, announcer):
 
         smach.State.__init__(self,
                              outcomes=['move',
@@ -50,6 +50,7 @@ class BeaconReturn(smach.State):
         
         self.label = label
         self.tf_listener = tf_listener
+        self.beacon_enable = beacon_enable
         self.announcer = announcer
         self.tried_spin = False
 
@@ -58,7 +59,8 @@ class BeaconReturn(smach.State):
         userdata.active_manager = userdata.manager_dict[self.label]
         userdata.report_sample = False
         userdata.report_beacon = True
-        
+        self.beacon_enable.publish(True)        
+
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'

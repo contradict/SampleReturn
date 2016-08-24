@@ -8,19 +8,22 @@ set(CMAKE_BUILD_TYPE Debug)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS tf rospy
   roscpp
+  cmake_modules
   sensor_msgs
   cv_bridge
   dynamic_reconfigure
   image_geometry
-  samplereturn_msgs)
+  samplereturn_msgs
+  samplereturn)
 
 find_package(OpenCV)
+find_package(Eigen REQUIRED)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and scripts declared therein get installed
-catkin_python_setup()
+# catkin_python_setup()
 
 #######################################
 ## Declare ROS messages and services ##
@@ -47,7 +50,7 @@ catkin_python_setup()
 # )
 
 generate_dynamic_reconfigure_options(cfg/kalman_filter_params.cfg
-  cfg/manipulator_kalman_filter_params.cfg)
+    cfg/ManipulatorKalmanFilter.cfg)
 
 ###################################################
 ## Declare things to be passed to other projects ##
@@ -68,8 +71,9 @@ catkin_package(
 ## Specify additional locations of header files
 # include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
- include_directories(include
+include_directories(include
    ${catkin_INCLUDE_DIRS}
+   ${Eigen_INCLUDE_DIRS}
 )
 
 add_definitions( -std=gnu++0x )
@@ -80,26 +84,24 @@ add_definitions( -std=gnu++0x )
 # )
 
 ## Declare a cpp executable
-#add_executable(kalman_filter_node nodes/kalman_filter_node.cpp)
- add_executable(dslr_kalman_filter_node nodes/dslr_kalman_filter_node.cpp)
- add_executable(manipulator_kalman_filter_node nodes/manipulator_kalman_filter_node.cpp)
+ add_executable(dslr_kalman_filter_node
+     nodes/dslr_kalman_filter_node.cpp
+     src/probability.cpp)
+ add_executable(manipulator_kalman_filter_node
+     nodes/manipulator_kalman_filter_node.cpp
+     src/probability.cpp)
 
- #add_dependencies(kalman_filter_node ${PROJECT_NAME}_gencfg)
  add_dependencies(dslr_kalman_filter_node ${PROJECT_NAME}_gencfg)
  add_dependencies(manipulator_kalman_filter_node ${PROJECT_NAME}_gencfg)
 
 ## Add dependencies to the executable
- #add_dependencies(kalman_filter_node samplereturn_msgs_gencpp)
  add_dependencies(dslr_kalman_filter_node samplereturn_msgs_gencpp)
  add_dependencies(manipulator_kalman_filter_node samplereturn_msgs_gencpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(kalman_filter_node
-#   ${catkin_LIBRARIES}
-#   ${OpenCV_LIBRARIES}
-# )
  target_link_libraries(dslr_kalman_filter_node
    ${catkin_LIBRARIES}
+   ${eigen_LIBRARIES}
  )
  target_link_libraries(manipulator_kalman_filter_node
    ${catkin_LIBRARIES}
@@ -111,11 +113,6 @@ add_definitions( -std=gnu++0x )
 
 ## Mark executable scripts (Python etc.) for installation
 ## not required for python when using catkin_python_setup()
-install(PROGRAMS
-		nodes/detection_filter_node.py
-		DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
 #install(DIRECTORY launch config
 #		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 #		USE_SOURCE_PERMISSIONS
@@ -124,18 +121,17 @@ install(PROGRAMS
 ## Mark executables and/or libraries for installation
 install(TARGETS dslr_kalman_filter_node
   manipulator_kalman_filter_node
-  #kalman_filter_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+  PATTERN ".svn" EXCLUDE
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES

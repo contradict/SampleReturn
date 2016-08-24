@@ -69,6 +69,7 @@ class ManualController(object):
         self.state_machine.userdata.light_state = False
         self.state_machine.userdata.search_camera_state = True
         self.state_machine.userdata.announce_sample = False
+        self.state_machine.userdata.manual_bin = 0
 
         #strafe search settings
         self.state_machine.userdata.manipulator_correction = self.node_params.manipulator_correction
@@ -170,7 +171,14 @@ class ManualController(object):
                 return 'succeeded'
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
-                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(True)),
+                                     transitions = {'succeeded':'ENABLE_MANIPULATOR_PROJECTOR',
+                                                    'aborted':'SELECT_JOYSTICK'})
+
+            smach.StateMachine.add('ENABLE_MANIPULATOR_PROJECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(True),
                                                             response_cb = enable_detector_cb,
@@ -213,7 +221,14 @@ class ManualController(object):
                                    transitions = {'next':'DISABLE_MANIPULATOR_DETECTOR'})
 
             smach.StateMachine.add('DISABLE_MANIPULATOR_DETECTOR',
-                                    smach_ros.ServiceState('enable_hard_manipulator_detector',
+                                    smach_ros.ServiceState('enable_manipulator_detector',
+                                                            samplereturn_srv.Enable,
+                                                            request = samplereturn_srv.EnableRequest(False)),
+                                     transitions = {'succeeded':'DISABLE_MANIPULATOR_PROJECTOR',
+                                                    'aborted':'SELECT_JOYSTICK'})
+
+            smach.StateMachine.add('DISABLE_MANIPULATOR_PROJECTOR',
+                                    smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
                                      transitions = {'succeeded':'SELECT_JOYSTICK',
@@ -224,12 +239,13 @@ class ManualController(object):
                                                  'Start ing, grab.'),
                                    transitions = {'next':'MANIPULATOR_GRAB'})
 
-            @smach.cb_interface(input_keys = ['manipulator_sample'])
+            @smach.cb_interface(input_keys = ['manipulator_sample',
+                                              'manual_bin'])
             def grab_msg_cb(userdata):
                 grab_msg = manipulator_msg.ManipulatorGoal()
                 grab_msg.type = grab_msg.GRAB
                 grab_msg.grip_torque = 0.7
-                grab_msg.target_bin = 1
+                grab_msg.target_bin = userdata.manual_bin
                 grab_msg.wrist_angle = 0
                 if userdata.manipulator_sample is not None:
                     grab_msg.wrist_angle = userdata.manipulator_sample.grip_angle
@@ -390,6 +406,12 @@ class ManualController(object):
                     TypeError), e:
                 rospy.logerr("Unable to set search camera enable %s: %s",
                             newstate, e)
+        if self.joy_state.button('BUTTON_SELECT_BIN'):
+            self.state_machine.userdata.manual_bin += 1
+            if self.state_machine.userdata.manual_bin == 11:
+                    self.state_machine.userdata.manual_bin = 0
+            self.announcer.say("Bin {!s}.".format(self.state_machine.userdata.manual_bin))
+            
 
     def pause_state_update(self, msg):
         self.state_machine.userdata.paused = msg.data

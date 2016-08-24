@@ -1,15 +1,23 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(samplereturn)
 
+add_definitions("-std=c++11" "-Wall")
+
 find_package(catkin REQUIRED
         COMPONENTS
+        samplereturn_msgs
             rospy
         )
+
+find_package(OpenCV)
 
 catkin_python_setup()
 
 catkin_package(
-    CATKIN_DEPENDS
+  INCLUDE_DIRS
+    include
+    LIBRARIES samplereturn
+     CATKIN_DEPENDS
         rospy
 )
 
@@ -17,6 +25,26 @@ catkin_add_env_hooks(
     00phidgets
     SHELLS sh
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/env-hooks)
+
+include_directories(
+    include
+    ${catkin_INCLUDE_DIRS}
+    )
+
+add_library(samplereturn
+    src/utils/colormodel.cpp
+    src/utils/mask_utils.cpp
+)
+target_link_libraries(samplereturn
+    ${OpenCV_LIBRARIES}
+    )
+add_dependencies(samplereturn samplereturn_msgs_gencpp)
+
+install(TARGETS samplereturn
+   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 foreach( d
         launch
@@ -30,6 +58,13 @@ foreach( d
         USE_SOURCE_PERMISSIONS
         )
 endforeach()
+
+install(
+    DIRECTORY include/samplereturn/
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+    USE_SOURCE_PERMISSIONS
+)
+
 install(
     PROGRAMS
        nodes/camlogger.py

@@ -68,7 +68,7 @@
               <param name="input_frame" type="string" value="base_link"/>
               <param name="output_frame" type="string" value="base_link"/>
         </node>
-        <node name="xlimit"
+        <node name="zlimit"
               machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
@@ -80,14 +80,14 @@
               <remap from="~input" to="points2"/>
 
               <rosparam>
-                  filter_field_name: x
-                  filter_limit_min: 0.0
+                  filter_field_name: z
+                  filter_limit_min: 1.8
                   filter_limit_max: 3.0
-                  input_frame: "base_link"
-                  output_frame: "base_link"
               </rosparam>
+              <param name="input_frame" type="string" value="navigation_$(arg namespace)_left_camera"/>
+              <param name="output_frame" type="string" value="navigation_$(arg namespace)_left_camera"/>
         </node>
-        <node name="ylimit"
+        <node name="xlimit"
               machine="$(arg machine)"
               pkg="nodelet"
               type="nodelet"
@@ -96,15 +96,15 @@
               output="log"
               respawn_delay="5.0"
               respawn="true">
-              <remap from="~input" to="xlimit/output"/>
+              <remap from="~input" to="zlimit/output"/>
 
               <rosparam>
-                  filter_field_name: y
-                  filter_limit_min: -3.0
-                  filter_limit_max:  3.0
-                  input_frame: "base_link"
+                  filter_field_name: x
+                  filter_limit_min: -1.0
+                  filter_limit_max:  1.0
                   output_frame: "base_link"
               </rosparam>
+              <param name="input_frame" type="string" value="navigation_$(arg namespace)_left_camera"/>
         </node>
         <node name="planefit"
               machine="$(arg machine)"
@@ -115,7 +115,7 @@
               output="log"
               respawn_delay="5.0"
               respawn="true">
-              <remap from="~input" to="ylimit/output"/>
+              <remap from="~input" to="xlimit/output"/>
 
               <rosparam>
                   axis: [0.0,0.0,1.0]

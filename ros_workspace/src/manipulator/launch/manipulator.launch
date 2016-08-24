@@ -59,7 +59,7 @@
         
             hand_open_position: 2.7
 
-            wrist_zero_position: 1.82
+            wrist_zero_position: 1.78
 
             arm_down_maximum: 3.0
         </rosparam>
