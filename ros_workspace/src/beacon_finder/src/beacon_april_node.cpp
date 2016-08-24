@@ -29,7 +29,12 @@ namespace beacon_april_node{
  
 class AprilTagDescription{
  public:
-  AprilTagDescription(int id, double size, std::string &frame_name, std::vector<cv::Point3d> &corner_pos):id_(id), size_(size), frame_name_(frame_name), corners(corner_pos) {}
+  AprilTagDescription(int id, double size, std::string &frame_name, std::vector<cv::Point3d> &corner_pos) :
+      corners(corner_pos),
+      id_(id),
+      size_(size),
+      frame_name_(frame_name)
+  {}
   double size(){return size_;}
   int id(){return id_;} 
   std::string& frame_name(){return frame_name_;}
@@ -84,10 +89,10 @@ class BeaconAprilDetector{
 BeaconAprilDetector::BeaconAprilDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh):
     it_(nh),
     _tf(ros::Duration(10.0)),
-    tag_det_(NULL),
-    covariance_(36,0.0),
     rng_(0),
-    point_size_(10)
+    point_size_(10),
+    tag_det_(NULL),
+    covariance_(36,0.0)
 {
   //get april tag descriptors from launch file
   XmlRpc::XmlRpcValue april_tag_descriptions;
@@ -225,7 +230,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
               continue;
           }
           AprilTagDescription description = description_itr->second;
-          double tag_size = description.size();
+          //double tag_size = description.size();
           
         std::string frame_id = description.frame_name();
         std::string tf_err;
@@ -238,11 +243,11 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
         tf::StampedTransform T_beacon_to_tag;
         _tf.lookupTransform(frame_id, "beacon", ros::Time(0), T_beacon_to_tag);
         
-        double width, height;
-        width = std::min(abs(det->p[1][0] - det->p[0][0]),
-                         abs(det->p[2][0] - det->p[3][0]));
-        height = std::min(abs(det->p[3][1] - det->p[0][1]),
-                          abs(det->p[2][1] - det->p[1][1]));
+        //double width, height;
+        //width = std::min(fabs(det->p[1][0] - det->p[0][0]),
+        //                 fabs(det->p[2][0] - det->p[3][0]));
+        //height = std::min(fabs(det->p[3][1] - det->p[0][1]),
+        //                  fabs(det->p[2][1] - det->p[1][1]));
     
         //stuff points from detections into an array for opencv, even if the tag is small,
         //these may be useful to the multi tag solver
@@ -276,7 +281,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       } //end detections iteration
        
       //corners are only added for tags we want, should be 4/tag
-      if ( transformed_corners.size() >= (min_tags_ * 4) ) { 
+      if ( transformed_corners.size() >= (unsigned int)(min_tags_ * 4) ) {
         //try the multi_tag 3d solution
         cv::Vec3d rvec, tvec;
         bool solved = false;
