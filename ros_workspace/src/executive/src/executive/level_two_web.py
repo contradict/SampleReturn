@@ -396,8 +396,7 @@ class LevelTwoWeb(object):
                                    transitions = {'complete':'RECOVERY_MANAGER',
                                                   'object_detected':'RECOVERY_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_detection':'false'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('CALCULATE_BEACON_ROTATION',
                                    CalculateBeaconRotation(self.tf_listener),
