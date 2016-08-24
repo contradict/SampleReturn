@@ -77,3 +77,4 @@ pursue_sample:
     final_pursuit_step: 0.2
     spiral_search_step: 0.15 
     search_velocity: 0.05
+    available_bins: [1,2,3,4,5,6,7,8,9,10]

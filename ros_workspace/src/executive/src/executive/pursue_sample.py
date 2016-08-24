@@ -126,7 +126,7 @@ class PursueSample(object):
         self.state_machine.userdata.spiral_search_positions = spiral_search_positions
 
         #allocate 10 bins from 1 to 10, bin 0 is the closed carousel position
-        self.state_machine.userdata.available_bins = range(1,11)
+        self.state_machine.userdata.available_bins = self.node_params.available_bins
         self.state_machine.userdata.active_bin_id = 0
 
         #use these as booleans in remaps
