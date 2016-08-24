@@ -122,10 +122,7 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.pause_start_time = None
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
 
-        #dismount move
-        dismount_move =  node_params.dismount_move
-        dismount_move['angle'] = np.radians(dismount_move['angle'])
-        self.state_machine.userdata.dismount_move = dismount_move
+        #initial behavior
         self.state_machine.userdata.initial_behavior = node_params.initial_behavior
         
         #beacon and localization
@@ -217,46 +214,6 @@ class LevelTwoWeb(object):
                                                   'timeout':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED'})
 
-            smach.StateMachine.add('DISMOUNT_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'ANNOUNCE_DISMOUNT',
-                                                  'object_detected':'ANNOUNCE_DISMOUNT',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_detection':'false'})
-
-            smach.StateMachine.add('ANNOUNCE_DISMOUNT',
-                                   AnnounceState(self.announcer,
-                                                 'Platform dismounted.'),
-                                   transitions = {'next':'LOOK_AT_BEACON'})
-
-
-            smach.StateMachine.add('LOOK_AT_BEACON',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'CALIBRATE_TO_BEACON',
-                                                  'object_detected':'CALIBRATE_TO_BEACON',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'beacon_turn',
-                                                'stop_on_detection':'false'})
-
-            smach.StateMachine.add('CALIBRATE_TO_BEACON',
-                                   WaitForFlagState('false',
-                                                    flag_trigger_value = 'true',
-                                                    timeout = self.beacon_calibration_delay,
-                                                    announcer = self.announcer,
-                                                    start_message ='Calibrate ing to beacon.'),
-                                   transitions = {'next':'FINISH_CALIBRATION',
-                                                  'timeout':'FINISH_CALIBRATION',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED'})
-
-            smach.StateMachine.add('FINISH_CALIBRATION',
-                                   FinishCalibration(input_keys = ['map_calibration_requested'],
-                                                     output_keys = ['map_calibration_requested'],
-                                                     outcomes = ['first', 'recalibration']),
-                                   transitions = {'first':'WEB_MANAGER',
-                                                  'recalibration':'CREATE_MOVE_GOAL',})
- 
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
                                               self.tf_listener,
@@ -403,6 +360,32 @@ class LevelTwoWeb(object):
                                    CalculateBeaconRotation(self.tf_listener),
                                    transitions = {'next':'LOOK_AT_BEACON',
                                                   'aborted':'CREATE_MOVE_GOAL'})
+
+            smach.StateMachine.add('LOOK_AT_BEACON',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'CALIBRATE_TO_BEACON',
+                                                  'object_detected':'CALIBRATE_TO_BEACON',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'simple_move':'beacon_turn',
+                                                'stop_on_detection':'false'})
+
+            smach.StateMachine.add('CALIBRATE_TO_BEACON',
+                                   WaitForFlagState('false',
+                                                    flag_trigger_value = 'true',
+                                                    timeout = self.beacon_calibration_delay,
+                                                    announcer = self.announcer,
+                                                    start_message ='Calibrate ing to beacon.'),
+                                   transitions = {'next':'FINISH_CALIBRATION',
+                                                  'timeout':'FINISH_CALIBRATION',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})
+
+            smach.StateMachine.add('FINISH_CALIBRATION',
+                                   FinishCalibration(input_keys = ['map_calibration_requested'],
+                                                     output_keys = ['map_calibration_requested'],
+                                                     outcomes = ['first', 'recalibration']),
+                                   transitions = {'first':'WEB_MANAGER',
+                                                  'recalibration':'CREATE_MOVE_GOAL',})
 
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(self.camera_enablers),
@@ -586,15 +569,12 @@ class StartLeveLTwo(smach.State):
 
         smach.State.__init__(self,
                             input_keys=['paused',
-                                        'dismount_move',
                                         'initial_behavior',
                                         'spin_velocity'],
                             output_keys=['action_result',
                                         'recovery_parameters',
                                         'recovery_requested',
                                         'move_target',
-                                        'simple_move',
-                                        'beacon_turn',
                                         'start_time',
                                         'pause_start_time',
                                         'pause_time_offset'],
@@ -609,14 +589,7 @@ class StartLeveLTwo(smach.State):
         userdata.action_result = result
         userdata.move_target = None
 
-        #create the dismount_move
-        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                              **userdata.dismount_move)
-
-        userdata.beacon_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
-                                             angle = np.pi,
-                                             velocity = userdata.spin_velocity)
-
+        #load the initial behavior
         userdata.recovery_parameters = userdata.initial_behavior
         userdata.recovery_requested = True
 
