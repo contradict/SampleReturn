@@ -13,7 +13,6 @@ import tf
 
 import std_msgs.msg as std_msg
 import actionlib_msgs.msg as action_msg
-import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
