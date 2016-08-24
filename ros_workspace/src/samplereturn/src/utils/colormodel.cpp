@@ -28,8 +28,7 @@ ColorModel::createHueHistogram(const cv::Mat& mask, double min_color_saturation,
     cv::extractChannel(image_hsv, value, 2);
     cv::threshold(saturation, saturation_mask, min_color_saturation, 255, cv::THRESH_BINARY);
     cv::bitwise_and(mask, saturation_mask, combined_mask);
-    double salient_pixels = cv::countNonZero(mask);
-    hh.saturation_score_ = double(cv::countNonZero(combined_mask))/salient_pixels;
+    hh.saturation_score_ = cv::mean(saturation, mask)[0]/255.0;
     hh.value_mean_ = cv::mean(value, mask)[0];
     int histSize[] = { hbins };
     float hrange[] = { 0, 180 };
