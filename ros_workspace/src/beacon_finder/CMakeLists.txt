@@ -6,7 +6,6 @@ add_definitions(-std=c++11)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-     rospy
      roscpp
      tf
      tf_conversions
@@ -29,7 +28,7 @@ find_package(OpenCV)
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/groovy/api/catkin/html/user_guide/setup_dot_py.html
-catkin_python_setup()
+# catkin_python_setup()
 
 #######################################
 ## Declare ROS messages and services ##
@@ -74,7 +73,6 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES sample_detection_filter
     CATKIN_DEPENDS
-        rospy
 		cv
 		cv2
         std_msgs
@@ -127,11 +125,11 @@ target_link_libraries(beacon_april_node
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-install(
-    PROGRAMS
-        nodes/beacon_finder.py
-    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+#install(
+#    PROGRAMS
+#        nodes/beacon_finder.py
+#    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+#)
 
 install(DIRECTORY launch
 		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
