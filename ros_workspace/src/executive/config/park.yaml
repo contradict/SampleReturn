@@ -24,8 +24,8 @@ level_two:
     blocked_retry_delay: 3.0
   
     #search shape parameters
-    spoke_hub_radius: 6
-    raster_step: 5
+    spoke_hub_radius: 8
+    raster_step: 4
     raster_tolerance: 1.5 #close enough to next point?
     chord_course_tolerance: 4.0 #what is off course on a chord move
   
