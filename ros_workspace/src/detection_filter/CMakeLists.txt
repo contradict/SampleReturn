@@ -23,7 +23,7 @@ find_package(Eigen REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and scripts declared therein get installed
-catkin_python_setup()
+# catkin_python_setup()
 
 #######################################
 ## Declare ROS messages and services ##

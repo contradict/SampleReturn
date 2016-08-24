@@ -23,7 +23,6 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>rospy</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>roslib</build_depend>
@@ -41,10 +40,6 @@
   <run_depend>samplereturn_msgs</run_depend>
   <run_depend>image_geometry</run_depend>
   <run_depend>samplereturn</run_depend>
-
-
-  <run_depend>rospy</run_depend>
   <run_depend>tf</run_depend>
-  <run_depend>linemod_detector</run_depend>
 
 </package>
