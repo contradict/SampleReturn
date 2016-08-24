@@ -7,6 +7,7 @@ SSH_PORT="22"
 PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOME=/home/robot
 DELAY=5
+PTPD_OUTPUT=/home/zlizer/ptpd_output.txt
 
 eval `ssh-agent`
 ssh-add ${HOME}/.ssh/robot_rsa
@@ -31,6 +32,9 @@ if echo ${MASTER_HOST} | grep -q `hostname`; then
     ros_workspace/robot start log
 else
     if echo ${OTHER_HOST} | grep -q `hostname`; then
+        # wait for ptpd to start synchronizing
+        tail -fn0 ${PTPD_OUTPUT} | grep --line-buffered 'slv' | head -n 10 >>/dev/null
+        # force step of local ptpd
         # This requires the line
         # robot ALL=(root) NOPASSWD: /bin/kill
         # in /etc/sudoers
