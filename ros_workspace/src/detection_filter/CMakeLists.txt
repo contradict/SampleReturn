@@ -113,11 +113,6 @@ add_definitions( -std=gnu++0x )
 
 ## Mark executable scripts (Python etc.) for installation
 ## not required for python when using catkin_python_setup()
-install(PROGRAMS
-		nodes/detection_filter_node.py
-		DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
 #install(DIRECTORY launch config
 #		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 #		USE_SOURCE_PERMISSIONS
