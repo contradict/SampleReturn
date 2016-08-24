@@ -187,7 +187,10 @@ class KalmanDetectionFilter
 
     // When any exclusion zone is added in recovery, clear all filters in the zone
     filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
-        [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
+        [this](std::shared_ptr<ColoredKF> ckf){
+        bool check = filterInZone(ckf,exclusion_list_.back());
+        if (check) {clearMarker(ckf);}
+        return check;}),
         filter_list_.end());
   }
 
@@ -208,6 +211,9 @@ class KalmanDetectionFilter
 
     if(config.clear_filters) {
       //clear all filters
+      for (auto ckf : filter_list_) {
+        clearMarker(ckf);
+      }
       filter_list_.clear();
       exclusion_list_.clear();
       current_published_id_ = 0;
@@ -277,7 +283,10 @@ class KalmanDetectionFilter
     // When positive exclusion zone is added, clear all filters in the zone
     if (msg.success) {
       filter_list_.erase(std::remove_if(filter_list_.begin(), filter_list_.end(),
-          [this](std::shared_ptr<ColoredKF> ckf){return filterInZone(ckf,exclusion_list_.back());}),
+          [this](std::shared_ptr<ColoredKF> ckf){
+          bool check = filterInZone(ckf,exclusion_list_.back());
+          if (check) {clearMarker(ckf);}
+          return check;}),
           filter_list_.end());
     }
 
