@@ -137,7 +137,7 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES visual_servo_msgs
+#  LIBRARIES samplereturn_msgs
   CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
 #  DEPENDS system_lib
 )
@@ -154,19 +154,19 @@ include_directories(
 )
 
 ## Declare a cpp library
-# add_library(visual_servo_msgs
-#   src/${PROJECT_NAME}/visual_servo_msgs.cpp
+# add_library(samplereturn_msgs
+#   src/${PROJECT_NAME}/samplereturn_msgs.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(visual_servo_msgs_node src/visual_servo_msgs_node.cpp)
+# add_executable(samplereturn_msgs_node src/samplereturn_msgs_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(visual_servo_msgs_node visual_servo_msgs_generate_messages_cpp)
+# add_dependencies(samplereturn_msgs_node samplereturn_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(visual_servo_msgs_node
+# target_link_libraries(samplereturn_msgs_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -185,7 +185,7 @@ include_directories(
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS visual_servo_msgs visual_servo_msgs_node
+# install(TARGETS samplereturn_msgs samplereturn_msgs_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -210,7 +210,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_visual_servo_msgs.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_samplereturn_msgs.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

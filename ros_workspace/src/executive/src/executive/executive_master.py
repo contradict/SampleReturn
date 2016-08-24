@@ -19,7 +19,6 @@ import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
 import manipulator_msgs.msg as manipulator_msg
 import geometry_msgs.msg as geometry_msg
-import visual_servo_msgs.msg as visual_servo_msg
 import dynamic_reconfigure.srv as dynsrv
 import dynamic_reconfigure.msg as dynmsg
 import samplereturn_msgs.msg as samplereturn_msg

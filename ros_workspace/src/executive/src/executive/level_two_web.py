@@ -18,7 +18,6 @@ import tf
 import std_msgs.msg as std_msg
 import actionlib_msgs.msg as action_msg
 import nav_msgs.msg as nav_msg
-import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn_msgs.srv as samplereturn_srv
 import move_base_msgs.msg as move_base_msg
