@@ -28,6 +28,7 @@ from motion_planning.simple_motion import TimeoutException
 from samplereturn_msgs.msg import SimpleMoveGoal
 from sun_pointing.msg import ComputeAngleAction, ComputeAngleGoal
 
+from executive.executive_states import PublishMessageState
 from executive.executive_states import WaitForFlagState
 from executive.executive_states import AnnounceState
 from executive.executive_states import SelectMotionMode
@@ -241,11 +242,16 @@ class PursueSample(object):
 
             smach.StateMachine.add('MANIPULATOR_APPROACH_MOVE',
                                    ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'ENABLE_MANIPULATOR_DETECTOR',
-                                                  'object_detected':'ENABLE_MANIPULATOR_DETECTOR',
+                                   transitions = {'complete':'SEARCH_LIGHTS_ON',
+                                                  'object_detected':'SEARCH_LIGHTS_ON',
                                                   'aborted':'PUBLISH_FAILURE'},
                                    remapping = {'detection_message':'detected_sample',
                                                 'stop_on_detection':'false'})
+
+            smach.StateMachine.add('SEARCH_LIGHTS_ON',
+                                   PublishMessageState(self.light_pub),
+                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'},
+                                   remapping = {'message':'true'})
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
@@ -407,8 +413,13 @@ class PursueSample(object):
                                     smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
                                                             request = samplereturn_srv.EnableRequest(False)),
-                                     transitions = {'succeeded':'ANNOUNCE_CONTINUE',
-                                                    'aborted':'ANNOUNCE_CONTINUE'})
+                                     transitions = {'succeeded':'SEARCH_LIGHTS_OFF',
+                                                    'aborted':'SEARCH_LIGHTS_OFF'})
+
+            smach.StateMachine.add('SEARCH_LIGHTS_OFF',
+                                   PublishMessageState(self.light_pub),
+                                   transitions = {'next':'ANNOUNCE_CONTINUE'},
+                                   remapping = {'message':'true'})
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
@@ -773,14 +784,6 @@ class ConfirmSampleAcquired(smach.State):
                 self.announcer.say("Sample acquisition failed. Retry ing")
                 return 'sample_present'
 
-class SearchLightSwitch(smach.State):
-    def __init__(self):
-        smach.State.__init__(self,
-                             outcomes=['next'],
-                             input_keys =['on'])
-
-    def execute(self, userdata):
-        pass
 
 class PublishFailure(smach.State):
     def __init__(self, result_pub):

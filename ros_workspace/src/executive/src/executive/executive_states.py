@@ -24,6 +24,20 @@ from samplereturn_msgs.msg import (VFHMoveAction,
                                    VFHMoveResult,
                                    VFHMoveFeedback)
 
+class PublishMessageState(smach.State):
+    """General state for publishing a ros message.  Input key message
+    will be put directly into the publish() method.
+    """
+    def __init__(self, publisher):
+        smach.State.__init__(self,
+                             outcomes=['next'],
+                             input_keys =['message'])
+
+        self.publisher = publisher
+    def execute(self, userdata):
+        self.publisher.publish(userdata.message)
+        return 'next'
+
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
     values.  Each specified value tiggers an outcome of the state.
