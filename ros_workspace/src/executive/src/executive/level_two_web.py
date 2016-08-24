@@ -18,7 +18,6 @@ import tf
 import std_msgs.msg as std_msg
 import actionlib_msgs.msg as action_msg
 import nav_msgs.msg as nav_msg
-import visual_servo_msgs.msg as visual_servo_msg
 import samplereturn_msgs.msg as samplereturn_msg
 import samplereturn_msgs.srv as samplereturn_srv
 import move_base_msgs.msg as move_base_msg
@@ -150,7 +149,6 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.raster_step = node_params.raster_step
         self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
-
 
         #web management flags
         self.state_machine.userdata.outbound = True
@@ -297,14 +295,6 @@ class LevelTwoWeb(object):
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
 
-            smach.StateMachine.add('ANNOUNCE_BLOCKED',
-                                   AnnounceState(self.announcer, 'Path Blocked.'),
-                                                 transitions = {'next':'MOVE_MUX'})
-
-            smach.StateMachine.add('ANNOUNCE_ROTATE_TO_CLEAR',
-                                   AnnounceState(self.announcer, 'Started Blocked.'),
-                                   transitions = {'next':'MOVE_MUX'})
-
             smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
                                    AnnounceState(self.announcer, 'Off Course.'),
                                    transitions = {'next':'MOVE_MUX'})
@@ -398,7 +388,7 @@ class LevelTwoWeb(object):
                                                   'simple_move':'RECOVERY_SIMPLE_MOVE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'return_manager':'RETURN_MANAGER',
-                                                  'web_manager':'CREATE_MOVE_GOAL',
+                                                  'web_manager':'WEB_MANAGER',
                                                   'wait_for_preempt':'WAIT_FOR_PREEMPT'})
 
             smach.StateMachine.add('RECOVERY_SIMPLE_MOVE',
@@ -598,6 +588,7 @@ class StartLeveLTwo(smach.State):
                                         'dismount_move',
                                         'spin_velocity'],
                             output_keys=['action_result',
+                                        'move_target',
                                         'simple_move',
                                         'beacon_turn',
                                         'start_time',
@@ -612,6 +603,7 @@ class StartLeveLTwo(smach.State):
         result = samplereturn_msg.GeneralExecutiveResult()
         result.result_string = 'initialized'
         userdata.action_result = result
+        userdata.move_target = None
 
         #create the dismount_move
         userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
@@ -653,6 +645,7 @@ class WebManager(smach.State):
                                            'start_time',
                                            'return_time_offset',
                                            'pause_time_offset',
+                                           'move_target',
                                            'world_fixed_frame'],
                              output_keys = ['outbound',
                                             'web_slice_indices',
@@ -693,7 +686,11 @@ class WebManager(smach.State):
             userdata.stop_on_detection = False
             userdata.move_velocity = userdata.default_velocity
             return 'return_home'
-        
+
+        #this means the last move was preempted, we should finish it        
+        if userdata.move_target is not None:
+           return 'move'
+
         if len(userdata.web_slice_indices) == 0:
             rospy.loginfo("WEB_MANAGER finished last spoke")
             userdata.move_velocity = userdata.default_velocity
@@ -702,6 +699,8 @@ class WebManager(smach.State):
             active_slice = userdata.web_slices[userdata.web_slice_indices[0]] 
 
         if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
+            #this is where we will go after pursuit
+            userdata.move_target = self.last_web_move['point']       
             return 'sample_detected'
 
         if userdata.outbound:
@@ -1168,6 +1167,7 @@ class MoveMUX(smach.State):
         smach.State.__init__(self,
                              input_keys = ['active_manager'],
                              output_keys = ['retry_active',
+                                            'move_target',
                                             'move_point_map'],
                              outcomes = manager_list)
 
@@ -1175,6 +1175,7 @@ class MoveMUX(smach.State):
         #clear and reset flags after all moves!
         userdata.retry_active = False
         userdata.move_point_map = None
+        userdata.move_target = None
         return userdata.active_manager
 
 class LevelTwoPreempted(smach.State):
