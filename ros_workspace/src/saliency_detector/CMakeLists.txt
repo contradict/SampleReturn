@@ -6,7 +6,6 @@ project(saliency_detector)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  rospy
   roslib
   sensor_msgs
   samplereturn
@@ -107,7 +106,7 @@ catkin_package(
     include
     ${Eigen_INCLUDE_DIRS}
     LIBRARIES BMS saliency_detector_core
-  CATKIN_DEPENDS roscpp rospy roslib dynamic_reconfigure
+  CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
 
@@ -179,11 +178,6 @@ add_library(saliency_detector_core
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
- install(PROGRAMS
-   nodes/close_range_detector.py
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
-
 ## Mark executables and/or libraries for installation
 install(TARGETS saliency_detector_core BMS saliency_detector_node
    ground_projector_node color_histogram_descriptor_node
@@ -199,9 +193,6 @@ install(DIRECTORY launch
 install(DIRECTORY include
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
     USE_SOURCE_PERMISSIONS
-)
-install(FILES config/w2c.txt
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
 )
 
 
