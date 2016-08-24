@@ -50,7 +50,7 @@ find_package(Eigen REQUIRED)
 # )
 
 generate_dynamic_reconfigure_options(cfg/kalman_filter_params.cfg
-  cfg/manipulator_kalman_filter_params.cfg)
+    cfg/ManipulatorKalmanFilter.cfg)
 
 ###################################################
 ## Declare things to be passed to other projects ##
