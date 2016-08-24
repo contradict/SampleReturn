@@ -116,8 +116,6 @@ class LineMOD_Detector
             "/home/zlizer/src/SampleReturn/ros_workspace/src/linemod_detector/config/metal_samples.yaml");
     ros::param::param<bool>("~load_inner_linemod", load_inner_linemod, false);
 
-    reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
-
     // Initialize LINEMOD data structures
     if (load_inner_linemod) {
       detector = readInnerLinemod(template_filename);
@@ -128,6 +126,8 @@ class LineMOD_Detector
       num_modalities = (int)detector->getModalities().size();
     }
     ROS_DEBUG("Number of modalities loaded: %i", num_modalities);
+
+    reconfigure.setCallback(boost::bind(&LineMOD_Detector::configCallback, this,  _1, _2));
 
     ground_normal_ = tf::Stamped<tf::Vector3>(tf::Vector3(0,0,1.),ros::Time(0),"base_link");
     patch_array_sub = nh.subscribe("projected_patch_array", 1, &LineMOD_Detector::patchArrayCallback, this);
@@ -151,6 +151,8 @@ class LineMOD_Detector
   {
       (void)level;
       _config = config;
+      cv::Ptr<cv::linemod::Modality> mod = detector->getModalities()[0];
+      mod.dynamicCast<cv::linemod::InnerColorGradient>()->weak_threshold = float(config.weak_threshold);
   }
 
   cv::Mat rectifyPatch(std::string frame_id, const Eigen::Matrix3d& K, cv::Rect roi, const cv::Mat& img, int tw, int th)
@@ -342,6 +344,13 @@ class LineMOD_Detector
           cv::medianBlur(det_img, blur, _config.median_blur_size);
           blur.copyTo(det_img);
       }
+      if (_config.grayscale) {
+        cv::cvtColor(det_img, det_img, cv::COLOR_RGB2GRAY);
+        cv::Mat gray_stack(det_img.rows, det_img.cols, CV_8UC3);
+        int from_to[] = { 0,0, 0,1, 0,2 };
+        cv::mixChannels(&det_img, 1, &gray_stack, 1, from_to, 3);
+        det_img = gray_stack;
+      }
       sources.push_back(det_img);
       masks.push_back(det_mask);
       cv::linemod::Match m;
@@ -423,12 +432,6 @@ class LineMOD_Detector
         }
       }
 
-      // If a positive match, publish NamedPoint
-      if (m.similarity < _config.pub_threshold)
-      {
-          continue;
-      }
-
       // Do a background/foreground color histogram comparison, drop if
       // too similar
       if(_config.check_color_model)
@@ -440,7 +443,12 @@ class LineMOD_Detector
           double d_value = cm.getValuedSampleModel(_config.min_color_saturation, _config.low_saturation_limit, _config.high_saturation_limit).distance(hh_inner);
           if(debug_img_pub.getNumSubscribers()>0)
           {
-              hh_inner.draw_histogram(debug_image, draw_rect.x, draw_rect.y+draw_rect.height);
+              hh_inner.draw_histogram(debug_image, draw_rect.x, draw_rect.y, _config.debug_font_scale);
+              hh_outer.draw_histogram(debug_image, draw_rect.x, draw_rect.y+draw_rect.height+25*_config.debug_font_scale, _config.debug_font_scale);
+              char edist[100];
+              snprintf(edist, 100, "b:%3.2f v:%3.2f", d_background, d_value);
+              cv::putText(debug_image,edist,cv::Point2d(draw_rect.x+70, draw_rect.y + draw_rect.height + 50*_config.debug_font_scale),
+                      cv::FONT_HERSHEY_SIMPLEX, _config.debug_font_scale, cv::Scalar(255,0,0),4,cv::LINE_8);
           }
           if( (d_background<_config.min_inner_outer_distance) ||
               (d_value>_config.max_exemplar_distance))
@@ -449,24 +457,36 @@ class LineMOD_Detector
           }
       }
 
+      float grip_angle = 0.0;
+      if(_config.compute_grip_angle)
+      {
+          cv::RotatedRect griprect;
+          if(samplereturn::computeGripAngle(det_mask, &griprect, &grip_angle) &&
+                  (debug_img_pub.getNumSubscribers()>0))
+          {
+              griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
+                      orig_y + orig_height/2 - h/2);
+              if(debug_img_pub.getNumSubscribers()>0)
+              {
+                  samplereturn::drawGripRect(debug_image, griprect);
+              }
+          }
+      }
+
+      // If a positive match, publish NamedPoint
+      if (m.similarity < _config.pub_threshold)
+      {
+          continue;
+      }
+
       samplereturn_msgs::NamedPoint np;
       np.header.stamp = msg->header.stamp;
       np.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
       np.point = msg->patch_array[i].world_point.point;
       np.sensor_frame = msg->header.frame_id;
       np.name = m.class_id;
+      np.grip_angle = grip_angle;
 
-      if(_config.compute_grip_angle)
-      {
-          cv::RotatedRect griprect;
-          if(samplereturn::computeGripAngle(det_mask, &griprect, &np.grip_angle) &&
-                  (debug_img_pub.getNumSubscribers()>0))
-          {
-              griprect.center += cv::Point2f(orig_x + orig_width/2 - w/2,
-                      orig_y + orig_height/2 - h/2);
-              samplereturn::drawGripRect(debug_image, griprect);
-          }
-      }
       points_out.points.push_back(np);
     }
     points_pub.publish(points_out);

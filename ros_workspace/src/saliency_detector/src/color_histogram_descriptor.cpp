@@ -99,60 +99,13 @@ class ColorHistogramDescriptorNode
                 msg->patch_array[i].image_roi.width,
                 msg->patch_array[i].image_roi.height)));
       }
+
+      // check foreground/background distance
       samplereturn::ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
       samplereturn::HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
       samplereturn::HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
-      double distance = hh_inner.distance(hh_outer);
+      double background_distance = hh_inner.distance(hh_outer);
     
-      if (enable_debug_) {
-          int x,y,w,h;
-          x = msg->patch_array[i].image_roi.x_offset;
-          y = msg->patch_array[i].image_roi.y_offset;
-          w = msg->patch_array[i].image_roi.width;
-          h = msg->patch_array[i].image_roi.height;
-          char *str=hh_inner.str();
-          if (y > 100) {
-              cv::putText(debug_image_, str, cv::Point2d(x, y),
-                      cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
-          }
-          else {
-              cv::putText(debug_image_, str, cv::Point2d(x, y + h),
-                      cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
-          }
-          free(str);
-          hh_inner.draw_histogram(debug_image_, x, y+w);
-      }
-
-      // Compare inner and outer hists. If they're insufficiently different,
-      // count this as a falsely salient positive.
-      if (distance < config_.min_inner_outer_distance) {
-        // Nix region, with explanatory text
-        if (enable_debug_) {
-          int x,y,w,h;
-          x = msg->patch_array[i].image_roi.x_offset;
-          y = msg->patch_array[i].image_roi.y_offset;
-          w = msg->patch_array[i].image_roi.width;
-          h = msg->patch_array[i].image_roi.height;
-          cv::line(debug_image_,
-              cv::Point2f(x, y),
-              cv::Point2f(x + w, y + h), cv::Scalar(255,0,0), 20);
-          cv::line(debug_image_,
-              cv::Point2f(x + w, y),
-              cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
-          char bgdist[100];
-          snprintf(bgdist, 100, "Too similar to bg: %4.3f", distance);
-          if (y > 100) {
-            cv::putText(debug_image_,bgdist,cv::Point2d(x, y-25*config_.debug_font_scale),
-               cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
-          }
-          else {
-            cv::putText(debug_image_,bgdist,cv::Point2d(x, y + h),
-               cv::FONT_HERSHEY_SIMPLEX,config_.debug_font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
-          }
-        }
-        continue;
-      }
-
       // compare background to fence color
       std::vector<std::tuple<double, double>> edges;
       edges.push_back(std::make_tuple(0, config_.max_fence_hue));
@@ -169,19 +122,46 @@ class ColorHistogramDescriptorNode
       samplereturn::HueHistogramExemplar hh_value_sample = samplereturn::ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
       double hue_exemplar_distance = hh_colored_sample.distance(hh_inner);
       double value_exemplar_distance = hh_value_sample.distance(hh_inner);
-      bool is_sample = ((hue_exemplar_distance<config_.max_exemplar_distance) ||
-                       (value_exemplar_distance<config_.max_exemplar_distance)) &&
-                       (fence_distance>config_.min_fence_distance);
-      if(enable_debug_)
-      {
+
+      if (enable_debug_) {
           int x,y,h;
           x = msg->patch_array[i].image_roi.x_offset;
           y = msg->patch_array[i].image_roi.y_offset;
+          //w = msg->patch_array[i].image_roi.width;
           h = msg->patch_array[i].image_roi.height;
+          hh_inner.draw_histogram(debug_image_, x, y, config_.debug_font_scale);
+          hh_outer.draw_histogram(debug_image_, x, y + h + 25*config_.debug_font_scale, config_.debug_font_scale);
           char edist[100];
-          snprintf(edist, 100, "h:%3.2f v:%3.2f f:%3.2f", hue_exemplar_distance, value_exemplar_distance, fence_distance);
-          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 25*config_.debug_font_scale),
+          snprintf(edist, 100, "b:%3.2f h: %3.2f v:%3.2f f:%3.2f", background_distance, hue_exemplar_distance, value_exemplar_distance, fence_distance);
+          cv::putText(debug_image_,edist,cv::Point2d(x+70, y + h + 50*config_.debug_font_scale),
                   cv::FONT_HERSHEY_SIMPLEX, config_.debug_font_scale, cv::Scalar(255,0,0),4,cv::LINE_8);
+      }
+
+      // is a sample if high enough bg/fg distance, high enough fence distance,
+      // and close to one of the exemplars
+      bool is_sample = ((background_distance>config_.min_inner_outer_distance) &&
+                        (fence_distance>config_.min_fence_distance) &&
+                        ((hue_exemplar_distance<config_.max_exemplar_distance) ||
+                         (value_exemplar_distance<config_.max_exemplar_distance)));
+
+      if (!is_sample)
+      {
+          if(enable_debug_)
+          {
+              // Nix region
+              int x,y,w,h;
+              x = msg->patch_array[i].image_roi.x_offset;
+              y = msg->patch_array[i].image_roi.y_offset;
+              w = msg->patch_array[i].image_roi.width;
+              h = msg->patch_array[i].image_roi.height;
+              cv::line(debug_image_,
+                      cv::Point2f(x, y),
+                      cv::Point2f(x + w, y + h), cv::Scalar(255,0,0), 20);
+              cv::line(debug_image_,
+                      cv::Point2f(x + w, y),
+                      cv::Point2f(x, y + h), cv::Scalar(255,0,0), 20);
+          }
+          continue;
       }
 
       samplereturn_msgs::NamedPoint np_msg;
