@@ -3,9 +3,10 @@
 #Simple moves are executed first, strafes only.
 #Sample detection is disabled during simple moves.
 #Use with extreme caution, no obstacle checking.
-#example: - { angle: 45, distance: 2.0, velocity: 0.2 }
+#strafe example: - { angle: 45, distance: 2.0, velocity: 0.2 }
+#spin example: - { angle: 90, velocity: 0.3 }
 simple_moves: [
-    { angle: 180 , distance: 6.0, velocity: 0.2 }
+    { angle: 90 , distance: 6.0, velocity: 0.6 }
 ]
 
 #These moves are executed with VFH control. Rotations
@@ -22,12 +23,12 @@ moves: [
 pursue_samples: true
 
 #Enable beacon camera
-beacon_enabled_on_entry: false
-beacon_enabled_on_exit: true
+beacon_enabled_on_entry: true
+beacon_enabled_on_exit: false
 
 #A value of 1 gets rid of the rest of the raster on the
 #current spoke.  Only useful if exiting to web_manager.
-slices_to_remove: 6 
+slices_to_remove: 1
 
 #Add the indices of web slices to be appended to remaining
 #list of indices.  New indices added to front of list

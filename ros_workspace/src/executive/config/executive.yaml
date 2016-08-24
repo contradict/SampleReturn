@@ -9,8 +9,19 @@ level_two:
     raster_velocity: 0.6
     spin_velocity: 0.3
     return_time_minutes: 110 
-    #dismount and beacon approach
-    dismount_move: {angle: 0, distance: 6.0, velocity: 0.5}
+    
+    #initial move params (same as recovery)
+    initial_behavior:    
+        simple_moves: [
+            { angle: 0.0, distance: 6.0, velocity: 0.5 },
+            { angle: 180.0, velocity: 0.3 },
+            { angle: 180.0, distance: 3.0, velocity: 0.1 }
+        ]
+        beacon_enabled_on_entry: true
+        beacon_enabled_on_exit: false
+        time_offset: 0
+        terminal_outcome: web_manager
+
     beacon_approach_point: {x: 6.0, y: 0}
     platform_point: {x: -0.8, y: 0.0}
     beacon_observation_delay: 5 
