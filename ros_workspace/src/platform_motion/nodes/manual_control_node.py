@@ -14,7 +14,6 @@ import actionlib_msgs.msg as action_msg
 import manipulator_msgs.msg as manipulator_msg
 import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
-import visual_servo_msgs.msg as visual_servo_msg
 import geometry_msgs.msg as geometry_msg
 import sensor_msgs.msg as sensor_msg
 import samplereturn_msgs.msg as samplereturn_msg
