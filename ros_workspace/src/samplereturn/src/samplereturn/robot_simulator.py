@@ -577,7 +577,7 @@ class RobotSimulator(object):
         self.manipulator_image_publisher.publish(msg)
 
     def check_sample_detection_search(self, event):
-        if self.publish_samples:
+        if self.publish_samples and self.search_enabled:
             for sample in self.fake_samples:
                 #get headers in Time(0) for latest transforms
                 header = std_msg.Header(0, rospy.Time(0), self.reality_frame)    
