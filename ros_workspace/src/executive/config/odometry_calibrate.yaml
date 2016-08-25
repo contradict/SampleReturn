@@ -1,0 +1,70 @@
+#camera ignore params, to allow testing without certain cameras
+executive_master:
+    ignore_search_camera: True
+    ignore_manipulator_camera: True
+        
+level_two:
+    #all values in degrees and meters
+    move_velocity: 0.8
+    raster_velocity: 0.6
+    spin_velocity: 0.3
+    return_time_minutes: 110
+
+    #initial move params (same as recovery)
+    initial_behavior:
+        announcement: 'Executing odometry calibration, 6 meters.'
+        simple_moves: [
+            { angle: 0, distance: 6.0, velocity: 0.5 },
+        ]
+        search_enabled_on_entry: true
+        beacon_enabled_on_entry: false
+        time_offset: 0
+        terminal_outcome: wait_for_preempt
+
+    beacon_approach_point: {x: 6.0, y: 0}
+    platform_point: {x: -0.8, y: 0.0}
+    beacon_observation_delay: 4 
+    beacon_calibration_delay: 10
+    beacon_mount_tolerance: 0.02 #correction must be less than this before mount
+    #if a planned point has changed more than this, replan.
+    #if greater than recalibrate, wait and observe beacon, and set gyro bias
+    replan_threshold: 2.0
+    recalibrate_threshold: 5.0    
+    #for costmap issues, set to zero to disable this
+    blocked_retry_delay: 3.0
+  
+    #search shape parameters
+    spoke_hub_radius: 8
+    raster_step: 4
+    raster_tolerance: 1.5 #close enough to next point?
+    chord_course_tolerance: 4.0 #what is off course on a chord move
+  
+    #Slices are the angular extent between a start spoke and end spoke.
+    #Angles are specified in degrees from initial facing.  0 degrees is
+    #specified as the robot facing the Reference Point in the WPI
+    #localization map.  Slices also specify a maximum and minimum radius
+
+    web_slices: [
+        { start_angle: 195, end_angle: 215, min_radius: 50, max_radius: 61, return_on_end: True },
+        { start_angle: 335, end_angle: 315, min_radius: 45, max_radius: 56, return_on_end: True },
+        { start_angle: 145, end_angle: 155, min_radius: 125, max_radius: 136, return_on_end: True },
+        { start_angle: 135, end_angle: 115, min_radius: 35, max_radius: 46, return_on_end: False },
+        { start_angle: 140, end_angle: 130, min_radius: 140, max_radius: 151, return_on_end: True }
+    ]
+
+pursue_sample:
+    #sample approach (pursuit) parameters
+    pursuit_velocity: 0.8
+    spin_velocity: 0.3
+    max_pursuit_error: 0.5
+    min_pursuit_distance: 1.5
+    #if sample is closer than this, strafe to approach point
+    simple_pursuit_threshold: 1.5 
+    #after min_pursuit reached, we move to check_distance, wait settle_time
+    #and check for obstacles.  Then we make the manipulator view approach.
+    settle_time: 4.0
+    sample_obstacle_check_width: 0.6
+    final_pursuit_step: 0.2
+    spiral_search_step: 0.15 
+    search_velocity: 0.05
+    available_bins: [1,2,3,4,5,6,7,8,9,10]
