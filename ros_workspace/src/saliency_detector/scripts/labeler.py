@@ -74,11 +74,12 @@ class Labeler(object):
 
 
     def load(self):
-        fname = os.path.join(self.directory, self.filenames[self.index])
+        fname = self.filenames[self.index]
+        fullname = os.path.join(self.directory, fname)
         stamp, index, _ = fname.split("_")
-        maskname = "%s_%s_mask.png"%(stamp, index)
+        maskname = os.path.join(self.directory, "%s_%s_mask.png"%(stamp, index))
         try:
-            img = plt.imread(fname)
+            img = plt.imread(fullname)
             mask = plt.imread(maskname)
             self.current_fname = fname
         except:
