@@ -744,7 +744,8 @@ class ConfirmSampleAcquired(smach.State):
                                          'grab_count',
                                          'grab_count_limit',
                                          'active_bin_id',
-                                         'available_bins'],
+                                         'available_bins',
+                                         'settle_time'],
                              output_keys=['detected_sample',
                                           'grab_count',
                                           'action_result',
@@ -758,9 +759,10 @@ class ConfirmSampleAcquired(smach.State):
 
         userdata.grab_count += 1
 
-        #wait for 1 second, see if sample is present in view
+        #wait for settle_time, see if sample is present in view
+        rospy.sleep(userdata.settle_time)
         userdata.detected_sample = None
-        rospy.sleep(1.0)
+        rospy.sleep(userdata.settle_time)
         if userdata.detected_sample is None:
             #this is the path of great success, notify filter nodes about success
             #and return the acquired sample ID in case the calling executive needs it
