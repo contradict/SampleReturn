@@ -3,6 +3,7 @@ import os
 import logging
 from tempfile import NamedTemporaryFile
 from shutil import copy
+from collections import defaultdict
 
 import matplotlib
 matplotlib.use("Qt5Agg")
@@ -12,8 +13,7 @@ import matplotlib.pyplot as plt
 LOG=logging.getLogger("Labeler")
 
 class Labeler(object):
-    def __init__(self, directory, classes):
-        self.directory = directory
+    def __init__(self, classes):
         self.classes = classes
         self.figure = plt.figure()
         self.ax_img = self.figure.add_subplot(121)
@@ -40,16 +40,28 @@ class Labeler(object):
             plt.close(self.figure)
         LOG.debug('index=%d', self.index)
 
-    def collect_files(self, directory):
+    def add_files_from_directory(self, directory):
+        self.directories = [directory]
         allfiles = os.listdir(self.directory)
+        self.filenames = self.namefilter(allfiles)
+
+    def namefilter(self, allfiles):
         images = filter(lambda x:".png" in x,
                 allfiles)
-        patches = filter(lambda x:"image.png" in x,
-                images)
+        patches = sorted(filter(lambda x:"image.png" in x,
+                images))
         return [p for p in patches]
 
+    def add_files(self, filelist):
+        fdict = defaultdict(list)
+        [fdict[os.path.dirname(f)].append(os.path.basename(f)) for f in filelist]
+        if len(fdict)>1:
+            LOG.error("All files must be in one directory")
+            exit(2)
+        self.directory = next(iter(fdict.keys()))
+        self.filenames = self.namefilter(fdict[self.directory])
+
     def label(self, outputname):
-        self.filenames = self.collect_files(self.directory)
         self.index = 0
         self.outputname = outputname
         self.loadlabels(self.outputname)
@@ -89,7 +101,8 @@ class Labeler(object):
 
     def title(self):
         cls = self.labels.get(self.current_fname, "")
-        title = "\n".join((" ".join(self.classes), self.current_fname, cls))
+        clstitle = " ".join(["%d-%s"%(i+1,c) for i,c in enumerate(self.classes)])
+        title = "\n".join((clstitle, self.current_fname, cls))
         self.figure.suptitle(title)
         self.figure.canvas.draw()
 
@@ -109,17 +122,26 @@ if __name__ == "__main__":
     parser.add_argument("--outputname", default="labels.csv",
             help="csv output file name")
     parser.add_argument("--classes", 
-            nargs='*',
+            nargs='+',
             help="list of classes")
-    parser.add_argument("path",
+    parser.add_argument("--path",
             help="directory to label")
+    parser.add_argument("--files",
+            nargs='+',
+            help="list of files to label")
     options = parser.parse_args()
     logging.basicConfig()
     LOG.setLevel(logging.WARN)
+    if options.files is None and options.path is None:
+        LOG.error("Must specify --files or --path")
+        exit(2)
     if options.classes is None:
         options.classes = ['good', 'bad']
-    print(options.classes)
-    l = Labeler(options.path, options.classes)
+    l = Labeler(options.classes)
+    if options.path is not None:
+        l.add_files_from_directory(options.path)
+    elif options.files is not None:
+        l.add_files(options.files)
     l.label(options.outputname)
     plt.show()
 
