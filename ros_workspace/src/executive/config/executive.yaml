@@ -11,7 +11,8 @@ level_two:
     return_time_minutes: 110 
     
     #initial move params (same as recovery)
-    initial_behavior:    
+    initial_behavior:
+        announcement: 'Entering level two mode.'
         simple_moves: [
             { angle: 0.0, distance: 6.0, velocity: 0.5 },
             { angle: 180.0, velocity: 0.3 },
