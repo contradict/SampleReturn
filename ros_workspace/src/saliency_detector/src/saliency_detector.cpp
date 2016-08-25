@@ -112,16 +112,25 @@ class SaliencyDetectorNode
     ROS_DEBUG("Begin resize");
     cv::Mat small;
     double scale = cv_ptr->image.cols/config_.bms_img_width;
-    cv::resize(cv_ptr->image.rowRange(config_.bms_top_trim,cv_ptr->image.rows),
-        small,
-        cv::Size(config_.bms_img_width,
-            (cv_ptr->image.rows-config_.bms_top_trim)/scale),
-        0.0,0.0,cv::INTER_AREA);
+    if (config_.bms_resize == 0) {
+      cv::resize(cv_ptr->image.rowRange(config_.bms_top_trim,cv_ptr->image.rows),
+          small,
+          cv::Size(config_.bms_img_width,
+              (cv_ptr->image.rows-config_.bms_top_trim)/scale),
+          0.0,0.0,cv::INTER_NEAREST);
+    }
+    else if (config_.bms_resize == 1) {
+      cv::resize(cv_ptr->image.rowRange(config_.bms_top_trim,cv_ptr->image.rows),
+          small,
+          cv::Size(config_.bms_img_width,
+              (cv_ptr->image.rows-config_.bms_top_trim)/scale),
+          0.0,0.0,cv::INTER_AREA);
+    }
     ROS_DEBUG("End resize");
 
     // Compute saliency map
     ROS_DEBUG("Begin BMS Comp");
-    bms_.computeSaliency(small, config_.bms_sample_step);
+    bms_.computeSaliency(small, config_.bms_sample_step, config_.bms_channels);
     cv::Mat saliency_map = bms_.getSaliencyMap();
     ROS_DEBUG("End BMS Comp");
 

@@ -36,7 +36,7 @@ public:
   BMS ();
   BMS (const int dw1, const int ow, const bool nm, const bool hb);
   Mat getSaliencyMap();
-  void computeSaliency(const Mat& src, float step);
+  void computeSaliency(const Mat& src, float step, int channels);
 private:
   Mat registerPosition(const Mat& bm);
   Mat getAttentionMap(const Mat& bm);
