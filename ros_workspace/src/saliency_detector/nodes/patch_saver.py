@@ -1,13 +1,10 @@
 #!/usr/bin/env python
-import roslib
 import rospy
-import rospkg
 import numpy as np
 import cv2
 
 from cv_bridge import CvBridge, CvBridgeError
 from dynamic_reconfigure.server import Server
-from saliency_detector.cfg import patch_saver_paramsConfig
 
 from sensor_msgs.msg import Image, CameraInfo
 from samplereturn_msgs.msg import PatchArray, Patch
@@ -27,15 +24,16 @@ class PatchSaver(object):
         self.path = rospy.get_param('~save_path')
 
     def patch_array_callback(self, PatchArray):
+        rospy.loginfo("Patch Array Callback")
         for idx, patch in enumerate(PatchArray.patch_array):
-            image = np.asarray(self.bridge.imgmsg_to_cv2(patch.image,'rgb8'))
+            image = np.asarray(self.bridge.imgmsg_to_cv2(patch.image,'bgr8'))
             mask = np.asarray(self.bridge.imgmsg_to_cv2(patch.mask,'mono8'))
             cv2.imwrite(self.path +
-                    str(int(rospy.Time.to_sec(patcharray.header.stamp) * 1000))
-                    + str(idx) + "_image.png", image)
+                    str(int(PatchArray.header.stamp.to_sec() * 1000))
+                    + "_" + str(idx) + "_image.png", image)
             cv2.imwrite(self.path +
-                    str(int(rospy.Time.to_sec(patcharray.header.stamp) * 1000))
-                    + str(idx) + "_mask.png", mask)
+                    str(int(PatchArray.header.stamp.to_sec() * 1000))
+                    + "_" + str(idx) + "_mask.png", mask)
 
 if __name__=="__main__":
   try:
