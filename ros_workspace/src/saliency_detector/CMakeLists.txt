@@ -105,7 +105,7 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS saliency_detector_core
+    LIBRARIES BMS
   CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
@@ -129,9 +129,6 @@ add_library(BMS
   src/BMS.cpp
  )
 
-add_library(saliency_detector_core
-  src/saliency_detector_core.cpp
- )
 
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
@@ -142,19 +139,11 @@ add_library(saliency_detector_core
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
  add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
- add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
  add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(color_histogram_descriptor_node ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(saliency_detector_core
-   ${catkin_LIBRARIES}
-   ${OpenCV_LIBRARIES}
-   ${PCL_LIBRARIES}
-   )
-
  target_link_libraries(saliency_detector_node
-   saliency_detector_core
    ${catkin_LIBRARIES}
    BMS
  )
@@ -179,7 +168,7 @@ add_library(saliency_detector_core
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS saliency_detector_node
+install(TARGETS BMS saliency_detector_node
    ground_projector_node color_histogram_descriptor_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
