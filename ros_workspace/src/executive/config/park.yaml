@@ -18,7 +18,6 @@ level_two:
             { angle: 180.0, distance: 3.0, velocity: 0.1 }
         ]
         beacon_enabled_on_entry: true
-        beacon_enabled_on_exit: false
         time_offset: 0
         terminal_outcome: web_manager
 

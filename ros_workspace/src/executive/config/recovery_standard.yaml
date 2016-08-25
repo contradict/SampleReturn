@@ -22,9 +22,16 @@ moves: [
 #cancel the remaining recovery moves.
 pursue_samples: true
 
+#If a camera state is not specified on entry or exit
+#nothing will be published at that time
+
 #Enable beacon camera
 beacon_enabled_on_entry: true
 beacon_enabled_on_exit: false
+
+#Enable search camera
+search_enabled_on_entry: true
+search_enabled_on_exit: false
 
 #A value of 1 gets rid of the rest of the raster on the
 #current spoke.  Only useful if exiting to web_manager.
