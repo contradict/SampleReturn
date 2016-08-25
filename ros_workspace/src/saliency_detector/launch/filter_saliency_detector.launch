@@ -32,7 +32,7 @@
     <param name="measurement_noise_cov" type="double" value="0.1"/>
     <param name="period" type="double" value="0.33"/>
     <param name="PDgO" type="double" value="0.95"/> <!-- true positive rate -->
-    <param name="PDgo" type="double" value="0.05"/> <!-- false positive rate -->
+    <param name="PDgo" type="double" value="0.10"/> <!-- false positive rate -->
     <param name="PO_init" type="double" value="0.01"/>
     <param name="pub_certainty_thresh" type="double" value="0.9"/>
     <param name="min_certainty" type="double" value="0.01"/>
