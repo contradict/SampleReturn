@@ -195,6 +195,13 @@ install(DIRECTORY include
     USE_SOURCE_PERMISSIONS
 )
 
+install(
+    PROGRAMS
+        scripts/labeler.py
+        nodes/patch_saver.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/
