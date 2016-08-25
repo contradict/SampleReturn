@@ -176,7 +176,8 @@ class LevelTwoWeb(object):
         #list of manager outcomes, and their corresponding labels
         manager_dict = {'WEB_MANAGER':'web_manager',
                         'RETURN_MANAGER':'return_manager',
-                        'RECOVERY_MANAGER':'recovery_manager'}
+                        'RECOVERY_MANAGER':'recovery_manager',
+                        'LEVEL_TWO_PREEMPTED':'preempted'}
         self.state_machine.userdata.manager_dict = manager_dict
         #get inverted version for the transition dict of the mux
         manager_transitions = dict([[v,k] for k,v in manager_dict.items()])
@@ -1198,11 +1199,14 @@ class MoveMUX(smach.State):
                              outcomes = manager_list)
 
     def execute(self, userdata):
-        #clear and reset flags after all moves!
+        #do not clear move target on preempt
         userdata.retry_active = False
         userdata.move_point_map = None
-        userdata.move_target = None
-        return userdata.active_manager
+        if not self.preempt_requested():                
+            userdata.move_target = None        
+            return userdata.active_manager
+        else:
+            return 'preempted'
 
 class LevelTwoPreempted(smach.State):
     def __init__(self, camera_enablers):
