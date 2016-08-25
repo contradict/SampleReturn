@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import os
 import logging
-from tempfile import TemporaryFile
-from shutil import copyfileobj
+from tempfile import NamedTemporaryFile
+from shutil import copy
 
 import matplotlib
 matplotlib.use("Qt5Agg")
@@ -66,12 +66,11 @@ class Labeler(object):
             pass
 
     def savelabels(self, outputname):
-        with TemporaryFile('w+') as tf:
-            for k, v in self.labels.items():
+        with NamedTemporaryFile('w+') as tf:
+            for k, v in sorted(self.labels.items()):
                 tf.write("%s, %s\n"%(k,v))
-            tf.seek(0,0)
-            with open(outputname, 'w') as of:
-                copyfileobj(tf, of)
+            tf.flush()
+            copy(tf.name, outputname)
 
 
     def load(self):
