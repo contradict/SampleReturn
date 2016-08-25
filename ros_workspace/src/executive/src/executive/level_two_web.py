@@ -191,7 +191,7 @@ class LevelTwoWeb(object):
 
             smach.StateMachine.add('START_LEVEL_TWO',
                                    StartLeveLTwo(),
-                                   transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
+                                   transitions = {'next':'SELECT_PLANNER'})
 
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
@@ -559,6 +559,7 @@ class LevelTwoWeb(object):
                     self.state_machine.userdata.move_goal = goal
 
     def shutdown_cb(self):
+        rospy.delete_param('~initial_behavior')
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
@@ -739,7 +740,7 @@ class WebManager(smach.State):
             else:
                 #time to start rastering, create the points, and set flag
                 self.search_enable.publish(True)                
-                self.announcer.say("Begin ing raster on spoke, yaw {!s}.  Search cameras awn.".format(
+                self.announcer.say("Begin ing raster on spoke, yaw {!s}.  Search cameras active.".format(
                                     int(active_slice['start_angle'])))
                 userdata.raster_active = True
                 return 'get_raster'
@@ -969,7 +970,7 @@ class RetryCheck(smach.State):
 
 
 class RecoveryManager(smach.State):
-    def __init__(self, label, announcer, enable_beacon, search_enable, tf_listener):
+    def __init__(self, label, announcer, beacon_enable, search_enable, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
@@ -1006,7 +1007,7 @@ class RecoveryManager(smach.State):
                                        'aborted'])
 
         self.label = label
-        self.enable_beacon = enable_beacon
+        self.beacon_enable = beacon_enable
         self.search_enable = search_enable
         self.announcer = announcer
         self.tf_listener = tf_listener
@@ -1026,6 +1027,9 @@ class RecoveryManager(smach.State):
             userdata.report_beacon = False
             userdata.stop_on_detection = True
             
+            if ('announcement') in params_dict:
+                self.announcer.say(params_dict['announcement'])
+
             if ('pursue_samples' in params_dict) and params_dict['pursue_samples']:
                 userdata.report_sample = True
             else:
@@ -1034,10 +1038,18 @@ class RecoveryManager(smach.State):
             if 'beacon_enabled_on_entry' in params_dict:
                 if params_dict['beacon_enabled_on_entry']:
                     self.announcer.say('Beacon camera active.')
-                    self.enable_beacon.publish(True)
+                    self.beacon_enable.publish(True)
                 else:
                     self.announcer.say('Beacon camera off.')
-                    self.enable_beacon.publish(False)
+                    self.beacon_enable.publish(False)
+
+            if 'search_enabled_on_entry' in params_dict:
+                if params_dict['search_enabled_on_entry']:
+                    self.announcer.say('Search cameras active.')
+                    self.search_enable.publish(True)
+                else:
+                    self.announcer.say('Search cameras off.')
+                    self.search_enable.publish(False)
 
             #modify return time
             if 'time_offset' in params_dict:
@@ -1113,10 +1125,18 @@ class RecoveryManager(smach.State):
             if 'beacon_enabled_on_exit' in userdata.recovery_parameters:
                 if userdata.recovery_parameters['beacon_enabled_on_exit']:
                     self.announcer.say('Beacon camera active.')
-                    self.enable_beacon.publish(True)
+                    self.beacon_enable.publish(True)
                 else:
                     self.announcer.say('Beacon camera off.')
-                    self.enable_beacon.publish(False)
+                    self.beacon_enable.publish(False)
+
+            if 'search_enabled_on_exit' in userdata.recovery_parameters:
+                if userdata.recovery_parameters['search_enabled_on_exit']:
+                    self.announcer.say('Search cameras active.')
+                    self.search_enable.publish(True)
+                else:
+                    self.announcer.say('Search cameras off.')
+                    self.search_enable.publish(False)
             
             userdata.stop_on_detection = False
             #setting the active manager is for the return to web_manager
