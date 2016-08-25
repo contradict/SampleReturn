@@ -15,7 +15,7 @@ from samplereturn_msgs.msg import PatchArray, Patch
 class PatchSaver(object):
 
     def __init__(self):
-        rospy.init_node('close_range_detector',log_level=rospy.DEBUG)
+        rospy.init_node('patch_saver',log_level=rospy.DEBUG)
 
         self.patch_array_sub = rospy.Subscriber('patch_array', PatchArray,
                 self.patch_array_callback, None, 1)
