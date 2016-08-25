@@ -30,9 +30,11 @@ class PatchSaver(object):
         for idx, patch in enumerate(PatchArray.patch_array):
             image = np.asarray(self.bridge.imgmsg_to_cv2(patch.image,'rgb8'))
             mask = np.asarray(self.bridge.imgmsg_to_cv2(patch.mask,'mono8'))
-            cv2.imwrite(self.path + str(rospy.time.to_sec(patcharray.header.stamp))
+            cv2.imwrite(self.path +
+                    str(int(rospy.Time.to_sec(patcharray.header.stamp) * 1000))
                     + str(idx) + "_image.png", image)
-            cv2.imwrite(self.path + str(rospy.time.to_sec(patcharray.header.stamp))
+            cv2.imwrite(self.path +
+                    str(int(rospy.Time.to_sec(patcharray.header.stamp) * 1000))
                     + str(idx) + "_mask.png", mask)
 
 if __name__=="__main__":
