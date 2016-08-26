@@ -488,6 +488,7 @@ class PursueSample(object):
                          self.state_machine.userdata.pursuit_goal = goal
 
             elif not self.state_machine.userdata.filter_changed:
+                self.state_machine.userdata.filter_changed = True
                 self.announcer.say('New filter eye dee.')
 
     def sample_detection_manipulator(self, sample):
@@ -735,6 +736,7 @@ class ConfirmSampleAcquired(smach.State):
                                          'available_bins',
                                          'settle_time'],
                              output_keys=['detected_sample',
+                                          'latched_filter_id',
                                           'grab_count',
                                           'action_result',
                                           'pursuit_goal',
@@ -765,6 +767,7 @@ class ConfirmSampleAcquired(smach.State):
                 used_bin = userdata.available_bins.pop(0)
                 rospy.loginfo("PURSUE_SAMPLE removing bin: {!s}".format(used_bin))
             userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
+            userdata.latched_filter_id = None
             return 'sample_gone'
         else:
             if userdata.grab_count > userdata.grab_count_limit:
@@ -780,7 +783,8 @@ class PublishFailure(smach.State):
         smach.State.__init__(self,
                              outcomes=['next'],
                              input_keys = ['latched_filter_id'],
-                             output_keys=['detected_sample',
+                             output_keys=['latched_filter_id',
+                                          'detected_sample',
                                           'pursuit_goal'])
         self.result_pub = result_pub
     def execute(self, userdata):
@@ -788,17 +792,20 @@ class PublishFailure(smach.State):
         userdata.pursuit_goal = None #finally, clear the pursuit_goal for next time
         self.result_pub.publish(samplereturn_msg.PursuitResult(id = userdata.latched_filter_id,
                                                                success = False))
+        userdata.latched_filter_id = None        
         return 'next'
 
 class PursueSampleAborted(smach.State):
     def __init__(self, result_pub):
         smach.State.__init__(self,
                              input_keys = ['latched_filter_id'],
+                             output_keys = ['latched_filter_id'],
                              outcomes=['next'])
         self.result_pub = result_pub
     def execute(self, userdata):
         self.result_pub.publish(samplereturn_msg.PursuitResult(id = userdata.latched_filter_id,
                                                                success = False))
+        userdata.latched_filter_id = None               
         return 'next'
 
 #transforms a detected point, and also calculates a position min_pursuit_distance from the point
