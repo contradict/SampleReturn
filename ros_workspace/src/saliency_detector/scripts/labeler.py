@@ -32,7 +32,7 @@ class Labeler(object):
             self.index = max(0, self.index-1)
             self.show()
         elif event.key == "right":
-            self.index = min(self.index+1, len(self.filenames))
+            self.index = min(self.index+1, len(self.filenames)-1)
             self.show()
         elif event.key == "escape" or event.key.upper() == 'Q':
             self.loadlabels(self.outputname)
