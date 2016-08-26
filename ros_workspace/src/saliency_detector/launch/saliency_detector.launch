@@ -43,24 +43,15 @@
 
   <node
     pkg="saliency_detector"
-    type="color_histogram_descriptor_node"
-    name="color_histogram_descriptor"
+    type="svm_color_discriminator"
+    name="svm_color_discriminator"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="/processes/sample_detection/search/$(arg namespace)/named_point"
       to="/processes/sample_detection/search/named_point"/>
-    <param name="min_target_hue" type="double" value="120"/>
-    <param name="max_target_hue" type="double" value="30"/>
-    <param name="min_color_saturation" type="double" value="100"/>
-    <param name="high_saturation_limit" type="double" value="0.4"/>
-    <param name="low_saturation_limit" type="double" value="0.3"/>
-    <param name="min_inner_outer_distance" type="double" value="0.9"/>
-    <param name="max_exemplar_distance" type="double" value="0.7"/>
-    <param name="min_fence_distance" type="double" value="0.5"/>
-    <param name="min_fence_color_saturation" type="double" value="90"/>
-    <param name="fence_high_saturation_limit" type="double" value="0.25"/>
+    <param name="model_file" type="string" value="$(find saliency_detector)/config/test_svm.yaml"/>
+    <param name="debug_font_scale" type="double" value="2.0"/>
   </node>
-
 
   <node
     machine="search"
