@@ -41,7 +41,7 @@ class Labeler(object):
         LOG.debug('index=%d', self.index)
 
     def add_files_from_directory(self, directory):
-        self.directories = [directory]
+        self.directory = directory
         allfiles = os.listdir(self.directory)
         self.filenames = self.namefilter(allfiles)
 
