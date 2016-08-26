@@ -39,6 +39,7 @@
     <remap from="model" to="/cameras/navigation/$(arg namespace)/planefit/model"/>
     <param name="min_major_axis" type="double" value="0.04"/>
     <param name="max_major_axis" type="double" value="0.2"/>
+    <remap from="frustum_buffer" to="/processes/sample_detection/search/frustum_buffer"/>
   </node>
 
   <node
@@ -51,6 +52,15 @@
       to="/processes/sample_detection/search/named_point"/>
     <param name="model_file" type="string" value="$(find saliency_detector)/config/test_svm.yaml"/>
     <param name="debug_font_scale" type="double" value="2.0"/>
+  </node>
+
+  <node
+    pkg="topic_tools"
+    type="relay"
+    name="search_camera_info_relay"
+    machine="search"
+    ns="/processes/sample_detection/search/$(arg namespace)"
+    args="/cameras/search/$(arg namespace)/camera_info /processes/sample_detection/search/camera_info">
   </node>
 
   <node

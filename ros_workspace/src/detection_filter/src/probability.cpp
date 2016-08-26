@@ -1,3 +1,6 @@
+#include <limits>
+#include <algorithm>
+
 namespace detection_filter
 {
 
@@ -15,7 +18,9 @@ double updateProb(double PO, bool detection, double PDgO, double PDgo)
         // Update
         PO = (1.0 - PDgO) * PO / Pd;
     }
-    return PO;
+    return std::max(
+            std::min(PO, (1.0-std::numeric_limits<double>::epsilon())),
+                std::numeric_limits<double>::epsilon());
 }
 
 }
