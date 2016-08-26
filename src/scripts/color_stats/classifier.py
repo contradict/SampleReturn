@@ -91,3 +91,11 @@ plt.clf()
 #draw_svm([100,150,200], np.linspace(50,200,500), np.linspace(50,200,500), svm, pd)
 draw_svm([100,150,200], np.linspace(50,200,500), np.linspace(50,200,500), cv_svm, pd)
 plt.draw()
+
+
+def save(fname):
+    cv_svm.save(fname)
+    fs = cv2.FileStorage(fname, cv2.FILE_STORAGE_APPEND)
+    fs.write("mean", scaler.mean_.reshape((1,3)).astype('f4'))
+    fs.write("std", scaler.std_.reshape((1,3)).astype('f4'))
+    fs.release()
