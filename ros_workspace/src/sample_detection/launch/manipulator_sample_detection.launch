@@ -64,6 +64,8 @@
         <param name="max_exemplar_distance" type="double" value="0.21"/>
         <param name="compute_grip_angle" type="bool" value="true"/>
         <param name="debug_font_scale" type="double" value="0.75"/>
+        <param name="bms_resize" type="int" value="0"/>
+        <param name="bms_channels" type="int" value="1"/>
     </node>
 
     <node
