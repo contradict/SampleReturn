@@ -61,14 +61,6 @@
     <param name="fence_high_saturation_limit" type="double" value="0.25"/>
   </node>
 
-  <node
-    pkg="topic_tools"
-    type="relay"
-    name="search_camera_info_relay"
-    machine="search"
-    ns="/processes/sample_detection/search/$(arg namespace)"
-    args="/cameras/search/$(arg namespace)/camera_info /processes/sample_detection/search/camera_info">
-  </node>
 
   <node
     machine="search"
