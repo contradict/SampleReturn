@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <param name="/processes/sample_detection/search/frustum_buffer" type="double" value="200"/>
+
   <include file="$(find saliency_detector)/launch/saliency_detector.launch">
     <arg name="namespace" value="port"/>
   </include>
