@@ -1,6 +1,8 @@
 import sys
-sys.path.insert(0,"/home/zlizer/src/opencv/build/lib")
-from collections import defaultdict
+cvlibpath="/home/zlizer/src/opencv/build/lib"
+#cvlibpath='/usr/local/opencv3/lib/python2.7/dist-packages'
+if not cvlibpath in sys.path:
+    sys.path.insert(0,cvlibpath)
 
 import numpy as np
 import matplotlib
@@ -65,9 +67,13 @@ def draw_svm(lrange, arange, brange, svm, pd):
         plt.subplot(len(lrange), 1, i+1)
         gpts = np.c_[ L*np.ones_like(aa).ravel(), aa.ravel(), bb.ravel()]
         sgpts = scaler.transform(gpts)
-        Z = svm.predict(sgpts)
+        if type(svm) == SVC:
+            Z = svm.decision_function(sgpts)
+        else:
+            Z = svm.predict(sgpts.astype(np.float32), None, cv2.ml.StatModel_RAW_OUTPUT)[1].flatten()
         Z = Z.reshape(aa.shape)
         plt.contourf(aa, bb, Z)
+        plt.colorbar()
         for k in pd.keys():
             pts = np.hstack([pd[k][:,6:7], pd[k][:,7:8], pd[k][:,8:9]])
             pts = pts[((L-25)<pts[:,0])*(pts[:,0]<(L+25))]
@@ -82,5 +88,6 @@ def draw_svm(lrange, arange, brange, svm, pd):
 
 plt.figure(4)
 plt.clf()
-draw_svm([100,150,200], np.linspace(50,200,500), np.linspace(50,200,500), svm, pd)
+#draw_svm([100,150,200], np.linspace(50,200,500), np.linspace(50,200,500), svm, pd)
+draw_svm([100,150,200], np.linspace(50,200,500), np.linspace(50,200,500), cv_svm, pd)
 plt.draw()
