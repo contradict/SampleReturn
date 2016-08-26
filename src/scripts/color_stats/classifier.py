@@ -55,3 +55,32 @@ print "Opencv train error rate", len(np.where(labels_train != \
     cv_svm.predict(feat_train.astype(np.float32))[1].flatten())[0])/float(len(labels_train))
 print "Opencv test error rate", len(np.where(labels_test != \
     cv_svm.predict(feat_test.astype(np.float32))[1].flatten())[0])/float(len(labels_test))
+
+def draw_svm(lrange, arange, brange, svm, pd):
+    keys = pd.keys()
+    cm = plt.get_cmap('spectral')
+    labelcolors = dict([(l, cm(1.*i/len(keys))) for i,l in enumerate(keys)])
+    for i,L in enumerate(lrange):
+        aa, bb = np.meshgrid(arange, brange)
+        plt.subplot(len(lrange), 1, i+1)
+        gpts = np.c_[ L*np.ones_like(aa).ravel(), aa.ravel(), bb.ravel()]
+        sgpts = scaler.transform(gpts)
+        Z = svm.predict(sgpts)
+        Z = Z.reshape(aa.shape)
+        plt.contourf(aa, bb, Z)
+        for k in pd.keys():
+            pts = np.hstack([pd[k][:,6:7], pd[k][:,7:8], pd[k][:,8:9]])
+            pts = pts[((L-25)<pts[:,0])*(pts[:,0]<(L+25))]
+            plt.scatter(pts[:,1],
+                        pts[:,2],
+                        label=k,
+                        c=labelcolors[k])
+        plt.xlabel("Mean A")
+        plt.ylabel("Mean B")
+        plt.title("L=%f"%L)
+        plt.legend()
+
+plt.figure(4)
+plt.clf()
+draw_svm([100,150,200], np.linspace(50,200,500), np.linspace(50,200,500), svm, pd)
+plt.draw()
