@@ -39,6 +39,8 @@
     <param name="minRepeatability" type="double" value="3.0"/>
     <param name="patch_scaling_factor" type="double" value="4.0"/>
     <param name="debug_font_scale" type="double" value="2.0"/>
+    <param name="bms_resize" type="int" value="0"/>
+    <param name="bms_channels" type="int" value="1"/>
   </node>
 
   <node
