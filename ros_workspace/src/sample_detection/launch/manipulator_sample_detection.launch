@@ -15,7 +15,7 @@
         <param name="bms_dilation_width_1" type="int" value="0"/>
         <param name="bms_thresh_fraction" type="double" value="0.25"/>
         <param name="bms_thresh_on" type="bool" value="true"/>
-        <param name="bms_img_width" type="double" value="400"/>
+        <param name="bms_img_width" type="double" value="200"/>
         <param name="bms_top_trim" type="double" value="0"/>
         <param name="filterByConvexity" type="bool" value="True"/>
         <param name="filterByArea" type="bool" value="True"/>
@@ -26,8 +26,8 @@
         <param name="maxThreshold" type="double" value="150.0"/>
         <param name="thresholdStep" type="double" value="10.0"/>
         <param name="minRepeatability" type="double" value="3.0"/>
-        <param name="patch_scaling_factor" type="double" value="3.0"/>
-        <param name="bms_resize" type="int" value="0"/>
+        <param name="patch_scaling_factor" type="double" value="2.0"/>
+        <param name="bms_resize" type="int" value="1"/>
         <param name="bms_channels" type="int" value="1"/>
     </node>
 
