@@ -46,26 +46,15 @@
     </node>
 
     <node
-        pkg="saliency_detector"
-        type="color_histogram_descriptor_node"
-        name="color_histogram_descriptor"
-        machine="search"
-        ns="/processes/sample_detection/manipulator">
-        <remap from="projected_patch_array" to="positioned_patches"/>
-        <param name="output_frame_id" type="string" value="odom"/>
-        <param name="min_target_hue" type="double" value="120"/>
-        <param name="max_target_hue" type="double" value="30"/>
-        <param name="max_fence_hue" type="double" value="18"/>
-        <param name="min_fence_distance" type="double" value="0.0"/>
-        <param name="min_color_saturation" type="double" value="90"/>
-        <param name="high_saturation_limit" type="double" value="0.27"/>
-        <param name="low_saturation_limit" type="double" value="0.25"/>
-        <param name="min_inner_outer_distance" type="double" value="0.4"/>
-        <param name="max_exemplar_distance" type="double" value="0.21"/>
-        <param name="compute_grip_angle" type="bool" value="true"/>
-        <param name="debug_font_scale" type="double" value="0.75"/>
-        <param name="bms_resize" type="int" value="0"/>
-        <param name="bms_channels" type="int" value="1"/>
+      pkg="saliency_detector"
+      type="svm_color_discriminator"
+      name="svm_color_discriminator"
+      machine="search"
+      ns="/processes/sample_detection/manipulator">
+      <remap from="positioned_patch_array" to="positioned_patches"/>
+      <param name="model_file" type="string"
+        value="$(find saliency_detector)/config/manipulator_test_svm.yaml"/>
+      <param name="debug_font_scale" type="double" value="2.0"/>
     </node>
 
     <node
