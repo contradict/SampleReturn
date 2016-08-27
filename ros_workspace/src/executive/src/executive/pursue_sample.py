@@ -413,7 +413,7 @@ class PursueSample(object):
             smach.StateMachine.add('SEARCH_LIGHTS_OFF',
                                    PublishMessageState(self.light_pub),
                                    transitions = {'next':'ANNOUNCE_CONTINUE'},
-                                   remapping = {'message':'true'})
+                                   remapping = {'message':'false'})
 
             smach.StateMachine.add('ANNOUNCE_CONTINUE',
                                    AnnounceState(self.announcer,
