@@ -181,8 +181,8 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                     NULL))
         {
             // if sample size is outside bounds, skip this patch
-            if ((dimension < config_.max_major_axis) &&
-                    (dimension > config_.min_major_axis)) {
+            if ((dimension > config_.max_major_axis) ||
+                    (dimension < config_.min_major_axis)) {
                 continue;
             }
         }
