@@ -42,7 +42,7 @@
     <param name="exclusion_zone_range" type="double" value="50.0"/>
     <param name="max_colormodel_distance" type="double" value="0.2"/>
     <param name="positive_exclusion_radius" type="double" value="10.0"/>
-    <param name="negative_exclusion_radius" type="double" value="0.1"/>
+    <param name="negative_exclusion_radius" type="double" value="0.2"/>
     <remap from="frustum_buffer" to="/processes/sample_detection/search/frustum_buffer"/>
   </node>
 
