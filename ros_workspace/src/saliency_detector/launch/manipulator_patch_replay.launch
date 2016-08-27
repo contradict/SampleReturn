@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="replay" default="true"/>
+  <arg name="run_cameras" default="false"/>
+  <arg name="save_path" default=""/>
+  <arg name="user" default="robot"/>
+  <arg name="path" default="Desktop"/>
+  <arg name="kind" default="install"/>
+
+  <include file="$(find samplereturn)/launch/machine_definitions.launch">
+      <arg name="user" value="$(arg user)"/>
+      <arg name="path" value="$(arg path)"/>
+      <arg name="kind" value="$(arg kind)"/>
+      <arg name="replay" value="$(arg replay)"/>
+  </include>
+
+  <include file="$(find samplereturn)/launch/manipulator_camera.launch">
+      <arg name="run_cameras" value="$(arg run_cameras)"/>
+  </include>
+
+  <node
+    pkg="saliency_detector"
+    type="saliency_detector_node"
+    name="saliency_detector"
+    machine="search"
+    ns="/processes/sample_detection/manipulator/">
+    <remap from="image" to="/cameras/manipulator/left/rect_color"/>
+    <param name="bms_opening_width" type="int" value="3"/>
+    <param name="bms_dilation_width_1" type="int" value="0"/>
+    <param name="bms_thresh_fraction" type="double" value="0.3"/>
+    <param name="bms_thresh_on" type="bool" value="True"/>
+    <param name="bms_img_width" type="double" value="200"/>
+    <param name="bms_top_trim" type="double" value="0"/>
+    <param name="filterByConvexity" type="bool" value="True"/>
+    <param name="filterByArea" type="bool" value="True"/>
+    <param name="minArea" type="double" value="2500.0"/>
+    <param name="maxArea" type="double" value="100000.0"/>
+    <param name="minDistBetweenBlobs" type="double" value="100.0"/>
+    <param name="minThreshold" type="double" value="70.0"/>
+    <param name="maxThreshold" type="double" value="200.0"/>
+    <param name="thresholdStep" type="double" value="20.0"/>
+    <param name="minRepeatability" type="double" value="3.0"/>
+    <param name="patch_scaling_factor" type="double" value="2.0"/>
+    <param name="debug_font_scale" type="double" value="2.0"/>
+    <param name="bms_resize" type="int" value="1"/>
+    <param name="bms_channels" type="int" value="1"/>
+  </node>
+
+  <node
+    pkg="saliency_detector"
+    type="patch_saver.py"
+    name="patch_saver"
+    machine="search">
+    <remap from="patch_array" to="/processes/sample_detection/manipulator/patch_array"/>
+    <param name="save_path" type="str" value="$(arg save_path)"/>
+  </node>
+
+</launch>
