@@ -22,7 +22,8 @@
 #include <linemod_detector/PointCloudProjectorConfig.h>
 #include <visualization_msgs/MarkerArray.h>
 
-namespace linemod_detector {
+namespace linemod_detector
+{
 
 class PointCloudProjector {
     message_filters::Subscriber<sensor_msgs::PointCloud2> pointcloud_sub;
@@ -165,6 +166,27 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
             ROS_ERROR("cv_bridge mask exception: %s", e.what());
             continue;
         }
+
+        cv::Point2f roi_offset(patch.image_roi.x_offset, patch.image_roi.x_offset);
+        Eigen::Vector4d ground_plane;
+        // assume ground plane at z=0, in base_link xy plane for manipulators
+        ground_plane << 0,0,1,0;
+        float dimension, angle;
+        tf::Stamped<tf::Point> world_point;
+        if(samplereturn::computeMaskPositionAndSize(listener_,
+                    cv_ptr_mask->image, roi_offset,
+                    model, patches_msg->header.stamp, patches_msg->header.frame_id,
+                    ground_plane, "base_link",
+                    &dimension, &angle, &world_point,
+                    NULL))
+        {
+            // if sample size is outside bounds, skip this patch
+            if ((dimension < config_.max_major_axis) &&
+                    (dimension > config_.min_major_axis)) {
+                continue;
+            }
+        }
+
 
         // find bounding box of mask
         cv::Rect rect;
