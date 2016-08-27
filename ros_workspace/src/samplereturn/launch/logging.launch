@@ -66,12 +66,6 @@
   </node>
 
     <!--
-             /cameras/manipulator/left/image_raw
-             /cameras/manipulator/right/image_raw
-             /cameras/manipulator/left/camera_info
-             /cameras/manipulator/right/camera_info
-             /cameras/manipulator/desync
-             /cameras/manipulator/status
     -->
    <node machine="search"
        pkg="rosbag"
@@ -89,6 +83,12 @@
              /cameras/navigation/port/status
              /cameras/navigation/beacon/image
              /cameras/navigation/beacon/camera_info
+             /cameras/manipulator/left/image_raw
+             /cameras/manipulator/right/image_raw
+             /cameras/manipulator/left/camera_info
+             /cameras/manipulator/right/camera_info
+             /cameras/manipulator/desync
+             /cameras/manipulator/status
              /cameras/search/port/image_color
              /cameras/search/port/camera_info
              /cameras/search/center/image_color
