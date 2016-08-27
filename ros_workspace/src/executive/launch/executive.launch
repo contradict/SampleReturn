@@ -94,8 +94,7 @@
         ns="/processes/executive">
 
         <!-- remaps -->
-        <remap from="search_lights" to="search_lights"/>
-         <remap from="sun_pointing" to="/processes/compute_sun_angle/sun_pointing_action"/>
+        <remap from="sun_pointing" to="/processes/compute_sun_angle/sun_pointing_action"/>
 
         <!-- executive tf frame and planner_mode -->
         <param name="planner_mode" type="string" value="$(arg planner_mode)"/>
