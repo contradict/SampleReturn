@@ -265,7 +265,7 @@ class KalmanDetectionFilter
     {
         ROS_DEBUG_STREAM("Removing filter id " << msg.id << " from active list.");
         auto new_end = std::remove_if(filter_list_.begin(), filter_list_.end(),
-                [&](std::shared_ptr<ColoredKF> ckf) {return ckf->filter_id == current_published_id_;});
+                [&](std::shared_ptr<ColoredKF> ckf) {return ckf->filter_id == msg.id;});
         filter_list_.erase(new_end, filter_list_.end());
     }
     double x, y, r;
