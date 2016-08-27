@@ -132,7 +132,7 @@ bool computeMaskPositionAndSize(const tf::Transformer& listener,
     // project major points to 3D rays in camera frame
     cv::Point3d ray_a, ray_b;
     getCameraRay(model, major_point_a, &ray_a);
-    getCameraRay(model, major_point_a, &ray_a);
+    getCameraRay(model, major_point_b, &ray_b);
     ROS_DEBUG("Ray A %f, %f, %f",ray_a.x,ray_a.y,ray_a.z);
     ROS_DEBUG("Ray B %f, %f, %f",ray_b.x,ray_b.y,ray_b.z);
 
