@@ -95,6 +95,10 @@ class GroundProjectorNode
       return;
     }
     sensor_msgs::CameraInfo cam_info = cam_model_.cameraInfo();
+    if(!listener_.canTransform("base_link", cam_info.header.frame_id, cam_info.header.stamp))
+    {
+        return;
+    }
     // Take corners of image, buffer inward by param
     std::vector<cv::Point2d> corners, rect_corners;
     corners.push_back(cv::Point2d(0 + frustum_buffer_,
