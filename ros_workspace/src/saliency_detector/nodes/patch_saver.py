@@ -26,7 +26,7 @@ class PatchSaver(object):
     def patch_array_callback(self, PatchArray):
         rospy.loginfo("Patch Array Callback")
         num = np.random.random()
-        if ((len(PatchArray.patch_array) > 1) and num > 0.5) or (num > 0.9):
+        if ((len(PatchArray.patch_array) > 1) and num > 0.9) or (num > 0.95):
             for idx, patch in enumerate(PatchArray.patch_array):
                 image = np.asarray(self.bridge.imgmsg_to_cv2(patch.image,'bgr8'))
                 mask = np.asarray(self.bridge.imgmsg_to_cv2(patch.mask,'mono8'))
