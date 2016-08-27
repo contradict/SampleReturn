@@ -171,13 +171,13 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
         Eigen::Vector4d ground_plane;
         // assume ground plane at z=0, in base_link xy plane for manipulators
         ground_plane << 0,0,1,0;
-        float dimension;
+        float dimension, angle;
         tf::Stamped<tf::Point> world_point;
         if(samplereturn::computeMaskPositionAndSize(listener_,
                     cv_ptr_mask->image, roi_offset,
                     model, patches_msg->header.stamp, patches_msg->header.frame_id,
                     ground_plane, "base_link",
-                    &dimension, &world_point,
+                    &dimension, &angle, &world_point,
                     NULL))
         {
             // if sample size is outside bounds, skip this patch

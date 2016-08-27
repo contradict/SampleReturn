@@ -199,13 +199,13 @@ class GroundProjectorNode
       cv::Point2f roi_offset(msg->patch_array[i].image_roi.x_offset,
               msg->patch_array[i].image_roi.x_offset);
 
-      float dimension;
+      float dimension, angle;
       tf::Stamped<tf::Point> world_point;
       if(!samplereturn::computeMaskPositionAndSize(listener_,
               cv_ptr->image, roi_offset,
               cam_model_, msg->header.stamp, msg->header.frame_id,
               ground_plane_, "base_link",
-              &dimension, &world_point,
+              &dimension, &angle, &world_point,
               enable_debug_?&debug_image_:NULL))
       {
           continue;
