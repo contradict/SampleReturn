@@ -56,7 +56,7 @@ level_two:
 
 pursue_sample:
     #sample approach (pursuit) parameters
-    pursuit_velocity: 0.8
+    pursuit_velocity: 0.4
     spin_velocity: 0.3
     max_pursuit_error: 0.5
     min_pursuit_distance: 1.5
