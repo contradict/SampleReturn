@@ -16,7 +16,7 @@ level_two:
         simple_moves: [
             { angle: 0.0, distance: 4.0, velocity: 0.5 },
             { angle: 180.0, velocity: 0.3 },
-            { angle: 180.0, distance: 3.0, velocity: 0.1 }
+            { angle: 180.0, distance: 3.0, velocity: 0.05 }
         ]
         beacon_enabled_on_entry: true
         search_enabled_on_entry: false
