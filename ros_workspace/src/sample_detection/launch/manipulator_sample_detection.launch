@@ -18,9 +18,11 @@
         <param name="bms_img_width" type="double" value="200"/>
         <param name="bms_top_trim" type="double" value="0"/>
         <param name="filterByConvexity" type="bool" value="True"/>
+        <param name="minConvexity" type="double" value="0.85"/>
+        <param name="maxConvexity" type="double" value="1.0"/>
         <param name="filterByArea" type="bool" value="True"/>
-        <param name="minArea" type="double" value="2500.0"/>
-        <param name="maxArea" type="double" value="100000.0"/>
+        <param name="minArea" type="double" value="2000.0"/>
+        <param name="maxArea" type="double" value="20000.0"/>
         <param name="minDistBetweenBlobs" type="double" value="100.0"/>
         <param name="minThreshold" type="double" value="20.0"/>
         <param name="maxThreshold" type="double" value="150.0"/>
@@ -43,6 +45,8 @@
         <param name="pointcloud_scale" type="double" value="1.1"/>
         <param name="hist_min_scale" type="double" value="0.9"/>
         <param name="maximum_patch_height" type="double" value="10.0"/>
+        <param name="min_major_axis" type="double" value="0.05"/>
+        <param name="max_major_axis" type="double" value="0.15"/>
     </node>
 
     <node
@@ -51,10 +55,11 @@
       name="svm_color_discriminator"
       machine="search"
       ns="/processes/sample_detection/manipulator">
-      <remap from="positioned_patch_array" to="positioned_patches"/>
+      <remap from="projected_patch_array" to="positioned_patches"/>
       <param name="model_file" type="string"
         value="$(find saliency_detector)/config/manipulator_test_svm.yaml"/>
-      <param name="debug_font_scale" type="double" value="2.0"/>
+      <param name="debug_font_scale" type="double" value="0.5"/>
+      <param name="compute_grip_angle" type="bool" value="true"/>
     </node>
 
     <node
