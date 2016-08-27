@@ -23,14 +23,14 @@
     <remap from="ack" to="/processes/executive/pursuit_result"/>
     <remap from="odometry" to="/motion/odometry"/>
     <remap from="pause_state" to="/io/pause_state"/>
-    <param name="max_dist" type="double" value="0.1"/>
+    <param name="max_dist" type="double" value="0.2"/>
     <param name="max_cov" type="double" value="1.7"/>
     <param name="max_pub_cov" type="double" value="0.01"/>
     <param name="max_pub_vel" type="double" value="0.1"/>
     <param name="positive_exclusion_radius" type="double" value="10.0"/>
     <param name="negative_exclusion_radius" type="double" value="0.2"/>
     <param name="error_cov_post" type="double" value="0.09"/>
-    <param name="process_noise_cov" type="double" value="0.0001"/>
+    <param name="process_noise_cov" type="double" value="0.00025"/>
     <param name="measurement_noise_cov" type="double" value="0.01"/>
     <param name="period" type="double" value="0.33"/>
     <param name="PDgO" type="double" value="0.95"/> <!-- true positive rate -->
