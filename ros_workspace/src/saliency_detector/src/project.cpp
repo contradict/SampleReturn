@@ -201,7 +201,7 @@ class GroundProjectorNode
       }
 
       cv::Point2f roi_offset(msg->patch_array[i].image_roi.x_offset,
-              msg->patch_array[i].image_roi.x_offset);
+              msg->patch_array[i].image_roi.y_offset);
 
       float dimension, angle;
       tf::Stamped<tf::Point> world_point;
