@@ -105,17 +105,17 @@ bool computeMaskPositionAndSize(const tf::Transformer& listener,
       const cv::Mat& mask, const cv::Point2f roi_offset,
       const image_geometry::PinholeCameraModel& model, const ros::Time& stamp, const std::string& camera_frame_id,
       const Eigen::Vector4d& ground_plane, const std::string& ground_frame,
-      float* dimension, tf::Stamped<tf::Point>* world_point,
+      float* dimension, float* angle, tf::Stamped<tf::Point>* world_point,
       cv::Mat* debug_image)
 {
     // compute oriented min area rectangle around mask
     cv::RotatedRect griprect;
-    float grip_angle;
-    if(!samplereturn::computeGripAngle(mask, &griprect, &grip_angle))
+    if(!samplereturn::computeGripAngle(mask, &griprect, angle))
     {
         ROS_DEBUG("No contours found in patch");
         return false;
     }
+
     // place rectangle in full image
     griprect.center += roi_offset;
     // draw if needed

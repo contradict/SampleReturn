@@ -15,7 +15,7 @@ bool computeMaskPositionAndSize(const tf::Transformer& listener,
       const cv::Mat& mask, const cv::Point2f roi_offset,
       const image_geometry::PinholeCameraModel& model, const ros::Time& stamp, const std::string& camera_frame_id,
       const Eigen::Vector4d& ground_plane, const std::string& ground_frame,
-      float* dimension, tf::Stamped<tf::Point>* world_point,
+      float* dimension, float *angle, tf::Stamped<tf::Point>* world_point,
       cv::Mat* debug_image);
 
 }
