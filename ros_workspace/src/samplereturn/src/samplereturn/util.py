@@ -3,6 +3,7 @@ import math
 from copy import deepcopy
 import tf
 import numpy as np
+import yaml
 
 from collections import namedtuple
 
@@ -11,8 +12,8 @@ import rosgraph_msgs.msg as rosgraph_msg
 import std_msgs.msg as std_msg
 import geometry_msgs.msg as geometry_msg
 import actionlib_msgs.msg as action_msg
-import platform_motion_msgs.msg as platform_msg
 import platform_motion_msgs.srv as platform_srv
+from sensor_msgs.msg import CameraInfo
 
 
 actionlib_working_states = [action_msg.GoalStatus.ACTIVE,
@@ -214,4 +215,16 @@ class CANInterface(object):
         self.planner_command.publish(t)
         self.servo_command.publish(t)
     
+def parse_camera_info(filename):
+    stream = file(filename, 'r')
+    calib_data = yaml.load(stream)
+    cam_info = CameraInfo()
+    cam_info.width = calib_data['image_width']
+    cam_info.height = calib_data['image_height']
+    cam_info.K = calib_data['camera_matrix']['data']
+    cam_info.D = calib_data['distortion_coefficients']['data']
+    cam_info.R = calib_data['rectification_matrix']['data']
+    cam_info.P = calib_data['projection_matrix']['data']
+    cam_info.distortion_model = calib_data['distortion_model']
+    return cam_info
 
