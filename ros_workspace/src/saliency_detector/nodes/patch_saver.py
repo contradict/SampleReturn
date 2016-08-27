@@ -25,15 +25,17 @@ class PatchSaver(object):
 
     def patch_array_callback(self, PatchArray):
         rospy.loginfo("Patch Array Callback")
-        for idx, patch in enumerate(PatchArray.patch_array):
-            image = np.asarray(self.bridge.imgmsg_to_cv2(patch.image,'bgr8'))
-            mask = np.asarray(self.bridge.imgmsg_to_cv2(patch.mask,'mono8'))
-            cv2.imwrite(self.path +
-                    str(int(PatchArray.header.stamp.to_sec() * 1000))
-                    + "_" + str(idx) + "_image.png", image)
-            cv2.imwrite(self.path +
-                    str(int(PatchArray.header.stamp.to_sec() * 1000))
-                    + "_" + str(idx) + "_mask.png", mask)
+        num = np.random.random()
+        if ((len(PatchArray.patch_array) > 1) and num > 0.5) or (num > 0.9):
+            for idx, patch in enumerate(PatchArray.patch_array):
+                image = np.asarray(self.bridge.imgmsg_to_cv2(patch.image,'bgr8'))
+                mask = np.asarray(self.bridge.imgmsg_to_cv2(patch.mask,'mono8'))
+                cv2.imwrite(self.path +
+                        str(int(PatchArray.header.stamp.to_sec() * 1000))
+                        + "_" + str(idx) + "_image.png", image)
+                cv2.imwrite(self.path +
+                        str(int(PatchArray.header.stamp.to_sec() * 1000))
+                        + "_" + str(idx) + "_mask.png", mask)
 
 if __name__=="__main__":
   try:
