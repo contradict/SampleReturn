@@ -45,6 +45,8 @@
         <param name="pointcloud_scale" type="double" value="1.1"/>
         <param name="hist_min_scale" type="double" value="0.9"/>
         <param name="maximum_patch_height" type="double" value="10.0"/>
+        <param name="min_major_axis" type="double" value="0.05"/>
+        <param name="max_major_axis" type="double" value="0.15"/>
     </node>
 
     <node
