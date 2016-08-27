@@ -227,7 +227,7 @@ class GroundProjectorNode
                 msg->patch_array[i].image_roi.height)));
       }
       // Project major axis end rays to plane, compute major axis in meters
-      cv::Point2d roi_offset(msg->patch_array[i].image_roi.x_offset,
+      cv::Point2f roi_offset(msg->patch_array[i].image_roi.x_offset,
           msg->patch_array[i].image_roi.y_offset);
       cv::Point2d major_point_a, major_point_b;
       cv::Point2d rect_major_point_a, rect_major_point_b;
@@ -280,17 +280,23 @@ class GroundProjectorNode
     }
   }
 
-  void getMajorPointsFullImage(const cv::RotatedRect rect, cv::Point2d roi_offset,
+  void getMajorPointsFullImage(const cv::RotatedRect rect, cv::Point2f roi_offset,
       cv::Point2d& major_point_a, cv::Point2d& major_point_b)
   {
-    major_point_a.x = rect.center.x - (rect.size.width/2.)*cos(rect.angle*(M_PI/180.))
-                      + roi_offset.x;
-    major_point_a.y = rect.center.y - (rect.size.height/2.)*sin(rect.angle*(M_PI/180.))
-                      + roi_offset.y;
-    major_point_b.x = rect.center.x + (rect.size.width/2.)*cos(rect.angle*(M_PI/180.))
-                      + roi_offset.x;
-    major_point_b.y = rect.center.y + (rect.size.height/2.)*sin(rect.angle*(M_PI/180.))
-                      + roi_offset.y;
+    cv::Point2f rect_points[4];
+    rect.points(rect_points);
+    float d0 = cv::norm(rect_points[0] - rect_points[1]);
+    float d1 = cv::norm(rect_points[1] - rect_points[2]);
+    if(d0>d1)
+    {
+      major_point_a = (rect_points[0] + rect_points[3])/2.0f + roi_offset;
+      major_point_b = (rect_points[1] + rect_points[2])/2.0f + roi_offset;
+    }
+    else
+    {
+      major_point_a = (rect_points[0] + rect_points[1])/2.0f + roi_offset;
+      major_point_b = (rect_points[2] + rect_points[3])/2.0f + roi_offset;
+    }
     return;
   }
 
@@ -336,8 +342,10 @@ class GroundProjectorNode
     ROS_DEBUG("Ground Point B: %f, %f, %f",ground_point_b.x(),ground_point_b.y(),ground_point_b.z());
     Eigen::Vector3d mid_ground_point = (ground_point_a + ground_point_b)/2;
     ROS_DEBUG("Ground Point Mid: %f, %f, %f",mid_ground_point.x(),mid_ground_point.y(),mid_ground_point.z());
-    if (((ground_point_b - ground_point_a).norm() < max_major_axis_) &&
-        ((ground_point_b - ground_point_a).norm() > min_major_axis_)) {
+    float size = (ground_point_b - ground_point_a).norm();
+    ROS_DEBUG("Major axis size: %f",size);
+    if ((size < max_major_axis_) &&
+        (size > min_major_axis_)) {
       ground_point.header.stamp = header.stamp;
       ground_point.header.frame_id = "base_link";
       ground_point.point.x = mid_ground_point[0];

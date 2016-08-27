@@ -46,6 +46,7 @@
     <remap from="audio_search" to="/io/audio/search"/>
     <remap from="audio_navigate" to="/io/audio/navigate"/>
     <remap from="gpio_read" to="/io/gpio_read"/>
+    <remap from="search_lights" to="/io/search_lights"/>
 
     <node
         pkg="executive"

@@ -90,7 +90,9 @@ add_definitions("-std=c++11" "-Wall")
 
 generate_dynamic_reconfigure_options(cfg/saliency_detector_params.cfg
   cfg/ground_projector_params.cfg
-  cfg/color_histogram_descriptor_params.cfg)
+  cfg/color_histogram_descriptor_params.cfg
+  cfg/SVMColorDiscriminator.cfg
+  )
 
 ###################################
 ## catkin specific configuration ##
@@ -105,7 +107,7 @@ catkin_package(
   INCLUDE_DIRS
     include
     ${Eigen_INCLUDE_DIRS}
-    LIBRARIES BMS saliency_detector_core
+    LIBRARIES BMS
   CATKIN_DEPENDS roscpp roslib dynamic_reconfigure
   DEPENDS opencv2 Eigen
 )
@@ -129,32 +131,23 @@ add_library(BMS
   src/BMS.cpp
  )
 
-add_library(saliency_detector_core
-  src/saliency_detector_core.cpp
- )
 
 ## Declare a cpp executable
  add_executable(saliency_detector_node src/saliency_detector.cpp)
  add_executable(ground_projector_node src/project.cpp)
  add_executable(color_histogram_descriptor_node src/color_histogram_descriptor.cpp)
+ add_executable(svm_color_discriminator src/svm_color_discriminator.cpp)
  # add_executable(BMS_standalone src/BMS.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
  add_dependencies(saliency_detector_node ${PROJECT_NAME}_gencfg)
- add_dependencies(saliency_detector_core ${PROJECT_NAME}_gencfg)
  add_dependencies(ground_projector_node ${PROJECT_NAME}_gencfg)
  add_dependencies(color_histogram_descriptor_node ${PROJECT_NAME}_gencfg)
+ add_dependencies(svm_color_discriminator ${PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(saliency_detector_core
-   ${catkin_LIBRARIES}
-   ${OpenCV_LIBRARIES}
-   ${PCL_LIBRARIES}
-   )
-
  target_link_libraries(saliency_detector_node
-   saliency_detector_core
    ${catkin_LIBRARIES}
    BMS
  )
@@ -169,6 +162,11 @@ add_library(saliency_detector_core
    ${OpenCV_LIBRARIES}
  )
 
+ target_link_libraries(svm_color_discriminator
+   ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+ )
+
 #############
 ## Install ##
 #############
@@ -179,8 +177,9 @@ add_library(saliency_detector_core
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 ## Mark executables and/or libraries for installation
-install(TARGETS saliency_detector_core BMS saliency_detector_node
+install(TARGETS BMS saliency_detector_node
    ground_projector_node color_histogram_descriptor_node
+   svm_color_discriminator
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

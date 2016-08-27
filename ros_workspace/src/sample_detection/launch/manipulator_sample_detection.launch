@@ -27,6 +27,8 @@
         <param name="thresholdStep" type="double" value="10.0"/>
         <param name="minRepeatability" type="double" value="3.0"/>
         <param name="patch_scaling_factor" type="double" value="3.0"/>
+        <param name="bms_resize" type="int" value="0"/>
+        <param name="bms_channels" type="int" value="1"/>
     </node>
 
     <node
@@ -54,10 +56,10 @@
         <param name="min_target_hue" type="double" value="120"/>
         <param name="max_target_hue" type="double" value="30"/>
         <param name="max_fence_hue" type="double" value="18"/>
-        <param name="min_fence_distance" type="double" value="0.9"/>
+        <param name="min_fence_distance" type="double" value="0.0"/>
         <param name="min_color_saturation" type="double" value="90"/>
-        <param name="high_saturation_limit" type="double" value="0.65"/>
-        <param name="low_saturation_limit" type="double" value="0.5"/>
+        <param name="high_saturation_limit" type="double" value="0.27"/>
+        <param name="low_saturation_limit" type="double" value="0.25"/>
         <param name="min_inner_outer_distance" type="double" value="0.7"/>
         <param name="max_exemplar_distance" type="double" value="0.21"/>
         <param name="compute_grip_angle" type="bool" value="true"/>
@@ -80,8 +82,8 @@
         <param name="compute_grip_angle" type="bool" value="true"/>
         <param name="do_median_blur" type="bool" value="false"/>
         <param name="median_blur_size" type="int" value="13"/>
-        <param name="high_saturation_limit" type="double" value="0.5"/>
-        <param name="low_saturation_limit" type="double" value="0.1"/>
+        <param name="high_saturation_limit" type="double" value="0.4"/>
+        <param name="low_saturation_limit" type="double" value="0.3"/>
         <param name="mask_dilation_iterations" type="int" value="2"/>
         <param name="matching_threshold" type="double" value="70.0"/>
         <param name="max_exemplar_distance" type="double" value="0.3"/>

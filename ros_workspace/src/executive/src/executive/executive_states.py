@@ -305,11 +305,11 @@ class ExecuteSimpleMove(ExecuteMoveState):
         #watch the action server
         while True:
             rospy.sleep(0.1)
+            if self.preempt_requested():
+                return self.handle_preempt()
             move_state = self._move_client.get_state()
             if move_state not in util.actionlib_working_states:
                 break            
-            if self.preempt_requested():
-                return self.handle_preempt()
             #Handle object detection
             if userdata.stop_on_detection and (userdata.detection_message is not None):
                 rospy.loginfo("ExecuteSimpleMove detected object: " + str(userdata.detection_message))

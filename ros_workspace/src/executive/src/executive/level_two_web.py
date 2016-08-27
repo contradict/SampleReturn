@@ -86,12 +86,13 @@ class LevelTwoWeb(object):
         self.beacon_enable = rospy.Publisher('enable_beacon',
                                               std_msg.Bool,
                                               queue_size=10)       
-        self.camera_enablers = []
-        self.camera_enablers.append(rospy.Publisher('enable_search',
-                                                   std_msg.Bool,
-                                                   queue_size=10))
-        self.camera_enablers.append(self.beacon_enable)
+        
+        self.search_enable = rospy.Publisher('enable_search',
+                                              std_msg.Bool,
+                                              queue_size=10)
 
+        self.camera_enablers = [self.beacon_enable, self.search_enable]
+        
         #movement action servers
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
                                                        VFHMoveAction)
@@ -175,7 +176,8 @@ class LevelTwoWeb(object):
         #list of manager outcomes, and their corresponding labels
         manager_dict = {'WEB_MANAGER':'web_manager',
                         'RETURN_MANAGER':'return_manager',
-                        'RECOVERY_MANAGER':'recovery_manager'}
+                        'RECOVERY_MANAGER':'recovery_manager',
+                        'LEVEL_TWO_PREEMPTED':'preempted'}
         self.state_machine.userdata.manager_dict = manager_dict
         #get inverted version for the transition dict of the mux
         manager_transitions = dict([[v,k] for k,v in manager_dict.items()])
@@ -189,12 +191,12 @@ class LevelTwoWeb(object):
         with self.state_machine:
 
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(self.camera_enablers),
-                                   transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
+                                   StartLeveLTwo(),
+                                   transitions = {'next':'SELECT_PLANNER'})
 
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode. Enable ing search cameras.'),
+                                                 'Enter ing level two mode.'),
                                    transitions = {'next':'SELECT_PLANNER'})
 
             smach.StateMachine.add('SELECT_PLANNER',
@@ -218,6 +220,7 @@ class LevelTwoWeb(object):
                                    WebManager('WEB_MANAGER',
                                               self.tf_listener,
                                               self.beacon_enable,
+                                              self.search_enable,
                                               self.announcer),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
@@ -341,6 +344,7 @@ class LevelTwoWeb(object):
                                    RecoveryManager('RECOVERY_MANAGER',
                                                    self.announcer,
                                                    self.beacon_enable,
+                                                   self.search_enable,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'simple_move':'RECOVERY_SIMPLE_MOVE',
@@ -556,6 +560,7 @@ class LevelTwoWeb(object):
                     self.state_machine.userdata.move_goal = goal
 
     def shutdown_cb(self):
+        rospy.delete_param('~initial_behavior')
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
@@ -565,7 +570,7 @@ class LevelTwoWeb(object):
 #searches the globe
 class StartLeveLTwo(smach.State):
 
-    def __init__(self, camera_enablers):
+    def __init__(self):
 
         smach.State.__init__(self,
                             input_keys=['paused',
@@ -579,9 +584,7 @@ class StartLeveLTwo(smach.State):
                                         'pause_start_time',
                                         'pause_time_offset'],
                             outcomes=['next']),
-
-        self.camera_enablers = camera_enablers
-
+        
     def execute(self, userdata):
 
         result = samplereturn_msg.GeneralExecutiveResult()
@@ -593,10 +596,6 @@ class StartLeveLTwo(smach.State):
         userdata.recovery_parameters = deepcopy(userdata.initial_behavior)
         userdata.recovery_requested = True
 
-        #enable all search/beacon cameras
-        for publisher in self.camera_enablers:
-            publisher.publish(True)
-
         userdata.pause_time_offset = rospy.Duration(0)
         userdata.start_time = rospy.Time.now()
         if userdata.paused:
@@ -607,7 +606,7 @@ class StartLeveLTwo(smach.State):
         return 'next'
 
 class WebManager(smach.State):
-    def __init__(self, label, tf_listener, beacon_enable, announcer):
+    def __init__(self, label, tf_listener, beacon_enable, search_enable, announcer):
         smach.State.__init__(self,
                              input_keys = ['outbound',
                                            'web_slices',
@@ -646,6 +645,7 @@ class WebManager(smach.State):
 
         self.tf_listener = tf_listener
         self.beacon_enable = beacon_enable
+        self.search_enable = search_enable
         self.announcer = announcer
         self.label = label
         self.last_web_move = None
@@ -694,7 +694,7 @@ class WebManager(smach.State):
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f:" %(active_slice['start_angle']))
             rospy.loginfo("WEB_MANAGER remaining indices: {!s}".format(userdata.web_slice_indices))
             remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
-            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left.  Beacon camera disabled.".format(
+            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left.  Beacon camera off.".format(
                                 int(active_slice['start_angle']),
                                 remaining_minutes))
             return self.load_move(next_move, userdata)
@@ -721,8 +721,9 @@ class WebManager(smach.State):
 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
-                    self.announcer.say("Return ing from raster on spoke, yaw {!s}. Beacon camera enabled.".format(
-                                        int(active_slice['start_angle'])))
+                    self.announcer.say("Return ing from raster on spoke, yaw {!s}. Beacon camera active. \
+                                        Search cameras off.".format(int(active_slice['start_angle'])))
+                    self.search_enable.publish(False)
                     self.beacon_enable.publish(True)
                     userdata.raster_active = False
                     userdata.web_slice_indices.popleft() #remove the current index
@@ -739,7 +740,8 @@ class WebManager(smach.State):
                 return self.load_move(next_move, userdata)
             else:
                 #time to start rastering, create the points, and set flag
-                self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(
+                self.search_enable.publish(True)                
+                self.announcer.say("Begin ing raster on spoke, yaw {!s}.  Search cameras active.".format(
                                     int(active_slice['start_angle'])))
                 userdata.raster_active = True
                 return 'get_raster'
@@ -969,7 +971,7 @@ class RetryCheck(smach.State):
 
 
 class RecoveryManager(smach.State):
-    def __init__(self, label, announcer, enable_beacon, tf_listener):
+    def __init__(self, label, announcer, beacon_enable, search_enable, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
@@ -1006,7 +1008,8 @@ class RecoveryManager(smach.State):
                                        'aborted'])
 
         self.label = label
-        self.enable_beacon = enable_beacon
+        self.beacon_enable = beacon_enable
+        self.search_enable = search_enable
         self.announcer = announcer
         self.tf_listener = tf_listener
         self.exit_move = None
@@ -1025,16 +1028,29 @@ class RecoveryManager(smach.State):
             userdata.report_beacon = False
             userdata.stop_on_detection = True
             
+            if ('announcement') in params_dict:
+                self.announcer.say(params_dict['announcement'])
+
             if ('pursue_samples' in params_dict) and params_dict['pursue_samples']:
                 userdata.report_sample = True
             else:
                 userdata.report_sample = False
 
-            if 'beacon_enabled_on_entry' in params_dict and \
-                params_dict['beacon_enabled_on_entry']:
-                self.enable_beacon.publish(True)
-            else:
-                self.enable_beacon.publish(False)
+            if 'beacon_enabled_on_entry' in params_dict:
+                if params_dict['beacon_enabled_on_entry']:
+                    self.announcer.say('Beacon camera active.')
+                    self.beacon_enable.publish(True)
+                else:
+                    self.announcer.say('Beacon camera off.')
+                    self.beacon_enable.publish(False)
+
+            if 'search_enabled_on_entry' in params_dict:
+                if params_dict['search_enabled_on_entry']:
+                    self.announcer.say('Search cameras active.')
+                    self.search_enable.publish(True)
+                else:
+                    self.announcer.say('Search cameras off.')
+                    self.search_enable.publish(False)
 
             #modify return time
             if 'time_offset' in params_dict:
@@ -1107,11 +1123,22 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)
             return 'move'
         else:
-            if 'beacon_enabled_on_exit' in userdata.recovery_parameters and \
-             userdata.recovery_parameters['beacon_enabled_on_exit']:
-                self.enable_beacon.publish(True)
-            else:
-                self.enable_beacon.publish(False)
+            if 'beacon_enabled_on_exit' in userdata.recovery_parameters:
+                if userdata.recovery_parameters['beacon_enabled_on_exit']:
+                    self.announcer.say('Beacon camera active.')
+                    self.beacon_enable.publish(True)
+                else:
+                    self.announcer.say('Beacon camera off.')
+                    self.beacon_enable.publish(False)
+
+            if 'search_enabled_on_exit' in userdata.recovery_parameters:
+                if userdata.recovery_parameters['search_enabled_on_exit']:
+                    self.announcer.say('Search cameras active.')
+                    self.search_enable.publish(True)
+                else:
+                    self.announcer.say('Search cameras off.')
+                    self.search_enable.publish(False)
+            
             userdata.stop_on_detection = False
             #setting the active manager is for the return to web_manager
             #it's the only way I could think of to return to the previous goal
@@ -1172,11 +1199,14 @@ class MoveMUX(smach.State):
                              outcomes = manager_list)
 
     def execute(self, userdata):
-        #clear and reset flags after all moves!
+        #do not clear move target on preempt
         userdata.retry_active = False
         userdata.move_point_map = None
-        userdata.move_target = None
-        return userdata.active_manager
+        if not self.preempt_requested():                
+            userdata.move_target = None        
+            return userdata.active_manager
+        else:
+            return 'preempted'
 
 class LevelTwoPreempted(smach.State):
     def __init__(self, camera_enablers):

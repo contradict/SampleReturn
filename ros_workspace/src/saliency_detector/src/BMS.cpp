@@ -41,7 +41,7 @@ BMS::BMS(const int dw1, const int ow, const bool nm, const bool hb)
 {
 }
 
-void BMS::computeSaliency(const Mat& src, float step)
+void BMS::computeSaliency(const Mat& src, float step, int channels)
 {
 	_src=src.clone();
 	Mat lab;
@@ -49,12 +49,21 @@ void BMS::computeSaliency(const Mat& src, float step)
 	cvtColor(_src,lab,CV_RGB2Lab);
 	cvtColor(_src,hsv,CV_RGB2HSV);
 
-  int from_to[] = {5,0 , 1,1 , 2,2};
-  Mat in[] = {lab, hsv};
-  Mat mix(lab.rows, lab.cols, CV_8UC3);
-  mixChannels(in, 2, &mix, 1, from_to, 3);
+  if (channels == 0) {
+    int from_to[] = {5,0 , 1,1 , 2,2};
+    Mat in[] = {lab, hsv};
+    Mat mix(lab.rows, lab.cols, CV_8UC3);
+    mixChannels(in, 2, &mix, 1, from_to, 3);
+    whitenFeatMap(mix,50.0,false);
+  }
+  else if (channels == 1) {
+    int from_to[] = {4,0 , 1,1 , 2,2};
+    Mat in[] = {lab, hsv};
+    Mat mix(lab.rows, lab.cols, CV_8UC3);
+    mixChannels(in, 2, &mix, 1, from_to, 3);
+    whitenFeatMap(mix,50.0,false);
+  }
 
-  whitenFeatMap(mix,50.0,false);
 
 	_sm=Mat::zeros(src.size(),CV_64FC1);
 

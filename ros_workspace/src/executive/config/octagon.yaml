@@ -11,7 +11,8 @@ level_two:
     return_time_minutes: 110
 
     #initial move params (same as recovery)
-    initial_behavior:    
+    initial_behavior:
+        announcement: 'Executing octagon.'
         simple_moves: [
             { angle: -90, distance: 1.53, velocity: 0.5 },
             { angle: 45.0, velocity: 0.3 },
@@ -30,8 +31,8 @@ level_two:
             { angle: -90, distance: 1.53, velocity: 0.5 },
             { angle: 45.0, velocity: 0.3 },
         ]
+        search_enabled_on_entry: true
         beacon_enabled_on_entry: false
-        beacon_enabled_on_exit: false
         time_offset: 0
         terminal_outcome: wait_for_preempt
 

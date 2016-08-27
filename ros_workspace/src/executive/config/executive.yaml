@@ -11,14 +11,15 @@ level_two:
     return_time_minutes: 110 
     
     #initial move params (same as recovery)
-    initial_behavior:    
+    initial_behavior:
+        announcement: 'Entering level two mode.'
         simple_moves: [
             { angle: 0.0, distance: 6.0, velocity: 0.5 },
             { angle: 180.0, velocity: 0.3 },
             { angle: 180.0, distance: 3.0, velocity: 0.1 }
         ]
         beacon_enabled_on_entry: true
-        beacon_enabled_on_exit: false
+        search_enabled_on_entry: false
         time_offset: 0
         terminal_outcome: web_manager
 
@@ -72,7 +73,7 @@ pursue_sample:
     simple_pursuit_threshold: 1.5 
     #after min_pursuit reached, we move to check_distance, wait settle_time
     #and check for obstacles.  Then we make the manipulator view approach.
-    settle_time: 4.0
+    settle_time: 3.0
     sample_obstacle_check_width: 0.6
     final_pursuit_step: 0.2
     spiral_search_step: 0.15 

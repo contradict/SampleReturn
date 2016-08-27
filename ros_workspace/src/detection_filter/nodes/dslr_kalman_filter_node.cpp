@@ -317,10 +317,12 @@ class KalmanDetectionFilter
     {
         // Get filters in this camera that were in view but weren't updated,
         // apply a negative measurement
-        ROS_DEBUG("Checking NUF %s", msg->header.frame_id.c_str());
+        ROS_DEBUG("Checking NUF(%ld) %s", not_updated_filter_list_[msg->header.frame_id.c_str()].size(),
+            msg->header.frame_id.c_str());
         for (auto ckf : not_updated_filter_list_[msg->header.frame_id])
         {
-          if (isInView(ckf) or (odometer_-last_odometry_tick_)>config_.odometry_tick_dist) {
+          if(isInView(ckf))
+          {
             ckf->predict();
             ckf->measure(config_.PDgO, config_.PDgo);
             ROS_DEBUG("Negative observation for filter id=%d Updated Prob: %f", ckf->filter_id, ckf->certainty);
@@ -330,8 +332,7 @@ class KalmanDetectionFilter
         // copy all filters to not updated list for next time
         not_updated_filter_list_[msg->header.frame_id].clear();
         for (auto ckf : filter_list_) {
-            ROS_DEBUG("Checking Filter to NUF");
-            ROS_DEBUG("%s",msg->header.frame_id.c_str());
+            ROS_DEBUG("Checking Filter to NUF %s", msg->header.frame_id.c_str());
             if (ckf->sensor_frame_id.compare(msg->header.frame_id) == 0) {
                 ROS_DEBUG("Adding Filter id=%d to NUF", ckf->filter_id);
                 not_updated_filter_list_[msg->header.frame_id].push_back(ckf);
@@ -351,7 +352,10 @@ class KalmanDetectionFilter
         ROS_DEBUG("checking np %s at %f, %f, %f",
                 fp.name.c_str(), fp.point.x, fp.point.y, fp.point.z);
         int filter_id = checkObservation(fp);
-        ROS_DEBUG("Updated filter id=%d", filter_id);
+        if(filter_id>0)
+        {
+          ROS_DEBUG("Updated filter id=%d", filter_id);
+        }
 
         // remove the matching filter from NUF
         auto newend = std::remove_if(not_updated_filter_list_[msg->header.frame_id].begin(),
@@ -518,7 +522,6 @@ class KalmanDetectionFilter
 
   /* This will check if each hypothesis is in view currently */
   bool isInView (const std::shared_ptr<ColoredKF>& kf) {
-    ROS_DEBUG("Is In View Check");
     // We're going to check all the camera models and see if the point
     // is in view of any of them
     for(auto kv : camera_models_)
@@ -539,6 +542,7 @@ class KalmanDetectionFilter
           (uv.y > 0 + frustum_buffer_) and
           (uv.y < kv.second.fullResolution().height - frustum_buffer_))
       {
+        ROS_DEBUG("Is In View %s", kv.first.c_str());
         return true;
       }
       else
@@ -546,6 +550,7 @@ class KalmanDetectionFilter
         continue;
       }
     }
+    ROS_DEBUG("Not In View");
     return false;
   }
 
