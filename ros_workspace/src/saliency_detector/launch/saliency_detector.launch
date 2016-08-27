@@ -16,6 +16,8 @@
     <param name="bms_img_width" type="double" value="400"/>
     <param name="bms_top_trim" type="double" value="0"/>
     <param name="filterByConvexity" type="bool" value="True"/>
+    <param name="minConvexity" type="double" value="0.8"/>
+    <param name="maxConvexity" type="double" value="1.0"/>
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="2500.0"/>
     <param name="maxArea" type="double" value="100000.0"/>
