@@ -298,7 +298,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             rvec[0] = 0;
             rvec[1] = 0;
             rvec[2] = 0;
-            solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, true, CV_ITERATIVE);
+            solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, true, CV_EPNP);
             if (tvec[2] < 0) {
                 ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER solved for crazy pose a second time! giving up");
                 solved = false;
