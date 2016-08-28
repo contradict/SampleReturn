@@ -5,9 +5,8 @@
 
     <arg name="start_paused" default="True"/>
 
-    <arg name="port_wheel_diameter" value="0.3106"/>
-    <arg name="starboard_wheel_diameter" value="0.3106"/>
-    <arg name="stern_wheel_diameter" value="0.3106"/>
+    <!-- Wheel diameter should be passed to odometry node and platform_motion-->
+    <arg name="wheel_diameter" value="0.3112"/>
     
     <!-- Remaps - apply to all nodes in this launch file -->
     <remap from="platform_joint_state" to="/motion/platform_joint_state"/>`
@@ -49,7 +48,7 @@
         <param name="port_steering_id" type="int" value="6"/>
         <param name="port_wheel_id" type="int" value="7"/>
 
-        <param name="wheel_diameter" type="double" value="0.3112"/>
+        <param name="wheel_diameter" type="double" value="$(arg wheel_diameter)"/>
 
         <param name="status_publish_interval" type="double" value="1.0"/>
     </node>
@@ -61,7 +60,7 @@
           type="EKF_odometry"
           output="log"
           ns="/motion">
-        <param name="wheel_diameter" type="double" value="0.3112"/>
+        <param name="wheel_diameter" type="double" value="$(arg wheel_diameter)"/>
         <param name="odom_frame_id" type="string" value="odom"/>
         <param name="child_frame_id" type="string" value="base_link_flat"/>
 
