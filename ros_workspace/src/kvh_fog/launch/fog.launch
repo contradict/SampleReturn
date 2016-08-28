@@ -14,9 +14,9 @@
         <!-- seconds to wait before re-open -->
         <param name="reopen_delay" type="int" value="30"/>
         <!-- Bette Davis Picnic Area, LA, USA-->
-        <!--<param name="lat" type="double" value="34.157229"/>-->
+        <!--<param name="latitude" type="double" value="34.157229"/>-->
         <!--Institude park in Worcester, MA, USA-->
-        <param name="lattitude" type="double" value="42.2750873" />
+        <param name="latitude" type="double" value="42.2750873" />
         <!-- if not specified, default to local earth rate-->
         <!--
         -->

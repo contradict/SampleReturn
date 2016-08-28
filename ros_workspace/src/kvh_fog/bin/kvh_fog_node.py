@@ -2,7 +2,6 @@
 import rospy
 from math import sin, cos, radians
 import numpy as np
-import threading
 from kvh_fog import driver
 from kvh_fog.srv import MeasureBiasResponse, MeasureBias
 from sensor_msgs.msg import Imu
@@ -20,7 +19,7 @@ class KVHFOGNode(object):
         # based on bias stability of 1 degree/hour
         self._sigma_theta = rospy.get_param("~sigma_theta",
                 radians(1.0)/3600.)
-        lat = rospy.get_param("~lattitude", 34.156406)
+        lat = rospy.get_param("~latitude", 34.156406)
         if rospy.has_param("~bias"):
             self._rate_bias = rospy.get_param("~bias")
         else:
