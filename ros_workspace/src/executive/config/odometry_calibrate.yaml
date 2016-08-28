@@ -12,16 +12,14 @@ level_two:
 
     #initial move params (same as recovery)
     initial_behavior:
-        announcement: 'Entering level two mode, california edition.'
+        announcement: 'Executing odometry calibration, 6 meters.'
         simple_moves: [
-            { angle: 0.0, distance: 4.0, velocity: 0.5 },
-            { angle: 180.0, velocity: 0.3 },
-            { angle: 180.0, distance: 3.0, velocity: 0.05 }
+            { angle: 0, distance: 6.0, velocity: 0.5 },
         ]
-        beacon_enabled_on_entry: true
-        search_enabled_on_entry: false
+        search_enabled_on_entry: true
+        beacon_enabled_on_entry: false
         time_offset: 0
-        terminal_outcome: web_manager
+        terminal_outcome: wait_for_preempt
 
     beacon_approach_point: {x: 6.0, y: 0}
     platform_point: {x: -0.8, y: 0.0}
@@ -47,24 +45,24 @@ level_two:
     #localization map.  Slices also specify a maximum and minimum radius
 
     web_slices: [
-        { start_angle: 195, end_angle: 215, min_radius: 48, max_radius: 61, return_on_end: True },
+        { start_angle: 195, end_angle: 215, min_radius: 50, max_radius: 61, return_on_end: True },
         { start_angle: 335, end_angle: 315, min_radius: 45, max_radius: 56, return_on_end: True },
-        { start_angle: 143, end_angle: 153, min_radius: 125, max_radius: 136, return_on_end: True },
+        { start_angle: 145, end_angle: 155, min_radius: 125, max_radius: 136, return_on_end: True },
         { start_angle: 135, end_angle: 115, min_radius: 35, max_radius: 46, return_on_end: False },
         { start_angle: 140, end_angle: 130, min_radius: 140, max_radius: 151, return_on_end: True }
     ]
 
 pursue_sample:
     #sample approach (pursuit) parameters
-    pursuit_velocity: 0.4
+    pursuit_velocity: 0.8
     spin_velocity: 0.3
     max_pursuit_error: 0.5
     min_pursuit_distance: 1.5
     #if sample is closer than this, strafe to approach point
-    simple_pursuit_threshold: 0.7 
+    simple_pursuit_threshold: 1.5 
     #after min_pursuit reached, we move to check_distance, wait settle_time
     #and check for obstacles.  Then we make the manipulator view approach.
-    settle_time: 3.0
+    settle_time: 4.0
     sample_obstacle_check_width: 0.6
     final_pursuit_step: 0.2
     spiral_search_step: 0.15 

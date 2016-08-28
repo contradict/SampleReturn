@@ -6,8 +6,7 @@
 #include <samplereturn_msgs/NamedPointArray.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <saliency_detector/color_histogram_descriptor_paramsConfig.h>
-#include <samplereturn/colormodel.h>
+#include <saliency_detector/SVMColorDiscriminatorConfig.h>
 #include <samplereturn/mask_utils.h>
 
 #include <opencv2/opencv.hpp>
@@ -19,29 +18,54 @@ namespace saliency_detector {
 // Take in a PatchArray, compute a color model of the salient object in each patch,
 // publish a NamedPoint. This is the end of the detection part of sample search,
 // objects past here have matched saliency, shape, size, and color criteria.
-class ColorHistogramDescriptorNode
+class SVMColorDiscriminator
 {
   ros::Subscriber sub_patch_array;
   ros::Publisher pub_named_points;
   ros::Publisher pub_debug_image;
 
-  dynamic_reconfigure::Server<saliency_detector::color_histogram_descriptor_paramsConfig> dr_srv;
+  dynamic_reconfigure::Server<saliency_detector::SVMColorDiscriminatorConfig> dr_srv;
 
   // OpenCV HSV represents H between 0-180, remember that
-  saliency_detector::color_histogram_descriptor_paramsConfig config_;
+  saliency_detector::SVMColorDiscriminatorConfig config_;
+
+  cv::Ptr<cv::ml::SVM> svm;
+  cv::Mat mean_;
+  cv::Mat std_;
 
   public:
-  ColorHistogramDescriptorNode() {
+  SVMColorDiscriminator() {
     ros::NodeHandle nh;
 
-    dynamic_reconfigure::Server<saliency_detector::color_histogram_descriptor_paramsConfig>::CallbackType cb;
-    cb = boost::bind(&ColorHistogramDescriptorNode::configCallback, this,  _1, _2);
+    dynamic_reconfigure::Server<saliency_detector::SVMColorDiscriminatorConfig>::CallbackType cb;
+    cb = boost::bind(&SVMColorDiscriminator::configCallback, this,  _1, _2);
     dr_srv.setCallback(cb);
 
-    ros::NodeHandle private_node_handle_("~");
+    ros::NodeHandle private_node_handle("~");
+
+    const std::string MODELFILE="model_file";
+    std::string model_file;
+    if(!private_node_handle.getParam(MODELFILE, model_file))
+    {
+        ROS_ERROR("No model file specified, exiting.");
+        ros::requestShutdown();
+        return;
+    }
+
+    svm = cv::ml::StatModel::load<cv::ml::SVM>(model_file,
+            "opencv_ml_svm");
+    if(!svm->isTrained())
+    {
+        ROS_ERROR("Loading model file %s failed, exiting", model_file.c_str());
+        ros::requestShutdown();
+        return;
+    }
+    cv::FileStorage fs(model_file, cv::FileStorage::READ);
+    fs["mean"] >> mean_;
+    fs["std"] >> std_;
 
     sub_patch_array =
-      nh.subscribe("projected_patch_array", 1, &ColorHistogramDescriptorNode::patchArrayCallback, this);
+      nh.subscribe("projected_patch_array", 1, &SVMColorDiscriminator::patchArrayCallback, this);
 
     pub_named_points =
       nh.advertise<samplereturn_msgs::NamedPointArray>("named_point", 1);
@@ -84,28 +108,14 @@ class ColorHistogramDescriptorNode
                 msg->patch_array[i].image_roi.height)));
       }
 
-      // check foreground/background distance
-      samplereturn::ColorModel cm(cv_ptr_img->image, cv_ptr_mask->image);
-      samplereturn::HueHistogram hh_inner = cm.getInnerHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
-      samplereturn::HueHistogram hh_outer = cm.getOuterHueHistogram(config_.min_color_saturation, config_.low_saturation_limit, config_.high_saturation_limit);
-      double background_distance = hh_inner.distance(hh_outer);
-    
-      // compare background to fence color
-      std::vector<std::tuple<double, double>> edges;
-      edges.push_back(std::make_tuple(0, config_.max_fence_hue));
-      samplereturn::HueHistogram hh_fence_measured = cm.getOuterHueHistogram(config_.min_fence_color_saturation,0.0, config_.fence_high_saturation_limit);
-      samplereturn::HueHistogramExemplar hh_fence_exemplar = samplereturn::ColorModel::getColoredSampleModel(edges, 0.0, config_.fence_high_saturation_limit);
-      double fence_distance = hh_fence_exemplar.distance(hh_fence_measured);
-
-      // Check inner hist against targets, either well-saturated in the specified
-      // hue range, or unsaturated with a high value (metal and pre-cached)
-      edges.clear();
-      edges.push_back(std::make_tuple(0, config_.max_target_hue));
-      edges.push_back(std::make_tuple(config_.min_target_hue, 180));
-      samplereturn::HueHistogramExemplar hh_colored_sample = samplereturn::ColorModel::getColoredSampleModel(edges, config_.low_saturation_limit, config_.high_saturation_limit);
-      samplereturn::HueHistogramExemplar hh_value_sample = samplereturn::ColorModel::getValuedSampleModel(config_.low_saturation_limit, config_.high_saturation_limit);
-      double hue_exemplar_distance = hh_colored_sample.distance(hh_inner);
-      double value_exemplar_distance = hh_value_sample.distance(hh_inner);
+      cv::Mat Lab;
+      cv::cvtColor(cv_ptr_img->image, Lab, cv::COLOR_RGB2Lab);
+      cv::Mat point(1,1,CV_32FC3);
+      point = cv::mean(Lab, cv_ptr_mask->image);
+      cv::Mat scaled_point = (point.reshape(1) - mean_)/std_;
+      cv::Mat prediction;
+      svm->predict(scaled_point, prediction, cv::ml::StatModel::RAW_OUTPUT);
+      float distance = prediction.at<float>(0);
 
       if (enable_debug) {
           int x,y,h;
@@ -113,22 +123,15 @@ class ColorHistogramDescriptorNode
           y = msg->patch_array[i].image_roi.y_offset;
           //w = msg->patch_array[i].image_roi.width;
           h = msg->patch_array[i].image_roi.height;
-          hh_inner.draw_histogram(debug_image, x, y, config_.debug_font_scale);
-          hh_outer.draw_histogram(debug_image, x, y + h + 25*config_.debug_font_scale, config_.debug_font_scale);
           char edist[100];
-          snprintf(edist, 100, "b:%3.2f h: %3.2f v:%3.2f f:%3.2f", background_distance, hue_exemplar_distance, value_exemplar_distance, fence_distance);
+          snprintf(edist, 100, "d:%3.2f", distance);
           cv::putText(debug_image,edist,cv::Point2d(x+70, y + h + 50*config_.debug_font_scale),
                   cv::FONT_HERSHEY_SIMPLEX, config_.debug_font_scale, cv::Scalar(255,0,0),4,cv::LINE_8);
       }
 
-      // is a sample if high enough bg/fg distance, high enough fence distance,
-      // and close to one of the exemplars
-      bool is_sample = ((background_distance>config_.min_inner_outer_distance) &&
-                        (fence_distance>config_.min_fence_distance) &&
-                        ((hue_exemplar_distance<config_.max_exemplar_distance) ||
-                         (value_exemplar_distance<config_.max_exemplar_distance)));
+      bool is_sample = distance<0;
 
-      if (!is_sample)
+      if(!is_sample)
       {
           if(enable_debug)
           {
@@ -149,15 +152,8 @@ class ColorHistogramDescriptorNode
       }
 
       samplereturn_msgs::NamedPoint np_msg;
-      np_msg.header.stamp = msg->header.stamp;
-      np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
-      np_msg.point = msg->patch_array[i].world_point.point;
-      hh_inner.to_msg(&np_msg.model.hue);
-      np_msg.sensor_frame = msg->header.frame_id;
-      np_msg.name = (hue_exemplar_distance < value_exemplar_distance) ?
-          std::string("Hue object") : std::string("Value object");
 
-      if(is_sample && config_.compute_grip_angle)
+      if(config_.compute_grip_angle)
       {
           cv::RotatedRect griprect;
           if(samplereturn::computeGripAngle(cv_ptr_mask->image, &griprect, &np_msg.grip_angle) &&
@@ -170,8 +166,12 @@ class ColorHistogramDescriptorNode
           }
       }
 
+      np_msg.header.stamp = msg->header.stamp;
+      np_msg.header.frame_id = msg->patch_array[i].world_point.header.frame_id;
+      np_msg.point = msg->patch_array[i].world_point.point;
+      np_msg.sensor_frame = msg->header.frame_id;
+      np_msg.name = "SVM";
       points_out.points.push_back(np_msg);
-      
     }
     pub_named_points.publish(points_out);
     if (enable_debug) {
@@ -181,7 +181,7 @@ class ColorHistogramDescriptorNode
     }
   }
 
-  void configCallback(saliency_detector::color_histogram_descriptor_paramsConfig &config, uint32_t level)
+  void configCallback(saliency_detector::SVMColorDiscriminatorConfig &config, uint32_t level)
   {
       (void)level;
       config_ = config;
@@ -192,7 +192,7 @@ class ColorHistogramDescriptorNode
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "color_histogram_desciptor");
-  saliency_detector::ColorHistogramDescriptorNode ch;
+  ros::init(argc, argv, "svm_color_discriminator");
+  saliency_detector::SVMColorDiscriminator svm;
   ros::spin();
 }

@@ -68,7 +68,7 @@ class HueHistogram
     distance(const HueHistogramExemplar& other) const;
 
     char * str() const;
-    void draw_histogram(cv::Mat image, int x, int y) const;
+    void draw_histogram(cv::Mat image, int x, int y, double font_scale=1.0) const;
 
     friend class ColorModel;
     friend std::ostream& operator<<(std::ostream& os, const HueHistogram& hh);

@@ -135,7 +135,6 @@ class RobotSimulator(object):
         gpio_read_name = "/io/gpio_read"
         pause_state_name = "/io/pause_state"
         
-        visual_servo_name = "/processes/visual_servo/servo_action"
         pursuit_result_name = "/processes/executive/pursuit_result"
         detected_sample_search_name = "/processes/sample_detection/search/filtered_point"
         detected_sample_manipulator_name = "/processes/sample_detection/manipulator/filtered_point"
@@ -315,17 +314,7 @@ class RobotSimulator(object):
         self.time_remaining_sub = rospy.Subscriber(time_remaining_name,
                                                    std_msg.Int16,
                                                    self.handle_time_remaining)
-        
-        
-        
-
-        #visual servo stuff
-        self.visual_servo_server = actionlib.SimpleActionServer(visual_servo_name,
-                                                           visual_servo_msg.VisualServoAction,
-                                                           self.run_visual_servo_action,
-                                                           False)
-        self.visual_servo_server.start()
-        
+       
         self.points_center_pub = rospy.Publisher(point_cloud_center_name,
                                                  sensor_msg.PointCloud2,
                                                  queue_size=2)
@@ -588,7 +577,7 @@ class RobotSimulator(object):
         self.manipulator_image_publisher.publish(msg)
 
     def check_sample_detection_search(self, event):
-        if self.publish_samples:
+        if self.publish_samples and self.search_enabled:
             for sample in self.fake_samples:
                 #get headers in Time(0) for latest transforms
                 header = std_msg.Header(0, rospy.Time(0), self.reality_frame)    
@@ -815,28 +804,6 @@ class RobotSimulator(object):
         rospy.sleep(0.5)
         return req.state
  
-    def run_visual_servo_action(self, goal):
-        servo_result = visual_servo_msg.VisualServoResult()
-        servo_feedback = visual_servo_msg.VisualServoFeedback()
-    
-        update_rate = rospy.Rate(10.0)
-        fake_distance = 150
-        step = 1
-            
-        while not rospy.is_shutdown():
-            fake_distance = fake_distance - step
-            if fake_distance <= 0:
-                servo_result.success = True
-                self.visual_servo_server.set_succeeded(result=servo_result)
-                break
-            else:
-                servo_feedback.state = visual_servo_msg.VisualServoFeedback.MOVE_FORWARD
-                servo_feedback.error = fake_distance
-                self.visual_servo_server.publish_feedback(servo_feedback)
-                if self.visual_servo_server.is_preempt_requested():
-                    break
-            update_rate.sleep()
-            
     def set_sample_success(self):
         if self.active_sample_id is not None:
             self.collected_ids.append(self.active_sample_id)

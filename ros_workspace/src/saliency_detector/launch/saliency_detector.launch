@@ -16,6 +16,8 @@
     <param name="bms_img_width" type="double" value="400"/>
     <param name="bms_top_trim" type="double" value="0"/>
     <param name="filterByConvexity" type="bool" value="True"/>
+    <param name="minConvexity" type="double" value="0.8"/>
+    <param name="maxConvexity" type="double" value="1.0"/>
     <param name="filterByArea" type="bool" value="True"/>
     <param name="minArea" type="double" value="2500.0"/>
     <param name="maxArea" type="double" value="100000.0"/>
@@ -26,6 +28,8 @@
     <param name="minRepeatability" type="double" value="3.0"/>
     <param name="patch_scaling_factor" type="double" value="4.0"/>
     <param name="debug_font_scale" type="double" value="2.0"/>
+    <param name="bms_resize" type="int" value="0"/>
+    <param name="bms_channels" type="int" value="1"/>
   </node>
 
   <node
@@ -37,26 +41,19 @@
     <remap from="model" to="/cameras/navigation/$(arg namespace)/planefit/model"/>
     <param name="min_major_axis" type="double" value="0.04"/>
     <param name="max_major_axis" type="double" value="0.2"/>
+    <remap from="frustum_buffer" to="/processes/sample_detection/search/frustum_buffer"/>
   </node>
 
   <node
     pkg="saliency_detector"
-    type="color_histogram_descriptor_node"
-    name="color_histogram_descriptor"
+    type="svm_color_discriminator"
+    name="svm_color_discriminator"
     machine="search"
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="/processes/sample_detection/search/$(arg namespace)/named_point"
       to="/processes/sample_detection/search/named_point"/>
-    <param name="min_target_hue" type="double" value="120"/>
-    <param name="max_target_hue" type="double" value="30"/>
-    <param name="min_color_saturation" type="double" value="90"/>
-    <param name="high_saturation_limit" type="double" value="0.7"/>
-    <param name="low_saturation_limit" type="double" value="0.1"/>
-    <param name="min_inner_outer_distance" type="double" value="0.9"/>
-    <param name="max_exemplar_distance" type="double" value="0.7"/>
-    <param name="min_fence_distance" type="double" value="0.5"/>
-    <param name="min_fence_color_saturation" type="double" value="90"/>
-    <param name="fence_high_saturation_limit" type="double" value="0.25"/>
+    <param name="model_file" type="string" value="$(find saliency_detector)/config/test_svm.yaml"/>
+    <param name="debug_font_scale" type="double" value="2.0"/>
   </node>
 
   <node
@@ -83,12 +80,12 @@
     <param name="compute_grip_angle" type="bool" value="false"/>
     <param name="do_median_blur" type="bool" value="false"/>
     <param name="median_blur_size" type="int" value="13"/>
-    <param name="high_saturation_limit" type="double" value="0.5"/>
-    <param name="low_saturation_limit" type="double" value="0.1"/>
+    <param name="high_saturation_limit" type="double" value="0.4"/>
+    <param name="low_saturation_limit" type="double" value="0.3"/>
     <param name="mask_dilation_iterations" type="int" value="2"/>
     <param name="matching_threshold" type="double" value="70.0"/>
     <param name="max_exemplar_distance" type="double" value="0.3"/>
-    <param name="min_color_saturation" type="double" value="150"/>
+    <param name="min_color_saturation" type="double" value="100"/>
     <param name="min_inner_outer_distance" type="double" value="0.5"/>
     <param name="rectify_patch" type="bool" value="true"/>
     <param name="target_width" type="double" value="130.0"/>

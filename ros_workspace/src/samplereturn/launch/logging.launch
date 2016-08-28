@@ -12,16 +12,13 @@
 
     <!-- rosbag record -->
     <!--
-            /io/microstrain_3dm_gx3_35/imu
-            /io/microstrain_3dm_gx3_35/gps
-            /io/microstrain_3dm_gx3_35/magnetometer
-  -->
+    -->
   <node machine="navigate"
       pkg="rosbag"
       type="record"
       name="navigate_record"
       output="log"
-      args="--lz4 --size 2048 --split
+      args="--lz4 --split --size 2048
             tf
             tf_static
             diagnostics
@@ -69,15 +66,13 @@
   </node>
 
     <!--
-             /cameras/sun_cam/image_raw
-             /cameras/sun_cam/camera_info
     -->
    <node machine="search"
        pkg="rosbag"
        type="record"
        name="search_record"
        output="log"
-       args="--lz4 --size 2048 --split
+       args="--lz4 --split --size 2048
              tf
              tf_static
              /cameras/navigation/port/right/image_raw
@@ -88,18 +83,18 @@
              /cameras/navigation/port/status
              /cameras/navigation/beacon/image
              /cameras/navigation/beacon/camera_info
-             /cameras/search/port/image_color
-             /cameras/search/port/camera_info
-             /cameras/search/center/image_color
-             /cameras/search/center/camera_info
-             /cameras/search/starboard/image_color
-             /cameras/search/starboard/camera_info
              /cameras/manipulator/left/image_raw
              /cameras/manipulator/right/image_raw
              /cameras/manipulator/left/camera_info
              /cameras/manipulator/right/camera_info
              /cameras/manipulator/desync
              /cameras/manipulator/status
+             /cameras/search/port/image_color
+             /cameras/search/port/camera_info
+             /cameras/search/center/image_color
+             /cameras/search/center/camera_info
+             /cameras/search/starboard/image_color
+             /cameras/search/starboard/camera_info
              /process/beacon_finder/beacon_pose
              /process/sample_detection/named_point
              /process/sample_detection/manipulator/named_point

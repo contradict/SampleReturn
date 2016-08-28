@@ -24,6 +24,20 @@ from samplereturn_msgs.msg import (VFHMoveAction,
                                    VFHMoveResult,
                                    VFHMoveFeedback)
 
+class PublishMessageState(smach.State):
+    """General state for publishing a ros message.  Input key message
+    will be put directly into the publish() method.
+    """
+    def __init__(self, publisher):
+        smach.State.__init__(self,
+                             outcomes=['next'],
+                             input_keys =['message'])
+
+        self.publisher = publisher
+    def execute(self, userdata):
+        self.publisher.publish(userdata.message)
+        return 'next'
+
 class MonitorTopicState(smach.State):
     """A state that checks a field in a given ROS topic, and compares against specified
     values.  Each specified value tiggers an outcome of the state.
@@ -291,11 +305,11 @@ class ExecuteSimpleMove(ExecuteMoveState):
         #watch the action server
         while True:
             rospy.sleep(0.1)
+            if self.preempt_requested():
+                return self.handle_preempt()
             move_state = self._move_client.get_state()
             if move_state not in util.actionlib_working_states:
                 break            
-            if self.preempt_requested():
-                return self.handle_preempt()
             #Handle object detection
             if userdata.stop_on_detection and (userdata.detection_message is not None):
                 rospy.loginfo("ExecuteSimpleMove detected object: " + str(userdata.detection_message))
@@ -390,14 +404,15 @@ class ServoController(smach.State):
             self.try_count = 0
             return 'point_lost'
         else:
-            sample_time = userdata.detected_sample.header.stamp
-            sample_frame = userdata.detected_sample.header.frame_id
+            detected_sample = userdata.detected_sample
+            sample_time = detected_sample.header.stamp
+            sample_frame = detected_sample.header.frame_id
             while not rospy.core.is_shutdown_requested():
                 try:
                     self.tf_listener.waitForTransform('manipulator_arm',
                             sample_frame, sample_time, rospy.Duration(1.0))
                     point_in_manipulator = self.tf_listener.transformPoint('manipulator_arm',
-                                                                 userdata.detected_sample).point
+                                                                 detected_sample).point
                     break
                 except tf.Exception, exc:
                     rospy.logwarn("SERVO CONTROLLER failed to get manipulator_arm -> {!s} transform.  Exception: {!s}".format(sample_frame, exc))

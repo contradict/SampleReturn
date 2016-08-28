@@ -7,8 +7,12 @@ find_package(catkin REQUIRED
         COMPONENTS
         samplereturn_msgs
             rospy
+            cmake_modules
+            tf_conversions
+            image_geometry
         )
 
+find_package(Eigen REQUIRED)
 find_package(OpenCV)
 
 catkin_python_setup()
@@ -28,15 +32,18 @@ catkin_add_env_hooks(
 
 include_directories(
     include
+    ${Eigen_INCLUDE_DIRS}
     ${catkin_INCLUDE_DIRS}
     )
 
 add_library(samplereturn
     src/utils/colormodel.cpp
     src/utils/mask_utils.cpp
+    src/utils/camera_ray.cpp
 )
 target_link_libraries(samplereturn
     ${OpenCV_LIBRARIES}
+    ${catkin_LIBRARIES}
     )
 add_dependencies(samplereturn samplereturn_msgs_gencpp)
 

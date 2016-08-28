@@ -24,49 +24,54 @@ int main( int argc, char** argv)
   // Load an image
   std::string path = "/home/zlizer/src/SampleReturn/ros_workspace/";
   cv::Mat img = cv::imread(argv[5]);
-  //cv::Mat img = cv::imread(path+"Basler_outdoor_exp5000_tree_pre_red.png");
   cv::cvtColor(img,img,CV_BGR2RGB);
+
   // Do whatever resizing we're going to do
   int height = width * (float(img.rows)/img.cols);
   std::cout << "Height: " << height << " Width: " << width << std::endl;
-  cv::Mat small, bms_out;
-  std::chrono::time_point<std::chrono::system_clock> start, resize_end,
-    comp_sal_end, get_sal_end;
-  std::chrono::duration<double> elapsed_resize, elapsed_comp_sal, elapsed_get_sal;
+  cv::Mat small_nearest, small_area, bms_out_sab_n, bms_out_vab_n, bms_out_sab_area, bms_out_vab_area;
 
-  start = std::chrono::system_clock::now();
-  cv::resize(img, small, cv::Size(width,height), 0.0, 0.0, cv::INTER_AREA);
-  resize_end = std::chrono::system_clock::now();
+  cv::resize(img, small_nearest, cv::Size(width,height), 0.0, 0.0, cv::INTER_NEAREST);
+  cv::resize(img, small_area, cv::Size(width,height), 0.0, 0.0, cv::INTER_AREA);
 
   // Compute Saliency, with timing
-  bms.computeSaliency(small,sample_step);
-  comp_sal_end = std::chrono::system_clock::now();
-  bms_out = bms.getSaliencyMap().clone();
-  get_sal_end = std::chrono::system_clock::now();
+  bms.computeSaliency(small_nearest,sample_step,0);
+  bms_out_vab_n = bms.getSaliencyMap().clone();
 
-  elapsed_resize = resize_end-start;
-  std::cout << "elapsed time resize: " << elapsed_resize.count() << std::endl;
-  elapsed_comp_sal = comp_sal_end-resize_end;
-  std::cout << "elapsed time comp sal: " << elapsed_comp_sal.count() << std::endl;
-  elapsed_resize = get_sal_end-comp_sal_end;
-  std::cout << "elapsed time get sal: " << elapsed_get_sal.count() << std::endl;
+  bms.computeSaliency(small_nearest,sample_step,1);
+  bms_out_sab_n = bms.getSaliencyMap().clone();
 
-  cv::Mat bms_thresh;
-  cv::threshold(bms_out, bms_thresh, atoi(argv[6]), 255, cv::THRESH_BINARY);
+  bms.computeSaliency(small_area,sample_step,0);
+  bms_out_vab_area = bms.getSaliencyMap().clone();
+
+  bms.computeSaliency(small_area,sample_step,1);
+  bms_out_sab_area = bms.getSaliencyMap().clone();
 
   cv::cvtColor(img,img,CV_RGB2BGR);
 
-  cv::imwrite("small_image.png", small);
-  cv::imwrite("small_bms.png", bms_out);
-
-  cv::namedWindow("BMS",WINDOW_NORMAL);
-  cv::namedWindow("BMS Thresh",WINDOW_NORMAL);
-  //cv::moveWindow("BMS",1940,0);
-  cv::imshow("BMS",bms_out);
-  cv::imshow("BMS Thresh",bms_thresh);
+  cv::namedWindow("BMS Area Vab",WINDOW_NORMAL);
+  cv::namedWindow("BMS Area Sab",WINDOW_NORMAL);
+  cv::namedWindow("BMS Nearest Vab",WINDOW_NORMAL);
+  cv::namedWindow("BMS Nearest Sab",WINDOW_NORMAL);
   cv::namedWindow("Image",WINDOW_NORMAL);
-  //cv::moveWindow("Image",2900,0);
+  cv::namedWindow("Small Area",WINDOW_NORMAL);
+  cv::namedWindow("Small Nearest",WINDOW_NORMAL);
+  cv::imshow("BMS Area Vab",bms_out_vab_area);
+  cv::imshow("BMS Area Sab",bms_out_sab_area);
+  cv::imshow("BMS Nearest Vab",bms_out_vab_n);
+  cv::imshow("BMS Nearest Sab",bms_out_sab_n);
   cv::imshow("Image",img);
+  cv::imshow("Small Area",small_area);
+  cv::imshow("Small Nearest",small_nearest);
+  cv::resizeWindow("BMS Area Vab", 1000, 500);
+  cv::resizeWindow("BMS Area Sab", 1000, 500);
+  cv::resizeWindow("BMS Nearest Vab", 1000, 500);
+  cv::resizeWindow("BMS Nearest Sab", 1000, 500);
+  cv::resizeWindow("Image", 1000, 1000);
+  cv::moveWindow("BMS Area Vab", 2000, 0);
+  cv::moveWindow("BMS Area Sab", 3000, 0);
+  cv::moveWindow("BMS Nearest Vab", 2000, 500);
+  cv::moveWindow("BMS Nearest Sab", 3000, 500);
   for(;;) {
     int keycode = waitKey(0);
     if( keycode == 27 )

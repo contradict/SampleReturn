@@ -28,8 +28,7 @@ ColorModel::createHueHistogram(const cv::Mat& mask, double min_color_saturation,
     cv::extractChannel(image_hsv, value, 2);
     cv::threshold(saturation, saturation_mask, min_color_saturation, 255, cv::THRESH_BINARY);
     cv::bitwise_and(mask, saturation_mask, combined_mask);
-    double salient_pixels = cv::countNonZero(mask);
-    hh.saturation_score_ = double(cv::countNonZero(combined_mask))/salient_pixels;
+    hh.saturation_score_ = cv::mean(saturation, mask)[0]/255.0;
     hh.value_mean_ = cv::mean(value, mask)[0];
     int histSize[] = { hbins };
     float hrange[] = { 0, 180 };
@@ -187,10 +186,10 @@ HueHistogram::str() const
 }
 
 void
-HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
+HueHistogram::draw_histogram(cv::Mat image, int x, int y, double font_scale) const
 {
     const int height_scale = 100;
-    int y_spark = y + height_scale/2 + 2;
+    int y_spark = y;
     std::vector<cv::Point> points;
     for(int j=0;j<histogram_.rows; j++)
     {
@@ -199,6 +198,10 @@ HueHistogram::draw_histogram(cv::Mat image, int x, int y) const
     const cv::Point *pts = (const cv::Point*) cv::Mat(points).data;
     int npts = cv::Mat(points).rows;
     cv::polylines(image, &pts, &npts, 1, false, cv::Scalar(255,0,0), 3, CV_AA, 0);
+    char *description=str();
+    cv::putText(image, description, cv::Point2d(x + histogram_.rows + 5, y),
+             cv::FONT_HERSHEY_SIMPLEX,font_scale,cv::Scalar(255,0,0),4,cv::LINE_8);
+    free(description);
 }
 
 std::ostream&

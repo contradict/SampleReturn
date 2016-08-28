@@ -15,18 +15,22 @@
         <param name="bms_dilation_width_1" type="int" value="0"/>
         <param name="bms_thresh_fraction" type="double" value="0.25"/>
         <param name="bms_thresh_on" type="bool" value="true"/>
-        <param name="bms_img_width" type="double" value="400"/>
+        <param name="bms_img_width" type="double" value="200"/>
         <param name="bms_top_trim" type="double" value="0"/>
         <param name="filterByConvexity" type="bool" value="True"/>
+        <param name="minConvexity" type="double" value="0.85"/>
+        <param name="maxConvexity" type="double" value="1.0"/>
         <param name="filterByArea" type="bool" value="True"/>
-        <param name="minArea" type="double" value="2500.0"/>
-        <param name="maxArea" type="double" value="100000.0"/>
+        <param name="minArea" type="double" value="2000.0"/>
+        <param name="maxArea" type="double" value="20000.0"/>
         <param name="minDistBetweenBlobs" type="double" value="100.0"/>
         <param name="minThreshold" type="double" value="20.0"/>
         <param name="maxThreshold" type="double" value="150.0"/>
         <param name="thresholdStep" type="double" value="10.0"/>
         <param name="minRepeatability" type="double" value="3.0"/>
-        <param name="patch_scaling_factor" type="double" value="3.0"/>
+        <param name="patch_scaling_factor" type="double" value="2.0"/>
+        <param name="bms_resize" type="int" value="1"/>
+        <param name="bms_channels" type="int" value="1"/>
     </node>
 
     <node
@@ -41,27 +45,21 @@
         <param name="pointcloud_scale" type="double" value="1.1"/>
         <param name="hist_min_scale" type="double" value="0.9"/>
         <param name="maximum_patch_height" type="double" value="10.0"/>
+        <param name="min_major_axis" type="double" value="0.05"/>
+        <param name="max_major_axis" type="double" value="0.20"/>
     </node>
 
     <node
-        pkg="saliency_detector"
-        type="color_histogram_descriptor_node"
-        name="color_histogram_descriptor"
-        machine="search"
-        ns="/processes/sample_detection/manipulator">
-        <remap from="projected_patch_array" to="positioned_patches"/>
-        <param name="output_frame_id" type="string" value="odom"/>
-        <param name="min_target_hue" type="double" value="120"/>
-        <param name="max_target_hue" type="double" value="30"/>
-        <param name="max_fence_hue" type="double" value="18"/>
-        <param name="min_fence_distance" type="double" value="0.9"/>
-        <param name="min_color_saturation" type="double" value="90"/>
-        <param name="high_saturation_limit" type="double" value="0.65"/>
-        <param name="low_saturation_limit" type="double" value="0.5"/>
-        <param name="min_inner_outer_distance" type="double" value="0.7"/>
-        <param name="max_exemplar_distance" type="double" value="0.21"/>
-        <param name="compute_grip_angle" type="bool" value="true"/>
-        <param name="debug_font_scale" type="double" value="0.75"/>
+      pkg="saliency_detector"
+      type="svm_color_discriminator"
+      name="svm_color_discriminator"
+      machine="search"
+      ns="/processes/sample_detection/manipulator">
+      <remap from="projected_patch_array" to="positioned_patches"/>
+      <param name="model_file" type="string"
+        value="$(find saliency_detector)/config/manipulator_test_svm.yaml"/>
+      <param name="debug_font_scale" type="double" value="0.5"/>
+      <param name="compute_grip_angle" type="bool" value="true"/>
     </node>
 
     <node
@@ -80,8 +78,8 @@
         <param name="compute_grip_angle" type="bool" value="true"/>
         <param name="do_median_blur" type="bool" value="false"/>
         <param name="median_blur_size" type="int" value="13"/>
-        <param name="high_saturation_limit" type="double" value="0.5"/>
-        <param name="low_saturation_limit" type="double" value="0.1"/>
+        <param name="high_saturation_limit" type="double" value="0.4"/>
+        <param name="low_saturation_limit" type="double" value="0.3"/>
         <param name="mask_dilation_iterations" type="int" value="2"/>
         <param name="matching_threshold" type="double" value="70.0"/>
         <param name="max_exemplar_distance" type="double" value="0.3"/>

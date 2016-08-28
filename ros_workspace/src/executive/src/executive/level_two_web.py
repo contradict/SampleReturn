@@ -86,12 +86,13 @@ class LevelTwoWeb(object):
         self.beacon_enable = rospy.Publisher('enable_beacon',
                                               std_msg.Bool,
                                               queue_size=10)       
-        self.camera_enablers = []
-        self.camera_enablers.append(rospy.Publisher('enable_search',
-                                                   std_msg.Bool,
-                                                   queue_size=10))
-        self.camera_enablers.append(self.beacon_enable)
+        
+        self.search_enable = rospy.Publisher('enable_search',
+                                              std_msg.Bool,
+                                              queue_size=10)
 
+        self.camera_enablers = [self.beacon_enable, self.search_enable]
+        
         #movement action servers
         self.vfh_mover = actionlib.SimpleActionClient("vfh_move",
                                                        VFHMoveAction)
@@ -122,10 +123,8 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.pause_start_time = None
         self.state_machine.userdata.pre_cached_id = samplereturn_msg.NamedPoint.PRE_CACHED
 
-        #dismount move
-        dismount_move =  node_params.dismount_move
-        dismount_move['angle'] = np.radians(dismount_move['angle'])
-        self.state_machine.userdata.dismount_move = dismount_move
+        #initial behavior
+        self.state_machine.userdata.initial_behavior = node_params.initial_behavior
         
         #beacon and localization
         self.state_machine.userdata.beacon_approach_pose = self.beacon_approach_pose
@@ -149,7 +148,6 @@ class LevelTwoWeb(object):
         self.state_machine.userdata.raster_step = node_params.raster_step
         self.state_machine.userdata.raster_tolerance = node_params.raster_tolerance
         self.state_machine.userdata.blocked_retry_delay = rospy.Duration(node_params.blocked_retry_delay)
-
 
         #web management flags
         self.state_machine.userdata.outbound = True
@@ -178,7 +176,8 @@ class LevelTwoWeb(object):
         #list of manager outcomes, and their corresponding labels
         manager_dict = {'WEB_MANAGER':'web_manager',
                         'RETURN_MANAGER':'return_manager',
-                        'RECOVERY_MANAGER':'recovery_manager'}
+                        'RECOVERY_MANAGER':'recovery_manager',
+                        'LEVEL_TWO_PREEMPTED':'preempted'}
         self.state_machine.userdata.manager_dict = manager_dict
         #get inverted version for the transition dict of the mux
         manager_transitions = dict([[v,k] for k,v in manager_dict.items()])
@@ -192,18 +191,18 @@ class LevelTwoWeb(object):
         with self.state_machine:
 
             smach.StateMachine.add('START_LEVEL_TWO',
-                                   StartLeveLTwo(self.camera_enablers),
-                                   transitions = {'next':'ANNOUNCE_LEVEL_TWO'})
+                                   StartLeveLTwo(),
+                                   transitions = {'next':'SELECT_PLANNER'})
 
             smach.StateMachine.add('ANNOUNCE_LEVEL_TWO',
                                    AnnounceState(self.announcer,
-                                                 'Enter ing level two mode. Enable ing search cameras.'),
+                                                 'Enter ing level two mode.'),
                                    transitions = {'next':'SELECT_PLANNER'})
 
             smach.StateMachine.add('SELECT_PLANNER',
                                     SelectMotionMode(self.CAN_interface,
                                                      MODE_PLANNER),
-                                    transitions = {'next':'DISMOUNT_MOVE',
+                                    transitions = {'next':'RECOVERY_MANAGER',
                                                    'paused':'WAIT_FOR_UNPAUSE',
                                                   'failed':'LEVEL_TWO_ABORTED'})
 
@@ -217,50 +216,11 @@ class LevelTwoWeb(object):
                                                   'timeout':'WAIT_FOR_UNPAUSE',
                                                   'preempted':'LEVEL_TWO_PREEMPTED'})
 
-            smach.StateMachine.add('DISMOUNT_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'ANNOUNCE_DISMOUNT',
-                                                  'object_detected':'ANNOUNCE_DISMOUNT',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_detection':'false'})
-
-            smach.StateMachine.add('ANNOUNCE_DISMOUNT',
-                                   AnnounceState(self.announcer,
-                                                 'Platform dismounted.'),
-                                   transitions = {'next':'LOOK_AT_BEACON'})
-
-
-            smach.StateMachine.add('LOOK_AT_BEACON',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'CALIBRATE_TO_BEACON',
-                                                  'object_detected':'CALIBRATE_TO_BEACON',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'simple_move':'beacon_turn',
-                                                'stop_on_detection':'false'})
-
-            smach.StateMachine.add('CALIBRATE_TO_BEACON',
-                                   WaitForFlagState('false',
-                                                    flag_trigger_value = 'true',
-                                                    timeout = self.beacon_calibration_delay,
-                                                    announcer = self.announcer,
-                                                    start_message ='Calibrate ing to beacon.'),
-                                   transitions = {'next':'FINISH_CALIBRATION',
-                                                  'timeout':'FINISH_CALIBRATION',
-                                                  'preempted':'LEVEL_TWO_PREEMPTED'})
-
-            smach.StateMachine.add('FINISH_CALIBRATION',
-                                   FinishCalibration(input_keys = ['map_calibration_requested'],
-                                                     output_keys = ['map_calibration_requested'],
-                                                     outcomes = ['first', 'recalibration']),
-                                   transitions = {'first':'WEB_MANAGER',
-                                                  'recalibration':'CREATE_MOVE_GOAL',})
- 
             smach.StateMachine.add('WEB_MANAGER',
                                    WebManager('WEB_MANAGER',
                                               self.tf_listener,
                                               self.beacon_enable,
+                                              self.search_enable,
                                               self.announcer),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'get_raster':'CREATE_RASTER_POINTS',
@@ -295,14 +255,6 @@ class LevelTwoWeb(object):
                                                   'retry':'CREATE_MOVE_GOAL',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
                                                   'aborted':'LEVEL_TWO_ABORTED'})
-
-            smach.StateMachine.add('ANNOUNCE_BLOCKED',
-                                   AnnounceState(self.announcer, 'Path Blocked.'),
-                                                 transitions = {'next':'MOVE_MUX'})
-
-            smach.StateMachine.add('ANNOUNCE_ROTATE_TO_CLEAR',
-                                   AnnounceState(self.announcer, 'Started Blocked.'),
-                                   transitions = {'next':'MOVE_MUX'})
 
             smach.StateMachine.add('ANNOUNCE_OFF_COURSE',
                                    AnnounceState(self.announcer, 'Off Course.'),
@@ -392,12 +344,13 @@ class LevelTwoWeb(object):
                                    RecoveryManager('RECOVERY_MANAGER',
                                                    self.announcer,
                                                    self.beacon_enable,
+                                                   self.search_enable,
                                                    self.tf_listener),
                                    transitions = {'move':'CREATE_MOVE_GOAL',
                                                   'simple_move':'RECOVERY_SIMPLE_MOVE',
                                                   'sample_detected':'PURSUE_SAMPLE',
                                                   'return_manager':'RETURN_MANAGER',
-                                                  'web_manager':'CREATE_MOVE_GOAL',
+                                                  'web_manager':'WEB_MANAGER',
                                                   'wait_for_preempt':'WAIT_FOR_PREEMPT'})
 
             smach.StateMachine.add('RECOVERY_SIMPLE_MOVE',
@@ -405,13 +358,38 @@ class LevelTwoWeb(object):
                                    transitions = {'complete':'RECOVERY_MANAGER',
                                                   'object_detected':'RECOVERY_MANAGER',
                                                   'preempted':'LEVEL_TWO_PREEMPTED',
-                                                  'aborted':'LEVEL_TWO_ABORTED'},
-                                   remapping = {'stop_on_detection':'false'})
+                                                  'aborted':'LEVEL_TWO_ABORTED'})
 
             smach.StateMachine.add('CALCULATE_BEACON_ROTATION',
                                    CalculateBeaconRotation(self.tf_listener),
                                    transitions = {'next':'LOOK_AT_BEACON',
                                                   'aborted':'CREATE_MOVE_GOAL'})
+
+            smach.StateMachine.add('LOOK_AT_BEACON',
+                                   ExecuteSimpleMove(self.simple_mover),
+                                   transitions = {'complete':'CALIBRATE_TO_BEACON',
+                                                  'object_detected':'CALIBRATE_TO_BEACON',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED',
+                                                  'aborted':'LEVEL_TWO_ABORTED'},
+                                   remapping = {'simple_move':'beacon_turn',
+                                                'stop_on_detection':'false'})
+
+            smach.StateMachine.add('CALIBRATE_TO_BEACON',
+                                   WaitForFlagState('false',
+                                                    flag_trigger_value = 'true',
+                                                    timeout = self.beacon_calibration_delay,
+                                                    announcer = self.announcer,
+                                                    start_message ='Calibrate ing to beacon.'),
+                                   transitions = {'next':'FINISH_CALIBRATION',
+                                                  'timeout':'FINISH_CALIBRATION',
+                                                  'preempted':'LEVEL_TWO_PREEMPTED'})
+
+            smach.StateMachine.add('FINISH_CALIBRATION',
+                                   FinishCalibration(input_keys = ['map_calibration_requested'],
+                                                     output_keys = ['map_calibration_requested'],
+                                                     outcomes = ['first', 'recalibration']),
+                                   transitions = {'first':'WEB_MANAGER',
+                                                  'recalibration':'CREATE_MOVE_GOAL',})
 
             smach.StateMachine.add('LEVEL_TWO_PREEMPTED',
                                   LevelTwoPreempted(self.camera_enablers),
@@ -474,6 +452,7 @@ class LevelTwoWeb(object):
             rospy.loginfo("START_RECOVERY failed to parse params: {!s}".format(exc))
             return False
 
+        self.announcer.say("Enter ing recovery state.")
         self.state_machine.userdata.recovery_requested = True
         self.state_machine.userdata.recovery_parameters = params
         self.state_machine.request_preempt()
@@ -581,6 +560,7 @@ class LevelTwoWeb(object):
                     self.state_machine.userdata.move_goal = goal
 
     def shutdown_cb(self):
+        rospy.delete_param('~initial_behavior')
         self.state_machine.request_preempt()
         while self.state_machine.is_running():
             rospy.sleep(0.1)
@@ -590,39 +570,31 @@ class LevelTwoWeb(object):
 #searches the globe
 class StartLeveLTwo(smach.State):
 
-    def __init__(self, camera_enablers):
+    def __init__(self):
 
         smach.State.__init__(self,
                             input_keys=['paused',
-                                        'dismount_move',
+                                        'initial_behavior',
                                         'spin_velocity'],
                             output_keys=['action_result',
-                                        'simple_move',
-                                        'beacon_turn',
+                                        'recovery_parameters',
+                                        'recovery_requested',
+                                        'move_target',
                                         'start_time',
                                         'pause_start_time',
                                         'pause_time_offset'],
                             outcomes=['next']),
-
-        self.camera_enablers = camera_enablers
-
+        
     def execute(self, userdata):
 
         result = samplereturn_msg.GeneralExecutiveResult()
         result.result_string = 'initialized'
         userdata.action_result = result
+        userdata.move_target = None
 
-        #create the dismount_move
-        userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                              **userdata.dismount_move)
-
-        userdata.beacon_turn = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
-                                             angle = np.pi,
-                                             velocity = userdata.spin_velocity)
-
-        #enable all search/beacon cameras
-        for publisher in self.camera_enablers:
-            publisher.publish(True)
+        #load the initial behavior
+        userdata.recovery_parameters = deepcopy(userdata.initial_behavior)
+        userdata.recovery_requested = True
 
         userdata.pause_time_offset = rospy.Duration(0)
         userdata.start_time = rospy.Time.now()
@@ -634,7 +606,7 @@ class StartLeveLTwo(smach.State):
         return 'next'
 
 class WebManager(smach.State):
-    def __init__(self, label, tf_listener, beacon_enable, announcer):
+    def __init__(self, label, tf_listener, beacon_enable, search_enable, announcer):
         smach.State.__init__(self,
                              input_keys = ['outbound',
                                            'web_slices',
@@ -652,6 +624,7 @@ class WebManager(smach.State):
                                            'start_time',
                                            'return_time_offset',
                                            'pause_time_offset',
+                                           'move_target',
                                            'world_fixed_frame'],
                              output_keys = ['outbound',
                                             'web_slice_indices',
@@ -672,6 +645,7 @@ class WebManager(smach.State):
 
         self.tf_listener = tf_listener
         self.beacon_enable = beacon_enable
+        self.search_enable = search_enable
         self.announcer = announcer
         self.label = label
         self.last_web_move = None
@@ -692,7 +666,11 @@ class WebManager(smach.State):
             userdata.stop_on_detection = False
             userdata.move_velocity = userdata.default_velocity
             return 'return_home'
-        
+
+        #this means the last move was preempted, we should finish it        
+        if userdata.move_target is not None:
+           return 'move'
+
         if len(userdata.web_slice_indices) == 0:
             rospy.loginfo("WEB_MANAGER finished last spoke")
             userdata.move_velocity = userdata.default_velocity
@@ -701,6 +679,8 @@ class WebManager(smach.State):
             active_slice = userdata.web_slices[userdata.web_slice_indices[0]] 
 
         if isinstance(userdata.detection_message, samplereturn_msg.NamedPoint):
+            #this is where we will go after pursuit
+            userdata.move_target = self.last_web_move['point']       
             return 'sample_detected'
 
         if userdata.outbound:
@@ -714,7 +694,7 @@ class WebManager(smach.State):
             rospy.loginfo("WEB_MANAGER starting spoke: %.2f:" %(active_slice['start_angle']))
             rospy.loginfo("WEB_MANAGER remaining indices: {!s}".format(userdata.web_slice_indices))
             remaining_minutes = int((return_time - rospy.Time.now()).to_sec()/60)
-            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left.  Beacon camera disabled.".format(
+            self.announcer.say("Start ing on spoke, yaw {!s}.  {:d} minutes left.  Beacon camera off.".format(
                                 int(active_slice['start_angle']),
                                 remaining_minutes))
             return self.load_move(next_move, userdata)
@@ -741,8 +721,9 @@ class WebManager(smach.State):
 
                 #is this the last point?
                 if len(userdata.raster_points) == 0:
-                    self.announcer.say("Return ing from raster on spoke, yaw {!s}. Beacon camera enabled.".format(
-                                        int(active_slice['start_angle'])))
+                    self.announcer.say("Return ing from raster on spoke, yaw {!s}. Beacon camera active. \
+                                        Search cameras off.".format(int(active_slice['start_angle'])))
+                    self.search_enable.publish(False)
                     self.beacon_enable.publish(True)
                     userdata.raster_active = False
                     userdata.web_slice_indices.popleft() #remove the current index
@@ -759,7 +740,8 @@ class WebManager(smach.State):
                 return self.load_move(next_move, userdata)
             else:
                 #time to start rastering, create the points, and set flag
-                self.announcer.say("Begin ing raster on spoke, yaw {!s}".format(
+                self.search_enable.publish(True)                
+                self.announcer.say("Begin ing raster on spoke, yaw {!s}.  Search cameras active.".format(
                                     int(active_slice['start_angle'])))
                 userdata.raster_active = True
                 return 'get_raster'
@@ -989,7 +971,7 @@ class RetryCheck(smach.State):
 
 
 class RecoveryManager(smach.State):
-    def __init__(self, label, announcer, enable_beacon, tf_listener):
+    def __init__(self, label, announcer, beacon_enable, search_enable, tf_listener):
         smach.State.__init__(self,
                              input_keys = ['recovery_parameters',
                                            'recovery_requested',
@@ -1026,7 +1008,8 @@ class RecoveryManager(smach.State):
                                        'aborted'])
 
         self.label = label
-        self.enable_beacon = enable_beacon
+        self.beacon_enable = beacon_enable
+        self.search_enable = search_enable
         self.announcer = announcer
         self.tf_listener = tf_listener
         self.exit_move = None
@@ -1035,29 +1018,54 @@ class RecoveryManager(smach.State):
 
         if userdata.recovery_requested == True:
             #first time through
-            rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(userdata.recovery_parameters))
-            self.announcer.say("Enter ing recovery state.")
+            params_dict = userdata.recovery_parameters #make this name shorter for the love of god
+            rospy.loginfo("RECOVERY_MANAGER starting with params: {!s}".format(params_dict))
+            
             #save these in case we are returning to the web manager
             self.exit_move = userdata.move_target
             userdata.detection_message = False
             userdata.recovery_requested = False
             userdata.report_beacon = False
             userdata.stop_on_detection = True
-            userdata.report_sample = userdata.recovery_parameters['pursue_samples']
+            
+            if ('announcement') in params_dict:
+                self.announcer.say(params_dict['announcement'])
 
-            if userdata.recovery_parameters['beacon_enabled_on_entry']:
-                self.enable_beacon.publish(True)
+            if ('pursue_samples' in params_dict) and params_dict['pursue_samples']:
+                userdata.report_sample = True
             else:
-                self.enable_beacon.publish(False)
+                userdata.report_sample = False
+
+            if 'beacon_enabled_on_entry' in params_dict:
+                if params_dict['beacon_enabled_on_entry']:
+                    self.announcer.say('Beacon camera active.')
+                    self.beacon_enable.publish(True)
+                else:
+                    self.announcer.say('Beacon camera off.')
+                    self.beacon_enable.publish(False)
+
+            if 'search_enabled_on_entry' in params_dict:
+                if params_dict['search_enabled_on_entry']:
+                    self.announcer.say('Search cameras active.')
+                    self.search_enable.publish(True)
+                else:
+                    self.announcer.say('Search cameras off.')
+                    self.search_enable.publish(False)
 
             #modify return time
-            if 'time_offset' in userdata.recovery_parameters:
-                time_offset = rospy.Duration(userdata.recovery_parameters['time_offset']*60)
+            if 'time_offset' in params_dict:
+                time_offset = rospy.Duration(params_dict['time_offset']*60)
                 userdata.return_time_offset += time_offset
             
             #prune requested web_slices
-            web_slices_to_remove = userdata.recovery_parameters['slices_to_remove']
-            slices_to_add = userdata.recovery_parameters['slices_to_add']
+            if 'slices_to_remove' in params_dict:
+                web_slices_to_remove = params_dict['slices_to_remove']
+            else:
+                web_slices_to_remove = 0
+            if 'slices_to_add' in params_dict:
+                slices_to_add = userdata.recovery_parameters['slices_to_add']
+            else:
+                slices_to_add = []
             if len(userdata.web_slice_indices) > 0:
                 if web_slices_to_remove > 0:
                     userdata.raster_active = False
@@ -1089,15 +1097,22 @@ class RecoveryManager(smach.State):
             userdata.move_target = self.exit_move
             return 'sample_detected'
 
-        if len(userdata.recovery_parameters['simple_moves']) > 0:
+        if 'simple_moves' in userdata.recovery_parameters and \
+         len(userdata.recovery_parameters['simple_moves']) > 0:
             simple_move = userdata.recovery_parameters['simple_moves'].pop(0)
-            userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
-                                                  angle = np.radians(simple_move['angle']),
-                                                  distance = simple_move['distance'],
-                                                  velocity = simple_move['velocity'])
+            if 'distance' in simple_move:
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
+                                                      angle = np.radians(simple_move['angle']),
+                                                      distance = simple_move['distance'],
+                                                      velocity = simple_move['velocity'])
+            else:
+                userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.SPIN,
+                                                      angle = np.radians(simple_move['angle']),
+                                                      velocity = simple_move['velocity'])
             return 'simple_move'
 
-        if len(userdata.recovery_parameters['moves']) > 0:
+        if 'moves' in userdata.recovery_parameters and \
+         len(userdata.recovery_parameters['moves']) > 0:
             move = userdata.recovery_parameters['moves'].pop(0)
             base_header = std_msg.Header(0, rospy.Time(0), userdata.local_frame)
             base_pose_stamped = geometry_msg.PoseStamped(header = base_header)
@@ -1108,10 +1123,22 @@ class RecoveryManager(smach.State):
                                                              target_pose.pose.position)
             return 'move'
         else:
-            if userdata.recovery_parameters['beacon_enabled_on_exit']:
-                self.enable_beacon.publish(True)
-            else:
-                self.enable_beacon.publish(False)
+            if 'beacon_enabled_on_exit' in userdata.recovery_parameters:
+                if userdata.recovery_parameters['beacon_enabled_on_exit']:
+                    self.announcer.say('Beacon camera active.')
+                    self.beacon_enable.publish(True)
+                else:
+                    self.announcer.say('Beacon camera off.')
+                    self.beacon_enable.publish(False)
+
+            if 'search_enabled_on_exit' in userdata.recovery_parameters:
+                if userdata.recovery_parameters['search_enabled_on_exit']:
+                    self.announcer.say('Search cameras active.')
+                    self.search_enable.publish(True)
+                else:
+                    self.announcer.say('Search cameras off.')
+                    self.search_enable.publish(False)
+            
             userdata.stop_on_detection = False
             #setting the active manager is for the return to web_manager
             #it's the only way I could think of to return to the previous goal
@@ -1167,14 +1194,19 @@ class MoveMUX(smach.State):
         smach.State.__init__(self,
                              input_keys = ['active_manager'],
                              output_keys = ['retry_active',
+                                            'move_target',
                                             'move_point_map'],
                              outcomes = manager_list)
 
     def execute(self, userdata):
-        #clear and reset flags after all moves!
+        #do not clear move target on preempt
         userdata.retry_active = False
         userdata.move_point_map = None
-        return userdata.active_manager
+        if not self.preempt_requested():                
+            userdata.move_target = None        
+            return userdata.active_manager
+        else:
+            return 'preempted'
 
 class LevelTwoPreempted(smach.State):
     def __init__(self, camera_enablers):
