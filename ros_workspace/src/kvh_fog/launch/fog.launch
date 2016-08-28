@@ -7,6 +7,7 @@
         ns="/io/kvh"
         machine="navigate"
         >
+        <remap from="announce" to="/io/audio/search"/>
         <param name="frame_id" type="string" value="gyro"/>
         <param name="port" type="string" value="/dev/ttyUSB0"/>
         <!-- discard measurements after re-open -->

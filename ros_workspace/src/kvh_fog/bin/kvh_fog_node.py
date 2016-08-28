@@ -5,6 +5,8 @@ import numpy as np
 from kvh_fog import driver
 from kvh_fog.srv import MeasureBiasResponse, MeasureBias
 from sensor_msgs.msg import Imu
+from samplereturn.util import AnnouncerInterface
+from math import degrees
 
 class KVHFOGNode(object):
     def __init__(self):
@@ -30,6 +32,9 @@ class KVHFOGNode(object):
         self._gyro = None
         self._seq = 0
 
+        self._anouncer = AnnouncerInterface("announce")
+
+        self._restarted = False
         self._zero_integrator = True
         self._last_angle = None
         self._last_time = None
@@ -56,6 +61,7 @@ class KVHFOGNode(object):
                 rospy.sleep(rospy.Duration(self._reopen_delay))
                 continue
             self._read_gyro()
+            self._restarted = True
 
     def _read_gyro(self):
         to_discard = self._discard_count
@@ -85,11 +91,15 @@ class KVHFOGNode(object):
                     continue
             else:
                 invalid_count = 0
+
+            if self._restarted:
+                self._restarted = False
+                self._anouncer.say("Gyro restarted %d"%degrees(angle - self._last_angle))
+
             if to_discard > 0:
                 to_discard -= 1
                 self._bias_measurement_time = now
                 continue
-
             self._check_averaging(now, angle)
 
             self._send_one(now, angle)
