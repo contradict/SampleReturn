@@ -12,11 +12,12 @@ level_two:
 
     #initial move params (same as recovery)
     initial_behavior:
-        announcement: 'Executing odometry calibration, 6 meters.'
+        announcement: 'Executing oh dom calibration, 25 meters.'
         simple_moves: [
-            { angle: 0, distance: 6.0, velocity: 0.5 },
+            { angle: 0, distance: 25.0, velocity: 0.6 },
+            { angle: 180, distance: 25.0, velocity: 0.6 }
         ]
-        search_enabled_on_entry: true
+        search_enabled_on_entry: false
         beacon_enabled_on_entry: false
         time_offset: 0
         terminal_outcome: wait_for_preempt
