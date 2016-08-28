@@ -39,7 +39,7 @@
         <!--launch-prefix="xterm -e gdb -ex run - -args"-->
         <param name="port_steering_offset" type="double" value="0.104"/>
         <param name="starboard_steering_offset" type="double" value="0.027"/>
-        <param name="stern_steering_offset" type="double" value="0.072"/>
+        <param name="stern_steering_offset" type="double" value="0.068"/>
 
         <param name="carousel_id" type="int" value="1"/>
         <param name="starboard_steering_id" type="int" value="2"/>
