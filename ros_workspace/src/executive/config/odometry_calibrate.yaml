@@ -14,8 +14,7 @@ level_two:
     initial_behavior:
         announcement: 'Executing oh dom calibration, 25 meters.'
         simple_moves: [
-            { angle: 0, distance: 25.0, velocity: 0.6 },
-            { angle: 180, distance: 25.0, velocity: 0.6 }
+            { angle: 0, distance: 25.0, velocity: 0.6 }
         ]
         search_enabled_on_entry: false
         beacon_enabled_on_entry: false
