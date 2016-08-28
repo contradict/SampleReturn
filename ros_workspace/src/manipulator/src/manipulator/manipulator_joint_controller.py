@@ -46,7 +46,7 @@ class ManipulatorJointController(JointControllerMX):
         #minimum moving velocity for an "is moving" condition check
         #XXX TODO: GET THIS FROM ROS PARAMETERS
         self.min_moving_velocity = None
-        self.move_timeout = 3.0
+        self.move_timeout = 2.0
         
         self.max_stopped_velocity = .01
         self.position_tol = .05
@@ -73,6 +73,7 @@ class ManipulatorJointController(JointControllerMX):
     
     @check_pause            
     def velocity_standoff(self, req):
+        rospy.logdebug("DYNAMIXEL velocity standoff requested: {!s}".format(req))        
         velocity = req.velocity
         torque_limit = req.torque_limit
         start_torque_limit = req.start_torque_limit
@@ -83,15 +84,16 @@ class ManipulatorJointController(JointControllerMX):
         self.set_torque_limit(starting_torque_limit)
         self.set_angle_limits(0, 0) #enable wheel mode!
         self.set_speed(velocity)
-        self.timeout_start_time = rospy.Time.now()
         #check to make sure the joint starts moving        
-        if (req.check_velocity):        
+        if (req.check_velocity):
             self.min_moving_velocity = abs(velocity/2.0)        
+            rospy.logdebug("DYNAMIXEL velocity standoff checking for velocity: {:f}".format(self.min_moving_velocity))
             self.check_for_move = True        
             self.start_timeout_check(self.move_timeout)
             yield self.block()
         self.set_torque_limit(torque_limit)        
         #wait for stop        
+        rospy.logdebug("DYNAMIXEL velocity standoff waiting for stop")        
         self.check_for_stop = True
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff

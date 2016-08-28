@@ -118,7 +118,7 @@ class ManipulatorStateMachine(object):
       )
 
       @smach.cb_interface(input_keys = ['arm_down_maximum',
-                                             'arm_joint_position'],
+                                        'arm_joint_position'],
                           output_keys = ['target_bin'],
                           outcomes = ['too_high'])
       def arm_down_response_cb(userdata, response):
@@ -161,6 +161,10 @@ class ManipulatorStateMachine(object):
                          'aborted':'ERROR'}
       )
 
+      @smach.cb_interface(outcomes = ['timeout'])
+      def arm_up_response_cb(userdata, response):
+        return response.result
+
       smach.StateMachine.add('ARM_UP',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(velocity = self.arm_up_velocity,
@@ -168,7 +172,7 @@ class ManipulatorStateMachine(object):
                                             torque_limit = self.arm_home_torque,
                                             distance = self.arm_up_standoff,
                                             check_velocity = True),
-          response_cb = manipulator_response_cb),          
+          response_cb = arm_up_response_cb),          
           transitions = {'succeeded':'GET_BIN',
                          'timeout':'RELEASE_GRIP',
                          'preempted':'PAUSED',
