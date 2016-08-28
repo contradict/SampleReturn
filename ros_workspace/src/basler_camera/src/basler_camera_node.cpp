@@ -3,6 +3,8 @@
 #include <sensor_msgs/fill_image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <basler_camera/basler_node.h>
+#include <pylon/usb/PylonUsbIncludes.h>
+#include <pylon/PayloadType.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -169,6 +171,11 @@ BaslerNode::configure_callback(basler_camera::CameraConfig &config, uint32_t lev
             ROS_FATAL_STREAM("Unknown param type for config parameter " << (*_i)->name << ": " << (*_i)->type);
         }
     }
+    if(config.use_hardware_timestamp && !config_.use_hardware_timestamp)
+    {
+        set_timestamp_offset();
+    }
+    config_ = config;
 }
 
 bool
@@ -235,7 +242,20 @@ BaslerNode::do_enable_grab(bool state)
 }
 
 void
-BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::CGrabResultPtr& ptrGrabResult)
+BaslerNode::set_timestamp_offset(void)
+{
+    ros::Time before = ros::Time::now();
+    camera.TimestampLatch.Execute();
+    initial_counter_ = camera.TimestampLatchValue.GetValue();
+    ros::Time after = ros::Time::now();
+
+    ROS_INFO_STREAM("latch duration: " << (after-before));
+    ROS_INFO_STREAM("initial counter: " << initial_counter_);
+    initial_stamp_ = (after.toSec() + before.toSec())/2.0;
+}
+
+void
+BaslerNode::OnImageGrabbed( Pylon::CBaslerUsbInstantCamera& unused_camera, const Pylon::CBaslerUsbGrabResultPtr& ptrGrabResult)
 {
     (void)unused_camera;
     sensor_msgs::Image img_msg;
@@ -254,9 +274,15 @@ BaslerNode::OnImageGrabbed( Pylon::CInstantCamera& unused_camera, const Pylon::C
                     output_bytes_per_pixel*ptrGrabResult->GetWidth(),
                     pylon_image_.GetBuffer());
             sensor_msgs::CameraInfo info = cinfo_manager_->getCameraInfo();
-            info.header.stamp = img_msg.header.stamp;
-            info.header.frame_id = img_msg.header.frame_id;
+            uint64_t stamp;
+            if (config_.use_hardware_timestamp && IsReadable(ptrGrabResult->ChunkTimestamp))
+            {
+                stamp = ptrGrabResult->ChunkTimestamp.GetValue();
+                img_msg.header.stamp = ros::Time(initial_stamp_ + double(stamp-initial_counter_)*1e-9);
+            }
+            info.header = img_msg.header;
             cam_pub_.publish(img_msg, info);
+            ROS_DEBUG_STREAM("Grabbed stamp: " << stamp << " msg stamp: " << img_msg.header.stamp << " now: " << timestamp);
         }
     }
     else
@@ -291,6 +317,20 @@ BaslerNode::BaslerNode(ros::NodeHandle &nh) :
     camera.RegisterImageEventHandler(this, Pylon::RegistrationMode_Append, Pylon::Cleanup_None);
 
     camera.RegisterConfiguration(new Pylon::CAcquireContinuousConfiguration , Pylon::RegistrationMode_ReplaceAll, Pylon::Cleanup_Delete);
+
+    // Enable chunks in general.
+    if (GenApi::IsWritable(camera.ChunkModeActive))
+    {
+        camera.ChunkModeActive.SetValue(true);
+    }
+    else
+    {
+        throw RUNTIME_EXCEPTION( "The camera doesn't support chunk features");
+    }
+    // Enable time stamp chunks.
+    camera.ChunkSelector.SetValue(Basler_UsbCameraParams::ChunkSelector_Timestamp);
+    camera.ChunkEnable.SetValue(true);
+    set_timestamp_offset();
 
     // use dynamic reconfigure to trigger a camera configuration
     server.setCallback(boost::bind(&BaslerNode::configure_callback, this, _1, _2));

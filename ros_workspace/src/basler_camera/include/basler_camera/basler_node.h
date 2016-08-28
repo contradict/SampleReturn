@@ -8,12 +8,13 @@
 
 // Include files to use the PYLON API.
 #include <pylon/PylonIncludes.h>
+#include <pylon/usb/BaslerUsbInstantCamera.h>
 
 
 namespace BaslerCamera
 {
 
-class BaslerNode : public Pylon::CImageEventHandler
+class BaslerNode : public Pylon::CBaslerUsbImageEventHandler
 {
     std::string camera_info_url;
     std::string frame_id;
@@ -32,16 +33,20 @@ class BaslerNode : public Pylon::CImageEventHandler
     camera_info_manager::CameraInfoManager *cinfo_manager_;
     dynamic_reconfigure::Server<basler_camera::CameraConfig> server;
 
+    basler_camera::CameraConfig config_;
+
     Pylon::CImageFormatConverter converter_;
     Pylon::CPylonImage pylon_image_;
     std::string output_encoding;
     int output_bytes_per_pixel;
+    double initial_stamp_;
+    uint64_t initial_counter_;
 
     // Automatically call PylonInitialize and PylonTerminate to ensure the pylon runtime system
     // is initialized during the lifetime of this object.
     Pylon::PylonAutoInitTerm autoInitTerm;
 
-    Pylon::CInstantCamera camera;
+    Pylon::CBaslerUsbInstantCamera camera;
 
     void
     find_camera(void);
@@ -69,19 +74,19 @@ class BaslerNode : public Pylon::CImageEventHandler
     void
     topic_enable_publish(std_msgs::BoolConstPtr msg);
 
+    void set_timestamp_offset(void);
 
     public:
     BaslerNode(ros::NodeHandle &nh);
 
     void shutdown(void);
 
-    virtual void OnImageGrabbed( Pylon::CInstantCamera& camera, const Pylon::CGrabResultPtr& ptrGrabResult);
-    virtual void OnImagesSkipped( Pylon::CInstantCamera& camera, size_t countOfSkippedImages)
+    virtual void OnImageGrabbed( Pylon::CBaslerUsbInstantCamera& camera, const Pylon::CBaslerUsbGrabResultPtr& ptrGrabResult);
+    virtual void OnImagesSkipped( Pylon::CBaslerUsbInstantCamera& camera, size_t countOfSkippedImages)
     {
         (void)camera;
         ROS_ERROR_STREAM (countOfSkippedImages  << " images have been skipped.");
     }
-
 };
 
 }
