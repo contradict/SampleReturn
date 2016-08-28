@@ -175,6 +175,8 @@ class GroundProjectorNode
     samplereturn_msgs::PatchArray out_pa_msg;
     out_pa_msg.header = msg->header;
     out_pa_msg.cam_info = msg->cam_info;
+    cam_model_.fromCameraInfo(msg->cam_info);
+
     if (msg->patch_array.empty()) {
       pub_patch_array.publish(out_pa_msg);
       return;
@@ -183,8 +185,6 @@ class GroundProjectorNode
       debug_image_ = cv::Mat::ones(msg->cam_info.height,
           msg->cam_info.width, CV_8U)*255;
     }
-
-    cam_model_.fromCameraInfo(msg->cam_info);
 
     // For each patch, project onto the available ground plane and make
     // accurate 3D position and size estimates. Filter out candidate patches
