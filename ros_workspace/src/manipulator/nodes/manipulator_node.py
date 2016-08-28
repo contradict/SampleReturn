@@ -39,8 +39,9 @@ class ManipulatorStateMachine(object):
     self.arm_down_standoff = rospy.get_param('~arm_down_standoff', 0.1)
     
     self.arm_up_velocity = rospy.get_param('~arm_up_velocity', 0.5)
-    self.arm_home_torque = rospy.get_param('~arm_home_torque', 0.6)    
-    self.arm_up_torque = rospy.get_param('~arm_up_torque', 0.9)
+    self.arm_home_torque = rospy.get_param('~arm_home_torque', 0.4)
+    self.arm_start_torque = ropys.get_param('~arm_start_torque', 0.9)
+    self.arm_up_torque = rospy.get_param('~arm_up_torque', 0.6)
     self.arm_up_standoff = rospy.get_param('~arm_up_standoff', 0.1)
     
     #if arm position greater than this after heading down, we are too high for grabbing
@@ -168,8 +169,8 @@ class ManipulatorStateMachine(object):
       smach.StateMachine.add('ARM_UP',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
           request = VelocityStandoffRequest(velocity = self.arm_up_velocity,
-                                            start_torque_limit = self.arm_up_torque,                                                      
-                                            torque_limit = self.arm_home_torque,
+                                            start_torque_limit = self.arm_start_torque,                                                      
+                                            torque_limit = self.arm_up_torque,
                                             distance = self.arm_up_standoff,
                                             check_velocity = True),
           response_cb = arm_up_response_cb),          
