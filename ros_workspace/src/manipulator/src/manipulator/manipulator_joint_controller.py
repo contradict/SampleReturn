@@ -94,6 +94,7 @@ class ManipulatorJointController(JointControllerMX):
             self.check_for_move = True        
             self.start_timeout_check(self.move_timeout)
             yield self.block()
+            self.check_for_timeout = False
         self.set_torque_limit(torque_limit)        
         #wait for stop        
         rospy.logdebug("DYNAMIXEL velocity standoff waiting for stop")        
