@@ -46,6 +46,7 @@ class ManipulatorJointController(JointControllerMX):
         #minimum moving velocity for an "is moving" condition check
         #XXX TODO: GET THIS FROM ROS PARAMETERS
         self.min_moving_velocity = None
+        self.velocity_start_delay = 0.5
         self.move_timeout = 2.0
         
         self.max_stopped_velocity = .01
@@ -84,6 +85,8 @@ class ManipulatorJointController(JointControllerMX):
         self.set_torque_limit(start_torque_limit)
         self.set_angle_limits(0, 0) #enable wheel mode!
         self.set_speed(velocity)
+        #allow a moment for dynamixel to start
+        rospy.sleep(self.velocity_start_delay)
         #check to make sure the joint starts moving        
         if (req.check_velocity):
             self.min_moving_velocity = abs(velocity/2.0)        
