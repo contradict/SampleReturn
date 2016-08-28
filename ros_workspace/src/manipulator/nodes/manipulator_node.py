@@ -40,7 +40,7 @@ class ManipulatorStateMachine(object):
     
     self.arm_up_velocity = rospy.get_param('~arm_up_velocity', 0.5)
     self.arm_home_torque = rospy.get_param('~arm_home_torque', 0.4)
-    self.arm_start_torque = ropys.get_param('~arm_start_torque', 0.9)
+    self.arm_start_torque = rospy.get_param('~arm_start_torque', 0.9)
     self.arm_up_torque = rospy.get_param('~arm_up_torque', 0.6)
     self.arm_up_standoff = rospy.get_param('~arm_up_standoff', 0.1)
     
