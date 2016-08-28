@@ -134,7 +134,7 @@ class ManipulatorJointController(JointControllerMX):
         yield self.block()
         self.check_for_stop = True
         yield self.block()
-        yield ("succeeded", self.joint_state.current_pos)
+        yield ("succeeded")
     
     @check_pause    
     def go_to_position(self, position):

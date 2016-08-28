@@ -2,4 +2,3 @@
 float64 torque
 ---
 string result
-float64 position
