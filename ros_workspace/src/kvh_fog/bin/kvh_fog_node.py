@@ -25,10 +25,12 @@ class KVHFOGNode(object):
         else:
             self._rate_bias = driver.EARTH_RATE*sin(radians(lat))
         self._invert_rotation = rospy.get_param("~invert_rotation", False)
+        self._invalid_limit = rospy.get_param("~invalid_limit", 10)
         rospy.loginfo("Invert: %s", self._invert_rotation)
         self._gyro = None
         self._seq = 0
 
+        self._zero_integrator = True
         self._last_angle = None
         self._last_time = None
         self._averaging_start_time = None
@@ -58,7 +60,14 @@ class KVHFOGNode(object):
     def _read_gyro(self):
         to_discard = self._discard_count
         mode_set = False
+        invalid_count = 0
         while not rospy.is_shutdown():
+            if not mode_set:
+                self._gyro.set_integrated_mode()
+                if self._zero_integrator:
+                    self._zero_integrator = False
+                    self._gyro.zero_integrator()
+                mode_set = True
             try:
                 now, valid, angle = self._gyro.read()
             except (driver.SerialException, OSError), e:
@@ -68,11 +77,14 @@ class KVHFOGNode(object):
                 rospy.sleep(rospy.Duration(self._reopen_delay))
                 break
             if not valid:
-                continue
-            if not mode_set:
-                self._gyro.set_integrated_mode()
-                self._gyro.zero_integrator()
-                mode_set = True
+                invalid_count += 1
+                if invalid_count >= self._invalid_limit:
+                    rospy.logerr("Too many invaild reads, restarting")
+                    break
+                else:
+                    continue
+            else:
+                invalid_count = 0
             if to_discard > 0:
                 to_discard -= 1
                 self._bias_measurement_time = now
