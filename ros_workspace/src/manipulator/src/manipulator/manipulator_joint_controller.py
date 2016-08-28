@@ -81,7 +81,7 @@ class ManipulatorJointController(JointControllerMX):
             standoff = req.distance * -1
         else:
             standoff = req.distance
-        self.set_torque_limit(starting_torque_limit)
+        self.set_torque_limit(start_torque_limit)
         self.set_angle_limits(0, 0) #enable wheel mode!
         self.set_speed(velocity)
         #check to make sure the joint starts moving        
