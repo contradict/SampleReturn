@@ -61,6 +61,7 @@ class KVHFOGNode(object):
                 rospy.sleep(rospy.Duration(self._reopen_delay))
                 continue
             self._read_gyro()
+            self._gyro.close()
             self._restarted = True
 
     def _read_gyro(self):
