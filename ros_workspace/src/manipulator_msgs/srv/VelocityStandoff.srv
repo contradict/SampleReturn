@@ -1,6 +1,8 @@
 # See Dynamixel documentation for details
 float64 velocity
+float64 start_torque_limit
 float64 torque_limit
 float64 distance
+bool check_velocity
 ---
 string result
