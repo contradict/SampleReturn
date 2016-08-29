@@ -45,7 +45,10 @@ class ManipulatorJointController(JointControllerMX):
         
         #minimum moving velocity for an "is moving" condition check
         #XXX TODO: GET THIS FROM ROS PARAMETERS
-        self.min_moving_velocity = .2
+        self.min_moving_velocity = None
+        self.velocity_start_delay = 0.5
+        self.move_timeout = 2.0
+        
         self.max_stopped_velocity = .01
         self.position_tol = .05
         
@@ -60,7 +63,10 @@ class ManipulatorJointController(JointControllerMX):
         self.check_for_move = False
         self.check_for_stop = False
         self.check_for_position = False
+        self.check_for_timeout = False
         self.check_current = None
+        self.timeout = None
+        self.timed_out = False
         self.paused = True #start up these dynamixels paused
     
         #record initial torque limit, to be reset after pauses
@@ -68,16 +74,30 @@ class ManipulatorJointController(JointControllerMX):
     
     @check_pause            
     def velocity_standoff(self, req):
+        rospy.logdebug("DYNAMIXEL velocity standoff requested: {!s}".format(req))        
         velocity = req.velocity
-        torque_limit = req.torque_limit 
+        torque_limit = req.torque_limit
+        start_torque_limit = req.start_torque_limit
         if velocity > 0:
             standoff = req.distance * -1
         else:
             standoff = req.distance
-        self.set_torque_limit(torque_limit)
+        self.set_torque_limit(start_torque_limit)
         self.set_angle_limits(0, 0) #enable wheel mode!
         self.set_speed(velocity)
-        time.sleep(.5) #allow .5 seconds for dynamixel to move
+        #allow a moment for dynamixel to start
+        rospy.sleep(self.velocity_start_delay)
+        #check to make sure the joint starts moving        
+        if (req.check_velocity):
+            self.min_moving_velocity = abs(velocity/2.0)        
+            rospy.logdebug("DYNAMIXEL velocity standoff checking for velocity: {:f}".format(self.min_moving_velocity))
+            self.check_for_move = True        
+            self.start_timeout_check(self.move_timeout)
+            yield self.block()
+            self.check_for_timeout = False
+        self.set_torque_limit(torque_limit)        
+        #wait for stop        
+        rospy.logdebug("DYNAMIXEL velocity standoff waiting for stop")        
         self.check_for_stop = True
         yield self.block()
         standoff_pos = self.joint_state.current_pos + standoff
@@ -114,7 +134,7 @@ class ManipulatorJointController(JointControllerMX):
         yield self.block()
         self.check_for_stop = True
         yield self.block()
-        yield ("succeeded", self.joint_state.current_pos)
+        yield ("succeeded")
     
     @check_pause    
     def go_to_position(self, position):
@@ -125,6 +145,12 @@ class ManipulatorJointController(JointControllerMX):
                 
     def service_go_to_position(self, req):
         return self.go_to_position(req.position)
+
+    def start_timeout_check(self, duration):
+        self.timed_out = False        
+        self.timeout_start_time = rospy.Time.now()
+        self.timeout = rospy.Duration(duration)
+        self.check_for_timeout = True
 
     def service_pause(self, req):
         self.paused = req.state
@@ -143,6 +169,7 @@ class ManipulatorJointController(JointControllerMX):
         self.check_for_move = False
         self.check_for_stop = False
         self.check_for_position = False
+        self.check_for_timeout = False
         self.check_current = None
           
     def process_motor_states(self, state_list):
@@ -174,17 +201,29 @@ class ManipulatorJointController(JointControllerMX):
                 self.unblock()
                 self.check_for_position = False
         
+        if self.check_for_timeout:
+            if (rospy.Time.now() - self.timeout_start_time) > self.timeout:
+                self.timed_out = True                
+                self.unblock()
+                self.check_for_timeout = False
+
         if self.check_current is not None:
             if abs(self.avg_current) > self.check_current:
                 self.unblock()
                 self.check_current = None
+        
                 
     def block(self):
         self.waitCV.acquire()
         self.waitCV.wait()
-        paused = "preempted" if self.paused else None
+        if self.paused:
+            result = 'preempted'
+        elif self.timed_out:
+            result = 'timeout'
+        else:
+            result = None
         self.waitCV.release()
-        return paused
+        return result
 
     def unblock(self):
         self.waitCV.acquire()

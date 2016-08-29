@@ -54,9 +54,12 @@
             arm_down_standoff: 0.05
 
             arm_up_velocity: 1.0
-            arm_up_torque: 0.9
+            arm_up_torque: 0.6
             arm_up_standoff: 0.02
         
+            arm_start_torque: 0.9            
+            arm_home_torque: 0.4
+
             hand_open_position: 2.7
 
             wrist_zero_position: 1.78

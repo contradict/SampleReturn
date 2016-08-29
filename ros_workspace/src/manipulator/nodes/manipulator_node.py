@@ -39,6 +39,8 @@ class ManipulatorStateMachine(object):
     self.arm_down_standoff = rospy.get_param('~arm_down_standoff', 0.1)
     
     self.arm_up_velocity = rospy.get_param('~arm_up_velocity', 0.5)
+    self.arm_home_torque = rospy.get_param('~arm_home_torque', 0.4)
+    self.arm_start_torque = rospy.get_param('~arm_start_torque', 0.9)
     self.arm_up_torque = rospy.get_param('~arm_up_torque', 0.6)
     self.arm_up_standoff = rospy.get_param('~arm_up_standoff', 0.1)
     
@@ -117,7 +119,7 @@ class ManipulatorStateMachine(object):
       )
 
       @smach.cb_interface(input_keys = ['arm_down_maximum',
-                                             'arm_joint_position'],
+                                        'arm_joint_position'],
                           output_keys = ['target_bin'],
                           outcomes = ['too_high'])
       def arm_down_response_cb(userdata, response):
@@ -134,7 +136,11 @@ class ManipulatorStateMachine(object):
 
       smach.StateMachine.add('ARM_DOWN',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
-          request = VelocityStandoffRequest(self.arm_down_velocity, self.arm_down_torque, self.arm_down_standoff),
+          request = VelocityStandoffRequest(velocity = self.arm_down_velocity,
+                                            start_torque_limit = self.arm_down_torque,                                                      
+                                            torque_limit = self.arm_down_torque,
+                                            distance = self.arm_down_standoff,
+                                            check_velocity = False),
           response_cb = arm_down_response_cb),
           transitions = {'succeeded':'GRIP_SAMPLE',
                          'too_high':'GRIP_SAMPLE',
@@ -156,11 +162,20 @@ class ManipulatorStateMachine(object):
                          'aborted':'ERROR'}
       )
 
+      @smach.cb_interface(outcomes = ['timeout'])
+      def arm_up_response_cb(userdata, response):
+        return response.result
+
       smach.StateMachine.add('ARM_UP',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
-          request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
-          response_cb = manipulator_response_cb),          
+          request = VelocityStandoffRequest(velocity = self.arm_up_velocity,
+                                            start_torque_limit = self.arm_start_torque,                                                      
+                                            torque_limit = self.arm_up_torque,
+                                            distance = self.arm_up_standoff,
+                                            check_velocity = True),
+          response_cb = arm_up_response_cb),          
           transitions = {'succeeded':'GET_BIN',
+                         'timeout':'RELEASE_GRIP',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       ) 
@@ -223,7 +238,11 @@ class ManipulatorStateMachine(object):
 
       smach.StateMachine.add('HOME_ARM',
           smach_ros.ServiceState('arm_joint/velocity_standoff', VelocityStandoff,
-          request = VelocityStandoffRequest(self.arm_up_velocity, self.arm_up_torque, self.arm_up_standoff),
+          request = VelocityStandoffRequest(velocity = self.arm_up_velocity,
+                                            start_torque_limit = self.arm_home_torque,                                                      
+                                            torque_limit = self.arm_home_torque,
+                                            distance = self.arm_up_standoff,
+                                            check_velocity = False),
           response_cb = manipulator_response_cb,
           input_keys = ['error','goal']),
           transitions = {'succeeded':'HOME_WRIST',
@@ -245,6 +264,15 @@ class ManipulatorStateMachine(object):
           request = GoToPositionRequest(self.hand_open_position),
           response_cb = manipulator_response_cb),          
           transitions = {'succeeded':'CLEAR_CAROUSEL',
+                         'preempted':'PAUSED',
+                         'aborted':'ERROR'}
+      )
+
+      smach.StateMachine.add('RELEASE_GRIP',
+          smach_ros.ServiceState('hand_joint/go_to_position', GoToPosition,
+          request = GoToPositionRequest(self.hand_open_position),
+          response_cb = manipulator_response_cb),          
+          transitions = {'succeeded':'ARM_UP',
                          'preempted':'PAUSED',
                          'aborted':'ERROR'}
       )
