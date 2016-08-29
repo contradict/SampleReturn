@@ -12,7 +12,7 @@ class ColoredKF : public cv::KalmanFilter
     samplereturn::HueHistogram huemodel;
     int16_t filter_id;
     std::string sensor_frame_id;
-    float certainty;
+    double certainty;
     int sample_id;
     std::string name;
     double grip_angle;

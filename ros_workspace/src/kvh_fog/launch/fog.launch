@@ -7,16 +7,17 @@
         ns="/io/kvh"
         machine="navigate"
         >
+        <remap from="announce" to="/io/audio/search"/>
         <param name="frame_id" type="string" value="gyro"/>
         <param name="port" type="string" value="/dev/ttyUSB0"/>
         <!-- discard measurements after re-open -->
         <param name="discard_count" type="int" value="10"/>
         <!-- seconds to wait before re-open -->
-        <param name="reopen_delay" type="int" value="30"/>
+        <param name="reopen_delay" type="int" value="5"/>
         <!-- Bette Davis Picnic Area, LA, USA-->
-        <!--<param name="lat" type="double" value="34.157229"/>-->
+        <!--<param name="latitude" type="double" value="34.157229"/>-->
         <!--Institude park in Worcester, MA, USA-->
-        <param name="lattitude" type="double" value="42.2750873" />
+        <param name="latitude" type="double" value="42.2750873" />
         <!-- if not specified, default to local earth rate-->
         <!--
         -->

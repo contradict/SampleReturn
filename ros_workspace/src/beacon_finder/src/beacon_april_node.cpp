@@ -284,8 +284,34 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
       if ( transformed_corners.size() >= (unsigned int)(min_tags_ * 4) ) {
         //try the multi_tag 3d solution
         cv::Vec3d rvec, tvec;
+        bool initial_guess = false;
+        try{
+          tf::StampedTransform T_camera_to_beacon;
+          _tf.waitForTransform(cv_ptr->header.frame_id, "beacon", cv_ptr->header.stamp, ros::Duration(0.5));
+          _tf.lookupTransform(cv_ptr->header.frame_id, "beacon", cv_ptr->header.stamp, T_camera_to_beacon);
+          tvec(0) = T_camera_to_beacon.getOrigin().x();
+          tvec(1) = T_camera_to_beacon.getOrigin().y();
+          tvec(2) = T_camera_to_beacon.getOrigin().z();
+          double theta = acos(T_camera_to_beacon.getRotation().w())*2;
+          rvec(0) = T_camera_to_beacon.getRotation().x();
+          rvec(1) = T_camera_to_beacon.getRotation().y();
+          rvec(2) = T_camera_to_beacon.getRotation().z();
+          cv::normalize(rvec);
+          rvec*=theta;
+          initial_guess = true;
+          ROS_DEBUG_STREAM("Initial guess tvec:( " <<
+                  tvec(0) << ", " <<
+                  tvec(1) << ", " <<
+                  tvec(2) << ") rvec:( " <<
+                  rvec(0) << ", " <<
+                  rvec(1) << ", " <<
+                  rvec(2) << ")");
+        }
+        catch (tf::TransformException& e){
+            ROS_DEBUG("Unable to transform beacon to camera, no initial guess: %s", e.what());
+        }
         bool solved = false;
-        solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, false, CV_ITERATIVE);
+        solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, initial_guess, CV_ITERATIVE);
         if ( !solved) {
             ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER Unable to solve for multiple tag pose.");
             ROS_ERROR_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
@@ -298,7 +324,7 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             rvec[0] = 0;
             rvec[1] = 0;
             rvec[2] = 0;
-            solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, true, CV_ITERATIVE);
+            solved = cv::solvePnP(transformed_corners, all_imgPts, model_.fullIntrinsicMatrix(), model_.distortionCoeffs(), rvec, tvec, true, CV_EPNP);
             if (tvec[2] < 0) {
                 ROS_ERROR_NAMED("tag_detection", "APRIL BEACON FINDER solved for crazy pose a second time! giving up");
                 solved = false;
@@ -310,6 +336,13 @@ void BeaconAprilDetector::imageCb(const sensor_msgs::ImageConstPtr& msg,const se
             ROS_ERROR_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER corners:\n" << transformed_corners << std::endl << "imgPts:\n" << all_imgPts);
         } else {
             ROS_DEBUG_STREAM_NAMED("tag_detection", "APRIL BEACON FINDER found solution for: "<< zarray_size(detections) << " tags.");        
+            ROS_DEBUG_STREAM("Solution tvec:( " <<
+                  tvec(0) << ", " <<
+                  tvec(1) << ", " <<
+                  tvec(2) << ") rvec:( " <<
+                  rvec(0) << ", " <<
+                  rvec(1) << ", " <<
+                  rvec(2) << ")");
           
             //this solution is for points xformed into beacon frame
             double th = cv::norm(rvec);
