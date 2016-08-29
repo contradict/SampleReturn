@@ -41,14 +41,11 @@ class GroundProjectorNode
   dynamic_reconfigure::Server<saliency_detector::ground_projector_paramsConfig> dr_srv;
 
   double min_major_axis_, max_major_axis_;
-  bool enable_debug_;
   int miss_count_;
   int frustum_buffer_;
 
   Eigen::Vector4d ground_plane_;
   image_geometry::PinholeCameraModel cam_model_;
-
-  cv::Mat debug_image_;
 
   public:
   GroundProjectorNode() {
@@ -82,7 +79,6 @@ class GroundProjectorNode
     pub_frustum =
       nh.advertise<geometry_msgs::PolygonStamped>("view_frustum", 3);
 
-    enable_debug_ = false;
     ground_plane_ << 0.,0.,1.,0.;
     miss_count_ = 0;
   }
@@ -171,18 +167,16 @@ class GroundProjectorNode
   // ground plane, otherwise assume the plane under the wheels.
   void patchArrayCallback(const samplereturn_msgs::PatchArrayConstPtr& msg)
   {
-    enable_debug_ = (pub_debug_image.getNumSubscribers() != 0);
+    bool enable_debug = (pub_debug_image.getNumSubscribers() != 0);
     samplereturn_msgs::PatchArray out_pa_msg;
     out_pa_msg.header = msg->header;
     out_pa_msg.cam_info = msg->cam_info;
     cam_model_.fromCameraInfo(msg->cam_info);
 
-    if (msg->patch_array.empty()) {
-      pub_patch_array.publish(out_pa_msg);
-      return;
-    }
-    if (enable_debug_) {
-      debug_image_ = cv::Mat::ones(msg->cam_info.height,
+    cv::Mat debug_image;
+
+    if (enable_debug) {
+      debug_image = cv::Mat::ones(msg->cam_info.height,
           msg->cam_info.width, CV_8U)*255;
     }
 
@@ -200,6 +194,13 @@ class GroundProjectorNode
         ROS_ERROR("cv_bridge exception: %s", e.what());
       }
 
+      if (enable_debug) {
+        cv_ptr->image.copyTo(debug_image(cv::Rect(msg->patch_array[i].image_roi.x_offset,
+                msg->patch_array[i].image_roi.y_offset,
+                msg->patch_array[i].image_roi.width,
+                msg->patch_array[i].image_roi.height)));
+      }
+
       cv::Point2f roi_offset(msg->patch_array[i].image_roi.x_offset,
               msg->patch_array[i].image_roi.y_offset);
 
@@ -210,7 +211,7 @@ class GroundProjectorNode
               cam_model_, msg->header.stamp, msg->header.frame_id,
               ground_plane_, "base_link",
               &dimension, &angle, &world_point,
-              enable_debug_?&debug_image_:NULL))
+              enable_debug?&debug_image:NULL))
       {
           continue;
       }
@@ -238,15 +239,15 @@ class GroundProjectorNode
         out_pa_msg.patch_array.push_back(pa_msg);
       }
       else {
-        if (enable_debug_) {
-          cv::line(debug_image_,
+        if (enable_debug) {
+          cv::line(debug_image,
               cv::Point2f(msg->patch_array[i].image_roi.x_offset,
                           msg->patch_array[i].image_roi.y_offset),
               cv::Point2f(msg->patch_array[i].image_roi.x_offset +
                           msg->patch_array[i].image_roi.width,
                           msg->patch_array[i].image_roi.y_offset +
                           msg->patch_array[i].image_roi.height), 255, 20);
-          cv::line(debug_image_,
+          cv::line(debug_image,
               cv::Point2f(msg->patch_array[i].image_roi.x_offset +
                           msg->patch_array[i].image_roi.width,
                           msg->patch_array[i].image_roi.y_offset),
@@ -258,9 +259,9 @@ class GroundProjectorNode
       }
     }
     pub_patch_array.publish(out_pa_msg);
-    if (enable_debug_) {
+    if (enable_debug) {
       sensor_msgs::ImagePtr debug_image_msg =
-        cv_bridge::CvImage(msg->header,"mono8",debug_image_).toImageMsg();
+        cv_bridge::CvImage(msg->header,"mono8",debug_image).toImageMsg();
       pub_debug_image.publish(debug_image_msg);
     }
   }
