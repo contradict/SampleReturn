@@ -18,7 +18,13 @@
 \maketitle
 
 \begin{abstract}
-Our robot uses a primarily visual perception and navigation system, with multiple sets of cameras performing the tasks of navigation and mapping, obstacle avoidance, object detection, and manipulation control. A custom chassis has been designed to minimize weight and ease planning by allowing very general motion over varied terrain. A simple three-axis manipulator takes advantage of this flexibility to allow object retrieval and storage in a sectioned carousel.
+Our robot uses a primarily visual perception and navigation system, with
+multiple sets of cameras performing the tasks of navigation and mapping,
+obstacle avoidance, object detection, and manipulation control. A custom
+chassis has been designed to minimize weight and ease planning by allowing very
+general motion over varied terrain. A simple three-axis manipulator takes
+advantage of this flexibility to allow object retrieval and storage in a
+sectioned carousel.
 
 \end{abstract}
 
@@ -46,11 +52,22 @@ Our robot uses a primarily visual perception and navigation system, with multipl
 
 
 \section{Introduction}
-This proposal documents our thought process leading up to the prototype design of a robot to compete in the sample return challenge \cite{rules}. We focus on readily available components and technologies with the goal of getting quickly to the testing phase of our design. For the prior year's competition, we fabricated a custom chassis and began software development of its control system. This year's effort builds on this work.
+This proposal documents our thought process leading up to the prototype design
+of a robot to compete in the sample return challenge \cite{rules}. We focus on
+readily available components and technologies with the goal of getting quickly
+to the testing phase of our design. For the prior year's competition, we
+fabricated a custom chassis and began software development of its control
+system. This year's effort builds on this work.
 
 \paragraph{Outline}
 The remainder of this article is organized as follows.
-Section~\ref{Chassis} describes the locomotion and maneuvering system. Section~\ref{Manipulator} describes our approach to sample acquisition and storage. Section~\ref{Electronics} describes the power management, servo, and compute systems employed. Section~\ref{Perception} discusses our sensing systems. Section~\ref{Software} gives a high-level overview of our software architecture. Section~\ref{Hazardous} discusses hazardous materials compliance. Section~\ref{Comms} describes the external communications of the robot.
+Section~\ref{Chassis} describes the locomotion and maneuvering system.
+Section~\ref{Manipulator} describes our approach to sample acquisition and
+storage. Section~\ref{Electronics} describes the power management, servo, and
+compute systems employed. Section~\ref{Perception} discusses our sensing
+systems. Section~\ref{Software} gives a high-level overview of our software
+architecture. Section~\ref{Hazardous} discusses hazardous materials compliance.
+Section~\ref{Comms} describes the external communications of the robot.
 
 
 %\begin{figure}[htbp]
@@ -76,13 +93,36 @@ Section~\ref{Chassis} describes the locomotion and maneuvering system. Section~\
 
 \section{Chassis}\label{Chassis}
 
-We fabricated a custom, triangular plan chassis with three independently steerable wheel pods, one on each corner (the side between two wheels defining the front of the robot, with a trailing third). Each wheel pod consists of a wheel and tire driven through a gearbox and chain reduction/transmission by a brushless electric motor. Using three independently steerable wheels allows for in-place rotations of the robot, as well as translation in any direction relative to the manipulator, permitting a simple three-axis manipulator design (up/down, open/close, rotate). Both the drive axis and steering axis for each wheel pod have optical encoders for measuring angle/velocity and aiding the odometry system.
+We fabricated a custom, triangular plan chassis with three independently
+steerable wheel pods, one on each corner (the side between two wheels defining
+the front of the robot, with a trailing third). Each wheel pod consists of a
+wheel and tire driven through a gearbox and chain reduction/transmission by a
+brushless electric motor. Using three independently steerable wheels allows for
+in-place rotations of the robot, as well as translation in any direction
+relative to the manipulator, permitting a simple three-axis manipulator design
+(up/down, open/close, rotate). Both the drive axis and steering axis for each
+wheel pod have optical encoders for measuring angle/velocity and aiding the
+odometry system.
 
-The body itself is a triangular box, providing three distinct mounting layers: under the bottom plate, between the plates, and on the top plate. A sectioned carousel slung under the lower plate is used for sample storage. Indexed by a single motor, its low to the ground position reduces the amount of travel needed in the vertical manipulator axis. Behind the carousel are the lithium ion battery packs, mounted low to keep the center of mass as far down as possible. Between the two triangular decks are the six wheel motor controllers, driving the two motors on each of the three wheel pods. The search and navigation computers are also mounted on this level.
+The body itself is a triangular box, providing three distinct mounting layers:
+under the bottom plate, between the plates, and on the top plate. A sectioned
+carousel slung under the lower plate is used for sample storage. Indexed by a
+single motor, its low to the ground position reduces the amount of travel
+needed in the vertical manipulator axis. Behind the carousel are the lithium
+ion battery packs, mounted low to keep the center of mass as far down as
+possible. Between the two triangular decks are the six wheel motor controllers,
+driving the two motors on each of the three wheel pods. The search and
+navigation computers are also mounted on this level.
 
-The top plate supports navigation, manipulator, and search cameras, as well as the supports for the manipulator vertical axis. The manipulator cameras peer through a cutout in the lower deck to observe the gripper jaws and the object to be retrieved, as well as the appropriate carousel slot when it's rotated into position. Space is reserved for the specified required payload.
+The top plate supports navigation, manipulator, and search cameras, as well as
+the supports for the manipulator vertical axis. The manipulator cameras peer
+through a cutout in the lower deck to observe the gripper jaws and the object
+to be retrieved, as well as the appropriate carousel slot when it's rotated
+into position. Space is reserved for the specified required payload.
 
-The navigation and search cameras are mounted at the top of a pyramidal frame above the top deck. This provides maximum height above the ground given the volume envelope, expanding the search region
+The navigation and search cameras are mounted at the top of a pyramidal frame
+above the top deck. This provides maximum height above the ground given the
+volume envelope, expanding the search region
 
 %\begin{figure}[htbp]
 %\centering
@@ -94,7 +134,7 @@ The navigation and search cameras are mounted at the top of a pyramidal frame ab
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=4.5in]{../assets/overalliso.jpg}
+\includegraphics[width=4.5in]{../assets/srr-with-labels-iso.png}
 \caption{The proposed vehicle chassis.}
 \label{fig_bot_chassis}
 \end{figure}
@@ -113,53 +153,148 @@ The navigation and search cameras are mounted at the top of a pyramidal frame ab
 \label{fig_bot_manipulator}
 \end{figure}
 
-The challenge rules specify an 80kg mass limit. Our current design comes in just under this weight limit.
+The challenge rules specify an 80kg mass limit. Our current design comes in
+just under this weight limit.
 
 %\input{massbudget}
 \section{Manipulator}\label{Manipulator}
 
-Early in the design process, a variety of manipulators were considered for the task of sample retrieval. Adhesion based glue pucks, mechanically driven tentacles, and multi-axis grabbers were assessed and rejected in favor of a single axis grabber with parallel jaws; selected as the most simple and mechanically robust design that could still manipulate the specified samples. Driven through a linkage with a Dynamixel servo, the two jaws support a variety of surface types that can be rapidly iterated during testing to find the best general performer. The jaws themselves can be rotated through ninety degrees independently of the robot, so that the short dimension of any item can be gripped. The manipulator assembly rides vertically on a linear bearing driven by a rack and pinion to allow it to be lowered below the level of the wheels and above the sample carousel. Preliminary testing has shown this manipulator to be capable of retrieving all test samples.
+Early in the design process, a variety of manipulators were considered for the
+task of sample retrieval. Adhesion based glue pucks, mechanically driven
+tentacles, and multi-axis grabbers were assessed and rejected in favor of a
+single axis grabber with parallel jaws; selected as the most simple and
+mechanically robust design that could still manipulate the specified samples.
+Driven through a linkage with a Dynamixel servo, the two jaws support a variety
+of surface types that can be rapidly iterated during testing to find the best
+general performer. The jaws themselves can be rotated through ninety degrees
+independently of the robot, so that the short dimension of any item can be
+gripped. The manipulator assembly rides vertically on a linear bearing driven
+by a rack and pinion to allow it to be lowered below the level of the wheels
+and above the sample carousel. Preliminary testing has shown this manipulator
+to be capable of retrieving all test samples.
 
 
 \section{Electronics}\label{Electronics}
 
-The electronics system breaks down into four main components: energy storage, power distribution, actuators, and control. Energy is stored in two lithium iron phosphate battery packs packaged by PingBattery\footnote{\url{http://www.pingbattery.com}}. It feeds through the main power switch to the wheel motor controllers at 48V and into DC/DC converters to drive the cameras, warning beacon, computers, and manipulator servos at 12V. The E-stop is a latching push button switch sitting between the battery stack and all motor controllers and servos; activating it completely disconnects power from these actuators. The drive and steering motors are brushed DC motors with planetary gearboxes, each controlled by a Copley Accelnet \footnote{\url{http://www.copleycontrols.com/}} motor controller. The manipulator open/close, rotate, and lift axes are driven with Dynamixel RX-64 \footnote{\url{http://www.robotis.com/xe/dynamixel_en}} servomotors. Compute is provided by a pair of MiniITX computers: one handling navigation and mapping and one handling search and manipulation.
+The electronics system breaks down into four main components: energy storage,
+power distribution, actuators, and control. Energy is stored in two lithium
+iron phosphate battery packs packaged by
+PingBattery\footnote{\url{http://www.pingbattery.com}}. It feeds through the
+main power switch to the wheel motor controllers at 48V and into DC/DC
+converters to drive the cameras, warning beacon, computers, and manipulator
+servos at 12V. The E-stop is a latching push button switch sitting between the
+battery stack and all motor controllers and servos; activating it completely
+disconnects power from these actuators. The drive and steering motors are
+brushed DC motors with planetary gearboxes, each controlled by a Copley
+Accelnet\footnote{\url{http://www.copleycontrols.com/}} motor controller. The
+manipulator open/close, rotate, and lift axes are driven with Dynamixel
+MX-64\footnote{\url{http://www.robotis.com/xe/dynamixel_en}} servomotors.
+Compute is provided by a pair of MiniITX computers: one handling navigation and
+mapping and one handling search and manipulation.
 
 \section{Perception}\label{Perception}
-The environmental perception system consists of two stereo pairs and one high-resolution search camera. One stereo pair faces forward and provides the primary obstacle avoidance and navigation sensing. The other stereo pair is associated with the manipulator and provides close-in tracking and guidance for item collection. The search camera is positioned above the robot looking forward with a wide field of view and is used by all the long-range object detection algorithms while searching for items to be collected.
+The environmental perception system consists of four stereo pairs, one high
+resolution navigation camera and three high-resolution search cameras. Three
+stereo pairs face forward and provide the primary obstacle avoidance and
+navigation sensing. The fourth stereo pair is associated with the manipulator
+and provides close-in tracking and guidance for item collection. The final
+navigaiotn camera is a forward-looking high resolution camera for long range
+detection of our home beacon. The search cameras are positioned above the robot
+looking forward and down providing a wide field of view ahead of the robot.
+These caemras are used by all the long-range object detection algorithms while
+searching for items to be collected.
 
-The navigational perception system consists of 6 wheel encoders (one for the steering and drive axis of each wheel pod) for odometry, MEMS gyroscopes and precision inclinometers for attitude estimation. The attitude estimate is used to help stabilize the navigation estimate and to help align the search camera with the navigation map. We explored the possiblity of an odometry caster to provide estimates of distance traveled, but it was determined that the encoders on the wheels are of sufficient quality to render one unnecessary.
+The navigational perception system consists of 6 wheel encoders (one for the
+steering and drive axis of each wheel pod) for odometry, a KVH DSP-3000 fiber
+gyroscope and a 3-axis MEMS gyroscope and inclinometer for attitude estimation.
+The attitude estimate is used to help stabilize the navigation estimate and to
+help align the search camera with the navigation map. We explored the
+possiblity of an odometry caster to provide estimates of distance traveled, but
+it was determined that the encoders on the wheels are of sufficient quality to
+render one unnecessary. The most problematic error in wheel odometry was due to
+yaw, the fiberoptic gyroscope has sufficient stability to provide an excellent
+yaw estimate for the duration of the run. To recover from any odometry errors,
+we have a home beacon (figure~\ref{fig_home_beacon}) consisting of a flattened
+octagon with a uniquely identifiable and orientable tag on each face.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=4in]{beacon-front.png}
+\caption{Home Beacon}
+\label{fig_home_beacon}
+\end{figure}
 
 \section{Software}\label{Software}
-Our software uses the ROS framework \footnote{\url{http://www.ros.org/}} to provide structure and inter-module communication. In addition, ROS has a large library of general-purpose modules which allows us to take advantage of significant expertise outside of our immediate team.
+Our software uses the ROS\footnote{\url{http://www.ros.org/}} framework to
+provide structure and inter-module communication. In addition, ROS has a large
+library of general-purpose modules which allows us to take advantage of
+significant expertise outside of our immediate team.
 
 \subsection{Navigation}\label{Navigation}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=4in]{data_flow.dot.pdf}
-\caption{Navigation data flow}
+\caption{Obstacle detection data flow}
 \label{fig_df_nav}
 \end{figure}
-Figure~\ref{fig_df_nav} gives an overview of the navigation system dataflow. The primary navigation utility is visual odometry as described in \cite{HStrasDWO}. This is used to form a global feature map for large-scale navigation. The output of this system is used throughout the robot to relate measurements separated in time and space.
+Figure~\ref{fig_df_nav} gives an overview of the obstacle detection system
+dataflow.
 
-In addition, a local 2.5D occupancy grid is made based on obstacle detections for maneuver planning. This occupancy grid incorporates a local piece of the global data provided by satellite imagery as a prior on obstacle occupancy of a cell.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=4in]{data_flow.dot.2.pdf}:
+\caption{Navigation State Estimation data flow}
+\label{fig_se_nav}
+\end{figure}
+Figure~\ref{fig_se_nav} gives an overview of the state estimation dataflow.
+
+We use wheel odometry corrected by a fiber optic gyroscope to provide a
+smoothly varying local coordiante system for navigaion. This frame is used to
+localize obstacles and detected samples near the robot and for instantaneous
+path planning. To correct local odometry errors and fix our search pattern to
+the map, we use a home beacon. This beacon uses the
+AprilTags\footnote{\url{https://april.eecs.umich.edu/wiki/AprilTags}} 36H11
+family of markers. The AprilTags library provides tag identification and
+sub-pixel localization in the camera frame, our navigation software uses this
+information to estimate the robot pose relative to the beacon. We fuse this
+measurement with local inertial measurements to obtain a consistent global
+robot position. This global frame is used to orient or search pattern and
+ensure coverage of all interesting areas of the park.
+
+In addition, a local 2.5D occupancy grid is made based on obstacle detections
+for maneuver planning. This grid is only maintined in the immediate vicinity of
+the robot and used to plan simple maneuvers around obstacles.
 
 \subsection{Search}\label{Search}
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=6in]{data_flow.dot.2.pdf}
-\caption{Goal Search data flow}
+\includegraphics[width=6in]{data_flow.dot.3.pdf}
+\caption{Per-Camera Goal Search data flow}
 \label{fig_df_gs}
 \end{figure}
-As show in Figure~\ref{fig_df_gs}, each goal item has its own recognizer. Several of these share large pieces of functionality, but all can operate in parallel and have slightly different tunings. For example, the Tennis Ball and Colored Sphere recognizers may be identical code with different search parameters.
+As show in Figure~\ref{fig_df_gs}, we first filter the images from the camera
+into a list of salient patches using Boolean Map Saliency \cite{ZhangBMS}.
+These patches are then projected from camera coordinates to world coordinates
+using a ground plane estimation derived from the navigation pointclouds.
 
-All recognizers intersect the detection vector with an estimate of the ground plane. This estimate is constructed from the current vehicle pose and a subset of the points detected by the navigation stereo pair.
+The patches are the further inspected by two different detectors. An Support
+Vector Machine trained on mean values over the salient region in the $La^*b^*$
+color space rejects salient objects which are out of the allowed color range
+for the challenge. In addition, the patches are tested for matches with the
+hard sample patterns using LINEMOD \cite{HinterLINEMOD} modified with an inner gradient modality. 
+The Goal Recognizers are allowed to be noisy and produce false positives since
+all their measurements are accumulated in an multi-target tracking kalman
+filter. This filter accumulates an estimate of the objects position and
+probability of detection based on baysian updates.
 
-The Goal Recognizers are allowed to be noisy and produce false positives since all their measurements are accumulated in an occupancy grid. This grid encodes exclusions around detected goals and resolves conflicts between detectors. It also includes any pre-loaded information about goal and obstacle position. This map is mantained globally and effectively produces a record of already-searched areas.
+The most likely output of the filter is continually provided to the Master
+Executive which decides when a diversion from search to sample pursuit is
+apropriate.
 
-Detection of objects to be retrieved is done in two stages. Maximally stable extremal region (MSER) extraction on certain channels of the search camera images determined to be those in which the samples are most visible (specifically, a and b in Lab color space). Once these regions are found, color data are used to determine whether they match one of the defined samples based on hand-labeled images taken off-line.
-
-The current plan of operation of the robot is to execute a radial search pattern centered on the home platform. Using VSLAM for global navigation and stereo obstacle detection for local routing, the robot searches for the samples using a DSLR camera and a region extraction/color matching system. Navigation will be aided by visual recognition of the home platform as well.\\
+The current plan of operation of the robot is to execute a radial search
+pattern centered on the home platform. Using the beacon for global navigation,
+odometry and gyroscope updates for local navigation, and stereo obstacle
+detection for local routing, the robot searches for the samples
+using the search pipeline.
 
 \subsection{Route Planning}
 \begin{figure}[htbp]
