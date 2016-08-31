@@ -75,7 +75,7 @@ digraph search {
     S_LNM [label="Rectilinear Mark\nRecognizer"];
     S_SC->S_SAL->S_SP->S_SVM;
     S_GP->S_SP;
-    S_SAL->S_LNM;
+    S_SP->S_LNM;
     }
     //DC->P_GP;
     //DC->C_GP;
