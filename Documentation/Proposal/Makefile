@@ -11,9 +11,9 @@ proposal.aux: data_flow.dot.pdf
 data_flow.dot.pdf: data_flow.dot
 	dot -Tpdf -O $<
 
-tables: powerbudget_template.tex massbudget_template.tex mktables
-	scripts/GetTableData.py credentials
-	touch tables
+#tables: powerbudget_template.tex massbudget_template.tex mktables
+#	scripts/GetTableData.py credentials
+#	touch tables
 
 clean:
 	rm build/* *.pdf
