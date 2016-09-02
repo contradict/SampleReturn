@@ -12,16 +12,6 @@
 
     <!-- rosbag record -->
     <!--
-    -->
-  <node machine="navigate"
-      pkg="rosbag"
-      type="record"
-      name="navigate_record"
-      output="log"
-      args="--lz4 --split --size 2048
-            tf
-            tf_static
-            diagnostics
             /cameras/navigation/center/right/image_raw
             /cameras/navigation/center/right/camera_info
             /cameras/navigation/center/left/image_raw
@@ -35,6 +25,16 @@
             /cameras/navigation/starboard/desync
             /cameras/navigation/starboard/status
             /io/audio/navigate_soundplay
+    -->
+  <node machine="navigate"
+      pkg="rosbag"
+      type="record"
+      name="navigate_record"
+      output="log"
+      args="--lz4 --split --size 2048
+            tf
+            tf_static
+            diagnostics
             /io/battery_voltage
             /io/gpio_read
             /io/gpio_write
@@ -66,15 +66,6 @@
   </node>
 
     <!--
-    -->
-   <node machine="search"
-       pkg="rosbag"
-       type="record"
-       name="search_record"
-       output="log"
-       args="--lz4 --split --size 2048
-             tf
-             tf_static
              /cameras/navigation/port/right/image_raw
              /cameras/navigation/port/right/camera_info
              /cameras/navigation/port/left/image_raw
@@ -95,9 +86,24 @@
              /cameras/search/center/camera_info
              /cameras/search/starboard/image_color
              /cameras/search/starboard/camera_info
-             /process/beacon_finder/beacon_pose
-             /process/sample_detection/named_point
-             /process/sample_detection/manipulator/named_point
+    -->
+   <node machine="search"
+       pkg="rosbag"
+       type="record"
+       name="search_record"
+       output="log"
+       args="--lz4 --split --size 2048
+             tf
+             tf_static
+             /processes/sample_detection/search/port/patch_array
+             /processes/sample_detection/search/center/patch_array
+             /processes/sample_detection/search/starboard/patch_array
+             /processes/sample_detection/search/named_point
+             /processes/sample_detection/search/filtered_point
+             /processes/beacon_finder/beacon_pose
+             /processes/sample_detection/manipulator/patch_array
+             /processes/sample_detection/manipulator/named_point
+             /processes/sample_detection/manipulator/filtered_point
              /io/audio/search_soundplay
              "
        >
