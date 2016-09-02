@@ -120,7 +120,7 @@
               <rosparam>
                   axis: [0.0, 0.0, 1.0]
                   distance_threshold: 0.1
-                  eps_angle: 0.17
+                  eps_angle: 0.35
                   max_iterations: 50
                   min_inliers: 500
                   model_type: 9
