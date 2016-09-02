@@ -11,10 +11,10 @@ from mpl_toolkits.mplot3d import Axes3D
 #fig = plt.figure()
 #ax = fig.add_subplot(111)
 
-def load():
+def load_lines(filename):
     lines = []
 
-    with open("histdata.csv") as csv:
+    with open(filename) as csv:
         for line in csv:
             try:
                 (label, imgname, mean_saturation, mean_high_saturation, mean_value, hue_fraction, dominant_hue,
@@ -24,12 +24,20 @@ def load():
             lines.append([label, imgname]+[float(x) for x in [mean_saturation,
                 mean_high_saturation, mean_value,
                 hue_fraction, dominant_hue, saturated_pixel, mean_l, mean_a, mean_b, sat_fraction]])
+    return lines
+
+def make_pd(lines):
     pd = {}
     pd = defaultdict(list)
     for line in lines:
         pd[line[0]].append(line[2:])
     for k in pd.keys():
         pd[k] = np.array(pd[k])
+    return pd
+
+def load(filename='histdata.csv'):
+    lines = load_lines(filename)
+    pd = make_pd(lines)
     return lines, pd
 
 lines, pd = load()
