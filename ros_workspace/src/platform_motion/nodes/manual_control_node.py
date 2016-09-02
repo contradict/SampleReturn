@@ -248,8 +248,7 @@ class ManualController(object):
                 grab_msg.wrist_angle = 0
                 if userdata.manipulator_sample is not None:
                     grab_msg.wrist_angle = userdata.manipulator_sample.grip_angle
-                    grab_msg.target_bin = userdata.manipulator_sample.sample_id
-                rospy.sleep(3.0)
+                rospy.sleep(2.0)
                 return grab_msg
 
             smach.StateMachine.add('MANIPULATOR_GRAB',
