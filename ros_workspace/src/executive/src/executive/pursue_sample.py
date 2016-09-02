@@ -249,8 +249,9 @@ class PursueSample(object):
 
             smach.StateMachine.add('SEARCH_LIGHTS_ON',
                                    PublishMessageState(self.light_pub),
-                                   transitions = {'next':'ENABLE_MANIPULATOR_DETECTOR'},
+                                   transitions = {'next':'ANNOUNCE_SUN_POINTING'},
                                    remapping = {'message':'true'})
+
 
             smach.StateMachine.add('ENABLE_MANIPULATOR_DETECTOR',
                                     smach_ros.ServiceState('enable_manipulator_detector',
@@ -259,21 +260,26 @@ class PursueSample(object):
                                      transitions = {'succeeded':'ENABLE_MANIPULATOR_PROJECTOR',
                                                     'aborted':'PUBLISH_FAILURE'})
 
+            @smach.cb_interface(input_keys=['detected_sample'],
+                                outcomes=['sample_detected'])
+            def enable_detector_cb(userdata, response):
+                timeout = rospy.Duration(2.0)
+                start = rospy.Time.now()
+                while (rospy.Time.now() - start) < timeout:
+                    rospy.sleep(0.1)
+                    if userdata.detected_sample is not None:
+                        if userdata.detected_sample.header.stamp > start:
+                            return 'sample_detected'
+                return 'succeeded'
+
             smach.StateMachine.add('ENABLE_MANIPULATOR_PROJECTOR',
                                     smach_ros.ServiceState('enable_manipulator_projector',
                                                             samplereturn_srv.Enable,
-                                                            request = samplereturn_srv.EnableRequest(True)),
-                                     transitions = {'succeeded':'MANIPULATOR_FINAL_MOVE',
+                                                            request = samplereturn_srv.EnableRequest(True),
+                                                            response_cb = enable_detector_cb),
+                                     transitions = {'sample_detected':'VISUAL_SERVO',
+                                                    'succeeded':'HANDLE_SEARCH',
                                                     'aborted':'PUBLISH_FAILURE'})
-
-            smach.StateMachine.add('MANIPULATOR_FINAL_MOVE',
-                                   ExecuteSimpleMove(self.simple_mover),
-                                   transitions = {'complete':'HANDLE_SEARCH',
-                                                  'object_detected':'VISUAL_SERVO',
-                                                  'aborted':'PUBLISH_FAILURE'},
-                                   remapping = {'simple_move':'final_move',
-                                                'detection_message':'detected_sample',
-                                                'stop_on_detection':'true'})
 
             smach.StateMachine.add('ANNOUNCE_SUN_POINTING',
                                    AnnounceState(self.announcer,
@@ -284,7 +290,7 @@ class PursueSample(object):
                                    smach_ros.SimpleActionState('sun_pointing',
                                    ComputeAngleAction,
                                    goal = ComputeAngleGoal(True)),
-                                   transitions = {'succeeded':'HANDLE_SEARCH',
+                                   transitions = {'succeeded':'ENABLE_MANIPULATOR_DETECTOR',
                                                   'preempted':'PUBLISH_FAILURE',
                                                   'aborted':'PUBLISH_FAILURE'})
 
@@ -536,7 +542,7 @@ class StartSamplePursuit(smach.State):
         userdata.action_result = result
         #default velocity for all moves is in simple_mover!
         #initial approach pursuit done at pursuit_velocity
-        userdata.lighting_optimized = False
+        userdata.lighting_optimized = True
         userdata.search_count = 0
         userdata.grab_count = 0
 
@@ -641,10 +647,19 @@ class CalculateManipulatorApproach(smach.State):
                 return 'point_lost' #sample disappeared, give up
 
         try:
-            yaw, distance = util.get_robot_strafe(self.tf_listener, userdata.target_sample)
+            point = userdata.target_sample
+            self.tf_listener.waitForTransform('manipulator_arm',
+                                             point.header.frame_id,
+                                             point.header.stamp,
+                                             rospy.Duration(2.0))
+            point_in_base = self.tf_listener.transformPoint('manipulator_arm',
+                                                            point).point
+            robot_origin = geometry_msg.Point(0,0,0)
+            yaw = util.pointing_yaw(robot_origin, point_in_base)        
+            distance = util.point_distance_2d(robot_origin, point_in_base)
             robot_yaw = util.get_current_robot_yaw(self.tf_listener, userdata.odometry_frame)
-        except tf.Exception:
-            rospy.logwarn("PURSUE_SAMPLE failed to get base_link -> %s transform in 1.0 seconds", sample_frame)
+        except tf.Exception, e:
+            rospy.logwarn("PURSUE_SAMPLE failed to get manipulator_arm -> %s transform in 1.0 seconds: %s", point.header.frame_id, e)
             return 'aborted'
         rospy.loginfo("MANIPULATOR_APPROACH calculated with distance: {:f}, yaw: {:f} ".format(distance, yaw))
         #if, for some bizarre reason, the sample is now in a way different spot, re-approach
@@ -655,7 +670,7 @@ class CalculateManipulatorApproach(smach.State):
         userdata.target_distance = distance
         #clear detected_sample prior to manipulator approach
         userdata.detected_sample = None
-        distance -= userdata.final_pursuit_step
+        #distance -= userdata.final_pursuit_step
         userdata.simple_move = SimpleMoveGoal(type=SimpleMoveGoal.STRAFE,
                                               angle = yaw,
                                               distance = distance,
