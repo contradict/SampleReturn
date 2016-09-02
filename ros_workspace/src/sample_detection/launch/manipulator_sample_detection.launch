@@ -98,7 +98,7 @@
         ns="/processes/sample_detection/manipulator">
         <remap from="camera_info" to="/cameras/manipulator/left/camera_info"/>
         <remap from="point" to="named_point"/>
-        <param name="max_dist" type="double" value="0.1"/>
+        <param name="max_dist" type="double" value="0.05"/>
         <param name="max_cov" type="double" value="0.4"/>
         <param name="max_pub_cov" type="double" value="0.05"/>
         <param name="max_pub_vel" type="double" value="0.02"/>
