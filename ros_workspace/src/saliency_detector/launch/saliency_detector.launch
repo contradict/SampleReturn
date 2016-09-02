@@ -52,7 +52,7 @@
     ns="/processes/sample_detection/search/$(arg namespace)">
     <remap from="/processes/sample_detection/search/$(arg namespace)/named_point"
       to="/processes/sample_detection/search/named_point"/>
-    <param name="model_file" type="string" value="$(find saliency_detector)/config/test_svm.yaml"/>
+    <param name="model_file" type="string" value="$(find saliency_detector)/config/patches_no_yellow.yaml"/>
     <param name="debug_font_scale" type="double" value="2.0"/>
   </node>
 
