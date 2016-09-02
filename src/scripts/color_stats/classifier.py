@@ -9,12 +9,15 @@ import matplotlib
 matplotlib.use("Qt4Agg")
 import matplotlib.pyplot as plt
 import itertools
-from plotit import load
+from plotit import load, make_pd
 from sklearn.svm import SVC
 from sklearn.cross_validation import train_test_split
 from sklearn.preprocessing import StandardScaler
+import cv2
 
 lines, pd = load()
+noyellow = filter(lambda x: not ('hue' in x[0] and 105<x[9]<125), lines)
+pd = make_pd(noyellow)
 print "Loaded"
 
 neg_keys = ['none','non','leaf']
