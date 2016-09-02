@@ -11,8 +11,12 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 PATH="/media/zlizer/External_Data/patches"
+#PATH="/media/russel/aa3337ec-f642-45a5-8709-202851d29f77/SampleReturn/data/color_stats/manipulator_patches"
 CSVNAME="alllabels.csv"
+#CSVNAME="/media/russel/aa3337ec-f642-45a5-8709-202851d29f77/SampleReturn/data/color_stats/manipulator_labels.csv"
 OUTNAME="histdata.csv"
+#OUTNAME="manipulator_histdata.csv"
+
 min_saturation=100.
 #min_saturation=100./255
 N=20
