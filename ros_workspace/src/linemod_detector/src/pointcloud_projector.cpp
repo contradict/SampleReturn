@@ -245,6 +245,12 @@ PointCloudProjector::synchronized_callback(const sensor_msgs::PointCloud2ConstPt
                     clipped->indices.begin());
         }
 
+        // bail if the clipped pointcloud is empty
+        if(clipped->indices.size() == 0)
+        {
+            continue;
+        }
+
         // publish clipped pointcloud if anybody is listening
         if(debug_points_out.getNumSubscribers()>0)
         {
