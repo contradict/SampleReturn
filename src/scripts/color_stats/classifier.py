@@ -18,6 +18,13 @@ import cv2
 lines, pd = load()
 noyellow = filter(lambda x: not ('hue' in x[0] and 105<x[9]<125), lines)
 pd = make_pd(noyellow)
+
+# manipulator
+if False:
+    lines, pd = load("manipulator_histdata.csv")
+    noyellow = filter(lambda x: not ('hue' in x[0] and 118<x[9]<128), lines)
+    pd = make_pd(noyellow)
+
 print "Loaded"
 
 neg_keys = ['none','non','leaf']
