@@ -118,12 +118,12 @@
               <remap from="~input" to="xlimit/output"/>
 
               <rosparam>
-                  axis: [0.0,0.0,1.0]
+                  axis: [0.0, 0.0, 1.0]
                   distance_threshold: 0.1
-                  eps_angle: 0.17
+                  eps_angle: 0.35
                   max_iterations: 50
                   min_inliers: 500
-                  model_type: 0
+                  model_type: 9
                   optimize_coefficients: true
                   probability: 0.99
                   radius_max: 0.05
