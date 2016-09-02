@@ -108,8 +108,8 @@ class BeaconReturn(smach.State):
                 self.announcer.say("Close to approach point in map.  Beacon not in view.  Search ing")
                 search_pose = deepcopy(current_pose)                
                 #try a random position nearby-ish, ignore facing
-                search_pose.pose.position.x += random.randrange(-50, 50, 15) 
-                search_pose.pose.position.y += random.randrange(-50, 50, 15)
+                search_pose.pose.position.x += random.randrange(-30, 30, 10) 
+                search_pose.pose.position.y += random.randrange(-30, 30, 10)
                 userdata.stop_on_detection = True
                 self.tried_spin = False
                 userdata.move_target = geometry_msg.PointStamped(search_pose.header,
