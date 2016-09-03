@@ -58,7 +58,7 @@
       ns="/processes/sample_detection/manipulator">
       <remap from="projected_patch_array" to="positioned_patches"/>
       <param name="model_file" type="string"
-        value="$(find saliency_detector)/config/manipulator_test_svm.yaml"/>
+        value="$(find saliency_detector)/config/manipulator_patches_no_yellow.yaml"/>
       <param name="debug_font_scale" type="double" value="0.5"/>
       <param name="compute_grip_angle" type="bool" value="true"/>
     </node>
