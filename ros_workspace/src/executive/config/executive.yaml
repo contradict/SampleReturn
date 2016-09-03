@@ -48,8 +48,8 @@ level_two:
 
     web_slices: [
         { start_angle: 355, end_angle: 15, min_radius: 33, max_radius: 44, return_on_end: True },
-        { start_angle: 80, end_angle: 60, min_radius: 35, max_radius: 45, return_on_end: True },
-        { start_angle: 109, end_angle: 121, min_radius: 58, max_radius: 70, return_on_end: True },
+        { start_angle: 80, end_angle: 60, min_radius: 34, max_radius: 44, return_on_end: True },
+        { start_angle: 110, end_angle: 120, min_radius: 58, max_radius: 70, return_on_end: False },
         { start_angle: 123, end_angle: 133, min_radius: 77, max_radius: 87, return_on_end: True },
         { start_angle: 126, end_angle: 146, min_radius: 37, max_radius: 47, return_on_end: True },
         { start_angle: 138, end_angle: 156, min_radius: 103, max_radius: 129, return_on_end: True },
