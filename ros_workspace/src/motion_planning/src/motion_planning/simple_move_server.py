@@ -15,7 +15,7 @@ from samplereturn_msgs.msg import (SimpleMoveGoal,
                                    SimpleMoveAction,
                                    SimpleMoveResult,
                                    SimpleMoveFeedback)
-from motion_planning.simple_motion import SimpleMover
+from motion_planning.simple_motion import SimpleMover, TimeoutException
 
 
 class SimpleMoveServer( object ):
@@ -42,28 +42,36 @@ class SimpleMoveServer( object ):
         velocity = None if (goal.velocity == 0) else goal.velocity
         acceleration = None if (goal.acceleration == 0) else goal.acceleration        
  
- 
-        if goal.type == SimpleMoveGoal.SPIN:
-            error = self._mover.execute_spin(goal.angle,
-                                             max_velocity = velocity,
-                                             acceleration = acceleration)
-            rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(goal.angle),
-                                                               np.degrees(error)))
-        elif goal.type == SimpleMoveGoal.STRAFE:
-            error = self._mover.execute_strafe(goal.angle,
-                                               goal.distance,
-                                               max_velocity = velocity,
-                                               acceleration = acceleration)
-            rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %(
-                           np.degrees(goal.angle),
-                           goal.distance,
-                           error))
-        else:
-            rospy.logwarn('SIMPLE MOVE SERVER received invalid type')
-            self._as.set_aborted(SimpleMoveResult(False, None))
 
-        rospy.logdebug("Successfully completed goal.")
-        self._as.set_succeeded(SimpleMoveResult(True, error))
+        try:
+            if goal.type == SimpleMoveGoal.SPIN:
+                error = self._mover.execute_spin(goal.angle,
+                                                 max_velocity = velocity,
+                                                 acceleration = acceleration)
+                rospy.loginfo("EXECUTED SPIN: %.1f, error %.3f" %( np.degrees(goal.angle),
+                                                                   np.degrees(error)))
+            elif goal.type == SimpleMoveGoal.STRAFE:
+                error = self._mover.execute_strafe(goal.angle,
+                                                   goal.distance,
+                                                   max_velocity = velocity,
+                                                   acceleration = acceleration)
+                rospy.loginfo("EXECUTED STRAFE angle: %.1f, distance: %.1f, error %.3f" %(
+                               np.degrees(goal.angle),
+                               goal.distance,
+                               error))
+            else:
+                rospy.logwarn('SIMPLE MOVE SERVER received invalid type')
+                self._as.set_aborted(SimpleMoveResult(False, None))
+        except TimeoutException:
+            rospy.logerr("Timeout during move execution, aborting")
+            self._as.set_succeeded(SimpleMoveResult(False, None))
+        except Exception, e:
+            rospy.logerr("Unexpected exception during simple move, aborting: ",
+                    e)
+            self._as.set_succeeded(SimpleMoveResult(False, None))
+        else:
+            rospy.logdebug("Successfully completed goal.")
+            self._as.set_succeeded(SimpleMoveResult(True, error))
                 
  
     def mover_stop_cb(self):
